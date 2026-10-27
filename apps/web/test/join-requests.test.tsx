@@ -224,14 +224,34 @@ describe("an invitation link asks to join", () => {
     expect(errorText(createI18n("en").t, new ApiError(400, "join.code_wrong", "x"))).toBe("Wrong code. Try again.");
   });
 
-  test("too many codes for an address is said under the email", async () => {
-    await openLink(LINK, { sendCodeError: new ApiError(429, "join.code_limit", "limit") });
+  test("too many codes for an address is said under the email, and Verify and Resend go off for it", async () => {
+    const limit = new ApiError(429, "join.code_limit", "limit");
+    const { state } = await openLink(LINK, { sendCodeError: limit });
     await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
     await click(button("Verificar"));
     await settle(4);
     expect(text()).toContain("Muitos códigos para este e-mail. Tente de novo mais tarde.");
     expect(codeField()).toBeNull();
     expect(slot()).toBe("verify");
+    expect(button("Verificar").hasAttribute("disabled")).toBe(true);
+
+    // Another address gets one. At its cap Resend goes off, and the code already sent stays good.
+    state.sendCodeError = undefined;
+    await type(screen().getByLabelText("Seu e-mail"), "bia@acme.com");
+    expect(button("Verificar").hasAttribute("disabled")).toBe(false);
+    await click(button("Verificar"));
+    await settle(4);
+    setSystemTime(new Date(Date.now() + 61_000));
+    await type(codeField() as HTMLInputElement, "1");
+    state.sendCodeError = limit;
+    await click(button("Reenviar"));
+    await settle(4);
+    expect(slot()).toBe("resend");
+    expect(button("Reenviar").hasAttribute("disabled")).toBe(true);
+    expect(state.calls.filter((c) => c.method === "invites.sendCode")).toHaveLength(3);
+    await type(codeField() as HTMLInputElement, "123456");
+    await settle(4);
+    expect(slot()).toBe("status:Verificado");
   });
 
   test("signed in with an email not confirmed: the account's address, read-only, with Verify", async () => {

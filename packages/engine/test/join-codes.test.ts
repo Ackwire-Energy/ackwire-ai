@@ -7,6 +7,7 @@ import {
   checkJoinCode,
   createJobHandlers,
   createOrganization,
+  deleteAccount,
   denyJoinRequest,
   drainOutbox,
   type EmailTemplate,
@@ -224,6 +225,39 @@ describe("the limits, all counted in the database", () => {
     });
   });
 
+  test("guesses at a code typed right count too, and that code keeps working", async () => {
+    const token = await start();
+    const right = await send(token, "felipe@example.com");
+    await check(token, "felipe@example.com", right);
+    const guess = (i: number) => String((Number(right) + i) % 1_000_000).padStart(6, "0");
+    for (let i = 1; i <= 10; i++)
+      await expect(check(token, "felipe@example.com", guess(i), at(MIN))).rejects.toMatchObject({
+        code: "join.code_wrong",
+      });
+    await expect(check(token, "felipe@example.com", guess(11), at(MIN))).rejects.toMatchObject({
+      code: "join.code_tries",
+    });
+    await expect(ask(token, { email: "felipe@example.com", code: guess(12) }, at(MIN))).rejects.toMatchObject({
+      code: "join.code_tries",
+    });
+    expect(await check(token, "felipe@example.com", right, at(2 * MIN))).toEqual({ verified: true });
+  });
+
+  test("a deleted workspace keeps its counts, so making and deleting workspaces resets no mailbox's cap", async () => {
+    const token = await start();
+    const mia = await person("u_mia", "mia@example.com", true);
+    for (const name of ["Um", "Dois", "Tres", "Quatro"]) {
+      const { organization } = await createOrganization(fx().db, mia.id, { name });
+      const { token: theirs } = await inviteLink(fx().db, SECRET, mia.id, organization.id, NOW);
+      for (let m = 0; m < 5; m++)
+        await sendJoinCode(deps(), PUBLIC, { token: theirs, user: null, email: "victim@example.com" }, at(m * MIN));
+    }
+    expect((await deleteAccount(fx().db, mia.id)).deletedOrgIds).toHaveLength(4);
+    await expect(send(token, "victim@example.com", at(10 * MIN))).rejects.toMatchObject({ code: "join.code_limit" });
+    await pruneJoinRequests(deps(), at(DAY + 10 * MIN));
+    expect(await fx().db.select().from(schema.organizationJoinCodeEvents)).toEqual([]);
+  });
+
   test("counts written before a restart, or by another server process, hold the same", async () => {
     const token = await start();
     const mailbox = sha256(mailboxOf("felipe@example.com"));
@@ -346,6 +380,31 @@ describe("approving a proven request", () => {
     expect(member?.role).toBe("member");
     expect((await approve("rui@example.com")).outcome).toBe("invited");
     expect((await approve("eva@example.com")).outcome).toBe("invited");
+  });
+
+  test("a request from before codes, asked by a confirmed account, still lets that account in", async () => {
+    await start();
+    const gil = await person("u_gil", "gil@example.com", true);
+    await fx()
+      .db.insert(schema.organizationJoinRequests)
+      .values({
+        orgId: fx().org.id,
+        userId: gil.id,
+        email: "gil@example.com",
+        name: "Gil Lima",
+        verifiedAt: null,
+        expiresAt: at(DAY),
+      });
+    const [row] = await listWaitingJoinRequests(fx().db, fx().owner.id, fx().org.id, NOW);
+    expect(row).toMatchObject({ email: "gil@example.com", verified: true, confirmed: true });
+    expect(await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, row?.id ?? "", "member", NOW)).toEqual({
+      outcome: "joined",
+    });
+    const [member] = await fx()
+      .db.select()
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, gil.id));
+    expect(member?.orgId).toBe(fx().org.id);
   });
 });
 

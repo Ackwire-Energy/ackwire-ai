@@ -19,7 +19,6 @@ CREATE TABLE "organization_join_codes" (
 );
 --> statement-breakpoint
 ALTER TABLE "organization_join_requests" ADD COLUMN "verified_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "organization_join_code_events" ADD CONSTRAINT "organization_join_code_events_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_join_codes" ADD CONSTRAINT "organization_join_codes_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "organization_join_code_events_mailbox_at_index" ON "organization_join_code_events" USING btree ("mailbox","at");--> statement-breakpoint
 CREATE INDEX "organization_join_code_events_at_index" ON "organization_join_code_events" USING btree ("at");

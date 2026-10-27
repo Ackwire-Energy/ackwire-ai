@@ -186,8 +186,9 @@ export function inviteRoutes(deps: AppDeps) {
       security,
       summary: "Approve a request to join with a role (admins)",
       description:
-        "A signed-in account with this address confirmed joins at once; anyone else gets an email invitation to " +
-        "the address. `emailed: false` on a server that doesn't send email: hand them `url` yourself.",
+        "A confirmed account with this address joins at once when the address was proven (a code from its " +
+        "mailbox, or that account asking). Anyone else gets an email invitation to the address. `emailed: false` " +
+        "on a server that doesn't send email: hand them `url` yourself.",
       request: { params: RequestParams, body: body(z.object({ role: z.enum(["member", "admin"]) })) },
       responses: {
         200: json(

@@ -666,7 +666,9 @@ MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage
 it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
 email from **Settings → Members and invitations**. A workspace's invitation link lets nobody in by
 itself, nor opens sign-up: whoever opens it asks to join, and an owner or admin approves each person.
-A signed-in account with that address confirmed joins at once; anyone else gets an email invitation
+With email set up, whoever asks first proves the address with a 6-digit code sent to it, unless
+they're signed in with that address confirmed. Approving lets in at once a confirmed account with
+that address when the code proved it or that account asked. Anyone else gets an email invitation
 (without email, the admin gets its link to send). Keep sign-up closed on an instance reachable from
 the internet. To keep the first account for its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex)
 of a one-time token (the setup doesn't make one yet); then only `<PUBLIC_URL>/owner#claim=<token>`
@@ -685,8 +687,8 @@ same for the desktop app that runs the server on its own computer.
 **Email.** Without `SMTP_URL` or `MILLIONSEND_API_KEY`, the app writes each email to its log instead
 of sending it (`docker compose logs agentes | grep 'email (not sent'`), so an invitation link can
 still be copied from there; email verification and password reset stay off. With either set, it
-sends invitations, email verification, password reset links, and budget and approval alerts.
-`MILLIONSEND_API_KEY` wins when both are set.
+sends invitations, codes for asking to join through a link, email verification, password reset
+links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are set.
 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
