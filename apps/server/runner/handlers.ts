@@ -23,7 +23,7 @@ import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn 
 import type { CodexAppServers } from "./brain-codex-app";
 import type { BrowserManager } from "./browser";
 import type { DesktopManager } from "./desktop";
-import type { DesktopSessions } from "./desktop-session";
+import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
@@ -38,10 +38,25 @@ import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
 
-export const MAX_CONCURRENT_REQUESTS = 8;
 /**
- * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
- * would otherwise keep people from watching or taking control. Short, and capped per agent on both sides.
+ * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
+ * (a 32 GB computer takes about 48 coding turns, each with a tool call in flight).
+ */
+export const MAX_IN_FLIGHT = 128;
+/**
+ * Where the memory isn't known (not Linux): brain turns at once, the count the runner always had. Background
+ * tasks keep their own count (`maxConcurrentTasks`): a mission item refused for room would sit in its queue,
+ * which moves when a task ends or the computer comes back, never when room frees.
+ */
+export const TURNS_WITHOUT_MEMORY = 8;
+/** What a coding CLI grows to once it runs (measured: about 0.6 GB). */
+export const TURN_BYTES = 0.6e9;
+/** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
+export const TURN_SETTLE_MS = 30_000;
+/**
+ * Never refused for room nor at the ceiling: a brain turn holds its request for the whole turn, so a computer
+ * full of agents' work would otherwise keep people from watching or taking control. Short, and capped per
+ * agent on both sides.
  */
 const PEOPLE_OPS: ReadonlySet<string> = new Set(["stream.open", "desktop.session.status", "desktop.session.stop"]);
 export const MAX_LIST_ENTRIES = 5000;
@@ -945,22 +960,51 @@ export interface RequestObserver {
   finished(id: string, req: MachineRequest, outcome: RequestOutcome): void;
 }
 
+/** Tests: what admission reads. */
+export interface Admission {
+  /** The memory available now (default: `/proc/meminfo`, as desktops read it; null: not known). */
+  memAvailable?: () => number | null;
+  now?: () => number;
+}
+
 /**
- * Runs the requests of one connection concurrently (at most 8), sends their
- * `result` frames, and aborts them on `cancel` or when the connection ends.
+ * Runs the requests of one connection concurrently, sends their `result`
+ * frames, and aborts them on `cancel` or when the connection ends. A brain turn
+ * that finds no room is refused `no_slot` (the server waits and asks again);
+ * past `MAX_IN_FLIGHT` anything but a person's view is refused `busy`.
  */
 export class RequestRunner {
   private readonly inflight = new Map<string, AbortController>();
   private closed = false;
+  /** Brain turns running now. */
+  private turns = 0;
+  /** When brain turns were admitted, over the last `TURN_SETTLE_MS`. */
+  private admitted: number[] = [];
 
   constructor(
     private readonly ctx: HandlerContext,
     private readonly send: (frame: RunnerFrame) => void,
     private readonly log: (line: string) => void = () => {},
     private readonly handler: typeof handleRequest = handleRequest,
-    private readonly maxConcurrent = MAX_CONCURRENT_REQUESTS,
+    private readonly admission: Admission = {},
     private readonly observer?: RequestObserver,
   ) {}
+
+  /**
+   * Room for one more brain turn: `MemAvailable`, less what the turns admitted in the last
+   * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
+   * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
+   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead.
+   */
+  private admit(): boolean {
+    const now = (this.admission.now ?? Date.now)();
+    this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
+    const free = (this.admission.memAvailable ?? hostMemAvailable)();
+    const room =
+      free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
+    if (room) this.admitted.push(now);
+    return room;
+  }
 
   get size() {
     return this.inflight.size;
@@ -973,10 +1017,18 @@ export class RequestRunner {
       this.reply(id, { ok: false, error: { code: "bad_request", message: "Duplicate request id" } });
       return Promise.resolve();
     }
-    if (this.inflight.size >= this.maxConcurrent && !PEOPLE_OPS.has(req.op)) {
+    if (this.inflight.size >= MAX_IN_FLIGHT && !PEOPLE_OPS.has(req.op)) {
       this.reply(id, { ok: false, error: { code: "internal", message: "busy" } });
       return Promise.resolve();
     }
+    const turn = req.op === "brain.turn";
+    // A paused computer says so (the handler refuses new work), never that it is full.
+    if (turn && !this.ctx.paused?.() && !this.admit()) {
+      const message = "This computer is short of memory for more work right now";
+      this.reply(id, { ok: false, error: { code: "no_slot", message } });
+      return Promise.resolve();
+    }
+    if (turn) this.turns++;
     const controller = new AbortController();
     this.inflight.set(id, controller);
     // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
@@ -1031,6 +1083,7 @@ export class RequestRunner {
       })
       .finally(() => {
         this.inflight.delete(id);
+        if (turn) this.turns--;
       });
   }
 

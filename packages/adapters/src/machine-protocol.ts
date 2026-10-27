@@ -1433,7 +1433,10 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
-  /** `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`). */
+  /**
+   * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
+   * has no room for one more turn (ADR 0025 §5, admission). Try again later.
+   */
   | "no_slot"
   /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
   | "paused"

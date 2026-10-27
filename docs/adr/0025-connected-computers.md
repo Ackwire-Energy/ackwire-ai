@@ -68,6 +68,16 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 - Commands on a connected computer may run up to an hour (`machineMaxTimeoutSeconds`; ours stay at 10 min): it costs us nothing and tools like Claude Code take minutes. `run_code` tells the agent to drive Claude Code with one session per conversation (`claude -p --session-id <thread id>` the first time, `--resume <thread id>` after), so it keeps context across turns; sessions are per folder, so each agent's are its own.
 - Commands run as the user that runs the runner, with `cwd` in the workspace. A shell command can reach anything that user can, so the install guide recommends a dedicated OS user. `--no-exec` turns commands off (files and uploads only); `run_code` then says so.
 - The runner never receives secrets from us. Whatever the machine already has (a Claude Code login, SSH keys) stays there and is used under the machine owner's responsibility.
+- **Admission** (added 2026-10-27). A brain turn starts only while the computer has room for one more: `MemAvailable` (`/proc/meminfo`, the reader desktops use), less 0.6 GB for each turn admitted in the last 30 s (a new CLI takes seconds to grow, so the reading doesn't show it yet), must leave 1.5 GiB free, the floor desktops and headed browsers keep (ADR 0065 §2). The floor is above the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen and browser), so the turn admitted last still fits whole. A turn without room is refused `no_slot` ("short of memory"), and the server waits for room (ADR 0032, "Busy computer"). Where the memory isn't known (macOS, Windows) at most 8 turns run at once. Every other request counts only toward a ceiling of 128 per connection (`busy` beyond it, never for a person's view of an agent: `stream.open`, `desktop.session.status`, `desktop.session.stop`), which bounds a flood; a turn's own tool calls never wait for room. Background tasks keep their own count (`maxConcurrentTasks`, 5a): a mission item refused for room would wait in its queue, which moves when a task ends or the computer comes back, never when room frees.
+  - This replaces 8 requests at once per connection, from the runner's first version (people's own computers, quick commands). A brain turn held its request for the whole turn, so 8 turns filled a computer of any size, and their own tool calls were refused. Now a bigger computer takes more turns at once; with nothing else running (its base about 0.9 GB):
+
+    | Computer | Coding turns at once (0.6 GB each) | Computer-use agents at once (1.4 GB each) |
+    | --- | --- | --- |
+    | 8 GB | about 9 | about 4 |
+    | 16 GB | about 22 | about 10 |
+    | 32 GB | about 48 | about 21 |
+
+  - No protocol change: the Claude Code brain of older servers already read `no_slot` on a turn as `busy`, and newer servers read an older runner's `busy` the same way.
 
 **Across replicas.** The replica holding the socket executes requests. Another replica writes the request to `machine_rpc` and signals the holder through pub/sub; the reply comes back the same way (Postgres `NOTIFY` payloads are too small for file bodies). Live output streaming works only on the replica holding the socket; elsewhere the command reports its output at the end.
 
