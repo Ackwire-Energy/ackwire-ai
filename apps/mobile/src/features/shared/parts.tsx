@@ -6,6 +6,7 @@ import {
   Card,
   coverBarOptions,
   fonts,
+  HeaderCapsule,
   HeaderSlot,
   type HeaderSlotStore,
   haptics,
@@ -103,7 +104,8 @@ export function ActionList({ items }: { items: ActionItem[] }) {
  * itself; it sets the screen's header options, so screens keep calling it where the bar used to be.
  * The bar is opaque by default (`solid`, content lays out below it); `solid={false}` makes content scroll
  * under it (glass on iOS 26, blur before; the screen's scroll view needs
- * `contentInsetAdjustmentBehavior="automatic"`); `plate` puts a clear bar over a full-bleed cover.
+ * `contentInsetAdjustmentBehavior="automatic"`); `plate` puts a clear bar over a full-bleed cover. On Android
+ * the right actions float in a `HeaderCapsule` and the back button is a round plate (`usePushedOptions`).
  */
 export function PushedHeader({
   title,
@@ -135,7 +137,9 @@ export function PushedHeader({
       headerRight: hasRight
         ? () => (
             <View style={styles.headerRight}>
-              <HeaderSlot slot={rightNode} />
+              <HeaderCapsule>
+                <HeaderSlot slot={rightNode} />
+              </HeaderCapsule>
             </View>
           )
         : undefined,

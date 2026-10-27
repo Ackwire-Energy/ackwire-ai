@@ -1167,11 +1167,18 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     setComposerHeight(e.nativeEvent.layout.height);
   };
   const bottomPad = Math.max(insets.bottom, 10);
-  // iOS draws the header over the conversation (glass on iOS 26, a blur before); Android keeps it opaque.
+  // The header floats over the conversation (glass on iOS 26, a blur before; round plates on Android), which
+  // fades under it.
   const headerHeight = useHeaderHeight();
-  const barOver = Platform.OS === "ios";
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
+  // Android has no automatic inset under the clear bar: the conversation starts below it by padding (the
+  // pinned card, when there is one, already holds that room).
+  const hasPin = pinned !== null;
+  const listPad = useMemo(
+    () => (Platform.OS === "android" && !hasPin ? [styles.listPad, { paddingTop: headerHeight + 8 }] : styles.listPad),
+    [hasPin, headerHeight],
+  );
 
   // Whether the person is near the end (what the list follows): the "new messages" button shows otherwise.
   useEffect(() => {
@@ -1188,10 +1195,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
           system's scroll edge never makes one look different from another. */}
-      <PushedHeader title={pill ?? title} plate={barOver} solid={false} right={right} />
+      <PushedHeader title={pill ?? title} plate solid={false} right={right} />
       {pinned ? (
-        // The bar is see-through on iOS (the conversation runs under it): the pinned card starts below it.
-        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: barOver ? headerHeight : 0 }]}>
+        // The bar is see-through (the conversation runs under it): the pinned card starts below it.
+        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: headerHeight }]}>
           <MissionCardView mission={pinned} pinned />
         </View>
       ) : null}
@@ -1244,7 +1251,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyboardShouldPersistTaps="handled"
             keyboardOffset={lift}
             contentInsetEndAdjustment={contentInsetEndAdjustment}
-            contentContainerStyle={styles.listPad}
+            contentContainerStyle={listPad}
           />
         )}
         <KeyboardStickyView
@@ -1260,8 +1267,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             )
           ) : null}
         </KeyboardStickyView>
-        {barOver && !pinned ? (
-          // The conversation fades under the glass header, as it does under the box.
+        {!pinned ? (
+          // The conversation fades under the floating header, as it does under the box.
           <LinearGradient
             pointerEvents="none"
             colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}

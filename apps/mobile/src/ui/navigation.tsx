@@ -3,12 +3,14 @@ import {
   DefaultTheme,
   type NativeStackNavigationOptions,
   type Theme as NavigationTheme,
+  router,
   Stack,
 } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
+import { IconButton } from "./IconButton";
 import { sheetColors } from "./palette";
 import { useTheme } from "./theme";
 
@@ -169,7 +171,8 @@ export function CoverTabStack({ title }: { title: string }) {
 /**
  * A pushed screen (conversation, mission, agent, delete account): native bar, back chevron only, the
  * edge swipe back, the platform's push animation. Opaque by default (lists and composers lay out below
- * it); `PushedHeader` switches a screen to a bar its content scrolls under.
+ * it); `PushedHeader` switches a screen to a bar its content scrolls under. On Android the back button is a
+ * round plate floating like iOS 26's glass one (the toolbar's own arrow sat bare on the bar).
  */
 export function usePushedOptions(): NativeStackNavigationOptions {
   const { colors } = useTheme();
@@ -190,9 +193,25 @@ export function usePushedOptions(): NativeStackNavigationOptions {
       headerTintColor: colors.ink,
       gestureEnabled: true,
       contentStyle: { backgroundColor: colors.bg },
+      ...plateBack(backTitle),
     }),
     [colors, backTitle],
   );
+}
+
+/** Android's back button: a round plate (the toolbar's own arrow hidden); iOS keeps the system's. */
+function plateBack(label: string): NativeStackNavigationOptions {
+  if (Platform.OS !== "android") return {};
+  return {
+    headerBackVisible: false,
+    headerLeft: ({ canGoBack }) => (canGoBack ? <IconButton icon="back" label={label} plate onPress={back} /> : null),
+  };
+}
+
+/** Back, or home when the screen was opened by a link with nothing under it. */
+function back() {
+  if (router.canGoBack()) router.back();
+  else router.replace("/");
 }
 
 /** The bar of a pushed screen whose content scrolls under it (needs `contentInsetAdjustmentBehavior="automatic"`). */

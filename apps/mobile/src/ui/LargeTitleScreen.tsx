@@ -42,8 +42,9 @@ export interface LargeTitleScreenProps {
  * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's). We draw it
  * rather than using the native large title: on iOS 26 inside the system tabs the native one stayed
  * expanded while the list scrolled under it. The bar is clear over the large title and
- * turns into the system glass (iOS 26 scroll edge; a blur before; opaque on Android) once content passes
- * under it. Agents inside stop moving while the screen is not showing.
+ * turns into the system glass (iOS 26 scroll edge; a blur before; on Android a fade into the screen's color
+ * under the floating buttons) once content passes under it. Agents inside stop moving while the screen is not
+ * showing.
  */
 export function LargeTitleScreen({
   title,
@@ -99,7 +100,8 @@ export function LargeTitleScreen({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
-          <View style={backdrop && IOS ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
+          {/* The art reaches up behind the clear bar and the status bar on both platforms (no band above it). */}
+          <View style={backdrop ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
             {backdrop ? <View style={StyleSheet.absoluteFill}>{backdrop}</View> : null}
             <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
               <Text variant="display" accessibilityRole="header" numberOfLines={1}>
@@ -116,7 +118,7 @@ export function LargeTitleScreen({
           {children}
         </Animated.ScrollView>
       </LivePause>
-      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
+      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} tone={grouped ? colors.grouped : colors.bg} />
     </View>
   );
 }

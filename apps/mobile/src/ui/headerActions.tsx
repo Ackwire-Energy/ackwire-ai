@@ -2,9 +2,10 @@ import type { NativeStackNavigationOptions } from "expo-router";
 import type { SFSymbolIcon } from "expo-router/native-tabs";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import { IconButton } from "./IconButton";
+import { IconButton, usePlateEdge } from "./IconButton";
 import type { IconName } from "./icons.data";
 import { HeaderSlot, useHeaderSlot } from "./navigation";
+import { useTheme } from "./theme";
 
 /** An SF Symbol name (the bar buttons on iOS). */
 export type SFSymbolName = Extract<NonNullable<SFSymbolIcon["sf"]>, string>;
@@ -25,7 +26,8 @@ const IOS = Platform.OS === "ios";
  * Header options for a screen's actions. On iOS the right actions are native `UIBarButtonItem`s
  * (`unstable_headerRightItems`): UIKit places, sizes and groups them in the bar, where a React view in
  * `headerRight` could be laid out in the wrong place on iOS 26. `left` is a custom element (the avatar on
- * Início), shown without the shared glass behind it. On Android both are React views in the bar.
+ * Início), shown without the shared glass behind it. On Android both are React views in the bar, the right ones
+ * in a `HeaderCapsule` (the floating plate iOS 26 puts them in).
  * The options only change when the actions' icons or labels change; presses always reach the latest
  * handlers.
  */
@@ -81,11 +83,11 @@ export function useHeaderActionOptions({
     } else {
       options.headerRight = actions.length
         ? () => (
-            <View style={styles.row}>
+            <HeaderCapsule>
               {actions.map((a, i) => (
                 <IconButton key={`${a.icon}:${a.label}`} icon={a.icon} label={a.label} onPress={press(i)} />
               ))}
-            </View>
+            </HeaderCapsule>
           )
         : undefined;
       options.headerLeft = hasLeft ? () => <HeaderSlot slot={leftSlot} /> : undefined;
@@ -94,6 +96,19 @@ export function useHeaderActionOptions({
   }, [signature, hasLeft, leftSlot]);
 }
 
+/**
+ * Buttons of a bar floating over the content (Android): one opaque plate with round ends around them, like the
+ * glass capsule iOS 26 draws around a bar's buttons; one button makes a circle. Nothing of its own on iOS,
+ * where the system draws the capsule.
+ */
+export function HeaderCapsule({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  const edge = usePlateEdge();
+  if (IOS) return <>{children}</>;
+  return <View style={[styles.row, styles.capsule, { backgroundColor: colors.glassSolid }, edge]}>{children}</View>;
+}
+
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 4 },
+  capsule: { gap: 0, borderRadius: 20 },
 });

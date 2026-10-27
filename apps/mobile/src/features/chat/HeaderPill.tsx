@@ -1,6 +1,6 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Glass, PressScale, Text, useTheme } from "@/ui";
@@ -36,7 +36,7 @@ export function HeaderPill({
   /** Bar buttons beside "…" (an agent's computer): the centered pill gives up twice their 40 points each. */
   extraActions?: number;
 }) {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
   return (
     <PressScale
@@ -45,7 +45,12 @@ export function HeaderPill({
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : "header"}
       accessibilityLabel={label}
-      style={[styles.press, { maxWidth: Math.max(160, width - 136 - extraActions * 80) }]}
+      style={[
+        styles.press,
+        { maxWidth: Math.max(160, width - 136 - extraActions * 80) },
+        // Android's pill is opaque: a short shadow floats it over the conversation, as the glass does on iOS.
+        Platform.OS === "android" && { borderRadius: 22, boxShadow: shadows.e1 },
+      ]}
     >
       {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
       <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
