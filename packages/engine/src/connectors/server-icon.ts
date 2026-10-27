@@ -201,12 +201,16 @@ export function readIcon(bytes: Uint8Array, declared?: string): { body: Uint8Arr
 
 const ICON_FILE = /^[0-9a-f]{16}\.(jpg|png|webp)$/;
 const ICON_PATH = /^\/api\/app\/connector-icons\/[^/]+\/[^/]+\/([0-9a-f]{16}\.(jpg|png|webp))$/;
+/**
+ * Under the org's own prefix, so every platform store takes it: S3, a folder
+ * (`FILES_DIR`) or Postgres, whose row then carries the org and goes with it.
+ */
 const blobKey = (orgId: string, connectionId: string, file: string) =>
-  `connector-icons/${orgId}/${connectionId}/${file}`;
+  `orgs/${orgId}/connector-icons/${connectionId}/${file}`;
 
 /**
  * Keeps a custom server's own icon (`serverInfo.icons` from `initialize`)
- * after each listing. Stored in the platform bucket, named by a hash of its
+ * after each listing. Stored in the platform store, named by a hash of its
  * content, and served to the org's members by
  * `GET /api/app/connector-icons/{orgId}/{connectionId}/{file}`, so no
  * browser ever loads it from the server. A server that stops listing icons

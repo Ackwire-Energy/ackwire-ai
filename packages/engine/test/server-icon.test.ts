@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createMemoryBlobStore } from "@agenteschat/adapters";
+import { createPostgresBlobStore } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -103,7 +103,8 @@ function iconMcp(icons: McpIcon[]) {
 describe("a custom server's own icon", () => {
   test("kept on connect, served to members only, replaced, and dropped when the server stops listing one", async () => {
     f = await setup();
-    const blobs = createMemoryBlobStore();
+    // Postgres: the store a self-hosted server without a bucket or a files folder uses (it refuses unknown keys).
+    const blobs = createPostgresBlobStore(f.db);
     const fetched: { url: string; init?: RequestInit }[] = [];
     const http = (async (input: string | URL, init?: RequestInit) => {
       fetched.push({ url: String(input), init });
@@ -159,7 +160,7 @@ describe("a custom server's own icon", () => {
     mcp.state.icons = [{ src: `data:image/png;base64,${b64(pngSized(48, 48))}` }];
     const inline = await refreshCustomServer(deps, f.owner.id, f.org.id, id);
     expect(inline.iconUrl).not.toBe(iconUrl);
-    expect(await blobs.list(`connector-icons/${f.org.id}/${id}/`)).toHaveLength(1);
+    expect(await blobs.list(`orgs/${f.org.id}/connector-icons/${id}/`)).toHaveLength(1);
 
     // Every icon failing keeps the last good one (the failure may pass).
     mcp.state.icons = [{ src: "https://tickets.example.com/gone.png" }];
@@ -168,7 +169,7 @@ describe("a custom server's own icon", () => {
     // No icons listed: back to the monogram.
     mcp.state.icons = [];
     expect((await refreshCustomServer(deps, f.owner.id, f.org.id, id)).iconUrl).toBeNull();
-    expect(await blobs.list(`connector-icons/${f.org.id}/${id}/`)).toEqual([]);
+    expect(await blobs.list(`orgs/${f.org.id}/connector-icons/${id}/`)).toEqual([]);
     const [row] = await f.db.select().from(schema.connectorConnections);
     expect(row?.icon).toBeNull();
   });

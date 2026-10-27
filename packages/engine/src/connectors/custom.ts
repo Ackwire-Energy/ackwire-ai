@@ -111,7 +111,7 @@ export interface CustomDeps extends McpOAuthDeps {
   connect?: McpConnect;
   /** Suggests a level for tools whose name doesn't say (none: they suggest approval). */
   judge?: Judge;
-  /** Where servers' icons are kept (the platform bucket); none: no icons. */
+  /** Where servers' icons are kept (the platform store); none: no icons. */
   blobs?: BlobStore;
 }
 
