@@ -114,6 +114,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
             }),
+            billingUrl: z.string().nullable().openapi({
+              description:
+                "The billing service (BILLING_URL, ADR 0071): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
+            }),
           }),
         ),
       },
@@ -130,6 +134,7 @@ export function accountRoutes(deps: AppDeps) {
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
+          billingUrl: config.BILLING_URL ?? null,
         },
         200,
       );
@@ -566,6 +571,8 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create an organization (you become its owner)",
+      description:
+        "403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan. With BILLING_HOLD_NEW_WORKSPACES it starts on that hold (ADR 0071).",
       request: {
         body: body(
           z.object({
@@ -583,7 +590,9 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
-      const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      const { organization, general } = await createOrganization(db, c.get("user").id, input, {
+        holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
+      });
       if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {
         await updateOrgSettings(db, c.get("user").id, organization.id, {

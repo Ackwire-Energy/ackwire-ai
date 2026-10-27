@@ -48,6 +48,10 @@ const Notification = z
       quote: z.string().optional(),
       statusFrom: z.string().optional(),
       statusTo: z.string().optional(),
+      billingHold: z.string().optional().openapi({
+        description:
+          "`org_standing`: the billing hold put on (`payment`, `unpaid`, `ended`), said in the person's words.",
+      }),
       steps: z
         .object({ done: z.number().int(), total: z.number().int(), failedAt: z.number().int().optional() })
         .optional(),

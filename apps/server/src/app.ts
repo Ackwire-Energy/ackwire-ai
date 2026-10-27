@@ -14,6 +14,7 @@ import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { artifactRoutes } from "./routes/app/artifacts";
+import { billingRoutes } from "./routes/app/billing";
 import { browserRoutes } from "./routes/app/browser";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
@@ -141,6 +142,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", secretRoutes(deps));
     api.route("/app", inviteRoutes(deps));
     api.route("/app", storageRoutes(deps));
+    api.route("/app", billingRoutes(deps));
     api.route("/app", artifactRoutes(deps));
     api.route("/app", issueRoutes(deps));
     api.route("/app", forumRoutes(deps));
