@@ -1,14 +1,16 @@
 /*
  * agentes for Mac (ADR 0036): the site in the app's window. `html[data-desktop]` is set
  * by main.tsx when the app loaded it. The window has no title bar of its own: its three buttons float over
- * the top-left corner (main_window.rs puts them in the middle of these 40px).
+ * the top-left corner (main_window.rs asks for them in the middle of these 40px).
  */
 :root {
   /*
-   * The app sets --app-zoom with ⌘+/⌘− (main_window.rs `fit_page`): the bar stays 40pt and the room for the
-   * window's buttons stays theirs, which don't zoom.
+   * The app sets --app-zoom with ⌘+/⌘− (main_window.rs `fit_page`): the bar keeps its points and the room for
+   * the window's buttons stays theirs, which don't zoom. It also sets --titlebar-middle, where the buttons'
+   * row really is: macOS 26 places them itself (higher than asked), so the bar is twice that tall and what is
+   * in it lines up with them; 40pt where the buttons go where asked, and on Windows and Linux.
    */
-  --titlebar-h: calc(40px / var(--app-zoom, 1));
+  --titlebar-h: calc(max(32px, 2 * var(--titlebar-middle, 20px)) / var(--app-zoom, 1));
   /* The window's close, minimize and zoom buttons. */
   --titlebar-lights: calc(78px / var(--app-zoom, 1));
 }

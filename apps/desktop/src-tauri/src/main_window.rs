@@ -297,19 +297,58 @@ fn window_title(title: &str) -> &str {
     }
 }
 
-/// Tells the page the zoom (`--app-zoom`: its title bar stays 40pt and level with the window's buttons) and
-/// whether the window is full screen (no room kept for the buttons then).
+/// Tells the page the zoom (`--app-zoom`: its title bar keeps its points and stays level with the window's
+/// buttons), where the buttons' row really is (`--titlebar-middle`, on a Mac) and whether the window is full
+/// screen (no room kept for the buttons then). AppKit is read on the main thread.
 pub fn fit_page(app: &AppHandle) {
-    let Some(page) = app.get_webview(LABEL) else { return };
-    let zoom = crate::menus::current_zoom(app);
-    let full = app
-        .get_window(LABEL)
-        .and_then(|w| w.is_fullscreen().ok())
-        .unwrap_or(false);
-    let _ = page.eval(format!(
-        "document.documentElement.style.setProperty('--app-zoom','{zoom}');\
-         document.documentElement.toggleAttribute('data-fullscreen',{full});"
-    ));
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(page) = handle.get_webview(LABEL) else { return };
+        let zoom = crate::menus::current_zoom(&handle);
+        let window = handle.get_window(LABEL);
+        let full = window.as_ref().and_then(|w| w.is_fullscreen().ok()).unwrap_or(false);
+        #[cfg(target_os = "macos")]
+        let middle = window.as_ref().and_then(lights_middle);
+        #[cfg(not(target_os = "macos"))]
+        let middle: Option<f64> = None;
+        let middle = middle
+            .map(|m| format!("document.documentElement.style.setProperty('--titlebar-middle','{m:.2}px');"))
+            .unwrap_or_default();
+        let _ = page.eval(format!(
+            "document.documentElement.style.setProperty('--app-zoom','{zoom}');\
+             document.documentElement.toggleAttribute('data-fullscreen',{full});{middle}"
+        ));
+    });
+}
+
+/// The middle of the window's close, minimize and zoom buttons, in points from the window's top. macOS 26
+/// places them itself and ignores `traffic_light_position` (on macOS 27 their middle is at ~15pt, not the
+/// 20pt asked for), so the site's title bar follows where they are (desktop.css `--titlebar-middle`).
+#[cfg(target_os = "macos")]
+fn lights_middle(window: &tauri::Window) -> Option<f64> {
+    use crate::notch::native::CGRect;
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let ns = window.ns_window().ok()? as *mut AnyObject;
+    if ns.is_null() {
+        return None;
+    }
+    // SAFETY: `ns` is this window's live NSWindow, read on the main thread; NSWindowCloseButton is 0.
+    unsafe {
+        let close: *mut AnyObject = msg_send![ns, standardWindowButton: 0usize];
+        let content: *mut AnyObject = msg_send![ns, contentView];
+        if close.is_null() || content.is_null() {
+            return None;
+        }
+        let bounds: CGRect = msg_send![close, bounds];
+        let nil: *mut AnyObject = std::ptr::null_mut();
+        // In the window's coordinates (origin at its bottom left); the content view fills the window.
+        let button: CGRect = msg_send![close, convertRect: bounds, toView: nil];
+        let frame: CGRect = msg_send![content, frame];
+        let middle = frame.size.height - (button.origin.y + button.size.height / 2.0);
+        (middle > 4.0 && middle < 40.0).then_some(middle)
+    }
 }
 
 /// Downloads land in ~/Downloads under their own name, never over an existing file.

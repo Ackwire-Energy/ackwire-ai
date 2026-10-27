@@ -632,11 +632,12 @@ p {
   font-size: 11px;
   color: var(--ink-muted);
 }
+/* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background: var(--surface-sunken);
+  background: var(--line2);
   overflow: hidden;
 }
 .sidebar__usage-bar {
@@ -2854,11 +2855,11 @@ p {
   padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
-/* The person's face as big as the workspace's mark above (28px), beside the same two lines. */
+/* The person's face about as tall as its two lines (32px). */
 .sidebar__me > .sidebar__user > .ac-avatar {
-  width: 28px;
-  height: 28px;
-  font-size: 12px;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
