@@ -3,9 +3,11 @@ import { QueryClient } from "@tanstack/react-query";
 import { keys } from "../src/api/keys";
 import {
   allowFolderCommand,
+  allowsInApp,
   commandInReason,
   computerKind,
   computerState,
+  desktopTargetOf,
   downloadHref,
   folderName,
   foldersOfAgent,
@@ -14,7 +16,10 @@ import {
   isPaused,
   locationText,
   normalizeUserCode,
+  platformOf,
   shellQuote,
+  toolOffReason,
+  toolOnCommand,
 } from "../src/lib/machines";
 import { accessOf, applyComputerEvent, applyMachineEvent, pauseOf } from "../src/realtime/machines";
 
@@ -91,6 +96,39 @@ describe("connected computers helpers (ADR 0036)", () => {
     );
     expect(downloadHref("https://cdn.example/a.dmg", "https://agentes.chat")).toBe("https://cdn.example/a.dmg");
     expect(locationText({ city: "Curitiba", region: null, country: "Brasil" })).toBe("Curitiba, Brasil");
+  });
+
+  test("the app to download follows the visitor's system: one build for both Mac chips, x64 elsewhere", () => {
+    const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15";
+    const windows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
+    const linux = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0";
+    expect([mac, windows, linux].map(platformOf)).toEqual(["mac", "windows", "linux"]);
+    expect(desktopTargetOf("mac")).toEqual({ target: "darwin", arch: "aarch64" });
+    expect(desktopTargetOf("windows")).toEqual({ target: "windows", arch: "x86_64" });
+    expect(desktopTargetOf("linux")).toEqual({ target: "linux", arch: "x86_64" });
+  });
+
+  test("a tool turned off: the app's Preferences on a Mac or a PC, the command too elsewhere (sudo in system mode)", () => {
+    expect(toolOnCommand({ mode: "single" }, "browser")).toBe("agentes-runner tools enable browser");
+    expect(toolOnCommand({ mode: "system" }, "desktop")).toBe("sudo agentes-runner tools enable desktop");
+    expect([allowsInApp("darwin"), allowsInApp("windows"), allowsInApp("linux"), allowsInApp("other")]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect(toolOffReason({ os: "darwin", mode: "single" }, "claude_code")).toEqual({
+      key: "brain.reasons.tool_off",
+      command: "",
+    });
+    expect(toolOffReason({ os: "windows", mode: "single" }, "codex").key).toBe("brain.reasons.tool_off");
+    expect(toolOffReason({ os: "linux", mode: "system" }, "claude_code")).toEqual({
+      key: "brain.reasons.tool_offLinux",
+      command: "sudo agentes-runner tools enable claude",
+    });
+    expect(toolOffReason({ os: "linux", mode: "single" }, "codex").command).toBe("agentes-runner tools enable codex");
+    // Not known yet: the app's line, as before.
+    expect(toolOffReason(undefined, "codex").key).toBe("brain.reasons.tool_off");
   });
 
   test("portraits: the kind from the machine's os, the state with pause over online", () => {

@@ -38,6 +38,8 @@ export function InvitePage({ token }: { token: string }) {
   const navigate = useNavigate();
   const me = useMe();
   const preview = useQuery(invitationQuery(api, token));
+  // Strictly false: an older server says nothing and keeps the button.
+  const emails = useAuthConfig().data?.passwordReset !== false;
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -192,19 +194,25 @@ export function InvitePage({ token }: { token: string }) {
           <>
             <div className="stack-4" style={{ gap: 8 }}>
               <h1 className="page-title page-title--sm">{t("invite.expiredTitle")}</h1>
-              <p className="page-sub">{t("invite.expiredText")}</p>
+              <p className="page-sub">
+                {t("invite.expiredText")}
+                {!emails && ` ${t("invite.ask.closedText")}`}
+              </p>
             </div>
-            <Button
-              variant="primary"
-              block
-              disabled={asked}
-              onClick={async () => {
-                await api.invites.requestNew(token);
-                setAsked(true);
-              }}
-            >
-              {asked ? t("invite.askedNew") : t("invite.askNew")}
-            </Button>
+            {/* Asking is an email to whoever invited: a server that sends none would never deliver it. */}
+            {emails && (
+              <Button
+                variant="primary"
+                block
+                disabled={asked}
+                onClick={async () => {
+                  await api.invites.requestNew(token);
+                  setAsked(true);
+                }}
+              >
+                {asked ? t("invite.askedNew") : t("invite.askNew")}
+              </Button>
+            )}
           </>
         )}
       </Card>

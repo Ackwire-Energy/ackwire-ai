@@ -186,6 +186,29 @@ describe("Quem pensa (its dialog)", () => {
     expect(codex.querySelector(".ac-brand--off")).not.toBeNull();
     expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
   });
+
+  test("a tool turned off says where it turns on: the app on a Mac, the app or the command on Linux", async () => {
+    const reason = async (os: string, name: string) => {
+      cleanup();
+      const state = seedState();
+      const api = createFakeApi(state);
+      fakeMachinesOf.get(api)?.pair({ id: "machine_1", name, os, mode: "system" });
+      const computer = { machineId: "machine_1", name, online: true };
+      const base = fakeAgentBrain(ADA_ID, { computer });
+      const options = base.options.map((o) =>
+        o.kind === "claude_code" ? { ...o, available: false, reason: "tool_off" as const } : o,
+      );
+      api.agents.brain = async () => ({ ...base, options, machines: [{ ...computer, options }] });
+      await open(state, api);
+      return card(await brainDialog(), /^Claude Code/).textContent;
+    };
+    expect(await reason("darwin", "MacBook")).toContain(
+      "Desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+    );
+    expect(await reason("linux", "Servidor")).toContain(
+      "Desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable claude.",
+    );
+  });
 });
 
 describe("Quem pensa: the account on the computer and the effort (ADR 0041)", () => {
@@ -604,12 +627,37 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     expect(d.textContent).toContain("A Ada passa para o MacBook, que tem navegador.");
-    expect(d.textContent).toContain("Falta 1 passo, no próprio MacBook");
+    const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio MacBook" });
+    // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
+    expect(steps.textContent).toContain("Clique no ícone do agentes.chat perto do relógio");
+    expect(steps.querySelector(".machine-command__code")).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, "machine_1"]);
     expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
     expect(document.body.textContent).toContain("Falta 1 passo no MacBook.");
+  });
+
+  test("on a Linux computer, maybe a server without the app, the step there is the command too", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({
+      id: "machine_1",
+      name: "Servidor",
+      os: "linux",
+      mode: "system",
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: false } },
+      browser: { available: false, version: null, chrome: null, reason: null },
+    });
+    await open(state, api);
+    const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
+    await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
+    const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio Servidor" });
+    expect(steps.textContent).toContain(
+      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.Sem o app? No terminal do computador:",
+    );
+    expect(steps.querySelector(".machine-command__code")?.textContent).toBe("sudo agentes-runner tools enable browser");
+    expect(steps.querySelector(".brw-steps__grid")).toBeNull();
   });
 });
 

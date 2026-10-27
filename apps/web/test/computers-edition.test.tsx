@@ -59,7 +59,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
       "Sandboxes da Daytona",
     ])
       expect(region(name)).toBeNull();
-    expect(screen().queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
+    expect(screen().queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
     // The page on how people's own computers work is self-host's alone.
     expect(screen().queryByRole("link", { name: "Como os computadores funcionam" })).toBeNull();
     // Drawn as a server, never as the cloud.

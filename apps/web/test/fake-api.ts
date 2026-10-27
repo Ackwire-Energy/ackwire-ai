@@ -40,6 +40,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SignInOptions,
+  StoragePlatform,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -189,6 +190,8 @@ export interface FakeState {
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
   jev?: JevKey;
+  /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
+  storagePlatform?: StoragePlatform;
   /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
@@ -1972,7 +1975,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
       },
     },
-    storage: createMockStorage(),
+    storage: createMockStorage(() => state.storagePlatform),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,

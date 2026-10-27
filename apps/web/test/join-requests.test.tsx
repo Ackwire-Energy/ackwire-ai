@@ -11,6 +11,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
+import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -534,6 +535,36 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
   const headline = notice.querySelector(".nt-meta b");
   expect(headline?.textContent).toBe(name);
   expect(headline?.children.length).toBe(0);
+});
+
+describe("Members › Invite people", () => {
+  test("says no agent answers someone invited now, as the Team step does, while every agent with an AI is only yours", async () => {
+    const note = async (audience: "owner" | "everyone") => {
+      cleanup();
+      const state = seedState({ joinRequests: [] });
+      for (const a of state.agents) {
+        a.ownerUserId = state.me?.user.id ?? null;
+        a.audience = { mode: "owner", userIds: [] };
+      }
+      const first = state.agents[0];
+      if (first) first.audience = { mode: audience, userIds: [] };
+      await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
+      await settle(6);
+      const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+      return { invite, line: within(invite).queryByText("Seus agentes só respondem a você.")?.closest(".setup-line") };
+    };
+    const { invite, line } = await note("owner");
+    expect(line).toBeTruthy();
+    expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
+      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+    );
+    // Under the card's title, before the invitations it's about.
+    const emails = within(invite).getByLabelText("E-mails, separados por vírgula");
+    expect((line as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(invite.querySelector(".ac-card__title + .setup-line")).toBe(line as Element);
+    // One agent that answers everyone: someone invited gets an answer, so nothing to say.
+    expect((await note("everyone")).line).toBeFalsy();
+  });
 });
 
 describe("Members › Invitation link", () => {

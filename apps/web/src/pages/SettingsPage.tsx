@@ -486,6 +486,7 @@ function SettingsTiles() {
   const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
+  const edition = computerEdition(useComputerSetup(org.id, shown("storage")).data);
 
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
   const keys = (credentials.data ?? []).filter((c) => !c.revokedAt);
@@ -532,7 +533,10 @@ function SettingsTiles() {
         (plans.data.accounts.length > 0
           ? t("settings.tileState.plans", { count: plans.data.accounts.length })
           : t("settings.tileState.noPlans")),
-    storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
+    storage:
+      storage.data && edition
+        ? t(storage.data.kind === "s3" ? "storage.s3" : edition === "cloud" ? "storage.agentes" : "storage.server")
+        : undefined,
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
   const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role));

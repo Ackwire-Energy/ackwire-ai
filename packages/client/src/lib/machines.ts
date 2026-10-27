@@ -46,9 +46,27 @@ export function commandInReason(reason: string | null | undefined): string | nul
   return m?.[1] ?? null;
 }
 
-/** Turns the agents' screens on at the computer: its runner's settings, which are root's in system mode (ADR 0057). */
-export const screensOnCommand = (m: Pick<Machine, "mode">) =>
-  `${m.mode === "system" ? "sudo " : ""}agentes-runner tools enable desktop`;
+/**
+ * Turns a tool on at the computer (`desktop`: the agents' screens): its runner's settings, which are root's in system
+ * mode (ADR 0057).
+ */
+export const toolOnCommand = (m: Pick<Machine, "mode">, tool: keyof MachineAccess["tools"]) =>
+  `${m.mode === "system" ? "sudo " : ""}agentes-runner tools enable ${tool}`;
+
+/** A Mac or a PC: folders and tools are allowed in the agentes.chat app there. Any other may be a server without it. */
+export const allowsInApp = (os: string | null | undefined) => os === "darwin" || os === "windows";
+
+/**
+ * `brain.reasons.tool_off`'s line for a brain whose tool is off on `m`: the app's Preferences on a Mac or a PC, and on
+ * any other computer the command too.
+ */
+export function toolOffReason(m: Pick<Machine, "os" | "mode"> | null | undefined, kind: "claude_code" | "codex") {
+  if (!m || allowsInApp(m.os)) return { key: "brain.reasons.tool_off" as const, command: "" };
+  return {
+    key: "brain.reasons.tool_offLinux" as const,
+    command: toolOnCommand(m, kind === "codex" ? "codex" : "claude"),
+  };
+}
 
 /** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
@@ -75,8 +93,21 @@ export function isPaused(m: Pick<Machine, "paused">, now = Date.now()): boolean 
 /** The download link as given, or on `origin` when the server sends a path. */
 export const downloadHref = (url: string, origin = "") => (/^https?:\/\//.test(url) ? url : `${origin}${url}`);
 
-/** Where the browser runs: Apple Silicon or Intel is unknowable from the page, so Macs get the arm build. */
-export const DESKTOP_TARGET = { target: "darwin", arch: "aarch64" } as const;
+/** The systems the desktop app runs on (`window.__agentesDesktop.platform` on the site, `{{device}}` in the copy). */
+export type Platform = "mac" | "windows" | "linux";
+
+/** From a user agent: WKWebView or a Mac's browser, WebView2 or a Windows browser, and everything else as Linux. */
+export function platformOf(userAgent: string): Platform {
+  if (/Windows/i.test(userAgent)) return "windows";
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return "mac";
+  return "linux";
+}
+
+/** The app's build for a system, as `/api/desktop/latest` names it: one build for both Mac chips, x64 elsewhere. */
+export const desktopTargetOf = (platform: Platform) =>
+  platform === "mac"
+    ? ({ target: "darwin", arch: "aarch64" } as const)
+    : ({ target: platform, arch: "x86_64" } as const);
 
 /** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
 export type ComputerKind = "mac" | "windows" | "linux" | "cloud";

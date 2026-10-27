@@ -1,12 +1,15 @@
 import type { Agent, AgentAudience, AudienceMode } from "@agenteschat/client";
+import { useAgents, useAiStatus } from "@agenteschat/client";
 import { audienceChip } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
 import {
   Avatar,
   Checkbox,
   Chip,
   Icon,
   type IconName,
+  InfoHint,
   OptionList,
   RadioCard,
   RadioGroup,
@@ -28,6 +31,29 @@ const AUDIENCE_ICON: Record<AudienceMode, IconName> = {
 
 const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/**
+ * "Seus agentes só respondem a você.", before inviting anyone (setup's Team step, Members' invite card): every agent
+ * with an AI is the viewer's and answers only them, so whoever joins now gets no answer. Nothing otherwise.
+ */
+export function OnlyYouNote({ orgId, viewerId }: { orgId: string; viewerId: string }) {
+  const { t } = useTranslation();
+  const agents = useAgents(orgId);
+  const status = useAiStatus(orgId);
+  const thinks = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
+  if (!onlyOwnerReplies(agents.data ?? [], thinks, viewerId)) return null;
+  return (
+    <p className="setup-line ac-iconline">
+      <Icon name="audienceOwner" size={14} />
+      <span>
+        {t("members.agentsOnlyYou")}{" "}
+        <InfoHint name={t("common.about", { label: t("members.agentsOnlyYou") })}>
+          {t("members.agentsOnlyYouHint")}
+        </InfoHint>
+      </span>
+    </p>
+  );
+}
 
 /** Chip "Pessoal" / "Restrito" next to the agent's name (nothing when everyone can talk to it). */
 export function AudienceChip({ agent, compact }: { agent: Agent; compact?: boolean }) {

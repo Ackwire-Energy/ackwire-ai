@@ -59,6 +59,7 @@ const SELFHOST_ONLY = [
   "agentComputer.status.paused",
   "agentComputer.status.pausedPlain",
   "agentComputer.status.noComputer",
+  "agentComputer.status.noBrowser",
   "agentComputer.status.outdated",
   "agentComputer.sub.paused",
   "agentComputer.sub.offline",

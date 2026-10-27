@@ -1,6 +1,6 @@
 import type { Edition, Machine } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { commandInReason, screensOnCommand } from "@agenteschat/client/lib/machines";
+import { commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
 import type { AgentColor } from "@agenteschat/ui";
 import { Button } from "@agenteschat/ui";
 import type { ReactNode } from "react";
@@ -58,7 +58,7 @@ export function CantShowCover({
   const fixer = edition === "selfhost" && machine?.canManage === true && machine.os !== "darwin";
   const command =
     reason === "not_allowed" && machine
-      ? screensOnCommand(machine)
+      ? toolOnCommand(machine, "desktop")
       : reason === "desktop_unavailable"
         ? commandInReason(detail)
         : null;

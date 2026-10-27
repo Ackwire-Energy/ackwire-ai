@@ -3,7 +3,6 @@ import {
   keys,
   meQuery,
   newClientId,
-  useAgents,
   useAiStatus,
   useAuthConfig,
   useComputerSetup,
@@ -40,7 +39,6 @@ import {
   defaultTarget,
   gateDims,
   kindOf,
-  onlyOwnerReplies,
   type PlanChoice,
   planLabel,
 } from "@agenteschat/client/lib/no-ai";
@@ -90,6 +88,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
+import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   AiPicker,
@@ -548,8 +547,11 @@ export function OnboardingPage() {
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
   const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
+  const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
-  const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
+  const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
+  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
+  const emails = authConfig?.passwordReset !== false;
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
@@ -869,7 +871,9 @@ export function OnboardingPage() {
                       ? "onboarding.computer.leadCloudPaused"
                       : "onboarding.computer.leadCloud",
                   )
-                : t(`onboarding.${step.id}.lead`),
+                : step.id === "team" && !emails
+                  ? t("onboarding.team.leadLink")
+                  : t(`onboarding.${step.id}.lead`),
           };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
@@ -1254,6 +1258,7 @@ export function OnboardingPage() {
               <TeamStep
                 orgId={created.orgId}
                 viewerId={me.data?.user.id ?? ""}
+                emails={emails}
                 invites={invites}
                 sent={sent}
                 onChange={setInvites}
@@ -1712,11 +1717,13 @@ function WorkspaceComputerStep({
 
 /**
  * Who works with you: e-mails as chips (each with a role), and the invite link. While no agent would answer anyone
- * else (each with an AI on its owner's plan), it says so first.
+ * else (each with an AI on its owner's plan), it says so first. On a server that sends no email (`emails` false),
+ * the link alone: an invitation by email would never arrive.
  */
 function TeamStep({
   orgId,
   viewerId,
+  emails,
   invites,
   sent,
   onChange,
@@ -1724,6 +1731,7 @@ function TeamStep({
 }: {
   orgId: string;
   viewerId: string;
+  emails: boolean;
   invites: InviteDraft[];
   sent: Set<string>;
   onChange: (list: InviteDraft[]) => void;
@@ -1741,13 +1749,6 @@ function TeamStep({
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
-  const rows = useAgents(orgId);
-  const status = useAiStatus(orgId);
-  const onlyYou = onlyOwnerReplies(
-    rows.data ?? [],
-    (id) => (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai",
-    viewerId,
-  );
   const roleOptions = [
     { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
     { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
@@ -1784,83 +1785,75 @@ function TeamStep({
   const invalid = invites.some((i) => !i.valid);
   return (
     <>
-      {onlyYou && (
-        <p className="setup-line ac-iconline">
-          <Icon name="audienceOwner" size={14} />
-          <span>
-            {t("members.agentsOnlyYou")}{" "}
-            <InfoHint name={t("common.about", { label: t("members.agentsOnlyYou") })}>
-              {t("members.agentsOnlyYouHint")}
+      <OnlyYouNote orgId={orgId} viewerId={viewerId} />
+      {emails && (
+        <Card as="div">
+          <span className="ac-hintline onb__label">
+            <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
+            <InfoHint id="invite-emails-hint" name={t("common.about", { label: t("onboarding.team.emails") })}>
+              {t("onboarding.team.emailsHint")}
             </InfoHint>
           </span>
-        </p>
-      )}
-      <Card as="div">
-        <span className="ac-hintline onb__label">
-          <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
-          <InfoHint id="invite-emails-hint" name={t("common.about", { label: t("onboarding.team.emails") })}>
-            {t("onboarding.team.emailsHint")}
-          </InfoHint>
-        </span>
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
-        <div
-          className="onb__emails"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) input.current?.focus();
-          }}
-        >
-          {invites.map((i) => (
-            <span key={i.email} className="onb__chip" data-invalid={!i.valid || undefined}>
-              <Avatar name={i.email} initials={i.email.slice(0, 2).toUpperCase()} size="sm" />
-              <span className="onb__chip-email">{i.email}</span>
-              {!i.valid ? (
-                <span className="onb__chip-bad">{t("onboarding.team.invalid")}</span>
-              ) : sent.has(i.email) ? (
-                <span className="small muted">{t("onboarding.team.sent")}</span>
-              ) : (
-                <Select
-                  size="sm"
-                  value={i.role}
-                  aria-label={t("onboarding.team.roleOf", { email: i.email })}
-                  options={roleOptions}
-                  onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
-                />
-              )}
-              {!sent.has(i.email) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  aria-label={t("onboarding.removeInvite", { email: i.email })}
-                  onClick={() => onChange(invites.filter((x) => x.email !== i.email))}
-                />
-              )}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
+          <div
+            className="onb__emails"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) input.current?.focus();
+            }}
+          >
+            {invites.map((i) => (
+              <span key={i.email} className="onb__chip" data-invalid={!i.valid || undefined}>
+                <Avatar name={i.email} initials={i.email.slice(0, 2).toUpperCase()} size="sm" />
+                <span className="onb__chip-email">{i.email}</span>
+                {!i.valid ? (
+                  <span className="onb__chip-bad">{t("onboarding.team.invalid")}</span>
+                ) : sent.has(i.email) ? (
+                  <span className="small muted">{t("onboarding.team.sent")}</span>
+                ) : (
+                  <Select
+                    size="sm"
+                    value={i.role}
+                    aria-label={t("onboarding.team.roleOf", { email: i.email })}
+                    options={roleOptions}
+                    onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
+                  />
+                )}
+                {!sent.has(i.email) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="close"
+                    aria-label={t("onboarding.removeInvite", { email: i.email })}
+                    onClick={() => onChange(invites.filter((x) => x.email !== i.email))}
+                  />
+                )}
+              </span>
+            ))}
+            <input
+              ref={input}
+              id="invite-emails"
+              className="onb__emails-input"
+              type="text"
+              inputMode="email"
+              autoComplete="off"
+              value={draft}
+              placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
+              aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
+              aria-invalid={invalid || undefined}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              onBlur={() => commit(draft)}
+            />
+          </div>
+          {invalid && (
+            <span id="invite-emails-help" className="small onb__error">
+              {t("onboarding.team.invalidHelp")}
             </span>
-          ))}
-          <input
-            ref={input}
-            id="invite-emails"
-            className="onb__emails-input"
-            type="text"
-            inputMode="email"
-            autoComplete="off"
-            value={draft}
-            placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
-            aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
-            aria-invalid={invalid || undefined}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onBlur={() => commit(draft)}
-          />
-        </div>
-        {invalid && (
-          <span id="invite-emails-help" className="small onb__error">
-            {t("onboarding.team.invalidHelp")}
-          </span>
-        )}
-      </Card>
+          )}
+        </Card>
+      )}
       <Card as="div">
         <span className="ac-hintline onb__label">
           <span>{t("onboarding.team.link")}</span>
