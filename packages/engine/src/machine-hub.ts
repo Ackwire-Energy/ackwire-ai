@@ -394,14 +394,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (conn.machineId || conn.authing) return;
     conn.authing = true;
     if (frame.protocol < MIN_RUNNER_PROTOCOL) {
-      return refuse(conn, "outdated", "This runner is too old; install the latest one.", MACHINE_CLOSE.outdated);
+      return refuse(conn, "outdated", "This runner is too old. Install the latest one.", MACHINE_CLOSE.outdated);
     }
     const machine = await authenticateMachine(db, frame.token);
     if (!machine) {
       return refuse(
         conn,
         "invalid_token",
-        "This computer's token is not valid (it may have been removed); pair it again.",
+        "This computer's token isn't valid. It may have been removed. Pair it again.",
         MACHINE_CLOSE.invalidToken,
       );
     }

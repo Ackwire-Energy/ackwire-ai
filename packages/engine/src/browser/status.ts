@@ -2,6 +2,7 @@ import { BROWSER_PROTOCOL } from "@agenteschat/adapters";
 import type { Database } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import type { MachineCaller } from "../machine-hub";
+import { REMOVED_COMPUTER_MESSAGE } from "../machines";
 
 /** Why the agent's browser isn't usable, as a code (for the app) and a sentence (for the agent). */
 export type BrowserUnavailable =
@@ -74,7 +75,7 @@ export function browserUnavailableText(s: Extract<AgentBrowserStatus, { availabl
     case "no_machine":
       return "The browser only runs on a connected computer, and you don't use one. Ask your owner or an admin to choose one for you.";
     case "machine_removed":
-      return "Your connected computer was removed; ask an admin or your owner to choose another one.";
+      return REMOVED_COMPUTER_MESSAGE;
     case "outdated":
       return `The runner on ${on} is out of date and has no browser. Tell the person: its owner should update it.`;
     case "switched_off":

@@ -698,7 +698,7 @@ async function memberMachine(db: Database, userId: string, orgId: string, machin
 }
 
 const runnerOld = (machine: Pick<MachineRow, "name">) =>
-  new ConflictError(`The runner on ${machine.name} is too old for accounts; update it`, "account.runner_old", {
+  new ConflictError(`The runner on ${machine.name} is too old for accounts. Update it.`, "account.runner_old", {
     name: machine.name,
   });
 

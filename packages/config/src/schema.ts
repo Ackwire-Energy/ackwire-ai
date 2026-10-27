@@ -102,7 +102,7 @@ export const envVars = {
     section: "Database",
   },
   AGENTES_SECRET: {
-    schema: z.string().min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`"),
+    schema: z.string().min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`"),
     description:
       "Master secret. Session signing and the key that encrypts stored provider credentials (API keys of model providers) derive from it. Generate with `openssl rand -base64 48`. **Changing it makes stored credentials unreadable.** Back it up.",
     section: "Security",
@@ -671,7 +671,7 @@ export const envVars = {
   HOST_COMPUTER_TOKEN: {
     schema: z
       .string()
-      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
       .optional(),
     description:
       "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true` or `MACHINE_PROVISIONING=external`. Unset: off.",
@@ -698,7 +698,7 @@ export const envVars = {
   OPERATOR_API_TOKEN: {
     schema: z
       .string()
-      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
       .optional(),
     description:
       "Turns on the operator API (ADR 0056): a second listener on `OPERATOR_API_PORT` that serves `/api/operator/v1` to your own automation, called with this value as `Authorization: Bearer`. It reaches every workspace and account on the instance, so never publish that port or put it behind your reverse proxy. While it is set the server also keeps 90 days of events for it (sign-ups, sign-ins with their IP address, workspaces, agents, runs; metadata only). Unset (default): nothing listens there and nothing is recorded. Generate with `openssl rand -base64 48`.",

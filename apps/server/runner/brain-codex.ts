@@ -524,7 +524,7 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   const version = (opts.codexVersion ?? (() => detected().codex?.version))();
   if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
   if (!codexVersionOk(version)) {
-    return fail("codex_too_old", `Codex here is ${version}; agents need ${CODEX_MIN_VERSION} or newer.`);
+    return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);
   }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
   if (opts.app) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));

@@ -72,14 +72,14 @@ const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agente
 
 Usage:
   agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec] [--new]
-      Shows a code and a link; confirm it on the site (signed in) and this computer is connected.
+      Shows a code and a link. Confirm it on the site, signed in, and this computer is connected.
       Paired with that server before (even if it was removed there): it comes back as the same
       computer, with its name, permissions and agents, when you may manage it.
       --dir      the folder agents work in (default ~/agentes)
-      --no-exec  files and uploads only; agents can't run commands
+      --no-exec  files and uploads only (agents can't run commands)
       --new      connect as a new computer instead
   agentes-runner pair --server <url> --enroll-file <path> [--dir <workspace>] [--name <name>] [--no-exec]
-      Connects with a code issued for this computer by whoever provisions it; nobody confirms it.
+      Connects with a code issued for this computer by whoever provisions it. Nobody confirms it.
       The file is removed as soon as it is read.
   agentes-runner start
       Connects and stays connected (reconnects on its own).
@@ -92,7 +92,7 @@ Usage:
       This server's own computer (HOST_COMPUTER_TOKEN on the server, the same token here): one
       connection per organization of the person who installed the server, each agent as its own
       user on Linux (run it as root). Organizations come and go with the server, checked every minute.
-      --state    where it keeps each organization's connection (default: the home; on a Mac, <home>/host)
+      --state    where it keeps each organization's connection (default: the home, or <home>/host on a Mac)
       --no-exec  agents can't run commands here (Claude Code, Codex and the browser stay on)
   agentes-runner host --once --server <url> --token-file <path> [--state <dir>] [--name <name>] [--rotate <orgId>]...
       One sync for a program that runs the organizations' connections itself (the agentes.chat app):
@@ -101,7 +101,7 @@ Usage:
       --state    where it writes them (default: the home, on a Mac too, where the app keeps its own)
       --rotate   asks for a new token for that organization's connection (the server refused its own)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
-      Runs host as this computer's service (Linux: the root unit, from boot; macOS: at login).
+      Runs host as this computer's service: the root unit from boot on Linux, at login on macOS.
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
@@ -117,7 +117,7 @@ Usage:
       way the agent does (with how long each takes), opens a terminal as the agent, then stops what
       it started. Stop the runner first.
   agentes-runner app --home <dir>
-      The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
+      The desktop app's runner (a JSON-lines protocol on stdin/stdout, not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
   agentes-runner worker --agent <id> --dir <folder> --home <dir>
@@ -127,11 +127,11 @@ Usage:
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
-Config: <home>/config.json (mode 600; optional "maxConcurrentTasks" (default 3) and
-"taskMaxSeconds" (default 14400) for background tasks; "brainIdleMinutes" (default 10) and
-"brainMaxProcesses" (default 3) for agents thinking with Claude Code). Changes apply while it runs.
-Background tasks keep running when the runner restarts; their logs are in tasks/.
-Commands run as the user that runs the runner; consider a dedicated OS user.`;
+Config: <home>/config.json, mode 600. For background tasks, optional "maxConcurrentTasks" (default 3)
+and "taskMaxSeconds" (default 14400). For agents thinking with Claude Code, optional "brainIdleMinutes"
+(default 10) and "brainMaxProcesses" (default 3). Changes apply while it runs.
+Background tasks keep running when the runner restarts. Their logs are in tasks/.
+Commands run as the user that runs the runner. Consider a dedicated OS user.`;
 
 const stamp = (line: string) => `${new Date().toISOString()} ${line}`;
 const log = (line: string) => console.log(stamp(line));
@@ -334,7 +334,7 @@ async function start(): Promise<number> {
     return 1;
   }
   if (typeof WebSocket === "undefined") {
-    console.error(`This runtime has no WebSocket client (${process.version}); use Node.js 22 or newer, or Bun`);
+    console.error(`This runtime has no WebSocket client (${process.version}). Use Node.js 22 or newer, or Bun.`);
     return 1;
   }
   const lock = acquireLock(home, "start");
@@ -353,7 +353,7 @@ async function start(): Promise<number> {
         log("stopped");
         return 0;
       case "replaced":
-        log("Another runner connected with this computer's token and took over; this one stops.");
+        log("Another runner connected with this computer's token and took over. This one stops.");
         return 0;
       case "outdated":
         log("This runner is too old for the server. Update it: agentes-runner update");
@@ -643,7 +643,7 @@ async function update(): Promise<number> {
   if (!res.ok) return refuse(`Download failed: ${res.status} ${url}`);
   const text = await res.text();
   if (!text.startsWith("#!") || !text.includes("agentes-runner")) {
-    return refuse(`${url} doesn't look like the runner; nothing changed.`);
+    return refuse(`${url} doesn't look like the runner. Nothing changed.`);
   }
   writeFileSync(`${script}.new`, text, { mode: 0o755 });
   renameSync(`${script}.new`, script);
@@ -778,7 +778,7 @@ function folders(p: Parsed): number {
         console.log(
           ids.length
             ? `Allowed ${real} for ${ids.map(nameOf).join(", ")}.`
-            : `Allowed ${real}; no agent uses it yet (add --agent <handle>).`,
+            : `Allowed ${real}. No agent uses it yet. Add one with --agent <handle>.`,
         );
         return 0;
       }

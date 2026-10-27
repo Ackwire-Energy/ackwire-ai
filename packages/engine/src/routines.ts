@@ -1539,7 +1539,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
       { type: "person", userId: creator },
       routine.orgId,
       {
-        title: `${routine.name} — ${when}`,
+        title: `${routine.name} · ${when}`,
         goal: routine.prompt,
         agentIds: [...new Set([agent.id, ...target.agentIds])],
         rounds: target.rounds,
