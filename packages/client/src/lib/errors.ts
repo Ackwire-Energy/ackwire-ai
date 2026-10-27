@@ -84,6 +84,12 @@ const KNOWN = {
   "join.denied": "errors.join.denied",
   "join.answered": "errors.join.answered",
   "join.expired": "errors.join.expired",
+  "join.code_wrong": "errors.join.codeWrong",
+  "join.code_expired": "errors.join.codeExpired",
+  "join.code_tries": "errors.join.codeTries",
+  "join.code_limit": "errors.join.codeLimit",
+  "join.code_wait": "errors.join.codeWait",
+  "join.code_needed": "errors.join.codeNeeded",
   "invitation.ask_to_join": "errors.invitation.askToJoin",
 } as const;
 

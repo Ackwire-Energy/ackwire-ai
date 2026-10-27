@@ -5,8 +5,10 @@ setupDom();
 
 import type { InvitationPreview, JoinRequest, JoinStatus, Member, NotificationLatest } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { createI18n } from "@/i18n";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
@@ -40,26 +42,47 @@ const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
   ...patch,
 });
 
-/** The link's page, signed out (`me: null`) or as the fake's Walter. */
+/** The link's page, signed out (`me: null`) or as the fake's Walter (confirmed unless `unconfirmed`). */
 async function openLink(
   preview: InvitationPreview,
-  options: { signedIn?: boolean; askError?: ApiError; emails?: boolean } = {},
+  options: {
+    signedIn?: boolean;
+    unconfirmed?: boolean;
+    askError?: ApiError;
+    sendCodeError?: ApiError;
+    emails?: boolean;
+  } = {},
 ) {
   const state = seedState({
     previews: { lnk: preview },
     askError: options.askError,
+    sendCodeError: options.sendCodeError,
     authConfig: { passwordReset: options.emails ?? true },
   });
   if (!options.signedIn) state.me = null;
-  else if (state.me) state.me.user.emailVerified = true;
+  else if (state.me) state.me.user.emailVerified = !options.unconfirmed;
   const r = await renderApp("/invite/lnk", { api: createFakeApi(state) });
   await settle(4);
   return { ...r, state };
 }
 
+/** The Verify slot's four labels share one cell; only the current one shows. */
+const slot = () => {
+  const [verify, resend, wait] = [...document.querySelectorAll<HTMLElement>(".invite-ask__slot > .ac-btn")];
+  const shows = (el: HTMLElement | undefined) => !!el && el.style.visibility !== "hidden";
+  const status = document.querySelector(".invite-ask__slot [role=status]")?.textContent;
+  if (status) return `status:${status}`;
+  return shows(verify)
+    ? "verify"
+    : shows(resend)
+      ? "resend"
+      : `wait:${wait?.textContent} ${wait?.getAttribute("aria-label")}`;
+};
+const codeField = () => screen().queryByLabelText("Código do e-mail") as HTMLInputElement | null;
+
 describe("an invitation link asks to join", () => {
   test("signed out: who shared it and who works there, the form, then sent (the answer comes by email)", async () => {
-    const { state } = await openLink(LINK);
+    const { state } = await openLink(LINK, { emails: false });
     expect(heading()).toBe("Pedir para entrar na Acme");
     expect(text()).toContain("Marina compartilhou este link. Um admin aprova cada pessoa nova.");
     expect(text()).toContain("Ada e Atlas já trabalham lá.");
@@ -96,6 +119,139 @@ describe("an invitation link asks to join", () => {
     expect([...document.querySelectorAll(".invite-ask__outcome-text p")].map((p) => p.textContent)).toEqual([
       "Avisamos em ana@gmail.com quando um admin responder.",
     ]);
+  });
+
+  test("signed out, on a server that sends email: Verify, the code typed back, then Ask carries it", async () => {
+    const { state } = await openLink(LINK);
+    await type(screen().getByLabelText("Seu nome"), "Ana Souza");
+    expect(button("Verificar").hasAttribute("disabled")).toBe(true);
+    await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
+    await click(button("Você quis dizer ana@gmail.com?"));
+    const send = button("Pedir para entrar");
+    expect(send.hasAttribute("disabled")).toBe(true);
+    expect(codeField()).toBeNull();
+
+    await click(button("Verificar"));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual(["lnk", { email: "ana@gmail.com" }]);
+    // The code field takes the focus, and the slot counts down to Resend.
+    const code = codeField() as HTMLInputElement;
+    expect(document.activeElement).toBe(code);
+    expect(code.getAttribute("autocomplete")).toBe("one-time-code");
+    expect(code.getAttribute("inputmode")).toBe("numeric");
+    expect(slot()).toMatch(/^wait:[01]:\d\d Reenviar em \d+ segundos$/);
+    expect(send.hasAttribute("disabled")).toBe(true);
+
+    // A wrong code: said under the field, which empties for another try.
+    await type(code, "000000");
+    await settle(4);
+    expect(screen().getByRole("alert").textContent).toBe("Código errado. Tente de novo.");
+    expect(code.value).toBe("");
+    expect(document.activeElement).toBe(code);
+
+    // The sixth digit checks at once; spaces and dashes don't count.
+    await type(code, "123 45");
+    expect(code.value).toBe("12345");
+    expect(state.calls.filter((c) => c.method === "invites.checkCode")).toHaveLength(1);
+    await type(code, "123-456");
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "invites.checkCode").at(-1)?.args).toEqual([
+      "lnk",
+      { email: "ana@gmail.com", code: "123456" },
+    ]);
+    expect(slot()).toBe("status:Verificado");
+    expect(codeField()).toBeNull();
+    expect(screen().queryByRole("alert")).toBeNull();
+    expect(document.activeElement).toBe(screen().getByLabelText("Algo que eles devam saber? (opcional)"));
+    expect(send.hasAttribute("disabled")).toBe(false);
+    await click(send);
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual([
+      "lnk",
+      { name: "Ana Souza", email: "ana@gmail.com", code: "123456" },
+    ]);
+    expect(heading()).toBe("Pedido enviado");
+  });
+
+  test("editing the email starts over; Resend after the countdown; a code sent a moment ago counts down", async () => {
+    const { state } = await openLink(LINK);
+    await type(screen().getByLabelText("Seu nome"), "Ana Souza");
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(button("Verificar"));
+    await settle(4);
+    await type(codeField() as HTMLInputElement, "123456");
+    await settle(4);
+    expect(slot()).toBe("status:Verificado");
+
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.co");
+    expect(slot()).toBe("verify");
+    expect(codeField()).toBeNull();
+    expect(button("Pedir para entrar").hasAttribute("disabled")).toBe(true);
+    // The address the code went to, typed again: its proof still holds.
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    expect(slot()).toBe("status:Verificado");
+
+    await type(screen().getByLabelText("Seu e-mail"), "bia@acme.com");
+    await click(button("Verificar"));
+    await settle(4);
+    expect(slot()).toMatch(/^wait:/);
+    setSystemTime(new Date(Date.now() + 61_000));
+    await type(codeField() as HTMLInputElement, "1");
+    expect(slot()).toBe("resend");
+    await click(button("Reenviar"));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "invites.sendCode")).toHaveLength(3);
+    cleanup();
+
+    // Reopened inside the minute: the code already sent is the one to type.
+    const retry = new ApiError(429, "join.code_wait", "wait", { retryIn: 42 });
+    await openLink(LINK, { sendCodeError: retry });
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(button("Verificar"));
+    await settle(4);
+    expect(slot()).toBe("wait:0:42 Reenviar em 42 segundos");
+    expect(codeField()).toBeTruthy();
+    expect(screen().queryByRole("alert")).toBeNull();
+  });
+
+  test("every refusal of a code is said in both languages, never in the server's English", () => {
+    const codes = ["wrong", "expired", "tries", "limit", "wait", "needed"];
+    for (const lng of ["pt-BR", "en"] as const) {
+      const { t } = createI18n(lng);
+      const said = codes.map((c) => errorText(t, new ApiError(409, `join.code_${c}`, "SERVER WORDS")));
+      expect(said.filter((s) => s === "SERVER WORDS" || s.startsWith("errors."))).toEqual([]);
+    }
+    expect(errorText(createI18n("en").t, new ApiError(400, "join.code_wrong", "x"))).toBe("Wrong code. Try again.");
+  });
+
+  test("too many codes for an address is said under the email", async () => {
+    await openLink(LINK, { sendCodeError: new ApiError(429, "join.code_limit", "limit") });
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(button("Verificar"));
+    await settle(4);
+    expect(text()).toContain("Muitos códigos para este e-mail. Tente de novo mais tarde.");
+    expect(codeField()).toBeNull();
+    expect(slot()).toBe("verify");
+  });
+
+  test("signed in with an email not confirmed: the account's address, read-only, with Verify", async () => {
+    const { state } = await openLink({ ...LINK, you: you() }, { signedIn: true, unconfirmed: true });
+    const email = screen().getByLabelText("Seu e-mail") as HTMLInputElement;
+    expect(email.value).toBe("walter@acme.com.br");
+    expect(email.readOnly).toBe(true);
+    // "Not you? Sign out" beside the label, so the address shows once.
+    expect(email.closest(".ac-field")?.querySelector(".ac-field__label-row")?.textContent).toContain(
+      "Não é você? Sair",
+    );
+    expect(text()).not.toContain("Você vai pedir como");
+    await click(button("Verificar"));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual(["lnk", {}]);
+    await type(codeField() as HTMLInputElement, "123456");
+    await settle(4);
+    await click(button("Pedir para entrar"));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual(["lnk", { code: "123456" }]);
   });
 
   test("signed in: one tap as the account; the page follows the answer", async () => {
@@ -202,6 +358,7 @@ const requests = (): JoinRequest[] => [
     name: "Ana Souza",
     email: "ana@estudio.com",
     note: "Designer nova da Paula",
+    verified: true,
     confirmed: true,
     createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
     expiresAt: new Date(Date.now() + 12 * 86_400_000).toISOString(),
@@ -211,6 +368,7 @@ const requests = (): JoinRequest[] => [
     name: "Bruno Lima",
     email: "bruno@lima.dev",
     note: null,
+    verified: false,
     confirmed: false,
     createdAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
     expiresAt: new Date(Date.now() + 13 * 86_400_000).toISOString(),
@@ -227,20 +385,22 @@ async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) 
 const card = (name: string) => screen().getByRole("group", { name: `${name} pede para entrar` });
 
 describe("Members › Requests to join", () => {
-  test("each request says what approving does; approve with a role, or an invitation goes out", async () => {
+  test("each card keeps who asks and the answer; approve with a role, or an invitation goes out", async () => {
     const { state } = await members();
     const section = screen().getByRole("region", { name: "Pedidos para entrar 2" });
     const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
     expect(ana.textContent).toContain("Ana Souza pede para entrar");
     expect(ana.textContent).toContain("ana@estudio.com");
-    expect(ana.textContent).toContain("E-mail confirmado");
-    const proof = within(ana).getByText("E-mail confirmado").parentElement;
-    expect(proof?.classList.contains("ac-iconline")).toBe(true);
     expect(ana.textContent).toContain("“Designer nova da Paula”");
-    expect(within(ana).getByText(/^Fecha em \S+/)).toBeTruthy();
-    expect(ana.querySelector(".ac-chip")?.textContent).toBe("Pediu há 2 h");
-    expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
-    expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
+    // The top and the bottom only: no proof line, no closing date.
+    expect(ana.querySelector(".ac-approval__detail")).toBeNull();
+    expect(ana.textContent).not.toMatch(/E-mail (não )?confirmado|Fecha em/);
+    const chips = (el: HTMLElement) => [...el.querySelectorAll(".ac-chip")].map((c) => c.textContent);
+    expect(chips(ana)).toEqual(["Pediu há 2 h"]);
+    // Nobody proved Bruno's address: "Not verified" beside "Asked …", the only hint approving can't add him at once.
+    const bruno = card("Bruno Lima");
+    expect(chips(bruno)).toEqual(["Não verificado", expect.stringMatching(/^Pediu em \d/)]);
+    expect(bruno.querySelector(".jr-chips")?.children).toHaveLength(2);
 
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");

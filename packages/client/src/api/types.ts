@@ -171,6 +171,12 @@ export interface AskToJoinResult {
   emailed: boolean;
 }
 
+/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
+export interface JoinCodeSent {
+  email: string;
+  resendIn: number;
+}
+
 /** A workspace's invitation link people can still ask with (admins). */
 export interface InviteLink {
   id: string;
@@ -191,7 +197,12 @@ export interface JoinRequest {
   email: string;
   /** Their words: shown here only, never in an email or a push. */
   note: string | null;
-  /** Asked signed in with this address confirmed: approving lets them in at once; else it sends an invitation. */
+  /**
+   * A code proved the address, or a confirmed account with it asked (ADR 0072). False only on a server without
+   * email, or for a request typed before codes: approving can't add anyone at once then.
+   */
+  verified: boolean;
+  /** @deprecated Read `verified`. Kept for phone builds from before it: approving lets an account in at once. */
   confirmed: boolean;
   createdAt: string;
   /** Closes unanswered after this. */

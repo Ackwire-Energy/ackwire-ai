@@ -190,6 +190,10 @@ export interface FakeState {
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
   askError?: ApiError;
+  /** The code `invites.checkCode` takes (default 123456); any other is `join.code_wrong`. */
+  joinCode?: string;
+  /** Make `invites.sendCode` fail with this error (`join.code_wait`, `join.code_limit`…). */
+  sendCodeError?: ApiError;
   /** The workspace's invitation links (`invites.links`); `invites.createLink` makes one when none has a URL. */
   inviteLinks?: InviteLink[];
   /** Requests to join waiting (`joinRequests.list`). */
@@ -1886,6 +1890,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       turnOff: async (orgId, linkId) => {
         state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
         state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
+      },
+      sendCode: async (token, input) => {
+        state.calls.push({ method: "invites.sendCode", args: [token, input] });
+        if (state.sendCodeError) throw state.sendCodeError;
+        return { email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), resendIn: 60 };
+      },
+      checkCode: async (token, input) => {
+        state.calls.push({ method: "invites.checkCode", args: [token, input] });
+        if (input.code !== (state.joinCode ?? "123456"))
+          throw new ApiError(400, "join.code_wrong", "That code isn't right.");
+        return { verified: true };
       },
       ask: async (token, input) => {
         state.calls.push({ method: "invites.ask", args: [token, input] });

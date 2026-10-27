@@ -88,6 +88,7 @@ import type {
   IssuePatch,
   IssueStatus,
   JoinApproval,
+  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -942,8 +943,21 @@ export interface ApiClient {
     links(orgId: string): Promise<InviteLink[]>;
     /** Nobody new can ask with it; the requests made through it close without emails. */
     turnOff(orgId: string, linkId: string): Promise<void>;
-    /** Asks to join through a link: signed out with a name and an email, signed in as the account. */
-    ask(token: string, input: { name?: string; email?: string; note?: string }): Promise<AskToJoinResult>;
+    /**
+     * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
+     * `join.code_wait` (429) with `retryIn` seconds right after another.
+     */
+    sendCode(token: string, input: { email?: string }): Promise<JoinCodeSent>;
+    /** Checks the code from the email: right, the address can ask for 30 minutes. */
+    checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
+    /**
+     * Asks to join through a link: signed out with a name and an email, signed in as the account. On a server that
+     * sends email, `code` proves an address that isn't a confirmed account's.
+     */
+    ask(
+      token: string,
+      input: { name?: string; email?: string; note?: string; code?: string },
+    ): Promise<AskToJoinResult>;
     /** Expired email invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
   };
