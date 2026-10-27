@@ -24,4 +24,8 @@ export const haptics = {
   warning: () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
   },
+  /** Something didn't work (connecting a service failed). */
+  error: () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+  },
 };

@@ -1,5 +1,5 @@
 import { type ConnectorDef, useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
-import { connectedItems } from "@agenteschat/client/lib/connected";
+import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import { useMemo, useState } from "react";
@@ -13,7 +13,7 @@ import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hoo
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
-import { AddressSheet, ConnectSheet } from "./ConnectSheet";
+import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
 import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, suggestionsOf } from "./logic";
 
 /**
@@ -53,7 +53,6 @@ function Gallery() {
     [connections.data, servers.data, catalog.data],
   );
   const name = (d: ConnectorDef) => connectorName(t, d);
-  const connected = useMemo(() => list.filter((d) => connectionOf(d, items)), [list, items]);
   const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
   const searching = q.trim().length > 0;
   const rest = useMemo(() => {
@@ -63,6 +62,10 @@ function Gallery() {
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
   const open = (def: ConnectorDef) => sheet.open(<ConnectSheet def={def} />);
+  // A connection opens on itself: its service's sheet, or (a server connected by an address we don't know)
+  // its own with the address.
+  const openItem = (item: ConnectedItem) =>
+    sheet.open(item.def ? <ConnectSheet def={item.def} item={item} /> : <ServerSheet item={item} />);
 
   return (
     <PushedLargeTitle
@@ -96,21 +99,22 @@ function Gallery() {
         </View>
       ) : (
         <>
-          {searching ? null : connected.length > 0 ? (
+          {searching ? null : items.length > 0 ? (
             <>
               <SectionHeader title={t("mobile.connectors.connected")} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-                {connected.map((d) => (
+                {/* Every connection, servers connected by their address included (oldest first, as on the web). */}
+                {items.map((item) => (
                   <Pressable
-                    key={d.id}
-                    onPress={() => open(d)}
+                    key={item.id}
+                    onPress={() => openItem(item)}
                     accessibilityRole="button"
-                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: name(d) })}
+                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
                     style={styles.mini}
                   >
-                    <ConnectorIcon def={d} label={name(d)} size={48} check />
+                    <ConnectorIcon def={item.def} label={itemName(t, item)} size={48} check />
                     <Text variant="caption" tone="muted" numberOfLines={1}>
-                      {name(d)}
+                      {itemName(t, item)}
                     </Text>
                   </Pressable>
                 ))}

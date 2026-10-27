@@ -1291,7 +1291,11 @@ export const featureKeysEn: FeatureTranslations = {
     working: "Connecting…",
     failed: "Couldn't connect. Try again.",
     refused: "{{name}} didn't authorize. Nothing was connected.",
-    connectedLine: "{{name}} connected. Who will use it?",
+    connectedTitle: "{{name}} connected",
+    connectedSub: "Now choose which agents will use it.",
+    connectedDone: "Service connected.",
+    levelFailed: "Couldn't change {{name}}'s access. Try again.",
+    disconnectFailed: "Couldn't disconnect {{name}}. Try again.",
     whoTitle: "Who uses it and how far",
     level: {
       none: "Doesn't use",

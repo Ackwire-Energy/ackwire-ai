@@ -14,7 +14,7 @@ import {
   useStartOAuth,
 } from "@agenteschat/client";
 import { type Level, levelOf, resourcesOf, saveLevels } from "@agenteschat/client/lib/access-levels";
-import { connectedItems } from "@agenteschat/client/lib/connected";
+import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,11 +23,12 @@ import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, InfoHint, LineIcon, Segmented, Text, useToast } from "@/ui";
+import { Button, fieldText, Icon, InfoHint, LineIcon, Segmented, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { successHaptic } from "../shared/parts";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
 import {
@@ -50,27 +51,26 @@ type Step = "about" | "connect" | "who";
 /**
  * One service in a sheet over the gallery, in three steps: what agents could
  * do there (what always asks marked "pede sua aprovação") → connect (sign in in the browser and come back,
- * or paste a key) → who uses it and how far. A connected one opens on who uses it.
+ * or paste a key) → who uses it and how far. A connected one opens on who uses it (`item`: that connection,
+ * when the service is connected more than once).
  */
-export function ConnectSheet({ def }: { def: ConnectorDef }) {
+export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: ConnectedItem }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const orgId = useOrgId();
   const { org } = useOrg();
   const sheet = useSheet();
-  const toast = useToast();
+  const orgId = useOrgId();
   const catalog = useCatalog();
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
-  const disconnect = useDisconnect(orgId);
-  const { disconnect: disconnectServer } = useCustomServerAction(orgId);
   const admin = can(org?.role, "configure");
-  const existing = connectionOf(
-    def,
-    connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]),
-  );
+  const existing =
+    item ??
+    connectionOf(def, connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]));
   const [connectionId, setConnectionId] = useState<string | null>(existing?.id ?? null);
   const [step, setStep] = useState<Step>(existing ? "who" : "about");
+  // Connected in this sheet: it says so on top of who uses it (the list catching up must not take that away).
+  const [justConnected, setJustConnected] = useState(false);
   const name = connectorName(t, def);
   const tr = t as unknown as (key: string) => string;
   const lines = capabilityLines(
@@ -121,15 +121,19 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
           name={name}
           onConnected={(id) => {
             setConnectionId(id);
+            setJustConnected(true);
             setStep("who");
-            successHaptic();
           }}
         />
       ) : connectionId ? (
         <>
-          <Text variant="body" style={styles.bold}>
-            {existing ? t("mobile.connectors.whoTitle") : t("mobile.connectors.connectedLine", { name })}
-          </Text>
+          {justConnected ? (
+            <ConnectedNote name={name} />
+          ) : (
+            <Text variant="body" style={styles.bold}>
+              {t("mobile.connectors.whoTitle")}
+            </Text>
+          )}
           <AgentLevels connectionId={connectionId} />
           {def.kind === "remote_mcp" ? (
             <Text variant="small" tone="muted">
@@ -138,25 +142,7 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
           ) : null}
           <SafeNote />
           <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
-          {admin && existing ? (
-            <Button
-              variant="ghost"
-              wide
-              label={t("mobile.connectors.disconnect")}
-              disabled={disconnect.isPending || disconnectServer.isPending}
-              onPress={() => {
-                const done = {
-                  onSuccess: () => {
-                    sheet.close();
-                    toast({ title: t("mobile.connectors.disconnected", { name }) });
-                  },
-                };
-                // A server connected by address is removed through its own endpoint (as on the web).
-                if (existing.custom) disconnectServer.mutate(existing.id, done);
-                else disconnect.mutate(existing.id, done);
-              }}
-            />
-          ) : null}
+          {admin && existing ? <DisconnectButton item={existing} name={name} /> : null}
         </>
       ) : null}
     </View>
@@ -166,12 +152,12 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
 /** "Conectar pelo endereço": any MCP server by its https address (sign in there, or a key when it asks). */
 export function AddressSheet() {
   const { t } = useTranslation();
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connected, setConnected] = useState<{ id: string; name: string } | null>(null);
   const sheet = useSheet();
   return (
     <View style={styles.body}>
       <View style={styles.head}>
-        <ConnectorIcon def={null} label="+" size={52} />
+        <ConnectorIcon def={null} label={connected?.name ?? "+"} size={52} check={Boolean(connected)} />
         <View style={styles.grow}>
           <Text variant="title">{t("mobile.connectors.addressTitle")}</Text>
           <Text variant="small" tone="muted">
@@ -179,9 +165,10 @@ export function AddressSheet() {
           </Text>
         </View>
       </View>
-      {connectionId ? (
+      {connected ? (
         <>
-          <AgentLevels connectionId={connectionId} />
+          <ConnectedNote name={connected.name} />
+          <AgentLevels connectionId={connected.id} />
           <Text variant="small" tone="muted">
             {t("mobile.connectors.reviewOnComputer")}
           </Text>
@@ -189,9 +176,138 @@ export function AddressSheet() {
           <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
         </>
       ) : (
-        <ConnectStep def={null} name="" onConnected={setConnectionId} />
+        <ConnectStep def={null} name="" onConnected={(id, name) => setConnected({ id, name })} />
       )}
     </View>
+  );
+}
+
+/**
+ * A server connected by its address that isn't in the catalog: its name and address, who uses it and how
+ * far, and disconnecting it (its tools are reviewed on the computer).
+ */
+export function ServerSheet({ item }: { item: ConnectedItem }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const sheet = useSheet();
+  const admin = can(org?.role, "configure");
+  const name = itemName(t, item);
+  return (
+    <View style={styles.body}>
+      <View style={styles.head}>
+        <ConnectorIcon def={item.def} label={name} size={52} check />
+        <View style={styles.grow}>
+          <Text variant="title" numberOfLines={1}>
+            {name}
+          </Text>
+          {item.account ? (
+            <Text variant="small" tone="muted" numberOfLines={1}>
+              {item.account}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <Text variant="body" style={styles.bold}>
+        {t("mobile.connectors.whoTitle")}
+      </Text>
+      <AgentLevels connectionId={item.id} />
+      {item.needsReview ? (
+        <Text variant="small" tone="muted">
+          {t("mobile.connectors.reviewOnComputer")}
+        </Text>
+      ) : null}
+      <SafeNote />
+      <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
+      {admin ? <DisconnectButton item={item} name={name} /> : null}
+    </View>
+  );
+}
+
+/** Disconnecting, closing the sheet with a note on the screen behind it, or saying in the sheet that it failed. */
+function DisconnectButton({ item, name }: { item: ConnectedItem; name: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const sheet = useSheet();
+  const toast = useToast();
+  const disconnect = useDisconnect(orgId);
+  const { disconnect: disconnectServer } = useCustomServerAction(orgId);
+  const [failed, setFailed] = useState(false);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        wide
+        label={t("mobile.connectors.disconnect")}
+        disabled={disconnect.isPending || disconnectServer.isPending}
+        onPress={() => {
+          setFailed(false);
+          const done = {
+            onSuccess: () => {
+              successHaptic();
+              sheet.close();
+              toast({ title: t("mobile.connectors.disconnected", { name }) });
+            },
+            onError: () => {
+              errorHaptic();
+              setFailed(true);
+            },
+          };
+          // A server connected by address is removed through its own endpoint (as on the web).
+          if (item.custom) disconnectServer.mutate(item.id, done);
+          else disconnect.mutate(item.id, done);
+        }}
+      />
+      {failed ? <Problem text={t("mobile.connectors.disconnectFailed", { name })} /> : null}
+    </>
+  );
+}
+
+/** Just connected: a check that pops in (the phone buzzes with it), the name and what comes next. */
+function ConnectedNote({ name }: { name: string }) {
+  const { t } = useTranslation();
+  const { colors, reducedMotion } = useTheme();
+  return (
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(220)}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.note, styles.notice, { borderColor: colors.line }]}
+    >
+      <Animated.View
+        entering={reducedMotion ? undefined : ZoomIn.springify().damping(12)}
+        style={[styles.badge, { backgroundColor: colors.ok }]}
+      >
+        <Icon name="check" size={16} color="#ffffff" />
+      </Animated.View>
+      <View style={styles.grow}>
+        <Text variant="body" style={styles.bold}>
+          {t("mobile.connectors.connectedTitle", { name })}
+        </Text>
+        <Text variant="small" tone="muted">
+          {t("mobile.connectors.connectedSub")}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** What went wrong, in the sheet itself (a toast would sit under it). */
+function Problem({ text }: { text: string }) {
+  const { colors, reducedMotion } = useTheme();
+  return (
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(180)}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.note, styles.notice, { borderColor: colors.line }]}
+    >
+      <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+        <Icon name="x" size={16} color="#ffffff" />
+      </View>
+      <Text variant="small" style={styles.grow}>
+        {text}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -206,7 +322,7 @@ function ConnectStep({
 }: {
   def: ConnectorDef | null;
   name: string;
-  onConnected: (connectionId: string) => void;
+  onConnected: (connectionId: string, name: string) => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -227,7 +343,17 @@ function ConnectStep({
   const shownName = name || serverUrl.replace(/^https:\/\//, "").split("/")[0] || "";
   const keyLabel = t("mobile.connectors.keyLabel", { name: shownName });
 
-  const fail = () => setError(t("mobile.connectors.failed"));
+  // Every ending is felt as well as seen: a success buzz with the sheet moving on, an error buzz with the
+  // reason in the sheet.
+  const connected = (id: string, label: string) => {
+    successHaptic();
+    onConnected(id, label || shownName);
+  };
+  const oops = (text: string) => {
+    errorHaptic();
+    setError(text);
+  };
+  const fail = () => oops(t("mobile.connectors.failed"));
   /** The browser round trip: open, wait for the answer, finish with the app's session. */
   const signInWith = async (authorizeUrl: string) => {
     const state = stateOf(authorizeUrl);
@@ -237,9 +363,9 @@ function ConnectStep({
       if (result.type !== "success") return;
       const answer: AuthAnswer | null = authAnswerOf(result.url);
       if (!answer) return fail();
-      if (answer.kind === "error") return setError(t("mobile.connectors.refused", { name: shownName }));
+      if (answer.kind === "error") return oops(t("mobile.connectors.refused", { name: shownName }));
       const done = await complete.mutateAsync({ state: answer.state, code: answer.code });
-      onConnected(done.connectionId);
+      connected(done.connectionId, name);
     } catch {
       fail();
     } finally {
@@ -249,7 +375,7 @@ function ConnectStep({
 
   const signIn = async () => {
     setError(null);
-    if (askUrl && !isHttpsUrl(url)) return setError(t("mobile.connectors.addressInvalid"));
+    if (askUrl && !isHttpsUrl(url)) return oops(t("mobile.connectors.addressInvalid"));
     try {
       if (byAddress) {
         const res = await connect.mutateAsync({
@@ -260,9 +386,9 @@ function ConnectStep({
         if (res.status === "oauth") return void (await signInWith(res.authorizeUrl));
         if (res.status === "needs_key") {
           setMode("key");
-          return setError(t("mobile.connectors.needsKey"));
+          return oops(t("mobile.connectors.needsKey"));
         }
-        return onConnected(res.server.id);
+        return connected(res.server.id, name || res.server.label);
       }
       if (!def) return;
       const authorizeUrl = await start.mutateAsync({
@@ -278,8 +404,8 @@ function ConnectStep({
 
   const submitKey = async () => {
     setError(null);
-    if (askUrl && !isHttpsUrl(url)) return setError(t("mobile.connectors.addressInvalid"));
-    if (key.trim().length < 8) return setError(t("mobile.connectors.keyShort"));
+    if (askUrl && !isHttpsUrl(url)) return oops(t("mobile.connectors.addressInvalid"));
+    if (key.trim().length < 8) return oops(t("mobile.connectors.keyShort"));
     try {
       if (byAddress) {
         const res = await connect.mutateAsync({
@@ -288,7 +414,7 @@ function ConnectStep({
           returnTo: APP_OAUTH_RETURN,
           ...(name ? { label: name } : {}),
         });
-        if (res.status === "connected") return onConnected(res.server.id);
+        if (res.status === "connected") return connected(res.server.id, name || res.server.label);
         return fail();
       }
       if (!def) return;
@@ -297,7 +423,7 @@ function ConnectStep({
         apiKey: key.trim(),
         ...(askUrl ? { serverUrl } : {}),
       });
-      onConnected(conn.id);
+      connected(conn.id, name);
     } catch {
       fail();
     }
@@ -386,11 +512,7 @@ function ConnectStep({
         </>
       )}
       {busy ? <ActivityIndicator color={c.muted} /> : null}
-      {error ? (
-        <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      ) : null}
+      {error ? <Problem key={error} text={error} /> : null}
     </>
   );
 }
@@ -421,19 +543,23 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   const dir = useDirectory();
   const meId = useMeId();
   const { org } = useOrg();
-  const toast = useToast();
   const agent = dir.agentById.get(agentId);
   const access = useAgentAccess(orgId, agentId);
   const [saving, setSaving] = useState<Level | null>(null);
+  const [failed, setFailed] = useState(false);
   const resource = access.data ? resourcesOf(access.data).find((r) => r.id === `connector:${connectionId}`) : undefined;
   const current = saving ?? (resource ? levelOf(resource) : "none");
   const mayChange = can(org?.role, "manage_agents") || Boolean(meId && agent?.ownerUserId === meId);
   const choose = (level: Level) => {
     if (!resource || level === current) return;
     setSaving(level);
+    setFailed(false);
     void saveLevels(api, orgId, agentId, { [resource.id]: level })
       .then((next) => qc.setQueryData(keys.agentAccess(orgId, agentId), next))
-      .catch(() => toast({ title: t("mobile.connectors.failed"), icon: "x" }))
+      .catch(() => {
+        errorHaptic();
+        setFailed(true);
+      })
       .finally(() => setSaving(null));
   };
   return (
@@ -463,6 +589,7 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
           onChange={(k) => choose(k as Level)}
         />
       ) : null}
+      {failed ? <Problem text={t("mobile.connectors.levelFailed", { name: agent?.name ?? "" })} /> : null}
     </View>
   );
 }
@@ -519,6 +646,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  // A neutral card with a colored badge: the outcome of connecting (done, or what went wrong).
+  notice: {
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  badge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   agents: { gap: 10 },
   agent: { gap: 10, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
   agentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
