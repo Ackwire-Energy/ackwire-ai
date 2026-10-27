@@ -34,7 +34,7 @@ The app API (`/api/app/*`) is the wrong door for them: it acts as one person (co
 
 | Method, path | Answer |
 | --- | --- |
-| `GET /health` | `{ ok, version, botCheck }`: `botCheck` is the bot check's `state` (`off`, `ok`, `unreachable`, `secret_refused`), `since` when, and `blocked`, its `human_check_blocked` answers of the last 10 minutes (ADR 0075) |
+| `GET /health` | `{ ok, version, botCheck }`: `botCheck` is the bot check's `state` (`off`, `ok`, `unreachable`, `secret_refused`), `since` when, `blocked`, the networks it refused `human_check_blocked` in the last 10 minutes, `passed`, the tokens Cloudflare passed in those minutes, and `testing`, true with one of Cloudflare's test secrets (ADR 0075) |
 | `GET /orgs?q&createdAfter&standing&limit&cursor` | `{ orgs: [{ id, name, createdAt, standing, members, agents }], next }`, newest first, in keyset pages of up to 200. `q` is an org id, part of the name or part of a member's email, in any case, matched literally; `standing` keeps only the workspaces in that state (§8) |
 | `GET /orgs/{orgId}` | `id, name, createdAt`; its standing (§8); owners and admins (`userId, email, name, role, createdAt, lastSeenAt`); counts of members, agents, channels, connected computers and pending invitations |
 | `GET /users/{userId}` | `id, email, name, emailVerified, createdAt`; the workspaces with role; the 10 newest sessions on record (`ip, userAgent, createdAt`) |
