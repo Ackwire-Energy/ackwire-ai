@@ -34,9 +34,8 @@ import {
 } from "./context";
 
 const tags = ["Organizations"];
-/** Asks from one place and through one link (ADR 0068): enough for a team arriving, not for a flood. */
+/** Asks from one place (ADR 0068). A link's own count is the engine's (`askToJoin`). */
 const ASKS_PER_IP = { limit: 10, windowMs: 3600_000 };
-const ASKS_PER_LINK = { limit: 20, windowMs: 3600_000 };
 /** Codes that prove an address (ADR 0072): the per-address limits are the engine's, in the database. */
 const CODES_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_LINK = { limit: 40, windowMs: 3600_000 };
@@ -338,7 +337,8 @@ export function inviteRoutes(deps: AppDeps) {
         "Public. Signed out: a name, an email and an optional note, and no account is made. Signed in: the " +
         "account asks. On a server that sends email, an address that isn't a confirmed account's carries the " +
         "`code` from it (`…/code`), and a proven ask hears where it stands. On a server without email, a typed " +
-        "request answers the same whatever the address. Limited per IP and per link.",
+        "request answers the same whatever the address. Limited per IP, and per link by the new requests filed " +
+        "through it (every ask, on a server without email), so asks without a right code don't use up its hour.",
       request: {
         params: Token,
         body: body(
@@ -367,14 +367,12 @@ export function inviteRoutes(deps: AppDeps) {
         ASKS_PER_IP,
       );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
-      const link = await adapters.rateLimiter.consume(`join-request:link:${sha256(token)}`, ASKS_PER_LINK);
-      if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
       const input = c.req.valid("json");
       const user = await sessionUser(deps.auth, c.req.raw.headers);
       if (!user && (!input.name || !input.email)) {
         return apiError(c, 400, "invalid_request", "Your name and your email are needed");
       }
-      const asked = await askToJoin(events, config.PUBLIC_URL, {
+      const asked = await askToJoin({ ...events, rateLimiter: adapters.rateLimiter }, config.PUBLIC_URL, {
         token,
         user,
         name: input.name,
