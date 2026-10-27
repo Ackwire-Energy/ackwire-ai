@@ -76,6 +76,7 @@ import {
 } from "@/lib/context-menu";
 import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
+import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
@@ -756,7 +757,7 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, opening the phone app, theme, language, the budget and
+ * profile, time zone, opening the phone app, theme, language, sounds, the budget and
  * signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
@@ -765,6 +766,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const dir = useDirectory(org.id);
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
+  const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -880,6 +882,20 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
               value={i18n.language}
               onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
               options={locales.map((l) => ({ value: l.code, label: l.label }))}
+            />
+          </MenuOverlayRow>
+          <MenuOverlayRow icon="sound" label={t("shell.sounds")}>
+            <Segmented
+              size="sm"
+              label={t("shell.sounds")}
+              value={sounds}
+              onValueChange={(v) => setSoundChoice(v as SoundChoice)}
+              options={[
+                { value: "tactile", label: t("shell.soundTactile") },
+                { value: "sky", label: t("shell.soundSky") },
+                { value: "pixel", label: t("shell.soundPixel") },
+                { value: "off", label: t("shell.soundOff") },
+              ]}
             />
           </MenuOverlayRow>
           {inDesktopApp() && (
