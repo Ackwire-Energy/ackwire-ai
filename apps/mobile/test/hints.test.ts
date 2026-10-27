@@ -130,15 +130,14 @@ describe("where the ⓘ is plugged in", () => {
 
   test('every ⓘ in the app is named "About …"', () => {
     const files = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".tsx"));
-    // A row that passes its own `hint` on (`name={hint.name}`) is checked where it's called, as a field.
-    const names = files
-      .flatMap((f) => [...source(f).matchAll(/<InfoHint\b[\s\S]*?\bname=\{([^}]*)\}/g)].map((m) => m[1]))
-      .filter((name) => name !== "hint.name");
+    const names = files.flatMap((f) =>
+      [...source(f).matchAll(/<InfoHint\b[\s\S]*?\bname=\{([^}]*)\}/g)].map((m) => m[1]),
+    );
     const fields = files.flatMap((f) =>
       [...source(f).matchAll(/\bhint=\{[^}]*?\{\s*name:\s*([^,]*),/g)].map((m) => m[1]),
     );
     expect(names.length).toBeGreaterThanOrEqual(5);
-    expect(fields.length).toBeGreaterThanOrEqual(2);
+    expect(fields.length).toBeGreaterThanOrEqual(1);
     for (const name of [...names, ...fields]) expect(name).toStartWith('t("common.about"');
   });
 
