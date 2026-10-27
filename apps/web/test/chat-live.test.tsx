@@ -366,6 +366,18 @@ describe("empty conversations", () => {
   });
 });
 
+test("a DM's head: the name with a line under it rises to the face's top, a person's as an agent's", async () => {
+  await open(seedState(), "dm/person/u-joao");
+  await settle(4);
+  const person = screen().getByRole("heading", { level: 1, name: "João" });
+  expect(person.className).toBe("channel__title ac-captop");
+  expect(person.nextElementSibling?.textContent).toBe("joao@acme.com.br");
+  cleanup();
+  await open(seedState(), `dm/agent/${ADA_ID}`);
+  await settle(4);
+  expect(screen().getByRole("heading", { level: 1, name: "Ada" }).className).toBe("channel__title ac-captop");
+});
+
 describe("direct messages with an agent", () => {
   test("empty DM: 'Diga oi para a Ada' with first messages from her role; one goes to the composer", async () => {
     await open(seedState(), `dm/agent/${ADA_ID}`);

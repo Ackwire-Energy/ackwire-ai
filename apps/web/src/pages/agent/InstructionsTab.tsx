@@ -107,12 +107,12 @@ export function InstructionsTab() {
             </Card>
           )}
           {pending.length > 0 && (
-            <div className="agp-attn">
+            <div className="agp-attn ac-faceline">
               <span className="agp-ib agp-ib--warn">
                 <Icon name="document" size={16} />
               </span>
               <span className="agp-attn__t">
-                <b>{t("agentPage.instructions.proposals", { count: pending.length })}</b>
+                <b className="ac-captop">{t("agentPage.instructions.proposals", { count: pending.length })}</b>
                 <span>{t("agentPage.overview.proposes", g)}</span>
               </span>
               <Button size="sm" onClick={() => goTo("memory")}>

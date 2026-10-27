@@ -1603,16 +1603,18 @@ function ChannelView({
                   <h1 className="channel__title"># {channel.name}</h1>
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
-                <ChannelMembersStack
-                  channelId={channel.id}
-                  people={channelPeople}
-                  agents={channelAgents}
-                  onDetails={() => setDetailsOpen(true)}
-                />
-                {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                <Button size="sm" onClick={() => setDetailsOpen(true)}>
-                  {t("channel.details")}
-                </Button>
+                <div className="channel__acts ac-acts">
+                  <ChannelMembersStack
+                    channelId={channel.id}
+                    people={channelPeople}
+                    agents={channelAgents}
+                    onDetails={() => setDetailsOpen(true)}
+                  />
+                  {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  <Button size="sm" onClick={() => setDetailsOpen(true)}>
+                    {t("channel.details")}
+                  </Button>
+                </div>
               </header>
             )}
             {!chrome && isMember && (

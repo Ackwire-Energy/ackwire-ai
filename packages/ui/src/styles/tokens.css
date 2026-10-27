@@ -142,10 +142,21 @@
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
   /*
-   * How far a line's capitals' middle sits above its line box's middle, in x-heights (`ex` follows
-   * font-size-adjust). Measured for Source Sans 3 (0.037ex) and Onest (0.040ex): a new font is measured again.
+   * Where a line's capitals sit, in x-heights (`ex` follows font-size-adjust): their middle --cap-mid above the line
+   * box's middle, their top --cap-top above it. Measured for Source Sans 3 (0.037ex, 0.716ex) and Onest (0.040ex,
+   * 0.711ex): a new font is measured again.
    */
   --cap-mid: 0.04ex;
+  --cap-top: 0.71ex;
+  /*
+   * What looks the same in both themes: a site is a light page, behind its frame and before it loads; our drawings
+   * of the Mac's own menus and switches keep its blue and white; an agent's screen keeps its dark ground.
+   */
+  --site-paper: #fff;
+  --site-blank: #fbfbfc;
+  --mac-accent: #2f7cf6;
+  --mac-accent-ink: #fff;
+  --screen-bg: #1f2128;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-md: 14.5px;
