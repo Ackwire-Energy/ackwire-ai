@@ -157,7 +157,7 @@ describe("offer_connect_ai", () => {
     ]);
   });
 
-  test("its input is checked: an unknown step or provider, no line, unknown handles", async () => {
+  test("its input is checked: an unknown step or provider, no line, unknown handles; Gemini only as a key", async () => {
     f = await setup();
     const ctx = await runFor(f, f.owner.id, "conecta o gemini");
     for (const input of [
@@ -173,6 +173,11 @@ describe("offer_connect_ai", () => {
     const unknown = await call(f, ctx, "offer_connect_ai", { agents: ["@dev", "@nobody"], why: "Conectar." });
     expect(unknown).toMatchObject({ isError: true, content: "No agent @nobody in this organization." });
     expect(await cards(f)).toEqual([]);
+    // Google's plans can't be used in other products: Gemini comes as an API key.
+    await call(f, ctx, "offer_connect_ai", { what: "api_key", provider: "gemini", why: "Sua chave do Gemini." });
+    expect((await cards(f)).map((m) => (m.meta.actionCard as ActionCard).params)).toEqual([
+      { what: "api_key", provider: "gemini", agentIds: [], why: "Sua chave do Gemini." },
+    ]);
   });
 
   test(`at most ${MAX_CARDS_PER_RUN} cards per run`, async () => {

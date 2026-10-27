@@ -8,6 +8,7 @@ import {
   modelForTier,
   PROVIDER_IDS,
   PROVIDERS,
+  pricesAt,
   routerModelOf,
   summedCostNanoUsd,
   usdToNanoUsd,
@@ -63,6 +64,7 @@ describe("pricing", () => {
     expect(recommended).toEqual([
       ["claude-sonnet-5-5"],
       ["gpt-6.1-sol"],
+      ["gemini-3.8-flash"],
       ["deepseek-flash"],
       ["kimi-k3.1-pro"],
       ["glm-5.3"],
@@ -90,12 +92,14 @@ describe("pricing", () => {
     expect(PROVIDER_IDS.map((p) => cheapModelOf(p))).toEqual([
       "claude-haiku-5-5",
       "gpt-6-luna",
+      "gemini-3.5-flash-lite",
       "deepseek-flash",
       "kimi-k3.1-pro",
       "glm-5.3-flash",
       "MiniMax-M3.1-Flash",
     ]);
     const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
+    expect(line("gemini")).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"]);
     expect(line("deepseek")).toEqual(["deepseek-flash", "deepseek-flash", "deepseek-v4-pro"]);
     expect(line("moonshot")).toEqual(["kimi-k3.1-pro", "kimi-k3.1-pro", "kimi-k3.1-pro"]);
     expect(line("zai")).toEqual(["glm-5.3-flash", "glm-5.3", "glm-5.3"]);
@@ -106,6 +110,7 @@ describe("pricing", () => {
     expect(PROVIDER_IDS.map((p) => routerModelOf(p))).toEqual([
       "claude-haiku-5-5",
       "gpt-6-luna",
+      "gemini-3.5-flash-lite",
       "deepseek-flash",
       null,
       "glm-5.3-flash",
@@ -115,14 +120,34 @@ describe("pricing", () => {
       const picks = Object.values(MODEL_CATALOG).filter((m) => m.provider === provider && m.router);
       expect(picks).toHaveLength(provider === "moonshot" ? 0 : 1);
     }
-    // GLM-5.3 Flash can't stop thinking; every other pick turns it off.
+    // GLM-5.3 Flash can't stop thinking, Flash-Lite keeps a little, every other pick turns it off.
     expect(MODEL_CATALOG["glm-5.3-flash"]?.leastThinking).toBeUndefined();
+    expect(MODEL_CATALOG["gemini-3.5-flash-lite"]?.leastThinking).toBe("minimal");
     expect(MODEL_CATALOG["MiniMax-M3"]?.leastThinking).toBe("off");
+  });
+
+  test("Gemini at Google's prices, Argon and 3.8 Flash at half until their day (UTC); the list price shown after", () => {
+    // Input, output, cache read, cache write, for a call made at `at`.
+    const perMTok = (model: string, at: string) =>
+      [usage(1e6, 0), usage(0, 1e6), usage(0, 0, 1e6), usage(0, 0, 0, 1e6)].map(
+        (u) => costNanoUsd(model, u, new Date(at)) / 1e9,
+      );
+    expect(perMTok("gemini-4-argon", "2026-11-30T23:59:59Z")).toEqual([2, 10, 0.1, 2]);
+    expect(perMTok("gemini-4-argon", "2026-12-01T00:00:00Z")).toEqual([4, 20, 0.2, 4]);
+    expect(perMTok("gemini-3.8-flash", "2026-12-31T23:59:59Z")).toEqual([0.75, 3.75, 0.075, 0.75]);
+    expect(perMTok("gemini-3.8-flash", "2027-01-01T00:00:00Z")).toEqual([1.5, 7.5, 0.15, 1.5]);
+    expect(perMTok("gemini-3.5-flash-lite", "2026-10-27T12:00:00Z")).toEqual([0.3, 2.5, 0.03, 0.3]);
+    expect(perMTok("gemini-3.5-flash-lite", "2027-06-01T00:00:00Z")).toEqual([0.3, 2.5, 0.03, 0.3]);
+    const argon = MODEL_CATALOG["gemini-4-argon"];
+    if (!argon) throw new Error("no Argon");
+    expect(pricesAt(argon, new Date("2026-11-01T00:00:00Z")).input).toBe(2000);
+    expect(pricesAt(argon, new Date("2026-12-01T00:00:00Z"))).toBe(argon.prices);
   });
 
   test("costs are exact integers", () => {
     for (const model of Object.keys(MODEL_CATALOG)) {
       expect(Number.isInteger(costNanoUsd(model, usage(123, 456, 7, 8)))).toBe(true);
+      expect(Number.isInteger(costNanoUsd(model, usage(123, 456, 7, 8), new Date("2026-11-01T00:00:00Z")))).toBe(true);
     }
   });
 

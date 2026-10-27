@@ -204,7 +204,7 @@ export async function setup(
   const gateway = createModelGateway({
     db,
     keyWrappers: [keyWrapper],
-    // Every Anthropic-protocol provider (Anthropic and the compatible ones) answers through `provider`.
+    // Every provider but OpenAI answers through `provider`.
     providers: { ...Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])), openai: openaiProvider },
     platformCredentials: options.platform ?? noPlatformCredentials,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,

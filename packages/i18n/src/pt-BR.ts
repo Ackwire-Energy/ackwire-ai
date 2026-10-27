@@ -564,6 +564,7 @@ export const ptBR = {
     keyInvalid: {
       anthropic: "As chaves de API do Claude começam com sk-ant-. Confira e cole de novo.",
       openai: "As chaves da OpenAI começam com sk-. Confira e cole de novo.",
+      gemini: "As chaves de API do Gemini começam com AQ. ou AIza. Confira e cole de novo.",
       deepseek: "As chaves da DeepSeek começam com sk-. Confira e cole de novo.",
       moonshot: "As chaves da Kimi começam com sk-. Confira e cole de novo.",
       zai: "Cole a chave inteira da Z.ai, sem espaços. Confira e cole de novo.",
@@ -1021,13 +1022,14 @@ export const ptBR = {
     },
     key: {
       title: "Chave de API",
-      makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
+      makers: "Claude, OpenAI, Gemini e outros",
       sub: "Você paga pelo uso, direto ao provedor.",
       create: "Crie a sua chave de API {{of}} {{provider}}",
       paste: "Cole aqui",
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
+      billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       platform: "agentes.chat",
     },
     wait: {

@@ -47,6 +47,15 @@ describe("provider marks where a provider is named", () => {
     trigger.focus();
     await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
     expect(marks(screen().getByRole("option", { name: "OpenAI" }))).toEqual(["openai"]);
+    // Gemini third, by Google's own sparkle.
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Claude", "OpenAI", "Gemini", "DeepSeek", "Kimi", "Z.ai", "MiniMax"]);
+    const gemini = screen().getByRole("option", { name: "Gemini" });
+    expect(marks(gemini)).toEqual(["gemini"]);
+    expect(gemini.querySelector(".ac-brand img")?.getAttribute("src")).toBe("/brands/gemini.png");
   });
 
   test("Criar agente: each model card names its provider with its mark", async () => {
@@ -95,7 +104,7 @@ describe("provider marks where a provider is named", () => {
   test("several makers in one line: the API key row, by four marks, overlapped", () => {
     const { container } = render(<AiPicker choice="claude" onPick={() => {}} panel={null} />);
     const key = container.querySelector(".ac-brand-stack");
-    expect(key && marks(key)).toEqual(["claude", "openai", "deepseek", "kimi"]);
+    expect(key && marks(key)).toEqual(["claude", "openai", "gemini", "deepseek"]);
     // The row says the makers in words: its marks are decorative.
     expect(key?.getAttribute("aria-hidden")).toBe("true");
   });

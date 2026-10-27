@@ -11,8 +11,10 @@ interface ProviderEntry {
   site: string;
   /** It also sells coding plans, whose keys only work in coding tools. */
   plans?: boolean;
-  /** Its name is masculine in Portuguese ("do Claude"); the others are feminine ("da OpenAI"). */
+  /** Its name is masculine in Portuguese ("do Claude", "do Gemini"); the others are feminine ("da OpenAI"). */
   masculine?: boolean;
+  /** Its free tier lets the provider use what is sent: billing should be on. */
+  billing?: boolean;
 }
 
 /**
@@ -36,6 +38,16 @@ export const PROVIDERS = [
     site: "platform.openai.com/api-keys",
   },
   {
+    id: "gemini",
+    label: "Gemini",
+    placeholder: "AQ.…",
+    // AI Studio's keys: "AQ." since 2026-05-28 (bound to a service account), "AIza" before.
+    pattern: /^(?:AQ\.[A-Za-z0-9._-]{20,}|AIza[A-Za-z0-9_-]{30,})$/,
+    site: "aistudio.google.com/api-keys",
+    masculine: true,
+    billing: true,
+  },
+  {
     id: "deepseek",
     label: "DeepSeek",
     placeholder: "sk-…",
@@ -53,7 +65,7 @@ export const PROVIDERS = [
   {
     id: "zai",
     label: "Z.ai",
-    pattern: /^(?!sk-)[A-Za-z0-9._-]{16,}$/,
+    pattern: /^(?!sk-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "z.ai/manage-apikey/apikey-list",
     plans: true,
   },
@@ -61,7 +73,7 @@ export const PROVIDERS = [
     id: "minimax",
     label: "MiniMax",
     // `sk-cp-` keys are its coding plan's.
-    pattern: /^(?!sk-ant-|sk-cp-)[A-Za-z0-9._-]{16,}$/,
+    pattern: /^(?!sk-ant-|sk-cp-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "platform.minimax.io/user-center/basic-information/interface-key",
     plans: true,
   },
@@ -92,6 +104,13 @@ export function providerGuess(key: string | undefined, asked?: string): Provider
   const guess = (fits.length === 1 ? fits[0]?.id : undefined) ?? asked ?? fits[0]?.id;
   return guess && isProviderId(guess) ? guess : "anthropic";
 }
+
+/**
+ * The ⓘ on the key panel's first step, web and phone: for a maker that also sells coding plans, where a plan's key
+ * goes; for one whose free tier may use what is sent, to turn on billing.
+ */
+export const keyStepHint = (p: ProviderEntry) =>
+  p.plans ? "connectAi.key.notPlan" : p.billing ? "connectAi.key.billing" : undefined;
 
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {

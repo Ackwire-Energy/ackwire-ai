@@ -26,7 +26,7 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, usdToNanoUsd } from "@agenteschat/providers";
+import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
@@ -561,8 +561,8 @@ export function managementRoutes(deps: AppDeps) {
             available: usable(m.provider),
             recommended: usable(m.provider) && m.recommended === true,
             cheap: m.cheap === true,
-            inputUsdPerMTok: m.prices.input / 1000,
-            outputUsdPerMTok: m.prices.output / 1000,
+            inputUsdPerMTok: pricesAt(m).input / 1000,
+            outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
           providers: providerIds.map((id) => ({
             id,
