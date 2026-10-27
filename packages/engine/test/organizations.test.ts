@@ -236,4 +236,20 @@ describe("creating a workspace while one is held", () => {
     await setBillingHold({ db: f.db }, organization.id, null);
     expect((await createOrganization(f.db, ana.id, { name: "Ana 2" })).organization.standing).toBe("active");
   });
+
+  test("two creates at once start one workspace waiting for its plan, and refuse the other", async () => {
+    const ana = await addUser(f.db, "ana");
+    const create = (name: string) =>
+      createOrganization(f.db, ana.id, { name }, { holdForPayment: true }).then(
+        ({ organization }) => organization.id,
+        (e: ForbiddenError) => e.code,
+      );
+    const results = await Promise.all([create("One"), create("Two")]);
+    expect(results.filter((r) => r === "org.create_unpaid")).toHaveLength(1);
+    const owned = await f.db
+      .select({ orgId: schema.organizationMembers.orgId })
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, ana.id));
+    expect(owned).toHaveLength(1);
+  });
 });

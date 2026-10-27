@@ -177,20 +177,22 @@ export async function createOrganization(
   input: { name: string; context?: string },
   options: { holdForPayment?: boolean } = {},
 ) {
-  const held = await db
-    .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
-    .from(organizationMembers)
-    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
-    .orderBy(asc(organizations.createdAt));
-  if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(db, userId)))
-    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
-  const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
-  if (unpaid)
-    throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
-      orgId: unpaid.id,
-    });
   return db.transaction(async (tx) => {
+    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
+    const held = await tx
+      .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+      .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+      .orderBy(asc(organizations.createdAt));
+    if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
+      throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+    const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+    if (unpaid)
+      throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
+        orgId: unpaid.id,
+      });
     const [organization] = await tx
       .insert(organizations)
       .values({
