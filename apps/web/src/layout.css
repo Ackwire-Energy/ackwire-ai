@@ -591,7 +591,6 @@ p {
 }
 .sidebar__user {
   display: flex;
-  align-items: center;
   gap: 10px;
   width: 100%;
   padding: 4px 8px 4px 4px;
@@ -602,6 +601,10 @@ p {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+/* A name alone centres on the face; with the budget under it the card is an `.ac-faceline`. */
+.sidebar__user:not(.ac-faceline) {
+  align-items: center;
 }
 .sidebar__user:hover {
   background: var(--surface);
@@ -816,11 +819,14 @@ p {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
+/* Its reset at no weight, so a rise to the face's top (`.ac-captop`) wins it. */
+:where(.channel__title) {
+  margin: 0;
+}
 .channel__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -829,6 +835,12 @@ p {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+}
+/* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
+   whatever else the header holds. A name that doesn't rise stays centred on the face. */
+.channel__header > .ac-avatar:has(+ div > .ac-captop),
+.channel__header > .ac-avatar + div:has(> .ac-captop) {
+  align-self: flex-start;
 }
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
 /* The engine line (an `.ac-iconline`) inside a line of text. */
@@ -1013,6 +1025,20 @@ p {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+/*
+ * A list row led by a face beside its two lines (a member: the name, the email): the face on the name's 22px line, as
+ * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle. A name alone (an
+ * agent in Settings › Computers) stays centred with the rest of the row.
+ */
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
+  align-items: flex-start;
+}
+.ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) > :not(.ac-avatar, .list-col) {
+  align-self: center;
 }
 
 /* Memory and proposals */
@@ -2569,12 +2595,10 @@ p {
   margin: 0;
   padding: 0;
 }
-/* Icon, text and the level control line up on the name's row; long tool lists stay at two lines. */
+/* An `.ac-faceline`: the tile, the name's capitals and the level control start at one top; long tool lists stay at
+   two lines. */
 .level-row {
-  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
@@ -3177,7 +3201,7 @@ p {
   height: min(740px, calc(100dvh - 48px));
 }
 .catalog .ac-dialog__head {
-  padding: 24px 24px 14px 28px;
+  padding: 24px 28px 14px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
@@ -4442,7 +4466,7 @@ p {
  */
 .channel__messages .ac-msg {
   content-visibility: auto;
-  contain-intrinsic-size: auto 72px;
+  contain-intrinsic-size: auto 56px;
 }
 .channel__messages .ac-msg:is(:hover, :focus-within, .ac-msg--streaming),
 .channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]) {
@@ -5554,6 +5578,11 @@ p {
 }
 .members-stack:hover {
   background: var(--plate-soft);
+}
+/* In a row of actions its faces are what shows: its plate reaches into the gap, as a ghost button's does. */
+.ac-acts > .members-stack {
+  padding-right: var(--ghost-plate);
+  margin-right: calc(-1 * var(--ghost-plate));
 }
 .members-stack:focus-visible {
   outline: none;
@@ -6720,6 +6749,15 @@ a.machine-row__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A step with its answer under its name: the number stays on the name's 17.5px line, as an `.ac-iconline` lead. */
+@media (min-width: 761px) {
+  .onb__step:has(.onb__step-sub) {
+    align-items: flex-start;
+  }
+  .onb__step:has(.onb__step-sub) > .onb__n {
+    translate: 0 calc(8.75px - var(--cap-mid) - 50%);
+  }
+}
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
   display: flex;
@@ -7051,14 +7089,10 @@ a.machine-row__name:hover {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* An `.ac-faceline` with room above it for the face's hat: the name's capitals at the face's top. */
 .newag__role-top {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
   min-height: 58px;
-}
-.newag__role .newag__role-agent {
-  margin-top: 18px;
+  padding-top: 18px;
 }
 .newag__role-name {
   display: flex;
@@ -7789,7 +7823,7 @@ a.machine-row__name:hover {
   position: relative;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 14px;
-  align-items: center;
+  align-items: start;
   gap: 10px;
   min-width: 0;
   padding: 10px 10px 10px 12px;
@@ -7822,6 +7856,10 @@ a.machine-row__name:hover {
   width: 1px;
   background: var(--line);
 }
+/*
+ * The key on its label's 16px line, in the label's type so the capitals are the label's: an icon's middle on their
+ * middle (an `.ac-iconline` lead's place), a logo tile's top at their top (an `.ac-faceline` picture's).
+ */
 .agp-cell__key {
   display: grid;
   place-items: center;
@@ -7829,6 +7867,11 @@ a.machine-row__name:hover {
   height: 30px;
   border-radius: 10px 10px 10px 3px;
   color: var(--muted);
+  font-size: 12px;
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+.agp-cell__key:has(> .ac-brand) {
+  translate: 0 calc(8px - var(--cap-top));
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -7873,6 +7916,7 @@ a.machine-row__name:hover {
   line-height: 17px;
 }
 .agp-cell__chev {
+  align-self: center;
   color: var(--faint);
 }
 .agp-workcard__foot {
@@ -8436,10 +8480,8 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 8px;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the button in the row's middle. */
 .agp-attn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--raised);
@@ -8454,6 +8496,9 @@ a.machine-row__name:hover {
 .agp-attn__t b {
   font-weight: 600;
 }
+.agp-attn > .ac-btn {
+  align-self: center;
+}
 .agp-attn__t span {
   color: var(--muted);
   font-size: 12.5px;
@@ -8465,10 +8510,8 @@ a.machine-row__name:hover {
   padding: 0;
   list-style: none;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the time in the row's middle. */
 .agp-li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   min-width: 0;
   padding: 11px 0;
   border-top: 1px solid var(--line);
@@ -8501,6 +8544,7 @@ a.machine-row__name:hover {
 }
 .agp-li__when {
   flex: none;
+  align-self: center;
   color: var(--faint);
   white-space: nowrap;
 }

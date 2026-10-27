@@ -335,7 +335,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
   if (m.os !== "linux" || !use || use.available || !use.reason) return null;
   const command = commandInReason(use.reason);
   return (
-    <div className="brw-note">
+    <div className="brw-note ac-iconline">
       <Icon name="computer" size={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block" }}>{t("desktop.use.agent", { ...g, computer: m.name })}</span>

@@ -773,6 +773,39 @@ describe("Onboarding", () => {
     await settle(4);
   };
 
+  test("the step's actions: a bar always in view, Continue first, the text button after it, notes above it", async () => {
+    sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
+    await start();
+    const bar = document.querySelector(".onb__actions") as HTMLElement;
+    // Where the link went is the step's last line, above the bar, so the bar stays two controls tall.
+    const note = screen()
+      .getByText(/Mandamos um link de confirmação/)
+      .closest(".onb__note") as HTMLElement;
+    expect(bar.contains(note)).toBe(false);
+    expect(note.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await type("Nome", "Acme Saúde");
+    await next();
+    await type("Contexto", "A Acme Saúde faz um app para clínicas.");
+    await next();
+    // An optional step: Continue, then Skip beside it, in one bar.
+    const actions = [...(document.querySelector(".onb__actions") as HTMLElement).children].map((b) => b.textContent);
+    expect(actions[0]).toMatch(/^Continuar/);
+    expect(actions[1]).toBe("Pular esta etapa");
+    // It holds the screen's bottom while the step is longer, clear of a phone's home bar, and a field being typed in
+    // scrolls clear of it.
+    const css = readFileSync(join(import.meta.dir, "../src/pages/onboarding.css"), "utf8");
+    const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
+    expect(rule("\n.onb__actions")).toContain("position: sticky");
+    expect(rule("\n.onb__actions")).toContain("bottom: 0");
+    const phone = css.indexOf("@media (max-width: 760px) {\n  .onb__actions");
+    expect(phone).toBeGreaterThan(-1);
+    expect(rule("  .onb__actions", phone)).toContain("safe-area-inset-bottom");
+    expect(rule("\nhtml:has(.onb)")).toContain("scroll-padding-bottom: 104px");
+    expect(rule("  html:has(.onb)", phone)).toContain(
+      "scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px)",
+    );
+  });
+
   test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
     const { state } = await start();
     await type("Nome", "Acme Saúde");

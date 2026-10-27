@@ -6,7 +6,7 @@ setupDom();
 import { render } from "@testing-library/react";
 import { COMPUTER_KINDS, COMPUTER_STATES, ComputerIcon, ComputerPortrait, drawComputer } from "../src";
 import { liveComputerCount } from "../src/computer/live";
-import { COMPUTER_ART } from "../src/computer/portrait.js";
+import { COMPUTER_ART, COMPUTER_ROWS } from "../src/computer/portrait.js";
 
 /** Records the cells drawn, by color. */
 function fakeCtx() {
@@ -63,6 +63,26 @@ describe("computer portraits", () => {
       expect(Math.min(...xs)).toBe(first);
       expect(Math.max(...xs)).toBe(first + count - 1);
     }
+  });
+
+  test("each kind draws only inside its art's rows, in every state and frame: the box says where they start", () => {
+    for (const kind of COMPUTER_KINDS) {
+      const [first, count] = COMPUTER_ROWS[kind];
+      const ys = new Set<number>();
+      for (const state of COMPUTER_STATES)
+        for (const dark of [false, true])
+          for (let t = 0; t < 8; t += 0.1) {
+            const { ctx, cells } = fakeCtx();
+            drawComputer(ctx, kind, state, { dark, t });
+            for (const key of cells.keys()) ys.add(Number(key.split(",")[1]));
+          }
+      expect(Math.min(...ys)).toBe(first);
+      expect(Math.max(...ys)).toBe(first + count - 1);
+    }
+    const { container, unmount } = render(<ComputerPortrait kind="mac" state="online" size={96} />);
+    // The Mac starts 6 cells down: 12px at twice the grid.
+    expect((container.querySelector("canvas") as HTMLElement).style.getPropertyValue("--art-top")).toBe("12px");
+    unmount();
   });
 
   test("the portrait is its art's columns by the 48-cell grid, scaled by whole numbers; decorative unless labeled", () => {

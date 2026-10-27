@@ -312,10 +312,9 @@
   margin-top: 14px;
   padding: 18px;
 }
-.vault-card__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* An `.ac-faceline`: the title's capitals at the tile's top; the chip centres on the head. */
+.vault-card__head > .ac-chip {
+  align-self: center;
 }
 .vault-card__icon {
   flex: none;
