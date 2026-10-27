@@ -265,6 +265,8 @@ function EmailProof({
   const [sent, setSent] = useState<{ email: string; resendAt: number } | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<{ email: string; text: string } | null>(null);
+  // Past the address's hourly or daily cap, each press is a sure 429 that still spends the link's shared budget.
+  const [capped, setCapped] = useState<string | null>(null);
   const codeInput = useRef<HTMLInputElement>(null);
   const out = sent?.email === key;
   // A repaint every second while the countdown runs; the time itself is read below.
@@ -285,6 +287,7 @@ function EmailProof({
       const retryIn = e instanceof ApiError && e.code === "join.code_wait" ? Number(e.params?.retryIn) : 0;
       if (retryIn > 0) codeOut(retryIn);
       else setError({ email: key, text: errorText(t, e) });
+      if (e instanceof ApiError && e.code === "join.code_limit") setCapped(key);
     },
   });
   const check = useMutation({
@@ -330,13 +333,18 @@ function EmailProof({
           <span className="invite-ask__slot">
             <Button
               style={shown("verify")}
-              disabled={!isEmail(email)}
+              disabled={!isEmail(email) || capped === key}
               loading={send.isPending && !out}
               onClick={() => send.mutate()}
             >
               {t("invite.ask.verify")}
             </Button>
-            <Button style={shown("resend")} loading={send.isPending && out} onClick={() => send.mutate()}>
+            <Button
+              style={shown("resend")}
+              disabled={capped === key}
+              loading={send.isPending && out}
+              onClick={() => send.mutate()}
+            >
               {t("invite.ask.resend")}
             </Button>
             <Button
