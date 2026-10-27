@@ -31,13 +31,10 @@ const Jev = z
   .openapi("JevKey");
 
 const ApiKey = z.object({
-  apiKey: z
-    .string()
-    .trim()
-    .min(8)
-    .max(512)
-    .regex(/^\S+$/, "no spaces")
-    .openapi({ description: "The TypeSafe key, checked with TypeSafe before it is stored." }),
+  apiKey: z.string().trim().min(8).max(512).openapi({
+    description:
+      "The TypeSafe key, checked with TypeSafe before it is stored. Printable ASCII with no spaces, else 422 `jev_key_invalid` before any check, like a key TypeSafe refuses.",
+  }),
 });
 
 /** Limits checking keys through this server, so it can't test keys in bulk. */
@@ -92,7 +89,7 @@ export function jevRoutes(deps: AppDeps) {
       responses: {
         200: json(Jev),
         ...errors,
-        422: errorResponse("TypeSafe refused the key (`jev_key_invalid`)"),
+        422: errorResponse("TypeSafe refused the key, or it can't be one (`jev_key_invalid`)"),
         ...tooMany,
       },
     }),

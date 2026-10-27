@@ -128,6 +128,21 @@ describe("the key, saved and read", () => {
     expect(await f.db.select().from(schema.auditLog)).toEqual([]);
   });
 
+  test("a key that isn't printable ASCII is refused before TypeSafe sees it, and one in the env is never called", async () => {
+    f = await setup();
+    const ts = typesafe(200);
+    const key = jevKey(ts.fetch);
+    for (const pasted of ["“ts_quoted_key_9f2c”", "ts_zero\u200bwidth_9f2c", "ts with spaces"]) {
+      await expect(key.save(pasted, f.owner.id)).rejects.toMatchObject({ code: "jev_key_invalid" });
+    }
+    expect(await f.db.select().from(schema.instanceSecrets)).toEqual([]);
+    const env = jevKey(ts.fetch, "“ts_from_env_abcd”");
+    expect(await env.view()).toMatchObject({ source: "env", state: "invalid" });
+    expect(env.usable()).toBe(false);
+    expect(await live(env, ts.fetch)).toBe("off");
+    expect(ts.keys).toEqual([]);
+  });
+
   test("out of credit is stored and shown; a limit or no answer is stored and shown On", async () => {
     f = await setup();
     const broke = jevKey(typesafe({ status: 402 }).fetch);
@@ -252,6 +267,33 @@ describe("a broken key is skipped for a while", () => {
     expect((await key.view()).state).toBe("ok");
     tick(DOWN_SKIP_MS);
     expect(key.usable()).toBe(true);
+  });
+
+  test("an answer for a key replaced meanwhile says nothing about the new one", async () => {
+    f = await setup();
+    const key = jevKey(typesafe(200).fetch);
+    await key.save("ts_old_key_0000", f.owner.id);
+    let started = () => {};
+    let release = () => {};
+    const calling = new Promise<void>((r) => {
+      started = r;
+    });
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    // A live call with the old key, refused once the owner has replaced it.
+    const revoked = (async () => {
+      started();
+      await held;
+      return Response.json({ detail: {} }, { status: 401 });
+    }) as unknown as typeof globalThis.fetch;
+    const call = live(key, revoked);
+    await calling;
+    await key.save("ts_new_key_1111", f.owner.id);
+    release();
+    expect(await call).toBe("failed");
+    expect(await key.view()).toEqual({ source: "settings", hint: "1111", state: "ok" });
+    expect(await key.key()).toBe("ts_new_key_1111");
   });
 
   test("Check again: an answer about the key moves the state, a limit leaves Out of credit", async () => {

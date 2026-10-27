@@ -19,6 +19,7 @@ import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { deleteJevKey } from "./jev-key";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
@@ -222,7 +223,7 @@ export async function installOwner(db: Database): Promise<string | null> {
  * Who has the installation's own settings, the usage report's switch and the Jev key (ADR 0073): its first account,
  * pinned the first time anyone asks. Unlike `installOwner`, it never passes to the next oldest account, who may be
  * any member of any workspace: once the owner deletes their account, nobody has these settings here (the server's
- * environment still does).
+ * environment still does), until no account is left and the next first account is pinned.
  */
 export async function pinnedOwner(db: Database): Promise<string | null> {
   const [row] = await db
@@ -601,7 +602,7 @@ export async function deleteAccount(
 ): Promise<{ deletedOrgIds: string[] }> {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
   // Before any account goes: the first one stays the owner even once it is gone.
-  await pinnedOwner(db);
+  const owner = await pinnedOwner(db);
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
   const { left, deleted, released } = await db.transaction(async (tx) => {
     const mine = await tx
@@ -640,6 +641,10 @@ export async function deleteAccount(
     const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
     await tx.delete(users).where(eq(users.id, userId));
+    // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
+    if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
+    // With nobody left, the next first account owns the server again.
+    await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
     const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
     await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
     return { left: leaving, deleted: alone, released };

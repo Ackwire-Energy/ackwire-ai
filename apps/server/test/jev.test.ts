@@ -60,22 +60,29 @@ test("on agentes.chat itself nobody has it", async () => {
   expect((await first("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY }, origin })).status).toBe(404);
 });
 
-test("a key TypeSafe refuses: 422 and nothing stored", async () => {
-  const { t, owner } = await server({ status: 401 });
+test("a key TypeSafe refuses, or one that can't be a key: 422 and nothing stored", async () => {
+  const { t, owner, ts } = await server({ status: 401 });
   const res = await owner("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY } });
   expect(res.status).toBe(422);
   expect(((await res.json()) as { error: { code: string } }).error.code).toBe("jev_key_invalid");
+  // Pasted with curly quotes, a zero-width space or a space: refused before TypeSafe is asked.
+  for (const apiKey of [`“${SECRET_KEY}”`, "ts_live\u200b_9f2c", "ts with spaces"]) {
+    expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey } })).status).toBe(422);
+  }
+  expect(ts.calls).toHaveLength(1);
   expect(await t.db.select().from(schema.instanceSecrets)).toEqual([]);
   expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey: "short" } })).status).toBe(400);
-  expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey: "ts with spaces" } })).status).toBe(400);
 });
 
 test("saved: shown by its last 4 only, recorded in every workspace without the key; then removed", async () => {
   const { t, owner, other, ts } = await server();
   const acme = await org(owner, "Acme");
   const beta = await org(other, "Beta");
+  // Routing decisions name who decides: the cheap model until there is a key.
+  expect(t.engine.router?.strategy.name).toBe("llm");
   const saved = await owner("/api/app/jev", { method: "PUT", json: { apiKey: ` ${SECRET_KEY} ` } });
   expect(saved.status).toBe(200);
+  expect(t.engine.router?.strategy.name).toBe("jev");
   const text = await saved.text();
   expect(text).not.toContain("do_not_leak");
   expect(JSON.parse(text)).toMatchObject({ source: "settings", hint: "9f2c", state: "ok" });
@@ -147,9 +154,25 @@ test("the month: Jev's calls since the 1st (UTC), every workspace together, and 
   expect(view.month.costUsd).toBeCloseTo(0.000084, 9);
 });
 
-test("once the first account deletes itself, nobody inherits it", async () => {
-  const { owner, other } = await server();
+test("once the first account deletes itself, its key goes with it and nobody inherits the card", async () => {
+  const { t, owner, other } = await server();
+  const beta = await org(other, "Beta");
+  expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY } })).status).toBe(200);
   expect((await owner("/api/app/account", { method: "DELETE" })).status).toBe(204);
+  expect(await t.db.select().from(schema.instanceSecrets)).toEqual([]);
+  const gone = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "jev.key_removed"));
+  expect(gone).toMatchObject([{ orgId: beta, actorType: "system", details: { hint: "9f2c" } }]);
   expect((await other("/api/app/jev")).status).toBe(404);
   expect((await other("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY } })).status).toBe(404);
+});
+
+test("once no account is left, the next first account has it", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, jevFetch: typesafe().fetch });
+  const first = browser(t);
+  await signUp(first, "first@example.com");
+  expect((await first("/api/app/jev")).status).toBe(200);
+  expect((await first("/api/app/account", { method: "DELETE" })).status).toBe(204);
+  const next = browser(t);
+  await signUp(next, "next@example.com");
+  expect((await next("/api/app/jev")).status).toBe(200);
 });

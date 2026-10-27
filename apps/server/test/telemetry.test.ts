@@ -310,6 +310,17 @@ describe("the switch in Settings", () => {
     expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
   });
 
+  test("once no account is left, the next first account has the switch", async () => {
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const first = browser(t);
+    await signUp(first, "first@example.com");
+    expect((await first("/api/app/telemetry")).status).toBe(200);
+    expect((await first("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    const next = browser(t);
+    await signUp(next, "next@example.com");
+    expect((await next("/api/app/telemetry")).status).toBe(200);
+  });
+
   test("with TELEMETRY=off the page says so", async () => {
     const { owner } = await server({ TELEMETRY: "off" });
     const view = (await (await owner("/api/app/telemetry")).json()) as { enabled: boolean; envOff: boolean };

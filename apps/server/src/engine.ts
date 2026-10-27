@@ -174,6 +174,7 @@ export function buildEngine(o: EngineOptions) {
         fetch: o.jevFetch,
       }),
       llmJudge,
+      () => jevKey.usable(),
     );
   }
   // Screenshots go only to Jev's vision model: with a fake judge (tests) nothing looks at them.

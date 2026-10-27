@@ -165,11 +165,18 @@ const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Mat
 
 /**
  * Uses `primary`; on any error or timeout uses `fallback`, recording which one decided. With no Jev key the
- * fallback simply decides, under its own name.
+ * fallback simply decides, under its own name. While `primaryOn()` is false (no Jev key now) the strategy is named
+ * after `fallback` too, for the decisions recorded without asking it (no AI, an error).
  */
-export function withFallback(primary: RouterStrategy, fallback: RouterStrategy): RouterStrategy {
+export function withFallback(
+  primary: RouterStrategy,
+  fallback: RouterStrategy,
+  primaryOn: () => boolean = () => true,
+): RouterStrategy {
   return {
-    name: primary.name,
+    get name() {
+      return primaryOn() ? primary.name : fallback.name;
+    },
     async decide(input) {
       try {
         return { ...(await primary.decide(input)), strategy: primary.name };

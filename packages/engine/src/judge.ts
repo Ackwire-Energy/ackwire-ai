@@ -227,10 +227,15 @@ export function createLlmJudge(deps: {
   };
 }
 
-/** `primary`, and `fallback` on any error or timeout. */
-export function withJudgeFallback(primary: Judge, fallback: Judge): Judge {
+/**
+ * `primary`, and `fallback` on any error or timeout. Named after `fallback` while `primaryOn()` is false (no Jev key
+ * now), so a decision never names a judge that wasn't asked.
+ */
+export function withJudgeFallback(primary: Judge, fallback: Judge, primaryOn: () => boolean = () => true): Judge {
   return {
-    name: primary.name,
+    get name() {
+      return primaryOn() ? primary.name : fallback.name;
+    },
     async ask(request) {
       try {
         return await primary.ask(request);

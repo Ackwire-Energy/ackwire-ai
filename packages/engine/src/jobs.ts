@@ -138,6 +138,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
             },
           }),
           llm,
+          () => typeof jev.key === "string" || jev.key.usable(),
         )
       : llm);
   return {
