@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createMemoryRateLimiter } from "@agenteschat/adapters";
 import { eq, schema, sql } from "@agenteschat/db";
 import {
   acceptInvitation,
@@ -139,7 +140,10 @@ describe("members", () => {
     // A request to join waits; approving it is refused while full.
     const link = await inviteLink(f.db, SECRET, f.owner.id, f.org.id);
     const dan = await person("dan@example.com", true);
-    await askToJoin({ db: f.db }, "https://agentes.test", { token: link.token, user: dan });
+    await askToJoin({ db: f.db, rateLimiter: createMemoryRateLimiter() }, "https://agentes.test", {
+      token: link.token,
+      user: dan,
+    });
     const [request] = await f.db.select().from(schema.organizationJoinRequests);
     await expect(
       approveJoinRequest({ db: f.db }, "https://agentes.test", f.owner.id, f.org.id, request?.id ?? "", "member"),

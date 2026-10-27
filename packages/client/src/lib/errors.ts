@@ -85,6 +85,7 @@ const KNOWN = {
   "join.link_closed": "errors.join.linkClosed",
   "join.full": "errors.join.full",
   "join.rate_limited": "errors.join.rateLimited",
+  "join.link_busy": "errors.join.linkBusy",
   "join.member": "errors.join.member",
   "join.denied": "errors.join.denied",
   "join.answered": "errors.join.answered",

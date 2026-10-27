@@ -10,6 +10,7 @@
 - Workers claim due rows with `SELECT … FOR UPDATE SKIP LOCKED` and set a lease (`locked_until`, default 10 minutes, longer than any model call we allow). An expired lease makes the row claimable again (crash recovery). Completion is fenced by `locked_by`, so a late worker can't overwrite the new owner.
 - Failures retry with backoff (5 s → 3 h) up to `max_attempts`, then the row is `failed`. Handlers throw `PermanentJobError` to skip retries; errors with `retryable: false` (e.g. provider auth errors) also stop. Handlers get `finalAttempt` so they can fail cleanly.
 - Optional `dedupe_key` (unique) makes enqueueing idempotent.
+- Finished jobs (`done`, `failed`) keep their content 30 days: then the daily tick clears their `payload` and `last_error` (`clearOldOutboxPayloads`). The row stays, so its `dedupe_key` still refuses a second enqueue.
 - Workers run inside the server process (`apps/server/src/workers.ts`): the outbox every second (plus `wake()` right after a post with mentions), message partition maintenance daily. Safe on several replicas.
 - Job kinds today: `message.posted` (dispatch @mentions) and `agent_run.execute`.
 

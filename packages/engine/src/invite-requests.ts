@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import type { PubSub } from "@agenteschat/adapters";
+import type { PubSub, RateLimiter } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -83,11 +83,17 @@ const JOIN_CODE_LIMITS = { hour: 5, day: 10, wrongDay: 10, mailboxDay: 20, serve
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
+/** New requests through one link an hour (ADR 0068): enough for a team arriving, not for a flood. */
+const REQUESTS_PER_LINK = { limit: 20, windowMs: HOUR_MS };
 const group = (orgId: string) => `join_requests:${orgId}`;
 const closedLink = () => new NotFoundError("This link no longer works", "join.link_closed");
 const fullError = () => new ConflictError("This workspace has many requests waiting", "join.full");
+/** A link's hour used up, by asks or by codes: everyone asking through it shares it, unlike `join.rate_limited`. */
+export const linkBusy = () =>
+  new TooManyError("Many people asked through this link in the last hour. Try again later.", "join.link_busy");
 
-type Deps = { db: Database; pubsub?: PubSub };
+/** `rateLimiter` counts a link's new requests (`spendLinkRequest`): `askToJoin` requires it, the job never spends. */
+type Deps = { db: Database; pubsub?: PubSub; rateLimiter?: RateLimiter };
 type RequestRow = typeof requests.$inferSelect;
 
 /** Waiting for an answer: pending and not past its 14 days. */
@@ -157,6 +163,12 @@ async function openLink(db: Executor, token: string, now: Date) {
   const found = await findInviteLink(db, token);
   if (!found || !inviteLinkOpen(found, now)) throw closedLink();
   return found;
+}
+
+/** One of the link's new requests for the hour (`REQUESTS_PER_LINK`), in memory like every rate limit here. */
+async function spendLinkRequest(deps: Deps, linkId: string) {
+  const spent = await deps.rateLimiter?.consume(`join-request:link:${linkId}`, REQUESTS_PER_LINK);
+  if (spent && !spent.allowed) throw linkBusy();
 }
 
 const codeHash = (orgId: string, email: string, code: string) => sha256(`${orgId}:${email}:${code}`);
@@ -366,10 +378,17 @@ interface Ask {
  * where it stands and is filed at once. On a server without email, a typed address, or an account's that isn't
  * confirmed (anyone can sign up with an address that isn't theirs), gets the same answer after the same work
  * whatever it is: nothing here depends on the address, so a link never tells who works there, who waits or who was
- * turned down, not even by how long the answer takes. A job files it (`fileJoinRequest`). `created` is false only
- * when a request for the address already waited.
+ * turned down, not even by how long the answer takes. A job files it (`fileJoinRequest`). A link takes 20 new
+ * requests an hour (`join.link_busy`): a proven ask counts only when it files one, an unproven ask whenever it
+ * asks, so asks without a right code can't use up the hour for the people it was shared with. `created` is false
+ * only when a request for the address already waited.
  */
-export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinInput, now = new Date()) {
+export async function askToJoin(
+  deps: Deps & { rateLimiter: RateLimiter },
+  publicUrl: string,
+  input: AskToJoinInput,
+  now = new Date(),
+) {
   const { db } = deps;
   const found = await openLink(db, input.token, now);
   const orgId = found.link.orgId;
@@ -408,6 +427,7 @@ export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinI
     return { status: "pending" as const, email, created };
   }
   if ((await waitingCount(db, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
+  await spendLinkRequest(deps, found.link.id);
   await enqueue(db, { orgId, kind: FILE_JOIN_REQUEST_JOB, payload: { ...ask, publicUrl } });
   return { status: "pending" as const, email, created: true };
 }
@@ -474,6 +494,8 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
       if (proven) throw fullError();
       return null;
     }
+    // An unproven ask counted when it asked: its answer can't wait for the job, nor depend on the address.
+    if (proven) await spendLinkRequest(deps, ask.linkId);
     const values = {
       linkId: ask.linkId,
       userId: ask.userId,

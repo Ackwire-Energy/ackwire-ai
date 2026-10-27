@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createMemoryRateLimiter } from "@agenteschat/adapters";
 import { and, countQueries, eq, schema } from "@agenteschat/db";
 import {
   acceptInvitation,
@@ -42,11 +43,13 @@ const PUBLIC = "https://agentes.test/";
 const DAY = 86_400_000;
 const NOW = new Date("2026-10-26T10:15:00.000Z");
 const later = (days: number) => new Date(NOW.getTime() + days * DAY);
-const deps = () => ({ db: f.db, pubsub: f.pubsub });
+let limiter = createMemoryRateLimiter();
+const deps = () => ({ db: f.db, pubsub: f.pubsub, rateLimiter: limiter });
 
 async function start() {
   f = await setup();
   close = f.close;
+  limiter = createMemoryRateLimiter();
   const { token, link } = await inviteLink(f.db, SECRET, f.owner.id, f.org.id, NOW);
   return { token, link };
 }
@@ -248,6 +251,20 @@ describe("asking to join through a link", () => {
     expect(again).toEqual([
       expect.objectContaining({ name: "P0 again", status: "pending", expiresAt: later(JOIN_REQUEST_TTL_DAYS) }),
     ]);
+  });
+
+  test("a link files 20 new requests an hour: a confirmed account asking again spends none of them", async () => {
+    const { token, link } = await start();
+    const confirmed = (name: string) => person(`${name}@example.com`, { verified: true });
+    const bia = await confirmed("bia");
+    expect(await signedIn(token, bia)).toMatchObject({ created: true });
+    expect(await signedIn(token, bia)).toMatchObject({ created: false });
+    // Bia's request was the 1st: with 18 more, Cai's is the 20th and Dan's waits.
+    const hour = { limit: 20, windowMs: 3_600_000 };
+    for (let i = 0; i < 18; i++) await limiter.consume(`join-request:link:${link.id}`, hour);
+    expect(await signedIn(token, await confirmed("cai"))).toMatchObject({ created: true });
+    await expect(signedIn(token, await confirmed("dan"))).rejects.toMatchObject({ code: "join.link_busy" });
+    expect((await rows()).map((r) => r.email).sort()).toEqual(["bia@example.com", "cai@example.com"]);
   });
 
   test("signed in and confirmed: a member; a denied address hears it; a typed waiting request becomes theirs", async () => {

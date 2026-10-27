@@ -1,6 +1,6 @@
 # 0056. Operator API and external provisioning
 
-- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), and 2026-10-27 by ADR 0071 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal)
+- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), and 2026-10-27 by ADR 0071 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions)
 - Date: 2026-10-24
 - Extends: ADR 0002 (nothing private runs in the server process), ADR 0004 (configuration), ADR 0025 (connected computers)
 
@@ -57,7 +57,8 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 | `mail.sent` | an agent sends, replies to or forwards an email | `agentId`, `runId`, `kind`, `recipients` (how many), `domains` |
 | `run.finished` | an agent's run ends (done, failed or canceled) | `runId`, `agentId`, `brain`, `status`, `toolCalls` |
 | `task.finished` | a task on a computer ends (done, failed, canceled, or interrupted for good) | `taskId`, `agentId`, `executor`, `status` |
-| `content.viewed` | a review block is read (§6) | `ref` (`run:<id>` or `task:<id>`), `reason`, `operator` |
+| `desktop_control.ended` | a screened segment of a person's control of an agent's screen ends, having read something (ADR 0076; only with `SESSION_SCREENING`); `userId` is who was in control | `agentId`, `segmentId`, `startedAt`, `endedAt`, `screens` (how many) |
+| `content.viewed` | a review block is read (§6) | `ref` (`run:<id>`, `task:<id>` or `session:<id>`), `reason`, `operator` |
 | `platform_ai.threshold` | a workspace's usage billed to the platform this UTC month first reaches 50%, and first reaches 100%, of its `platformUsdPerMonth` limit (ADR 0071) | `month`, `percent` (50 or 100), `spentUsd`, `limitUsd` |
 
 - **Metadata only.** Ids, counts, domains and where a sign-in came from: never a message, prompt, subject, address list, file, credential or token. Content leaves only through §6.
@@ -70,9 +71,9 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 
 ### 6. Review blocks: the only content
 
-`GET /review/{run|task}/{id}?reason&operator` answers `{ kind, id, orgId, agentId, text }`: what one run or task did, for an abuse review (`packages/engine/src/operator-review.ts`).
+`GET /review/{run|task|session}/{id}?reason&operator` answers `{ kind, id, orgId, agentId, text }`: what one run or task did, or what was on an agent's screen while a person controlled it (a session, ADR 0076), for an abuse review (`packages/engine/src/operator-review.ts`).
 
-- **Built by the server, never raw rows.** A run's block holds the message that started it, each tool call with its input and result, and the reply; a task's holds its title, the message behind it, its prompt, command, result, last lines of output and the files it touched. Plus a header of ids, brain or executor, status and times.
+- **Built by the server, never raw rows.** A run's block holds the message that started it, each tool call with its input and result, and the reply; a task's holds its title, the message behind it, its prompt, command, result, last lines of output and the files it touched; a session's, one screened segment of a person's control, holds the text of its first and latest screens, from the server's memory only, gone 10 minutes after the segment ends (a 404 then, and always on a server without `SESSION_SCREENING`). Plus a header of ids, brain or executor (or who was in control), status and times.
 - **At most 12,000 bytes.** Every piece is cut first; when they still don't fit, the lowest-ranked go (tool calls before the request and the reply), and a last line says how many were left out.
 - **Credentials masked** by their shapes (API keys, tokens, `Bearer` headers, `password=` and `token:` values, private keys) before anything is cut. Tool inputs are written as `key: value` lines so a field named like a secret is masked too.
 - **Workspace text is quoted.** Everything people, agents, tools or web pages wrote is inside `<external_data>` envelopes, with any copy of the markers neutralised, so the reader (a person, or a model that judges it) weighs it as data and never follows it.

@@ -31,7 +31,7 @@ const BotCheck = z
     }),
     testing: z.boolean().openapi({
       description:
-        "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets, which pass every token, so nothing is really checked. Right only on a test server.",
+        "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets. They refuse real tokens, and the one that passes takes a public dummy token from anyone. Right only on a test server.",
     }),
   })
   .openapi("OperatorBotCheck");

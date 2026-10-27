@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 24;
+export const MACHINE_PROTOCOL_VERSION = 25;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -311,6 +311,19 @@ export interface BrowserTraffic {
   down: number;
   hours: number;
 }
+
+/**
+ * From this protocol on (ADR 0076): `desktop.text`, the text on an agent's
+ * screen, read on the computer (tesseract, as the agent's own user) from a
+ * capture like `desktop.capture`'s, for screening a person in control on
+ * agentes.chat Cloud. The image never leaves the computer. A screen whose
+ * capture didn't change since the last read answers `same`. Served where
+ * desktop use is (`desktop_unavailable` without tesseract). The server never
+ * sends it to an older runner.
+ */
+export const DESKTOP_TEXT_PROTOCOL = 25;
+/** The most text one `desktop.text` answers (characters). */
+export const DESKTOP_TEXT_MAX = 16_000;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -1312,6 +1325,8 @@ export type MachineRequest = (
   | { op: "desktop.capture"; region?: DesktopRegion }
   /** Protocol 21: the apps the agent can start. */
   | { op: "desktop.apps" }
+  /** Protocol 25: the text on the agent's screen, read on the computer. */
+  | { op: "desktop.text" }
 ) & { agent?: AgentScope };
 
 /** One command of a `browser.batch` (protocol 17). */
@@ -1359,6 +1374,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.act",
   "desktop.capture",
   "desktop.apps",
+  "desktop.text",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1458,6 +1474,8 @@ export interface MachineReplies {
   };
   /** The apps a person could start from the menu: what `launch` takes, and their names. */
   "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
+  /** The screen's text (trimmed, `DESKTOP_TEXT_MAX` at most), or `same`: the capture didn't change since the last read. */
+  "desktop.text": { text: string } | { same: true };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */

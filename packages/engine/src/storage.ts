@@ -483,6 +483,34 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
   return migrationView(migration) as StorageMigrationView;
 }
 
+/**
+ * Job `org.files.purge` (ADR 0019): a deleted workspace's files leave platform storage, its Drive, skills and
+ * connector icons (`orgs/{orgId}/`) and its logo (`org-logos/{orgId}/`), each folder at once where the store can
+ * (`FILES_DIR`), else up to `limit` keys of each per run. True when a page came back full, so more may be left. A
+ * bucket the workspace brought is its own and stays as it is.
+ */
+export async function purgeOrgFiles(deps: StorageDeps, orgId: string, limit = 1000): Promise<boolean> {
+  // Irreversible: never for a workspace that still exists.
+  const [alive] = await deps.db
+    .select({ id: schema.organizations.id })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId));
+  if (alive) return false;
+  const { platform } = deps;
+  const prefixes = [`orgs/${orgId}/`, `org-logos/${orgId}/`];
+  if (platform.deletePrefix) {
+    for (const prefix of prefixes) await platform.deletePrefix(prefix);
+    return false;
+  }
+  let full = false;
+  for (const prefix of prefixes) {
+    const keys = await platform.list(prefix, limit);
+    for (const key of keys) await platform.delete(key);
+    full ||= keys.length >= limit;
+  }
+  return full;
+}
+
 /** Job `storage.migrate`: copies in batches, saving progress after each object. */
 export async function runMigration(deps: StorageDeps, migrationId: string, options: { batch?: number } = {}) {
   const { db } = deps;

@@ -57,6 +57,7 @@ function brokerFor(
   options: {
     reply?: (request: MachineRequest) => Promise<unknown>;
     authorize?: StreamBrokerDeps["authorize"];
+    onReady?: StreamBrokerDeps["onReady"];
     onClosed?: StreamBrokerDeps["onClosed"];
     limits?: StreamBrokerDeps["limits"];
   } = {},
@@ -84,6 +85,7 @@ function brokerFor(
     authorize:
       options.authorize ??
       (async (input) => ({ machineId: machine.machineId, agent: { id: input.agentId, handle: "dev" } })),
+    onReady: options.onReady,
     onClosed: options.onClosed,
     limits: options.limits,
   });
@@ -195,6 +197,33 @@ describe("the broker", () => {
     broker.accept(silent.socket);
     await until(() => silent.closed !== null, "the hello timeout");
     expect(silent.closed?.code).toBe(STREAM_CLOSE.late);
+  });
+
+  test("onReady: once per stream, once its data socket is ready; never for one that got none", async () => {
+    f = await setup();
+    const machine = await paired();
+    const ready: string[] = [];
+    const { broker } = brokerFor(machine, {
+      authorize: async (i) =>
+        i.userId === f.owner.id
+          ? { machineId: machine.machineId, agent: { id: i.agentId, handle: "dev" } }
+          : { refused: STREAM_CLOSE.forbidden, reason: "forbidden" },
+      onReady: (s) => {
+        ready.push(s.runner ? s.id : "before its data socket");
+      },
+    });
+    const control = broker.open(fakeSocket().socket, input(CONTROL));
+    const watch = broker.open(fakeSocket().socket, input(WATCH));
+    const refused = fakeSocket();
+    broker.open(refused.socket, input(WATCH, f.agent.id, "someone-else"));
+    await until(() => ready.length === 2 && refused.closed !== null, "both ready, one refused");
+    expect(ready.sort()).toEqual([control.id, watch.id].sort());
+    // Another data socket for a stream already served is refused, and fires nothing.
+    const link = broker.accept(fakeSocket().socket);
+    await broker.fromRunner(link, JSON.stringify({ type: "stream.hello", token: machine.token, streamId: control.id }));
+    broker.close(control);
+    await Bun.sleep(10);
+    expect(ready).toHaveLength(2);
   });
 
   test("the computer's answer: its refusal, offline, paused, at its cap, or a reply without a data socket", async () => {

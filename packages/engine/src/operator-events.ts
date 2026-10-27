@@ -29,6 +29,7 @@ export type OperatorEventType =
   | "mail.sent"
   | "run.finished"
   | "task.finished"
+  | "desktop_control.ended"
   | "content.viewed"
   | "platform_ai.threshold";
 

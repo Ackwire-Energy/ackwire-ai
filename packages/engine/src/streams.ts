@@ -76,6 +76,8 @@ export interface StreamBrokerDeps {
   authorize(input: StreamInput): Promise<StreamTarget>;
   /** Every `accessRecheckMs` while it is open: whether the person may still have it (null), else its close. */
   recheck?(stream: Stream): Promise<{ refused: number; reason: string } | null>;
+  /** A stream got its data socket (session screening starts), once. */
+  onReady?(stream: Stream): unknown;
   /** A stream that got its data socket ended (the audit). */
   onClosed?(stream: Stream): unknown;
   /** Tests: shorter timeouts, smaller caps. */
@@ -101,7 +103,7 @@ interface OpenStream extends Stream {
  * which computer), checks the caps, then sends `stream.open` with a fresh
  * 32-byte id; the data socket's `stream.hello` names that id and carries its
  * machine's token. Either side closing closes both; a stream that got its data
- * socket goes to `onClosed`.
+ * socket goes to `onReady`, and to `onClosed` once it ends.
  */
 export function createStreamBroker(deps: StreamBrokerDeps) {
   const limits: Limits = { ...STREAM_LIMITS, ...deps.limits };
@@ -117,6 +119,14 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     }
   };
 
+  /** A hook, after the broker's own step and never in its way. */
+  const later = (hook: ((s: Stream) => unknown) | undefined, s: Stream, failed: string) => {
+    if (!hook) return;
+    void Promise.resolve()
+      .then(() => hook(s))
+      .catch((error) => deps.log?.warn(failed, { agentId: s.agentId, error: String(error) }));
+  };
+
   function close(stream: Stream, code: number = STREAM_CLOSE.normal, reason = "") {
     const s = streams.get(stream.id);
     if (!s) return;
@@ -128,12 +138,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     quietly(() => s.viewer.close(code, reason));
     const runner = s.runner;
     if (runner) quietly(() => runner.close(code, reason));
-    const onClosed = deps.onClosed;
-    if (s.readyAt !== null && onClosed) {
-      void Promise.resolve()
-        .then(() => onClosed(s))
-        .catch((error) => deps.log?.warn("stream audit failed", { agentId: s.agentId, error: String(error) }));
-    }
+    if (s.readyAt !== null) later(deps.onClosed, s, "stream audit failed");
   }
 
   /** Ends a data socket that has no stream (yet). */
@@ -255,6 +260,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     s.queue = [];
     s.queued = 0;
     for (const frame of queue) if (!s.closed) relay(s, link.socket, frame, limits.runnerBufferedMax);
+    if (!s.closed) later(deps.onReady, s, "stream start hook failed");
   }
 
   return {

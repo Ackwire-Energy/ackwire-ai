@@ -3,6 +3,7 @@ import { type Database, eq, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   claimJobs,
+  clearOldOutboxPayloads,
   completeJob,
   createOutboxPump,
   DEFAULT_LEASE_MS,
@@ -248,6 +249,30 @@ test("createOutboxPump: routines hold at most half of the slots, so other work a
   expect(await pump.pump()).toBe(1);
   await pump.idle();
   expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
+test("finished jobs lose their content after 30 days and keep their row and dedupe key", async () => {
+  const day = 86_400_000;
+  for (const kind of ["old", "failed", "recent", "waiting"]) await enqueue(db, job(kind, { dedupeKey: kind }));
+  const set = (kind: string, values: Partial<typeof schema.outbox.$inferInsert>) =>
+    db.update(schema.outbox).set(values).where(eq(schema.outbox.kind, kind));
+  await set("old", { status: "done", completedAt: at(-31 * day), lastError: "a@example.com bounced" });
+  await set("failed", { status: "failed", createdAt: at(-31 * day), lastError: "a@example.com bounced" });
+  await set("recent", { status: "done", completedAt: at(-29 * day) });
+  await set("waiting", { createdAt: at(-31 * day) });
+
+  expect(await clearOldOutboxPayloads(db)).toBe(2);
+  const kept = Object.fromEntries((await rows()).map((r) => [r.kind, [r.payload, r.lastError, r.dedupeKey]]));
+  expect(kept).toEqual({
+    old: [{}, null, "old"],
+    failed: [{}, null, "failed"],
+    recent: [{ n: 1 }, null, "recent"],
+    waiting: [{ n: 1 }, null, "waiting"],
+  });
+  // The cleared row still refuses the same key, and a second pass finds nothing to clear.
+  await enqueue(db, job("old", { dedupeKey: "old" }));
+  expect(await rows()).toHaveLength(4);
+  expect(await clearOldOutboxPayloads(db)).toBe(0);
 });
 
 test("drainOutbox follows chains of jobs", async () => {

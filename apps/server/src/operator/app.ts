@@ -1,7 +1,7 @@
 import type { HumanCheck, PubSub } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import { type MachineHub, safeEqual } from "@agenteschat/engine";
+import { type MachineHub, type SessionScreening, safeEqual } from "@agenteschat/engine";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
@@ -27,6 +27,8 @@ export interface OperatorDeps {
   emails?: boolean;
   /** The bot check (ADR 0075), reported by `/health`; absent: `off`. */
   humanCheck?: HumanCheck | null;
+  /** Screened sessions (ADR 0076), read through the review door; absent: none, so every one is a 404. */
+  sessions?: Pick<SessionScreening, "segment"> | null;
 }
 
 /**
