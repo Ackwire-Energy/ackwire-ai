@@ -12,7 +12,7 @@ export type { AgentMode } from "@/agent/poses";
 export { Fuse, type FuseProps } from "@/sky/Fuse";
 export type { PlanState } from "@/sky/math";
 export { PlanTrack, type PlanTrackProps } from "@/sky/PlanTrack";
-export { Sky, type SkyProps } from "@/sky/Sky";
+export { Sky, type SkyProps, WorkspaceSky } from "@/sky/Sky";
 export { SpendBar, type SpendBarProps } from "@/sky/SpendBar";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, type CardProps } from "./Card";

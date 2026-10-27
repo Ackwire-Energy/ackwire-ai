@@ -5862,6 +5862,29 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
+/*
+ * The workspace's sky (Sky.tsx WorkspaceSky): behind the header, from the sidebar's top edge to the header's
+ * foot (16px of the sidebar's padding + the 48px header), edge to edge; not on the icon rail.
+ */
+.sidebar__top {
+  position: relative;
+  isolation: isolate;
+}
+.workspace-sky {
+  position: absolute;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.workspace-sky--side {
+  top: -16px;
+  left: -12px;
+  right: -12px;
+  height: 64px;
+}
+.sidebar[data-rail="true"] .workspace-sky {
+  display: none;
+}
 /* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
   border-radius: 12px;

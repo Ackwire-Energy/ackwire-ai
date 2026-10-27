@@ -20,6 +20,8 @@ html[data-desktop="linux"] {
 }
 
 .titlebar {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -29,6 +31,13 @@ html[data-desktop="linux"] {
   border-bottom: 1px solid var(--line);
   user-select: none;
   -webkit-user-select: none;
+}
+/* The workspace's sky over the sidebar's width, its hairline included: one sky with the header below. */
+.workspace-sky--bar {
+  top: 0;
+  left: 0;
+  bottom: -1px;
+  width: 272px;
 }
 .titlebar__nav {
   display: flex;

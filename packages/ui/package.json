@@ -27,6 +27,7 @@
     "./sky/math": "./src/sky/math.ts",
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
+    "./sky/workspace": "./src/sky/workspace.ts",
     "./names": "./src/names.ts",
     "./plan-state": "./src/plan-state.ts",
     "./timezones": "./src/timezones.ts"
