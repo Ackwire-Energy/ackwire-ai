@@ -197,7 +197,7 @@ export const desktopPtBR = {
     getTailscale: "Baixar o Tailscale",
     usage: "Enviar estatísticas de uso anônimas ao agentes.chat",
     usageText:
-      "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
     start: "Iniciar o agentes.chat",
     setting: "Preparando o agentes.chat neste {{device}}",
     step: {

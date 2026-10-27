@@ -2,8 +2,17 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import os, { tmpdir } from "node:os";
 import { join } from "node:path";
-import { combineLoads, LoadWindow, machineSize, memAvailable, sampleLoad, vmStatAvailable } from "../src/host-stats";
-import { LOAD_SAMPLE_MS, parseRunnerFrame } from "../src/machine-protocol";
+import {
+  combineLoads,
+  combineTraffic,
+  LoadWindow,
+  machineSize,
+  memAvailable,
+  sampleLoad,
+  TrafficWindow,
+  vmStatAvailable,
+} from "../src/host-stats";
+import { LOAD_SAMPLE_MS, parseBrowserTraffic, parseRunnerFrame } from "../src/machine-protocol";
 
 const HOUR = 3600_000;
 const GIB = 2 ** 30;
@@ -155,5 +164,69 @@ describe("protocol 22 on the wire", () => {
       type: "pong",
       at: 1,
     });
+  });
+});
+
+describe("the agents' browsers' traffic (protocol 23)", () => {
+  test("the window sums the last day of samples, empty ones too, and says the hours it covers", () => {
+    const w = new TrafficWindow();
+    expect(w.summary()).toBeNull();
+    const t0 = Date.UTC(2026, 9, 27, 12);
+    w.add({ up: 1000, down: 50_000 }, t0);
+    w.add({ up: 0, down: 0 }, t0 + LOAD_SAMPLE_MS);
+    w.add({ up: 500, down: 7000 }, t0 + 2 * LOAD_SAMPLE_MS);
+    expect(w.summary()).toEqual({ up: 1500, down: 57_000, hours: 0.3 });
+    const same = w.summary();
+    expect(w.summary()).toBe(same);
+    // A day after the first sample, it is gone.
+    w.add({ up: 1, down: 2 }, t0 + 24 * HOUR);
+    expect(w.summary()).toEqual({ up: 501, down: 7002, hours: 0.3 });
+    expect(w.summary()).not.toBe(same);
+  });
+
+  test("a full day is 24 hours, never more", () => {
+    const w = new TrafficWindow();
+    for (let i = 0; i < 400; i++) w.add({ up: 1, down: 1 }, i * LOAD_SAMPLE_MS);
+    expect(w.summary()).toEqual({ up: 288, down: 288, hours: 24 });
+  });
+
+  test("several computers as one: bytes summed into MB, hours averaged, how many said", () => {
+    const a = { up: 1_400_000, down: 250_600_000, hours: 24 };
+    const b = { up: 600_000, down: 900_000, hours: 12.5 };
+    expect(combineTraffic([a, null, b])).toEqual({ upMb: 2, downMb: 252, hours: 18.3, computers: 2 });
+    expect(combineTraffic([null, { up: 0, down: 0, hours: 0.1 }])).toEqual({
+      upMb: 0,
+      downMb: 0,
+      hours: 0.1,
+      computers: 1,
+    });
+    expect(combineTraffic([null])).toBeNull();
+    expect(combineTraffic([])).toBeNull();
+  });
+
+  test("a pong carries it; one out of bounds is dropped whole", () => {
+    const traffic = { up: 12_000, down: 3_400_000, hours: 23.9 };
+    expect(parseRunnerFrame(JSON.stringify({ type: "pong", at: 1, browserTraffic: traffic }))).toEqual({
+      type: "pong",
+      at: 1,
+      browserTraffic: traffic,
+    });
+    expect(parseBrowserTraffic({ up: 0, down: 1e15, hours: 0 })).toEqual({ up: 0, down: 1e15, hours: 0 });
+    for (const bad of [
+      { ...traffic, up: -1 },
+      { ...traffic, down: 1e15 + 1 },
+      { ...traffic, up: 1.5 },
+      { ...traffic, down: "3400000" },
+      { ...traffic, hours: 24.1 },
+      { ...traffic, hours: -0.1 },
+      { up: 1, down: 1 },
+      null,
+      "traffic",
+    ]) {
+      expect(parseBrowserTraffic(bad)).toBeNull();
+    }
+    expect(
+      parseRunnerFrame(JSON.stringify({ type: "pong", at: 1, browserTraffic: { ...traffic, hours: 25 } })),
+    ).toEqual({ type: "pong", at: 1 });
   });
 });

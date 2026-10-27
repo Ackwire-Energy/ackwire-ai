@@ -1,4 +1,5 @@
 import {
+  type BrowserTraffic,
   HEARTBEAT_MS,
   type MachineLoad,
   type MachineRequest,
@@ -109,6 +110,8 @@ export interface ConnectionOptions {
   executors?: () => RunnerInfo["executors"];
   /** Protocol 22: the last day's load; each new summary goes out once, on the next `pong`. */
   load?: () => MachineLoad | null;
+  /** Protocol 23: the agents' browsers' last day of traffic, the same way. */
+  browserTraffic?: () => BrowserTraffic | null;
   /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
@@ -225,6 +228,7 @@ export class RunnerConnection {
       let heartbeatMs = HEARTBEAT_MS;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
       let sentLoad: MachineLoad | null = null;
+      let sentTraffic: BrowserTraffic | null = null;
 
       const send = (frame: RunnerFrame) => {
         if (finished || !socket) return;
@@ -308,8 +312,15 @@ export class RunnerConnection {
             return;
           case "ping": {
             const load = opts.load?.() ?? null;
-            send({ type: "pong", at: frame.at, ...(load && load !== sentLoad ? { load } : {}) });
+            const traffic = opts.browserTraffic?.() ?? null;
+            send({
+              type: "pong",
+              at: frame.at,
+              ...(load && load !== sentLoad ? { load } : {}),
+              ...(traffic && traffic !== sentTraffic ? { browserTraffic: traffic } : {}),
+            });
             sentLoad = load;
+            sentTraffic = traffic;
             arm();
             return;
           }
