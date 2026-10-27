@@ -103,6 +103,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         heading: "Your AI plans",
         blocks: [
           "Your agents can think with your own AI plan, like Claude, ChatGPT, GLM or Kimi, signed in on this computer: no API key needed. The account stays on this computer, and agentes.chat never sees the password or the access.",
+          "Google's AI Pro and Ultra plans don't work here: Google's terms don't allow them in other products. A Gemini API key does.",
         ],
       },
       {

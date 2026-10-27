@@ -30,7 +30,7 @@ import {
   updateAgent,
   usageSummary,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, usdToNanoUsd } from "@agenteschat/providers";
+import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -144,8 +144,8 @@ export function agentRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
-            inputUsdPerMTok: m.prices.input / 1000,
-            outputUsdPerMTok: m.prices.output / 1000,
+            inputUsdPerMTok: pricesAt(m).input / 1000,
+            outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
         },
         200,

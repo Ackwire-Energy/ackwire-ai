@@ -17,7 +17,7 @@ import {
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
 import { isPlanId, PLAN_IDS } from "@agenteschat/client/lib/plans";
-import { keyLooksValid, PROVIDERS, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
+import { keyLooksValid, keyStepHint, PROVIDERS, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -600,6 +600,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
   const maker = providerOf(form.provider);
+  const hint = maker && keyStepHint(maker);
   const clean = form.key.trim();
   const valid = keyLooksValid(form.provider, clean);
   const wrong = touched && clean.length > 0 && !valid;
@@ -638,7 +639,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               n={1}
               state={opened || clean ? "done" : "now"}
               title={t("connectAi.key.create", providerGrammar(t, form.provider))}
-              hint={"plans" in maker && maker.plans ? t("connectAi.key.notPlan") : undefined}
+              hint={hint && t(hint)}
               side={
                 <OpenPage
                   href={site.href}

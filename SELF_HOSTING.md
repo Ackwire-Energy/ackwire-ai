@@ -12,7 +12,7 @@ anything, and every link the app sends come from it. Opened at any other address
 "Invalid origin" and saving fails with `bad_origin`.
 
 The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
-DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+Gemini, DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -659,7 +659,7 @@ ones a self-hosted instance usually touches:
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
-**Model keys.** Each organization adds its own keys (Claude, OpenAI, DeepSeek, Kimi, Z.ai or
+**Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
@@ -780,7 +780,7 @@ party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Claude (Anthropic), OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or a key the server's owner saves with `PUT /api/app/jev` (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
@@ -789,6 +789,8 @@ party only when you turn that service on:
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
 | Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
 | Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+
+A Gemini key without billing lets Google use what it receives.
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.

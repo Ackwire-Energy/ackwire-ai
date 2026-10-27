@@ -181,7 +181,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Kimi Code",
       "MiniMax",
       "OpenCode Go",
-      "Chave de APIClaude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
+      "Chave de APIClaude, OpenAI, Gemini e outros",
     ]);
     // Each by its maker's mark; the key row by four of them, overlapped.
     expect(
@@ -191,8 +191,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
       "openai",
+      "gemini",
       "deepseek",
-      "kimi",
     ]);
     expect(dialog.textContent).toContain("Ou pague pelo uso");
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
@@ -569,12 +569,34 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);
     expect(shownText(panel)).toContain("Todo agente sem plano pensa com ela.");
+    // Every maker as a tile, Gemini third.
+    const makers = within(panel).getByRole("group", { name: "Provedor" });
+    expect([...makers.querySelectorAll(".ac-option__title")].map((el) => el.textContent)).toEqual([
+      "Claude",
+      "OpenAI",
+      "Gemini",
+      "DeepSeek",
+      "Kimi",
+      "Z.ai",
+      "MiniMax",
+    ]);
     // A maker with coding plans: where a plan's key goes is the first step's ⓘ, with no line under it.
     await click(within(panel).getByRole("button", { name: "Kimi" }));
     expect(hintOf("Crie a sua chave de API da Kimi", panel).text).toBe(
       "A chave de um plano de código vai na opção dele, acima.",
     );
     expect(shownText(panel)).not.toContain("plano de código");
+    // Gemini: its free tier may use what the agents send, so the first step's ⓘ says to turn on billing.
+    await click(within(panel).getByRole("button", { name: "Gemini" }));
+    expect(hintOf("Crie a sua chave de API do Gemini", panel)).toMatchObject({
+      text: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
+      hidden: true,
+    });
+    expect(shownText(panel)).not.toContain("faturamento");
+    expect(within(panel).getByRole("link", { name: "Abrir aistudio.google.com" }).getAttribute("href")).toBe(
+      "https://aistudio.google.com/api-keys",
+    );
+    expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("AQ.…");
     // A maker that publishes no prefix for its keys: no example in the field, never a bare "…".
     await click(within(panel).getByRole("button", { name: "Z.ai" }));
     expect(within(panel).getByLabelText("Cole aqui").hasAttribute("placeholder")).toBe(false);

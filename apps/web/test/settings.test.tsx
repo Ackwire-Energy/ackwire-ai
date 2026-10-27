@@ -277,6 +277,38 @@ describe("Configurações da organização", () => {
     });
   });
 
+  test("a Gemini key pasted while Claude is chosen: only Gemini is offered; its line says where and to turn on billing", async () => {
+    const { state } = await go(seedState(), "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const field = within(add).getByLabelText("Chave da API");
+    const save = () => click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await type(field, "AQ.Ab8RN6LxSampleOnlyKey_0123456789");
+    await save();
+    expect(add.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
+    expect(add.textContent).toContain("É de outro provedor?");
+    for (const name of ["OpenAI", "DeepSeek", "Kimi", "Z.ai", "MiniMax"])
+      expect(within(add).queryByRole("button", { name })).toBeNull();
+    await click(within(add).getByRole("button", { name: "Gemini" }));
+    expect(add.textContent).not.toContain("É de outro provedor?");
+    expect(within(add).getByRole("link", { name: "Crie a chave em aistudio.google.com/api-keys." })).toBeTruthy();
+    expect(add.textContent).toContain(
+      "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
+    );
+    expect(field.getAttribute("placeholder")).toBe("AQ.…");
+    // Gemini chosen, a key that isn't one: its own line.
+    await type(field, "sk-ant-api03-abcdefghijklmnop");
+    expect(add.textContent).toContain("As chaves de API do Gemini começam com AQ. ou AIza. Confira e cole de novo.");
+    await type(field, "AIzaSyD-sample0only1key2for3tests4567");
+    await save();
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "gemini",
+      label: "Gemini",
+    });
+  });
+
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
