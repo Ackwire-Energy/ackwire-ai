@@ -1,21 +1,32 @@
-import type { PushMessage, PushSender } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, schema } from "@agenteschat/db";
+import {
+  type Presence,
+  PushError,
+  type PushMessage,
+  type PushSender,
+  type WebPushKeys,
+  type WebPushResult,
+  type WebPushSender,
+} from "@agenteschat/adapters";
+import { and, asc, type Database, eq, inArray, isNull, lte, or, schema } from "@agenteschat/db";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
-import { pushLocale, renderPush } from "./push-messages";
+import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
 
 const { pushDevices, notifications, agents, users, approvals } = schema;
 
 /**
- * Push to the phone app (ADR 0035). A notification that should reach
- * the person's phone enqueues one `push.send` job; the job renders the text
- * per device language and sends through the `PushSender` adapter.
+ * Push to the phone app (ADR 0035) and to browsers (Web Push, ADR 0071). A
+ * notification that should reach the person's devices enqueues one
+ * `push.send` job; the job renders the text per device language and sends
+ * through the `PushSender` adapter (phones) and the `WebPushSender` (browsers).
  *
  * What pushes: everything in "Esperando você" (approval, agent question,
  * forum turn), mentions, DMs from a person, and missions or routines that
  * stopped or failed. Not what is read, done or snoozed by the time the job
  * runs. Grouped notifications push once per group while unread (only the
- * event that opened the row pushes).
+ * event that opened the row pushes). Something not waiting on the person
+ * waits `PUSH_ACTIVE_DELAY_MS` while they have the app open (ADR 0071 §7):
+ * read meanwhile, it never pushes.
  */
 
 export const PUSH_KINDS: ReadonlySet<string> = new Set([
@@ -36,11 +47,23 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
 /** Expo keeps receipts for a day and has most ready within 15 minutes: ask then. */
 export const PUSH_RECEIPTS_DELAY_MS = 15 * 60_000;
 
-/** Devices kept per person (the oldest beyond this are dropped when a new one registers). */
+/** Devices kept per person, phones and browsers together (the oldest are dropped when a new one registers). */
 export const MAX_PUSH_DEVICES = 10;
 
+/** How long a push that isn't waiting on the person holds while they have the app open (ADR 0071 §7). */
+export const PUSH_ACTIVE_DELAY_MS = 45_000;
+
+/** How long a browser's push service keeps a push while the browser is away. */
+export const WEB_PUSH_TTL_SECONDS = 86_400;
+
+/** Phone platforms (Expo tokens). Browsers register as `web` with their subscription instead. */
 export const PUSH_PLATFORMS = ["ios", "android"] as const;
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
+
+/** A device as `POST /push/devices` registers it: a phone's Expo token or a browser's Web Push subscription. */
+export type PushDeviceInput =
+  | { token: string; platform: PushPlatform; locale: string }
+  | { platform: "web"; endpoint: string; keys: WebPushKeys; locale: string };
 
 /** An Expo push token as the app gets it from `getExpoPushTokenAsync`. */
 export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
@@ -60,7 +83,7 @@ export function pushWorthy(
 /**
  * Called by `notify` for each row it created or merged into: the first event
  * of a group (count 1) of a pushing kind enqueues `push.send`, when the
- * person has a phone registered.
+ * person has a phone or a browser registered.
  */
 export async function enqueuePush(db: Database, row: NotificationRow, now = new Date()): Promise<boolean> {
   if (row.count !== 1 || !pushWorthy(row, now)) return false;
@@ -82,23 +105,28 @@ export async function enqueuePush(db: Database, row: NotificationRow, now = new 
 
 // ── Devices ───────────────────────────────────────────────────────────────────
 
+/** A subscription's keys without the base64 padding some browsers add. */
+const unpadded = (keys: WebPushKeys): WebPushKeys => ({
+  p256dh: keys.p256dh.replace(/=+$/, ""),
+  auth: keys.auth.replace(/=+$/, ""),
+});
+
 /**
- * Registers (or refreshes) a phone for a person. A token already registered
- * moves to this person (the phone changed hands or accounts). Keeps the
- * newest `MAX_PUSH_DEVICES` per person.
+ * Registers (or refreshes) a phone or a browser for a person. A token (a
+ * browser's endpoint) already registered moves to this person (the device
+ * changed hands or accounts). Keeps the newest `MAX_PUSH_DEVICES` per person.
  */
-export async function registerPushDevice(
-  db: Database,
-  userId: string,
-  input: { token: string; platform: PushPlatform; locale: string },
-  now = new Date(),
-) {
+export async function registerPushDevice(db: Database, userId: string, input: PushDeviceInput, now = new Date()) {
+  const device =
+    input.platform === "web"
+      ? { token: input.endpoint, platform: "web" as const, webKeys: unpadded(input.keys), locale: input.locale }
+      : { token: input.token, platform: input.platform, webKeys: null, locale: input.locale };
   await db
     .insert(pushDevices)
-    .values({ userId, token: input.token, platform: input.platform, locale: input.locale, lastSeenAt: now })
+    .values({ userId, ...device, lastSeenAt: now })
     .onConflictDoUpdate({
       target: pushDevices.token,
-      set: { userId, platform: input.platform, locale: input.locale, lastSeenAt: now },
+      set: { userId, platform: device.platform, webKeys: device.webKeys, locale: device.locale, lastSeenAt: now },
     });
   const devices = await db
     .select({ id: pushDevices.id })
@@ -109,7 +137,7 @@ export async function registerPushDevice(
   if (extra.length > 0) await db.delete(pushDevices).where(inArray(pushDevices.id, extra));
 }
 
-/** Forgets one of the person's phones (sign-out on the device). Other people's tokens are untouched. */
+/** Forgets one of the person's devices (sign-out, notifications turned off). Other people's tokens are untouched. */
 export async function unregisterPushDevice(db: Database, userId: string, token: string): Promise<boolean> {
   const rows = await db
     .delete(pushDevices)
@@ -126,8 +154,24 @@ export async function listPushDevices(db: Database, userId: string) {
 
 export interface PushDeps {
   db: Database;
+  /** Phones (Expo); absent = no phone push. */
   push?: PushSender | null;
+  /** Browsers (Web Push, ADR 0071); absent = no browser push. */
+  webPush?: WebPushSender | null;
+  /** Who has the app open: a push not waiting on them holds `PUSH_ACTIVE_DELAY_MS` (ADR 0071 §7). */
+  presence?: Pick<Presence, "online"> | null;
   now?: () => Date;
+}
+
+export interface PushDelivery {
+  /** Devices that took it. */
+  sent: number;
+  /** Devices deleted because their push service said they are gone. */
+  removed: number;
+  /** Devices that didn't take it, for another reason. */
+  failed: number;
+  /** Held because the person has the app open: a later `push.send` decides. */
+  held?: boolean;
 }
 
 /** Same rule as the web's approval card: production, irreversible or external actions are high risk. */
@@ -153,21 +197,63 @@ async function actorName(db: Database, orgId: string, actor: NotificationActor |
   return u?.name ?? null;
 }
 
+/** The in-app page a browser notification opens: the inbox, which opens the notification itself. */
+export function pushPagePath(orgId: string): string {
+  return `/org/${orgId}/notifications`;
+}
+
+/** Whether the person has the app open in the notification's organization (a realtime connection). */
+async function isLooking(presence: PushDeps["presence"], orgId: string, userId: string): Promise<boolean> {
+  if (!presence) return false;
+  try {
+    return (await presence.online(orgId)).includes(userId);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Sends the push of one notification to every phone of its person, unless it
- * was read, done or snoozed meanwhile. Tokens Expo reports as unregistered
- * are deleted. Accepted tickets are checked again later: a `push.receipts`
- * job ~15 min after (`checkPushReceipts`). Without a sender (push off) it
- * does nothing.
+ * Sends the push of one notification to every device of its person, unless
+ * it was read, done or snoozed meanwhile: phones through `push` (one request),
+ * browsers through `webPush` (one per subscription). Devices their push
+ * service reports as gone are deleted. Accepted phone tickets are checked
+ * again later: a `push.receipts` job ~15 min after (`checkPushReceipts`).
+ *
+ * Not waiting on the person and they have the app open: the first run holds
+ * it, enqueueing itself once more `PUSH_ACTIVE_DELAY_MS` later (`held`).
+ *
+ * Throws (so the outbox tries again) only when no device took it and every
+ * failure can be retried, so a retry never pushes a device twice; a failed
+ * phone request that can't be retried, with nothing sent, also throws (the
+ * job fails, as before browsers). Without senders it does nothing.
  */
-export async function deliverPush(deps: PushDeps, notificationId: string): Promise<{ sent: number; removed: number }> {
-  const none = { sent: 0, removed: 0 };
-  if (!deps.push) return none;
+export async function deliverPush(
+  deps: PushDeps,
+  notificationId: string,
+  options: { held?: boolean } = {},
+): Promise<PushDelivery> {
+  const none: PushDelivery = { sent: 0, removed: 0, failed: 0 };
+  if (!deps.push && !deps.webPush) return none;
   const { db } = deps;
+  const now = deps.now?.() ?? new Date();
   const [row] = await db.select().from(notifications).where(eq(notifications.id, notificationId));
-  if (!row || !pushWorthy(row, deps.now?.() ?? new Date())) return none;
+  if (!row || !pushWorthy(row, now)) return none;
   const devices = await listPushDevices(db, row.userId);
-  if (devices.length === 0) return none;
+  const phones = deps.push ? devices.filter((d) => d.platform !== "web") : [];
+  const browsers = deps.webPush ? devices.filter((d) => d.platform === "web" && d.webKeys) : [];
+  if (phones.length === 0 && browsers.length === 0) return none;
+
+  if (!options.held && !row.waiting && (await isLooking(deps.presence, row.orgId, row.userId))) {
+    await enqueue(db, {
+      orgId: row.orgId,
+      kind: "push.send",
+      payload: { notificationId: row.id, held: true },
+      dedupeKey: `push.send:${row.id}:held`,
+      runAt: new Date(now.getTime() + PUSH_ACTIVE_DELAY_MS),
+      maxAttempts: 4,
+    });
+    return { ...none, held: true };
+  }
 
   const source = row.source as NotificationSource;
   const latest = row.latest as NotificationLatest;
@@ -185,41 +271,88 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
   for (const key of ["channelId", "threadId", "approvalId", "missionId", "handoffId"] as const) {
     if (source[key]) data[key] = source[key];
   }
-  const messages: PushMessage[] = devices.map((d) => ({
-    to: d.token,
-    ...renderPush(pushLocale(d.locale), {
-      kind: row.kind,
-      waiting: row.waiting,
-      actorName: name,
-      actorType: actor?.type ?? null,
-      label: source.label,
-      title: latest.title,
-      text: latest.text,
-      highRisk,
-      routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
-      screen: source.screen ?? null,
-    }),
-    data,
-    priority: row.waiting ? "high" : "default",
-  }));
-  const results = await deps.push.send(messages);
-  const gone = results.filter((r) => r.unregistered).map((r) => r.token);
+  const text: PushTextInput = {
+    kind: row.kind,
+    waiting: row.waiting,
+    actorName: name,
+    actorType: actor?.type ?? null,
+    label: source.label,
+    title: latest.title,
+    text: latest.text,
+    highRisk,
+    routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
+    screen: source.screen ?? null,
+  };
+
+  let sent = 0;
+  const gone: string[] = [];
+  const failures: { retryable: boolean; error: string }[] = [];
+  let phoneRequestFailed = false;
+
+  if (deps.push && phones.length > 0) {
+    const messages: PushMessage[] = phones.map((d) => ({
+      to: d.token,
+      ...renderPush(pushLocale(d.locale), text),
+      data,
+      priority: row.waiting ? "high" : "default",
+    }));
+    try {
+      const results = await deps.push.send(messages);
+      sent += results.filter((r) => r.ok).length;
+      gone.push(...results.filter((r) => r.unregistered).map((r) => r.token));
+      const tickets = results.flatMap((r) => (r.ok && r.ticketId ? [{ id: r.ticketId, token: r.token }] : []));
+      if (tickets.length > 0 && deps.push.receipts) {
+        await enqueue(db, {
+          orgId: row.orgId,
+          kind: "push.receipts",
+          payload: { tickets },
+          dedupeKey: `push.receipts:${row.id}`,
+          runAt: new Date(now.getTime() + PUSH_RECEIPTS_DELAY_MS),
+          maxAttempts: 4,
+        });
+      }
+    } catch (error) {
+      phoneRequestFailed = true;
+      const retryable = (error as { retryable?: unknown } | null)?.retryable;
+      failures.push({ retryable: retryable !== false, error: String(error) });
+    }
+  }
+
+  if (deps.webPush && browsers.length > 0) {
+    const web = deps.webPush;
+    const results = await Promise.all(
+      browsers.map(async (d): Promise<[string, WebPushResult]> => {
+        const { title, body } = renderPush(pushLocale(d.locale), text);
+        const result = await web
+          .send({
+            endpoint: d.token,
+            keys: d.webKeys as WebPushKeys,
+            payload: { title, body, tag: row.id, url: pushPagePath(row.orgId), data },
+            ttlSeconds: WEB_PUSH_TTL_SECONDS,
+            urgency: row.waiting ? "high" : "normal",
+            topic: row.id.replace(/-/g, ""),
+          })
+          .catch((error: unknown) => ({ ok: false, gone: false, retryable: true, error: String(error) }));
+        return [d.token, result];
+      }),
+    );
+    for (const [token, result] of results) {
+      if (result.ok) sent++;
+      else if (result.gone) gone.push(token);
+      else failures.push({ retryable: result.retryable, error: result.error ?? "not sent" });
+    }
+  }
+
   if (gone.length > 0) {
     await db.delete(pushDevices).where(and(eq(pushDevices.userId, row.userId), inArray(pushDevices.token, gone)));
   }
-  const tickets = results.flatMap((r) => (r.ok && r.ticketId ? [{ id: r.ticketId, token: r.token }] : []));
-  if (tickets.length > 0 && deps.push.receipts) {
-    const now = deps.now?.() ?? new Date();
-    await enqueue(db, {
-      orgId: row.orgId,
-      kind: "push.receipts",
-      payload: { tickets },
-      dedupeKey: `push.receipts:${row.id}`,
-      runAt: new Date(now.getTime() + PUSH_RECEIPTS_DELAY_MS),
-      maxAttempts: 4,
-    });
+  if (sent === 0 && failures.length > 0) {
+    const retryable = failures.every((f) => f.retryable);
+    if (retryable || phoneRequestFailed) {
+      throw new PushError(`push not delivered: ${failures.map((f) => f.error).join("; ")}`, retryable);
+    }
   }
-  return { sent: results.filter((r) => r.ok).length, removed: gone.length };
+  return { sent, removed: gone.length, failed: failures.length };
 }
 
 export interface PushTicket {
@@ -261,4 +394,36 @@ export async function checkPushReceipts(
     .where(inArray(pushDevices.token, gone))
     .returning({ id: pushDevices.id });
   return { checked: receipts.length, removed: removed.length };
+}
+
+/** Ids `POST /push/stale` takes at once. */
+export const PUSH_STALE_MAX = 100;
+
+/**
+ * Which of these notification ids a browser should take down (ADR 0071): every one that isn't an open,
+ * unread, unsnoozed notification of this person (read, done, snoozed, gone, or someone else's). Pages
+ * ask when they come back to the foreground.
+ */
+export async function stalePushNotifications(
+  db: Database,
+  userId: string,
+  ids: string[],
+  now = new Date(),
+): Promise<string[]> {
+  const wanted = [...new Set(ids)].slice(0, PUSH_STALE_MAX);
+  if (wanted.length === 0) return [];
+  const open = await db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(
+      and(
+        inArray(notifications.id, wanted),
+        eq(notifications.userId, userId),
+        isNull(notifications.readAt),
+        isNull(notifications.doneAt),
+        or(isNull(notifications.snoozedUntil), lte(notifications.snoozedUntil, now)),
+      ),
+    );
+  const still = new Set(open.map((r) => r.id));
+  return wanted.filter((id) => !still.has(id));
 }

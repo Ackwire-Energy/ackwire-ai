@@ -22,11 +22,14 @@ import {
   createS3BlobStore,
   createSmtpEmailSender,
   createTurnstileCheck,
+  createWebPushSender,
   type EmailSender,
   envPlatformCredentials,
+  type KeyWrapper,
   MAIL_PRESETS,
   type MailAdapters,
   postgresJsNotifier,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import {
@@ -48,6 +51,7 @@ import {
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
+  vapidKeys,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
@@ -114,13 +118,17 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     (error: unknown) => log.warn("couldn't check this server's computer's tokens", { error: String(error) }),
   );
 
+  // Browser push's VAPID key is sealed with the installation's key wrappers, read once modules had their
+  // say (`resolved`, ADR 0071).
+  const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
+  let resolved: Adapters | null = null;
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
     // PGlite (native mode) is one process: nothing to tell other replicas.
     pubsub: database.client ? await createPostgresPubSub(postgresJsNotifier(database.client)) : createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
-    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    keyWrapper: localKeyWrapper,
     legacyKeyWrappers: [],
     email: emailSender(config, log),
     platformCredentials: envPlatformCredentials({
@@ -137,6 +145,11 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
       : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
+    webPush: webPushSender(config, database.db, () => [
+      resolved?.keyWrapper ?? localKeyWrapper,
+      ...(resolved?.legacyKeyWrappers ?? []),
+    ]),
     mail: mailAdapters(config),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
@@ -155,6 +168,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   log.info("transactional email", { sender: defaults.email.id });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
+  log.info("browser push", { webPush: defaults.webPush ? "on" : "off" });
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
@@ -163,6 +177,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     createModelProviders(),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  resolved = adapters;
   try {
     await checkHumanCheckAtBoot(adapters.humanCheck, log);
   } catch (error) {
@@ -400,6 +415,18 @@ function platformBlobStore(config: Config, db: Database) {
     accessKeyId: S3_ACCESS_KEY_ID,
     secretAccessKey: S3_SECRET_ACCESS_KEY,
     pathStyle: config.S3_PATH_STYLE,
+  });
+}
+
+/** Browser push, unless `WEB_PUSH=off`. Endpoints come from browsers, so hosts on our own network are refused. */
+function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[]): WebPushSender | null {
+  if (config.WEB_PUSH === "off") return null;
+  return createWebPushSender({
+    vapid: () => vapidKeys(db, wrappers(), config),
+    checkHost: async (host) => {
+      const addresses = await resolveHostDns(host);
+      if (addresses.length === 0 || addresses.some(isBlockedAddress)) throw new Error("blocked host");
+    },
   });
 }
 

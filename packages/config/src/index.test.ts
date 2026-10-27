@@ -123,6 +123,16 @@ describe("loadConfig", () => {
     expect(redactConfig(loadConfig({ ...valid, ...pair })).TURNSTILE_SECRET_KEY).toBe("********");
   });
 
+  test("browser push: on by default, a VAPID pair or nothing", () => {
+    expect(loadConfig(valid).WEB_PUSH).toBe("on");
+    expect(loadConfig({ ...valid, WEB_PUSH: "off" }).WEB_PUSH).toBe("off");
+    const pair = { WEB_PUSH_VAPID_PUBLIC_KEY: `B${"A".repeat(86)}`, WEB_PUSH_VAPID_PRIVATE_KEY: "d".repeat(43) };
+    expect(loadConfig({ ...valid, ...pair }).WEB_PUSH_VAPID_PUBLIC_KEY).toBe(pair.WEB_PUSH_VAPID_PUBLIC_KEY);
+    expect(() => loadConfig({ ...valid, WEB_PUSH_VAPID_PUBLIC_KEY: pair.WEB_PUSH_VAPID_PUBLIC_KEY })).toThrow(
+      /go together/,
+    );
+  });
+
   test("TRUSTED_PROXIES: a list, trimmed", () => {
     expect(loadConfig(valid).TRUSTED_PROXIES).toBeUndefined();
     const list = " 10.0.0.0/8, 173.245.48.1,2400:cb00::/32 ,";

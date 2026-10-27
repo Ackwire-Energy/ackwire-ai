@@ -50,6 +50,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
     throw new ConfigError(["TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY go together: set both, or neither"]);
   }
+  // A key pair or nothing (ADR 0071): half a pair can't sign.
+  if (Boolean(config.WEB_PUSH_VAPID_PUBLIC_KEY) !== Boolean(config.WEB_PUSH_VAPID_PRIVATE_KEY)) {
+    throw new ConfigError([
+      "WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_VAPID_PRIVATE_KEY go together: set both or neither",
+    ]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

@@ -636,3 +636,47 @@ describe("phone app endpoints", () => {
     ]);
   });
 });
+
+describe("push devices (ADR 0035, ADR 0071)", () => {
+  test("a browser's subscription and a phone's token share the route; the key is null when Web Push is off", async () => {
+    const endpoint = "https://push.example/send/abc?x=1";
+    const { fetch, calls } = fakeFetch({
+      "GET /api/app/push/web": { status: 200, body: { publicKey: "BPk" } },
+      "POST /api/app/push/devices": { status: 204 },
+      [`DELETE /api/app/push/devices/${encodeURIComponent(endpoint)}`]: { status: 204 },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.push.webKey()).toBe("BPk");
+    await api.push.register({ platform: "web", endpoint, keys: { p256dh: "p", auth: "a" }, locale: "pt-BR" });
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({
+      platform: "web",
+      endpoint,
+      keys: { p256dh: "p", auth: "a" },
+      locale: "pt-BR",
+    });
+    await api.push.register({ platform: "ios", token: "ExponentPushToken[abcdefgh12345]", locale: "en" });
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({
+      platform: "ios",
+      token: "ExponentPushToken[abcdefgh12345]",
+      locale: "en",
+    });
+    await api.push.unregister(endpoint);
+    expect(calls.at(-1)?.url).toBe(`/api/app/push/devices/${encodeURIComponent(endpoint)}`);
+    expect(calls.at(-1)?.init.method).toBe("DELETE");
+
+    const off = fakeFetch({
+      "GET /api/app/push/web": { status: 404, body: { error: { code: "web_push_off", message: "Off" } } },
+    });
+    expect(await createHttpApi({ fetch: off.fetch }).push.webKey()).toBeNull();
+  });
+
+  test("stale: the ids go in, the server's stale ones come back (clear on read)", async () => {
+    const { fetch, calls } = fakeFetch({
+      "POST /api/app/push/stale": { status: 200, body: { stale: ["n2"] } },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.push.stale(["n1", "n2"])).toEqual(["n2"]);
+    expect(calls.at(-1)?.init.method).toBe("POST");
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({ ids: ["n1", "n2"] });
+  });
+});

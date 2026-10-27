@@ -95,6 +95,7 @@ export interface AppOptions {
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
  * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
+ * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -235,6 +236,15 @@ export function createApp(options: AppOptions) {
       if (!res) return c.text("Not found", 404);
       res.headers.set("cache-control", "no-cache");
       if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
+      return res;
+    });
+    // The service worker (browser push, ADR 0071): at the root so it controls the whole app, always
+    // revalidated so a new deploy's worker takes over, JavaScript, and never the SPA when missing.
+    app.get("/sw.js", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "no-cache");
+      res.headers.set("content-type", "text/javascript; charset=utf-8");
       return res;
     });
     // Emails' pictures and font: fetched by mail clients and Gmail's image proxy, so readable without a

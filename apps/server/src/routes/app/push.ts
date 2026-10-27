@@ -1,7 +1,15 @@
-import { EXPO_PUSH_TOKEN, PUSH_PLATFORMS, registerPushDevice, unregisterPushDevice } from "@agenteschat/engine";
+import {
+  EXPO_PUSH_TOKEN,
+  PUSH_PLATFORMS,
+  PUSH_STALE_MAX,
+  registerPushDevice,
+  stalePushNotifications,
+  unregisterPushDevice,
+  vapidKeys,
+} from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
-import { type AppDeps, body, createAppRouter, errors, noContent, requireSession, security } from "./context";
+import { type AppDeps, body, createAppRouter, errors, json, noContent, requireSession, security } from "./context";
 
 const tags = ["Push"];
 
@@ -10,7 +18,38 @@ const Token = z
   .regex(EXPO_PUSH_TOKEN, "must be an Expo push token")
   .openapi({ example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" });
 
-/** The phone app's push devices (ADR 0035). Per person: one phone hears every organization of its person. */
+const Locale = z.string().trim().min(2).max(35).openapi({ description: "Device language, e.g. `pt-BR`." });
+
+/** Base64url of `min`–`max` characters, with the padding some browsers add (dropped when stored). */
+const base64url = (min: number, max: number) =>
+  z.string().regex(new RegExp(`^[A-Za-z0-9_-]{${min},${max}}={0,2}$`), "must be base64url");
+
+const bytesOf = (s: string) => Buffer.from(s.replace(/=+$/, ""), "base64url");
+
+const PhoneDevice = z.object({ token: Token, platform: z.enum(PUSH_PLATFORMS), locale: Locale });
+
+/** A browser's Web Push subscription (ADR 0071), as `PushSubscription.toJSON()` gives it. */
+const WebDevice = z.object({
+  platform: z.literal("web"),
+  endpoint: z
+    .url()
+    .max(2048)
+    .refine((u) => u.startsWith("https://"), "must be an https URL")
+    .openapi({ description: "The subscription's endpoint, at the browser's push service." }),
+  keys: z.object({
+    p256dh: base64url(80, 100).refine((k) => {
+      const point = bytesOf(k);
+      return point.length === 65 && point[0] === 0x04;
+    }, "must be an uncompressed P-256 point"),
+    auth: base64url(16, 30).refine((k) => bytesOf(k).length >= 16, "must be at least 16 bytes"),
+  }),
+  locale: Locale,
+});
+
+/**
+ * Push devices (ADR 0035, ADR 0071): the phone app's Expo tokens and browsers' Web Push subscriptions.
+ * Per person: one device hears every organization of its person.
+ */
 export function pushRoutes(deps: AppDeps) {
   const { db } = deps;
   const app = createAppRouter(deps);
@@ -18,22 +57,33 @@ export function pushRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/push/web",
+      tags,
+      security,
+      summary: "This server's Web Push key",
+      description:
+        "The VAPID public key a browser subscribes with (`applicationServerKey`), base64url. 404 `web_push_off` when this server sends no browser push (`WEB_PUSH=off`).",
+      responses: { 200: json(z.object({ publicKey: z.string() })), ...errors },
+    }),
+    async (c) => {
+      if (!deps.adapters.webPush) return apiError(c, 404, "web_push_off", "This server sends no browser push");
+      const wrappers = [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers];
+      const { publicKey } = await vapidKeys(db, wrappers, deps.config);
+      return c.json({ publicKey }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "post",
       path: "/push/devices",
       tags,
       security,
-      summary: "Register this phone for push notifications",
+      summary: "Register this phone or browser for push notifications",
       description:
-        "Upsert by token: registering a token again refreshes it, and a token registered by someone else moves to you. Call on every launch after sign-in.",
-      request: {
-        body: body(
-          z.object({
-            token: Token,
-            platform: z.enum(PUSH_PLATFORMS),
-            locale: z.string().trim().min(2).max(35).openapi({ description: "Device language, e.g. `pt-BR`." }),
-          }),
-        ),
-      },
+        "Upsert by token (a browser's endpoint): registering again refreshes it, and one registered by someone else moves to you. Phones send their Expo token; browsers their Web Push subscription. Call on every launch or page load after sign-in.",
+      request: { body: body(z.union([PhoneDevice, WebDevice])) },
       responses: { 204: noContent[204], 429: errorResponse("Too many registrations"), ...errors },
     }),
     async (c) => {
@@ -47,13 +97,40 @@ export function pushRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/push/stale",
+      tags,
+      security,
+      summary: "Which shown notifications to take down",
+      description: `Of the notification ids this device shows, the ones that aren't open, unread and unsnoozed notifications of yours anymore (read, done or snoozed elsewhere, gone, or not yours), at most ${PUSH_STALE_MAX}. Pages ask when they come back to the foreground (ADR 0071).`,
+      request: { body: body(z.object({ ids: z.array(z.uuid()).max(PUSH_STALE_MAX) })) },
+      responses: {
+        200: json(z.object({ stale: z.array(z.string()) })),
+        429: errorResponse("Too many requests"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const limit = await deps.adapters.rateLimiter.consume(`push-stale:${user.id}`, {
+        limit: 600,
+        windowMs: 3600_000,
+      });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      const stale = await stalePushNotifications(db, user.id, c.req.valid("json").ids);
+      return c.json({ stale }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/push/devices/{token}",
       tags,
       security,
-      summary: "Stop push notifications on this phone (sign-out)",
-      description: "Only your own tokens; anything else is a no-op. URL-encode the token.",
-      request: { params: z.object({ token: z.string().min(1).max(256) }) },
+      summary: "Stop push notifications on this phone or browser",
+      description: "Only your own devices; anything else is a no-op. URL-encode the token (a browser's endpoint).",
+      request: { params: z.object({ token: z.string().min(1).max(2048) }) },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
