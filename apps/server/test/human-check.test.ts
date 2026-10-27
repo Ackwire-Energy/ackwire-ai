@@ -185,9 +185,9 @@ test("at boot, a secret Cloudflare refuses stops the server; Cloudflare out of r
   await expect(checkHumanCheckAtBoot(turnstile(cf.fetch), log)).resolves.toBeUndefined();
   expect(lines.at(-1)).toContain("Cloudflare can't be reached");
   cf.state.up = true;
-  // Cloudflare's test secret passes even the dummy token: every token would pass.
+  // Cloudflare's always-passing test secret takes even the dummy token.
   await checkHumanCheckAtBoot(turnstile(cf.fetch), log);
-  expect(lines.at(-1)).toContain("TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets, so every token passes");
+  expect(lines.at(-1)).toContain("TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets. They refuse real tokens");
   cf.state.testSecret = false;
   await checkHumanCheckAtBoot(turnstile(cf.fetch), log);
   expect(lines.at(-1)).toContain("bot check on");

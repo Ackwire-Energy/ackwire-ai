@@ -719,7 +719,7 @@ export function useStartOAuth(orgId: string) {
 /** Where the phone app's OAuth lands: the callback hands `state` and `code` back to the app. */
 export const APP_OAUTH_RETURN = "app:connectors";
 
-/** The phone app finishes an authorization it started (see `APP_OAUTH_RETURN`). */
+/** The phone app (see `APP_OAUTH_RETURN`) or the desktop app's window finishes an authorization it started. */
 export function useCompleteOAuth(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

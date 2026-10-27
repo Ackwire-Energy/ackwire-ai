@@ -1,8 +1,12 @@
+import { isEuropeanTimeZone } from "@agenteschat/ui";
+
 /**
  * Himetrica, the product analytics (browser only). For now only the landing
  * page loads it (`loadAnalytics`), and only on agentes.chat itself: never in
- * dev or on a self-hosted server. Calls made before the tracker loads wait for
- * it; without it (dev, tests, blocked, self-hosted) they do nothing.
+ * dev or on a self-hosted server. Nor in Europe: its visitor id, stored on
+ * the device, would need consent there. Calls made before the tracker loads
+ * wait for it; without it (dev, tests, blocked, self-hosted, Europe) they do
+ * nothing.
  */
 const SRC = "https://cdn.himetrica.com/tracker.js";
 /** Public by design: it identifies the site to the tracker in the browser. */
@@ -24,6 +28,8 @@ const waiting: ((h: Himetrica) => void)[] = [];
 
 export function loadAnalytics() {
   if (location.hostname !== SITE_HOST || document.getElementById("himetrica")) return;
+  // ponytail: the device's time zone setting, not where the device is. A consent bar would also cover travellers.
+  if (isEuropeanTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)) return;
   const script = document.createElement("script");
   script.id = "himetrica";
   script.defer = true;

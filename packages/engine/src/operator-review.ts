@@ -3,28 +3,39 @@ import { and, asc, type Database, eq, inArray, schema, sql } from "@agenteschat/
 import { getMessage, type Message } from "./messages";
 import { recordContentViewed } from "./operator-events";
 import { runErrorDetail } from "./runs";
+import type { SessionScreening, SessionSegment } from "./session-screening";
 import { maskCredentials } from "./tool-detail";
 import { untrustedBlock } from "./untrusted";
 
 /**
- * The operator API's only door to content (ADR 0056 §6): what one run or one task did, for the
- * operator's abuse reviews. Built here, so no caller ever reads raw rows: one text block of at most
- * `REVIEW_MAX_BYTES`, credentials masked, everything written in the workspace (by people, agents, tools
- * or web pages) inside `<external_data>` envelopes, and every read leaves a `content.viewed` event.
+ * The operator API's only door to content (ADR 0056 §6): what one run or one task did, or what a person in
+ * control of an agent's screen saw there (a screened session, ADR 0076), for the operator's abuse reviews.
+ * Built here, so no caller ever reads raw rows: one text block of at most `REVIEW_MAX_BYTES`, credentials
+ * masked, everything written in the workspace (by people, agents, tools or web pages) inside `<external_data>`
+ * envelopes, and every read leaves a `content.viewed` event.
  */
 
 const { agentRuns, agentRunSteps, machineTasks } = schema;
 
 export const REVIEW_MAX_BYTES = 12_000;
 /** Characters kept of each piece before the whole block is fitted. */
-const CUT = { message: 3000, toolInput: 600, toolResult: 800, title: 200, prompt: 3000, command: 1000, output: 2000 };
+const CUT = {
+  message: 3000,
+  toolInput: 600,
+  toolResult: 800,
+  title: 200,
+  prompt: 3000,
+  command: 1000,
+  output: 2000,
+  screen: 4000,
+};
 const TOOL_STEPS_READ = 200;
 const OUTPUT_LINES = 30;
 const FILES_SHOWN = 20;
 /** Room kept for the line that says what was left out. */
 const NOTE_BYTES = 120;
 
-export type ReviewKind = "run" | "task";
+export type ReviewKind = "run" | "task" | "session";
 
 export interface OperatorReview {
   kind: ReviewKind;
@@ -174,7 +185,32 @@ async function taskReview(db: Database, taskId: string): Promise<OperatorReview 
 }
 
 /**
- * One run's or task's review block, or null when there is none with that id. The read is recorded
+ * A screened segment of a person's control, from memory only: its first screen and the latest ones, in order,
+ * the latest kept over the ones between when they don't all fit.
+ */
+function sessionReview(segment: SessionSegment | null): OperatorReview | null {
+  if (!segment) return null;
+  const at = (ms: number) => new Date(ms).toISOString();
+  const kept = segment.screens.length;
+  const until = segment.endedAt === null ? "(still in control)" : `to ${at(segment.endedAt)}`;
+  const header = [
+    `Session ${segment.id}: person ${segment.userId} in control of the screen of agent ${segment.agentId}, workspace ${segment.orgId}.`,
+    `From ${at(segment.startedAt)} ${until} · ${segment.read} screen(s) read, ${kept} kept (the first and the latest). Each is the text the computer read on the screen, with no image.`,
+    LEGEND,
+  ].join("\n");
+  const screens = segment.screens.map(
+    (s, i): Part => ({
+      rank: i === 0 ? 1 : kept - i + 1,
+      text: `Screen at ${at(s.at)}:\n${quoted("screen", s.text, CUT.screen)}`,
+    }),
+  );
+  const text = assemble([{ rank: 0, text: header }, ...screens]);
+  return { kind: "session", id: segment.id, orgId: segment.orgId, agentId: segment.agentId, text };
+}
+
+/**
+ * One run's, task's or screened session's review block, or null when there is none with that id (a session
+ * whose text was dropped, or any session on a server that screens none). The read is recorded
  * (`content.viewed`, with the operator's `reason`) before the block is returned, so content never
  * leaves without its trail.
  */
@@ -183,8 +219,14 @@ export async function operatorReview(
   kind: ReviewKind,
   id: string,
   viewer: { reason: string; operator: string },
+  sessions?: Pick<SessionScreening, "segment"> | null,
 ): Promise<OperatorReview | null> {
-  const review = kind === "run" ? await runReview(db, id) : await taskReview(db, id);
+  const review =
+    kind === "run"
+      ? await runReview(db, id)
+      : kind === "task"
+        ? await taskReview(db, id)
+        : sessionReview(sessions?.segment(id) ?? null);
   if (review) await recordContentViewed(db, { orgId: review.orgId, ref: `${kind}:${id}`, ...viewer });
   return review;
 }

@@ -355,10 +355,11 @@ describe("an invitation link asks to join", () => {
     expect(document.querySelectorAll(".invite-ask__agents .ac-avatar")).toHaveLength(4);
   });
 
-  test("a full workspace or too many asks: said in the form, which stays", async () => {
+  test("a full workspace or too many asks, from here or through the link: said in the form, which stays", async () => {
     for (const [error, words] of [
       [new ApiError(409, "join.full", "full"), "Este workspace tem muitos pedidos esperando."],
       [new ApiError(429, "join.rate_limited", "slow down"), "Muitos pedidos daqui. Tente de novo daqui a uma hora."],
+      [new ApiError(429, "join.link_busy", "busy"), "Muita gente pediu por este link na última hora."],
     ] as const) {
       await openLink({ ...LINK, you: you() }, { signedIn: true, askError: error });
       await click(button("Pedir para entrar"));

@@ -91,6 +91,8 @@ const CLOUD_EXTRA = [
   "browser.now.handedBack",
   "desktop.control.keys",
   "desktop.control.notice",
+  "desktop.session.check",
+  "desktop.session.screening",
   "desktop.keyboard.field",
   "desktop.keyboard.label",
   ...["got", "copied", "tooLong", "textOnly"].map((k) => `desktop.clipboard.${k}`),

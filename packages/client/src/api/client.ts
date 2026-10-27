@@ -419,13 +419,14 @@ export interface ApiClient {
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
     startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
     /**
-     * The phone app finishes an authorization it started (`returnTo: APP_OAUTH_RETURN`) with the `state` and
-     * `code` the callback handed back to it.
+     * The phone app (`returnTo: APP_OAUTH_RETURN`) or the desktop app's window (`desktop:` + a path) finishes an
+     * authorization it started with the `state` and `code` the callback handed back to it. `returnTo`: the path
+     * a desktop authorization lands on.
      */
     completeOAuth(
       orgId: string,
       input: { state: string; code: string },
-    ): Promise<{ connectionId: string; connector: string }>;
+    ): Promise<{ connectionId: string; connector: string; returnTo?: string }>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
   };
   githubApp: {
