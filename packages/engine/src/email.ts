@@ -96,6 +96,12 @@ export type EmailTemplate =
     }
   | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
+   * A code to type on an invitation link's page (ADR 0072), to prove the address before asking to join. No
+   * button: the page is already open. `url` is the server's own address, for the pictures. Its outbox row is
+   * deleted once it can't be sent again (`email.send`), since it holds the code and the address.
+   */
+  | { kind: "join_code"; locale?: EmailLocale; orgName: string; code: string; url: string }
+  /**
    * Double opt-in for the landing page's waiting list, in the language they
    * joined in. `email` is the address being confirmed (absent in jobs queued
    * before it existed).
@@ -404,7 +410,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           c.subject,
           c.preheader,
           c.headline,
-          [{ p: c.body(who, org) }, { p: c.next }, { button: c.button, url }, { small: c.small }, fallback(url)],
+          [{ p: c.body(who, org) }, { p: c.next }, { button: c.button, url }, fallback(url)],
           a.why(org),
         );
       }
@@ -420,6 +426,17 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { small: c.small },
         ],
         a.why(org),
+      );
+    }
+    case "join_code": {
+      const c = w.joinCode;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject(t.code),
+        c.preheader,
+        c.headline,
+        [{ p: c.body(org) }, { code: t.code }, { small: c.small }],
+        c.why(org),
       );
     }
   }
@@ -455,14 +472,14 @@ export function emailsByLocale(recipients: { email: string; locale: EmailLocale 
  */
 export async function queueEmail(
   tx: Executor,
-  input: { orgId: string | null; key: string; to: string[]; template: EmailTemplate },
+  input: { orgId: string | null; key: string; to: string[]; template: EmailTemplate; maxAttempts?: number },
 ) {
   await enqueue(tx, {
     orgId: input.orgId,
     kind: "email.send",
     payload: { key: input.key, to: input.to, template: input.template },
     dedupeKey: `email:${input.key}`,
-    maxAttempts: 6,
+    maxAttempts: input.maxAttempts ?? 6,
   });
 }
 

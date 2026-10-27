@@ -441,14 +441,16 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
  * Records a computer brain's plan usage (source "plan"): tokens with the
  * run, agent and org, cost zero, billed to the owner's plan. The engine calls
  * it for each `usage` event with `source: "plan"` (the Model Gateway records
- * API usage itself).
+ * API usage itself), and the router for a plan that picked who answers
+ * (kind `router`, no run).
  */
 export async function recordPlanUsage(
   db: Database,
   input: {
     orgId: string;
     agentId: string;
-    runId: string;
+    runId?: string;
+    kind?: "agent" | "router";
     /** `claude_code` or `codex`. */
     provider: string;
     /** The computer the turn ran on and the account it spent; `accountId` null: that computer's own sign-in. */
@@ -470,8 +472,8 @@ export async function recordPlanUsage(
     .values({
       orgId: input.orgId,
       agentId: input.agentId,
-      kind: "agent",
-      runId: input.runId,
+      kind: input.kind ?? "agent",
+      runId: input.runId ?? null,
       credentialId: null,
       provider: input.provider,
       model: input.model ?? input.provider,

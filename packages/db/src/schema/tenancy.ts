@@ -116,10 +116,11 @@ export const organizationInviteLinks = pgTable(
 );
 
 /**
- * Someone who opened an invitation link and asks to join (ADR 0068). An admin approves (with a role) or denies
- * (with an optional reason the person is told). Approval lets in only whoever controls `email`: a signed-in
- * account with that address confirmed joins at once; anyone else gets an email invitation to it. "Expired" isn't
- * stored: a `pending` row whose `expires_at` passed. Rows answered or expired more than 90 days ago are deleted.
+ * Someone who opened an invitation link and asks to join (ADR 0068, 0072). An admin approves (with a role) or
+ * denies (with an optional reason the person is told). Approval lets in at once only a confirmed account with
+ * `email` that proved it (`verified_at`, or it asked itself); anyone else gets an email invitation to it.
+ * "Expired" isn't stored: a `pending` row whose `expires_at` passed. Rows answered or expired more than 90 days
+ * ago are deleted.
  */
 export const organizationJoinRequests = pgTable(
   "organization_join_requests",
@@ -131,8 +132,10 @@ export const organizationJoinRequests = pgTable(
     linkId: uuid().references(() => organizationInviteLinks.id, { onDelete: "set null" }),
     /** The account that asked, when signed in. */
     userId: text().references(() => users.id, { onDelete: "cascade" }),
-    /** Lower-cased. Typed when signed out: unproven until an invitation to it is accepted. */
+    /** Lower-cased. */
     email: text().notNull(),
+    /** When the person proved the address: a code from its mailbox, or a confirmed account asking. */
+    verifiedAt: timestamp({ withTimezone: true }),
     name: text().notNull(),
     /** Shown in the app only, never in an email or a push: it is an outsider's text. */
     note: text(),
@@ -153,4 +156,46 @@ export const organizationJoinRequests = pgTable(
     uniqueIndex("organization_join_requests_pending").on(t.orgId, t.email).where(sql`${t.status} = 'pending'`),
     index().on(t.orgId, t.email),
   ],
+);
+
+/**
+ * The code emailed to an address typed on an invitation link's page (ADR 0072), one row per workspace and address.
+ * `codeHash`, `tries`, `sentAt` and `expiresAt` hold the code waiting to be typed, and a new code writes only those.
+ * Typed right, its hash moves to `verifiedHash`, good to ask with until `verifiedUntil`, which no newer code
+ * replaces. Hashes are sha256 of `{orgId}:{email}:{code}`. The row goes when the request is sent, and a day after
+ * both times pass.
+ */
+export const organizationJoinCodes = pgTable(
+  "organization_join_codes",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Lower-cased. */
+    email: text().notNull(),
+    codeHash: text(),
+    tries: integer().notNull().default(0),
+    sentAt: timestamp({ withTimezone: true }).notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    verifiedHash: text(),
+    verifiedUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.email] })],
+);
+
+/**
+ * Each join code sent and each wrong one typed (ADR 0072). Every limit on codes is a count here, so a restart
+ * resets none. `mailbox` is the sha256 of the address's mailbox (`mailboxOf`). Rows go after a day.
+ */
+export const organizationJoinCodeEvents = pgTable(
+  "organization_join_code_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** No foreign key: the counts outlive a deleted workspace, so deleting one resets no mailbox's or server's cap. */
+    orgId: uuid().notNull(),
+    mailbox: text().notNull(),
+    kind: text().$type<"sent" | "wrong">().notNull(),
+    at: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index().on(t.mailbox, t.at), index().on(t.at)],
 );

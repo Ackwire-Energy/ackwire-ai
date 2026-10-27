@@ -108,6 +108,31 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, INSTALL_MODE: "kubernetes" })).toThrow(/INSTALL_MODE/);
   });
 
+  test("the bot check's two keys go together, and unset there is none", () => {
+    expect([loadConfig(valid).TURNSTILE_SITE_KEY, loadConfig(valid).TURNSTILE_SECRET_KEY]).toEqual([
+      undefined,
+      undefined,
+    ]);
+    const pair = {
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+    };
+    expect(loadConfig({ ...valid, ...pair }).TURNSTILE_SITE_KEY).toBe(pair.TURNSTILE_SITE_KEY);
+    expect(() => loadConfig({ ...valid, TURNSTILE_SITE_KEY: pair.TURNSTILE_SITE_KEY })).toThrow(/go together/);
+    expect(() => loadConfig({ ...valid, TURNSTILE_SECRET_KEY: pair.TURNSTILE_SECRET_KEY })).toThrow(/go together/);
+    expect(redactConfig(loadConfig({ ...valid, ...pair })).TURNSTILE_SECRET_KEY).toBe("********");
+  });
+
+  test("TRUSTED_PROXIES: a list, trimmed", () => {
+    expect(loadConfig(valid).TRUSTED_PROXIES).toBeUndefined();
+    const list = " 10.0.0.0/8, 173.245.48.1,2400:cb00::/32 ,";
+    expect(loadConfig({ ...valid, TRUSTED_PROXIES: list }).TRUSTED_PROXIES).toEqual([
+      "10.0.0.0/8",
+      "173.245.48.1",
+      "2400:cb00::/32",
+    ]);
+  });
+
   test("ignores variables that are not in the schema", () => {
     const config = loadConfig({ ...valid, SOMETHING_ELSE: "1" }) as Record<string, unknown>;
     expect(config.SOMETHING_ELSE).toBeUndefined();

@@ -23,7 +23,9 @@ export type Block =
   /** The primary button, and an optional second action as a link beside it. */
   | { button: string; url: string; also?: { label: string; url: string; danger?: boolean } }
   /** For emails whose link is the point: the address to copy when the button doesn't work. */
-  | { fallback: string; url: string };
+  | { fallback: string; url: string }
+  /** A one-time code to type: large in a well, selectable as one word. */
+  | { code: string };
 
 export interface EmailDoc {
   lang: EmailLocale;
@@ -217,6 +219,10 @@ function block(b: Block, src: (file: string) => string): string {
 </tr>`,
       )
       .join("")}</table>`;
+  if ("code" in b)
+    // Letter spacing trails the last digit too: 8 px more on the left keeps the digits centred.
+    return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:12px;margin:0 0 20px`)}><tr>
+<td class="ink" align="center" style="padding:16px 16px 16px 24px;${P};font-size:32px;line-height:40px;font-weight:700;letter-spacing:8px;font-variant-numeric:tabular-nums;color:${L.ink};text-align:center">${esc(b.code)}</td></tr></table>`;
   if ("button" in b) {
     // A link button, clickable everywhere; classic Outlook gets its own spacers, in em at the 15 px label, and draws
     // it square and flat. The colour comes before the shorthand: a client without gradients keeps the colour, and
@@ -242,6 +248,7 @@ function text(b: Block): string {
   if ("note" in b) return plain(b.note);
   // "Theo, Merge pull request #42" would read as an order to Theo.
   if ("people" in b) return b.people.map((p) => (p.detail ? `${p.name} · ${plain(p.detail)}` : p.name)).join("\n");
+  if ("code" in b) return b.code;
   if ("button" in b) return [`${b.button}: ${b.url}`, ...(b.also ? [`${b.also.label}: ${b.also.url}`] : [])].join("\n");
   // The address is already in the button's line.
   return "";

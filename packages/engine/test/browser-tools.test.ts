@@ -83,7 +83,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: ()
           },
         },
         ...(options.judge ? { judge: options.judge } : {}),
-        ...(options.vision ? { vision: true } : {}),
+        ...(options.vision ? { vision: () => true } : {}),
         ...(options.now ? { now: options.now } : {}),
       }),
     ],

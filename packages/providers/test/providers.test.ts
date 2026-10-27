@@ -8,6 +8,7 @@ import {
   modelForTier,
   PROVIDER_IDS,
   PROVIDERS,
+  routerModelOf,
   summedCostNanoUsd,
   usdToNanoUsd,
 } from "../src";
@@ -99,6 +100,24 @@ describe("pricing", () => {
     expect(line("moonshot")).toEqual(["kimi-k3.1-pro", "kimi-k3.1-pro", "kimi-k3.1-pro"]);
     expect(line("zai")).toEqual(["glm-5.3-flash", "glm-5.3", "glm-5.3"]);
     expect(line("minimax")).toEqual(["MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M3"]);
+  });
+
+  test("routing picks one model per provider, never Kimi's (its cheapest always thinks)", () => {
+    expect(PROVIDER_IDS.map((p) => routerModelOf(p))).toEqual([
+      "claude-haiku-5-5",
+      "gpt-6-luna",
+      "deepseek-flash",
+      null,
+      "glm-5.3-flash",
+      "MiniMax-M3",
+    ]);
+    for (const provider of PROVIDER_IDS) {
+      const picks = Object.values(MODEL_CATALOG).filter((m) => m.provider === provider && m.router);
+      expect(picks).toHaveLength(provider === "moonshot" ? 0 : 1);
+    }
+    // GLM-5.3 Flash can't stop thinking; every other pick turns it off.
+    expect(MODEL_CATALOG["glm-5.3-flash"]?.leastThinking).toBeUndefined();
+    expect(MODEL_CATALOG["MiniMax-M3"]?.leastThinking).toBe("off");
   });
 
   test("costs are exact integers", () => {

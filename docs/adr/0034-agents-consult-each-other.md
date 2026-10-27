@@ -32,7 +32,8 @@ Agents should be able to ask each other privately, and a message to the room may
 - the author is never a candidate, and neither is any agent that already spoke in the recent history;
 - at most one agent is picked, and only a clear pick (`AGENT_CHIME_IN_SCORE` = 0.75);
 - never from an answer to an answer (`hop >= 2`);
-- no continuity.
+- no continuity;
+- since ADR 0074 (6), only Jev or a small model reads it: never a plan, never a rule.
 
 Receipts are published only when someone is picked.
 

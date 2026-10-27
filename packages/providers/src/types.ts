@@ -46,8 +46,11 @@ export interface ModelRequest {
   tools?: ToolSpec[];
   /** JSON Schema the reply must follow (structured output). The reply text is then JSON. */
   outputSchema?: Record<string, unknown>;
-  /** How much reasoning to spend. Providers without the notion ignore it. Default: the provider's. */
-  effort?: "low" | "medium" | "high";
+  /**
+   * How much reasoning to spend. Providers without the notion ignore it. Default: the provider's.
+   * `none`: the least the model allows (its catalog `leastThinking`), else `low`.
+   */
+  effort?: "none" | "low" | "medium" | "high";
   signal?: AbortSignal;
 }
 

@@ -52,8 +52,11 @@ export interface DesktopToolDeps {
   pubsub?: PubSub;
   /** Targets in words, checks and finds on the screen (ADR 0054), as for the browser. */
   judge?: Judge;
-  /** The judge sees images (Jev's vision model): a target the screen's text lacks is looked for on a screenshot. */
-  vision?: boolean;
+  /**
+   * Whether the judge sees images now (Jev's vision model): a target the screen's text lacks is looked for on a
+   * screenshot. Asked on each call, since the installation's Jev key can come and go.
+   */
+  vision?: () => boolean;
   /** Tests: the memory of targets per app (default: one per source, in memory). */
   targets?: TargetCache;
   now?: () => number;
@@ -368,7 +371,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
         },
         last: seen.within(key, FRESH_LOOK_MS),
         before: seen.within(key, KNOWN_LOOK_MS),
-        vision: deps.vision === true,
+        vision: deps.vision?.() === true,
         // What covers a target on a desktop is usually a real dialog ("Save changes?"): never closed on a guess.
         dismiss: false,
         now,

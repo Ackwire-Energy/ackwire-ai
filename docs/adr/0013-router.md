@@ -14,11 +14,11 @@ A person's message without mentions enqueues `message.posted`; the handler calls
 4. Runs are created with the shared `createAgentRuns` helper (trigger `router`), the same one mentions use.
 5. **Every decision is stored** in `routing_decisions` (unique per message): strategy name, every candidate's score, the need-any-agent score, who was picked, the reason, the usage record. That makes strategies comparable later.
 
-**Core strategy (`llm`)**: one structured-output call through `gateway.complete` (kind `router`, billed to the org's credential), `effort: "low"`, JSON Schema output whose `handle` field is an enum of the candidates. The model is `organization_settings.router_model` or the deployment's `ROUTER_MODEL`. Message text is wrapped as data. Malformed output means nobody answers.
+**Core strategy (`llm`)**: one structured-output call through `gateway.complete` (kind `router`, billed to the org's credential), `effort: "low"`, JSON Schema output whose `handle` field is an enum of the candidates. The model is `organization_settings.router_model` or the deployment's `ROUTER_MODEL`. Message text is wrapped as data. Malformed output means nobody answers. Since ADR 0074 it is the organization's small model on any of its keys, with the least thinking it allows, and malformed output is a failure.
 
-**Failures**: transient errors rethrow (outbox retry); permanent ones (no credential, rejected request) or the final attempt store a decision with `error` and pick nobody.
+**Failures**: transient errors rethrow (outbox retry); permanent ones (no credential, rejected request) or the final attempt store a decision with `error` and pick nobody. Replaced by ADR 0074: a failing step is noted in `error` and the next one decides in the same job, and rules in code end the chain.
 
-**Other strategies** plug in through `JobDeps.router.strategy`. Planned: an optional external classifier (TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone`, one question per candidate plus "does this need any agent?"), enabled by env only, never required, and recording its usage like every other model call.
+**Other strategies** plug in through `JobDeps.router.strategy`. Planned: an optional external classifier (TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone`, one question per candidate plus "does this need any agent?"), enabled by env only (or, since ADR 0073, by the key the installation's owner adds in Settings), never required, and recording its usage like every other model call. Since ADR 0074 it is the first step of the router's chain.
 
 ## Addendum (2026-10-20): up to four agents
 

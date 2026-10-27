@@ -6,8 +6,9 @@ import {
   useApi,
   useAuthConfig,
 } from "@agenteschat/client";
-import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
+import { authErrorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
+import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ import {
   SIGNED_IN_PATH,
   thisMac,
 } from "@/lib/desktop";
+import { useHumanCheck } from "@/lib/human-check";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 
 /**
@@ -53,6 +55,14 @@ type Step =
   | "sent"
   | "browser"
   | "ownerWaits";
+
+/** The steps that send something a bot could flood, and what their bot check is for (ADR 0075). */
+const STEP_ACTIONS: Partial<Record<Step, HumanAction>> = {
+  email: "email-lookup",
+  password: "sign-in",
+  newPassword: "sign-up",
+  forgot: "password-reset",
+};
 
 /** How often the Mac app's window asks whether the browser finished, and for how long. */
 const REDEEM_EVERY_MS = 2000;
@@ -113,6 +123,7 @@ export function AuthPage({
   const [passFocus, setPassFocus] = useState(false);
   const [wink, setWink] = useState(false);
   const header = useRef<HTMLElement>(null);
+  const human = useHumanCheck(config.data?.ownerClaim ? null : (STEP_ACTIONS[step] ?? null));
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
@@ -166,14 +177,20 @@ export function AuthPage({
   };
 
   const fail = (e: unknown) =>
-    setError(e instanceof ApiError && e.status === 429 ? t("auth.tooManyTries") : t("common.unknownError"));
+    setError(
+      e instanceof ApiError && e.status === 429
+        ? t("auth.tooManyTries")
+        : (knownErrorText(t, e) ?? t("common.unknownError")),
+    );
 
   /** Who is this e-mail: the next step follows from the server's answer. */
   const lookUp = async (value = email) => {
     setPending(true);
     setError(null);
     try {
-      const found = await api.account.signInOptions({ email: value.trim() });
+      const found = await withHumanCheck(human.check, (token) =>
+        api.account.signInOptions({ email: value.trim() }, token),
+      );
       setOptions(found);
       setPassword("");
       if (found.account) go(found.password ? "password" : found.providers.length > 0 ? "social" : "noPassword");
@@ -201,18 +218,12 @@ export function AuthPage({
   const signIn = async () => {
     setPending(true);
     setError(null);
-    const result = await auth.signIn({ email: email.trim(), password });
+    const result = await withHumanCheck(human.check, (token) => auth.signIn({ email: email.trim(), password }, token));
     setPending(false);
     if (!result.ok) {
       setWrong(result.status === 401);
       // Checked by code: a refused origin is a 403 too, and its own words tell an admin what to fix.
-      setError(
-        result.status === 401
-          ? null
-          : result.code === ACCOUNT_BLOCKED
-            ? t("auth.accountBlocked")
-            : result.message || t("common.unknownError"),
-      );
+      setError(result.status === 401 ? null : authErrorText(t, result));
       return;
     }
     rememberSignIn("email");
@@ -222,11 +233,14 @@ export function AuthPage({
   const signUp = async () => {
     setPending(true);
     setError(null);
-    const result = await auth.signUp({ name: name.trim(), email: email.trim(), password });
+    const result = await withHumanCheck(human.check, (token) =>
+      auth.signUp({ name: name.trim(), email: email.trim(), password }, token),
+    );
     setPending(false);
     if (!result.ok) {
-      if (result.status === 403) return go("closed");
-      setError(result.message || t("common.unknownError"));
+      // The bot check's 403 says so by its code: only another 403 means sign-up is closed.
+      if (result.status === 403 && !isHumanCheckRefusal(result.code)) return go("closed");
+      setError(authErrorText(t, result));
       return;
     }
     rememberSignIn("email");
@@ -238,13 +252,12 @@ export function AuthPage({
   const sendReset = async () => {
     setPending(true);
     setError(null);
-    const result = await auth.requestPasswordReset({
-      email: email.trim(),
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const result = await withHumanCheck(human.check, (token) =>
+      auth.requestPasswordReset({ email: email.trim(), redirectTo: `${window.location.origin}/reset-password` }, token),
+    );
     setPending(false);
     if (!result.ok) {
-      setError(result.message || t("common.unknownError"));
+      setError(authErrorText(t, result));
       return;
     }
     go("sent");
@@ -492,6 +505,8 @@ export function AuthPage({
                 {capsNote}
               </div>
             )}
+
+            {submitLabel[step] && human.slot}
 
             {error && (
               <p className="auth__error ac-iconline" role="alert">

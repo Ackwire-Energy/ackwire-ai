@@ -86,6 +86,38 @@ test("password reset: the email links straight to the web's /reset-password with
   expect(await again.json()).toMatchObject({ code: "INVALID_TOKEN" });
 });
 
+test("at most 3 reset and 3 confirmation emails an hour to one address: more go nowhere, with the same answer", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  const reset = () =>
+    browser(t)("/api/auth/request-password-reset", {
+      json: { email: "Ana@Example.com", redirectTo: "/reset-password" },
+    });
+  for (let i = 0; i < 4; i++) expect((await reset()).status).toBe(200);
+  const confirm = () => ana("/api/auth/send-verification-email", { json: { email: "ana@example.com" } });
+  const sent = (subject: string) => t.email.sent.filter((m) => m.to[0] === "ana@example.com" && m.subject === subject);
+  // The sign-up's confirmation was the first of three. (Links are stamped to the second: within one, they're one email.)
+  for (let i = 0; i < 2; i++) expect((await confirm()).status).toBe(200);
+  await t.drain();
+  expect(sent("Redefina sua senha do agentes.chat").length).toBe(3);
+  const confirmations = sent("Confirme seu e-mail no agentes.chat").length;
+  expect(confirmations).toBeGreaterThanOrEqual(1);
+  // A new second would make a new link: the fourth is dropped all the same.
+  await Bun.sleep(1000 - (Date.now() % 1000));
+  expect((await confirm()).status).toBe(200);
+  await t.drain();
+  expect(sent("Confirme seu e-mail no agentes.chat").length).toBe(confirmations);
+
+  // Another address has its own count.
+  await signUp(browser(t), "bia@example.com");
+  expect((await browser(t)("/api/auth/request-password-reset", { json: { email: "bia@example.com" } })).status).toBe(
+    200,
+  );
+  await t.drain();
+  expect(t.email.sent.filter((m) => m.to[0] === "bia@example.com").length).toBe(2);
+});
+
 test("the sign-up's own language: the confirmation email and the account follow it before anything else is picked", async () => {
   t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
   const localeOf = async (email: string) =>

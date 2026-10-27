@@ -1,5 +1,5 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { requestIp } from "../http/client-ip";
+import { requestLimitIp } from "../http/client-ip";
 import { apiError, errorResponse } from "../http/errors";
 import { type AppDeps, json } from "./app/context";
 
@@ -324,8 +324,9 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       },
     }),
     async (c) => {
-      const limit = await rateLimiter.consume(`desktop-latest:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+      const ip = requestLimitIp(c.req.raw.headers, deps.config.TRUSTED_PROXIES);
+      const limit = await rateLimiter.consume(`desktop-latest:${ip}`, LATEST_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again in a minute.");
       const { target, arch } = c.req.valid("query");
       // One universal build for both Mac architectures (Rust and Node names alike); x64 on Windows and Linux.
       const platform = desktopTarget(target, arch);
@@ -339,8 +340,9 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
   // The app's updater (Rust, no web view): Tauri's format, 204 when there is nothing to install.
   // It installs only a newer version whose bundle matches the public key built into the app.
   api.get("/desktop/update", async (c) => {
-    const limit = await rateLimiter.consume(`desktop-update:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
-    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+    const ip = requestLimitIp(c.req.raw.headers, deps.config.TRUSTED_PROXIES);
+    const limit = await rateLimiter.consume(`desktop-update:${ip}`, LATEST_LIMIT);
+    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again in a minute.");
     const platform = desktopTarget(c.req.query("target"), c.req.query("arch"));
     // On Linux the updater bundle is the AppImage, which only an AppImage install takes in place: a deb (or an
     // app that doesn't say which it is, `bundle`) updates by downloading again, from `/desktop/latest`'s link.
@@ -370,9 +372,9 @@ function registerDownload(
   releases: DesktopReleases | NativeReleases,
 ) {
   api.get(`/${kind}/download/:version/:file`, async (c) => {
-    const ip = requestIp(c.req.raw.headers);
+    const ip = requestLimitIp(c.req.raw.headers, deps.config.TRUSTED_PROXIES);
     const limit = await deps.adapters.rateLimiter.consume(`${kind}-download:${ip}`, DOWNLOAD_LIMIT);
-    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again in a minute.");
     const found = await releases.download(c.req.param("version"), c.req.param("file")).catch(() => null);
     if (!found) return apiError(c, 404, `${kind}.not_found`, "This build is not available");
     const upstream = found.response;
@@ -417,9 +419,9 @@ export function registerNativeRoutes(api: OpenAPIHono, deps: AppDeps, releases: 
       },
     }),
     async (c) => {
-      const ip = requestIp(c.req.raw.headers);
+      const ip = requestLimitIp(c.req.raw.headers, deps.config.TRUSTED_PROXIES);
       const limit = await deps.adapters.rateLimiter.consume(`native-latest:${ip}`, LATEST_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again in a minute.");
       const release = await releases.latest().catch(() => null);
       if (!release) return apiError(c, 404, "native.no_release", "No packages of this version yet");
       return c.json(release, 200);

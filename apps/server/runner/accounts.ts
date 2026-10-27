@@ -121,6 +121,22 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
   return env;
 }
 
+/**
+ * Routes (`brain-route.ts`) running in this process, by sign-in (`signInKey`). A turn or a task about to start a
+ * CLI on a sign-in stops the route there first (`yieldRoute`): two processes on one sign-in race on its refresh token.
+ */
+export const routesRunning = new Map<string, { stop: AbortController; done: Promise<unknown> }>();
+
+/** A sign-in: its account folder, or the computer's own (`home` absent). */
+export const signInKey = (kind: AccountKind, home?: string | null) => `${kind}:${home ?? "own"}`;
+
+/** Stops the route running on that sign-in, if any, and resolves once its CLI has exited. */
+export async function yieldRoute(kind: AccountKind, home?: string | null): Promise<void> {
+  const route = routesRunning.get(signInKey(kind, home));
+  route?.stop.abort();
+  await route?.done.catch(() => {});
+}
+
 /** A key account's plan and key, in its folder (mode 600). */
 const PROVIDER_FILE = "provider.json";
 /** The longest key kept (plans' keys are tens of characters, MiniMax's JWT-like ones a few hundred). */

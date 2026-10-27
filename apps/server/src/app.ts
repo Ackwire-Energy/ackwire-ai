@@ -27,6 +27,7 @@ import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
+import { jevRoutes } from "./routes/app/jev";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { machineAccountRoutes } from "./routes/app/machine-accounts";
 import { mailRoutes } from "./routes/app/mail";
@@ -156,6 +157,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
+    api.route("/app", jevRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);

@@ -37,3 +37,44 @@
   line-height: 20px;
   overflow-wrap: anywhere;
 }
+/* The email and its Verify slot in one row, both the control's height (as Members' link and Copy). */
+.invite-ask__verify {
+  display: flex;
+  gap: var(--space-2);
+}
+.invite-ask__verify > .ac-input {
+  flex: 1;
+  min-width: 0;
+}
+/* Verify, the countdown, Resend and Verified share one cell: the slot is as wide as the longest, so the field never
+   moves. */
+.invite-ask__slot {
+  display: grid;
+  align-items: center;
+}
+.invite-ask__slot > * {
+  grid-area: 1 / 1;
+}
+.invite-ask__wait {
+  font-variant-numeric: tabular-nums;
+}
+.invite-ask__verified {
+  justify-self: center;
+  color: var(--ok);
+  font-weight: 600;
+}
+/* Six digits, centred: the letter spacing trails the last one, so the left padding takes the same. */
+.invite-ask__code {
+  padding-left: calc(var(--control-px-md) + 0.3em);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
+/* With the bot check on the card, at phone width its padding gives way so Turnstile's checkbox (300px at least,
+   ADR 0075) fits: 316px at 390. Narrower still, the widget takes its compact size. */
+@media (max-width: 480px) {
+  .ac-card.invite-card:has(.human-check) {
+    --card-pad: 20px;
+  }
+}

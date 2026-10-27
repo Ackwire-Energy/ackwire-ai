@@ -669,7 +669,7 @@ describe("words", () => {
     }
   });
 
-  test("the three answers in both languages; one that invites says what to do if you never asked", () => {
+  test("the three answers in both languages, to an address that asked", () => {
     const answer = (locale: "en" | "pt-BR", outcome: "joined" | "invited" | "denied") =>
       renderEmail({
         kind: "join_answer",
@@ -694,8 +694,14 @@ describe("words", () => {
     ]);
     expect(answer("en", "joined").text).toContain("Marina approved your request. You joined Acme as an admin.");
     expect(answer("pt-BR", "invited").text).toContain("Aceitar convite: https://a.test/x");
-    expect(answer("en", "invited").text).toContain("If you didn't ask to join, ignore this email.");
-    expect(answer("pt-BR", "invited").text).toContain("Se você não pediu para entrar, ignore este e-mail.");
+    // The address proved itself before asking: nothing for someone who never asked.
+    for (const outcome of outcomes) {
+      expect(answer("en", outcome).text).not.toContain("If you didn't ask");
+      expect(answer("pt-BR", outcome).text).not.toContain("Se você não pediu");
+    }
+    expect(answer("en", "denied").text).toContain(
+      "If you think it's a mistake, ask someone there to invite you by email.",
+    );
     expect(answer("en", "denied").text).toContain("Their note: “Full <b>team</b>”");
     expect(answer("en", "denied").html).toContain("“Full &lt;b&gt;team&lt;/b&gt;”");
     expect(answer("en", "denied").html).not.toContain("https://a.test/x");
