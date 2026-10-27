@@ -1,5 +1,17 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
 /**
@@ -28,6 +40,20 @@ export const organizations = pgTable("organizations", {
   standingNotice: text().$type<"shown" | "silent">().notNull().default("shown"),
   /** When `standing` last changed; null: never. */
   standingChangedAt: timestamp({ withTimezone: true }),
+  /**
+   * Limits a billing service sets through the operator API (ADR 0071, `limits.ts`); null: no limit, all a
+   * self-hosted server ever has. The platform's AI per UTC month is kept in nano-US$, the unit of
+   * `usage_records.cost_nano_usd`.
+   */
+  limitMembers: integer(),
+  limitStorageBytes: bigint({ mode: "number" }),
+  limitUploadBytesPerDay: bigint({ mode: "number" }),
+  limitPlatformNanoUsd: bigint({ mode: "number" }),
+  /** When a limit last changed; null: never set. */
+  limitsUpdatedAt: timestamp({ withTimezone: true }),
+  /** The month (`YYYY-MM`) and highest share (50, 100) of the platform's AI already told (`platform_ai.threshold`). */
+  platformAlertMonth: text(),
+  platformAlertPercent: smallint(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
