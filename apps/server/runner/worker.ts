@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import {
   type AgentScope,
+  LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
   MAX_FRAME_BYTES,
   type MachineErrorCode,
@@ -224,6 +225,11 @@ export class WorkerLink {
     this.write(JSON.stringify({ type: "browser.desktop" } satisfies WorkerLinkFrame));
   }
 
+  /** What its agent's Chrome sent and received since the last time (protocol 23); nothing when it moved nothing. */
+  traffic({ up, down }: { up: number; down: number }) {
+    if (up > 0 || down > 0) this.write(JSON.stringify({ type: "browser.traffic", up, down } satisfies WorkerLinkFrame));
+  }
+
   /**
    * `push` without the machine token: the bytes go to the supervisor in
    * pieces, it uploads them to the request's URL and says how that went.
@@ -339,6 +345,9 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   });
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
   leases.unref?.();
+  // Root sums its agents' browsers' traffic for the computer's own count.
+  const counted = setInterval(() => link.traffic(browser.takeTraffic()), LOAD_SAMPLE_MS);
+  counted.unref?.();
   void browser.closeAll();
   link.onShow = (showId, agent) => {
     const shown =
@@ -425,11 +434,13 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   log(`agentes-runner ${RUNNER_VERSION}: worker of agent ${o.agentId} (folder ${workspaceReal})`);
   await connection.run();
   clearInterval(leases);
+  clearInterval(counted);
   desktopUse.stopAll();
   tasks.close();
   brains.close();
   codexApp.close();
   await browser.close().catch(() => undefined);
+  link.traffic(browser.takeTraffic());
   await mcp.close().catch(() => undefined);
   return 0;
 }

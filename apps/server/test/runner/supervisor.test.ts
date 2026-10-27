@@ -474,6 +474,48 @@ test("frames from a worker go up only when they are its agent's", async () => {
   expect(turn.emitted).toHaveLength(2);
 });
 
+test("the agents' browsers' traffic: each worker's count summed until taken, between sessions too; nonsense dropped", async () => {
+  const t = setup();
+  t.sup.boot();
+  t.sup.attach();
+  const runs = [handleRequest(t.ctx, exec(ANA), scope().scope), handleRequest(t.ctx, exec(BIA), scope().scope)];
+  await waitFor(() => t.workers.length === 2);
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  // Before its session's hello: its Chrome may have run meanwhile.
+  ana.send({ type: "browser.traffic", up: 100, down: 2000 });
+  ana.hello();
+  bia.hello();
+  bia.send({ type: "browser.traffic", up: 5, down: 70 });
+  for (const bad of [
+    { up: 1e12 + 1, down: 1 },
+    { up: 1, down: -1 },
+    { up: 1.5, down: 1 },
+    { up: "100", down: 1 },
+    { up: 1 },
+  ]) {
+    ana.send({ type: "browser.traffic", ...bad });
+  }
+  // Frames are read in order: once this one counts, the ones before it were seen.
+  ana.send({ type: "browser.traffic", up: 1e12, down: 0 });
+  const total = { up: 0, down: 0 };
+  await waitFor(() => {
+    const got = t.sup.takeTraffic();
+    total.up += got.up;
+    total.down += got.down;
+    return total.up >= 1e12;
+  });
+  expect(total).toEqual({ up: 1e12 + 105, down: 2070 });
+  expect(t.sup.takeTraffic()).toEqual({ up: 0, down: 0 });
+  // Nothing of it goes to the server: root says it on its own pong.
+  expect(t.up.filter((f) => f.type === "browser.traffic")).toEqual([]);
+  for (const w of [ana, bia]) {
+    const req = await requestOn(w);
+    w.send({ type: "result", id: req.id, ok: true, data: execDone });
+  }
+  await Promise.all(runs);
+});
+
 test("hello lists every worker's tasks until the server acknowledges them, across a restart of the supervisor", async () => {
   const home = newHome();
   const t = setup({}, home);

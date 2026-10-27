@@ -1581,7 +1581,7 @@ export const MCP_TOOLS_MAX = 200;
 /** Largest `mcp.call` arguments (JSON characters). */
 export const MCP_ARGS_MAX_CHARS = 64 * 1024;
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";
 const cut = (v: unknown, max: number) => (isString(v) ? v.slice(0, max) : undefined);
 const fileList = (v: unknown) =>
@@ -2481,7 +2481,8 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
   };
 }
 
-const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
+/** A whole number from `min` to `max`. */
+export const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
 /** A small JSON text frame, parsed; null when it is too long or not JSON. */

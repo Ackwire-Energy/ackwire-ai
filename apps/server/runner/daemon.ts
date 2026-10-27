@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { LoadWindow, machineSize, sampleLoad } from "@agenteschat/adapters/host-stats";
+import { LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
@@ -288,6 +288,8 @@ export class RunnerDaemon implements RequestObserver {
   private readonly timers: ReturnType<typeof setInterval>[] = [];
   /** Protocol 22: how busy this computer got over the last day (rides on `pong`). */
   private readonly load = new LoadWindow();
+  /** The agents' browsers' last day of traffic (protocol 23). */
+  private readonly traffic = new TrafficWindow();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private stopping = false;
@@ -469,10 +471,13 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
-    const sample = () =>
+    const sample = () => {
+      const s = this.session;
+      this.traffic.add((s?.supervisor ?? s?.browser)?.takeTraffic() ?? { up: 0, down: 0 });
       void sampleLoad()
-        .then((s) => this.load.add(s))
+        .then((l) => this.load.add(l))
         .catch(() => undefined);
+    };
     sample();
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();
@@ -882,6 +887,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       executors: () => this.helloExecutors(),
       load: () => this.load.summary(),
+      browserTraffic: () => this.traffic.summary(),
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),

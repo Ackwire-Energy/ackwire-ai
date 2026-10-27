@@ -7,6 +7,7 @@ import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   HEARTBEAT_MS,
+  inRange,
   MAX_FRAME_BYTES,
   type MachineErrorCode,
   type MachineReplies,
@@ -72,6 +73,8 @@ const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
  * it three times as often while it is.
  */
 export const BROWSER_LEASE_MS = 90_000;
+/** A worker's `browser.traffic` larger than this (bytes, either way) isn't believed. */
+const TRAFFIC_DELTA_MAX = 1e12;
 
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
@@ -122,7 +125,9 @@ export type WorkerLinkFrame =
   /** From the worker: Chrome for Testing installs first. */
   | { type: "browser.showing"; showId: string }
   /** From the worker: the agent's Chrome is on its desktop, or why not. */
-  | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } };
+  | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } }
+  /** From the worker: what its agent's Chrome sent and received since it last said (protocol 23). */
+  | { type: "browser.traffic"; up: number; down: number };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -217,6 +222,8 @@ export class Supervisor {
   private closed = false;
   private seq = 0;
   private pinger: ReturnType<typeof setInterval> | null = null;
+  /** What the workers said their agents' Chromes sent and received, not taken yet (protocol 23). */
+  private traffic = { up: 0, down: 0 };
 
   /** The connection's MCP side: answers go back to the worker that asked. */
   readonly mcp = {
@@ -384,6 +391,13 @@ export class Supervisor {
       });
       this.send(w, { type: "browser.show", showId, agent });
     });
+  }
+
+  /** What the agents' Chromes sent and received since the last call, as their workers said (protocol 23). */
+  takeTraffic(): { up: number; down: number } {
+    const total = this.traffic;
+    this.traffic = { up: 0, down: 0 };
+    return total;
   }
 
   /** The session is over: workers' stdin closes (they finish and exit), and the ones still there after `graceMs` are killed. */
@@ -722,6 +736,14 @@ export class Supervisor {
     if (f?.type === "desktop.ensure") {
       const use = f.use === "browser" ? "browser" : "desktop";
       return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "", use);
+    }
+    // Counted whenever it comes: the worker's Chrome ran between its sessions too.
+    if (f?.type === "browser.traffic") {
+      if (inRange(f.up, [0, TRAFFIC_DELTA_MAX]) && inRange(f.down, [0, TRAFFIC_DELTA_MAX])) {
+        this.traffic.up += f.up;
+        this.traffic.down += f.down;
+      }
+      return;
     }
     if (!w.ready) return;
     if (f?.type === "browser.desktop") {
