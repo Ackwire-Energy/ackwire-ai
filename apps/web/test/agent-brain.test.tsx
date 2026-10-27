@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, MachineAccount, PlanUsage } from "@agenteschat/client";
+import type { AgentBrain, BrowserUnavailableReason, Machine, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeAgentBrain, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -658,6 +658,77 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     );
     expect(steps.querySelector(".machine-command__code")?.textContent).toBe("sudo agentes-runner tools enable browser");
     expect(steps.querySelector(".brw-steps__grid")).toBeNull();
+  });
+
+  /**
+   * Ada's browser on Servidor, a Linux computer (`machine` over it), and the page open. `reason`: what the server says
+   * of her browser there; null: she is still on a sandbox, so turning it on moves her there.
+   */
+  const onServidor = async (
+    machine: Partial<Machine>,
+    reason: BrowserUnavailableReason | null,
+    { cloud = false, granted = false } = {},
+  ) => {
+    cleanup();
+    const state = seedState();
+    if (granted) state.scopes[ADA_ID] = [...(state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({ id: "machine_1", name: "Servidor", os: "linux", mode: "system", ...machine });
+    if (cloud) machines?.setSetup({ state: "ready", machineId: "machine_1" });
+    if (reason) {
+      await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+      fakeBrowserOf.get(api)?.settings.set(ADA_ID, {
+        allowedDomains: null,
+        available: false,
+        reason,
+        detail: null,
+        machine: { id: "machine_1", name: "Servidor" },
+      });
+    }
+    await open(state, api);
+  };
+  const tools = (browser?: boolean) => ({
+    folders: [],
+    tools: { claude: true, codex: true, commands: true, ...(browser === undefined ? {} : { browser }) },
+  });
+  const command = (steps: Element | null) => steps?.querySelector(".machine-command__code")?.textContent;
+
+  test("the step is only for a switch that is off, on a computer someone here reaches", async () => {
+    const stepsIn = async (...args: Parameters<typeof onServidor>) => {
+      await onServidor(...args);
+      const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
+      await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
+      return d.querySelector(".brw-steps");
+    };
+    const missing = {
+      available: false,
+      version: "1",
+      chrome: null,
+      reason: "Chrome's libraries are missing: run `agentes-runner browser install --with-deps`",
+    };
+    expect(command(await stepsIn({ access: tools(false) }, "switched_off"))).toBe(
+      "sudo agentes-runner tools enable browser",
+    );
+    // Switched on, and Chrome's libraries missing there: nothing to turn on, where she is or where she'd move.
+    expect(await stepsIn({ access: tools(true), browser: missing }, "not_installed")).toBeNull();
+    expect(await stepsIn({ access: tools(true), browser: missing }, null)).toBeNull();
+    // A runner from before the browser has no switch for it.
+    expect(await stepsIn({ access: tools() }, "outdated")).toBeNull();
+    // The workspace's own computer: nobody here reaches it.
+    expect(
+      await stepsIn({ kind: "managed", os: "other", access: tools(false) }, "switched_off", { cloud: true }),
+    ).toBeNull();
+  });
+
+  test("under the sentence, the step waits for a switch that is off, not for one that is on", async () => {
+    await onServidor({ access: tools(false) }, "switched_off", { granted: true });
+    expect(command(screen().getByRole("region", { name: "Falta 1 passo, no próprio Servidor" }))).toBe(
+      "sudo agentes-runner tools enable browser",
+    );
+    // On, and the computer hasn't said yet whether it runs.
+    await onServidor({ access: tools(true) }, "not_reported", { granted: true });
+    expect(document.querySelector(".brw-steps")).toBeNull();
   });
 });
 

@@ -246,13 +246,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const member = viewer === "member";
   const reason = work.browser.data?.reason;
   const machineRow = machine ? work.machines.data?.find((m) => m.id === machine.machineId) : undefined;
-  // The steps happen on the computer itself: never on the workspace's own, which nobody here reaches.
-  const steps =
-    !member &&
-    work.browserWord === "waiting" &&
-    machine &&
-    machineRow?.kind !== "managed" &&
-    (reason === "switched_off" || reason === "not_reported");
+  // Only a switch that is off has a step there: `not_reported` and `not_installed` are on, `outdated` has none.
+  const steps = !member && work.browserWord === "waiting" && machine && reason === "switched_off";
   const desktopGranted = (work.scopes.data ?? []).some(
     (s) => s.connectionId === null && s.scope === DESKTOP_TOOL_SCOPE,
   );
@@ -370,13 +365,15 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 /**
  * What turns the computer's browser on, there; the page notices by itself. The app's three clicks, drawn small; on a
  * Linux computer, which may be a server without the app, the command too. In agentes for Mac on this very Mac: one
- * button to Preferences → Ferramentas instead (ADR 0036).
+ * button to Preferences → Ferramentas instead (ADR 0036). Nothing once its switch is on, or on the workspace's own
+ * computer, which nobody here reaches.
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId ?? "");
   const row = useMachines(org.id).data?.find((m) => m.id === machineId);
+  if (row?.kind === "managed" || row?.access?.tools.browser) return null;
   if (here) {
     return (
       <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
@@ -1543,7 +1540,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
           {blocked && inDesktopApp() && (
             <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
           )}
-          {on && (moveTo ? !ready(moveTo) : !work.browser.data?.available && work.browser.data?.machine) && (
+          {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
             <BrowserSteps
               computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}
