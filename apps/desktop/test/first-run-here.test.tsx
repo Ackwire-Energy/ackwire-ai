@@ -18,7 +18,8 @@ import { FirstRun } from "../src/windows/FirstRun";
 
 const REACH_TEXT =
   "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.";
-const USAGE_TEXT = "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.";
+const USAGE_TEXT =
+  "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.";
 
 /** The first run on a fake host, with what it opened in the browser and in Tailscale; `host` changes the host first. */
 async function firstRun(

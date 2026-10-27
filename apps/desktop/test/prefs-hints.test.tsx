@@ -149,10 +149,10 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       (el) => {
         expect(row(el, "Send anonymous usage statistics to agentes.chat")).toEqual({
           title: "Send anonymous usage statistics to agentes.chat",
-          hint: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
+          hint: "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.",
           // The switch reads the hint, then what changing it does.
           switch:
-            "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names. Changing it restarts agentes.chat for a moment.",
+            "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. Changing it restarts agentes.chat for a moment.",
           line: "Changing it restarts agentes.chat for a moment.",
         });
         expect(el.textContent).not.toContain("nothing is sent");

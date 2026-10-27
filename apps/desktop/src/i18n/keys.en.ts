@@ -189,7 +189,8 @@ export const desktopEn: DesktopTranslations = {
     openTailscale: "Open Tailscale",
     getTailscale: "Get Tailscale",
     usage: "Send anonymous usage statistics to agentes.chat",
-    usageText: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
+    usageText:
+      "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.",
     start: "Start agentes.chat",
     setting: "Setting up agentes.chat on this {{device}}",
     step: {

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 22;
+export const MACHINE_PROTOCOL_VERSION = 23;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -295,6 +295,22 @@ export interface MachineLoad {
 
 /** How often a computer's load is sampled (protocol 22). */
 export const LOAD_SAMPLE_MS = 5 * 60_000;
+
+/**
+ * From this protocol on: how much data the agents' browsers send and receive.
+ * A `pong` carries `browserTraffic`, the last day's sum, after each new sample
+ * (every `LOAD_SAMPLE_MS`), counted from the network events of the Chromes the
+ * runner started, never from the rest of the machine. Nothing new goes to the
+ * runner, so an older one simply never says.
+ */
+export const BROWSER_TRAFFIC_PROTOCOL = 23;
+
+/** Protocol 23: what the agents' browsers sent (`up`) and received (`down`), in bytes, over the last `hours`. */
+export interface BrowserTraffic {
+  up: number;
+  down: number;
+  hours: number;
+}
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -1490,8 +1506,11 @@ export type RunnerFrame =
   | { type: "output"; id: string; stream: "stdout" | "stderr"; chunk: string }
   | { type: "result"; id: string; ok: true; data: unknown }
   | { type: "result"; id: string; ok: false; error: { code: MachineErrorCode; message: string } }
-  /** Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed). */
-  | { type: "pong"; at: number; load?: MachineLoad }
+  /**
+   * Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed);
+   * protocol 23: `browserTraffic` the same way.
+   */
+  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -1928,7 +1947,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
     case "pong": {
       if (typeof f.at !== "number") return null;
       const load = parseMachineLoad(f.load);
-      return { type: "pong", at: f.at, ...(load ? { load } : {}) };
+      const browserTraffic = parseBrowserTraffic(f.browserTraffic);
+      return { type: "pong", at: f.at, ...(load ? { load } : {}), ...(browserTraffic ? { browserTraffic } : {}) };
     }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;
@@ -2500,6 +2520,14 @@ export function parseMachineLoad(v: unknown): MachineLoad | null {
   if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
   if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
   return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
+}
+
+/** `pong.browserTraffic` (protocol 23): whole bytes up to 1e15 and at most 24 hours, else none. */
+export function parseBrowserTraffic(v: unknown): BrowserTraffic | null {
+  if (!isObject(v) || !inRange(v.up, [0, 1e15]) || !inRange(v.down, [0, 1e15]) || !between(v.hours, 0, 24)) {
+    return null;
+  }
+  return { up: v.up, down: v.down, hours: v.hours };
 }
 
 /** `hello.desktop` (protocol 18), cut; a size only when both sides are sane. */

@@ -31,6 +31,19 @@ const Load = z
   })
   .nullable();
 
+const BrowserTraffic = z
+  .object({
+    upMb: z.number().int(),
+    downMb: z.number().int(),
+    hours: z.number(),
+    computers: z.number().int(),
+  })
+  .nullable()
+  .openapi({
+    description:
+      "What the agents' browsers on these computers sent and received over the last day, in MB (10^6 bytes), as their Chrome counts each request's headers and body; `hours` counted on average and how many of them said. Null when none did.",
+  });
+
 const Report = z
   .object({
     report: z.literal(1),
@@ -59,6 +72,7 @@ const Report = z
         count: z.number().int().openapi({ description: "How many computers are of this kind, system and size." }),
         agents: z.number().int(),
         load: Load,
+        browserTraffic: BrowserTraffic,
       }),
     ),
     lastDay: z.object({
