@@ -68,7 +68,6 @@ export const featureKeysPtBR = {
   approval: {
     asksIn: "pede sua aprovação · #{{channel}}",
     asksYou: "pede sua aprovação",
-    highRisk: "Alto risco",
     expiresIn_one: "expira em {{count}} min",
     expiresIn_other: "expira em {{count}} min",
     refuse: "Recusar",
@@ -267,7 +266,7 @@ export const featureKeysPtBR = {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
-      held: "{{name}} lê depois da sua decisão no card",
+      held: "{{name}} lê depois da sua decisão",
       read: "{{name}} leu",
       resolved: "{{name}} encerrou o pedido de ajuda",
       well: "Leu seu recado",
@@ -291,10 +290,6 @@ export const featureKeysPtBR = {
       back: "Conectado de novo",
     },
     longPressHint: "Segure para reagir e ver mais ações",
-    steps_one: "{{count}} passo",
-    steps_other: "{{count}} passos",
-    stepsFailed: "Não deu para carregar os passos.",
-    stepsNone: "Respondeu sem usar ferramentas.",
     consult: {
       answered: "{{name}} respondeu",
       expiredF: "A {{name}} não respondeu a tempo",
@@ -315,8 +310,6 @@ export const featureKeysPtBR = {
     fileDeleted: "Arquivo removido",
     fileFailed: "Não deu para abrir o arquivo.",
     approval: {
-      asks: "Pede seu ok",
-      see: "Ver pedido",
       approved: "Aprovado: {{title}}",
       refused: "Recusado: {{title}}",
       expired: "Expirou: {{title}}",

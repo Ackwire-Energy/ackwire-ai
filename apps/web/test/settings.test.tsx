@@ -94,7 +94,7 @@ describe("Configurações da organização", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     // What is counted is the ⓘ's; no line under the switch while it can be changed.
     expect(describedBy(toggle)).toEqual([
-      "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
     ]);
     expect(card.querySelector(".settings-row__help")).toBeNull();
     await click(toggle);
@@ -117,7 +117,7 @@ describe("Configurações da organização", () => {
       "Desligado nas configurações deste servidor (TELEMETRY=off).",
     );
     expect(describedBy(toggle)).toEqual([
-      "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
       "Desligado nas configurações deste servidor (TELEMETRY=off).",
     ]);
     cleanup();

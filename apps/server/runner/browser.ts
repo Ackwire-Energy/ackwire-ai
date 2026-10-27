@@ -23,11 +23,13 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import { countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside } from "./paths";
+import type { Spawn } from "./scope-gate";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -123,6 +125,8 @@ const ALIVE_MARGIN_MS = 60_000;
 const CAPTURE_LEFTOVER_MS = 60_000;
 /** After the agent's desktop failed to start, its browser stays headless this long before trying again. */
 const DESKTOP_RETRY_MS = 5 * 60_000;
+/** A new Chrome's first command waits this long at most for its traffic counter to attach. */
+const TRAFFIC_ATTACH_MS = 1000;
 
 /** What the server may ask for: everything else (vault, plugins, chat, dashboard, sessions, installs) is refused. */
 const COMMANDS = new Set([
@@ -500,6 +504,8 @@ export interface OwnChrome {
   pid: number;
   /** Its debugging port (`agent-browser --cdp`). */
   port: number;
+  /** Its browser endpoint on that port (`/devtools/browser/<id>`), which its traffic is counted on. */
+  wsPath?: string;
   /** Asks it to quit, then kills it if it lingers. */
   kill(): void;
   /** Settles when the process is gone. */
@@ -546,17 +552,19 @@ function missingLibrariesText(missing: string[]): string {
 
 /**
  * Starts Chrome and waits for its debugging port (Chrome writes it to
- * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`).
+ * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`, its
+ * browser endpoint on the next line).
  */
 export async function launchChrome(
   exe: string,
   args: string[],
   profile: string,
   env?: Record<string, string>,
+  start: Spawn = spawn,
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
+  const child = start(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
   let output = "";
   let started = false;
   // Read for as long as Chrome runs, since a full pipe would stall it; only what it says while starting is kept.
@@ -614,11 +622,19 @@ export async function launchChrome(
       );
     }
     const text = await readFile(portFile, "utf8").catch(() => "");
-    const port = Number(text.split("\n")[0]);
+    const [first = "", second = ""] = text.split("\n");
+    const port = Number(first);
     if (Number.isInteger(port) && port > 0 && port < 65536) {
       if (!child.pid) break;
       started = true;
-      return { pid: child.pid, port, kill, exited };
+      const wsPath = second.trim();
+      return {
+        pid: child.pid,
+        port,
+        kill,
+        exited,
+        ...(/^\/devtools\/browser\/[\w-]+$/.test(wsPath) ? { wsPath } : {}),
+      };
     }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -997,6 +1013,10 @@ export class BrowserManager {
   private closing: Promise<void> = Promise.resolve();
   /** `<runner home>/browser/chromes.json`: the Chromes this runner home started (pid and profile). */
   private readonly pidFile: string;
+  /** What each running Chrome sends and receives (protocol 23). */
+  private readonly counters = new Map<OwnChrome, TrafficCounter>();
+  /** What the counters of Chromes that are gone counted, not taken yet. */
+  private trafficLeft = { up: 0, down: 0 };
   /** Writes to the pid file, one at a time. */
   private pidWrites: Promise<unknown> = Promise.resolve();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -1534,6 +1554,7 @@ export class BrowserManager {
         session.aliveAt = null;
         this.changed();
       });
+      await this.countTraffic(chrome);
       return chrome;
     })();
     session.chromeStarting = starting;
@@ -1542,6 +1563,35 @@ export class BrowserManager {
     } finally {
       if (session.chromeStarting === starting) session.chromeStarting = undefined;
     }
+  }
+
+  /** A new Chrome's traffic is counted from its first command on: the counter attaches first (1 s at most). */
+  private async countTraffic(chrome: OwnChrome) {
+    if (!chrome.wsPath) return;
+    const counter = countChromeTraffic(`ws://127.0.0.1:${chrome.port}${chrome.wsPath}`);
+    this.counters.set(chrome, counter);
+    void chrome.exited.then(() => {
+      const last = counter.take();
+      this.trafficLeft.up += last.up;
+      this.trafficLeft.down += last.down;
+      counter.close();
+      this.counters.delete(chrome);
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([counter.attached, new Promise((r) => (timer = setTimeout(r, TRAFFIC_ATTACH_MS)))]);
+    clearTimeout(timer);
+  }
+
+  /** What the agents' Chromes sent and received since the last call, those that are gone included (protocol 23). */
+  takeTraffic(): { up: number; down: number } {
+    const total = this.trafficLeft;
+    this.trafficLeft = { up: 0, down: 0 };
+    for (const counter of this.counters.values()) {
+      const t = counter.take();
+      total.up += t.up;
+      total.down += t.down;
+    }
+    return total;
   }
 
   /** The agent's Chrome stops (the profile, and so its logins, stay). */

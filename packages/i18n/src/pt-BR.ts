@@ -1336,6 +1336,11 @@ export const ptBR = {
       unattended: "sem ninguém acompanhando",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "Preciso do seu ok para seguir:",
+    seeEmail: "Ver o e-mail",
+    seeDetails: "Ver detalhes",
+    notNow: "Agora não",
     email: {
       from: "De",
       to: "Para",
@@ -5503,7 +5508,7 @@ export const ptBR = {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
-      held: "{{name}} lê depois da sua decisão no card",
+      held: "{{name}} lê depois da sua decisão",
       read: "{{name}} leu",
       resolved: "{{name}} encerrou o pedido de ajuda",
     },
@@ -7290,7 +7295,7 @@ export const ptBR = {
     telemetry: {
       title: "Estatísticas de uso",
       label: "Enviar estatísticas de uso anônimas ao agentes.chat",
-      help: "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      help: "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
       envOff: "Desligado nas configurações deste servidor (TELEMETRY=off).",
       envOffDesktop:
         "Desligado no app do agentes.chat no computador deste servidor (Preferências\u00a0›\u00a0Servidores).",
@@ -7534,6 +7539,15 @@ export const ptBR = {
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "O que {{pronoun}} fez",
+      used_one: "Usou {{count}} ferramenta",
+      used_other: "Usou {{count}} ferramentas",
+      times: "×{{count}}",
+      erred: "Deu erro {{activity}}",
+      gave: "recebeu",
+      answered: "devolveu",
+      error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
@@ -7591,6 +7605,7 @@ export const ptBR = {
         offeringConnectAi: "Ofereceu conectar uma IA",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
+        findingTools: "Procurou ferramentas",
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
@@ -7655,6 +7670,7 @@ export const ptBR = {
       offeringConnectAi: "preparando a conexão de uma IA",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
+      findingTools: "procurando ferramentas",
       usingTool: "usando uma ferramenta",
     },
     tokens: "{{value}} tokens",

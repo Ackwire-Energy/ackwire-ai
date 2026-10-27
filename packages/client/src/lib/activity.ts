@@ -67,6 +67,7 @@ export type ActivityKind =
   | "offeringConnectAi"
   | "askingAgent"
   | "tellingAgent"
+  | "findingTools"
   | "usingTool";
 
 export interface Activity {
@@ -216,6 +217,8 @@ export function toolActivity(
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
+  // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
+  if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };
   // The agent's own browser (ADR 0040): not an app called "browser".
   if (name.startsWith("browser_")) return { kind: "browsing" };
   const label = connector?.trim();

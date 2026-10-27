@@ -1,5 +1,5 @@
-import type { MachineLoad, MachineSize } from "@agenteschat/adapters";
-import { combineLoads, type LoadSample } from "@agenteschat/adapters/host-stats";
+import type { BrowserTraffic, MachineLoad, MachineSize } from "@agenteschat/adapters";
+import { type CombinedTraffic, combineLoads, combineTraffic, type LoadSample } from "@agenteschat/adapters/host-stats";
 import { type Database, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import { catalogModelOf } from "@agenteschat/providers";
 
@@ -45,6 +45,11 @@ export interface TelemetryComputer {
   agents: number;
   /** Their last day: the averages averaged and the highest peaks, of those that said in the last day. */
   load: MachineLoad | null;
+  /**
+   * What their agents' browsers sent and received over the last day, summed (protocol 23), with the hours
+   * counted on average and how many said in the last day; null when none did. Never the rest of the machine.
+   */
+  browserTraffic: CombinedTraffic | null;
 }
 
 /** What only the server process knows about itself. */
@@ -120,10 +125,10 @@ export async function saveHostLoad(
   await db.insert(instanceTelemetry).values(set).onConflictDoUpdate({ target: instanceTelemetry.id, set });
 }
 
-/** A load summary from over a day ago says nothing about the last day. */
-const fresh = (load: schema.MachineLoadRecord | null, now: Date): MachineLoad | null => {
-  if (!load || now.getTime() - Date.parse(load.at) > DAY_MS) return null;
-  const { at: _at, ...rest } = load;
+/** A summary from over a day ago says nothing about the last day. */
+const fresh = <T extends { at: string }>(record: T | null, now: Date): Omit<T, "at"> | null => {
+  if (!record || now.getTime() - Date.parse(record.at) > DAY_MS) return null;
+  const { at: _at, ...rest } = record;
   return rest;
 };
 const int = (v: unknown) => Math.round(Number(v ?? 0));
@@ -174,17 +179,18 @@ export async function buildTelemetryReport(
     size: MachineSize | null;
     specs: MachineSize | null;
     load: schema.MachineLoadRecord | null;
+    browser_traffic: schema.MachineTrafficRecord | null;
     agents: unknown;
   }>(
     await db.execute(sql`
-      select m.kind, m.os, m.arch, m.size, p.specs, m.load,
+      select m.kind, m.os, m.arch, m.size, p.specs, m.load, m.browser_traffic,
         (select count(*) from agents a where a.machine_id = m.id and a.archived_at is null) as agents
       from machines m
       left join machine_provisioning p on m.kind = 'managed' and p.org_id = m.org_id
       where m.deleted_at is null and m.last_seen_at >= ${since(30)}
       order by m.created_at`),
   );
-  type One = Omit<TelemetryComputer, "count">;
+  type One = Omit<TelemetryComputer, "count" | "browserTraffic"> & { traffic: BrowserTraffic | null };
   const each: One[] = [];
   let host: One | undefined;
   for (const m of machines) {
@@ -195,19 +201,26 @@ export async function buildTelemetryReport(
       size: m.size ?? m.specs ?? null,
       agents: int(m.agents),
       load: fresh(m.load, now),
+      traffic: fresh(m.browser_traffic, now),
     };
-    // The server's own computer has a row for each organization it serves: one machine all the same.
+    // The server's own computer has a row for each organization it serves: one machine all the same, its
+    // load said by each, while each row's runner counts only its own organization's browsers.
     if (m.kind === "host" && host) {
       host.agents += c.agents;
       host.size ??= c.size;
       host.load ??= c.load;
+      const [a, b] = [host.traffic, c.traffic];
+      host.traffic = a && b ? { up: a.up + b.up, down: a.down + b.down, hours: Math.max(a.hours, b.hours) } : (a ?? b);
       continue;
     }
     if (m.kind === "host") host = c;
     each.push(c);
   }
-  const alike = new Map<string, { computer: TelemetryComputer; loads: (MachineLoad | null)[] }>();
-  for (const { load, ...c } of each) {
+  const alike = new Map<
+    string,
+    { computer: TelemetryComputer; loads: (MachineLoad | null)[]; traffic: (BrowserTraffic | null)[] }
+  >();
+  for (const { load, traffic, ...c } of each) {
     const s = c.size;
     const key = JSON.stringify([c.kind, c.os, c.arch, s?.cpus, s?.memoryGb, s?.diskGb, s?.limit]);
     const group = alike.get(key);
@@ -215,12 +228,21 @@ export async function buildTelemetryReport(
       group.computer.count += 1;
       group.computer.agents += c.agents;
       group.loads.push(load);
+      group.traffic.push(traffic);
     } else {
-      alike.set(key, { computer: { ...c, count: 1, load: null }, loads: [load] });
+      alike.set(key, {
+        computer: { ...c, count: 1, load: null, browserTraffic: null },
+        loads: [load],
+        traffic: [traffic],
+      });
     }
   }
   const computers = [...alike.values()]
-    .map(({ computer, loads }) => ({ ...computer, load: combineLoads(loads) }))
+    .map(({ computer, loads, traffic }) => ({
+      ...computer,
+      load: combineLoads(loads),
+      browserTraffic: combineTraffic(traffic),
+    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, MAX_COMPUTERS);
 

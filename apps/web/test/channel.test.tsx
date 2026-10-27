@@ -123,15 +123,17 @@ describe("Canal", () => {
     expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
   });
 
-  test("the inline approval card: approve calls the API, shrinks to one line; events update it", async () => {
+  test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;
-    // The card lives on the agent message with meta.approvalId.
+    // It lives on the agent message with meta.approvalId: the agent asking, the action in one line.
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.closest("article")?.textContent).toContain("Ada");
-    expect(card.textContent).toContain("Ada pede aprovação");
-    expect(card.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
+    expect(card.textContent).toContain("Preciso do seu ok para seguir:");
     expect(card.textContent).toContain("Merge PR #42 into main");
+    // Its text isn't repeated above it ("Pedido de aprovação: …").
+    expect(card.closest("article")?.querySelector(".ac-msg__text")).toBeNull();
+    expect(within(card).getByRole("button", { name: "Agora não" })).toBeTruthy();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar merge" })));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
