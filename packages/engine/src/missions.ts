@@ -3136,11 +3136,11 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
           waiting.length ? `, ${waiting.length} waiting for you` : ""
         }.`
       : "No plan yet.",
-    ...(doing.length ? [`In progress: ${doing.map((i) => i.title).join("; ")}.`] : []),
-    ...(waiting.length ? [`Waiting for you: ${waiting.map((i) => i.title).join("; ")}.`] : []),
-    ...(pending.length ? [`Decisions to take: ${pending.map((d) => d.question).join("; ")}.`] : []),
+    ...(doing.length ? [`In progress: ${doing.map((i) => i.title).join(" · ")}.`] : []),
+    ...(waiting.length ? [`Waiting for you: ${waiting.map((i) => i.title).join(" · ")}.`] : []),
+    ...(pending.length ? [`Decisions to take: ${pending.map((d) => d.question).join(" · ")}.`] : []),
     ...(provisional.length ? [`Provisional decisions to review: ${provisional.length}.`] : []),
-    ...(reviews.length ? [`Ready for you to see: ${reviews.map((r) => r.title).join("; ")}.`] : []),
+    ...(reviews.length ? [`Ready for you to see: ${reviews.map((r) => r.title).join(" · ")}.`] : []),
     ...(running.length
       ? [
           `Running: ${running
@@ -3148,7 +3148,7 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
               (t) =>
                 `"${t.title}"${t.branch ? ` (${t.branch})` : ""}, ${formatDuration(taskSeconds(t))}${t.lastLine ? `: ${t.lastLine}` : ""}`,
             )
-            .join("; ")}.`,
+            .join(" · ")}.`,
         ]
       : ["Nothing running now."]),
     ...(computer ? [`Computer: ${computer.name} (${computer.online ? "online" : "offline"}).`] : []),

@@ -286,7 +286,7 @@ export function accessDecisionNotice(row: AccessRequestRow, computer: string) {
       ? `The owner allowed ${row.path} on ${computer}${row.scope === "all" ? " for every agent" : ""}.`
       : row.status === "denied"
         ? `The owner didn't allow ${row.path} on ${computer}.`
-        : `Nobody answered the request for ${row.path} on ${computer} in time; it expired.`;
+        : `Nobody answered the request for ${row.path} on ${computer} in time, so it expired.`;
   return {
     body,
     meta: {

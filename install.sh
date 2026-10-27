@@ -237,7 +237,7 @@ Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup optio
                       again with sudo).
   -h, --help
 
-Every other option goes to the setup, like --network local or --email skip; the guide lists them:
+Every other option goes to the setup, like --network local or --email skip. The guide lists them:
 $GUIDE
 
 AGENTES_INSTALL_SETUP=<file> runs that build of the setup instead of the published one."

@@ -5,24 +5,69 @@ import { sourceFiles } from "./maker-words";
  * Words people read use no semicolon and no em dash: two short sentences read plainer, and both marks read as
  * machine-written.
  */
-const MARKS = /[;—]/;
+export const MARKS = /[;—]/;
 
-/** The message of an `apiError(c, status, code, "…")`, or of an engine error the API answers with. */
-const SERVER_WORDS = [
-  /\bapiError\(\s*\w+,\s*\d+,\s*"[^"]*",\s*(["`])((?:(?!\1)[^\\]|\\.)*)\1/g,
-  /\bnew (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential)Error\(\s*(["`])((?:(?!\1)[^\\]|\\.)*)\1/g,
-];
+/** An `apiError(c, status, code, "…")`, or an engine error the API answers with, up to its `(`. */
+const SERVER_WORDS = /\b(?:apiError|new (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential)Error)\(/g;
 
 /**
- * The server's words for people that break the rule, as "file: text". It reads the raw source: `withoutComments`
- * takes a `/*` inside a string ("owner/*") for a comment and drops the rest of the file.
+ * Reads code from `i` to the bracket that closes the one just before it, and returns the index after that bracket.
+ * Every string in it goes to `out`: quoted ones, and the text of template literals (their `${…}` read as code).
+ */
+function scanCode(src: string, i: number, out: string[]): number {
+  let depth = 0;
+  while (i < src.length) {
+    const c = src[i] as string;
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      const close = src[i + 1] === "/" ? "\n" : "*/";
+      const at = src.indexOf(close, i + 2);
+      i = at < 0 ? src.length : at + close.length;
+    } else if (c === '"' || c === "'") {
+      let end = i + 1;
+      while (end < src.length && src[end] !== c) end += src[end] === "\\" ? 2 : 1;
+      out.push(src.slice(i + 1, end));
+      i = end + 1;
+    } else if (c === "`") i = scanTemplate(src, i + 1, out);
+    else if ("([{".includes(c)) {
+      depth++;
+      i++;
+    } else if (")]}".includes(c) && --depth < 0) return i + 1;
+    else i++;
+  }
+  return i;
+}
+
+function scanTemplate(src: string, i: number, out: string[]): number {
+  let text = "";
+  while (i < src.length) {
+    if (src[i] === "\\") {
+      text += src.slice(i, i + 2);
+      i += 2;
+    } else if (src[i] === "`") {
+      out.push(text);
+      return i + 1;
+    } else if (src[i] === "$" && src[i + 1] === "{") {
+      out.push(text);
+      text = "";
+      i = scanCode(src, i + 2, out);
+    } else text += src[i++];
+  }
+  return i;
+}
+
+/**
+ * The server's words for people that break the rule, as "file: text": every string in those calls' arguments, so
+ * both sides of a ternary count. It reads the raw source: `withoutComments` takes a `/*` inside a string ("owner/*")
+ * for a comment and drops the rest of the file.
  */
 export const unplainServerWords = (dirs: string[]) =>
   dirs
     .flatMap((dir) => sourceFiles(dir))
     .flatMap((file) => {
       const source = readFileSync(file, "utf8");
-      return SERVER_WORDS.flatMap((re) => [...source.matchAll(re)])
-        .filter((m) => MARKS.test(m[2] ?? ""))
-        .map((m) => `${file}: ${m[2]}`);
+      return [...source.matchAll(SERVER_WORDS)].flatMap((m) => {
+        const strings: string[] = [];
+        scanCode(source, m.index + m[0].length, strings);
+        return strings.filter((s) => MARKS.test(s)).map((s) => `${file}: ${s}`);
+      });
     });

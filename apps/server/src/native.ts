@@ -68,7 +68,7 @@ const USAGE = `agentes-server ${version}: agentes.chat on this computer, with it
 Usage:
   agentes-server [--data <folder>] [--until-stdin-ends]
       Runs agentes.chat until it's stopped (Ctrl-C, or the end of stdin with --until-stdin-ends).
-      The folder (default ~/.agentes) keeps everything; a new one gets its settings, in .env, the
+      The folder (default ~/.agentes) keeps everything. A new one gets its settings, in .env, the
       first time.
   agentes-server migrate [--data <folder>]
       Updates the database to this version, then exits.
