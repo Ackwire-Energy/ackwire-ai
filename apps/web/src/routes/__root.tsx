@@ -6,6 +6,8 @@ import type { RouterContext } from "@/app/router-context";
 import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { askForPhone, asksForPhone, inDesktopApp, pageReady, routeNewWindowLinks } from "@/lib/desktop";
+import { dispatchPushOpen } from "@/lib/push-open";
+import { listenForPushOpens } from "@/lib/web-push";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: Root,
@@ -42,6 +44,12 @@ function Root() {
       delete w.__agentesNavigate;
     };
   }, [router]);
+  // A click on a browser notification while the app is open in a tab (ADR 0071): the open workspace opens it
+  // where its inbox would (`PushOpens`); on any other page the tab moves to its address.
+  useEffect(
+    () => listenForPushOpens((click) => dispatchPushOpen(click, (path) => router.history.push(path))),
+    [router],
+  );
   return (
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}
