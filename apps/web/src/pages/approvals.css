@@ -765,6 +765,26 @@
   .ap-row__end {
     grid-column: 2;
   }
+  /* What waits on you in a mission keeps its Open on its line: the kind chip goes and the title takes two lines,
+     its capitals at the face's top (the rise of `.ac-captop` on the page's 22px line). */
+  .ap-mi__row {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .ap-mi__row .ap-row__end {
+    grid-column: auto;
+    align-self: center;
+  }
+  .ap-mi__row .ap-row__end > .ac-chip {
+    display: none;
+  }
+  .ap-mi__row .ap-row__text b {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    margin-block-start: calc(var(--cap-top) - 11px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ap-card,
