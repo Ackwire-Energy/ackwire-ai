@@ -45,6 +45,7 @@ const COMMANDS: &[&str] = &[
     "local_server_stop",
     "local_server_restart",
     "local_server_reach",
+    "local_server_reach_stop",
     "local_server_usage",
     "local_server_backup",
     "local_server_diagnostics",
