@@ -10,4 +10,6 @@ The logos of the apps the onboarding's "Bring your agents" step names, the same 
 - `openbot.png`: copied unchanged (the project has no vector logo);
 - `agenteschat.png`: our own mark, `apps/web/public/favicon.svg`, for a file exported from another agentes.chat workspace.
 
+`gemini.png` is Gemini's mark for `ProviderLogo`, the web's `gemini.png` byte for byte (its source and terms are in that README).
+
 Each logo is a trademark of its owner, used only to name the project.

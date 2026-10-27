@@ -54,13 +54,16 @@ import { useToast } from "@/lib/toast";
 /** Read-only for now: "Sem acesso" or "Ler". */
 const DB_LEVELS: Level[] = ["none", "read"];
 
+/** PostgreSQL's own elephant (`apps/web/public/brands/README.md`), for the product, never for databases in general. */
+export const POSTGRES_MARK = "/brands/postgresql.svg";
+
 export function DatabaseIcon({ size = "md" }: { size?: "md" | "lg" }) {
   return (
     <span
-      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--mono`}
+      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--brand`}
       aria-hidden="true"
     >
-      <Icon name="database" />
+      <img className="connector-icon__img" src={POSTGRES_MARK} alt="" />
     </span>
   );
 }
