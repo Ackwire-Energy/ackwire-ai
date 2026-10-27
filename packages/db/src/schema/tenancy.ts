@@ -191,9 +191,8 @@ export const organizationJoinCodeEvents = pgTable(
   "organization_join_code_events",
   {
     id: uuid().primaryKey().defaultRandom(),
-    orgId: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** No foreign key: the counts outlive a deleted workspace, so deleting one resets no mailbox's or server's cap. */
+    orgId: uuid().notNull(),
     mailbox: text().notNull(),
     kind: text().$type<"sent" | "wrong">().notNull(),
     at: timestamp({ withTimezone: true }).notNull(),
