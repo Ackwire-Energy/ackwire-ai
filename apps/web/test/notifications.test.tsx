@@ -688,7 +688,8 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const kit = await read("../../../packages/ui/src/styles/components.css");
     const block = (sheet: string, media: string) => sheet.split(`\n@media ${media} {`)[1]?.split("\n}")[0] ?? "";
     const phone = block(css, "(max-width: 720px)");
-    const wide = block(css, "(min-width: 721px)");
+    const wraps = block(css, "(max-width: 1023px)");
+    const wide = block(css, "(min-width: 1024px)");
     /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
     const rule = (selector: string, sheet = css) =>
       new RegExp(`\\n *${selector.replace(/[.()>:*]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
@@ -717,14 +718,26 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const line = px(".nt-wr__l1", "line-height");
     expect(line).toBe(px(".ac-chip", "height", kit));
     expect(px(".nt-wr__l1:only-child", "margin-block-start", wide)).toBe((px(".nt-av40", "height") - line) / 2);
-    // On a phone the tap opens: Open goes, the source chip too, and the words wrap with the time at their end (a
-    // short request stays one line), their first line's capitals at the face's top. The faces stay 40px.
-    expect(value(".nt-wr__open", "display", phone)).toBe("none");
+    // Under 1024px the words wrap, three lines at most, the time at their end and never alone on the last line, their
+    // first line's capitals at the face's top. A chip on its line's top keeps every line the chips' height, and a name
+    // with no spaces breaks instead of running under the clip.
+    expect(value(".nt-wr__l1", "display", wraps)).toBe("-webkit-box");
+    expect(value(".nt-wr__l1", "-webkit-line-clamp", wraps)).toBe("3");
+    expect(value(".nt-wr__l1", "text-wrap", wraps)).toBe("pretty");
+    expect(value(".nt-wr__l1", "overflow-wrap", wraps)).toBe("anywhere");
+    expect(value(".nt-wr .nt-what", "white-space", wraps)).toBe("normal");
+    expect(value(".nt-wr__l1 > .ac-chip", "vertical-align", wraps)).toBe("top");
+    // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard, and the
+    // source chip goes. The faces stay 40px.
+    expect(css).not.toMatch(/\.nt-wr__open[^{]*\{[^}]*display: none/);
+    expect(value(".nt-wr__open:not(:focus-visible)", "position", phone)).toBe("absolute");
+    expect(value(".nt-wr__open:not(:focus-visible)", "clip-path", phone)).toBe("inset(50%)");
     expect(value(".nt-wr__src", "display", phone)).toBe("none");
-    expect(value(".nt-wr__l1", "display", phone)).toBe("-webkit-box");
-    expect(value(".nt-wr__l1", "-webkit-line-clamp", phone)).toBe("3");
-    expect(value(".nt-what", "white-space", phone)).toBe("normal");
     expect(rule(".nt-av40", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
+    // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
+    const ring = value(".nt-item:focus-visible", "box-shadow");
+    expect(ring).toStartWith("inset ");
+    expect(value(".nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
   });
 });

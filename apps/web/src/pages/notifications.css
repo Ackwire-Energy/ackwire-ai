@@ -250,6 +250,11 @@
   display: flex;
   margin-left: auto;
 }
+/* On touch a ghost at the item's edge reaches to 2px from it (a phone's 14px padding, the 12px plate), and the item
+   clips: the ring goes inside, as the item's own does. */
+.nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
 
 /* ── What only points somewhere: one row, opened by a click on it ─────────── */
 .nt-wr {
@@ -311,11 +316,30 @@
     box-shadow: var(--e2), var(--top);
   }
 }
-/* A line alone centres on the face: (40 - 22) / 2. With a line under it, or wrapped on a phone, the first line's
+/* A line alone centres on the face: (40 - 22) / 2. With a line under it, or where the words wrap, the first line's
    capitals start at the face's top (`.ac-captop`). */
-@media (min-width: 721px) {
+@media (min-width: 1024px) {
   .nt-wr__l1:only-child {
     margin-block-start: 9px;
+  }
+}
+/* Under 1024px one line leaves the headline too little room beside the actions: the words wrap, three lines at most,
+   the time at their end and never alone on the last line. A name with no spaces (an email) breaks too. */
+@media (max-width: 1023px) {
+  .nt-wr__l1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+  .nt-wr .nt-what {
+    white-space: normal;
+  }
+  /* A chip is an inline box as tall as the line: on the baseline it makes the line 3px taller, on its top none. */
+  .nt-wr__l1 > .ac-chip {
+    vertical-align: top;
   }
 }
 .nt-sug {
@@ -989,20 +1013,20 @@
   .nt-wr {
     padding: 12px 14px;
   }
-  /* A tap on the row opens it, so the words take Open's room. */
-  .nt-wr__open {
-    display: none;
+  /* A tap on the row opens it, so the words take Open's room. Open stays for screen readers and the keyboard. */
+  .nt-wr__open:not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   /* Where it opens is the chip's job on wide screens. Here the words need the room. */
   .nt-wr__src {
     display: none;
-  }
-  /* The words wrap, three lines at most, the time at their end. */
-  .nt-wr__l1 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
   /* An expiring request says the time that matters: its chip in the time's place. */
   .nt-wr__l1:has(> .nt-wr__left) > .nt-wr__tm {
