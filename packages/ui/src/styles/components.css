@@ -2841,6 +2841,12 @@ a.ac-list__row:focus-visible {
   top: 0;
   right: 16px;
 }
+/* With words ("Picking who answers · Call an agent"), where it sits now, the text flowing around it, never under it. */
+.ac-msg__aside--floating:has(.ac-receipt > span) {
+  position: static;
+  float: right;
+  margin: -2px 0 0 12px;
+}
 .ac-msg__aside .ac-receipt {
   margin-top: 0;
 }
