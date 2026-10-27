@@ -95,6 +95,26 @@ const AREA: Record<string, ZoneRegion> = {
 };
 export const regionOf = (zone: string): ZoneRegion => AREA[zone.split("/")[0] ?? ""] ?? "Other";
 
+/** Places in the EU or the EEA whose IANA zone isn't under `Europe/`. */
+const EUROPEAN_ELSEWHERE = new Set([
+  "Atlantic/Canary",
+  "Atlantic/Madeira",
+  "Atlantic/Azores",
+  "Africa/Ceuta",
+  "Asia/Nicosia",
+  "Asia/Famagusta",
+  "Atlantic/Reykjavik",
+  "Indian/Reunion",
+  "Indian/Mayotte",
+  "America/Guadeloupe",
+  "America/Martinique",
+  "America/Cayenne",
+  "America/Marigot",
+]);
+
+/** Every `Europe/…` zone (a little wider than the EU, the EEA and the UK), plus the places above. */
+export const isEuropeanTimeZone = (zone: string) => zone.startsWith("Europe/") || EUROPEAN_ELSEWHERE.has(zone);
+
 /** "Sao_Paulo" → "Sao Paulo"; "America/Argentina/Buenos_Aires" → "Buenos Aires". */
 export const cityOf = (zone: string) => (zone.split("/").pop() ?? zone).replace(/_/g, " ");
 

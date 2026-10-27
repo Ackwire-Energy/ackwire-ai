@@ -1,4 +1,4 @@
-import { and, type Database, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 
 const { outbox } = schema;
 
@@ -301,6 +301,28 @@ export function createOutboxPump(
       while (running.size > 0) await Promise.all(running);
     },
   };
+}
+
+/**
+ * Finished jobs (`done`, `failed`) keep their content `days` days (ADR 0005), then lose their payload and error.
+ * The row stays, so its `dedupe_key` still refuses a second enqueue. Only pending and running jobs' payloads are
+ * ever read. Returns how many rows it cleared.
+ */
+export async function clearOldOutboxPayloads(db: Executor, days = 30): Promise<number> {
+  const before = new Date(Date.now() - days * 86_400_000);
+  // ponytail: one daily scan with no index, add a partial index if the outbox passes a few million rows.
+  const cleared = await db
+    .update(outbox)
+    .set({ payload: {}, lastError: null })
+    .where(
+      and(
+        inArray(outbox.status, ["done", "failed"]),
+        sql`coalesce(${outbox.completedAt}, ${outbox.createdAt}) < ${before.toISOString()}::timestamptz`,
+        sql`(${outbox.payload} <> '{}'::jsonb or ${outbox.lastError} is not null)`,
+      ),
+    )
+    .returning({ id: outbox.id });
+  return cleared.length;
 }
 
 /** Runs batches until nothing is due. For tests and CLI tools; workers call `processOutbox` on an interval. */

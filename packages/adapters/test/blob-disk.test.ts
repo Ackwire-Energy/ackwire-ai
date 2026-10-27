@@ -40,6 +40,19 @@ test("files live at their key with their content type; listed by prefix; deleted
   expect(await store.list("")).toEqual(["avatars/u1/abc.png", "orgs/o1/artifacts/a1/v2"]);
 });
 
+test("a folder goes whole, folders inside it too, and only when the prefix names it as written", async () => {
+  const store = createDiskBlobStore(dir);
+  await store.put("orgs/o1/skills/s1/v1/clientes/acme/notes.md", bytes("x"), { contentType: "text/markdown" });
+  await store.put("orgs/o2/artifacts/a1/v1", bytes("y"), { contentType: "text/plain" });
+  // Each would reach past one folder (or name none).
+  for (const prefix of ["orgs//", "orgs/o2/../", "orgs/o1", "", "../"]) {
+    await expect(store.deletePrefix?.(prefix)).rejects.toThrow();
+  }
+  await store.deletePrefix?.("orgs/o1/");
+  await store.deletePrefix?.("orgs/o1/");
+  expect(await readdir(join(dir, "orgs"))).toEqual(["o2"]);
+});
+
 test("a key never reaches outside the folder", async () => {
   const store = createDiskBlobStore(join(dir, "files"));
   for (const key of ["../outside", "orgs/o1/../../../outside", "/etc/passwd", ""]) {
