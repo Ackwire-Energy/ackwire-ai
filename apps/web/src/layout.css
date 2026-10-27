@@ -2854,6 +2854,12 @@ p {
   padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
+/* The person's face as big as the workspace's mark above (28px), beside the same two lines. */
+.sidebar__me > .sidebar__user > .ac-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
 
 /* Settings: a grouped left sub-nav + one section. */
 .settings {
