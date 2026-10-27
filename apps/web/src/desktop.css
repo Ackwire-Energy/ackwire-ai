@@ -102,6 +102,11 @@ html[data-desktop] .sidebar__jump-row {
 html[data-desktop] .auth__logo {
   top: calc(var(--titlebar-h) + 16px);
 }
+/* Onboarding and a new agent: the rail's logo starts under the Mac's buttons (Windows and Linux keep the
+   system's title bar above the page). */
+html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
+  padding-top: calc(var(--titlebar-h) + 8px);
+}
 
 /*
  * An app, not a page: the interface's own words don't select (messages, pages and

@@ -254,6 +254,7 @@ export const ptBR = {
       invites_other: "{{count}} convites",
     },
     back: "Voltar",
+    leave: "Voltar para {{name}}",
     actions: {
       continue: "Continuar",
       create_one: "Criar {{count}} agente",

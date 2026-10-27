@@ -247,6 +247,7 @@ export const en: Translations = {
       invites_other: "{{count}} invites",
     },
     back: "Back",
+    leave: "Back to {{name}}",
     actions: {
       continue: "Continue",
       create_one: "Create {{count}} agent",
