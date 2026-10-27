@@ -178,6 +178,9 @@ export const tapHaptic = () => haptics.light();
 /** Done: approved, sent. */
 export const successHaptic = () => haptics.success();
 
+/** Didn't work: a connection that failed. */
+export const errorHaptic = () => haptics.error();
+
 /** Puts a text on the clipboard; resolves false when the system refused. */
 export function copyText(text: string): Promise<boolean> {
   return Clipboard.setStringAsync(text).then(

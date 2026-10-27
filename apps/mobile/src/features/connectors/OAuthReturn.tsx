@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { isFinishing } from "./logic";
 
 /**
@@ -26,6 +27,7 @@ export function ConnectorOAuthReturn() {
     const leave = () => (router.canGoBack() ? router.back() : router.replace("/connectors"));
     if (state && isFinishing(state)) return leave();
     if (error || !state || !code) {
+      errorHaptic();
       toast({ title: t("mobile.connectors.failed"), icon: "x" });
       return void router.replace("/connectors");
     }
@@ -33,7 +35,13 @@ export function ConnectorOAuthReturn() {
       { state, code },
       {
         onSettled: (_data, failed) => {
-          if (failed) toast({ title: t("mobile.connectors.failed"), icon: "x" });
+          if (failed) {
+            errorHaptic();
+            toast({ title: t("mobile.connectors.failed"), icon: "x" });
+          } else {
+            successHaptic();
+            toast({ title: t("mobile.connectors.connectedDone") });
+          }
           router.replace("/connectors");
         },
       },

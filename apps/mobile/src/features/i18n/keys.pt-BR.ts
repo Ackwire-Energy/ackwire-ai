@@ -1296,7 +1296,11 @@ export const featureKeysPtBR = {
     working: "Conectando…",
     failed: "Não deu para conectar. Tente de novo.",
     refused: "O {{name}} não autorizou. Nada foi conectado.",
-    connectedLine: "{{name}} conectado. Quem vai usar?",
+    connectedTitle: "{{name}} conectado",
+    connectedSub: "Agora escolha quais agentes vão usar.",
+    connectedDone: "Serviço conectado.",
+    levelFailed: "Não deu para mudar o acesso de {{name}}. Tente de novo.",
+    disconnectFailed: "Não deu para desconectar o {{name}}. Tente de novo.",
     whoTitle: "Quem usa e até onde",
     level: {
       none: "Não usa",

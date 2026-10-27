@@ -133,9 +133,11 @@ export function ConnectorsSection({
       : connected
         ? latest(all.filter((i) => !i.custom && i.def?.id === connected))
         : latest(all.filter((i) => i.custom && i.needsReview));
+    // Signing in elsewhere ends here: say it worked, as connecting with a key does.
+    if (item && connected) toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
     if (item && admin) setFlow({ step: 1, item });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, review, connections.data, servers.data, catalog.data, admin]);
+  }, [connected, review, connections.data, servers.data, catalog.data, admin, t, toast]);
 
   return (
     <Card aria-labelledby="sec-conn">
