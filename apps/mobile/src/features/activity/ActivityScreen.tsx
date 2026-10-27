@@ -1,6 +1,7 @@
 import {
   type AppNotification,
   type Routine,
+  useAiStatus,
   useDms,
   useNotificationAction,
   useNotifications,
@@ -143,9 +144,11 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
       : card.kind === "join"
         ? t("notifications.wait.joinRequest", { count: n.count, name: card.title })
         : card.title;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
+  // an AI while no agent has one.
   const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, agentDmOf(dms.data), ai);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -312,9 +315,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const when = useWhen();
   const act = useNotificationAction(orgId);
   const x = useRef(new Animated.Value(0)).current;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
+  // an AI while no agent has one.
   const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, agentDmOf(dms.data), ai);
   const unread = n.readAt === null;
 
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));

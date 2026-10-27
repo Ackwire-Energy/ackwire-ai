@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { agentDmOf, chatHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
+import {
+  agentDmOf,
+  chatHref,
+  computerReadyHref,
+  hrefForPush,
+  hrefFromUrl,
+  notificationHref,
+} from "../../src/features/links/logic";
 import { notification } from "./fixtures";
 
 describe("deep links", () => {
@@ -96,5 +103,28 @@ describe("inbox items", () => {
     expect(agentDmOf(undefined)("atlas")).toBeNull();
     // Without an agent behind it, there is nowhere to go.
     expect(notificationHref(notification({ id: "n", kind: "routine_paused", source: { routineId: "r1" } }))).toBeNull();
+  });
+});
+
+describe("the workspace's computer is ready", () => {
+  const noAi = { any: false, agents: [{ agentId: "a1", state: "no_ai" as const }] };
+  const someAi = { any: true, agents: [{ agentId: "a1", state: "ready" as const }] };
+
+  test("Connect an AI, saying it's ready, while no agent has an AI; else the computer's wait", () => {
+    expect(computerReadyHref(noAi)).toBe("/connect-ai?ready=1");
+    expect(computerReadyHref(someAi)).toBe("/computer-setup");
+    // No agents yet, or the status not known: nothing to connect for, the computer.
+    expect(computerReadyHref({ any: false, agents: [] })).toBe("/computer-setup");
+    expect(computerReadyHref(undefined)).toBe("/computer-setup");
+  });
+
+  test("its push and its row in Atividade open the same place", () => {
+    expect(hrefForPush({ kind: "computer_ready", orgId: "o1", notificationId: "n1" }, noAi)).toBe(
+      "/connect-ai?ready=1",
+    );
+    expect(hrefForPush({ kind: "computer_ready", orgId: "o1" })).toBe("/computer-setup");
+    const n = notification({ id: "n", kind: "computer_ready", actors: [], source: { machineId: "m1", label: "Acme" } });
+    expect(notificationHref(n, undefined, noAi)).toBe("/connect-ai?ready=1");
+    expect(notificationHref(n, undefined, someAi)).toBe("/computer-setup");
   });
 });
