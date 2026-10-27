@@ -52,3 +52,7 @@
   justify-content: space-between;
   gap: var(--space-2);
 }
+/* Turn off is a text button: its word ends where Copy ends above it (its padding hangs past), on its own line too. */
+.jr-link__foot > .ac-btn--ghost {
+  margin: 0 calc(-1 * var(--control-px-sm)) 0 auto;
+}

@@ -549,7 +549,10 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
               aria-label={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
               onFocus={(e) => e.currentTarget.select()}
             />
-            <Button icon="copy" onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}>
+            <Button
+              icon={copied ? "check" : "copy"}
+              onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}
+            >
               {copied ? t("common.copied") : t("common.copy")}
             </Button>
           </div>
@@ -596,7 +599,10 @@ function InviteLinkBlock() {
               aria-labelledby="invite-link-label"
               onFocus={(e) => e.currentTarget.select()}
             />
-            <Button icon="copy" onClick={() => void copyText(current.url ?? "", () => setCopied(true))}>
+            <Button
+              icon={copied ? "check" : "copy"}
+              onClick={() => void copyText(current.url ?? "", () => setCopied(true))}
+            >
               {copied ? t("common.copied") : t("common.copy")}
             </Button>
           </div>

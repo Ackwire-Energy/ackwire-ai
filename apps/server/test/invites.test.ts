@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { orgTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -73,10 +74,14 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(toOwner?.text).toContain(`/org/${orgId}/settings/members?request=${request?.id}&do=approve`);
   expect(toOwner?.text).not.toContain("Paula");
   const inbox = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
-    items: { kind: string; waiting: boolean; latest: { title?: string } }[];
+    items: { kind: string; waiting: boolean; latest: { title?: string; names?: string[] } }[];
   };
   expect(inbox.items).toEqual([
-    expect.objectContaining({ kind: "join_request", waiting: true, latest: { title: "Ana Souza" } }),
+    expect.objectContaining({
+      kind: "join_request",
+      waiting: true,
+      latest: { title: "Ana Souza", names: ["Ana Souza"] },
+    }),
   ]);
 
   const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {
@@ -160,6 +165,29 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   expect(await invited.json()).toMatchObject({ outcome: "invited" });
 });
 
+test("members' open apps hear whoever joins, changes role or leaves, to read the people again", async () => {
+  const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
+  let heard = 0;
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if ((e as { event?: { type?: string } }).event?.type === "org.members") heard++;
+  });
+  const bia = browser(t);
+  await signUp(bia, "bia@example.com");
+  await t.db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.email, "bia@example.com"));
+  await ask(bia, token, {});
+  const [request] = await requests(owner, orgId);
+  await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: { role: "member" } });
+  expect(heard).toBe(1);
+  const cai = await joinByInvitation(t, owner, orgId, "cai@example.com");
+  expect(heard).toBe(2);
+  const { user } = (await (await cai("/api/app/me")).json()) as { user: { id: string } };
+  const member = `/api/app/organizations/${orgId}/members/${user.id}`;
+  expect((await owner(member, { method: "PATCH", json: { role: "admin" } })).status).toBe(204);
+  expect(heard).toBe(3);
+  expect((await owner(member, { method: "DELETE" })).status).toBe(204);
+  expect(heard).toBe(4);
+});
+
 test("only admins see and answer requests; asks must come from our own pages", async () => {
   const { owner, orgId, link, token } = await start();
   await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
@@ -228,7 +256,7 @@ test("joining by an email invitation closes the person's request and the admins'
 });
 
 test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
-  const { owner, orgId, link, token } = await start();
+  const { owner, orgId, link, token } = await start({ ALLOW_SIGNUP: "true" });
   await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
   await t.drain();
   t.email.sent.length = 0;
@@ -247,6 +275,14 @@ test("a link turned off: its requests close quietly, its page says it no longer 
   expect((await browser(t)(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(404);
   await t.drain();
   expect(t.email.sent).toEqual([]);
+  // A member opening it is told they're in; anyone else signed in hears only that it no longer works.
+  expect(await (await owner(`/api/app/invitations/${token}`)).json()).toMatchObject({
+    closed: true,
+    you: { member: true, orgId },
+  });
+  const eve = browser(t);
+  await signUp(eve, "eve@example.com");
+  expect(await (await eve(`/api/app/invitations/${token}`)).json()).not.toHaveProperty("you");
   // A new link is made the next time one is asked for.
   const next = (await (await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as Link;
   expect(next.url).not.toBe(link.url);

@@ -160,6 +160,13 @@ describe("ApprovalCard", () => {
     expect(within(card).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
   });
 
+  test("the detail sits in a well in both themes, never in the page's tone (the light card's own white)", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-approval")).toContain("background: var(--surface-raised);");
+    expect(rule(".ac-approval__detail")).toContain("background: var(--surface-sunken);");
+  });
+
   test("decided card shrinks and uses a done/neutral chip", () => {
     const { container } = render(
       <>
@@ -249,6 +256,13 @@ describe("Card", () => {
       expect(rule(row)).not.toContain("align-items:");
     }
   });
+});
+
+test("an avatar's initials sit in the middle of its tile at any size: it brings its own line height", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  expect(rule(".ac-avatar")).toContain("place-items: center;");
+  expect(rule(".ac-avatar")).toContain("line-height: 1;");
 });
 
 describe("single-line controls", () => {

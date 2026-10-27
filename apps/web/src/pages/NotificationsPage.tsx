@@ -19,6 +19,7 @@ import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   allItems,
+  askersOf,
   channelOf,
   groupByDay,
   isExpandable,
@@ -116,10 +117,11 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
       ? (dir.agentById.get(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
-/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2". */
-function namesText(t: TFunction, names: string[], max = 2) {
-  if (names.length <= max) return joinNames(names, t("notifications.and"));
-  return t("notifications.namesMore", { names: names.slice(0, max).join(", "), count: names.length - max });
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people. */
+function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
+  const shown = names.slice(0, max);
+  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
+  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
 }
 
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
@@ -151,7 +153,7 @@ function Face({
  * asking to join isn't a member yet: their initials.
  */
 function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
-  if (n.kind === "join_request") return <Avatar name={n.latest.title ?? ""} size="sm" className={className} />;
+  if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
       <span className="nt-sys" aria-hidden="true">
@@ -312,9 +314,13 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
         : k("machineConnectedAny", { name });
     case "browser_handoff":
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
-    case "join_request":
-      // Merged while unread: the newest name, "and others" for the rest of the burst.
-      return k(n.count > 1 ? "joinRequestMany" : "joinRequest", { name: n.latest.title ?? "" });
+    case "join_request": {
+      // Merged while unread: the first ones to ask, by name, then how many more.
+      const asked = askersOf(n);
+      return asked.total > 1
+        ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
+        : k("joinRequest", { name: asked.names[0] });
+    }
     case "reaction":
       return k("reaction", { names, count });
   }
@@ -1019,6 +1025,7 @@ function WaitCard({
   const feminine = isFeminineName(name);
   const l = n.latest;
   const unread = n.readAt === null;
+  const asked = n.kind === "join_request" ? askersOf(n) : null;
   const waitedMs = Date.now() - new Date(n.createdAt).getTime();
   const agent = first?.type === "agent" ? dir.agentById.get(first.id) : undefined;
   const tail = (
@@ -1284,9 +1291,11 @@ function WaitCard({
       data-wait=""
       data-burst=""
       aria-label={
-        n.kind === "join_request"
-          ? t("notifications.wait.joinRequest", { count: n.count, name: l.title ?? "" })
-          : [name, l.title ?? l.text].filter(Boolean).join(": ")
+        !asked
+          ? [name, l.title ?? l.text].filter(Boolean).join(": ")
+          : asked.total > 1
+            ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
+            : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] })
       }
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;

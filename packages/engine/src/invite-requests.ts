@@ -23,6 +23,7 @@ import { adminIds } from "./gateway";
 import { oneLine } from "./mail/text";
 import { notify, resolveNotifications } from "./notifications";
 import {
+  announceMembers,
   assertInviting,
   can,
   findInviteLink,
@@ -303,7 +304,7 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
       groupKey: group(orgId),
       waiting: true,
       source: { label: filed.orgName },
-      latest: { title: ask.name },
+      latest: { title: ask.name, names: [ask.name] },
     },
   ).catch(() => []);
   return true;
@@ -481,6 +482,7 @@ export async function approveJoinRequest(
     }
     return approval;
   });
+  if (result.outcome === "joined") await announceMembers(deps.pubsub, orgId);
   await settleJoinRequests(deps, orgId, now);
   return result;
 }

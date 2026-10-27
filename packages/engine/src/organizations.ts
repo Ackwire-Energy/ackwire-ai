@@ -481,6 +481,10 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   return row?.n ?? 0;
 }
 
+/** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
+export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
+
 /** Changes a member's role. Admins can't touch owners or make owners; nobody can demote the last owner. */
 export async function changeMemberRole(
   db: Database,
@@ -488,6 +492,7 @@ export async function changeMemberRole(
   orgId: string,
   targetUserId: string,
   role: MemberRole,
+  options: { pubsub?: PubSub } = {},
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
@@ -505,6 +510,7 @@ export async function changeMemberRole(
       .set({ role })
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
   });
+  await announceMembers(options.pubsub, orgId);
 }
 
 /** Removes a member (or lets a member leave). The last owner can't leave. */
@@ -543,6 +549,7 @@ export async function removeMember(
   await announceReleasedAccounts(options.pubsub, released);
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+  await announceMembers(options.pubsub, orgId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");
@@ -614,7 +621,10 @@ export async function deleteAccount(
     agents: released.agents.filter((a) => left.includes(a.orgId)),
   });
   // Their open WebSocket connections lose every subscription now.
-  for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+  for (const orgId of left) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+    await announceMembers(options.pubsub, orgId);
+  }
   return { deletedOrgIds: deleted };
 }
 
@@ -838,22 +848,27 @@ export const inviteLinkOpen = (
   now = new Date(),
 ) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
 
-/** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
-const INVITE_AGENTS = 3;
+/** How many of the organization's agents an invitation names ("Theo, Ada, Lia e Atlas já trabalham lá"). */
+const INVITE_AGENTS = 4;
 
-/** The organization's first agents (not archived), for an invitation page: name and look only. */
+/**
+ * The organization's first agents (not archived), for an invitation page: name and look only, and how many more
+ * work there (`moreAgents`, when some do), so the page never reads as if those were all of them.
+ */
 async function inviteAgents(db: Database, orgId: string) {
-  return db
-    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
+  const rows = await db
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance, total: sql<number>`count(*) over ()` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .orderBy(asc(agents.createdAt))
     .limit(INVITE_AGENTS);
+  const more = Number(rows[0]?.total ?? 0) - rows.length;
+  return { agents: rows.map(({ total: _, ...agent }) => agent), ...(more > 0 ? { moreAgents: more } : {}) };
 }
 
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
- * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ * invited (their name), the role and its first agents. Only for a valid token, which reached the person.
  * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
@@ -894,7 +909,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
-      agents: await inviteAgents(db, link.link.orgId),
+      ...(await inviteAgents(db, link.link.orgId)),
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
@@ -904,7 +919,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
-    agents: await inviteAgents(db, row.orgId),
+    ...(await inviteAgents(db, row.orgId)),
   };
 }
 

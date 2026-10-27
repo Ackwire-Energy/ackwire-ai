@@ -141,7 +141,7 @@ describe("asking to join through a link", () => {
         waiting: true,
         count: 1,
         actors: [],
-        latest: { title: "Ana Souza" },
+        latest: { title: "Ana Souza", names: ["Ana Souza"] },
         source: { label: "Acme" },
       });
     }
@@ -173,13 +173,20 @@ describe("asking to join through a link", () => {
     expect(await rows()).toHaveLength(1);
     expect((await notices()).map((n) => n.count)).toEqual([1, 1]);
     // Another person in the same hour: the notice merges (no second push), the hour's email was already sent.
+    // It names both, the first to ask first (its time is hers).
     await typed(token, "Bruno Lima", "bruno@example.com");
     expect((await notices()).map((n) => [n.count, n.latest])).toEqual([
-      [2, { title: "Bruno Lima" }],
-      [2, { title: "Bruno Lima" }],
+      [2, { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] }],
+      [2, { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] }],
     ]);
     expect(await joinEmails("join_request")).toHaveLength(2);
     expect(await pushes()).toBe(1);
+    // A third: still the first two by name, and the count.
+    await typed(token, "Carla Dias", "carla@example.com");
+    expect((await notices()).map((n) => [n.count, n.latest.names])).toEqual([
+      [3, ["Ana Souza", "Bruno Lima"]],
+      [3, ["Ana Souza", "Bruno Lima"]],
+    ]);
   });
 
   test("a typed request gets the same answer after the same work whatever the address, and files only a new one", async () => {

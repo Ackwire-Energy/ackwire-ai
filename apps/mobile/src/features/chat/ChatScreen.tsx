@@ -82,6 +82,7 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { ChannelMembersSheet } from "./ChannelMembers";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
 import { HeaderPill } from "./HeaderPill";
@@ -794,6 +795,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
+  const openMembers = () =>
+    channel ? sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channel.name} />) : undefined;
 
   // ── Header ──
   // The header is glass over the conversation: the system's
@@ -886,6 +889,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             }
             agentId={dmAgentId}
             onPins={openPins}
+            onMembers={channel && !dm ? openMembers : undefined}
           />,
         );
   const openOptions = () => {
@@ -926,18 +930,33 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         lead={<Icon name="hash" size={18} color={c.muted} />}
         title={channel.name}
         subtitle={roster.data ? t("mobile.chat.here", { count: roster.data.length }) : undefined}
+        // The channel's sky in the pill, as an agent's DM: the color of the first agent in it.
+        color={agentLook(dir.agentById.get(roster.data?.find((r) => r.type === "agent")?.id ?? "")).color}
         trailing={
           roster.data && roster.data.length > 0 ? (
             <View style={styles.faces}>
               {roster.data.slice(0, 3).map((r, i) => (
-                <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
-                  <Face who={r} size={20} live={false} framed={false} />
+                // Every face the same size and shape box, ringed in the pill's glass: an agent in its tile
+                // (its body alone stood lower than a person's circle), a person in a circle.
+                <View
+                  key={`${r.type}:${r.id}`}
+                  style={[
+                    styles.pillFace,
+                    i > 0 && styles.pillOverlap,
+                    { borderColor: c.glassSolid },
+                    r.type !== "agent" && styles.round,
+                  ]}
+                >
+                  <Face who={r} size={20} live={false} />
                 </View>
               ))}
             </View>
           ) : undefined
         }
-        onPress={openOptions}
+        onPress={() => {
+          holdPlace();
+          openMembers();
+        }}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
@@ -1432,5 +1451,5 @@ const styles = StyleSheet.create({
   },
   connText: { flexShrink: 1, fontWeight: "600" },
   faces: { flexDirection: "row" },
-  overlap: { marginLeft: -6 },
+  round: { borderRadius: 12 },
 });
