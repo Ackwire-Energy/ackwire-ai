@@ -52,6 +52,7 @@ import {
   resolveHostDns,
   retireHostTokens,
   vapidKeys,
+  vapidSubject,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
@@ -146,10 +147,12 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
-    webPush: webPushSender(config, database.db, () => [
-      resolved?.keyWrapper ?? localKeyWrapper,
-      ...(resolved?.legacyKeyWrappers ?? []),
-    ]),
+    webPush: webPushSender(
+      config,
+      database.db,
+      () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])],
+      log,
+    ),
     mail: mailAdapters(config),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
@@ -168,7 +171,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   log.info("transactional email", { sender: defaults.email.id });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
-  log.info("browser push", { webPush: defaults.webPush ? "on" : "off" });
+  log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
@@ -418,16 +421,41 @@ function platformBlobStore(config: Config, db: Database) {
   });
 }
 
-/** Browser push, unless `WEB_PUSH=off`. Endpoints come from browsers, so hosts on our own network are refused. */
-function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[]): WebPushSender | null {
+/** At most one log line this often about push services refusing this server's signature. */
+const WEB_PUSH_REFUSED_LOG_MS = 10 * 60_000;
+
+/**
+ * Browser push, unless `WEB_PUSH=off`. Endpoints come from browsers, so hosts on our own network are refused;
+ * a DNS that doesn't answer is a failure to retry (`resolveHostDns` throws), never a refused host.
+ */
+function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[], log: Logger): WebPushSender | null {
   if (config.WEB_PUSH === "off") return null;
-  return createWebPushSender({
+  const sender = createWebPushSender({
     vapid: () => vapidKeys(db, wrappers(), config),
     checkHost: async (host) => {
       const addresses = await resolveHostDns(host);
-      if (addresses.length === 0 || addresses.some(isBlockedAddress)) throw new Error("blocked host");
+      if (addresses.length === 0) throw new Error(`no address for ${host}`);
+      return !addresses.some(isBlockedAddress);
     },
   });
+  // A push service refusing the signature (401/403) keeps the subscription (ADR 0071) and is the operator's to
+  // see: for a while after the key changed it's expected, all the time it's this server's key or contact.
+  let loggedAt = 0;
+  return {
+    id: sender.id,
+    async send(message) {
+      const result = await sender.send(message);
+      if (result.unauthorized && Date.now() - loggedAt > WEB_PUSH_REFUSED_LOG_MS) {
+        loggedAt = Date.now();
+        log.warn("a browser's push service refused this server's Web Push signature", {
+          pushService: new URL(message.endpoint).host,
+          error: result.error,
+          contact: vapidSubject(config),
+        });
+      }
+      return result;
+    },
+  };
 }
 
 /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */

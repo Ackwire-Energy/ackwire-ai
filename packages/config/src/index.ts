@@ -1,3 +1,4 @@
+import { createECDH } from "node:crypto";
 import { type Config, configSchema, envVars } from "./schema";
 
 export { connectorOAuthApps, githubAppConfig } from "./connectors";
@@ -5,6 +6,17 @@ export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./
 
 /** agentes.chat's own site: its signed-out `/` is the marketing page and its legal pages are its own. */
 const OFFICIAL_HOSTS = new Set(["agentes.chat", "www.agentes.chat"]);
+
+/** Whether a VAPID public key (an uncompressed P-256 point) belongs to this private key (`d`), both base64url. */
+function vapidPairMatches(publicKey: string, privateKey: string): boolean {
+  try {
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(privateKey.replace(/=+$/, ""), "base64url"));
+    return ecdh.getPublicKey().equals(Buffer.from(publicKey.replace(/=+$/, ""), "base64url"));
+  } catch {
+    return false;
+  }
+}
 
 export class ConfigError extends Error {
   constructor(public readonly issues: string[]) {
@@ -55,6 +67,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new ConfigError([
       "WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_VAPID_PRIVATE_KEY go together: set both or neither",
     ]);
+  }
+  // Halves of two pairs would get every push refused, with nothing at boot to say why.
+  if (
+    config.WEB_PUSH_VAPID_PUBLIC_KEY &&
+    config.WEB_PUSH_VAPID_PRIVATE_KEY &&
+    !vapidPairMatches(config.WEB_PUSH_VAPID_PUBLIC_KEY, config.WEB_PUSH_VAPID_PRIVATE_KEY)
+  ) {
+    throw new ConfigError(["WEB_PUSH_VAPID_PUBLIC_KEY isn't the public half of WEB_PUSH_VAPID_PRIVATE_KEY"]);
   }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {

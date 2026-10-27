@@ -173,15 +173,18 @@ function keyBytes(base64url) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
-// The browser replaced the subscription (expired, or keys rotated): subscribe again with the same key and
-// tell the server, best effort. The locale is the browser's: a service worker can't read the app's choice.
+// The browser replaced the subscription (expired, or keys rotated): subscribe again with the server's key (the
+// old one when it can't be asked) and tell the server, best effort. The locale is the browser's: a service
+// worker can't read the app's choice.
 self.addEventListener("pushsubscriptionchange", (event) => {
   event.waitUntil(
     (async () => {
       let subscription = event.newSubscription ?? null;
       if (!subscription) {
-        const old = event.oldSubscription?.options?.applicationServerKey;
-        const key = old ?? (await serverKey().then((k) => (k ? keyBytes(k) : null)));
+        const current = await serverKey()
+          .then((k) => (k ? keyBytes(k) : null))
+          .catch(() => null);
+        const key = current ?? event.oldSubscription?.options?.applicationServerKey ?? null;
         if (!key) return;
         subscription = await self.registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -203,10 +206,12 @@ self.addEventListener("pushsubscriptionchange", (event) => {
       });
       const before = event.oldSubscription?.endpoint;
       if (before && before !== json.endpoint) {
-        await fetch(`/api/app/push/devices/${encodeURIComponent(before)}`, {
-          method: "DELETE",
+        // In the body: an endpoint's encoded slashes in a path don't survive every proxy.
+        await fetch("/api/app/push/devices/forget", {
+          method: "POST",
           credentials: "same-origin",
-          headers: { accept: "application/json" },
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ token: before }),
         });
       }
     })().catch(() => {}),

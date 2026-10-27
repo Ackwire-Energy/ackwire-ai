@@ -177,11 +177,18 @@ async function forgetSubscription(api: ApiClient, subscription: PushSubscription
   await api.push.unregister(endpoint).catch(() => {});
 }
 
+/**
+ * Subscribes with the server's key (anew when the key changed) and tells the server. `undo`: a registration the
+ * server refused unsubscribes here too, for a click turning it on (the switch then says what is true). The quiet
+ * refresh keeps the subscription instead, so a server restarting, a rate limit or a moment offline never turns
+ * someone's notifications off; the next page load sends it again.
+ */
 async function subscribeAndSend(
   api: ApiClient,
   registration: ServiceWorkerRegistration,
   publicKey: string,
   locale: string,
+  undo: boolean,
 ): Promise<void> {
   let subscription = await registration.pushManager.getSubscription();
   if (subscription && !sameKey(subscription.options.applicationServerKey, publicKey)) {
@@ -200,8 +207,7 @@ async function subscribeAndSend(
   try {
     await api.push.register(body);
   } catch (error) {
-    // The server doesn't know it: undone here too, so the switch says what is true.
-    await subscription.unsubscribe().catch(() => false);
+    if (undo) await subscription.unsubscribe().catch(() => false);
     throw error;
   }
 }
@@ -217,7 +223,7 @@ export async function enableWebPush(api: ApiClient, publicKey: string, locale: s
   if (permission !== "granted") return "default";
   await navigator.serviceWorker.register(SW_URL, { scope: "/" });
   const registration = await navigator.serviceWorker.ready;
-  await subscribeAndSend(api, registration, publicKey, locale);
+  await subscribeAndSend(api, registration, publicKey, locale, true);
   return "subscribed";
 }
 
@@ -245,17 +251,21 @@ export async function refreshWebPush(
     const publicKey = await api.push.webKey();
     // Off on the server for now: the subscription stays, for when it is on again.
     if (!publicKey) return;
-    await subscribeAndSend(api, registration, publicKey, locale);
+    await subscribeAndSend(api, registration, publicKey, locale, false);
   } catch {
-    // Quiet: the next opening tries again.
+    // Quiet, and the subscription stays: the next opening tries again.
   }
 }
 
-/** Signing out: this browser stops getting the account's notifications (waits at most `SIGN_OUT_WAIT_MS`). */
+/**
+ * Signing out: this browser stops getting the account's notifications, and the ones it still shows leave the
+ * screen (their full text is the account's, on a computer someone else may use next). Waits at most
+ * `SIGN_OUT_WAIT_MS`.
+ */
 export async function forgetWebPush(api: ApiClient): Promise<void> {
   if (!canOfferWebPush(readPushEnvironment())) return;
   await Promise.race([
-    disableWebPush(api).catch(() => {}),
+    Promise.all([clearAllShownPushes(), disableWebPush(api)]).catch(() => {}),
     new Promise<void>((resolve) => setTimeout(resolve, SIGN_OUT_WAIT_MS)),
   ]);
 }
@@ -408,6 +418,18 @@ export async function sweepStalePushes(api: ApiClient): Promise<void> {
     if (tags.length > 0) worker.postMessage({ type: PUSH_CLEAR_MESSAGE, tags });
   } catch {
     // Quiet: the next sweep tries again.
+  }
+}
+
+/** Takes every notification this site shows off the screen (signing out: they were the account's). Never throws. */
+async function clearAllShownPushes(): Promise<void> {
+  try {
+    const worker = await pushWorker();
+    if (!worker) return;
+    const tags = await askShownTags(worker);
+    if (tags.length > 0) worker.postMessage({ type: PUSH_CLEAR_MESSAGE, tags });
+  } catch {
+    // Quiet: signing out goes on.
   }
 }
 

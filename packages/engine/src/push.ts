@@ -7,12 +7,12 @@ import {
   type WebPushResult,
   type WebPushSender,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, lte, or, schema } from "@agenteschat/db";
+import { and, asc, type Database, eq, gt, inArray, isNull, lte, or, schema } from "@agenteschat/db";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
 import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
 
-const { pushDevices, notifications, agents, users, approvals } = schema;
+const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
 
 /**
  * Push to the phone app (ADR 0035) and to browsers (Web Push, ADR 0071). A
@@ -60,10 +60,13 @@ export const WEB_PUSH_TTL_SECONDS = 86_400;
 export const PUSH_PLATFORMS = ["ios", "android"] as const;
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 
-/** A device as `POST /push/devices` registers it: a phone's Expo token or a browser's Web Push subscription. */
+/**
+ * A device as `POST /push/devices` registers it: a phone's Expo token, or a browser's Web Push subscription
+ * with the session that turned it on (`sessionId`: it hears pushes only while that session lasts).
+ */
 export type PushDeviceInput =
   | { token: string; platform: PushPlatform; locale: string }
-  | { platform: "web"; endpoint: string; keys: WebPushKeys; locale: string };
+  | { platform: "web"; endpoint: string; keys: WebPushKeys; locale: string; sessionId: string };
 
 /** An Expo push token as the app gets it from `getExpoPushTokenAsync`. */
 export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
@@ -115,18 +118,48 @@ const unpadded = (keys: WebPushKeys): WebPushKeys => ({
  * Registers (or refreshes) a phone or a browser for a person. A token (a
  * browser's endpoint) already registered moves to this person (the device
  * changed hands or accounts). Keeps the newest `MAX_PUSH_DEVICES` per person.
+ *
+ * A browser belongs to the session that turned it on (ADR 0071): signing out,
+ * signing out everywhere, or the session running out stops its pushes, which
+ * matters on a computer people share. False when that session is no longer
+ * the person's (ended meanwhile): nothing is registered.
  */
-export async function registerPushDevice(db: Database, userId: string, input: PushDeviceInput, now = new Date()) {
+export async function registerPushDevice(
+  db: Database,
+  userId: string,
+  input: PushDeviceInput,
+  now = new Date(),
+): Promise<boolean> {
+  if (input.platform === "web") {
+    const [live] = await db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(and(eq(sessions.id, input.sessionId), eq(sessions.userId, userId), gt(sessions.expiresAt, now)));
+    if (!live) return false;
+  }
   const device =
     input.platform === "web"
-      ? { token: input.endpoint, platform: "web" as const, webKeys: unpadded(input.keys), locale: input.locale }
-      : { token: input.token, platform: input.platform, webKeys: null, locale: input.locale };
+      ? {
+          token: input.endpoint,
+          platform: "web" as const,
+          webKeys: unpadded(input.keys),
+          sessionId: input.sessionId,
+          locale: input.locale,
+        }
+      : { token: input.token, platform: input.platform, webKeys: null, sessionId: null, locale: input.locale };
   await db
     .insert(pushDevices)
     .values({ userId, ...device, lastSeenAt: now })
     .onConflictDoUpdate({
       target: pushDevices.token,
-      set: { userId, platform: device.platform, webKeys: device.webKeys, locale: device.locale, lastSeenAt: now },
+      set: {
+        userId,
+        platform: device.platform,
+        webKeys: device.webKeys,
+        sessionId: device.sessionId,
+        locale: device.locale,
+        lastSeenAt: now,
+      },
     });
   const devices = await db
     .select({ id: pushDevices.id })
@@ -135,6 +168,7 @@ export async function registerPushDevice(db: Database, userId: string, input: Pu
     .orderBy(asc(pushDevices.lastSeenAt));
   const extra = devices.slice(0, Math.max(0, devices.length - MAX_PUSH_DEVICES)).map((d) => d.id);
   if (extra.length > 0) await db.delete(pushDevices).where(inArray(pushDevices.id, extra));
+  return true;
 }
 
 /** Forgets one of the person's devices (sign-out, notifications turned off). Other people's tokens are untouched. */
@@ -148,6 +182,27 @@ export async function unregisterPushDevice(db: Database, userId: string, token: 
 
 export async function listPushDevices(db: Database, userId: string) {
   return db.select().from(pushDevices).where(eq(pushDevices.userId, userId)).orderBy(asc(pushDevices.createdAt));
+}
+
+/**
+ * Where a person's pushes go: every phone, and each browser whose session is still on. `ended`: browsers
+ * whose session is over (signed out elsewhere, run out), to forget; a sign-in again subscribes them anew.
+ */
+async function pushTargets(db: Database, userId: string, now: Date) {
+  const rows = await db
+    .select({ device: pushDevices, sessionEndsAt: sessions.expiresAt })
+    .from(pushDevices)
+    .leftJoin(sessions, eq(sessions.id, pushDevices.sessionId))
+    .where(eq(pushDevices.userId, userId))
+    .orderBy(asc(pushDevices.createdAt));
+  const phones = rows.filter((r) => r.device.platform !== "web").map((r) => r.device);
+  const web = rows.filter((r) => r.device.platform === "web");
+  const on = (r: (typeof web)[number]) => r.sessionEndsAt !== null && r.sessionEndsAt.getTime() > now.getTime();
+  return {
+    phones,
+    browsers: web.filter((r) => on(r) && r.device.webKeys).map((r) => r.device),
+    ended: web.filter((r) => !on(r)).map((r) => r.device.token),
+  };
 }
 
 // ── Delivery (job `push.send`) ────────────────────────────────────────────────
@@ -215,8 +270,9 @@ async function isLooking(presence: PushDeps["presence"], orgId: string, userId: 
 /**
  * Sends the push of one notification to every device of its person, unless
  * it was read, done or snoozed meanwhile: phones through `push` (one request),
- * browsers through `webPush` (one per subscription). Devices their push
- * service reports as gone are deleted. Accepted phone tickets are checked
+ * browsers whose session is still on through `webPush` (one per subscription).
+ * Devices their push service reports as gone are deleted, and so are browsers
+ * whose session ended. Accepted phone tickets are checked
  * again later: a `push.receipts` job ~15 min after (`checkPushReceipts`).
  *
  * Not waiting on the person and they have the app open: the first run holds
@@ -238,9 +294,15 @@ export async function deliverPush(
   const now = deps.now?.() ?? new Date();
   const [row] = await db.select().from(notifications).where(eq(notifications.id, notificationId));
   if (!row || !pushWorthy(row, now)) return none;
-  const devices = await listPushDevices(db, row.userId);
-  const phones = deps.push ? devices.filter((d) => d.platform !== "web") : [];
-  const browsers = deps.webPush ? devices.filter((d) => d.platform === "web" && d.webKeys) : [];
+  const targets = await pushTargets(db, row.userId, now);
+  // A browser whose session is over hears nothing more (ADR 0071); signing in there again subscribes it anew.
+  if (targets.ended.length > 0) {
+    await db
+      .delete(pushDevices)
+      .where(and(eq(pushDevices.userId, row.userId), inArray(pushDevices.token, targets.ended)));
+  }
+  const phones = deps.push ? targets.phones : [];
+  const browsers = deps.webPush ? targets.browsers : [];
   if (phones.length === 0 && browsers.length === 0) return none;
 
   if (!options.held && !row.waiting && (await isLooking(deps.presence, row.orgId, row.userId))) {
@@ -336,6 +398,7 @@ export async function deliverPush(
         return [d.token, result];
       }),
     );
+    // A refused signature (`unauthorized`) isn't `gone`: kept, since it is as often our own key or contact.
     for (const [token, result] of results) {
       if (result.ok) sent++;
       else if (result.gone) gone.push(token);

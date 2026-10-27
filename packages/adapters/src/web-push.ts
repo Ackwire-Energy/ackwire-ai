@@ -32,10 +32,15 @@ export interface WebPushMessage {
 
 export interface WebPushResult {
   ok: boolean;
-  /** The subscription can't be reached anymore (expired, unsubscribed, made for another key): delete it. */
+  /** The subscription can't be reached anymore (expired, unsubscribed, a host on our own network): delete it. */
   gone: boolean;
-  /** Worth trying again later (429, 5xx, network). */
+  /** Worth trying again later (429, 5xx, network, DNS). */
   retryable: boolean;
+  /**
+   * The push service refused this installation's signature (401/403): a subscription made for another key,
+   * or a key or contact of ours it doesn't accept. Not proof the subscription is gone, so it is kept.
+   */
+  unauthorized?: boolean;
   status?: number;
   error?: string;
 }
@@ -191,10 +196,14 @@ export async function vapidAuthorization(endpoint: string, vapid: VapidKeys, now
 export function webPushResultOf(status: number, detail = ""): WebPushResult {
   if (status >= 200 && status < 300) return { ok: true, gone: false, retryable: false, status };
   const error = `push service answered ${status}${detail ? `: ${detail}` : ""}`;
-  // 404/410: expired or unsubscribed. 401/403: made for another VAPID key (this installation's pair was
-  // replaced), so it can never be reached with ours; the page subscribes again with the new key.
-  if (status === 404 || status === 410 || status === 401 || status === 403)
-    return { ok: false, gone: true, retryable: false, status, error };
+  // 404/410: expired or unsubscribed, for good.
+  if (status === 404 || status === 410) return { ok: false, gone: true, retryable: false, status, error };
+  // 401/403: the signature was refused. A subscription made for a key this installation replaced answers so,
+  // but so does every subscription when our own key or contact is wrong (a pinned pair, a contact the push
+  // service rejects, a clock far off): deleting on it would wipe every browser over a setting. The page
+  // subscribes again with the new key on its next load, and a browser whose session ended is dropped anyway.
+  if (status === 401 || status === 403)
+    return { ok: false, gone: false, retryable: false, unauthorized: true, status, error };
   if (status === 429 || status >= 500) return { ok: false, gone: false, retryable: true, status, error };
   return { ok: false, gone: false, retryable: false, status, error };
 }
@@ -207,7 +216,11 @@ export function webPushResultOf(status: number, detail = ""): WebPushResult {
 export function createWebPushSender(options: {
   vapid: () => Promise<VapidKeys>;
   fetch?: typeof fetch;
-  checkHost?: (host: string) => Promise<void>;
+  /**
+   * Whether the endpoint's host may be called: `false` for one on our own network (the subscription is
+   * dropped). Throws when it can't tell now (DNS doesn't answer): a failure to retry, never a reason to drop it.
+   */
+  checkHost?: (host: string) => Promise<boolean>;
   timeoutMs?: number;
 }): WebPushSender {
   const http = options.fetch ?? fetch;
@@ -227,11 +240,14 @@ export function createWebPushSender(options: {
       if (plaintext.length > WEB_PUSH_PAYLOAD_MAX)
         return { ok: false, gone: false, retryable: false, error: "payload is larger than 3 KB" };
       if (options.checkHost) {
+        let allowed: boolean;
         try {
-          await options.checkHost(url.hostname);
-        } catch {
-          return { ok: false, gone: true, retryable: false, error: "endpoint's host is not allowed" };
+          allowed = await options.checkHost(url.hostname);
+        } catch (error) {
+          const why = `couldn't check the endpoint's host: ${String(error)}`;
+          return { ok: false, gone: false, retryable: true, error: why };
         }
+        if (!allowed) return { ok: false, gone: true, retryable: false, error: "endpoint's host is not allowed" };
       }
       let body: Buffer;
       try {
@@ -274,30 +290,40 @@ export function createWebPushSender(options: {
 
 /**
  * Test sender: records every message, never sends. Endpoints in `gone` answer as gone (410), those in
- * `failing` as a retryable failure (503), those in `refused` as a final one (400).
+ * `failing` as a retryable failure (503), those in `refused` as a final one (400), those in
+ * `unauthorized` as a refused signature (403).
  */
 export function createFakeWebPushSender(
-  options: { gone?: Iterable<string>; failing?: Iterable<string>; refused?: Iterable<string> } = {},
+  options: {
+    gone?: Iterable<string>;
+    failing?: Iterable<string>;
+    refused?: Iterable<string>;
+    unauthorized?: Iterable<string>;
+  } = {},
 ) {
   const sent: WebPushMessage[] = [];
   const gone = new Set(options.gone ?? []);
   const failing = new Set(options.failing ?? []);
   const refused = new Set(options.refused ?? []);
+  const unauthorized = new Set(options.unauthorized ?? []);
   const sender: WebPushSender & {
     sent: WebPushMessage[];
     gone: Set<string>;
     failing: Set<string>;
     refused: Set<string>;
+    unauthorized: Set<string>;
   } = {
     id: "fake-web-push",
     sent,
     gone,
     failing,
     refused,
+    unauthorized,
     async send(message) {
       if (gone.has(message.endpoint)) return webPushResultOf(410);
       if (failing.has(message.endpoint)) return webPushResultOf(503);
       if (refused.has(message.endpoint)) return webPushResultOf(400);
+      if (unauthorized.has(message.endpoint)) return webPushResultOf(403);
       sent.push(message);
       return webPushResultOf(201);
     },

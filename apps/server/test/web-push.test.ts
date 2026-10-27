@@ -74,7 +74,7 @@ describe("web push key", () => {
 });
 
 describe("web push devices", () => {
-  test("register a browser (https endpoint, real keys), refresh it, remove it by its encoded endpoint", async () => {
+  test("register a browser (https endpoint, real keys), refresh it, forget it by its endpoint", async () => {
     t = await createTestServer();
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
@@ -99,9 +99,41 @@ describe("web push devices", () => {
       [ENDPOINT, "web", "en", { p256dh: sub.keys.p256dh, auth: sub.keys.auth }],
     ]);
 
+    // The endpoint goes in the body: its encoded slashes in a path don't survive every proxy.
+    expect((await owner("/api/app/push/devices/forget", { json: { token: ENDPOINT } })).status).toBe(204);
+    expect(await t.db.select().from(schema.pushDevices)).toEqual([]);
+    // The path form still works where nothing in between decodes it (the phone app's sign-out).
+    expect((await register(sub)).status).toBe(204);
     const path = `/api/app/push/devices/${encodeURIComponent(ENDPOINT)}`;
     expect((await owner(path, { method: "DELETE" })).status).toBe(204);
     expect(await t.db.select().from(schema.pushDevices)).toEqual([]);
+  });
+
+  test("a browser belongs to its session: signing out, here or everywhere, stops it", async () => {
+    t = await createTestServer();
+    const laptop = browser(t);
+    await signUp(laptop, "owner@example.com");
+    const register = () => laptop("/api/app/push/devices", { json: subscription() });
+    expect((await register()).status).toBe(204);
+    const [first] = await t.db.select().from(schema.pushDevices);
+    expect(first?.sessionId).toBeString();
+
+    // Signing out in this browser ends its session, and the browser goes with it.
+    expect((await laptop("/api/auth/sign-out", { json: {} })).status).toBe(200);
+    expect(await t.db.select().from(schema.pushDevices)).toEqual([]);
+
+    // Signed in again: on again, for the new session. Signed out everywhere from another device: gone, and the
+    // cookie this browser still holds doesn't bring it back.
+    const signIn = await laptop("/api/auth/sign-in/email", {
+      json: { email: "owner@example.com", password: "correct horse battery" },
+    });
+    expect(signIn.status).toBe(200);
+    expect((await register()).status).toBe(204);
+    const [again] = await t.db.select().from(schema.pushDevices);
+    expect(again?.sessionId).not.toBe(first?.sessionId);
+    await t.db.delete(schema.sessions).where(eq(schema.sessions.userId, again?.userId ?? ""));
+    expect(await t.db.select().from(schema.pushDevices)).toEqual([]);
+    expect((await register()).status).toBe(401);
   });
 
   test("a mention reaches the browser through the outbox, with the page to open", async () => {

@@ -239,7 +239,10 @@ export interface ApiClient {
     webKey(): Promise<string | null>;
     /** Registers (or refreshes, or moves to me) a phone's token or a browser's subscription. Rate limited (429). */
     register(input: PushDeviceInput): Promise<void>;
-    /** Stops pushes to a phone's token or a browser's endpoint (only my own; anything else is a no-op). */
+    /**
+     * Stops pushes to a phone's token or a browser's endpoint (only my own; anything else is a no-op). In the
+     * body, not the path: an endpoint's encoded slashes don't survive every proxy.
+     */
     unregister(token: string): Promise<void>;
     /**
      * Of these notification ids (at most 100), the ones no longer open and unread for me (read, done, snoozed or

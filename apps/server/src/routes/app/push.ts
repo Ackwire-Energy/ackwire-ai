@@ -82,7 +82,7 @@ export function pushRoutes(deps: AppDeps) {
       security,
       summary: "Register this phone or browser for push notifications",
       description:
-        "Upsert by token (a browser's endpoint): registering again refreshes it, and one registered by someone else moves to you. Phones send their Expo token; browsers their Web Push subscription. Call on every launch or page load after sign-in.",
+        "Upsert by token (a browser's endpoint): registering again refreshes it, and one registered by someone else moves to you. Phones send their Expo token; browsers their Web Push subscription, which then belongs to this session: signing out (everywhere too) or the session running out stops it. Call on every launch or page load after sign-in.",
       request: { body: body(z.union([PhoneDevice, WebDevice])) },
       responses: { 204: noContent[204], 429: errorResponse("Too many registrations"), ...errors },
     }),
@@ -90,7 +90,17 @@ export function pushRoutes(deps: AppDeps) {
       const user = c.get("user");
       const limit = await deps.adapters.rateLimiter.consume(`push:${user.id}`, { limit: 30, windowMs: 3600_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many registrations; try again later");
-      await registerPushDevice(db, user.id, c.req.valid("json"));
+      const input = c.req.valid("json");
+      if (input.platform !== "web") {
+        await registerPushDevice(db, user.id, input);
+        return c.body(null, 204);
+      }
+      // A browser hears pushes only while the session that turned them on lasts (ADR 0071).
+      const session = await deps.auth.api.getSession({ headers: c.req.raw.headers });
+      const sessionId = session?.session.id;
+      if (!sessionId || !(await registerPushDevice(db, user.id, { ...input, sessionId }))) {
+        return apiError(c, 401, "unauthorized", "Sign in to continue");
+      }
       return c.body(null, 204);
     },
   );
@@ -124,12 +134,31 @@ export function pushRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/push/devices/forget",
+      tags,
+      security,
+      summary: "Stop push notifications on this browser or phone",
+      description:
+        "Only your own devices; anything else is a no-op. The token (a browser's endpoint, a phone's Expo token) goes in the body: an endpoint is a URL, and its encoded slashes in a path don't survive every proxy.",
+      request: { body: body(z.object({ token: z.string().min(1).max(2048) })) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      await unregisterPushDevice(db, c.get("user").id, c.req.valid("json").token);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/push/devices/{token}",
       tags,
       security,
-      summary: "Stop push notifications on this phone or browser",
-      description: "Only your own devices; anything else is a no-op. URL-encode the token (a browser's endpoint).",
+      summary: "Stop push notifications on this phone (sign-out)",
+      description:
+        "Only your own tokens; anything else is a no-op. URL-encode the token. A browser's endpoint goes to `POST /push/devices/forget` instead.",
       request: { params: z.object({ token: z.string().min(1).max(2048) }) },
       responses: { 204: noContent[204], ...errors },
     }),

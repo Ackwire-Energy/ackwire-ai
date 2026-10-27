@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { users } from "./auth";
+import { sessions, users } from "./auth";
 
 /**
  * Devices that receive push notifications (ADR 0035, ADR 0071). Per person, not per organization: one
@@ -9,7 +9,7 @@ import { users } from "./auth";
  * service reports as gone are deleted.
  *
  * Phones carry their Expo push token. Browsers (`web`) carry their Web Push subscription: the endpoint
- * in `token` and its keys in `webKeys`.
+ * in `token` and its keys in `webKeys`, and belong to the session that turned them on (`sessionId`).
  */
 export const pushDevices = pgTable(
   "push_devices",
@@ -26,13 +26,18 @@ export const pushDevices = pgTable(
     platform: text().$type<"ios" | "android" | "web">().notNull(),
     /** A browser's subscription keys pushes are encrypted to (RFC 8291): `p256dh` and `auth`, base64url. */
     webKeys: jsonb().$type<{ p256dh: string; auth: string }>(),
+    /**
+     * A browser's session (ADR 0071): it hears pushes only while that session lasts, and goes with it
+     * (signing out, everywhere too). Phones have none.
+     */
+    sessionId: text().references(() => sessions.id, { onDelete: "cascade" }),
     /** The device's language (`pt-BR`, `en`…): picks the push text. */
     locale: text().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /** Last time the device registered it (each launch, each page load). */
     lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.userId)],
+  (t) => [index().on(t.userId), index().on(t.sessionId)],
 );
 
 /**

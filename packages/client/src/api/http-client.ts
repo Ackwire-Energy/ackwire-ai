@@ -347,7 +347,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       webKey: async () =>
         (await nullOn(404, () => request<{ publicKey: string }>("/api/app/push/web")))?.publicKey ?? null,
       register: (input) => request<void>("/api/app/push/devices", { json: input }),
-      unregister: (token) => request<void>(`/api/app/push/devices/${enc(token)}`, { method: "DELETE" }),
+      unregister: (token) => request<void>("/api/app/push/devices/forget", { json: { token } }),
       stale: async (ids) => (await request<{ stale: string[] }>("/api/app/push/stale", { json: { ids } })).stale,
     },
     orgs: {

@@ -198,7 +198,10 @@ describe("Web Push sender", () => {
       const { push } = sender(() => new Response("nope", { status }));
       return push.send({ endpoint: ENDPOINT, keys: browser.keys, payload: {} });
     };
-    for (const status of [404, 410, 401, 403]) expect(await send(status)).toMatchObject({ ok: false, gone: true });
+    for (const status of [404, 410]) expect(await send(status)).toMatchObject({ ok: false, gone: true });
+    // A refused signature isn't proof the subscription is gone: our own key or contact may be what's wrong.
+    for (const status of [401, 403])
+      expect(await send(status)).toMatchObject({ ok: false, gone: false, retryable: false, unauthorized: true });
     for (const status of [429, 500, 503])
       expect(await send(status)).toMatchObject({ ok: false, gone: false, retryable: true, status });
     expect(await send(400)).toMatchObject({
@@ -238,7 +241,7 @@ describe("Web Push sender", () => {
     expect(calls).toHaveLength(0);
   });
 
-  test("a host refused by checkHost is never called", async () => {
+  test("a host refused by checkHost is never called; one it can't check now is tried again later", async () => {
     let called = false;
     const push = createWebPushSender({
       vapid: async () => vapid(),
@@ -247,22 +250,36 @@ describe("Web Push sender", () => {
         return new Response(null, { status: 201 });
       }) as unknown as typeof fetch,
       checkHost: async (host) => {
-        if (host === "internal.example") throw new Error("blocked host");
+        if (host === "dns-down.example") throw new Error("getaddrinfo EAI_AGAIN");
+        return host !== "internal.example";
       },
     });
-    const result = await push.send({ endpoint: "https://internal.example/x", keys: browserKeys().keys, payload: {} });
+    const keys = browserKeys().keys;
+    const result = await push.send({ endpoint: "https://internal.example/x", keys, payload: {} });
     expect(result).toMatchObject({ ok: false, gone: true });
+    // DNS that doesn't answer never drops a subscription.
+    const unsure = await push.send({ endpoint: "https://dns-down.example/x", keys, payload: {} });
+    expect(unsure).toMatchObject({ ok: false, gone: false, retryable: true });
     expect(called).toBe(false);
+    expect(await push.send({ endpoint: ENDPOINT, keys, payload: {} })).toMatchObject({ ok: true });
+    expect(called).toBe(true);
   });
 
   test("result mapping and the fake sender", async () => {
     expect(webPushResultOf(201)).toEqual({ ok: true, gone: false, retryable: false, status: 201 });
-    const fake = createFakeWebPushSender({ gone: ["https://a"], failing: ["https://b"], refused: ["https://c"] });
+    const fake = createFakeWebPushSender({
+      gone: ["https://a"],
+      failing: ["https://b"],
+      refused: ["https://c"],
+      unauthorized: ["https://e"],
+    });
     const keys = browserKeys().keys;
     expect(await fake.send({ endpoint: "https://a", keys, payload: {} })).toMatchObject({ gone: true });
     expect(await fake.send({ endpoint: "https://b", keys, payload: {} })).toMatchObject({ retryable: true });
     const refused = await fake.send({ endpoint: "https://c", keys, payload: {} });
     expect(refused).toMatchObject({ ok: false, retryable: false });
+    const unauthorized = await fake.send({ endpoint: "https://e", keys, payload: {} });
+    expect(unauthorized).toMatchObject({ ok: false, gone: false, unauthorized: true, status: 403 });
     expect(await fake.send({ endpoint: "https://d", keys, payload: {} })).toMatchObject({ ok: true });
     expect(fake.sent.map((m) => m.endpoint)).toEqual(["https://d"]);
   });

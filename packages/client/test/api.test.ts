@@ -643,7 +643,7 @@ describe("push devices (ADR 0035, ADR 0071)", () => {
     const { fetch, calls } = fakeFetch({
       "GET /api/app/push/web": { status: 200, body: { publicKey: "BPk" } },
       "POST /api/app/push/devices": { status: 204 },
-      [`DELETE /api/app/push/devices/${encodeURIComponent(endpoint)}`]: { status: 204 },
+      "POST /api/app/push/devices/forget": { status: 204 },
     });
     const api = createHttpApi({ fetch });
     expect(await api.push.webKey()).toBe("BPk");
@@ -660,9 +660,11 @@ describe("push devices (ADR 0035, ADR 0071)", () => {
       token: "ExponentPushToken[abcdefgh12345]",
       locale: "en",
     });
+    // Forgotten by a body, not a path: an endpoint's encoded slashes don't survive every proxy.
     await api.push.unregister(endpoint);
-    expect(calls.at(-1)?.url).toBe(`/api/app/push/devices/${encodeURIComponent(endpoint)}`);
-    expect(calls.at(-1)?.init.method).toBe("DELETE");
+    expect(calls.at(-1)?.url).toBe("/api/app/push/devices/forget");
+    expect(calls.at(-1)?.init.method).toBe("POST");
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({ token: endpoint });
 
     const off = fakeFetch({
       "GET /api/app/push/web": { status: 404, body: { error: { code: "web_push_off", message: "Off" } } },
