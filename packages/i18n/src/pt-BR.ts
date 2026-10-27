@@ -8467,6 +8467,12 @@ export const ptBR = {
       keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
       notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
     },
+    /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
+    session: {
+      check: "Verificações de segurança",
+      screening:
+        "Podemos verificar o texto desta tela para impedir abuso. Guardamos só o resultado. O que a tela não mostra, como uma senha num prompt, nunca é capturado.",
+    },
     /** What the agent did on its desktop, on its message after the run (ADR 0062); the rest is the browser card's. */
     after: {
       titleNoSite: "Usou a tela",

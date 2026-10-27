@@ -8419,6 +8419,12 @@ export const en: Translations = {
       keys: "Copy and paste as usual: {{key}} C, {{key}} V.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
+    /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
+    session: {
+      check: "Safety checks",
+      screening:
+        "We may check the text on this screen for abuse. We keep only the result. What the screen doesn't show, like a password at a prompt, is never captured.",
+    },
     /** What the agent did on its desktop, on its message after the run (ADR 0062); the rest is the browser card's. */
     after: {
       titleNoSite: "Used its screen",

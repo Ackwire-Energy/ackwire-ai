@@ -210,6 +210,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
     onRunProfile: (p) => log.debug("run profile", p),
     emailArt,
+    log,
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();
@@ -312,10 +313,12 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     hub: engine.machineHub,
     emails: adapters.email.delivers,
     humanCheck: adapters.humanCheck,
+    sessions: engine.sessions,
   });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
   }
+  if (engine.sessions) log.info("session screening on: screens are read while people are in control (ADR 0076)");
 
   for (const module of modules) await module.onStart?.(ctx);
 
