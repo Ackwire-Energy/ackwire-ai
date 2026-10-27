@@ -12,6 +12,7 @@ import {
   useResendInvitation,
   useRevokeInvitation,
   useTurnOffInviteLink,
+  useWorkspaceLimits,
 } from "@agenteschat/client";
 import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import {
@@ -21,6 +22,7 @@ import {
   askedLabel,
   JOIN_REASON_MAX,
 } from "@agenteschat/client/lib/join-requests";
+import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { parseEmails } from "@agenteschat/client/lib/text";
 import {
@@ -47,6 +49,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useFilterCopy } from "@/components/filters";
+import { MembersFull } from "@/components/Limits";
 import { LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -82,6 +85,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const revoke = useRevokeInvitation(org.id);
   const changeRole = useChangeRole(org.id);
   const peopleQuery = usePeople(org.id);
+  const full = membersFull(useWorkspaceLimits(org.id, manage).data) !== null;
   const [draft, setDraft] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +170,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           <h2 id="sec-invite" className="ac-card__title">
             {t("members.inviteTitle")}
           </h2>
+          <MembersFull />
           <div className="row row--end">
             <Field
               label={t("members.emails")}
@@ -195,7 +200,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             <Button
               variant="primary"
               onClick={() => void send().catch(() => {})}
-              disabled={inviteMany.isPending}
+              disabled={inviteMany.isPending || full}
               loading={inviteMany.isPending}
             >
               {t("members.invite")}
@@ -373,6 +378,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
   const list = useJoinRequests(org.id);
   const approve = useApproveJoinRequest(org.id);
   const deny = useDenyJoinRequest(org.id);
+  const full = membersFull(useWorkspaceLimits(org.id).data) !== null;
   const [roles, setRoles] = useState<Record<string, ApproveRole>>({});
   const [denying, setDenying] = useState<JoinRequest | null>(null);
   const [reason, setReason] = useState("");
@@ -435,6 +441,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
           <h2 id="sec-requests" className="section-title">
             {t("members.requests.title")} <span className="jr-count">{requests.length}</span>
           </h2>
+          <MembersFull />
           <div className="jr-list">
             {requests.map((r) => {
               const answering =
@@ -488,7 +495,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
                         }}
                         size="sm"
                         variant="primary"
-                        disabled={answering}
+                        disabled={answering || full}
                         loading={approve.isPending && approve.variables?.id === r.id}
                         onClick={() => approveOne(r)}
                       >

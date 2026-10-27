@@ -26,6 +26,7 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StorageMeter } from "@/components/Limits";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
@@ -97,6 +98,7 @@ export function StorageSection() {
       <h2 id="sec-storage" className="ac-card__title">
         {t("storage.title")}
       </h2>
+      <StorageMeter />
       {storage.isLoading && <LoadingCards count={2} />}
       {config && (
         <>

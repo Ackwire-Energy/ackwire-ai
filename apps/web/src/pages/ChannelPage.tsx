@@ -188,6 +188,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, LiveWorkList, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
@@ -1308,6 +1309,7 @@ function ChannelView({
 
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
   const [files, setFiles] = useState<PendingFile[]>([]);
+  const uploadFailed = useUploadFailed();
   // Thumbnails are object URLs: freed when a file leaves the composer and when the page goes.
   const previews = useRef(new Set<string>());
   const dropFiles = (keep: (f: PendingFile) => boolean) => {
@@ -1347,7 +1349,7 @@ function ChannelView({
         .then((saved) => update({ status: "done", ref: { id: saved.id, version: saved.version, title: saved.title } }))
         .catch((error) => {
           update({ status: "failed" });
-          toast.show(errorText(t, error), "error");
+          uploadFailed(error);
         });
     }
     composer.current?.focus();

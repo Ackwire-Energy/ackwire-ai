@@ -99,6 +99,7 @@ import {
 } from "@/components/ai/ConnectAiSteps";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
+import { MembersFull } from "@/components/Limits";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
@@ -647,6 +648,8 @@ export function OnboardingPage() {
           next.add(invite.email);
         } catch (err) {
           toast.show(`${invite.email}: ${errorText(t, err)}`, "error");
+          // A full workspace refuses the rest the same way.
+          if (errorCode(err) === "org.members_full") break;
         }
       }
       setSent(next);
@@ -1284,7 +1287,14 @@ export function OnboardingPage() {
               {unpaid ? (
                 <p className="onb__help">{t("onboarding.team.payment")}</p>
               ) : (
-                <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+                <>
+                  {orgSummary && me.data && (
+                    <OrgProvider org={orgSummary} me={me.data}>
+                      <MembersFull />
+                    </OrgProvider>
+                  )}
+                  <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+                </>
               )}
             </div>
           )}

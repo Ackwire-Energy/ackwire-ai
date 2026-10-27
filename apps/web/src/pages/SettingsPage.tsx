@@ -60,6 +60,7 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
+import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -179,12 +180,16 @@ export function SettingsPage({
   );
 }
 
-/** Plano e cobrança (ADR 0071): the plan, card and invoices live on the billing service, opened signed in. */
+/**
+ * Plano e cobrança (ADR 0071): people and files against the plan's limits; the plan, card and invoices live on the
+ * billing service, opened signed in.
+ */
 function BillingSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
     <Card aria-label={t("settings.section.billing")}>
+      <BillingMeters />
       <div className="row">
         <BillingLinkButton orgId={org.id} from="settings" variant="primary" icon="external">
           {t("billing.open")}
