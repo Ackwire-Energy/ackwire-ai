@@ -30,7 +30,8 @@ import {
  *   reasoning items come back as `opaque` blocks and are replayed unchanged
  *   in tool loops. Blocks from other providers are dropped.
  * - `outputSchema` → `text.format` JSON Schema (strict); `effort` →
- *   `reasoning.effort` on reasoning models.
+ *   `reasoning.effort` on reasoning models (`none` only on one that can
+ *   turn reasoning off, `low` on the others).
  * - Usage: `input_tokens` includes cached and cache-write tokens; we split
  *   them so each is priced at its own rate.
  * - Mid-stream failures carry what was received (`ProviderError.partial`).
@@ -59,6 +60,7 @@ export function createOpenAIProvider(
         outputChars: 0,
       };
       const info = MODEL_CATALOG[request.model];
+      const effort = request.effort === "none" && info?.leastThinking !== "off" ? "low" : request.effort;
       try {
         const stream = client(apiKey, organization, project).responses.stream(
           {
@@ -81,7 +83,7 @@ export function createOpenAIProvider(
                   },
                 }
               : {}),
-            ...(info?.reasoning && request.effort ? { reasoning: { effort: request.effort } } : {}),
+            ...(info?.reasoning && effort ? { reasoning: { effort } } : {}),
           },
           { signal: request.signal },
         );
