@@ -214,10 +214,11 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             }
         })
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
-        // browser, the device's name in its words), and that `this_mac` takes `servers` (older apps refuse
-        // it, so the site's sign-in offers another server only where this says so); nothing else.
+        // browser, the device's name in its words), that `this_mac` takes `servers` (older apps refuse
+        // it, so the site's sign-in offers another server only where this says so), and that a connector's
+        // sign-in comes back here (`deep_link.rs`, older apps don't take it); nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, connectorReturn: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
