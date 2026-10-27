@@ -10,8 +10,9 @@ import {
   type IconName,
   PixelSpinner,
 } from "@agenteschat/ui";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { POSTGRES_MARK } from "@/lib/brands";
 import { CAST, type CastKey, ORGS } from "./cast";
 import { useLanding } from "./context";
 import { useJoy, useRunner, useVisible } from "./hooks";
@@ -62,7 +63,11 @@ export function Bento() {
             <WikiGraph />
           </Card>
           <Card as="article" className="lp-bento-card lp-bento-w4 lp-bento-fixed lp-bento-c-row">
-            <Head icon="database" title={t("landing.bento.db.title")} sub={t("landing.bento.db.sub")} />
+            <Head
+              icon={<img src={POSTGRES_MARK} alt="" width={16} height={16} />}
+              title={t("landing.bento.db.title")}
+              sub={t("landing.bento.db.sub")}
+            />
             <ReadOnlySql active={visible} />
           </Card>
           <Card as="article" className="lp-bento-card lp-bento-w6 lp-bento-c-row">
@@ -80,12 +85,15 @@ export function Bento() {
   );
 }
 
-/** The card head of the design system (key, title, quiet line), with an h3 under the section's h2. */
-function Head({ icon, title, sub }: { icon: IconName; title: string; sub: string }) {
+/**
+ * The card head of the design system (key, title, quiet line), with an h3 under the section's h2. The key is a
+ * line icon, or a product's own mark at the same 16 px.
+ */
+function Head({ icon, title, sub }: { icon: IconName | ReactElement; title: string; sub: string }) {
   return (
     <div className="ac-card__head">
       <span className="ac-card__key" aria-hidden="true">
-        <Icon name={icon} size={16} />
+        {typeof icon === "string" ? <Icon name={icon} size={16} /> : icon}
       </span>
       <div className="ac-card__heading">
         <h3>{title}</h3>

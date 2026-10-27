@@ -1,9 +1,14 @@
+import type { MarkId } from "@agenteschat/ui/brand/marks";
+import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { LOGO_SIZES, type LogoSize, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "./provider-marks";
 import { useTheme } from "./theme";
 
 const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18, hero: 24 } as const;
+
+/** The phone's own copies of the image marks (assets/images/brands/README.md). */
+const MARK_IMAGES: Partial<Record<MarkId, number>> = { gemini: require("../../assets/images/brands/gemini.png") };
 
 export interface ProviderLogoProps {
   /** A provider, plan, brain or mission executor id (`anthropic`, `zai`, `claude_code`…). */
@@ -37,7 +42,9 @@ export function ProviderLogo({ id, size = "tile", off = false, label }: Provider
         size === "hero" ? { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` } : null,
       ]}
     >
-      {drawn ? (
+      {drawn?.image ? (
+        <Image source={MARK_IMAGES[drawn.key]} contentFit="contain" style={{ width: drawing, height: drawing }} />
+      ) : drawn ? (
         <Svg width={drawing} height={drawing} viewBox="0 0 24 24">
           {drawn.gradient ? (
             <Defs>
@@ -121,6 +128,15 @@ export function ProviderQuad({ ids, label, off = false }: { ids: readonly string
     >
       {ids.slice(0, 4).map((id) => {
         const drawn = markShapes(id, scheme, colors.ink2);
+        if (drawn?.image)
+          return (
+            <Image
+              key={id}
+              source={MARK_IMAGES[drawn.key]}
+              contentFit="contain"
+              style={{ width: cell, height: cell }}
+            />
+          );
         return (
           <Svg key={id} width={cell} height={cell} viewBox="0 0 24 24">
             {drawn?.gradient ? (

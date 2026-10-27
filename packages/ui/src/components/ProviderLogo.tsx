@@ -17,14 +17,17 @@ export interface ProviderLogoProps {
   className?: string;
 }
 
+/** An image mark's size in each tile: `components.css` gives a path mark's `svg` the same. */
+const IMAGE_PX = { xs: 14, chip: 12, sm: 16, tile: 26 } as const;
+
 /**
  * A provider's official mark (`brand/marks.ts`) on a tile tinted with its color; one-color marks follow the
- * theme. An id without a mark shows its initial on a neutral tile.
+ * theme, and an image mark sits on the neutral tile. An id without a mark shows its initial on a neutral tile.
  */
 export function ProviderLogo({ id, size = "tile", off = false, label, className }: ProviderLogoProps) {
   const key = markOf(id);
   const mark = key ? PROVIDER_MARKS[key] : null;
-  const color = mark?.color;
+  const color = mark && "path" in mark ? mark.color : undefined;
   const gradient = `ac-brand-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <span
@@ -33,7 +36,9 @@ export function ProviderLogo({ id, size = "tile", off = false, label, className 
       data-mark={key ?? undefined}
       {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}
     >
-      {mark ? (
+      {mark && "image" in mark ? (
+        <img src={mark.image} alt="" width={IMAGE_PX[size]} height={IMAGE_PX[size]} />
+      ) : mark ? (
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           {mark.gradient && (
             <defs>
