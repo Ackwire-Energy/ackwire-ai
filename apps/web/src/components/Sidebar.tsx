@@ -94,6 +94,7 @@ import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
+import { BrowserNoticesRow } from "./WebPush";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
 const selectionSky = (color: AgentColor = "sky") =>
@@ -901,6 +902,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
               ]}
             />
           </MenuOverlayRow>
+          <BrowserNoticesRow />
           {inDesktopApp() && (
             <MenuOverlayRow icon="pointer" label={t("contextMenu.look")}>
               <Segmented

@@ -754,6 +754,11 @@ export const en: Translations = {
     soundSky: "Sky",
     soundPixel: "Pixel",
     soundOff: "Off",
+    browserNotices: "Notifications in this browser",
+    browserNoticesHint: "Even with the tab closed",
+    browserNoticesBlocked:
+      "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
+    browserNoticesFailed: "Couldn't turn notifications on right now. Try again.",
     languageCurrent: "Language: {{name}}",
     orgSettings: "Organization settings",
     switchOrg: "Switch organization",
