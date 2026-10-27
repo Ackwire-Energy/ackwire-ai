@@ -104,6 +104,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   creatingChannel: "hash",
   askingAgent: "agent",
   tellingAgent: "agent",
+  findingTools: "search",
 };
 
 /** How many logos the closed line stacks (a phone has no room for more). */

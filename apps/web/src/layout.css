@@ -5155,6 +5155,7 @@ p {
   height: 20px;
   border-radius: 6px;
   font-size: 9px;
+  line-height: 1;
 }
 .tool-logo {
   display: inline-grid;

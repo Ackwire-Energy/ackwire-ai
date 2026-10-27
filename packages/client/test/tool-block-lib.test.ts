@@ -115,6 +115,13 @@ describe("the block's lines", () => {
     expect(toolApps(items)).toEqual([{ kind: "consulting", app: "GitHub" }, { kind: "creatingIssue" }]);
   });
 
+  test("looking up a tool on demand is ours, not an app called find", () => {
+    const items = toolItemsLive([call("1", "find_tools"), call("2", "github_find_tools", { connector: "GitHub" })]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "findingTools×2",
+    ]);
+  });
+
   test("grey words: a built-in's label, or a connector tool's own name without its app; never its input", () => {
     expect(toolHint("create_issue", { kind: "creatingIssue" }, "Corrigir login")).toBe("Corrigir login");
     expect(toolHint("create_issue", { kind: "creatingIssue" })).toBeNull();

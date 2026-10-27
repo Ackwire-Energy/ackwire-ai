@@ -5120,10 +5120,14 @@ a.ac-list__row:focus-visible {
 }
 .ac-tools__logos {
   display: inline-flex;
+  align-items: center;
   flex: none;
 }
+/* Each logo centered in its own box, never on the text's baseline (a letter tile sat lower than an icon). */
 .ac-tools__logos > * {
   display: inline-flex;
+  align-items: center;
+  line-height: 0;
   margin-left: -5px;
   box-shadow: 0 0 0 1.5px var(--surface-raised);
   border-radius: 5px;
@@ -5232,6 +5236,7 @@ button.ac-tools__row:focus-visible {
   display: inline-grid;
   place-items: center;
   flex: none;
+  line-height: 0;
 }
 .ac-tools__label {
   display: flex;

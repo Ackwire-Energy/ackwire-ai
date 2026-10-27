@@ -84,6 +84,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   requestingApproval: "approve",
   creatingChannel: "channel",
   offeringConnectAi: "plug",
+  findingTools: "search",
 };
 
 const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
