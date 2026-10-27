@@ -10,6 +10,7 @@ import type { PushSender } from "./push";
 import type { RateLimiter } from "./rate-limiter";
 import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
+import type { WebPushSender } from "./web-push";
 
 export * from "./blob";
 export * from "./blob-disk";
@@ -35,6 +36,7 @@ export * from "./s3-fake";
 export * from "./sandbox";
 export * from "./search";
 export * from "./secret-box";
+export * from "./web-push";
 
 /**
  * Infrastructure the core talks to through interfaces, so each edition can
@@ -61,6 +63,8 @@ export interface Adapters {
   sandbox?: SandboxProvider | null;
   /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
   push?: PushSender | null;
+  /** Web Push to browsers (`push.send` outbox job, ADR 0071); null/absent = browsers get no push. */
+  webPush?: WebPushSender | null;
   /** People's mailboxes for agents (ADR 0038); absent = no email connectors. */
   mail?: MailAdapters;
   /** People's Postgres databases for agents (ADR 0039); null/absent = no database connector. */

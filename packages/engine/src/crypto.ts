@@ -42,13 +42,30 @@ export function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array, aad: strin
     .join(".");
 }
 
+/**
+ * A sealed value this key can never open: sealed with another key (another AGENTES_SECRET), for another
+ * owner (`aad`), or damaged. Unlike a key service that doesn't answer, trying again won't change it.
+ */
+export class SealedValueError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SealedValueError";
+  }
+}
+
 export function aesGcmDecrypt(key: Uint8Array, encrypted: string, aad: string): Buffer {
   const [version, iv, ciphertext, tag] = encrypted.split(".");
-  if (version !== "v1" || !iv || ciphertext === undefined || !tag) throw new Error("unsupported encrypted value");
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
-  decipher.setAAD(Buffer.from(aad, "utf8"));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]);
+  if (version !== "v1" || !iv || ciphertext === undefined || !tag)
+    throw new SealedValueError("unsupported encrypted value");
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
+    decipher.setAAD(Buffer.from(aad, "utf8"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]);
+  } catch (error) {
+    // Only local computation here: a wrong key, `aad` or tag, never a passing failure.
+    throw new SealedValueError(error instanceof Error ? error.message : String(error));
+  }
 }
 
 /**

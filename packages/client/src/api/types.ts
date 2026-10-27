@@ -31,6 +31,14 @@ export interface JevKey {
   month: { decisions: number; costUsd: number };
 }
 
+/**
+ * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
+ * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
+ */
+export type PushDeviceInput =
+  | { platform: "ios" | "android"; token: string; locale: string }
+  | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;

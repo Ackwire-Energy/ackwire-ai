@@ -2,6 +2,7 @@ import {
   type Adapters,
   createFakeEmailSender,
   createFakePushSender,
+  createFakeWebPushSender,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
@@ -13,6 +14,7 @@ import {
   noPlatformCredentials,
   type S3Fetch,
   type SandboxProvider,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -88,6 +90,8 @@ export async function createTestServer(
     jevFetch?: typeof fetch;
     /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
     humanCheck?: HumanCheck;
+    /** Browser push (ADR 0071); absent = a fake that records, null = off. */
+    webPush?: WebPushSender | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -99,6 +103,7 @@ export async function createTestServer(
   const log = createLogger("error");
   const email = createFakeEmailSender();
   const push = createFakePushSender();
+  const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
   const platformBlobs = createMemoryBlobStore();
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
@@ -111,6 +116,7 @@ export async function createTestServer(
     email,
     platformBlobs,
     push,
+    webPush,
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
     humanCheck: options.humanCheck ?? null,
@@ -201,6 +207,7 @@ export async function createTestServer(
     embeddings,
     email,
     push,
+    webPush,
     platformBlobs,
     engine,
     app,

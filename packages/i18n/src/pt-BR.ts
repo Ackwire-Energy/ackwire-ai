@@ -765,6 +765,11 @@ export const ptBR = {
     soundSky: "Céu",
     soundPixel: "Pixel",
     soundOff: "Sem som",
+    browserNotices: "Avisos neste navegador",
+    browserNoticesHint: "Mesmo com a aba fechada",
+    browserNoticesBlocked:
+      "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
+    browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações da organização",
     switchOrg: "Trocar de organização",
