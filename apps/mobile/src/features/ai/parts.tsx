@@ -189,20 +189,23 @@ export function PasteField({
         onBlur={onBlur}
         style={[styles.insetInput, { color: c.ink }]}
       />
-      <Button
-        size="sm"
-        variant="secondary"
-        icon="copy"
-        label={t("aiAccounts.add.paste")}
-        disabled={disabled}
-        onPress={() =>
-          void Clipboard.getStringAsync()
-            .catch(() => "")
-            .then((v) => {
-              if (v.trim()) onPasted(v.trim());
-            })
-        }
-      />
+      {/* A button sits at its row's top (`alignSelf: flex-start`); this box keeps it on the field's middle. */}
+      <View style={styles.insetAction}>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="copy"
+          label={t("aiAccounts.add.paste")}
+          disabled={disabled}
+          onPress={() =>
+            void Clipboard.getStringAsync()
+              .catch(() => "")
+              .then((v) => {
+                if (v.trim()) onPasted(v.trim());
+              })
+          }
+        />
+      </View>
     </View>
   );
 }
@@ -244,4 +247,5 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
+  insetAction: { alignSelf: "center" },
 });
