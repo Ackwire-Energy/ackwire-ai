@@ -23,6 +23,7 @@ import type {
   InvitationPreview,
   InvitationWithStatus,
   InviteLink,
+  JevKey,
   JoinApproval,
   JoinRequest,
   Me,
@@ -186,6 +187,8 @@ export interface FakeState {
   answerNowError?: ApiError;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
+  /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
+  jev?: JevKey;
   /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
@@ -749,6 +752,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!state.telemetry) throw new ApiError(404, "not_found", "Not found");
         state.telemetry = { ...state.telemetry, enabled };
         return state.telemetry;
+      },
+      jev: async () => state.jev ?? null,
+      saveJev: async (apiKey) => {
+        log("system.saveJev", apiKey);
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        state.jev = { ...state.jev, source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        return state.jev;
+      },
+      checkJev: async () => {
+        log("system.checkJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        return state.jev;
+      },
+      removeJev: async () => {
+        log("system.removeJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        state.jev = { ...state.jev, source: null, hint: null, state: "off" };
+        return state.jev;
       },
     },
     waitlist: {
