@@ -86,6 +86,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
+import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
 import { HeaderPill } from "./HeaderPill";
@@ -938,6 +939,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         subtitle={dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
+        extraActions={dmAgentId ? 1 : 0}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         label={
           dmAgentId
@@ -980,9 +982,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
+  // An agent's DM also opens its computer (as the web's DM header), for whoever may watch it.
   const right =
     (isThread && info) || dm || channel ? (
-      <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
+      <>
+        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} /> : null}
+        <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
+      </>
     ) : null;
 
   const placeholder = isThread
