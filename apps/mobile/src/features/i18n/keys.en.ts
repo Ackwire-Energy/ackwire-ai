@@ -1399,6 +1399,9 @@ export const featureKeysEn: FeatureTranslations = {
     rowKeys_other: "{{count}} keys",
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
+    moveHere: "Move it here",
+    audience: "Who it replies to",
+    another: "Another AI",
   },
   notFound: {
     title: "We couldn't find that",

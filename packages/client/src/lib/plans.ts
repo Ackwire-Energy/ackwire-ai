@@ -1,4 +1,5 @@
 import { type CodingPlan, planAliases, planModel, planOf } from "@agenteschat/providers/plans";
+import type { TFunction } from "i18next";
 
 export * from "@agenteschat/providers/plans";
 
@@ -11,3 +12,22 @@ export const accountPlan = (account: { provider: string | null } | null | undefi
 
 /** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
+
+/** Team and enterprise seats are one person's each, not a personal subscription. */
+const SEATS = new Set(["team", "enterprise"]);
+
+/**
+ * Before an agent answers other people on its owner's plan (ADR 0059 §5), the provider's own words about personal
+ * use: a coding plan's maker's (`maker`), a seat's, else the personal plan's. The web's dialog and the phone's alert.
+ */
+export function sharePlanBody(
+  t: TFunction,
+  brain: "claude_code" | "codex",
+  plan?: string | null,
+  maker?: string,
+): string {
+  if (maker) return t("aiAccounts.share.body.other", { maker });
+  return SEATS.has(plan?.toLowerCase() ?? "")
+    ? t(`aiAccounts.share.body.seat.${brain}`)
+    : t(`aiAccounts.share.body.${brain}`);
+}

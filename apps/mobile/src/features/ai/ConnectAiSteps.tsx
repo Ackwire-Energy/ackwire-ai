@@ -21,15 +21,7 @@ import { keyLooksValid, PROVIDERS, providerOf, providersForKey } from "@agentesc
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ActionSheetIOS,
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import {
   Button,
   GroupedFooter,
@@ -54,7 +46,7 @@ import { useAiOrg } from "./org";
 import { Note, OpenPage, PasteField, Step, StepsCard } from "./parts";
 
 /*
- * "Conectar uma IA" on the phone (ConectarIA A · Ajustes, approved 2026-10-26): the web's content and rules
+ * "Conectar uma IA" on the phone: the web's content and rules
  * (ADR 0059, ADR 0061) in the app's own line. The first page is two grouped lists like iOS Settings: your AI plan
  * (Claude, ChatGPT, the coding plans in one row) and pay as you go (the API key). Each row pushes its page inside
  * the sheet: a plan's mark, for which agent, and its numbered steps on the agent's computer (or why they wait); the
