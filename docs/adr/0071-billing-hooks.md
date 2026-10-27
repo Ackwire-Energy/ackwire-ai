@@ -49,7 +49,7 @@ Bytes count in GiB (1024³), the unit the apps print. The storage check takes no
 
 ### 5. The platform's own AI, capped per month
 
-- Over `platformUsdPerMonth`, the platform's judge (Jev) is skipped and the workspace's own cheap model answers in its place, the path a Jev outage already takes; what only Jev does (images and boxes for computer use) fails like an outage. The router starts no run (`platform_cap`, stored like `no_ai`), and the app says to mention an agent with @, which still starts it.
+- Over `platformUsdPerMonth`, the platform's judge (Jev) is skipped and the workspace's own cheap model answers in its place, the path a Jev outage already takes; what only Jev does (images and boxes for computer use) fails like an outage. The router starts no run (`platform_cap`, stored like `no_ai`, before any step of the chain of ADR 0074), and the app says to mention an agent with @, which still starts it.
 - The spend is read from usage records with a 60-second cache, so it may run up to a minute of calls past the cap.
 - The operator's events feed gets `platform_ai.threshold` (`{ month, percent: 50 | 100, spentUsd, limitUsd }`) the first time a month's spend reaches each threshold, once per workspace, month and threshold.
 
