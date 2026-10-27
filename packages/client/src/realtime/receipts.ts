@@ -179,13 +179,16 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
       next = set(next, message.id, h.agentId, h.reason === NO_AI ? "no_ai" : phaseOf(h.status));
       next = linkRun(next, message.id, h.runId, h.agentId);
     }
-    // Receipts come from the router's decision: "nobody picked it" is final.
+    // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
+    // still on it) keeps "Picking who answers", and a `message.routing` after it still counts.
     const current = next[message.id] ?? { routed: false, agents: [] };
+    const decided = r.seenBy.length > 0 || r.handled.length > 0 || Boolean(r.noAi || r.reason || r.decidedBy);
     return withMentions({
       ...next,
       [message.id]: {
         ...current,
-        routed: true,
+        routed: decided,
+        ...(!decided && existing?.picking ? { picking: true as const } : {}),
         blocked: r.blocked ?? [],
         // The Connect step `message.routed` asked for stays while the server still says "no AI".
         ...(r.noAi ? { noAi: existing?.noAi ?? {} } : {}),

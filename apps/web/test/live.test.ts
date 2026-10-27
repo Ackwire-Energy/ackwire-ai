@@ -152,6 +152,20 @@ describe("receipts", () => {
     expect(step(s, { type: "message.routing", messageId: "m1", step: "plan" })).toBe(s);
   });
 
+  test("a list read before the decision keeps 'Picking who answers', whichever comes first", () => {
+    const undecided = { ...person(), receipts: { seenBy: [], pickedBy: [], handled: [], blocked: [] } } as Message;
+    const picking = { seen: [], status: null, done: false, referenced: [], picking: true };
+    let s = step(seedReceipt({}, person()), { type: "message.routing", messageId: "m1", step: "plan" });
+    s = seedReceipt(s, undecided);
+    expect(receiptView(s.m1)).toEqual(picking);
+    s = seedReceipt({}, undecided);
+    s = step(s, { type: "message.routing", messageId: "m1", step: "plan" });
+    expect(receiptView(s.m1)).toEqual(picking);
+    s = step(s, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "picked", agents: ["ada"] } });
+    expect(receiptView(s.m1).picking).toBeUndefined();
+  });
+
   test("claimed and failed; server receipts seed the row", () => {
     let s = step({}, { type: "message.claimed", messageId: "m1", agentId: "atlas" });
     expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["atlas"] });
