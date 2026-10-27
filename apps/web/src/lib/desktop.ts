@@ -157,6 +157,26 @@ export function pageReady() {
   void tauri.invoke("page_ready", {}).catch(() => {});
 }
 
+/**
+ * Links that open a new window (`target="_blank"`) in the app: the window's `on_new_window` sends them on, a page
+ * of this server to the window and anything else to the browser (main_window.rs). The app's shell plugin adds
+ * a click listener of its own to every page (on `body`) that takes these links first and asks the app over IPC,
+ * which the site may not do, so a click did nothing. This one sits on the React root: after the page's own
+ * handlers (one that handled the click itself, a popup, keeps it) and before the plugin's.
+ */
+export function routeNewWindowLinks(root: HTMLElement): () => void {
+  const onClick = (e: MouseEvent) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
+    if (!link || link.target !== "_blank" || !/^(https?|mailto|tel):$/.test(link.protocol)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(link.href, "_blank", "noopener");
+  };
+  root.addEventListener("click", onClick);
+  return () => root.removeEventListener("click", onClick);
+}
+
 export const thisMac = {
   status: () => invoke<ThisMacStatus>({ kind: "status" }),
   /**
