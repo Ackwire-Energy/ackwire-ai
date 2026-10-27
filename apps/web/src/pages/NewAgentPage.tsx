@@ -174,6 +174,7 @@ function NewAgentFlow() {
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
 
   // Navigation
@@ -1191,8 +1192,11 @@ function NewAgentFlow() {
             <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
           </div>
           <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
-            <div className="newag__pv-cover">
-              <AgentPreviewSky color={look.color as AgentColor} />
+            <div className="newag__pv-cover" ref={preview}>
+              <AgentPreviewSky
+                color={look.color as AgentColor}
+                clear={() => [...(preview.current?.querySelectorAll(".newag__pv-state, .newag__pv-agent") ?? [])]}
+              />
               <span className="newag__pv-state">
                 <Icon name="edit" size={14} />
                 {t("newAgent.preview.draft")}
@@ -1359,6 +1363,7 @@ function CreatedMoment({
   const { t } = useTranslation();
   const { org } = useOrg();
   const text = useRef<HTMLDivElement>(null);
+  const born = useRef<HTMLSpanElement>(null);
   const { agent, channels } = created;
   const first = channels[0];
   const names = joinNames(
@@ -1367,8 +1372,13 @@ function CreatedMoment({
   );
   return (
     <section className="newag__born" aria-labelledby="ag-born">
-      <AgentBornSky color={created.look.color} at={phone ? [0.5, 0.26] : [0.8, 0.45]} calm={() => [text.current]} />
-      <span className="newag__born-agent">
+      <AgentBornSky
+        color={created.look.color}
+        at={phone ? [0.5, 0.26] : [0.8, 0.45]}
+        calm={() => [text.current]}
+        clear={() => [born.current]}
+      />
+      <span className="newag__born-agent" ref={born}>
         <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
       </span>
       <div className="newag__born-text" ref={text}>

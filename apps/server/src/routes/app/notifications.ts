@@ -62,6 +62,10 @@ const Notification = z
       origin: ApprovalOrigin.optional().openapi({
         description: "`approval`: asked while nobody watched, by a routine or by unattended work.",
       }),
+      names: z
+        .array(z.string())
+        .optional()
+        .openapi({ description: "`join_request`: the first two people who asked, in the order they asked." }),
     }),
     readAt: z.string().nullable(),
     doneAt: z.string().nullable(),

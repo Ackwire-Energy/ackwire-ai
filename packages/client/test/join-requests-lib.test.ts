@@ -17,8 +17,15 @@ describe("askView: an invitation link's page", () => {
     expect(askView({}, true)).toEqual({ state: "sent" });
   });
 
-  test("a closed link says only that, whatever else is known", () => {
-    expect(askView({ closed: true, you: you({ member: true, orgId: "o1" }) }, true)).toEqual({ state: "closed" });
+  test("a link that no longer works says only that, except to a member, who is in", () => {
+    const denied = you({ request: { status: "denied", reason: "Full team" } });
+    expect(askView({ closed: true, you: denied }, true)).toEqual({ state: "closed" });
+    expect(askView({ closed: true }, false)).toEqual({ state: "closed" });
+    expect(askView({ closed: true, you: you({ member: true, orgId: "o1" }) }, false)).toEqual({
+      state: "in",
+      orgId: "o1",
+      already: true,
+    });
   });
 
   test("signed in: the server's answer wins over what the page knows", () => {

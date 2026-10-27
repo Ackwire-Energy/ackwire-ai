@@ -1,6 +1,7 @@
 import type { DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
+  DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
@@ -11,18 +12,18 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
-import { showsPicture } from "@/lib/canvas";
-import { useToast } from "@/lib/toast";
+import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas";
+import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover } from "../computer/covers";
-import { DialogHead, FullButton, useDialogHead } from "../computer/head";
+import { DialogHead, FullButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useScreenKeys } from "./screen-keys";
@@ -38,6 +39,13 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
  */
 const PICTURE_POLL_MS = 200;
 const PICTURE_WAIT_MS = 10_000;
+/**
+ * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection
+ * until that one draws (`holdPicture`), so the hand back shows no "Abrindo…" and the head says watching as soon as
+ * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds nothing:
+ * noVNC drops keys and pastes until its connection opens, and a held picture would look ready meanwhile.
+ */
+const HOLD_MS = 3_000;
 
 /** A phone or tablet: no keys hint, and a Keyboard button raises its keyboard. */
 const TOUCH = "(pointer: coarse)";
@@ -79,8 +87,8 @@ export function DesktopView({
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const toast = useToast();
   const head = useDialogHead();
+  const sayFailed = useSayFailed();
   const createSocket = useContext(SocketFactoryContext);
   const actions = useBrowserHandoffMutations(org.id);
   const g = agentGrammar(t, name);
@@ -108,29 +116,37 @@ export function DesktopView({
         ? "unavailable"
         : "connecting";
   const mode = s ? desktopMode(s, me.user.id) : "watch";
+  // The mode as a connection ends: a hand back keeps its picture (`holdPicture`).
+  const modeNow = useRef(mode);
+  modeNow.current = mode;
   const inControl = mode === "control";
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
-  const copiedToast = () => toast.show(t("desktop.clipboard.copied", g));
+  const didntWork = () => sayFailed(t("browser.live.actionFailed"));
+  // What the clipboard just did, in the line under the screen in place of its words.
+  const { said, say, unsay } = useSaid();
+  const copied = () => say(t("desktop.clipboard.copied", g));
+  const copyFailed = () => say(t("browser.live.actionFailed"), true);
   // What the computer copied when the browser kept it out of the person's clipboard: the line under the screen
   // offers it until they copy it, copy again or hand back.
   const [got, setGot] = useState<string | null>(null);
   const copyGot = (text: string) =>
     navigator.clipboard?.writeText(text).then(() => {
       setGot(null);
-      copiedToast();
-    }, failedToast) ?? failedToast();
+      copied();
+    }, copyFailed) ?? copyFailed();
   const copiedThere = useScreenKeys({
     field: keysRef,
     screen: screenRef,
     rfb: rfbRef,
     active: inControl,
     onRefused: (why) =>
-      toast.show(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), "error"),
+      say(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), true),
     onCopied: (text, written) => {
       setGot(written ? null : text);
-      if (written) copiedToast();
+      // The newest copy speaks: what is offered to copy isn't hidden behind an older word.
+      if (written) copied();
+      else unsay();
     },
   });
   // Leaving the page in control asks first: outside full screen Ctrl+W closes the tab, which in a terminal there
@@ -149,13 +165,24 @@ export function DesktopView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new `round` opens the screen again
   useEffect(() => {
     const el = screenRef.current;
-    if (!connect || !el) return;
-    // While it retries, the cover keeps saying why; anything else is a fresh start.
-    setView((v) => (v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
+    if (!el) return;
+    // Control opens behind "Abrindo…", never over a held picture (`HOLD_MS`).
+    if (!connect || inControl) heldPicture(el)?.remove();
+    if (!connect) return;
+    // While it retries, the cover keeps saying why; a picture held over a hand back stays live; anything else is a
+    // fresh start.
+    const holding = heldPicture(el) !== null;
+    setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let looking: ReturnType<typeof setInterval> | undefined;
+    const stale = holding
+      ? setTimeout(() => {
+          heldPicture(el)?.remove();
+          setView("connecting");
+        }, HOLD_MS)
+      : undefined;
     let ws: WebSocket | null = null;
     let rfb: RFB | null = null;
     void import("@novnc/novnc").then(
@@ -172,11 +199,16 @@ export function DesktopView({
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
           clearInterval(looking);
+          clearTimeout(stale);
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
           const next = desktopCloseState(e.code, e.reason);
-          setView(next.state);
+          // Control ended (handed back): it opens again as a watcher over the picture it had; any other close says why.
+          if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(el)) {
+            heldPicture(el)?.remove();
+            setView(next.state);
+          }
           // What changed shows at once (someone took control); a state that blocks it stops the retry.
           void refetch();
           if (next.retry === "never") return setGaveUp(true);
@@ -200,9 +232,11 @@ export function DesktopView({
           if (inControl && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
           const since = Date.now();
           const look = () => {
-            const canvas = el.querySelector("canvas");
+            const canvas = liveCanvas(el);
             if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
             clearInterval(looking);
+            clearTimeout(stale);
+            heldPicture(el)?.remove();
             if (!cancelled) setView("live");
           };
           looking = setInterval(look, PICTURE_POLL_MS);
@@ -222,9 +256,12 @@ export function DesktopView({
       cancelled = true;
       clearTimeout(timer);
       clearInterval(looking);
+      clearTimeout(stale);
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;
+      // Handed back: the picture stays over the watching connection that replaces this one.
+      if (inControl && modeNow.current === "watch") holdPicture(el);
       if (rfb) rfb.disconnect();
       else ws?.close();
     };
@@ -250,9 +287,10 @@ export function DesktopView({
     if (inControl) return;
     setHandingBack(false);
     setGot(null);
+    unsay();
     // Its field goes with control, and a field removed while focused may get no blur.
     setTyping(false);
-  }, [inControl]);
+  }, [inControl, unsay]);
   // In control, full screen starting or ending gives the keys back to the computer: a click on the full-screen
   // button leaves the browser's focus on it, where Space would toggle it and Esc would reach nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: full screen's changes move the keys too
@@ -285,9 +323,8 @@ export function DesktopView({
       { agentId, screen: "desktop" },
       {
         onError: (err) =>
-          toast.show(
+          sayFailed(
             (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
-            "error",
           ),
       },
     );
@@ -300,12 +337,12 @@ export function DesktopView({
         setBackNote("");
         onSettled?.();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
   };
   const giveUp = () => {
     if (!handoff) return;
-    actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: failedToast });
+    actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: didntWork });
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
@@ -457,13 +494,15 @@ export function DesktopView({
       </div>
       {inControl &&
         (handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. Two lines that
-          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away. Enter hands
-          // back as in the chat: Shift+Enter, an input method's Enter and a phone's return key add a line instead.
+          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. One line that grows
+          // as it wraps (`.brw-ac__note`), so all of a note stays in sight. Enter hands back as in the chat:
+          // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
           <div className="brw-ac__foot brw-ac__fail">
             <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
             <Textarea
-              rows={2}
+              rows={1}
+              autoGrow
+              className="brw-ac__note"
               autoFocus
               value={backNote}
               onChange={(e) => setBackNote(e.target.value)}
@@ -501,7 +540,16 @@ export function DesktopView({
                 {t("desktop.keyboard.label")}
               </Button>
             )}
-            {got === null ? (
+            {said ? (
+              <span
+                key={said.at}
+                className={cx("dsk-said ac-iconline", said.error && "is-error")}
+                role={said.error ? "alert" : "status"}
+              >
+                <Icon name={said.error ? "alert" : "check"} size={14} />
+                <span>{said.text}</span>
+              </span>
+            ) : got === null ? (
               <span className="muted">
                 {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
                 {t("desktop.control.notice", g)}

@@ -804,6 +804,14 @@
   font-size: 14px;
   font-weight: 650;
 }
+/*
+ * A note to the agent (handing back, or why it couldn't be done): one line in the middle of its field that grows as it
+ * wraps, up to four lines (10 + 4 × 22 + 10, and the border), with no grip.
+ */
+.brw-ac__note.ac-input {
+  max-height: 110px;
+  resize: none;
+}
 /* Typing: one quiet field like the composer. */
 .brw-type {
   position: relative;

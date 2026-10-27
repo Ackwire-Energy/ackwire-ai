@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentQuestion, AppNotification } from "@agenteschat/client";
+import type { Agent, AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
@@ -180,6 +180,35 @@ describe("Notificações", () => {
     expect(within(region).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
     await click(within(region).getByRole("button", { name: "Recusar" }));
     expect(region.querySelector("textarea")).toBeTruthy();
+  });
+
+  test("who is stopped until I answer: up to three agents by name, then how many more", async () => {
+    const asking = (agentId: string, m: number) =>
+      notification({
+        id: `n-${agentId}`,
+        kind: "approval",
+        waiting: true,
+        actors: [{ type: "agent", id: agentId }],
+        source: { approvalId: `ap-${m}`, channelId: ENG_ID },
+        latest: { title: "Run deploy workflow" },
+        createdAt: ago(m),
+        updatedAt: ago(m),
+      });
+    const stopped = async (count: number) => {
+      const state = seedState();
+      const ada = state.agents[0] as Agent;
+      state.agents.push(
+        { ...ada, id: "00000000-0000-4000-8000-0000000000a3", name: "Lia", handle: "lia" },
+        { ...ada, id: "00000000-0000-4000-8000-0000000000a4", name: "Theo", handle: "theo" },
+      );
+      state.notifications = state.agents.slice(0, count).map((a, i) => asking(a.id, i + 1));
+      await go(state);
+      const text = screen().getByRole("region", { name: "Esperando você" }).querySelector(".nt-wh small")?.textContent;
+      cleanup();
+      return text;
+    };
+    expect(await stopped(2)).toBe("Ada e Atlas estão parados até você responder.");
+    expect(await stopped(4)).toBe("Ada, Atlas, Lia e mais 1 estão parados até você responder.");
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {

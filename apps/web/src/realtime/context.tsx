@@ -441,6 +441,12 @@ export function RealtimeProvider({
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
       }
+      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count.
+      if (event.type === "org.members") {
+        void qc.invalidateQueries({ queryKey: keys.people(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
         void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });

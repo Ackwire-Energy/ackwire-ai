@@ -1,8 +1,16 @@
-import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfig } from "@agenteschat/client";
+import {
+  ApiError,
+  invitationQuery,
+  type SignInOptions,
+  type SignInProvider,
+  useApi,
+  useAuthConfig,
+} from "@agenteschat/client";
 import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
+import { signInFor } from "@agenteschat/client/lib/guards";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
@@ -111,6 +119,20 @@ export function AuthPage({
   const termsUrl = config.data?.termsUrl;
   const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
+  // Where this sign-in leads, in place of the general line, read from the address alone: only what the page before
+  // already showed (an invitation's workspace, by its token; the ready email's Connect your AI or Create an agent).
+  const goal = signInFor(redirect);
+  const invite = goal && "invite" in goal ? goal.invite : "";
+  const invitation = useQuery({ ...invitationQuery(api, invite), enabled: invite !== "" });
+  const joining = invitation.data && !invitation.data.closed ? invitation.data : null;
+  const purpose =
+    goal && "connect" in goal
+      ? t("auth.flow.toConnectAi")
+      : goal && "create" in goal
+        ? t("auth.flow.toCreateAgent")
+        : joining
+          ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
+          : null;
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
   );
@@ -299,8 +321,8 @@ export function AuthPage({
   const providerNames = linkedProviders.map((p) => t(`auth.provider.${p}`)).join(" · ");
   // A step with nothing to add under its question has no lead: the field and its help line say the rest.
   const bubble: Record<Step, [string, string?]> = {
-    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), t("auth.flow.emailLead")],
-    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), t("auth.flow.passwordLead")],
+    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), purpose ?? t("auth.flow.emailLead")],
+    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), purpose ?? t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     noPassword: [t("auth.flow.noPassword"), local ? t("auth.desktopOwner.text") : t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],

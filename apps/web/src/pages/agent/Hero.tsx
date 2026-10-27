@@ -3,6 +3,7 @@ import { formatMonth, formatPercent, formatUsd } from "@agenteschat/client/lib/f
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AgentColor, Button, Icon, Menu, MenuItem, Meter } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usd } from "@/components/AgentFields";
@@ -103,13 +104,15 @@ export function AgentHero({
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
   const g = agentGrammar(t, agent.name);
+  const face = useRef<HTMLSpanElement>(null);
+  const acts = useRef<HTMLDivElement>(null);
   return (
     <header className="agp-hero">
       {/* Open sky: the cover edge to edge, the agent on its left edge, no card. */}
       <section className="agp-idcard" aria-label={name}>
         <div className="agp-cover" data-busy={busy || undefined}>
-          <AgentCover color={draft.look.color as AgentColor} busy={busy} />
-          <div className="agp-cover__acts">
+          <AgentCover color={draft.look.color as AgentColor} busy={busy} clear={() => [face.current, acts.current]} />
+          <div className="agp-cover__acts" ref={acts}>
             {!onClose && (
               <Button asChild variant="primary" size="sm" className="agp-chat">
                 <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
@@ -194,7 +197,7 @@ export function AgentHero({
           </div>
         </div>
         {/* Over the cover's left edge, cut out by a ring of the page. */}
-        <span className="agp-face">
+        <span className="agp-face" ref={face}>
           <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
         </span>
         <div className="agp-ident">

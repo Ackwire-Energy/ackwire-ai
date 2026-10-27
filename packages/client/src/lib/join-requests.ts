@@ -42,13 +42,14 @@ export type AskView =
 
 /**
  * The state of a link's page: `sent` once the person asked here. Signed out that is the end, since the answer
- * comes by email; signed in, the preview's `you` tells the answer and wins over what this page knows.
+ * comes by email; signed in, the preview's `you` tells the answer and wins over what this page knows. A link that
+ * no longer works says only that, except to a member, who is told they're in.
  */
 export function askView(preview: Pick<InvitationPreview, "closed" | "you">, sent: boolean): AskView {
-  if (preview.closed) return { state: "closed" };
   const you = preview.you;
   const status = you?.request?.status;
   if (you?.member) return { state: "in", orgId: you.orgId ?? null, already: status !== "approved" };
+  if (preview.closed) return { state: "closed" };
   if (status === "denied") return { state: "denied", reason: you?.request?.reason ?? null };
   if (status === "approved") return { state: "approvedEmail" };
   if (sent || status === "pending") return { state: "sent" };

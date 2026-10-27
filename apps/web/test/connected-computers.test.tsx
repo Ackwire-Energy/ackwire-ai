@@ -567,6 +567,15 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
   const reduceCalls = (state: ReturnType<typeof seedState>) =>
     state.calls.filter((c) => c.method === "machines.reduceAccess").map((c) => c.args);
 
+  test("its facts start at the card's edge, under the portrait, whatever the portrait's width", async () => {
+    await open();
+    expect(document.querySelector(".ac-card > .machine-page__facts")?.textContent).toContain("macOS");
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    expect(css).toContain("\n.machine-page__facts {\n  display: flex;");
+    // No indent past a portrait: a tower is half as wide as a laptop.
+    expect(css).not.toMatch(/\.machine-page__facts\s*\{[^}]*padding/);
+  });
+
   test("the pause set on the machine shows and goes away live", async () => {
     const { m, socket } = await open();
     const head = screen().getByRole("region", { name: "MacBook do Walter" });

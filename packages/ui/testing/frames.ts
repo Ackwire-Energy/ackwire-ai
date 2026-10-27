@@ -1,13 +1,15 @@
 /**
  * A canvas on a page whose animation frames run by hand, for tests of drawing loops: `frames(ms)` runs that long
- * of a 60 Hz screen (`performance.now()` follows), the canvas's 2D context counts what it draws, and the
- * intersection observer's answer is the test's (`onScreen`). With `reduced`, `matchMedia` says the person asked
- * for reduced motion; `motion` switches that while the page is open. Needs the DOM (`setupDom`); `close` puts
+ * of a 60 Hz screen (`performance.now()` follows), the canvas's 2D context counts what it draws and keeps the last
+ * frame (`image`), the intersection observer's answer is the test's (`onScreen`), and `resize` gives the canvas's
+ * parent a new size as a resize observer would see it. With `reduced`, `matchMedia` says the person asked for
+ * reduced motion; `motion` switches that while the page is open. Needs the DOM (`setupDom`); `close` puts
  * everything back.
  */
 import { spyOn } from "bun:test";
 
 export function canvasPage({ width, height, reduced = false }: { width: number; height: number; reduced?: boolean }) {
+  let size = { width, height };
   let clock = 0;
   let queue: FrameRequestCallback[] = [];
   const g = globalThis as unknown as Record<string, unknown>;
@@ -18,6 +20,7 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
     ResizeObserver: g.ResizeObserver,
   };
   let seen: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+  const resized: (() => void)[] = [];
   g.requestAnimationFrame = (cb: FrameRequestCallback) => queue.push(cb);
   g.cancelAnimationFrame = () => {
     queue = [];
@@ -30,6 +33,9 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
     disconnect() {}
   };
   g.ResizeObserver = class {
+    constructor(cb: () => void) {
+      resized.push(cb);
+    }
     observe() {}
     disconnect() {}
   };
@@ -51,19 +57,29 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
   host.append(canvas);
   document.body.append(host);
   host.getBoundingClientRect = () =>
-    ({ x: 0, y: 0, left: 0, top: 0, right: width, bottom: height, width, height }) as DOMRect;
+    ({ x: 0, y: 0, left: 0, top: 0, right: size.width, bottom: size.height, ...size }) as DOMRect;
   Object.defineProperty(canvas, "offsetParent", { get: () => host });
   let draws = 0;
+  let last: ImageData | null = null;
   canvas.getContext = (() => ({
     createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
-    putImageData: () => {
+    putImageData: (image: ImageData) => {
       draws++;
+      last = image;
     },
   })) as unknown as typeof canvas.getContext;
   return {
     canvas,
+    host,
     /** Frames drawn on the canvas so far. */
     draws: () => draws,
+    /** The last frame drawn: one RGBA pixel (`pixelOf`) per sky pixel, row by row. */
+    image: () => (last ? { pixels: new Uint32Array(last.data.buffer.slice(0)), w: last.width, h: last.height } : null),
+    /** The canvas's parent takes a new size (CSS pixels). */
+    resize(w: number, h: number) {
+      size = { width: w, height: h };
+      for (const cb of resized) cb();
+    },
     /** Animation frames asked for and not run yet. */
     pending: () => queue.length,
     /** Runs `ms` of a 60 Hz screen. */
