@@ -223,7 +223,8 @@ export function SwitchComputerDialog({
   const chosenAgents = o.agents.filter((a) => picked.includes(a.agentId));
   // A target must run every brain of the agents chosen (all of them while none is chosen).
   const brains = brainsOf(chosenAgents.length > 0 ? chosenAgents : o.agents);
-  const targets = targetsFor(data, o.machineId);
+  // Which rows show doesn't change with the checks: only whether each can take who is checked.
+  const targets = targetsFor(data, o.machineId, brainsOf(o.agents));
   const options = targets.map((x) => targetOption(t, x, brains));
   const firstOpen = options.find((x) => !x.disabled)?.value ?? "";
   const [target, setTarget] = useState(firstOpen);

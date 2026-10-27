@@ -48,6 +48,8 @@ export const STORED = {
   invite: "invite",
   /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
   sounds: "sounds",
+  /** Offline-computer notices the person closed, by outage (JSON list; features/outages). */
+  outagesDismissed: "outages-dismissed",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

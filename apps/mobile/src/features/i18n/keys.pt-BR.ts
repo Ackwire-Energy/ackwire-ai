@@ -503,7 +503,7 @@ export const featureKeysPtBR = {
     noAgents: "Nenhum agente pode fazer missões ainda. Conecte um computador pelo site.",
     reason: {
       no_computer: "Precisa de um computador conectado",
-      cloud_computer: "Missões nas sandboxes da Daytona chegam em breve",
+      cloud_computer: "Missões num computador na nuvem chegam em breve",
       exec_off: "O computador não deixa rodar comandos",
       runner_outdated: "O computador precisa de uma atualização",
       not_in_audience: "Não atende você",
@@ -1098,6 +1098,7 @@ export const featureKeysPtBR = {
     tasks_one: "{{count}} tarefa",
     tasks_other: "{{count}} tarefas",
     switch: "Trocar computador",
+    dismiss: "Fechar aviso",
     rowWaiting: "Esperando o {{computer}}",
     rowWaitingLabel: "{{name}}, esperando o {{computer}}",
     waiting: {
@@ -1120,10 +1121,10 @@ export const featureKeysPtBR = {
       submit_other: "Trocar {{count}} agentes",
       later: "Agora não",
       on: "Ligado",
-      cloud: "Sandbox da Daytona",
+      cloud: "Computador na nuvem",
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
-      cloudDesc: "Um computador isolado na Daytona",
+      cloudDesc: "Um computador isolado na nuvem",
       has: "Tem o {{brains}}",
       and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
@@ -1157,7 +1158,7 @@ export const featureKeysPtBR = {
       target_not_found: "Esse computador não está mais conectado. Escolha outro.",
       target_same: "Escolha um computador diferente do {{computer}}.",
       target_paused: "Esse computador está pausado. Escolha outro.",
-      target_cloud_unavailable: "As sandboxes da Daytona não estão disponíveis agora.",
+      target_cloud_unavailable: "O computador na nuvem não está disponível agora.",
       not_found: "O {{computer}} não está mais na lista de computadores.",
     },
     card: {
