@@ -203,7 +203,8 @@ describe("storage", () => {
     expect((await storageUsage(f.db, f.org.id)).usedBytes).toBe(110);
     await expect(skill("templates/b.md", 1)).rejects.toMatchObject({ code: "storage.full" });
     expect((await f.db.select().from(schema.skills))[0]?.version).toBe(1);
-    // A file never stored (not shown to agents) takes no space.
+    // A file never stored (not shown to agents) takes no space, even past a limit lowered below what is kept.
+    await limit({ storageBytes: 100 });
     await skill("logo.png", 50);
 
     // On its own bucket, nothing counts against the limit.

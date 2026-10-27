@@ -250,11 +250,10 @@ async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]
     const path = safePath(f.path);
     return { f, path, ...classifyFile(path) };
   });
-  // The workspace's own bucket counts against no limit of ours.
-  if (location.storageConfigId === null) {
-    const stored = planned.filter((p) => p.status !== "ignored").reduce((n, p) => n + p.f.data.byteLength, 0);
-    await assertStorageRoom(deps.db, orgId, stored);
-  }
+  // The workspace's own bucket counts against no limit of ours. Storing no file (the skill's text is in the database)
+  // takes no room, even past a limit lowered below what the workspace already keeps.
+  const stored = planned.filter((p) => p.status !== "ignored").reduce((n, p) => n + p.f.data.byteLength, 0);
+  if (location.storageConfigId === null && stored > 0) await assertStorageRoom(deps.db, orgId, stored);
   return { location, files: planned };
 }
 
