@@ -32,7 +32,7 @@ export function PixelDone({ size = 14, label, className }: PixelDoneProps) {
   return (
     <span
       className={cx("ac-pixdone", className)}
-      style={{ width: size, height: size, "--px": `${inner}px` } as CSSProperties}
+      style={{ width: size, height: size, "--mark-size": `${size}px`, "--px": `${inner}px` } as CSSProperties}
       {...a11y(label)}
     />
   );
@@ -69,7 +69,15 @@ export function PixelStop({ size = 13, animated = false, dim = false, label, cla
       className={cx("ac-pixstop", className)}
       data-animated={animated || undefined}
       data-dim={(!animated && dim) || undefined}
-      style={{ width: size, height: size, "--stop-side": `${side}px`, "--stop-radius": `${radius}px` } as CSSProperties}
+      style={
+        {
+          width: size,
+          height: size,
+          "--mark-size": `${size}px`,
+          "--stop-side": `${side}px`,
+          "--stop-radius": `${radius}px`,
+        } as CSSProperties
+      }
       {...a11y(label)}
     >
       <span />

@@ -150,6 +150,8 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     expect(card().textContent).toContain("O navegador da Ada está fechado");
     expect(card().textContent).toContain("Os logins continuam salvos.");
     expect(card().textContent).not.toContain("Abre quando");
+    // One surface: the agent's sky over the whole stage, its card on it, no frost over a blank page.
+    expect(card().querySelector(".brw-ac__stage > .brw-dim--sky > .cmp-sky")).not.toBeNull();
     expect(sub()).toBe("Ao vivo");
     // The dialog's page is its stage, not a card in a message: one sky, under the dialog's head.
     expect(card().classList.contains("is-surface")).toBe(true);

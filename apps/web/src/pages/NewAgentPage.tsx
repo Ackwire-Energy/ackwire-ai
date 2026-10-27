@@ -579,7 +579,7 @@ function NewAgentFlow() {
                       <span className="newag__check" aria-hidden="true">
                         <Icon name="check" size={14} />
                       </span>
-                      <span className="newag__role-top">
+                      <span className="newag__role-top ac-faceline">
                         <AgentAvatar
                           name={t(`newAgent.roles.${id}.agent`)}
                           appearance={preset.look}
@@ -587,7 +587,7 @@ function NewAgentFlow() {
                           className="newag__role-agent"
                         />
                         <span className="newag__role-name">
-                          <b>{t(`newAgent.roles.${id}.name`)}</b>
+                          <b className="ac-captop">{t(`newAgent.roles.${id}.name`)}</b>
                           <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
                         </span>
                       </span>

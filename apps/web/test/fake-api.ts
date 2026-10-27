@@ -1072,7 +1072,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             ...rest,
             ...(seesCost() ? { monthlyBudgetUsd } : {}),
             budgetUsedPercent: percentOf(a),
-            audienceMode: mode,
+            // As stored, which `audience` (the gate) may narrow: on the Cloud a plan answers only its owner.
+            audienceMode: a.audienceMode ?? mode,
             canTalk,
           };
         }),

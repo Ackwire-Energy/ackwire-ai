@@ -9,6 +9,7 @@ import {
   pageNoteOf,
   siteLetter,
   siteOf,
+  skyBehind,
 } from "../../src/features/browser/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
@@ -103,6 +104,15 @@ describe("the page box with no page to show", () => {
     expect(pageNoteOf("reconnecting", false, false)).toEqual({ say: "reconnecting", spin: true, help: null });
     for (const gap of ["offline", "no_computer", "unavailable", "forbidden", "ended"] as const)
       expect(pageNoteOf(gap, false, false)).toEqual({ say: gap, spin: false, help: null });
+  });
+
+  test("a closed, ended or offline browser shows the agent's sky behind its words; a page on its way doesn't", () => {
+    for (const gap of ["closed", "ended", "offline"] as const)
+      expect(skyBehind(pageNoteOf(gap, false, false))).toBe(true);
+    for (const gap of [null, "reconnecting", "no_computer", "unavailable", "forbidden"] as const)
+      expect(skyBehind(pageNoteOf(gap, false, false))).toBe(false);
+    // Someone else in control: their screen stays theirs, no sky.
+    expect(skyBehind(pageNoteOf("closed", true, false))).toBe(false);
   });
 
   test("every reason has its words in both languages (the key is built from the reason)", () => {

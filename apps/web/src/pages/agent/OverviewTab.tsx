@@ -71,12 +71,12 @@ export function OverviewTab() {
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (
-                <div className="agp-attn">
+                <div className="agp-attn ac-faceline">
                   <span className="agp-ib agp-ib--warn">
                     <Icon name="lock" size={16} />
                   </span>
                   <span className="agp-attn__t">
-                    <b>{t("agentPage.overview.approvals", { count: approvals })}</b>
+                    <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
                     <span>
                       {decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}
                     </span>
@@ -89,12 +89,12 @@ export function OverviewTab() {
                 </div>
               )}
               {pending.map((p) => (
-                <div key={p.id} className="agp-attn">
+                <div key={p.id} className="agp-attn ac-faceline">
                   <span className="agp-ib agp-ib--warn">
                     <Icon name="document" size={16} />
                   </span>
                   <span className="agp-attn__t">
-                    <b>{t("agentPage.overview.proposes", g)}</b>
+                    <b className="ac-captop">{t("agentPage.overview.proposes", g)}</b>
                     <span>
                       {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}
                       {p.canDecide
@@ -161,10 +161,10 @@ export function OverviewTab() {
             ) : (
               <ul className="agp-list">
                 {recent.map((r) => (
-                  <li key={r.id} className="agp-li">
+                  <li key={r.id} className="agp-li ac-faceline">
                     <RunIcon run={r} />
                     <span className="agp-li__t">
-                      <b>{r.what || t("agent.runNoText")}</b>
+                      <b className="ac-captop">{r.what || t("agent.runNoText")}</b>
                       <span>
                         {runWhere(t, r, channels.data ?? [])}
                         {r.repo ? ` · ${r.repo}` : ""}
@@ -347,12 +347,12 @@ export function OverviewTab() {
                   <span className="agp-k">{t("agentPage.overview.routines")}</span>
                   <ul className="agp-list">
                     {mine.map((r) => (
-                      <li key={r.id} className="agp-li">
+                      <li key={r.id} className="agp-li ac-faceline">
                         <span className="agp-ib">
                           <Icon name="routines" size={14} />
                         </span>
                         <span className="agp-li__t">
-                          <b>{r.name}</b>
+                          <b className="ac-captop">{r.name}</b>
                           <span>
                             {r.nextRunAt
                               ? t("agentPage.overview.nextRun", { when: whenAt(t, locale, r.nextRunAt) })
