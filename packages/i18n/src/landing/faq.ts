@@ -8,7 +8,7 @@ export const pt = {
     items: {
       opens: {
         q: "Quando abre?",
-        a: "Em ondas, por ordem da lista. Cada onda recebe um convite por e-mail com o link para criar o espaço do time.",
+        a: "Em ondas, por ordem da lista. Cada onda recebe um convite por e-mail com o link para criar o workspace do time.",
       },
       code: {
         q: "Preciso saber programar?",
@@ -16,7 +16,7 @@ export const pt = {
       },
       models: {
         q: "Quais modelos os agentes usam?",
-        a: "Você escolhe por agente: a chave da plataforma, a do seu provedor (guardada cifrada) ou a sua assinatura do Claude ou do ChatGPT no computador conectado.",
+        a: "Você escolhe por agente: o seu plano de IA, como o do Claude ou o do ChatGPT, ou uma chave de API do seu provedor, guardada cifrada.",
       },
       alone: {
         q: "Um agente pode publicar ou apagar algo sozinho?",
@@ -28,15 +28,15 @@ export const pt = {
       },
       data: {
         q: "O que acontece com os nossos dados?",
-        a: "Chaves e segredos ficam cifrados na sua organização e nunca chegam ao navegador. Bancos de dados conectados são só leitura.",
+        a: "Chaves e segredos ficam cifrados no seu workspace e nunca chegam ao navegador. Bancos de dados conectados são só leitura.",
       },
       tools: {
         q: "Funciona com as ferramentas que já usamos?",
         a: "Sim: GitHub, Sentry, Linear, Notion, Google Drive e outros do catálogo, ou um servidor próprio pelo endereço.",
       },
       price: {
-        q: "Quanto vai custar?",
-        a: "Os planos saem antes da abertura. Quem está na lista fica sabendo primeiro.",
+        q: "Quanto custa?",
+        a: "Os preços da agentes.chat Cloud estão na <prices>página de preços</prices>. Num servidor seu, é de graça.",
       },
     },
   },
@@ -49,7 +49,7 @@ export const en: Widen<typeof pt> = {
     items: {
       opens: {
         q: "When does it open?",
-        a: "In waves, in waitlist order. Each wave gets an email invite with a link to create the team's space.",
+        a: "In waves, in waitlist order. Each wave gets an email invite with a link to create the team's workspace.",
       },
       code: {
         q: "Do I need to know how to code?",
@@ -57,7 +57,7 @@ export const en: Widen<typeof pt> = {
       },
       models: {
         q: "Which models do the agents use?",
-        a: "You choose per agent: the platform's key, your provider's key (stored encrypted) or your Claude or ChatGPT subscription on the connected computer.",
+        a: "You choose per agent: your AI plan, such as Claude or ChatGPT, or an API key from your provider, stored encrypted.",
       },
       alone: {
         q: "Can an agent publish or delete something on its own?",
@@ -69,15 +69,15 @@ export const en: Widen<typeof pt> = {
       },
       data: {
         q: "What happens to our data?",
-        a: "Keys and secrets stay encrypted in your organization and never reach the browser. Connected databases are read-only.",
+        a: "Keys and secrets stay encrypted in your workspace and never reach the browser. Connected databases are read-only.",
       },
       tools: {
         q: "Does it work with the tools we already use?",
         a: "Yes: GitHub, Sentry, Linear, Notion, Google Drive and others from the catalog, or your own server by its address.",
       },
       price: {
-        q: "How much will it cost?",
-        a: "Plans come out before launch. People on the waitlist hear first.",
+        q: "How much does it cost?",
+        a: "The prices of agentes.chat Cloud are on the <prices>pricing page</prices>. On a server you run yourself, it's free.",
       },
     },
   },

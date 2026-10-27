@@ -22,7 +22,7 @@ export const pt = {
       "Ela recebe os pedidos, define o orçamento e vê o uso de cada um. Valores em dinheiro só para quem administra.",
     usage: "Uso do orçamento de {{agent}}",
     keysTitle: "Chaves que ninguém vê",
-    keys: "Credenciais ficam cifradas na sua organização e nunca chegam ao navegador. Segredos vão ao computador do agente de ponta a ponta.",
+    keys: "Credenciais ficam cifradas no seu workspace e nunca chegam ao navegador. Segredos vão ao computador do agente de ponta a ponta.",
     lesson: "Recusou? O motivo vira lição para a próxima vez.",
   },
 };
@@ -47,7 +47,7 @@ export const en: Widen<typeof pt> = {
     owner: "She gets the requests, sets the budget and sees each one's usage. Money amounts only for admins.",
     usage: "{{agent}}'s budget used",
     keysTitle: "Keys nobody sees",
-    keys: "Credentials stay encrypted in your organization and never reach the browser. Secrets go to the agent's computer end to end.",
+    keys: "Credentials stay encrypted in your workspace and never reach the browser. Secrets go to the agent's computer end to end.",
     lesson: "Declined? The reason becomes a lesson for next time.",
   },
 };

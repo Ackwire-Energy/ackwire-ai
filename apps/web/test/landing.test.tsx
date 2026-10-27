@@ -157,6 +157,31 @@ describe("landing page", () => {
     expect(screen().getAllByText("Check your email.").length).toBe(2);
   });
 
+  test("the price answer links the billing service's price page in the page's language", async () => {
+    const { api } = signedOut({ authConfig: { billingUrl: "https://billing.example.com/" } });
+    const { services } = await renderApp("/", { api });
+    await act(async () => {
+      fireEvent.click(screen().getByRole("button", { name: "Quanto custa?" }));
+    });
+    expect(screen().getByRole("link", { name: "página de preços" }).getAttribute("href")).toBe(
+      "https://billing.example.com/precos",
+    );
+    await act(async () => {
+      await services.i18n.changeLanguage("en");
+    });
+    await settle();
+    expect(screen().getByRole("link", { name: "pricing page" }).getAttribute("href")).toBe(
+      "https://billing.example.com/pricing",
+    );
+  });
+
+  test("without a billing service there is no price question", async () => {
+    const { api } = signedOut();
+    await renderApp("/", { api });
+    expect(screen().getByRole("button", { name: "Preciso saber programar?" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Quanto custa?" })).toBeNull();
+  });
+
   test("the PT | EN switch in the nav changes the language, and a later join sends locale en", async () => {
     const lang = document.documentElement.lang;
     const { state, api } = signedOut();
