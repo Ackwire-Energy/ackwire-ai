@@ -516,7 +516,7 @@ export class AccountManager {
     if (!provider && running >= SIGN_INS_AT_ONCE) {
       throw new RunnerError(
         "bad_request",
-        "Too many sign-ins are in progress on this computer; try again in a few minutes",
+        "Too many sign-ins are in progress on this computer. Try again in a few minutes.",
       );
     }
     const dir = this.dirOf(kind, loginId);
@@ -531,7 +531,7 @@ export class AccountManager {
         throw new RunnerError("bad_request", "This sign-in already exists");
       }
       if ((await this.list().catch(() => [])).length >= MAX_MACHINE_ACCOUNTS) {
-        throw new RunnerError("bad_request", "This computer already has too many accounts; remove one first");
+        throw new RunnerError("bad_request", "This computer already has too many accounts. Remove one first.");
       }
     }
     // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
@@ -724,7 +724,10 @@ export class AccountManager {
   private async keepKey(login: Login, provider: PlanId, key: string) {
     const plan = planOf(provider);
     if (!plan || !key || key.length > MAX_KEY_CHARS || !planKeyFits(plan, key)) {
-      throw new RunnerError("bad_request", `That doesn't look like a ${plan?.label ?? "plan"} key; copy the whole key`);
+      throw new RunnerError(
+        "bad_request",
+        `That doesn't look like a ${plan?.label ?? "plan"} key. Copy the whole key.`,
+      );
     }
     const file = path.join(login.dir, PROVIDER_FILE);
     const tmp = `${file}.${process.pid}.tmp`;
@@ -779,7 +782,7 @@ export class AccountManager {
 
   private expire(login: Login) {
     if (login.state !== "waiting") return;
-    this.settle(login, "expired", "The sign-in took too long; start again");
+    this.settle(login, "expired", "The sign-in took too long. Start again.");
     void this.drop(login);
     this.log(`account sign-in ${login.id.slice(0, 8)} expired`);
   }

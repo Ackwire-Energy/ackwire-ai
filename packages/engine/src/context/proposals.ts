@@ -249,7 +249,7 @@ export async function decideProposal(
   caches.orgs.delete(`${orgId}:`);
   if (decided.status === "rejected") await recordRefusal(db, actorId, decided);
   if (decided.status === "stale")
-    throw new ConflictError("The text changed since this was proposed; it can't be applied");
+    throw new ConflictError("The text changed since this was proposed, so it can't be applied.");
   return decided;
 }
 

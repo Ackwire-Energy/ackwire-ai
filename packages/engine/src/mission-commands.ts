@@ -404,7 +404,7 @@ export async function decideCommand(
   if (!p) throw new NotFoundError("Command not found", "mission.command_not_found");
   if (p.state !== "pending") {
     throw new ConflictError(
-      p.state === "expired" ? "Nobody answered in time; the command was denied" : "Already answered",
+      p.state === "expired" ? "Nobody answered in time, so the command was denied." : "Already answered",
       p.state === "expired" ? "mission.command_expired" : "mission.command_decided",
     );
   }

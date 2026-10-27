@@ -32,7 +32,7 @@ export type Dial = (url: string, handlers: SocketHandlers) => Socket;
 /** The global WebSocket (Node 22+ and Bun both have it). */
 export const webSocketDial: Dial = (url, handlers) => {
   if (typeof WebSocket === "undefined") {
-    throw new Error("This runtime has no WebSocket client; use Node.js 22 or newer, or Bun");
+    throw new Error("This runtime has no WebSocket client. Use Node.js 22 or newer, or Bun.");
   }
   const ws = new WebSocket(url);
   let closed = false;

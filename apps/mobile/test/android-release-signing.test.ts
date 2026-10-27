@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 // The config plugin is plain CommonJS (expo prebuild loads it); only its pure part is tested here.
 const { withReleaseSigning } = require("../plugins/with-android-release-signing") as {
   withReleaseSigning: (gradle: string) => string;

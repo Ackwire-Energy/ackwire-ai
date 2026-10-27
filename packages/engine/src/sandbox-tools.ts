@@ -40,7 +40,7 @@ import {
   taskRequester,
   taskSeconds,
 } from "./machine-tasks";
-import { MachineOfflineError, pausedMessage } from "./machines";
+import { MachineOfflineError, pausedMessage, REMOVED_COMPUTER_MESSAGE } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
@@ -220,7 +220,7 @@ type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
 /** One or two sentences the agent reads about its computer, in `run_code`'s description. */
 export function computerSentence(info: ComputerInfo, network: Network) {
   if (info.kind === "removed") {
-    return "Your connected computer was removed; ask an admin or your owner to choose another one (calls fail until then).";
+    return REMOVED_COMPUTER_MESSAGE.replace(/\.$/, " (calls fail until then).");
   }
   if (info.kind === "cloud") {
     if (!info.available) return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
