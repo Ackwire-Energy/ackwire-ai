@@ -1,3 +1,4 @@
+import { callJev, type JevKeySource, JevOffError } from "./jev-key";
 import type { RouterStrategy, RoutingInput, RoutingResult } from "./router";
 
 /**
@@ -6,8 +7,8 @@ import type { RouterStrategy, RoutingInput, RoutingResult } from "./router";
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
  * more candidates, a Choice over the candidates plus "none" to break ties.
- * It only scores; policy stays in `selectAgents`. Optional (needs
- * `TYPESAFE_API_KEY`); errors and timeouts fall back to another strategy.
+ * It only scores; policy stays in `selectAgents`. Optional (needs the
+ * installation's Jev key, ADR 0073); errors and timeouts fall back to another strategy.
  *
  * Questions are in English (Jev's primary training language); the
  * conversation goes in as written.
@@ -37,7 +38,8 @@ interface JevAnswer {
 }
 
 export function createJevRouterStrategy(options: {
-  apiKey: string;
+  /** Read on every call (`jev-key.ts`): without one it throws `JevOffError`. */
+  key: JevKeySource;
   /** Records the call's usage (kind `router`, provider `typesafe`). */
   recordUsage(usage: JevUsage): Promise<void>;
   baseURL?: string;
@@ -45,8 +47,6 @@ export function createJevRouterStrategy(options: {
   timeoutMs?: number;
   fetch?: typeof fetch;
 }): RouterStrategy {
-  const http = options.fetch ?? fetch;
-  const base = (options.baseURL ?? "https://api.typesafe.ai").replace(/\/$/, "");
   return {
     name: "jev",
     async decide(input: RoutingInput): Promise<RoutingResult> {
@@ -119,18 +119,16 @@ export function createJevRouterStrategy(options: {
         };
       }
 
-      const res = await http(`${base}/v1/systemone`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify({ state, model: options.model ?? "jev-latest", questions }),
-        signal: AbortSignal.timeout(options.timeoutMs ?? 2000),
-      });
-      if (!res.ok) throw new Error(`TypeSafe answered ${res.status}`);
-      const body = (await res.json()) as {
+      const body = await callJev<{
         model?: string;
         answers?: Record<string, JevAnswer>;
         usage?: { input_tokens?: number; output_tokens?: number };
-      };
+      }>(options.key, {
+        fetch: options.fetch,
+        baseURL: options.baseURL,
+        body: { state, model: options.model ?? "jev-latest", questions },
+        timeoutMs: options.timeoutMs ?? 2000,
+      });
       await options
         .recordUsage({
           orgId: input.orgId,
@@ -165,7 +163,10 @@ export function createJevRouterStrategy(options: {
 
 const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
 
-/** Uses `primary`; on any error or timeout uses `fallback`, recording which one decided. */
+/**
+ * Uses `primary`; on any error or timeout uses `fallback`, recording which one decided. With no Jev key the
+ * fallback simply decides, under its own name.
+ */
 export function withFallback(primary: RouterStrategy, fallback: RouterStrategy): RouterStrategy {
   return {
     name: primary.name,
@@ -174,6 +175,7 @@ export function withFallback(primary: RouterStrategy, fallback: RouterStrategy):
         return { ...(await primary.decide(input)), strategy: primary.name };
       } catch (error) {
         const result = await fallback.decide(input);
+        if (error instanceof JevOffError) return { ...result, strategy: fallback.name };
         return {
           ...result,
           strategy: `${fallback.name} (fallback: ${error instanceof Error ? error.message.slice(0, 80) : "error"})`,

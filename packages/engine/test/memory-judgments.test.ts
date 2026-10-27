@@ -4,6 +4,8 @@ import {
   consolidateByMeaning,
   consolidateItem,
   createFakeJudge,
+  createJevJudge,
+  createJevKey,
   createLlmJudge,
   insertContextItem,
   itemLabel,
@@ -328,5 +330,32 @@ describe("memory judgments: the daily pass", () => {
     });
     const [still] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, twin.id));
     expect(still?.status).toBe("active");
+  });
+
+  test("with no Jev key nothing moves, and once its owner saves one the next pass does, with no restart", async () => {
+    f = await setup();
+    const older = await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const twin = await insertContextItem(f.db, fact(f, "Hospedamos a aplicação no Railway."));
+    await ageOf(older.id);
+    // TypeSafe hears every pair as the same fact, and accepts the key.
+    const typesafe = (async (_url: string, init: RequestInit) => {
+      const { questions } = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
+      const same = { choice: "same", probabilities: { same: 0.95 } };
+      return Response.json({ answers: Object.fromEntries(Object.keys(questions).map((id) => [id, same])) });
+    }) as unknown as typeof fetch;
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], fetch: typesafe });
+    const llmOnly = createLlmJudge({
+      gateway: { complete: async () => Promise.reject(new Error("must not be called")) },
+      resolveModel: async () => "claude-haiku-5-5",
+    });
+    const deps = {
+      ...f.context,
+      judge: withJudgeFallback(createJevJudge({ key, gateway: f.gateway, fetch: typesafe }), llmOnly),
+    };
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 0, linked: 0 });
+    await key.save("ts_memory_key_1", f.owner.id);
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 1, linked: 0 });
+    const [merged] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, twin.id));
+    expect(merged).toMatchObject({ status: "archived", supersededBy: older.id });
   });
 });

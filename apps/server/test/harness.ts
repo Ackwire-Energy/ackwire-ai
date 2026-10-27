@@ -83,6 +83,8 @@ export async function createTestServer(
     databases?: DatabaseDriver;
     /** Where emails get their pictures; absent = linked from `PUBLIC_URL`. */
     emailArt?: EmailArt;
+    /** Fake TypeSafe (checks of the Jev key). */
+    jevFetch?: typeof fetch;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -129,7 +131,10 @@ export async function createTestServer(
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
     toolsOnDemand: false,
     emailArt: options.emailArt,
+    jevFetch: options.jevFetch,
   });
+  // As at boot: the saved Jev key is read before anything serves.
+  await engine.jevKey.ready();
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });
   const app = createApp({
@@ -157,6 +162,7 @@ export async function createTestServer(
         browserLive: engine.browserLive,
         router: engine.router,
         streams: engine.streams,
+        jevKey: engine.jevKey,
       },
     },
     log,

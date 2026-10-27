@@ -99,7 +99,7 @@ describe("an agent's @mention of another agent", () => {
     const seen: string[] = [];
     const usage: unknown[] = [];
     const judge = createJevJudge({
-      apiKey: "tk",
+      key: "tk",
       gateway: {
         recordExternalUsage: async (u) => {
           usage.push(u);
@@ -130,7 +130,7 @@ describe("an agent's @mention of another agent", () => {
   test("a judgment inside an agent's run records that agent and run on its usage", async () => {
     const usage: unknown[] = [];
     const judge = createJevJudge({
-      apiKey: "tk",
+      key: "tk",
       gateway: {
         recordExternalUsage: async (u) => {
           usage.push(u);

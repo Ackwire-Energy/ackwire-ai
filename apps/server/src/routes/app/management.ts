@@ -813,7 +813,7 @@ export function managementRoutes(deps: AppDeps) {
             totalUsd: z.number(),
             platformBilled: z
               .object({ calls: z.number(), costUsd: z.number() })
-              .openapi({ description: "Calls our platform pays for (e.g. the router's Jev model); not in the total." }),
+              .openapi({ description: "Calls the server pays for (Jev), not in the total." }),
             byKind: z.array(
               z.object({
                 kind: z.enum(["agent", "router", "embedding", "summary", "sandbox"]),

@@ -187,6 +187,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     onRunProfile: (p) => log.debug("run profile", p),
     emailArt,
   });
+  // The saved Jev key, before anything calls Jev (vision reads it synchronously).
+  await engine.jevKey.ready();
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -223,6 +225,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         streams: engine.streams,
         talker: engine.talker,
         router: engine.router,
+        jevKey: engine.jevKey,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
       },

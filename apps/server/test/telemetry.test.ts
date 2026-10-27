@@ -303,6 +303,13 @@ describe("the switch in Settings", () => {
     expect(row?.enabled).toBe(false);
   });
 
+  test("once the first account deletes itself, nobody inherits the switch", async () => {
+    const { owner, other } = await server();
+    expect((await owner("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    expect((await other("/api/app/telemetry")).status).toBe(404);
+    expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
+  });
+
   test("with TELEMETRY=off the page says so", async () => {
     const { owner } = await server({ TELEMETRY: "off" });
     const view = (await (await owner("/api/app/telemetry")).json()) as { enabled: boolean; envOff: boolean };

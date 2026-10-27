@@ -30,6 +30,7 @@ import {
   createHandOffToolSource,
   createIssueToolSource,
   createJevJudge,
+  createJevKey,
   createJobHandlers,
   createLlmJudge,
   createMachineHub,
@@ -152,23 +153,31 @@ export function buildEngine(o: EngineOptions) {
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
     },
   };
-  // Semantic judgments (stop requests, hand-offs, permission changes): Jev when its platform key is
-  // set, with the org's cheap model as fallback; the cheap model alone otherwise.
+  // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
+  const jevKey = createJevKey({
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    envKey: config.TYPESAFE_API_KEY,
+    fetch: o.jevFetch,
+  });
+  // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
+  // with the org's cheap model as fallback.
   if (!context.judge) {
     const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
-    context.judge = config.TYPESAFE_API_KEY
-      ? withJudgeFallback(
-          createJevJudge({
-            apiKey: config.TYPESAFE_API_KEY,
-            gateway,
-            timeoutMs: config.JEV_TIMEOUT_MS,
-            visionModel: config.JEV_VISION_MODEL,
-            fetch: o.jevFetch,
-          }),
-          llmJudge,
-        )
-      : llmJudge;
+    context.judge = withJudgeFallback(
+      createJevJudge({
+        key: jevKey,
+        gateway,
+        timeoutMs: config.JEV_TIMEOUT_MS,
+        visionModel: config.JEV_VISION_MODEL,
+        fetch: o.jevFetch,
+      }),
+      llmJudge,
+    );
   }
+  // Screenshots go only to Jev's vision model: with a fake judge (tests) nothing looks at them.
+  const vision = o.judge ? undefined : () => jevKey.usable();
   // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
   context.judge = standingJudge(db, context.judge);
   // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
@@ -288,14 +297,14 @@ export function buildEngine(o: EngineOptions) {
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
         judge: context.judge,
-        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+        vision,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
         judge: context.judge,
-        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+        vision,
       }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
@@ -403,9 +412,9 @@ export function buildEngine(o: EngineOptions) {
       cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
-      // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
-      ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"
-        ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
+      // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
+      ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
+        ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
         : {}),
     },
   };
@@ -436,6 +445,8 @@ export function buildEngine(o: EngineOptions) {
     desktops,
     mail,
     talker,
+    /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
+    jevKey,
   };
 }
 

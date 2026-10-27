@@ -93,7 +93,7 @@ test("one calibrated request: the message, the five steps, the catalog's provide
     [];
   const usage: unknown[] = [];
   const judge = createJevJudge({
-    apiKey: "tk",
+    key: "tk",
     gateway: {
       recordExternalUsage: async (u) => {
         usage.push(u);

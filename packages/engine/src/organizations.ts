@@ -35,6 +35,7 @@ const {
   users,
   accounts,
   agents,
+  instanceTelemetry,
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -215,6 +216,31 @@ export async function countUsers(db: Database): Promise<number> {
 export async function installOwner(db: Database): Promise<string | null> {
   const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
   return first?.id ?? null;
+}
+
+/**
+ * Who has the installation's own settings, the usage report's switch and the Jev key (ADR 0073): its first account,
+ * pinned the first time anyone asks. Unlike `installOwner`, it never passes to the next oldest account, who may be
+ * any member of any workspace: once the owner deletes their account, nobody has these settings here (the server's
+ * environment still does).
+ */
+export async function pinnedOwner(db: Database): Promise<string | null> {
+  const [row] = await db
+    .select({ owner: instanceTelemetry.ownerUserId })
+    .from(instanceTelemetry)
+    .where(eq(instanceTelemetry.id, 1));
+  if (row?.owner) return row.owner;
+  const first = await installOwner(db);
+  if (!first) return null;
+  const [pinned] = await db
+    .insert(instanceTelemetry)
+    .values({ ownerUserId: first })
+    .onConflictDoUpdate({
+      target: instanceTelemetry.id,
+      set: { ownerUserId: sql`coalesce(${instanceTelemetry.ownerUserId}, excluded.owner_user_id)` },
+    })
+    .returning({ owner: instanceTelemetry.ownerUserId });
+  return pinned?.owner ?? first;
 }
 
 /** Who may create an account (ADR 0006): see `isSignupAllowed`. */
@@ -574,6 +600,8 @@ export async function deleteAccount(
   options: { pubsub?: PubSub } = {},
 ): Promise<{ deletedOrgIds: string[] }> {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
+  // Before any account goes: the first one stays the owner even once it is gone.
+  await pinnedOwner(db);
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
   const { left, deleted, released } = await db.transaction(async (tx) => {
     const mine = await tx
