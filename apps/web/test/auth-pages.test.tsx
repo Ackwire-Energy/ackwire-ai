@@ -552,6 +552,28 @@ describe("A verificação contra robôs (agentes.chat Cloud)", () => {
     ]);
     expect(cf.widgets.map((w) => w.options.action)).toEqual(["ask-code"]);
   });
+
+  test("an email invitation's sign-up is busy while the check waits for its token: a second press signs up nobody", async () => {
+    const cf = installTurnstile({ gives: false });
+    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/invite/valid", { api: createFakeApi(state), auth });
+    await settle();
+    await type("Seu nome", "Marina");
+    await type("Crie uma senha", "senha-exemplo");
+    await press("Aceitar e entrar na Acme");
+    const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
+    expect(accept.getAttribute("aria-busy")).toBe("true");
+    expect(accept.hasAttribute("disabled")).toBe(true);
+    // A submit that reaches the form anyway, as Enter would.
+    await act(async () => fireEvent.submit(accept.closest("form") as HTMLFormElement));
+    expect(calls.filter((c) => c.method === "signUp")).toEqual([]);
+
+    cf.give("w1");
+    await settle(6);
+    expect(calls.filter((c) => c.method === "signUp").map((c) => c.args[1])).toEqual(["w1-1"]);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").length).toBe(1);
+  });
 });
 
 describe("Onboarding", () => {

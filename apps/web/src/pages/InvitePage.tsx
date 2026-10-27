@@ -42,6 +42,7 @@ export function InvitePage({ token }: { token: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [asked, setAsked] = useState(false);
+  const [signingUp, setSigningUp] = useState(false);
   // Signed out on an email invitation: the sign-up form below.
   const human = useHumanCheck(preview.data && preview.data.kind !== "link" && me.data === null ? "sign-up" : null);
 
@@ -55,19 +56,26 @@ export function InvitePage({ token }: { token: string }) {
     onError: (e) => setError(e instanceof Error ? e.message : t("common.unknownError")),
   });
 
+  // From the press on: the bot check may wait for its token, or for a click, before the sign-up goes out.
+  const busy = signingUp || accept.isPending;
   const signUpAndAccept = async (e: React.FormEvent) => {
     e.preventDefault();
     const invitation = preview.data;
-    if (!invitation) return;
+    if (!invitation || busy) return;
     setError(null);
-    const result = await withHumanCheck(human.check, (humanCheck) =>
-      auth.signUp({ name: name.trim(), email: invitation.email, password }, humanCheck),
-    );
-    if (!result.ok) {
-      setError(authErrorText(t, result));
-      return;
+    setSigningUp(true);
+    try {
+      const result = await withHumanCheck(human.check, (humanCheck) =>
+        auth.signUp({ name: name.trim(), email: invitation.email, password }, humanCheck),
+      );
+      if (!result.ok) {
+        setError(authErrorText(t, result));
+        return;
+      }
+      accept.mutate();
+    } finally {
+      setSigningUp(false);
     }
-    accept.mutate();
   };
 
   if (preview.isPending || me.isPending) {
@@ -166,8 +174,8 @@ export function InvitePage({ token }: { token: string }) {
                   type="submit"
                   variant="primary"
                   block
-                  disabled={!name.trim() || !passwordOk || accept.isPending}
-                  loading={accept.isPending}
+                  disabled={!name.trim() || !passwordOk || busy}
+                  loading={busy}
                 >
                   {t("invite.accept", { org: orgName })}
                 </Button>
