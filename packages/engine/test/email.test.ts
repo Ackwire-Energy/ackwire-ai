@@ -115,6 +115,7 @@ describe("every email, in both languages", () => {
       computer_ready: true,
       join_request: true,
       join_answer: true,
+      join_code: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
   });
@@ -240,6 +241,24 @@ describe("the look", () => {
   test("an expired invitation link's request names nobody and still reads", () => {
     const { text } = renderEmail(EMAIL_SAMPLES["invite_request-link.en"] as EmailTemplate, art);
     expect(text).toContain("Someone with an expired invitation link to Souza Bakery asked for a new one.");
+  });
+
+  test("the join code: first in the subject, large in a well, alone on its line, and no button", () => {
+    const sample = EMAIL_SAMPLES["join_code.en"] as Extract<EmailTemplate, { kind: "join_code" }>;
+    for (const [locale, subject, body] of [
+      ["en", "482913 is your agentes.chat code", "Type this code on the page to ask to join"],
+      ["pt-BR", "482913 é seu código do agentes.chat", "Digite este código na página para pedir para entrar na"],
+    ] as const) {
+      const e = renderEmail({ ...sample, locale, orgName: "Acme evil.com" }, art);
+      expect(e.subject).toBe(subject);
+      expect(e.text).toContain(`\n\n${body} Acme evil.${BREAK}com.\n\n482913\n\n`);
+      expect(e.html).toContain(
+        'letter-spacing:8px;font-variant-numeric:tabular-nums;color:#151514;text-align:center">482913</td>',
+      );
+      expect(e.html).toContain('<table width="100%" class="well"');
+      expect(e.html).not.toContain('class="btn"');
+      expect(e.html).not.toContain("evil.com");
+    }
   });
 
   test("without EMAIL_FROM, the sender is agentes.chat at this server's host", () => {

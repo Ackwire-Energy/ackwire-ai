@@ -29,13 +29,13 @@ import {
   Avatar,
   Button,
   Card,
+  Chip,
   Dialog,
   DialogBody,
   DialogFooter,
   Field,
   FilterBar,
   FilterChip,
-  Icon,
   Input,
   List,
   Select,
@@ -449,26 +449,24 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
                   aria-label={t("members.requests.label", { name: r.name })}
                   avatar={<Avatar size="sm" name={r.name} />}
                   who={
-                    <Trans
-                      i18nKey="members.requests.asks"
-                      values={{ name: r.name }}
-                      components={{ b: <b /> }}
-                      {...TYPED_VALUES}
-                    />
-                  }
-                  statusLabel={askedLabel(t, i18n.language, r.createdAt)}
-                  title={r.email}
-                  detail={
                     <>
-                      <span className="jr-proof ac-iconline" data-confirmed={r.confirmed || undefined}>
-                        <Icon name={r.confirmed ? "check" : "mail"} size={14} />
-                        <span>{r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}</span>
+                      <span>
+                        <Trans
+                          i18nKey="members.requests.asks"
+                          values={{ name: r.name }}
+                          components={{ b: <b /> }}
+                          {...TYPED_VALUES}
+                        />
                       </span>
-                      <span className="jr-via">
-                        {t("members.requests.via", { date: formatShortDate(i18n.language, r.expiresAt) })}
+                      <span className="jr-chips">
+                        {!r.verified && <Chip icon="mail">{t("members.requests.unverified")}</Chip>}
+                        <Chip icon="waiting" tone="waiting">
+                          {askedLabel(t, i18n.language, r.createdAt)}
+                        </Chip>
                       </span>
                     </>
                   }
+                  title={r.email}
                   why={r.note ? t("members.requests.note", { note: r.note }) : undefined}
                   actions={
                     <>

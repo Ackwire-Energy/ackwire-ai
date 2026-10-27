@@ -1,4 +1,5 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import { MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
@@ -31,6 +32,34 @@ import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
 import type { SecretRequestView } from "./secrets";
 import type { ThreadChange, ThreadInfo, ThreadState } from "./threads";
+
+/** Which step of the router's chain picked the agents for a message nobody mentioned (ADR 0074). */
+export type DecidedBy =
+  | { step: "jev" }
+  | { step: "model"; model: string; provider: string }
+  /** The author's own plan: `ownerId` is the author. */
+  | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+
+/** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
+export const MENTION_NEEDED = "mention_needed";
+
+const RULES = new Set(["reply", "only_agent", "follow_up"]);
+
+/**
+ * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
+ * for anything else: a mention's judge, or a decision from before the chain.
+ */
+export function decidedByOf(strategy: string, authorUserId: string | null): DecidedBy | undefined {
+  if (strategy === "jev") return { step: "jev" };
+  const [step, rest = ""] = strategy.split(/:(.*)/s);
+  if (step === "llm" && rest) return { step: "model", model: rest, provider: MODEL_CATALOG[rest]?.provider ?? "" };
+  if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
+    return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
+  }
+  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as "reply" | "only_agent" | "follow_up" };
+  return undefined;
+}
 
 /**
  * Real-time events sent to WebSocket clients subscribed to a channel. The
@@ -119,7 +148,10 @@ export type ChannelEvent =
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
     }
-  /** The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`). */
+  /**
+   * The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`,
+   * with its `toolUseId`, `failed` when the tool answered with an error, `held` when it waits on a person).
+   */
   | {
       type: "agent.tool";
       channelId: string;
@@ -134,6 +166,10 @@ export type ChannelEvent =
       toolUseId?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
+      /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
+      failed?: boolean;
+      /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
+      held?: boolean;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {
@@ -276,13 +312,20 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy: "mention" | "dm" | "router" | "none";
-      /** `no_ai`: the organization has no AI; `mention_needed`: no key to route with (plans only), mentions still answer. */
+      /**
+       * `no_ai`: the organization has no AI. `mention_needed`: no step could pick an agent (no Jev, no small
+       * model, no plan of the author, no rule): a mention still calls one.
+       */
       reason?: string;
+      /** The router's step that picked (ADR 0074). */
+      decidedBy?: DecidedBy;
       /** With `no_ai`: the Connect step the message asks for (`aiConnectIntent`). */
       intent?: ConnectIntent["intent"];
       provider?: string;
       autoOpen?: true;
     }
+  /** The author's own plan reads a message nobody mentioned, which takes seconds: "Picking who answers" until `message.routed`. */
+  | { type: "message.routing"; channelId: string; messageId: string; step: "plan" }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId: string }
   | {
       type: "message.handled";
@@ -455,9 +498,10 @@ export async function publishRouted(
     seenBy: string[];
     runs: { id: string; agentId: string }[];
     reason?: string;
+    decidedBy?: DecidedBy;
   } & Partial<ConnectIntent>,
 ) {
-  const { strategy, seenBy, runs, reason, ...intent } = routed;
+  const { strategy, seenBy, runs, reason, decidedBy, ...intent } = routed;
   await publishChannelEvent(pubsub, {
     type: "message.routed",
     channelId: message.channelId,
@@ -467,6 +511,7 @@ export async function publishRouted(
     runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
     strategy,
     ...(reason ? { reason } : {}),
+    ...(decidedBy ? { decidedBy } : {}),
     ...intent,
   });
   for (const run of runs) {

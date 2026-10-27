@@ -215,6 +215,25 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
     expect(result.stopReason).toBe("end_turn");
   });
 
+  test("effort none: reasoning off on a model that allows it, low on the others", async () => {
+    const effortOf = async (model: string) => {
+      const { fetcher, requests } = scripted(
+        sse([
+          { type: "response.created", response: baseResponse({ status: "in_progress", output: [] }) },
+          { type: "response.completed", response: baseResponse({ output: [] }) },
+        ]),
+      );
+      const provider = createOpenAIProvider({ fetch: fetcher, maxRetries: 0 });
+      await provider.stream(
+        { model, system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 10, effort: "none" },
+        { apiKey: "k", onDelta: () => {} },
+      );
+      return requests[0]?.body.reasoning;
+    };
+    expect(await effortOf("gpt-6-luna")).toEqual({ effort: "none" });
+    expect(await effortOf("gpt-6.1-sol")).toEqual({ effort: "low" });
+  });
+
   test("a broken stream reports the output received so far", async () => {
     const { fetcher } = scripted(
       sse([

@@ -177,8 +177,6 @@ const en = {
       body: (who: string, org: string): Text => [`${who} approved your request to join `, { b: org }, "."],
       next: "Accept the invitation with this email address within 7 days.",
       button: "Accept invitation",
-      // Anyone with the link can type any address, so this can reach someone who never asked.
-      small: "If you didn't ask to join, ignore this email. Nothing happens until you accept.",
     },
     denied: {
       subject: "Your request to join wasn't approved",
@@ -186,10 +184,18 @@ const en = {
       headline: "Your request wasn't approved",
       body: (org: string): Text => ["Someone at ", { b: org }, " looked at your request and didn't approve it."],
       reason: (reason: string): Text => [{ b: "Their note: " }, `“${reason}”`],
-      small:
-        "If you think it's a mistake, ask someone there to invite you by email. If you didn't ask to join, ignore this email.",
+      small: "If you think it's a mistake, ask someone there to invite you by email.",
     },
     why: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
+  },
+  joinCode: {
+    subject: (code: string) => `${code} is your agentes.chat code`,
+    preheader: "Type it on the page to ask to join. It works for 10 minutes.",
+    headline: "Your code",
+    body: (org: string): Text => ["Type this code on the page to ask to join ", { b: org }, "."],
+    small: "It works for 10 minutes. If you didn't ask, ignore this email.",
+    why: (org: string) =>
+      `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
   },
 };
 
@@ -356,7 +362,6 @@ const ptBR: Words = {
       body: (who, org) => [`${who} aprovou seu pedido para entrar na `, { b: org }, "."],
       next: "Aceite o convite com este endereço de e-mail em até 7 dias.",
       button: "Aceitar convite",
-      small: "Se você não pediu para entrar, ignore este e-mail. Nada acontece até você aceitar.",
     },
     denied: {
       subject: "Seu pedido para entrar não foi aprovado",
@@ -364,10 +369,18 @@ const ptBR: Words = {
       headline: "Seu pedido não foi aprovado",
       body: (org) => ["Alguém da ", { b: org }, " viu seu pedido e não aprovou."],
       reason: (reason) => [{ b: "Recado: " }, `“${reason}”`],
-      small:
-        "Se acha que foi engano, peça a alguém de lá para convidar você por e-mail. Se você não pediu para entrar, ignore este e-mail.",
+      small: "Se acha que foi engano, peça a alguém de lá para convidar você por e-mail.",
     },
     why: (org) => `Você recebeu este e-mail porque este endereço pediu para entrar na ${org} no agentes.chat.`,
+  },
+  joinCode: {
+    subject: (code) => `${code} é seu código do agentes.chat`,
+    preheader: "Digite na página para pedir para entrar. Vale por 10 minutos.",
+    headline: "Seu código",
+    body: (org) => ["Digite este código na página para pedir para entrar na ", { b: org }, "."],
+    small: "Vale por 10 minutos. Se não foi você, ignore este e-mail.",
+    why: (org) =>
+      `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
   },
 };
 

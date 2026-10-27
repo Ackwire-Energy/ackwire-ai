@@ -87,7 +87,9 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  JevKey,
   JoinApproval,
+  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -207,11 +209,20 @@ export interface ApiClient {
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+    /** `null` unless I am the installation's owner on a self-hosted server. */
+    jev(): Promise<JevKey | null>;
+    /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */
+    saveJev(apiKey: string): Promise<JevKey>;
+    checkJev(): Promise<JevKey>;
+    removeJev(): Promise<JevKey>;
   };
   account: {
     authConfig(): Promise<AuthConfig>;
-    /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
-    signInOptions(input: { email: string }): Promise<SignInOptions>;
+    /**
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
+     * bot check's token, when the server has one (`human_check` 403 without it).
+     */
+    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -942,8 +953,21 @@ export interface ApiClient {
     links(orgId: string): Promise<InviteLink[]>;
     /** Nobody new can ask with it; the requests made through it close without emails. */
     turnOff(orgId: string, linkId: string): Promise<void>;
-    /** Asks to join through a link: signed out with a name and an email, signed in as the account. */
-    ask(token: string, input: { name?: string; email?: string; note?: string }): Promise<AskToJoinResult>;
+    /**
+     * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
+     * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
+     */
+    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<JoinCodeSent>;
+    /** Checks the code from the email: right, the address can ask for 30 minutes. */
+    checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
+    /**
+     * Asks to join through a link: signed out with a name and an email, signed in as the account. On a server that
+     * sends email, `code` proves an address that isn't a confirmed account's.
+     */
+    ask(
+      token: string,
+      input: { name?: string; email?: string; note?: string; code?: string },
+    ): Promise<AskToJoinResult>;
     /** Expired email invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
   };
@@ -1082,7 +1106,8 @@ export interface ApiClient {
   };
   /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
   waitlist: {
-    join(input: { email: string; locale: string }): Promise<void>;
+    /** `humanCheck`: the bot check's token, when the server has one. */
+    join(input: { email: string; locale: string }, humanCheck?: string): Promise<void>;
     /** The link in the confirmation email (`?confirm=`); `invalid_token` when unknown or expired. */
     confirm(input: { token: string }): Promise<void>;
   };

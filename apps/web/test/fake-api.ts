@@ -23,6 +23,7 @@ import type {
   InvitationPreview,
   InvitationWithStatus,
   InviteLink,
+  JevKey,
   JoinApproval,
   JoinRequest,
   Me,
@@ -186,10 +187,16 @@ export interface FakeState {
   answerNowError?: ApiError;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
+  /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
+  jev?: JevKey;
   /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
   askError?: ApiError;
+  /** The code `invites.checkCode` takes (default 123456); any other is `join.code_wrong`. */
+  joinCode?: string;
+  /** Make `invites.sendCode` fail with this error (`join.code_wait`, `join.code_limit`…). */
+  sendCodeError?: ApiError;
   /** The workspace's invitation links (`invites.links`); `invites.createLink` makes one when none has a URL. */
   inviteLinks?: InviteLink[];
   /** Requests to join waiting (`joinRequests.list`). */
@@ -746,10 +753,28 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.telemetry = { ...state.telemetry, enabled };
         return state.telemetry;
       },
+      jev: async () => state.jev ?? null,
+      saveJev: async (apiKey) => {
+        log("system.saveJev", apiKey);
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        state.jev = { ...state.jev, source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        return state.jev;
+      },
+      checkJev: async () => {
+        log("system.checkJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        return state.jev;
+      },
+      removeJev: async () => {
+        log("system.removeJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        state.jev = { ...state.jev, source: null, hint: null, state: "off" };
+        return state.jev;
+      },
     },
     waitlist: {
-      join: async (input) => {
-        log("waitlist.join", input);
+      join: async (input, humanCheck) => {
+        state.calls.push({ method: "waitlist.join", args: humanCheck === undefined ? [input] : [input, humanCheck] });
         if (state.waitlistError) throw state.waitlistError;
       },
       confirm: async (input) => {
@@ -765,8 +790,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         landing: true,
         ...state.authConfig,
       }),
-      signInOptions: async () =>
-        state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true },
+      signInOptions: async (input, humanCheck) => {
+        if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
+        return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
+      },
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
@@ -1887,6 +1914,20 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       turnOff: async (orgId, linkId) => {
         state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
         state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
+      },
+      sendCode: async (token, input, humanCheck) => {
+        state.calls.push({
+          method: "invites.sendCode",
+          args: humanCheck === undefined ? [token, input] : [token, input, humanCheck],
+        });
+        if (state.sendCodeError) throw state.sendCodeError;
+        return { email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), resendIn: 60 };
+      },
+      checkCode: async (token, input) => {
+        state.calls.push({ method: "invites.checkCode", args: [token, input] });
+        if (input.code !== (state.joinCode ?? "123456"))
+          throw new ApiError(400, "join.code_wrong", "That code isn't right.");
+        return { verified: true };
       },
       ask: async (token, input) => {
         state.calls.push({ method: "invites.ask", args: [token, input] });

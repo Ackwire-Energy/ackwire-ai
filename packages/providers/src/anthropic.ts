@@ -74,7 +74,8 @@ export function createAnthropicProvider(
   return {
     id,
     async stream(request, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
-      const fallback = !compat && MODEL_CATALOG[request.model]?.serverSideFallback === true;
+      const info = MODEL_CATALOG[request.model];
+      const fallback = !compat && info?.serverSideFallback === true;
       const format = compat ? undefined : request.outputSchema;
       const answerSchema = compat ? request.outputSchema : undefined;
       const tools = [
@@ -90,7 +91,11 @@ export function createAnthropicProvider(
             ]
           : []),
       ];
-      const effort = compat && request.effort === "medium" ? "high" : request.effort;
+      // `none`: thinking off where the model allows it, `low` elsewhere. With thinking off a compatible
+      // endpoint gets no effort: MiniMax takes one only on the model that always thinks.
+      const thinkingOff = request.effort === "none" && info?.leastThinking === "off";
+      const asked = request.effort === "none" ? (thinkingOff && compat ? undefined : "low") : request.effort;
+      const effort = compat && asked === "medium" ? "high" : asked;
       const partial: PartialUsage = {
         inputTokens: null,
         cacheReadTokens: 0,
@@ -108,6 +113,7 @@ export function createAnthropicProvider(
             ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
             ...(tools.length > 0 ? { tools } : {}),
             ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
+            ...(thinkingOff ? { thinking: { type: "disabled" as const } } : {}),
             ...(format || effort
               ? {
                   output_config: {

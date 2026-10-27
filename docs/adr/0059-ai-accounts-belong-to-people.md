@@ -52,6 +52,7 @@ Automatic names are the maker and the plan, numbered per owner: "Claude Max", "C
 - Turning the switch off shows the provider's own words about personal use and that answering others might go against its terms. Accepting sets the audience to everyone and is audited with the date. Choosing a plan no longer asks anything; only sharing it does.
 - Only the plan's owner can widen the audience of an agent that thinks with their plan. Admins can only narrow it.
 - With sharing on, anyone who can talk to the agent can make it use the owner's plan and, on a computer where agents share one OS user, reach its sign-in.
+- A plan also picks who answers its owner's own messages nobody mentioned, only on a self-hosted server, and never for anyone else's (ADR 0074 §3).
 
 *Amended 2026-10-27:* where the server provisions the workspaces' computers (`MACHINE_PROVISIONING=external`, the Cloud), the service runs the plans' CLIs for its customers, and the providers' conditions for platforms that do want each person on their own plan ("Each end user must authenticate with their own Anthropic API key, Claude subscription plan credentials, or 3P inference provider credential", code.claude.com/docs/en/legal-and-compliance). There an agent on a plan answers only its owner whatever its stored audience, and nobody can widen it (`plan.personal`). An agent shared before narrows, and answers its stored audience again once it moves to the API key. A self-host keeps the switch and the warning: whoever runs it carries the terms.
 

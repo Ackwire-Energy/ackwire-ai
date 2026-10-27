@@ -42,6 +42,20 @@ export const addressDomain = (address: string) => {
   return a.includes("@") ? a.slice(a.lastIndexOf("@") + 1) : "";
 };
 
+/**
+ * The mailbox an address reaches: lowercased, without a `+tag`, and for Gmail without dots, so `a.b+x@gmail.com`
+ * and `AB@googlemail.com` both reach `ab@gmail.com`.
+ */
+export function mailboxOf(address: string) {
+  const a = normalizeAddress(address);
+  const at = a.lastIndexOf("@");
+  const local = a.slice(0, Math.max(at, 0)).split("+")[0] ?? "";
+  const domain = addressDomain(a);
+  return domain === "gmail.com" || domain === "googlemail.com"
+    ? `${local.replaceAll(".", "")}@gmail.com`
+    : `${local}@${domain}`;
+}
+
 const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 

@@ -8,9 +8,9 @@ import {
   listCredentials,
   makeDefaultCredential,
   postPersonMessage,
-  resolveRouterModel,
   resolveSummaryModel,
   revokeCredential,
+  smallModelFor,
   updateOrgSettings,
   ValidationError,
 } from "../src";
@@ -91,20 +91,18 @@ describe("credentials per provider", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  test("router fallback and summaries use the cheap model of the org's default key's provider", async () => {
+  test("routing and summaries use the small model of the org's default key's provider", async () => {
     f = await setup();
-    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5", { openai: "gpt-6-luna" })).toBe(
-      "claude-haiku-5-5",
-    );
+    expect(await smallModelFor(f, f.org.id, { openai: "gpt-6-luna" })).toBe("claude-haiku-5-5");
     await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
     await openaiKey(f, { makeDefault: true });
-    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5", { openai: "gpt-6-luna" })).toBe("gpt-6-luna");
+    expect(await smallModelFor(f, f.org.id, { openai: "gpt-6-luna" })).toBe("gpt-6-luna");
     expect(await resolveSummaryModel({ ...f.context, cheapModels: { openai: "gpt-6-luna" } }, f.org.id)).toBe(
       "gpt-6-luna",
     );
   });
 
-  test("a DeepSeek-only workspace: its agent thinks with the DeepSeek key, priced at DeepSeek's rates; system tasks on DeepSeek Flash, on Kimi's recommended model for Kimi", async () => {
+  test("a DeepSeek-only workspace: its agent thinks with the DeepSeek key, priced at DeepSeek's rates; system tasks on DeepSeek Flash, never on Kimi's", async () => {
     f = await setup({ reply: () => ({ chunks: ["oi"], usage: { inputTokens: 1000, outputTokens: 100 } }) });
     await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
     const key = (provider: "deepseek" | "moonshot", apiKey: string) =>
@@ -126,10 +124,11 @@ describe("credentials per provider", () => {
       model: "deepseek-flash",
       costNanoUsd: 1000 * 300 + 100 * 1200,
     });
-    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5")).toBe("deepseek-flash");
+    expect(await smallModelFor(f, f.org.id)).toBe("deepseek-flash");
     expect(await resolveSummaryModel(f.context, f.org.id)).toBe("deepseek-flash");
 
+    // Kimi has no small model: the default Kimi key routes with the other key's, never with K3.1 Pro.
     await key("moonshot", "sk-kimi-9999");
-    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5")).toBe("kimi-k3.1-pro");
+    expect(await smallModelFor(f, f.org.id)).toBe("deepseek-flash");
   });
 });

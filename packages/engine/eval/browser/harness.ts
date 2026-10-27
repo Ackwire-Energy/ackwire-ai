@@ -222,7 +222,7 @@ export const newJudgeLog = (): JudgeLog => ({ calls: [], usage: [] });
 /** The real Jev judge with production timeouts, every call timed and its usage kept. */
 export function jevJudge(log: JudgeLog): Judge {
   const jev = createJevJudge({
-    apiKey: requireKey("TYPESAFE_API_KEY"),
+    key: requireKey("TYPESAFE_API_KEY"),
     gateway: {
       async recordExternalUsage(u) {
         log.usage.push({ inputTokens: u.inputTokens, costNanoUsd: u.costNanoUsd, model: u.model });

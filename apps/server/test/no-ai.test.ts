@@ -18,10 +18,17 @@ test("ai-status per agent; a mention with no key gets the card; answer-now 409, 
   const { orgId, channelId, agentId } = await seedOrg(owner);
   const org = `/api/app/organizations/${orgId}`;
   const status = async () => (await (await owner(`${org}/ai-status`)).json()) as Record<string, unknown>;
-  expect(await status()).toEqual({ any: true, agents: [{ agentId, state: "ready" }] });
+  // Who picks the agents for a message nobody mentioned: the workspace's small model, on its own key.
+  const byModel = { by: "model", mine: "model", model: "claude-haiku-5-5", noSmallModel: null };
+  expect(await status()).toEqual({ any: true, agents: [{ agentId, state: "ready" }], routing: byModel, apiKey: true });
 
   await t.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
-  expect(await status()).toEqual({ any: false, agents: [{ agentId, state: "no_ai", reason: "no_key" }] });
+  expect(await status()).toEqual({
+    any: false,
+    agents: [{ agentId, state: "no_ai", reason: "no_key" }],
+    routing: { by: "rules", mine: "rules", model: null, noSmallModel: null },
+    apiKey: false,
+  });
   const asked = await owner(`${org}/channels/${channelId}/messages`, { json: { body: "@dev resume o canal" } });
   const { id: askedId } = (await asked.json()) as { id: string };
   await t.drain();

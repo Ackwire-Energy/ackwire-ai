@@ -1,6 +1,6 @@
 # 0068. An invitation link asks to join; an admin approves
 
-- Status: Accepted (built: server, web, the shared client and the phone app)
+- Status: Accepted (built: server, web, the shared client and the phone app). Revised by ADR 0072: on a server that sends email, an address proves itself with a code before it asks, and an approval lets in at once only a confirmed account whose address was proven
 - Date: 2026-10-26
 - Revises: ADR 0006 (the organization-wide invitation link, and the sign-up policy's link path)
 

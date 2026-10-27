@@ -12,19 +12,18 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* Whether approving lets them in or sends an invitation (an `.ac-iconline`). */
-.jr-proof {
-  color: var(--ink);
+/* Who asks, then "Not verified" beside "Asked …" at the head's end: the two chips wrap together. */
+.jr-list .ac-approval__who {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
-.jr-proof > :first-child {
-  color: var(--muted);
-}
-.jr-proof[data-confirmed] > :first-child {
-  color: var(--ok);
-}
-.jr-via {
-  display: block;
-  margin-top: 2px;
+.jr-chips {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 .jr-role {
   width: 132px;

@@ -4,10 +4,14 @@ import {
   consolidateByMeaning,
   consolidateItem,
   createFakeJudge,
+  createJevJudge,
+  createJevKey,
   createLlmJudge,
   insertContextItem,
+  isStopRequest,
   itemLabel,
   type NewContextItem,
+  smallModelFor,
   withJudgeFallback,
 } from "../src";
 import {
@@ -266,6 +270,17 @@ test("memory never takes the LLM fallback's word: without Jev, words decide", as
   }
 });
 
+test("without Jev the judge asks the workspace's small model with the least thinking it allows; with none it fails", async () => {
+  f = await setup({ reply: () => ({ chunks: ['{"stop":0.9}'] }) });
+  const judge = createLlmJudge({ gateway: f.gateway, resolveModel: (orgId) => smallModelFor(f, orgId) });
+  const stop = { orgId: f.org.id, text: "para", agentName: "Dev" };
+  expect(await isStopRequest(judge, stop)).toBe(true);
+  expect(f.provider.calls[0]?.request).toMatchObject({ model: "claude-haiku-5-5", effort: "none", maxTokens: 512 });
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  await expect(isStopRequest(judge, stop)).rejects.toThrow("no small model");
+  expect(f.provider.calls).toHaveLength(1);
+});
+
 describe("memory judgments: the daily pass", () => {
   const relation = (answer: string) => createFakeJudge((kind) => (kind === "memory_relation" ? answer : undefined));
   /** Makes `id` the older item (writes in one test can share a timestamp). */
@@ -328,5 +343,32 @@ describe("memory judgments: the daily pass", () => {
     });
     const [still] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, twin.id));
     expect(still?.status).toBe("active");
+  });
+
+  test("with no Jev key nothing moves, and once its owner saves one the next pass does, with no restart", async () => {
+    f = await setup();
+    const older = await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const twin = await insertContextItem(f.db, fact(f, "Hospedamos a aplicação no Railway."));
+    await ageOf(older.id);
+    // TypeSafe hears every pair as the same fact, and accepts the key.
+    const typesafe = (async (_url: string, init: RequestInit) => {
+      const { questions } = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
+      const same = { choice: "same", probabilities: { same: 0.95 } };
+      return Response.json({ answers: Object.fromEntries(Object.keys(questions).map((id) => [id, same])) });
+    }) as unknown as typeof fetch;
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], fetch: typesafe });
+    const llmOnly = createLlmJudge({
+      gateway: { complete: async () => Promise.reject(new Error("must not be called")) },
+      resolveModel: async () => "claude-haiku-5-5",
+    });
+    const deps = {
+      ...f.context,
+      judge: withJudgeFallback(createJevJudge({ key, gateway: f.gateway, fetch: typesafe }), llmOnly),
+    };
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 0, linked: 0 });
+    await key.save("ts_memory_key_1", f.owner.id);
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 1, linked: 0 });
+    const [merged] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, twin.id));
+    expect(merged).toMatchObject({ status: "archived", supersededBy: older.id });
   });
 });

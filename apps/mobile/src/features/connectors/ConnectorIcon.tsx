@@ -2,7 +2,7 @@ import type { ConnectorDef } from "@agenteschat/client";
 import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Icon, Text } from "@/ui";
+import { Icon, type IconName, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { brandOf, iconUri, monogram } from "./logic";
 
@@ -50,6 +50,28 @@ export function ConnectorIcon({
           <Icon name="check" size={10} color="#ffffff" />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** One of our own icons on the same tile (a built-in tool, a mailbox), where a service would show its mark. */
+export function IconTile({ name, size = 20 }: { name: IconName; size?: number }) {
+  const c = useColors();
+  return (
+    <View
+      style={[
+        styles.tile,
+        {
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.3),
+          backgroundColor: c.sunken,
+          borderColor: c.line,
+        },
+      ]}
+      accessible={false}
+    >
+      <Icon name={name} size={Math.round(size * 0.62)} color={c.muted} />
     </View>
   );
 }

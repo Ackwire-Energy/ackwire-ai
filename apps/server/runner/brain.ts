@@ -30,7 +30,7 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf, yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -1083,6 +1083,8 @@ interface Live {
   key: string;
   id: string;
   proc: ClaudeProcess;
+  /** The account folder it signs in with; null: the computer's own sign-in. */
+  account: string | null;
   /** Launch settings: a turn asking for others restarts the process (resumed). */
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
@@ -1201,6 +1203,12 @@ export class BrainManager {
     return this.live.get(`${agentId}:${session}`)?.proc;
   }
 
+  /** Whether a process of that sign-in is open: a turn, or the one kept after it (`null`: the computer's own). */
+  holds(account: string | null): boolean {
+    const open = (l: Live) => l.account === account && !l.proc.exited;
+    return [...this.live.values()].some(open) || [...this.running.values()].some(open);
+  }
+
   /**
    * For the MCP bridge: the token of a brain process's MCP server, the run it
    * works for now (its calls are relayed for that run) and whether a turn runs.
@@ -1308,6 +1316,9 @@ export class BrainManager {
     ctx: BrainTurnContext,
   ): Promise<WireBrainEvent> {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
+    // A route on this sign-in stops first: two processes on one sign-in race on its refresh token. Kept right
+    // before the process starts, since a route may begin during any await before it.
+    await yieldRoute("claude_code", ctx.accountHome);
     const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
     // A turn Claude Code runs by itself there (or one due): its output would read as this turn's. Wait for
@@ -1576,6 +1587,7 @@ export class BrainManager {
       key,
       id,
       proc,
+      account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
       ranKey: ranKeyOf(req, session),
       busy: false,

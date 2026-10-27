@@ -46,6 +46,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "HOST_COMPUTER_TOKEN can't be set with MACHINE_PROVISIONING=external: every workspace gets its own computer, and no other computer joins it",
     ]);
   }
+  // Half a pair means the bot check was meant to be on: it never runs quietly off.
+  if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
+    throw new ConfigError(["TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY go together: set both, or neither"]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

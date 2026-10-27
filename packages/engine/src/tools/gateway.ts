@@ -15,7 +15,7 @@ import {
   summarizeCall,
   type TeamCheck,
 } from "../team-actions";
-import { carriesCredential } from "../tool-detail";
+import { carriesCredential, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
@@ -249,7 +249,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // A mission task's call through the bridge has no run (ADR 0032): nothing to record steps on.
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
-      await record(ctx.db, step, "tool_call", { toolUseId: call.toolUseId, name: call.name, input: call.input });
+      // The same short label the live chip shows (built-in tools only, never a connector's input): the chat's
+      // line of this call says it after the run too.
+      const detail = toolDetail(call.name, call.input);
+      await record(ctx.db, step, "tool_call", {
+        toolUseId: call.toolUseId,
+        name: call.name,
+        input: call.input,
+        ...(detail ? { detail } : {}),
+      });
       const finish = async (output: ToolOutput) => {
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,

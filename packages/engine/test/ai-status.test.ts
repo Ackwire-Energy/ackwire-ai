@@ -1,16 +1,23 @@
-import { afterEach, expect, test } from "bun:test";
-import { envPlatformCredentials, noPlatformCredentials } from "@agenteschat/adapters";
+import { afterEach, describe, expect, test } from "bun:test";
+import { envPlatformCredentials, noPlatformCredentials, ROUTE_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  type AiRouting,
   agentAiState,
   createAgent,
   createCredential,
+  createJevKey,
   createModelGateway,
+  type JobDeps,
+  type MachineCaller,
   type MachineStatus,
+  messageRouter,
   orgAiStatus,
   orgHasAi,
+  orgRouting,
+  type RoutingSetup,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
@@ -166,5 +173,133 @@ test("the organization: any agent ready or waiting; archived ones don't count", 
   expect(await orgAiStatus(deps, f.org.id)).toEqual({
     any: false,
     agents: [{ agentId: f.agent.id, state: "no_ai", reason: "no_key" }],
+  });
+});
+
+describe("who picks the agents (ADR 0074)", () => {
+  /** The router as `message.posted` builds it, on a computer hub that reports `status`. */
+  const routingOf = (over: Partial<NonNullable<JobDeps["router"]>>, status: Partial<MachineStatus> = {}) => {
+    const hub = {
+      status: async (id: string) => statusOf({ id, protocol: ROUTE_PROTOCOL, ...status }),
+      call: async () => Promise.reject(new Error("not asked")),
+    } as unknown as Pick<MachineCaller, "call" | "status">;
+    return (
+      messageRouter({
+        ...f.jobDeps,
+        router: {
+          enabled: true,
+          model: "claude-haiku-5-5",
+          plans: { hub, publicUrl: "http://localhost:3000" },
+          ...over,
+        },
+      })?.routing ?? null
+    );
+  };
+  const who = (routing: RoutingSetup | null, userId = f.owner.id) =>
+    orgRouting({ db: f.db, gateway: f.gateway }, routing, f.org.id, userId);
+
+  /** Ana's own Claude account on her computer, lent to Dev; no API key; Bruna in the workspace. */
+  async function plans() {
+    await revokeKeys();
+    const bruna = await addMember(f.db, f.org.id, "member", "Bruna");
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Mac" });
+    const accountId = crypto.randomUUID();
+    await f.db.insert(schema.machineAccounts).values({
+      id: accountId,
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Trabalho",
+      createdBy: f.owner.id,
+    });
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", machineId, brainAccountId: accountId })
+      .where(eq(schema.agents.id, f.agent.id));
+    return { bruna, accountId };
+  }
+
+  test("Jev, while its owner sees it working; a small model; off", async () => {
+    f = await setup();
+    let clock = Date.now();
+    const key = createJevKey({
+      db: f.db,
+      keyWrapper: f.keyWrapper,
+      keyWrappers: [f.keyWrapper],
+      envKey: "ts_env_key",
+      now: () => clock,
+    });
+    const jev = routingOf({ jev: { key } });
+    const jevLine: AiRouting = { by: "jev", mine: "jev", model: null, noSmallModel: null };
+    expect(await who(jev)).toEqual({ apiKey: true, routing: jevLine });
+    // Three outages in a row skip Jev for a minute: no screen says so.
+    for (const _ of [1, 2, 3]) key.report("down");
+    expect(key.usable()).toBe(false);
+    expect((await who(jev)).routing).toEqual(jevLine);
+    key.report("no_credit");
+    expect((await who(jev)).routing).toEqual({
+      by: "model",
+      mine: "model",
+      model: "claude-haiku-5-5",
+      noSmallModel: null,
+    });
+    clock += 1;
+    expect(await who(null)).toEqual({
+      apiKey: true,
+      routing: { by: "off", mine: "off", model: null, noSmallModel: null },
+    });
+  });
+
+  test("plans: the owner's own, a teammate gets the rules; coding plans, offline and old computers don't count", async () => {
+    f = await setup();
+    const { bruna, accountId } = await plans();
+    const routing = routingOf({});
+    expect(await who(routing)).toEqual({
+      apiKey: false,
+      routing: { by: "plans", mine: "plan", model: null, noSmallModel: null },
+    });
+    expect((await who(routing, bruna.id)).routing).toMatchObject({ by: "plans", mine: "rules" });
+    expect((await who(routingOf({}, { online: false }))).routing).toMatchObject({ by: "rules", mine: "rules" });
+    expect((await who(routingOf({}, { protocol: ROUTE_PROTOCOL - 1 }))).routing.by).toBe("rules");
+    // The runner refuses routes on Windows, and with that CLI switched off.
+    expect((await who(routingOf({}, { os: "windows" }))).routing).toMatchObject({ by: "rules", mine: "rules" });
+    const off = { folders: [], tools: { claude: false, codex: true, commands: true } };
+    expect((await who(routingOf({}, { access: off }))).routing).toMatchObject({ by: "rules", mine: "rules" });
+    // The Cloud: never a plan.
+    const cloud = routingOf({
+      plans: {
+        hub: { status: async () => null, call: async () => null } as never,
+        publicUrl: "https://app.agentes.chat",
+      },
+    });
+    expect((await who(cloud)).routing.by).toBe("rules");
+    await f.db.update(schema.machineAccounts).set({ provider: "zai" }).where(eq(schema.machineAccounts.id, accountId));
+    expect((await who(routing)).routing).toMatchObject({ by: "rules", mine: "rules" });
+  });
+
+  test("the computer's own sign-in counts only when made with a plan", async () => {
+    f = await setup();
+    await plans();
+    await f.db.update(schema.agents).set({ brainAccountId: null }).where(eq(schema.agents.id, f.agent.id));
+    const signedIn = (authMethod: string) => ({
+      executors: { claude: { version: "2.1.311", loggedIn: true, authMethod }, detectedAt: new Date().toISOString() },
+    });
+    expect((await who(routingOf({}, signedIn("claude.ai")))).routing.mine).toBe("plan");
+    expect((await who(routingOf({}, signedIn("api_key")))).routing.mine).toBe("rules");
+  });
+
+  test("a Kimi key alone: the rules, and why", async () => {
+    f = await setup();
+    await revokeKeys();
+    await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "moonshot",
+      label: "kimi",
+      apiKey: "sk-kimi-test-key-123456",
+      makeDefault: true,
+    });
+    expect(await who(routingOf({}))).toEqual({
+      apiKey: true,
+      routing: { by: "rules", mine: "rules", model: null, noSmallModel: "moonshot" },
+    });
   });
 });

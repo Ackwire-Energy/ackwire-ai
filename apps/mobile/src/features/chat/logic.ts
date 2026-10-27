@@ -218,7 +218,7 @@ export function missionLinkOf(meta: Message["meta"]): { missionId: string; threa
   return p && str(p.missionId) && str(p.threadId) ? { missionId: str(p.missionId), threadId: str(p.threadId) } : null;
 }
 
-/** `meta.work`: how many steps the run took (the collapsed "N passos" header). */
+/** `meta.work`: how many tools the run used (its saved tool block shows only when it used some). */
 export function workStepsOf(meta: Message["meta"]): number | null {
   const w = obj(meta?.work);
   return w && typeof w.steps === "number" && w.steps > 0 ? w.steps : null;

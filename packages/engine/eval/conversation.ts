@@ -230,7 +230,7 @@ async function handoffSuite() {
   if (judgeKind === "jev") {
     const key = process.env.TYPESAFE_API_KEY;
     if (!key) throw new Error("TYPESAFE_API_KEY is missing (or run with --judge llm)");
-    judge = createJevJudge({ apiKey: key, gateway: { recordExternalUsage: async () => null }, timeoutMs: 10_000 });
+    judge = createJevJudge({ key, gateway: { recordExternalUsage: async () => null }, timeoutMs: 10_000 });
   } else judge = createLlmJudge({ gateway, resolveModel: async () => model });
   await Promise.all(
     HANDOFF_CASES.map(async (c) => {

@@ -177,6 +177,12 @@ export type LiveWork =
       running: boolean;
       /** When the call started (the stop confirmation says "rodando código há 2 min"). */
       since?: number;
+      /** How long it took, once it ended (its line says "1,2 s"). */
+      ms?: number;
+      /** The tool answered with an error (`agent.tool` end with `failed`). */
+      failed?: boolean;
+      /** It didn't run: it waits on a person (an approval, a question, a secret). */
+      held?: boolean;
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -248,6 +254,10 @@ export interface AgentToolEvent {
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
   code?: LiveCode | null;
   toolUseId?: string;
+  /** On the end (`tool: null`): the tool answered with an error. */
+  failed?: boolean;
+  /** On the end: it didn't run, it waits on a person. */
+  held?: boolean;
 }
 
 export interface StreamsState {
@@ -479,10 +489,17 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
       if (said) work = say(work, said, current?.turn);
+      const end = (w: Extract<LiveWork, { kind: "call" }>, how: { failed?: boolean; held?: boolean } = {}) => ({
+        ...w,
+        running: false,
+        ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
+        ...(how.failed ? { failed: true } : {}),
+        ...(how.held ? { held: true } : {}),
+      });
       if (newCall) {
         // A new call means the previous ones ended.
         work = [
-          ...work.map((w) => (w.kind === "call" && w.running ? { ...w, running: false } : w)),
+          ...work.map((w) => (w.kind === "call" && w.running ? end(w) : w)),
           {
             kind: "call" as const,
             since: Date.now(),
@@ -496,12 +513,13 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           },
         ];
       } else {
-        // The call ended: the last running one stops.
+        // The call ended: that one (by id), else the last running one.
+        const named = event.toolUseId && work.some((w) => w.kind === "call" && w.id === event.toolUseId);
         let done = false;
         work = [...work].reverse().map((w) => {
-          if (!done && w.kind === "call" && w.running) {
+          if (!done && w.kind === "call" && w.running && (!named || w.id === event.toolUseId)) {
             done = true;
-            return { ...w, running: false };
+            return end(w, { failed: event.failed === true, held: event.held === true });
           }
           return w;
         });

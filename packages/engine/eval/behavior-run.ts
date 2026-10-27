@@ -353,7 +353,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     ];
     const tools = createToolGateway({ sources });
     if (options.toolsOnDemand && options.jevKey) {
-      const jev = createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 });
+      const jev = createJevJudge({ key: options.jevKey, gateway, timeoutMs: 5000 });
       const fake = context.judge as Judge;
       context.judge = { name: "eval", ask: (r) => (r.kind === "tool_groups" ? jev : fake).ask(r) };
     }
@@ -517,7 +517,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
       const judge = c.addressees
         ? options.jevKey
-          ? withJudgeFallback(createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
+          ? withJudgeFallback(createJevJudge({ key: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
           : llmJudge
         : undefined;
       if (routine && conv.routine) {
@@ -914,7 +914,7 @@ async function judgeWithJev(
 ) {
   let costNanoUsd = 0;
   const judge = createJevJudge({
-    apiKey: jev.apiKey,
+    key: jev.apiKey,
     timeoutMs: 30_000,
     ...(jev.fetch ? { fetch: jev.fetch } : {}),
     gateway: {

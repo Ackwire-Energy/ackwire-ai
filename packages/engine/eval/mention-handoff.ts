@@ -137,7 +137,7 @@ let judge: Judge;
 if (which === "jev") {
   const apiKey = process.env.TYPESAFE_API_KEY;
   if (!apiKey) throw new Error("TYPESAFE_API_KEY is missing (or run with --judge llm)");
-  judge = createJevJudge({ apiKey, gateway: noUsage, timeoutMs: 10_000 });
+  judge = createJevJudge({ key: apiKey, gateway: noUsage, timeoutMs: 10_000 });
 } else {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");

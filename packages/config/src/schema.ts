@@ -148,11 +148,32 @@ export const envVars = {
     example: "https://example.com/privacy",
   },
   TRUSTED_PROXIES: {
-    schema: z.string().optional(),
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      ),
     description:
-      "Comma-separated IPs/CIDRs of your reverse proxies (load balancer, Cloudflare…). Used to find the real client IP for sign-in rate limiting. Leave empty if agentes.chat is reached directly.",
+      "Comma-separated IPs/CIDRs of your reverse proxies (load balancer, Cloudflare…). Used to find the real client IP for every rate limit. Leave empty if agentes.chat is reached directly.",
     section: "Sign-in",
     example: "10.0.0.0/8,172.16.0.0/12",
+  },
+  TURNSTILE_SITE_KEY: {
+    schema: z.string().optional(),
+    description:
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's site key. With `TURNSTILE_SECRET_KEY`, a bot check runs before email lookup, sign-in, sign-up, password reset, the code to ask to join and the waiting list. Unset: no check, and no page loads anything from Cloudflare.",
+    section: "Sign-in",
+  },
+  TURNSTILE_SECRET_KEY: {
+    schema: z.string().optional(),
+    description:
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's secret key, which this server uses to check each answer with Cloudflare. Set both keys or neither. A secret Cloudflare refuses stops the server at boot.",
+    section: "Sign-in",
+    secret: true,
   },
   GOOGLE_CLIENT_ID: {
     schema: z.string().optional(),

@@ -5160,53 +5160,40 @@ p {
   }
 }
 
-/* Live work in a reply: narration lines and tool calls, stacked like a mini timeline. */
-.live-work {
+/* What a reply said and read before its first tool call (its tools go in the ToolBlock, ToolCalls.tsx). */
+.live-work-notes {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 2px 0 6px;
-  padding-left: 12px;
-  border-left: 2px solid var(--line);
 }
 .live-work__say {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
 }
-.live-call {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* A call's logo in the tool block: the connector's mark or one of our icons, a 20px tile (18px in its head). */
+.ac-tools .connector-icon,
+.tool-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 1;
 }
-.live-call__head {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  margin: 0;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: var(--radius-item);
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink2);
-  cursor: pointer;
-}
-button.live-call__head:hover {
-  background: var(--plate);
-}
-.live-call__head:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-call__head--static {
-  cursor: default;
+.tool-logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
 }
-.live-call__head .ac-icon {
-  color: var(--faint);
+.ac-tools__logos .connector-icon,
+.ac-tools__logos .tool-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
 }
 /* "Parar": a small round icon button (stop square in a circle); a danger tint only on hover. */
 .run-status {
@@ -9679,80 +9666,6 @@ html[data-menu-overlay] .shell {
 }
 
 /* ── Messages fluidity ── */
-
-/* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
-.live-call__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-.live-call[data-s="stop"] .live-call__head {
-  color: var(--faint);
-  text-decoration: line-through;
-  text-decoration-color: var(--line2);
-}
-/* When the answer is done the steps fold into "3 passos" (same element: it closes smoothly). */
-.live-work-fold {
-  display: grid;
-  grid-template-rows: 1fr;
-}
-.live-work-fold > .live-work {
-  min-height: 0;
-  overflow: hidden;
-}
-.live-work-fold[data-folded] {
-  grid-template-rows: 0fr;
-  opacity: 0;
-}
-.live-work-fold[data-folded] > .live-work {
-  margin: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work-fold {
-    transition:
-      grid-template-rows 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 0.3s;
-  }
-}
-.live-work__sum {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: max-content;
-  height: 24px;
-  margin: 2px 0 4px -6px;
-  padding: 0 8px 0 6px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: normal;
-  color: var(--muted);
-  cursor: pointer;
-}
-.live-work__sum:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.live-work__sum:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-work__chev {
-  transition: transform 0.2s;
-}
-.live-work__sum[aria-expanded="true"] .live-work__chev {
-  transform: rotate(90deg);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work__sum {
-    animation: ac-fade-in 0.4s ease-out both;
-  }
-}
 
 /*
  * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
