@@ -43,6 +43,10 @@ export const mobilePtBR = {
       notAgentes: "{{host}} não é um servidor agentes.chat. Confira o endereço.",
       serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",
       appTooOld: "Atualize o app agentes para usar {{host}}.",
+      down: {
+        title: "Sem resposta do servidor",
+        text: "{{host}} não respondeu. Ele pode estar fora do ar ou fora da sua rede. Assim que voltar, o app abre sozinho.",
+      },
     },
     connect: {
       title: "Conectar a este servidor?",

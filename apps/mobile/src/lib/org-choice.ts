@@ -1,3 +1,5 @@
+import type { ServerProblem } from "@agenteschat/client/lib/server";
+
 /** Picks the remembered organization if the person still belongs to it, else the first one (pure). */
 export function chooseOrg(orgs: readonly { id: string }[], remembered: string | null): string | null {
   if (remembered && orgs.some((o) => o.id === remembered)) return remembered;
@@ -26,4 +28,22 @@ export function suspendedOf<O extends { id: string; standing?: { state: string; 
     reason: org.standing.reason,
     others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended"),
   };
+}
+
+/** How long the account may load before the app asks the server itself whether it is there. */
+export const SERVER_STUCK_MS = 10_000;
+
+/**
+ * Why the app can't open its server, or null while it can (pure). `unreachable`: the account failed to load with
+ * nothing cached; `stuck`: it is still loading after `SERVER_STUCK_MS`; `check`: what `GET /api/instance` said,
+ * once asked. A failed load is always shown (as "unreachable" when the server itself answers); a slow one only
+ * once the server is known to be out of reach.
+ */
+export function serverDownOf(
+  unreachable: boolean,
+  stuck: boolean,
+  check: { ok: true } | { ok: false; problem: ServerProblem } | null,
+): ServerProblem | null {
+  if (check && !check.ok && (unreachable || stuck)) return check.problem;
+  return unreachable ? "unreachable" : null;
 }
