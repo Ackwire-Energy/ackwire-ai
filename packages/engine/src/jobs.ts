@@ -27,7 +27,7 @@ import { afterMachineTaskEnded, afterMissionRunEnded } from "./mission-worktree"
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
-import { ORG_FILES_PURGE_JOB } from "./organizations";
+import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
@@ -470,6 +470,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         kind: ORG_FILES_PURGE_JOB,
         payload: { orgId },
         dedupeKey: `${ORG_FILES_PURGE_JOB}:${job.id}`,
+        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
       });
     },
     "email.send": async (job, ctx) => {

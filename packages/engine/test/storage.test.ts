@@ -1,5 +1,8 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { createS3BlobStore, StorageError } from "@agenteschat/adapters";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createDiskBlobStore, createS3BlobStore, StorageError } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   artifactDownload,
@@ -15,6 +18,7 @@ import {
   getStorage,
   isBlockedAddress,
   ORG_FILES_PURGE_JOB,
+  purgeOrgFiles,
   type S3Input,
   saveStorage,
   startMigration,
@@ -23,8 +27,12 @@ import {
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
 let f: Fixture;
 afterEach(async () => {
+  setSystemTime();
   // Some tests don't set up a database: close each one once.
   const current = f;
   f = undefined as unknown as Fixture;
@@ -204,6 +212,7 @@ describe("org storage", () => {
     const runsOf = async (orgId: string) => (await purges()).filter((j) => j.payload.orgId === orgId);
 
     expect((await deleteAccount(f.db, f.owner.id)).deletedOrgIds.sort()).toEqual([f.org.id, second.id].sort());
+    // Two per workspace: one now, one a day later.
     const queued = (await purges()).map((j) => ({ orgId: j.orgId, payload: j.payload }));
     expect(queued).toEqual(
       expect.arrayContaining([
@@ -211,21 +220,84 @@ describe("org storage", () => {
         { orgId: null, payload: { orgId: second.id } },
       ]),
     );
-    expect(queued).toHaveLength(2);
+    expect(queued).toHaveLength(4);
 
     await drainOutbox(f.db, f.handlers);
     expect([...f.platformBlobs.objects.keys()].sort()).toEqual(kept.sort());
     // The full first page ran the job once more.
-    expect((await runsOf(f.org.id)).map((j) => j.status)).toEqual(["done", "done"]);
-    expect((await runsOf(second.id)).map((j) => j.status)).toEqual(["done"]);
+    expect((await runsOf(f.org.id)).map((j) => j.status).sort()).toEqual(["done", "done", "pending"]);
+    expect((await runsOf(second.id)).map((j) => j.status).sort()).toEqual(["done", "pending"]);
 
-    // Run again, nothing is left and nothing more is queued. A workspace that still exists keeps its files.
+    // Run again, and a day later: nothing is left and nothing more is queued. A workspace that still exists keeps
+    // its files.
     for (const orgId of [f.org.id, hers.id])
       await enqueue(f.db, { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId } });
-    await drainOutbox(f.db, f.handlers);
+    await drainOutbox(f.db, f.handlers, { now: new Date(Date.now() + 2 * DAY) });
     expect([...f.platformBlobs.objects.keys()].sort()).toEqual(kept.sort());
-    expect(await runsOf(f.org.id)).toHaveLength(3);
+    expect(await runsOf(f.org.id)).toHaveLength(4);
     expect((await purges()).every((j) => j.status === "done")).toBe(true);
+  });
+
+  test("the purge outlasts a storage outage, and its pass a day later takes a file stored after the first", async () => {
+    f = await setup();
+    const t0 = Date.now();
+    const filesOf = (orgId: string) =>
+      [...f.platformBlobs.objects.keys()].filter((k) => k.startsWith(`orgs/${orgId}/`));
+    await f.platformBlobs.put(`orgs/${f.org.id}/artifacts/a/v1`, new Uint8Array([1]), { contentType: "text/plain" });
+    // Every delete fails for 5 hours.
+    const remove = f.platformBlobs.delete;
+    f.platformBlobs.delete = async (key) => {
+      if (Date.now() < t0 + 5 * HOUR) throw new Error("storage unreachable");
+      await remove(key);
+    };
+    const purges = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, ORG_FILES_PURGE_JOB));
+    // The clock jumps to each purge when it is due, up to `until`.
+    const runUntil = async (until: number) => {
+      for (;;) {
+        const next = Math.min(
+          ...(await purges()).filter((j) => j.status === "pending").map((j) => j.nextAttemptAt.getTime()),
+        );
+        if (!(next <= until)) return;
+        setSystemTime(new Date(Math.max(next, Date.now())));
+        await drainOutbox(f.db, f.handlers);
+      }
+    };
+
+    await deleteAccount(f.db, f.owner.id);
+    await runUntil(t0 + 20 * HOUR);
+    // Eight tries failed, all that the default budget gives, and the ninth, after the outage, deleted the file.
+    expect((await purges()).find((j) => j.status === "done")?.attempts).toBe(9);
+    expect(filesOf(f.org.id)).toEqual([]);
+
+    // An agent's upload under way: the file is stored, then its row is refused (the workspace is gone).
+    const agent = { type: "agent" as const, agentId: f.agent.id, channelId: f.general.id };
+    await expect(createArtifact(f.artifactDeps, agent, f.org.id, doc("Late"))).rejects.toThrow();
+    expect(filesOf(f.org.id)).toHaveLength(1);
+    await runUntil(t0 + 2 * DAY);
+    expect(filesOf(f.org.id)).toEqual([]);
+    expect((await purges()).map((j) => j.status)).toEqual(["done", "done"]);
+  });
+
+  test("on a disk, a deleted workspace's folders go whole, with the folder names people chose", async () => {
+    f = await setup();
+    const dir = await mkdtemp(join(tmpdir(), "agentes-purge-"));
+    try {
+      const disk = createDiskBlobStore(dir);
+      const gone = crypto.randomUUID();
+      const keys = [
+        `orgs/${gone}/skills/s/v1/clientes/acme-contrato-2026/notes.md`,
+        `org-logos/${gone}/logo.png`,
+        `orgs/${f.org.id}/artifacts/a/v1`,
+      ];
+      for (const key of keys) await disk.put(key, new Uint8Array([1]), { contentType: "text/plain" });
+      for (const orgId of [gone, f.org.id])
+        expect(await purgeOrgFiles({ ...f.storage, platform: disk }, orgId)).toBe(false);
+      expect(await readdir(join(dir, "orgs"))).toEqual([f.org.id]);
+      expect(await readdir(join(dir, "org-logos"))).toEqual([]);
+      expect(await disk.list("")).toEqual([`orgs/${f.org.id}/artifacts/a/v1`]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   test("only admins manage storage", async () => {

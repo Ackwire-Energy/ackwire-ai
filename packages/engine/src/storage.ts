@@ -471,8 +471,9 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
 
 /**
  * Job `org.files.purge` (ADR 0019): a deleted workspace's files leave platform storage, its Drive, skills and
- * connector icons (`orgs/{orgId}/`) and its logo (`org-logos/{orgId}/`), up to `limit` keys of each per run. True
- * when a page came back full, so more may be left. A bucket the workspace brought is its own and stays as it is.
+ * connector icons (`orgs/{orgId}/`) and its logo (`org-logos/{orgId}/`), each folder at once where the store can
+ * (`FILES_DIR`), else up to `limit` keys of each per run. True when a page came back full, so more may be left. A
+ * bucket the workspace brought is its own and stays as it is.
  */
 export async function purgeOrgFiles(deps: StorageDeps, orgId: string, limit = 1000): Promise<boolean> {
   // Irreversible: never for a workspace that still exists.
@@ -481,10 +482,16 @@ export async function purgeOrgFiles(deps: StorageDeps, orgId: string, limit = 10
     .from(schema.organizations)
     .where(eq(schema.organizations.id, orgId));
   if (alive) return false;
+  const { platform } = deps;
+  const prefixes = [`orgs/${orgId}/`, `org-logos/${orgId}/`];
+  if (platform.deletePrefix) {
+    for (const prefix of prefixes) await platform.deletePrefix(prefix);
+    return false;
+  }
   let full = false;
-  for (const prefix of [`orgs/${orgId}/`, `org-logos/${orgId}/`]) {
-    const keys = await deps.platform.list(prefix, limit);
-    for (const key of keys) await deps.platform.delete(key);
+  for (const prefix of prefixes) {
+    const keys = await platform.list(prefix, limit);
+    for (const key of keys) await platform.delete(key);
     full ||= keys.length >= limit;
   }
   return full;

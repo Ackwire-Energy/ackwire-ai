@@ -586,6 +586,8 @@ export async function removeMember(
 
 /** A deleted workspace's files leave platform storage (`purgeOrgFiles`). */
 export const ORG_FILES_PURGE_JOB = "org.files.purge";
+/** The backoff tops out at 3 h: a purge keeps trying through a storage outage for about 30 days. */
+export const ORG_FILES_PURGE_ATTEMPTS = 240;
 
 /**
  * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
@@ -645,8 +647,20 @@ export async function deleteAccount(
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
-    // No org_id on the job: the outbox row would be deleted with the workspace (cascade).
-    for (const orgId of alone) await enqueue(tx, { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId } });
+    // No org_id on the job: the outbox row would be deleted with the workspace (cascade). A second pass a day
+    // later takes files that work under way stored after the first (an agent's upload stores its file, then its
+    // row is refused).
+    for (const orgId of alone) {
+      const purge = {
+        orgId: null,
+        kind: ORG_FILES_PURGE_JOB,
+        payload: { orgId },
+        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+      };
+      await enqueue(tx, purge);
+      const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
+      await enqueue(tx, { ...purge, ...late });
+    }
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
     if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
