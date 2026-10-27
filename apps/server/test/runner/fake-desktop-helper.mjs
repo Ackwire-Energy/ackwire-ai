@@ -3,7 +3,7 @@
 // It appends `{ start: { env, cwd, argv } }` once (`argv`: what follows those two) and `{ request }` for
 // each line to the log.
 // The state file (read again for each request) is the desktop:
-//   { snapshot, boxes: { "<bus> <path>": box | null }, windows, hello, apps,
+//   { snapshot, boxes: { "<bus> <path>": box | null }, windows, hello, apps, jpeg (what a capture holds),
 //     crash: "<op>" (exits instead of answering), fail: { "<op>": { code, error } }, garbage: "<op>" }
 // Boxes and windows the state doesn't give come from the snapshot.
 import { appendFileSync, readFileSync } from "node:fs";
@@ -44,7 +44,8 @@ function answer(req, s) {
       return { ms: 7, ...(req.settle ? { settled: true, changed: true } : {}) };
     case "capture": {
       const [width, height] = req.region ? [req.region.width, req.region.height] : snap.screen;
-      return { jpeg: Buffer.from("not really a jpeg").toString("base64"), width, height, region: req.region ?? null };
+      const jpeg = Buffer.from(s.jpeg ?? "not really a jpeg").toString("base64");
+      return { jpeg, width, height, region: req.region ?? null };
     }
     case "apps":
       return s.apps ?? [{ id: "thunar.desktop", name: "File Manager", generic: "File Manager", keywords: [] }];

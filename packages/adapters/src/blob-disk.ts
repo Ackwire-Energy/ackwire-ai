@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import type { BlobStore } from "./blob";
 
 /**
@@ -41,6 +41,12 @@ export function createDiskBlobStore(root: string): BlobStore {
       const path = pathOf(key);
       await rm(`${path}.type`, { force: true });
       await rm(path, { force: true });
+    },
+    async deletePrefix(prefix) {
+      const path = pathOf(prefix);
+      // Recursive, so the prefix must name its folder as written: `orgs//` resolves to every workspace's folder.
+      if (`${relative(base, path).split(sep).join("/")}/` !== prefix) throw new Error(`not a folder prefix: ${prefix}`);
+      await rm(path, { recursive: true, force: true });
     },
     async list(prefix, limit = 1000) {
       // Walk the deepest folder the prefix names, then keep the keys that start with the whole prefix.

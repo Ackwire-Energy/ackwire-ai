@@ -526,7 +526,7 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
     .from(usageRecords)
     .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since), eq(usageRecords.billedTo, "org")))
     .groupBy(usageRecords.kind);
-  // Calls our platform pays for (e.g. the Jev router) are reported apart, never in the org's total.
+  // Calls the server's own keys pay for (Jev) are reported apart, never in the org's total.
   const [platform] = await db
     .select({ calls: sql<number>`count(*)::int`, cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
     .from(usageRecords)

@@ -227,9 +227,9 @@ export const usageRecords = pgTable(
      */
     partial: boolean().notNull().default(false),
     /**
-     * Who pays: `org` (its own key) or `platform` (our keys: the platform model
-     * key, or internal services such as the Jev router). Org usage reports
-     * keep platform-billed rows apart.
+     * Who pays: `org` (its own key) or `platform` (the server's own keys: the
+     * platform model key, or internal services such as Jev, with this server's
+     * TypeSafe key). Org usage reports keep platform-billed rows apart.
      */
     billedTo: text().notNull().default("org"),
     /**

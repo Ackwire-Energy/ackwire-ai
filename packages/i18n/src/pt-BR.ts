@@ -6900,6 +6900,7 @@ export const ptBR = {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você por e-mail.",
       rateLimited: "Muitos pedidos daqui. Tente de novo daqui a uma hora.",
+      linkBusy: "Muita gente pediu por este link na última hora. Tente de novo mais tarde.",
       member: "Você já está neste workspace.",
       denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você por e-mail.",
       answered: "Alguém já respondeu este pedido.",
@@ -8467,6 +8468,12 @@ export const ptBR = {
     control: {
       keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
       notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
+    },
+    /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
+    session: {
+      check: "Verificações de segurança",
+      screening:
+        "Podemos verificar o texto desta tela para impedir abuso. Guardamos só o resultado. O que a tela não mostra, como uma senha num prompt, nunca é capturado.",
     },
     /** What the agent did on its desktop, on its message after the run (ADR 0062); the rest is the browser card's. */
     after: {

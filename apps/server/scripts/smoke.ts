@@ -16,7 +16,7 @@
  * With `--desktop-agent <handle>` (or the agent's id), through the server
  * running at PUBLIC_URL: the agent's desktop (started by watching it, if it
  * wasn't running) watched until one framebuffer update, and its terminal's
- * `id -un`, which must not be root
+ * `id -un`, which must not be root, or its refusal where sessions are screened
  * (`smoke-desktop.ts`). Without a model key, only that runs.
  */
 import { parseArgs } from "node:util";

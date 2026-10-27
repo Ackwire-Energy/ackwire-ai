@@ -27,6 +27,7 @@ import { afterMachineTaskEnded, afterMissionRunEnded } from "./mission-worktree"
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
+import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
@@ -43,7 +44,7 @@ import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
-import { runMigration, type StorageDeps } from "./storage";
+import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
@@ -458,6 +459,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "storage.migrate": async (job) => {
       if (!deps.storage) throw new PermanentJobError("no storage configured");
       await runMigration(deps.storage, String(job.payload.migrationId));
+    },
+    // A page at a time: a full page enqueues the next run, once even if this one runs twice.
+    [ORG_FILES_PURGE_JOB]: async (job) => {
+      if (!deps.storage) throw new PermanentJobError("no storage configured");
+      const orgId = String(job.payload.orgId);
+      if (!(await purgeOrgFiles(deps.storage, orgId))) return;
+      await enqueue(deps.db, {
+        orgId: null,
+        kind: ORG_FILES_PURGE_JOB,
+        payload: { orgId },
+        dedupeKey: `${ORG_FILES_PURGE_JOB}:${job.id}`,
+        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+      });
     },
     "email.send": async (job, ctx) => {
       try {
