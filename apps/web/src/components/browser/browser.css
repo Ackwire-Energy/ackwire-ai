@@ -1,6 +1,7 @@
 /* The agent browser (ADR 0040). */
 
 /* ---------- agent page and computer page ---------- */
+/* A whole-pixel line, so its icon lands on the capitals' middle (a fractional one rounds its baseline off by a pixel). */
 .brw-note {
   display: flex;
   gap: 10px;
@@ -11,16 +12,25 @@
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 18px;
 }
 .brw-note b {
   color: var(--ink);
   font-weight: 600;
 }
-.brw-note > .ac-icon {
-  margin-top: 2px;
+.brw-note > .ac-icon,
+.brw-note__text > .ac-icon {
   color: var(--ink2);
-  flex: none;
+}
+/* Words and a button: the words' block centres on the button, its icon on the words' first line. */
+.brw-note--act {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.brw-note__text {
+  flex: 1 1 200px;
+  gap: 10px;
 }
 .brw-note--off {
   opacity: 0.55;
@@ -361,6 +371,25 @@
   max-width: 420px;
   text-align: center;
 }
+/*
+ * The agent's sky in place of the frost (a screen opening, a closed browser): it paints the whole stage, inside the
+ * stage's corners, with the card on it. Here, not with the computer window, so a card in a conversation has it too.
+ */
+.brw-dim--sky {
+  overflow: hidden;
+}
+.cmp-sky {
+  position: absolute;
+  inset: 0;
+}
+.cmp-sky canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.brw-dim--sky .brw-dim__box {
+  position: relative;
+}
 .brw-typer {
   flex: 1 1 320px;
   display: flex;
@@ -512,7 +541,7 @@
   aspect-ratio: 16 / 10;
   border-radius: 9px;
   overflow: hidden;
-  background: #fbfbfc;
+  background: var(--site-blank);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .brw-ac__thumb img {
@@ -686,7 +715,7 @@
   border-radius: 10px;
   overflow: hidden;
   box-shadow: var(--e2);
-  background: #fff;
+  background: var(--site-paper);
   outline: none;
 }
 /* A fixed shape: frames arriving never change the card's height, so the conversation never jumps. */
@@ -731,7 +760,7 @@
 }
 /* Before the first frame: a page-shaped placeholder (a site is a light page in both themes). */
 .brw-ac__page--blank {
-  background: #fbfbfc;
+  background: var(--site-blank);
 }
 .brw-skel {
   position: absolute;
@@ -760,6 +789,10 @@
 }
 .brw-ac__stage .brw-dim {
   border-radius: 0;
+}
+/* The sky keeps the stage's corners (the computer window rounds them). */
+.brw-ac__stage > .brw-dim--sky {
+  border-radius: inherit;
 }
 .brw-dim__box {
   flex-direction: column;
@@ -1007,7 +1040,7 @@
   0%,
   33% {
     box-shadow:
-      0 0 0 2px var(--accent, #2f7cf6),
+      0 0 0 2px var(--accent, var(--mac-accent)),
       var(--e1);
   }
   34%,
@@ -1040,8 +1073,8 @@
   border-radius: 5px;
 }
 .brw-mbar__me[data-hit] {
-  background: color-mix(in srgb, #2f7cf6 25%, transparent);
-  box-shadow: 0 0 0 1.5px #2f7cf6;
+  background: color-mix(in srgb, var(--mac-accent) 25%, transparent);
+  box-shadow: 0 0 0 1.5px var(--mac-accent);
 }
 .brw-mmenu {
   position: absolute;
@@ -1061,8 +1094,8 @@
   white-space: nowrap;
 }
 .brw-mmenu span[data-hl] {
-  background: #2f7cf6;
-  color: #fff;
+  background: var(--mac-accent);
+  color: var(--mac-accent-ink);
 }
 .brw-mmenu hr {
   width: auto;
@@ -1095,7 +1128,7 @@
   border-top: 1px solid var(--line);
 }
 .brw-mwin__row[data-hl] {
-  background: color-mix(in srgb, #2f7cf6 10%, transparent);
+  background: color-mix(in srgb, var(--mac-accent) 10%, transparent);
   font-weight: 600;
 }
 .brw-mwin__row i {
@@ -1113,7 +1146,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--mac-accent-ink);
 }
 .brw-mwin__row i[data-on] {
   background: var(--success);

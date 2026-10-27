@@ -160,8 +160,8 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       },
     ));
 
-  test("Servers: until Tailscale answers, nothing shows under reach and its switch waits", async () => {
-    // Tailscale is connected, but its read takes a moment: no "Needs Tailscale" in the meantime.
+  test("Servers: until Tailscale answers, reach says it is checking and its switch waits", async () => {
+    // Tailscale is connected, but its read takes a moment: the line says so, never "Needs Tailscale" meanwhile.
     const answers: ((tailnet: Tailnet) => void)[] = [];
     await pane(
       "here",
@@ -169,7 +169,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       (el) => row(el, "Reach it from your phone and teammates"),
       async (el) => {
         const reach = () => row(el, "Reach it from your phone and teammates");
-        expect(reach()?.line).toBeNull();
+        expect(reach()?.line).toBe("Checking whether Tailscale is connected…");
         expect(el.querySelector("#here-reach")?.hasAttribute("disabled")).toBe(true);
         await act(async () => {
           for (const answer of answers) answer({ state: "on", device: "macbook" });

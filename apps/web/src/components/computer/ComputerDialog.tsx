@@ -221,7 +221,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
           <span ref={setSub} className="cmp-sub" hidden={said !== null} />
         </>
       }
-      actions={<span ref={setActs} className="cmp-acts" />}
+      actions={<span ref={setActs} className="cmp-acts ac-acts" />}
       closeLabel={t("common.close")}
       width={1280}
       className={cx(

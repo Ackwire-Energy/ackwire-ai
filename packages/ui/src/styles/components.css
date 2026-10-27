@@ -104,8 +104,67 @@ samp {
 /* A face keeps its initials' small type but takes the row's line, so its `lh` is the line it sits on. */
 .ac-iconline > .ac-avatar:first-child {
   line-height: inherit;
-  /* One row as tall as the face: a photo of any shape fills it, and the initials' taller line stays centred on it. */
-  grid-template-rows: 100%;
+}
+
+/*
+ * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two or more lines: the first line's
+ * capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes on the box that holds the
+ * first line (block-level, in that line's font size and line height): it rises by the air above its capitals. One
+ * line beside a picture centres on it instead (`.ac-iconline`).
+ */
+.ac-faceline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ac-faceline > :first-child {
+  flex: none;
+}
+/* An option card with a face (an agent to create) is a face line too: its title takes the rise. */
+.ac-captop,
+.ac-option > .ac-avatar:first-child + .ac-option__text > .ac-option__title {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-block-start: calc(var(--cap-top) - 11px);
+}
+@supports (top: 1lh) {
+  .ac-captop,
+  .ac-option > .ac-avatar:first-child + .ac-option__text > .ac-option__title {
+    margin-block-start: calc(var(--cap-top) - 0.5lh);
+  }
+}
+
+/*
+ * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
+ * at a row's edge reaches out by it, so its icon sits on the padding line.
+ */
+:root {
+  --ghost-plate: 8px;
+}
+@media (pointer: coarse) {
+  :root {
+    --ghost-plate: 12px;
+  }
+}
+
+/*
+ * A row of actions: 16px between what the eye sees, 24px on touch. A ghost shows only its icon or words until
+ * hovered, so its plate reaches half into the gap on each side: its icon or words stand as far from the next shape
+ * as two boxes do, and at either end of the row they sit on its edge. The gap is a column gap, so a row that wraps
+ * starts each line on the same edge. A nested `.ac-acts` (a slot another component fills) joins the row.
+ */
+.ac-acts {
+  display: flex;
+  align-items: center;
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.ac-acts > .ac-acts {
+  display: contents;
+}
+.ac-acts > .ac-btn--ghost {
+  margin-inline: calc(-1 * var(--ghost-plate));
+}
+.ac-acts > .ac-btn--ghost:not(.ac-btn--icon) {
+  padding-inline: var(--ghost-plate);
 }
 
 /* Button */
@@ -598,6 +657,8 @@ textarea.ac-input {
    tile from its top, and the initials sit low. */
 .ac-avatar {
   display: inline-grid;
+  /* One row as tall as the face: a photo of any shape fills it instead of growing the row past the face. */
+  grid-template-rows: 100%;
   place-items: center;
   flex: none;
   width: 36px;
@@ -719,17 +780,26 @@ textarea.ac-input {
   min-width: 0;
   flex: 1;
 }
-/* Name and time on a line as tall as the face; turns are told apart by space, name and face only. */
+/*
+ * Name and time on a 20px line whose capitals start at the face's top, as `.ac-captop` places them (the line's height
+ * is known here, so no lh unit); turns are told apart by space, name and face only. The name's size is the head's, so
+ * the rise is measured in its type.
+ */
 .ac-msg__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  line-height: 32px;
+  font-size: 14.5px;
+  line-height: 20px;
+  margin-block-start: calc(var(--cap-top) - 10px);
 }
 .ac-msg__author {
-  font-size: 14.5px;
   font-weight: 650;
+}
+/* The receipt beside the name never raises its line. */
+.ac-msg__head > .ac-msg__aside {
+  align-self: center;
 }
 .ac-msg__time {
   font-size: 12px;
@@ -1022,10 +1092,11 @@ textarea.ac-input {
   max-height: 240px;
   overflow-y: auto;
 }
+/* An `.ac-acts` row that wraps: its lines 8px apart, a one-line choice as tall as a two-line one beside it. */
 .ac-approval__actions {
-  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: stretch;
+  row-gap: var(--space-2);
 }
 /* Choices can be whole sentences: they wrap inside the card instead of running past it. */
 .ac-approval__actions .ac-btn {
@@ -1394,6 +1465,23 @@ textarea.ac-input {
 .ac-menu__leading .ac-icon {
   margin-top: 0;
 }
+/*
+ * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
+ * small face or a stack of them) sits on the first line's capitals, as an `.ac-iconline` lead does. A 30px tile stays
+ * centred on both lines, which starts the first line's capitals at its top.
+ */
+.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+> .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
+  align-self: flex-start;
+  /* Browsers without the lh unit: the option's 20px line. */
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+    > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
 .ac-menu__desc {
   font-size: 13px;
   line-height: 18px;
@@ -1708,6 +1796,19 @@ textarea.ac-input {
   gap: var(--space-3);
   padding: 20px 20px 12px;
 }
+.ac-dialog__lead {
+  display: flex;
+  flex: none;
+}
+/* Before a title with a line under it, the face sits on the title's 24px line, as an `.ac-iconline` lead does. */
+.ac-dialog__lead:has(+ .ac-dialog__titles) {
+  align-self: flex-start;
+  translate: 0 calc(12px - var(--cap-mid) - 50%);
+}
+/* The head's actions and its close, in one `.ac-acts` row: the close's icon on the head's padding line. */
+.ac-dialog__acts {
+  flex: none;
+}
 .ac-dialog__title {
   margin: 0;
   flex: 1;
@@ -1953,6 +2054,10 @@ textarea.ac-input {
 }
 .ac-list__row + .ac-list__row {
   border-top: 1px solid var(--line);
+}
+/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead. */
+.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child {
+  margin-right: calc(-1 * var(--ghost-plate));
 }
 a.ac-list__row:hover {
   background: var(--surface);
@@ -2261,7 +2366,7 @@ a.ac-list__row:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 16px 0 24px;
+  padding: 16px 24px 0;
 }
 .ac-details__bar {
   display: flex;
@@ -2280,17 +2385,14 @@ a.ac-list__row:focus-visible {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
+/* An `.ac-acts` row: the close's icon on the head's padding line. */
 .ac-details__actions {
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 .ac-details__heading {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding-right: 8px;
 }
 .ac-details__icon {
   flex: none;
@@ -3100,18 +3202,29 @@ a.ac-list__row:focus-visible {
 .ac-pixspin {
   display: inline-block;
   flex: none;
-  vertical-align: middle;
   image-rendering: pixelated;
+}
+/*
+ * In a line of text the pixel marks centre on the capitals, as an `.ac-iconline` lead does (a flex or grid item
+ * ignores vertical-align): their box's bottom is their baseline (the spinner is a canvas, the others draw in an
+ * absolute child), raised by half the capitals' height less half their size (`--mark-size`, set by each).
+ */
+.ac-pixspin,
+.ac-pixdone,
+.ac-pixstop {
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--mark-size, 14px) / 2);
 }
 /* Done: one pixel in the ok color, the spinner's center cell, popping in. */
 .ac-pixdone {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  position: relative;
   flex: none;
-  vertical-align: middle;
 }
 .ac-pixdone::before {
   content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
   width: var(--px, 4px);
   height: var(--px, 4px);
   background: var(--ok);
@@ -3136,12 +3249,14 @@ a.ac-list__row:focus-visible {
 }
 /* Stop: a 2×2 pixel square in the text color; while an agent works one cell dims in turn (220 ms each). */
 .ac-pixstop {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  position: relative;
   flex: none;
-  vertical-align: middle;
 }
 .ac-pixstop > span {
+  position: absolute;
+  inset: 0;
+  margin: auto;
   width: var(--stop-side, 10px);
   height: var(--stop-side, 10px);
   border-radius: var(--stop-radius, 2px);
@@ -6261,7 +6376,7 @@ button.ac-tools__row:focus-visible {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .ac-details__head {
-    padding: 12px 8px 0 16px;
+    padding: 12px 16px 0;
   }
   .ac-details__body {
     padding: 12px 16px 20px;

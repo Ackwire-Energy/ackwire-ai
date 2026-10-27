@@ -169,10 +169,10 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row" data-changed={changed || undefined}>
+    <li className="level-row ac-faceline" data-changed={changed || undefined}>
       {icon}
       <span className="level-row__text">
-        <span className="level-row__name">
+        <span className="level-row__name ac-captop">
           {name}
           {tag}
         </span>

@@ -1108,18 +1108,24 @@ describe("the dialog's size (computer.css)", () => {
 
   test("one frame for the screen, its covers and the agent's page; with no line under the screen it ends 16 px under it and keeps its top", async () => {
     const text = await css();
-    // The wait for the workspace's computer is as wide, so its screen opens in place.
-    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
-      "width: calc(var(--cmp-screen) + 32px)",
-    );
-    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
-      "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
-    );
+    // The wait for the workspace's computer takes the same frame, so its screen opens in place.
+    const frame = rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))");
+    expect(frame).toContain("width: calc(var(--cmp-screen) + 32px)");
+    expect(frame).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 130px)");
+    // The wait fills that box, its words in the middle (on a phone it is as tall as its words). Auto margins centre
+    // them, so a box shorter than the words starts them at its top and scrolls all of them: `justify-content: center`
+    // would push their top out of reach.
+    const prep = rule(text, ".cmp-prep");
+    expect(prep).toContain("flex: 1 1 0");
+    expect(prep).toContain("overflow-y: auto");
+    expect(prep).not.toContain("justify-content");
+    expect(rule(text, ".cmp-prep > :first-child")).toContain("margin-top: auto");
+    expect(rule(text, ".cmp-prep > :last-child")).toContain("margin-bottom: auto");
     // The same screen with nothing under it (no steps, no keys' line, no note, no tools of the page): 30 px shorter,
     // its top where it was (the dialog is centred on 50%), so a line coming adds it below and the screen never moves.
     const bare = rule(
       text,
-      ".ac-dialog.cmp-dialog:where(\n  :has(.dsk, .cmp-stage, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))\n)",
+      ".ac-dialog.cmp-dialog:where(\n  :has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))\n)",
     );
     expect(bare).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)");
     expect(bare).toContain("top: calc(50% - 15px)");
@@ -1157,16 +1163,23 @@ describe("the dialog's size (computer.css)", () => {
   const phoneRule = async (selector: string) =>
     (await css()).split("@media (max-width: 640px) {")[1]?.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
   /** On a phone, actions with words get the head's second row (`computer.css`). */
-  const OWN_ROW = ".cmp-dialog:not(.is-screen-only) .cmp-acts:has(> :not(.ac-btn--icon))";
+  const OWN_ROW = ".cmp-dialog:not(.is-screen-only) .ac-dialog__acts > .cmp-acts:has(> :not(.ac-btn--icon))";
 
   test("a phone's head: the name and its line share a row with Close, actions with words get a row of their own", async () => {
     const head = await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head");
     expect(head).toContain("display: grid");
-    // The face, the name and its line, an icon alone, Close.
-    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto");
-    expect(await phoneRule(OWN_ROW)).toContain("grid-area: 2 / 2 / 3 / 5");
-    expect(await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head > :last-child")).toContain(
-      "grid-column: -2",
+    // The face, the name and its line, the head's actions (an icon alone and Close, or Close alone).
+    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto");
+    // With words, the row of actions lets its parts into the grid: the actions keep a box of their own (an `.ac-acts`,
+    // against the nested group's `display: contents`) on the second row, Close its column on the first.
+    expect(
+      await phoneRule(".cmp-dialog:not(.is-screen-only) .ac-dialog__acts:has(> .cmp-acts > :not(.ac-btn--icon))"),
+    ).toContain("display: contents");
+    const own = await phoneRule(OWN_ROW);
+    expect(own).toContain("display: flex");
+    expect(own).toContain("grid-area: 2 / 2 / 3 / 4");
+    expect(await phoneRule(".cmp-dialog:not(.is-screen-only) .ac-dialog__acts > :last-child")).toContain(
+      "grid-area: 1 / 3",
     );
   });
 
@@ -1228,8 +1241,11 @@ describe("the dialog's size (computer.css)", () => {
     expect(stage).toContain("grid-area: 1 / 1 / -1 / -1");
     expect(stage).toContain("container-type: size");
     expect(rule(text, ".cmp-dialog.is-screen-only .dsk-screen")).toContain("width: min(100cqw, 100cqh * 1280 / 900)");
-    // The ground is the screen's own in both themes, so the dialog has it, not only the screen.
-    expect(rule(text, ".ac-dialog.cmp-dialog")).toContain("--screen-bg: #1f2128");
+    // The ground is the screen's own in both themes: one token, no dark value of its own.
+    const tokens = await Bun.file(
+      new URL("../../../packages/ui/src/styles/tokens.css", import.meta.url).pathname,
+    ).text();
+    expect(tokens.match(/--screen-bg: #1f2128;/g)).toHaveLength(1);
   });
 
   test("the bar over the full screen: what hides with it, what keeps it, and over any cover", async () => {

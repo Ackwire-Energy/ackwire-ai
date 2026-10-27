@@ -33,9 +33,10 @@
   flex-direction: column;
   gap: 24px;
 }
+/* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */
 .auth__ask {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 14px;
 }
 .auth__ask .ac-avatar {
@@ -46,7 +47,7 @@
   flex: 1;
   min-width: 0;
   padding: 16px 20px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
+  border-radius: 6px var(--radius-section) var(--radius-section) var(--radius-section);
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
   animation: auth-in 0.3s var(--out) both;

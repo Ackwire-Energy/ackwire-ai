@@ -25,6 +25,11 @@ export const COMPUTER_STATES = ["online", "paused", "offline"];
  * is this wide, so its pixels meet the row's edge like any other lead (the tower is half the grid's width).
  */
 export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25], cloud: [7, 38] };
+/**
+ * The rows each drawing covers, in every state and frame: [first, count]. The box keeps the whole grid's height, so
+ * a row that starts text at a picture's top (`.ac-faceline`) starts it at the drawing's first row instead.
+ */
+export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42], cloud: [8, 36] };
 
 const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);

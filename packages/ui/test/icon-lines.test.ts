@@ -38,8 +38,6 @@ const X_HEIGHT_AIM = /(?:^|;)\s*(?:translate|top|margin(?:-top)?|vertical-align)
 const PLACED_BY_HAND: Record<string, string> = {
   "packages/ui/src/styles/components.css .ac-menu__item .ac-icon":
     "menu items are one line (no wrapping) of 14px text on their own 20px line, which the 16px icon sits on",
-  "apps/web/src/components/browser/browser.css .brw-note > .ac-icon":
-    "the browser and desktop-use notes (MachineDesktopUseCard.tsx) are not on .ac-iconline yet",
   "apps/web/src/components/import-flow.css .imp-row__mark":
     "an import plan row's 18px check column centres on the row's 26px lead tile (.imp-row__lead), not on its text",
 };
@@ -176,10 +174,10 @@ describe("an icon before text sits on the text's first line", () => {
       expect(fallback).toBeGreaterThan(-1);
       expect(lh).toBeGreaterThan(fallback);
     }
-    // A face keeps its initials' type but reads the row's line, its one row as tall as the face so a photo of any
-    // shape fills it; a key centred with its title only rises.
+    // A face keeps its initials' type but reads the row's line; every face is one row as tall as it, so a photo of
+    // any shape fills it; a key centred with its title only rises.
     expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("line-height: inherit");
-    expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("grid-template-rows: 100%");
+    expect(body(".ac-avatar")).toContain("grid-template-rows: 100%");
     expect(body(".ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key")).toContain("var(--cap-mid)");
   });
 
@@ -201,5 +199,91 @@ describe("an icon before text sits on the text's first line", () => {
       .filter(([, , body]) => X_HEIGHT_AIM.test(body))
       .map(([file, selector]) => `${file} ${selector}`);
     expect(aimed).toEqual([]);
+  });
+});
+
+/** The rules of one selector in the kit's stylesheet, joined; `@supports (top: 1lh)` ones last, as in the file. */
+async function kitRule(selector: string) {
+  return (await allRules())
+    .filter(([file, s]) => file === "packages/ui/src/styles/components.css" && s === selector)
+    .map(([, , b]) => b)
+    .join("\n");
+}
+
+describe("a picture beside lines, a bubble beside a face, a row of actions", () => {
+  test("lines start at a picture's top: --cap-top, .ac-faceline and .ac-captop with a 22px-line fallback first", async () => {
+    const tokens = await Bun.file(join(ROOT, "packages/ui/src/styles/tokens.css")).text();
+    expect(tokens).toMatch(/--cap-top:\s*0\.71ex;/);
+    expect(await kitRule(".ac-faceline")).toContain("align-items: flex-start");
+    const rise = await kitRule(".ac-captop");
+    const fallback = rise.indexOf("margin-block-start: calc(var(--cap-top) - 11px)");
+    expect(fallback).toBeGreaterThan(-1);
+    expect(rise.indexOf("margin-block-start: calc(var(--cap-top) - 0.5lh)")).toBeGreaterThan(fallback);
+    // The chat's name on a 20px line known in place, its capitals at the face's top: never a line as tall as the face.
+    const head = await kitRule(".ac-msg__head");
+    expect(head).toContain("line-height: 20px");
+    expect(head).toContain("margin-block-start: calc(var(--cap-top) - 10px)");
+    expect(await kitRule(".ac-msg__head > .ac-msg__aside")).toContain("align-self: center");
+  });
+
+  test("every .ac-faceline holds an .ac-captop: its first line rises to the picture's top", async () => {
+    const lines = (await elements()).filter((e) => e.classes.includes("ac-faceline"));
+    expect(lines.length).toBeGreaterThan(5);
+    expect(lines.filter((e) => !/\bac-captop\b/.test(e.body)).map((e) => e.where)).toEqual([]);
+  });
+
+  test("a row on .ac-iconline or .ac-faceline isn't re-centred elsewhere unless its lead is placed again", async () => {
+    const all = await elements();
+    const rows = new Set(
+      all
+        .filter((e) => e.classes.includes("ac-iconline") || e.classes.includes("ac-faceline"))
+        .flatMap((e) => e.classes)
+        .filter((c) => c !== "ac-iconline" && c !== "ac-faceline" && /[-_]/.test(c)),
+    );
+    const rules = await allRules();
+    const recentred = rules.filter(([file, selector, body]) => {
+      const align = /(?:^|;)\s*align-items:\s*([\w-]+)/.exec(body)?.[1];
+      if (!align || align === "flex-start" || align === "start") return false;
+      const last = selector.split(/[\s>+~]+/).pop() ?? "";
+      if (![...rows].some((row) => new RegExp(`\\.${row}(?![\\w-])`).test(last))) return false;
+      // Excluded from the primitive, or its lead placed again for the new centre.
+      if (/:not\(\.ac-(?:iconline|faceline)\)/.test(selector)) return false;
+      return !rules.some(([f, s, b]) => f === file && s.startsWith(`${selector} > `) && /translate:/.test(b));
+    });
+    expect(recentred.map(([file, selector]) => `${file} ${selector}`)).toEqual([]);
+  });
+
+  test("a host's face and its bubble start at one top (no bubble row aligned to its bottom)", async () => {
+    const asks = (await allRules()).filter(([, selector]) => /__ask$/.test(selector));
+    expect(asks.length).toBeGreaterThan(1);
+    expect(asks.filter(([, , body]) => /align-items:\s*(?:flex-)?end/.test(body)).map(([f, s]) => `${f} ${s}`)).toEqual(
+      [],
+    );
+  });
+
+  test("a row of actions: 16px between what shows, 24px on touch, ghosts reaching into the gap by their plate", async () => {
+    const css = (await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    expect(css).toMatch(/:root \{\s*--ghost-plate: 8px;\s*\}/);
+    expect(css).toMatch(/@media \(pointer: coarse\) \{\s*:root \{\s*--ghost-plate: 12px;\s*\}\s*\}/);
+    expect(await kitRule(".ac-acts")).toContain("column-gap: calc(2 * var(--ghost-plate))");
+    expect(await kitRule(".ac-acts > .ac-acts")).toContain("display: contents");
+    expect(await kitRule(".ac-acts > .ac-btn--ghost")).toContain("margin-inline: calc(-1 * var(--ghost-plate))");
+    expect(await kitRule(".ac-acts > .ac-btn--ghost:not(.ac-btn--icon)")).toContain(
+      "padding-inline: var(--ghost-plate)",
+    );
+  });
+
+  test("the pixel marks in a line of text centre on its capitals, never on the x-height's middle", async () => {
+    for (const mark of [".ac-pixspin", ".ac-pixdone", ".ac-pixstop"]) {
+      const rule = await kitRule(mark);
+      expect(rule).not.toContain("middle");
+      expect(rule).toContain("vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--mark-size, 14px) / 2)");
+    }
+    // Their baseline is their box's bottom: the two drawn in CSS place their pixel in an absolute child.
+    expect(await kitRule(".ac-pixdone")).toContain("position: relative");
+    expect(await kitRule(".ac-pixstop")).toContain("position: relative");
   });
 });

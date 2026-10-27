@@ -12,12 +12,12 @@ export function VaultCard({ reader }: { reader: ReturnType<typeof useVaultReader
   const { state, report } = reader;
   return (
     <Card as="section" className="vault-card" aria-label={t("onboarding.vault.title")}>
-      <div className="vault-card__head">
+      <div className="vault-card__head ac-faceline">
         <span className="vault-card__icon">
           <ObsidianMark size={22} />
         </span>
         <span className="vault-card__t">
-          <b>{t("onboarding.vault.title")}</b>
+          <b className="ac-captop">{t("onboarding.vault.title")}</b>
           <span className="small muted">{t("onboarding.vault.text")}</span>
         </span>
         {state.step === "ready" ? (

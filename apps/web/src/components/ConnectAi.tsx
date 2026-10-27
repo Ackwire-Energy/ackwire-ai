@@ -1,8 +1,18 @@
 import type { ConnectIntent } from "@agenteschat/client";
-import { keys, useAddCredential, useAiStatus, useApi } from "@agenteschat/client";
+import { keys, useAddCredential, useAiStatus, useApi, useMachines } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type AiChoice, aiStateOf, defaultChoice, firstAgent, gateDims } from "@agenteschat/client/lib/no-ai";
+import {
+  type AgentAi,
+  type AiChoice,
+  agentAi,
+  aiStateOf,
+  allAgents,
+  defaultChoice,
+  defaultTarget,
+  gateDims,
+  type PlanChoice,
+} from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
@@ -13,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { AiPicker, type KeyDraft, KeyPanel, PlanPanel, usePlanGates } from "@/components/ai/ConnectAiSteps";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./no-ai.css";
@@ -30,9 +41,9 @@ export interface ConnectAiRequest {
   intent?: ConnectIntent;
   /** With `api_key`: the provider it named. */
   provider?: string;
-  /** The agent to connect: a plan changes who thinks for it. */
+  /** The agent to connect: a plan's panel opens on it, the viewer's other agents one choice away. */
   agentId?: string;
-  /** The agents to choose from (an agent's card names them); `agentId` is shown first. */
+  /** The agents to choose from (an agent's card names them); `agentId` is chosen first. */
   agentIds?: string[];
   /** The no-AI card or the person's message: once connected, it is answered ("Responder agora"). */
   from?: string;
@@ -132,15 +143,29 @@ function ConnectAiDialog({
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org.role, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
-  const named = request.agentIds?.length ? request.agentIds : request.agentId ? [request.agentId] : null;
-  const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));
-  // The agents a plan was connected for here: they think with it before the AI status says so.
-  const [linked, setLinked] = useState<string[]>([]);
-  const hasAi = (id: string) => linked.includes(id) || (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
-  // Only a pick is kept; else the first agent is worked out on each render (a link opens this before the agents load).
-  const [pickedAgent, setPickedAgent] = useState<string>();
-  const agentId = pickedAgent ?? firstAgent(agents, hasAi, request.agentId)?.id;
-  const gates = usePlanGates(org.id, agentId);
+  // An agent's card names whom to choose from; anywhere else every agent of the viewer's stays a choice.
+  const named = request.agentIds?.length ? request.agentIds : null;
+  const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({
+    id: a.id,
+    name: a.name,
+    appearance: lookOf(a),
+    initials: dir.agentInitials(a.id),
+  }));
+  const machines = useMachines(org.id);
+  // The agents a plan was connected for here, by plan: they think with it before the AI status says so.
+  const [linked, setLinked] = useState<Record<string, PlanChoice>>({});
+  const aiOf = (id: string): AgentAi => linked[id] ?? agentAi(dir.agentById.get(id), aiStateOf(status.data, id));
+  const hasAi = (id: string) => aiOf(id) !== null;
+  const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
+  const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
+  // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
+  const [pickedTarget, setPickedTarget] = useState<string>();
+  // Held once a sign-in starts (`onStart`): every move it makes gives an agent an AI, which would move the default.
+  const [heldReader, setHeldReader] = useState<string>();
+  const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
+  // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
+  const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
+  const gates = usePlanGates(org.id, reader);
   const [picked, setPicked] = useState<AiChoice | null>(null);
   const choice =
     picked ??
@@ -148,8 +173,10 @@ function ConnectAiDialog({
       intent: request.intent,
       ownsAgents: agents.length > 0,
       mayAddKey,
-      claudeGate: agentId ? gates.gateOf("claude") : { state: "loading" },
+      claudeGate: agents.length > 0 ? gates.gateOf("claude") : { state: "loading" },
     });
+  const all = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
+  const target = defaultTarget({ ...aimed, set: all });
   const [draft, setDraft] = useState<KeyDraft>(() => ({
     provider: providerGuess(request.apiKey, request.provider),
     apiKey: request.apiKey ?? "",
@@ -175,23 +202,30 @@ function ConnectAiDialog({
     );
   };
 
-  // Opened for one agent: its name in the title, and no agent to choose.
-  const one = named?.length === 1 ? dir.agentById.get(named[0] ?? "") : undefined;
-  // No agent of theirs among those: who connects a plan instead.
+  // Opened for one agent: its name in the title while the plan is for it.
+  const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
+  const one = only ? dir.agentById.get(only) : undefined;
+  const theirs = one !== undefined && one.ownerUserId !== me.user.id;
+  // Someone else's agent, or no agent of theirs among those: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
-  const locked =
-    agents.length > 0
+  const locked = theirs
+    ? owner
+      ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+      : t("noAi.lockedAdmins")
+    : agents.length > 0
       ? undefined
-      : !named
-        ? t("connectAi.noAgents")
-        : one && owner
-          ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-          : t("noAi.lockedAdmins");
+      : named
+        ? t("noAi.lockedAdmins")
+        : t("connectAi.noAgents");
   return (
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={one ? t("connectAi.titleFor", agentGrammar(t, one.name)) : t("connectAi.title.any")}
+      title={
+        one && (theirs || target === one.id)
+          ? t("connectAi.titleFor", agentGrammar(t, one.name))
+          : t("connectAi.title.any")
+      }
       closeLabel={t("common.close")}
       // Three plans a row, each name on one line even when chosen, as in the setup's column.
       width={600}
@@ -205,11 +239,13 @@ function ConnectAiDialog({
             choice={choice}
             onPick={(next) => {
               setPicked(next);
-              // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
-              if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
-                setPickedAgent(firstAgent(agents, hasAi)?.id);
+              if (next === choice) return;
+              setHeldReader(undefined);
+              // Another plan moves on to whoever still has no AI once this one's agents think with a plan from here.
+              if (next !== "key" && Object.keys(linked).length > 0)
+                setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
-            dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
+            dims={(c) => agents.length > 0 && gateDims(gates.gateOf(c))}
             panel={
               choice === "key" ? (
                 <KeyPanel
@@ -227,8 +263,16 @@ function ConnectAiDialog({
                   gates={gates}
                   justReady={request.ready}
                   agents={agents}
-                  agentId={agentId}
-                  onAgent={setPickedAgent}
+                  all={all}
+                  target={target}
+                  onTarget={(next) => {
+                    setPickedTarget(next);
+                    setHeldReader(undefined);
+                  }}
+                  onStart={() => {
+                    setPickedTarget(target);
+                    setHeldReader(reader);
+                  }}
                   locked={locked}
                   onKey={() => setPicked("key")}
                   onComputer={() => {
@@ -238,10 +282,10 @@ function ConnectAiDialog({
                       params: { orgId: org.id, section: "computers" },
                     });
                   }}
-                  onDone={(id) => {
-                    // The panel stays on that agent, saying it's done.
-                    setPickedAgent(id);
-                    setLinked((l) => [...l, id]);
+                  onDone={(ids) => {
+                    // The panel stays on whom it was for, saying it's done.
+                    setPickedTarget(target);
+                    setLinked((l) => ({ ...l, ...Object.fromEntries(ids.map((id) => [id, choice])) }));
                     done();
                   }}
                 />

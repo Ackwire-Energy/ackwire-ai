@@ -636,9 +636,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
    * A new person's onboarding up to the computer step, the import skipped. Its agents get the workspace's computer
    * once it's ready (`computer.ready`), as the server gives it to them; nobody connected it.
    */
-  const toComputerStep = async (setup: Partial<ComputerSetup>) => {
+  const toComputerStep = async (
+    setup: Partial<ComputerSetup>,
+    prepare?: (state: ReturnType<typeof seedState>) => void,
+  ) => {
     const state = seedState();
     if (state.me) state.me.organizations = [];
+    prepare?.(state);
     // The server says every workspace gets its own: never "opcional", from the first step on.
     state.authConfig = { workspaceComputer: true };
     const api = createFakeApi(state);
@@ -802,15 +806,20 @@ describe("the onboarding where the workspace gets its own computer", () => {
     // Ada and Theo exist before any AI: leaving now leaves a whole team.
     expect(r.state.calls.filter((c) => c.method === "agents.create")).toHaveLength(2);
     const panel = () => screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel().textContent).toContain("Passo 3 de 4 · Instalando os programas");
-    expect(panel().textContent).toContain("Faltam uns 10 min");
-    // The panel's own line says what happens once it's ready, with no email line.
-    expect(panel().textContent).toContain("Você entra aqui assim que ele ficar pronto.");
-    expect(panel().textContent).not.toContain("Avisamos");
+    // The computer's wait in the panel's well, the owner's email line with no address; the sign-in's step says
+    // its own timing.
+    const well = panel().querySelector(".ai-panel__wait") as HTMLElement;
+    expect(well.textContent).toBe(
+      "Passo 3 de 4 · Instalando os programasFaltam uns 10 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
+    );
+    expect(panel().querySelector(".agp-addacct__step")?.textContent).toContain(
+      "Você entra aqui assim que o computador ficar pronto.",
+    );
+    expect([...panel().querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
     const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
     // A plan for the first agent with no AI in the team's order, Theo, as Connect an AI picks; Ada is the other choice.
-    expect(within(panel()).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Theo");
+    expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Theo");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -834,7 +843,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
     expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
-    expect(panel().textContent).not.toContain("Você entra aqui assim que ele ficar pronto.");
+    expect(panel().textContent).not.toContain("assim que o computador ficar pronto");
+    expect(panel().querySelector(".ai-panel__wait")).toBeNull();
     expect(signIn().disabled).toBe(false);
     expect(interval("computer-setup")).toBe(false);
     expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(0);
@@ -938,12 +948,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(panel.textContent).toContain(
         setup.state === "problem" ? "Algo deu errado ao preparar o computador" : "Esperando um computador disponível",
       );
-      // No time to give: the owner reads when they'll hear instead, then what happens here once it's ready.
-      expect(panel.textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
-      const lines = [...panel.querySelectorAll(".ac-iconline")];
-      expect(lines.filter(leadsWithClock).map((l) => l.textContent)).toEqual([
-        "Você entra aqui assim que ele ficar pronto.",
-      ]);
+      // No time to give: the owner reads when they'll hear, then the sign-in's step what happens once it's ready.
+      const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
+      expect(well.textContent).toContain("Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.");
+      expect(panel.querySelector(".agp-addacct__step")?.textContent).toContain(
+        "Você entra aqui assim que o computador ficar pronto.",
+      );
+      expect([...panel.querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
       // A key is the picker's own row, under the panel: no button for it in any wait.
       expect(within(panel).queryByRole("button", { name: "Usar uma chave de API agora" })).toBeNull();
       const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
@@ -952,6 +963,77 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(0);
       cleanup();
     }
+  });
+
+  test("a coding plan thinks for all of them at once by default; then the Team step says nobody else gets an answer", async () => {
+    // Only this workspace's agents.
+    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS }, (state) => {
+      state.agents = [];
+    });
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
+    // Claude signs in once per account: one agent, the first in the team's order.
+    const claude = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(claude).getByRole("combobox").textContent).not.toBe("Todos os agentes");
+    await click(within(picker).getByRole("button", { name: /^GLM Coding/ }));
+    const panel = screen().getByRole("region", { name: "GLM Coding Plan" });
+    expect(within(panel).getByRole("combobox").textContent).toBe("Todos os agentes");
+    const who = [...panel.querySelectorAll(".ai-panel__who > li")].map((li) => li.textContent);
+    expect(who).toEqual(["TheoEsperando", "AdaEsperando", "LiaEsperando", "AtlasEsperando"]);
+    for (const n of [1, 2, 3, 4]) {
+      r.machines.endLogin(`login_${n}`, {
+        state: "done",
+        account: {
+          id: `acct_${n}`,
+          kind: "claude_code",
+          label: "GLM Coding",
+          email: null,
+          plan: null,
+          status: "active",
+          ownerId: "u-walter",
+          ownerName: "Walter",
+          mine: true,
+          usedBy: [],
+          usage: null,
+          provider: "zai",
+          keyHint: "MnOp",
+        },
+      });
+    }
+    await act(async () =>
+      fireEvent.change(within(panel).getByLabelText("Chave do GLM Coding"), {
+        target: { value: "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp" },
+      }),
+    );
+    await click(within(panel).getByRole("button", { name: /^Enviar ao/ }));
+    await settle(12);
+    expect(r.state.calls.filter((c) => c.method === "agents.setBrain")).toHaveLength(4);
+    expect(panel.textContent).toContain("Theo, Ada, Lia e Atlas agora pensam com GLM Coding.");
+    // Every agent has an AI: Who thinks has nobody left to offer the key for.
+    expect(screen().queryByRole("region", { name: "Quem pensa" })).toBeNull();
+    // On a plan each answers only its owner, as the server sets them.
+    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
+    for (const a of r.state.agents) {
+      a.ownerUserId = "u-walter";
+      a.audience = { mode: "owner", userIds: [] };
+    }
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    const note = () => screen().queryByText("Seus agentes só respondem a você.")?.closest(".setup-line");
+    expect(note()).toBeTruthy();
+    expect(hintOf("Seus agentes só respondem a você.").text).toBe(
+      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+    );
+    // It comes before the invitations it's about.
+    const emails = screen().getByLabelText("E-mails");
+    expect((note() as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // One agent on the API key answering everyone: someone invited gets an answer, so nothing to say.
+    const first = r.state.agents[0];
+    if (first) first.audience = { mode: "everyone", userIds: [] };
+    await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.agents(orgId) }));
+    await settle(4);
+    expect(note()).toBeFalsy();
   });
 
   test("a step's column stays where it opened as its content changes; a resize or the next step places it", async () => {

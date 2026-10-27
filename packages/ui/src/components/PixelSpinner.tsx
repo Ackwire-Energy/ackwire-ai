@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import { bodyTones } from "../agent/engine.js";
 import { cx } from "../cx";
 import type { AgentColor } from "./AgentLook";
@@ -108,7 +108,7 @@ export function PixelSpinner({ size = 16, color, label, className }: PixelSpinne
     <canvas
       ref={ref}
       className={cx("ac-pixspin", className)}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, "--mark-size": `${size}px` } as CSSProperties}
       data-color={color}
       role={label ? "img" : undefined}
       aria-label={label}

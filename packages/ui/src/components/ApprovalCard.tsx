@@ -86,7 +86,7 @@ export function ApprovalCard({
       {action && <div className="ac-approval__action">{action}</div>}
       {detail && <p className="ac-approval__detail">{detail}</p>}
       {why && <p className="ac-approval__why">{why}</p>}
-      {actions && <div className="ac-approval__actions">{actions}</div>}
+      {actions && <div className="ac-approval__actions ac-acts">{actions}</div>}
     </Tag>
   );
 }

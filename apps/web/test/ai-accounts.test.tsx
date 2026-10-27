@@ -78,7 +78,7 @@ describe("Contas de IA", () => {
     const plans = screen().getByRole("region", { name: "Seus planos" });
     // Its title and ⓘ (what a plan is for and where it stays), Connect, the empty line: nothing else to read.
     expect(hintOf("Seus planos", plans).text).toBe(
-      "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
+      "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O agentes.chat guarda só o nome, o email e o uso.",
     );
     expect(shownText(plans)).toBe("Seus planosConectar uma IANenhum plano ainda.");
     // Its action in its head, the way Provider keys has Add key: the same kind of button in the same place.
@@ -122,7 +122,9 @@ describe("Contas de IA", () => {
     const { state, rows } = await page([WORK, MINIMAX]);
     await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Desconectar" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar Trabalho?" });
-    expect(confirm.textContent).toContain("Ada deixa de pensar com ela e volta para a API.");
+    expect(confirm.textContent).toContain(
+      "Ada deixa de pensar com ela. O MacBook sai da conta e apaga o que guardava.",
+    );
     await click(within(confirm).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "machines.removeAccount")?.args).toEqual([
@@ -146,5 +148,128 @@ describe("Contas de IA", () => {
       "acct_mm",
       "MiniMax do Walt",
     ]);
+  });
+});
+
+describe("Contas de IA: a plan with a login per agent", () => {
+  const usage = (percent: number, at: string) => ({
+    windows: [{ kind: "five_hour" as const, usedPercent: percent, resetsAt: "2099-01-01T15:40:00.000Z" }],
+    source: "probe" as const,
+    at,
+  });
+  /** One GLM key signed in for Ada, Theo and Lia: three logins, one account. */
+  type Row = AiAccounts["accounts"][number];
+  const glm = (id: string, agent: string, over: Partial<Row> = {}): Row => ({
+    ...MINIMAX,
+    id,
+    label: "GLM Coding",
+    provider: "zai",
+    keyHint: "4f2a",
+    usedBy: [agent],
+    ...over,
+  });
+  const LOGINS = [
+    glm("acct_ada", "Ada", { usage: usage(40, "2026-10-27T10:00:00.000Z") }),
+    glm("acct_theo", "Theo", { usage: usage(62, "2026-10-27T11:00:00.000Z") }),
+    glm("acct_lia", "Lia"),
+  ];
+
+  test("one row for the account: every agent on it, one meter from the newest usage", async () => {
+    const { rows } = await page(LOGINS);
+    expect(rows()).toHaveLength(1);
+    const [row] = rows();
+    expect(row?.textContent).toContain("chave …4f2a · Ada, Theo e Lia pensam com ela");
+    expect(row?.querySelectorAll(".ac-planmeter")).toHaveLength(1);
+    expect(row?.textContent).toContain("62%");
+    // Its name's capitals start at its mark's top; its actions stay in the row's middle, evenly spaced.
+    expect(row?.querySelector(".list-col > :first-child")?.classList.contains("ac-captop")).toBe(true);
+    expect(row?.querySelector(":scope > .ac-acts")).not.toBeNull();
+  });
+
+  test("one login signed out: whose, said under the facts", async () => {
+    const [ada, theo, lia] = LOGINS as [Row, Row, Row];
+    const { rows } = await page([ada, { ...theo, status: "signed_out" }, lia]);
+    expect(rows()[0]?.textContent).toContain("Theo ficou sem login.");
+  });
+
+  test("Disconnect takes every login of the account, and the dialog names every agent", async () => {
+    const { state, rows } = await page(LOGINS);
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Desconectar" }));
+    const confirm = screen().getByRole("dialog", { name: "Desconectar GLM Coding?" });
+    expect(confirm.textContent).toContain(
+      "Ada, Theo e Lia deixam de pensar com ela. O MacBook sai da conta e apaga o que guardava.",
+    );
+    await click(within(confirm).getByRole("button", { name: "Desconectar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.removeAccount").map((c) => c.args[2])).toEqual([
+      "acct_ada",
+      "acct_theo",
+      "acct_lia",
+    ]);
+  });
+
+  test("two accounts with the same name stay two rows: a name is anyone's to repeat", async () => {
+    const other = glm("acct_bo", "Bo", { keyHint: "9z9z" });
+    const { state, rows } = await page([...LOGINS, other]);
+    expect(rows()).toHaveLength(2);
+    expect(rows()[1]?.textContent).toContain("chave …9z9z · Bo pensa com ela");
+    await click(within(rows()[1] as HTMLElement).getByRole("button", { name: "Desconectar" }));
+    await click(within(screen().getByRole("dialog")).getByRole("button", { name: "Desconectar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.removeAccount").map((c) => c.args[2])).toEqual(["acct_bo"]);
+  });
+
+  test("Replace the key: the new key goes to every login of the account, sealed to each", async () => {
+    const { state, api, rows } = await page(LOGINS);
+    const machines = fakeMachinesOf.get(api);
+    for (const [n, l] of LOGINS.entries()) machines?.endLogin(`login_${n + 1}`, { state: "done", account: l });
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Trocar a chave" }));
+    const dialog = screen().getByRole("dialog", { name: "GLM Coding" });
+    await act(async () =>
+      fireEvent.change(within(dialog).getByLabelText("Chave do GLM Coding"), {
+        target: { value: "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp" },
+      }),
+    );
+    await click(within(dialog).getByRole("button", { name: "Enviar ao MacBook" }));
+    await settle(12);
+    expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args[3])).toEqual([
+      { accountId: "acct_ada", provider: "zai" },
+      { accountId: "acct_theo", provider: "zai" },
+      { accountId: "acct_lia", provider: "zai" },
+    ]);
+    expect(new Set(machines?.logins().map((l) => JSON.stringify(l.box))).size).toBe(3);
+    // Each took it: the dialog closes.
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("Replace the key, one login failing: Try again sends the key only to that login", async () => {
+    const { state, api, rows } = await page(LOGINS);
+    const machines = fakeMachinesOf.get(api);
+    const [ada, theo, lia] = LOGINS as [Row, Row, Row];
+    machines?.endLogin("login_1", { state: "done", account: ada });
+    machines?.endLogin("login_2", { state: "done", account: theo });
+    machines?.endLogin("login_3", { state: "failed" });
+    machines?.endLogin("login_4", { state: "done", account: lia });
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Trocar a chave" }));
+    const dialog = screen().getByRole("dialog", { name: "GLM Coding" });
+    const send = async () => {
+      await act(async () =>
+        fireEvent.change(within(dialog).getByLabelText("Chave do GLM Coding"), {
+          target: { value: "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp" },
+        }),
+      );
+      await click(within(dialog).getByRole("button", { name: "Enviar ao MacBook" }));
+      await settle(12);
+    };
+    await send();
+    await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+    await send();
+    expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args[3])).toEqual([
+      { accountId: "acct_ada", provider: "zai" },
+      { accountId: "acct_theo", provider: "zai" },
+      { accountId: "acct_lia", provider: "zai" },
+      { accountId: "acct_lia", provider: "zai" },
+    ]);
+    expect(screen().queryByRole("dialog")).toBeNull();
   });
 });

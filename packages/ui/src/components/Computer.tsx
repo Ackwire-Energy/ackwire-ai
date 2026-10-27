@@ -1,6 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
+import { type CSSProperties, useLayoutEffect, useRef } from "react";
 import { addLiveComputer, drawLiveComputer, type LiveComputer } from "../computer/live";
-import { COMPUTER_ART, COMPUTER_GRID, type ComputerKind, type ComputerState } from "../computer/portrait.js";
+import {
+  COMPUTER_ART,
+  COMPUTER_GRID,
+  COMPUTER_ROWS,
+  type ComputerKind,
+  type ComputerState,
+} from "../computer/portrait.js";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
@@ -51,7 +57,15 @@ export function ComputerPortrait({ kind, state, size = 48, label, className }: C
       className={cx("ac-computer", className)}
       width={cols}
       height={COMPUTER_GRID}
-      style={{ width: (cols * size) / COMPUTER_GRID, height: size, imageRendering: "pixelated" }}
+      style={
+        {
+          width: (cols * size) / COMPUTER_GRID,
+          height: size,
+          imageRendering: "pixelated",
+          // Where the drawing starts under the box's top: a face line puts the text there.
+          "--art-top": `${(COMPUTER_ROWS[kind][0] * size) / COMPUTER_GRID}px`,
+        } as CSSProperties
+      }
       data-kind={kind}
       data-state={state}
       role={label ? "img" : undefined}

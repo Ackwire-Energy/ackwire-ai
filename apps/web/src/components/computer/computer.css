@@ -14,12 +14,17 @@
     inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
     var(--e1);
 }
+/* An `.ac-faceline` on the portrait's drawing, not its box: the title's capitals where the pixels start. */
 .cmp-entry__row {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px 12px;
   padding: 10px 12px;
+}
+.cmp-entry__row > .ac-computer {
+  margin-top: calc(-1 * var(--art-top));
+}
+.cmp-entry__row > .ac-btn {
+  align-self: center;
 }
 .cmp-entry__t {
   flex: 1 1 200px;
@@ -54,25 +59,21 @@
 
 /* The dialog: up to 96vw × 94vh. */
 .ac-dialog.cmp-dialog {
-  /* The agent's screen's own ground, around it in full screen too. */
-  --screen-bg: #1f2128;
   width: min(96vw, 1280px);
   max-height: 94vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   max-height: 94dvh;
 }
 /*
- * One frame for whatever takes the screen's place (the screen, a cover, the agent's page), so the dialog keeps
- * its size from one to the next: as large as 96vw × 94vh allow and no larger than the screen itself (1280×900),
- * keeping its shape. Around the screen: the head (70 px), the sky strip (6), the body's padding (8 + 16) and the
- * line under the screen (22 + 8): the run's steps, or in control the line of the keys. The wait for the workspace's
- * computer is as wide, so the screen that follows it opens in place.
+ * One frame for whatever takes the screen's place (the screen, a cover, the agent's page, the wait for the
+ * workspace's computer), so the dialog keeps its size from one to the next and the screen opens in place: as large
+ * as 96vw × 94vh allow and no larger than the screen itself (1280×900), keeping its shape. Around the screen: the head
+ * (70 px), the sky strip (6), the body's padding (8 + 16) and the line under the screen (22 + 8): the run's steps, or
+ * in control the line of the keys.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
   --cmp-screen: min(96vw - 32px, 1280px, (94dvh - 130px) * 1280 / 900);
   width: calc(var(--cmp-screen) + 32px);
-}
-.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface)) {
   height: calc(var(--cmp-screen) * 900 / 1280 + 130px);
 }
 /*
@@ -81,7 +82,7 @@
  * below and the screen stays where it is.
  */
 .ac-dialog.cmp-dialog:where(
-  :has(.dsk, .cmp-stage, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))
+  :has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))
 ) {
   top: calc(50% - 15px);
   height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
@@ -233,12 +234,6 @@
 .cmp-dialog .ac-dialog__head {
   padding-bottom: 8px;
 }
-.cmp-acts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
 .cmp-sub:empty::before {
   content: "\00a0";
 }
@@ -337,22 +332,7 @@
   padding: 8px 0 0;
 }
 
-/* What covers the stage: the agent's sky behind a screen opening. */
-.brw-dim--sky {
-  overflow: hidden;
-}
-.cmp-sky {
-  position: absolute;
-  inset: 0;
-}
-.cmp-sky canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.brw-dim--sky .brw-dim__box {
-  position: relative;
-}
+/* A cover's portrait of the computer, over its words. */
 .brw-dim__box > .ac-computer {
   align-self: center;
 }
@@ -425,15 +405,26 @@
   color: var(--faint);
 }
 
-/* The workspace's computer on its way, in the dialog. */
+/* The workspace's computer on its way, in the dialog: the screen's box, its words in the middle. */
 .cmp-prep {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   padding: 24px 16px;
+  overflow-y: auto;
   border-radius: 12px;
   background: var(--sunken);
+}
+/* Centred by auto margins, not justify-content: taller than the box (a short window), its words start at the top and
+   all of them scroll, where centring would put their top out of reach. */
+.cmp-prep > :first-child {
+  margin-top: auto;
+}
+.cmp-prep > :last-child {
+  margin-bottom: auto;
 }
 .cmp-prep__title {
   font-size: 16px;
@@ -459,6 +450,7 @@
   .cmp-body > .dsk,
   .cmp-body .dsk-stage,
   .cmp-body > .cmp-stage,
+  .cmp-body > .cmp-prep,
   .cmp-body > .brw-ac.is-surface,
   .cmp-body > .brw-ac.is-surface > .brw-ac__body,
   .cmp-body > .brw-ac.is-surface .brw-ac__stage {
@@ -486,22 +478,24 @@
 /*
  * A phone's head: the name and the line under it share the first row with Close, and actions with words get a row of
  * their own under them, so the name never folds into short lines beside a button. Icons alone (full screen) stay
- * beside Close, with no row of their own. Full screen's bar keeps one row.
+ * beside Close, in the head's one row of actions. Full screen's bar keeps one row.
  */
 @media (max-width: 640px) {
   .cmp-dialog:not(.is-screen-only) > .ac-dialog__head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     row-gap: 8px;
   }
-  .cmp-dialog:not(.is-screen-only) .cmp-acts:has(> :not(.ac-btn--icon)) {
-    grid-area: 2 / 2 / 3 / 5;
+  /* The actions' row lets its parts into the grid: the actions keep a row (an `.ac-acts` box), Close its column. */
+  .cmp-dialog:not(.is-screen-only) .ac-dialog__acts:has(> .cmp-acts > :not(.ac-btn--icon)) {
+    display: contents;
   }
-  .cmp-dialog:not(.is-screen-only) > .ac-dialog__head > :last-child {
-    grid-column: -2;
+  .cmp-dialog:not(.is-screen-only) .ac-dialog__acts > .cmp-acts:has(> :not(.ac-btn--icon)) {
+    display: flex;
+    grid-area: 2 / 2 / 3 / 4;
   }
-  .cmp-acts:empty {
-    display: none;
+  .cmp-dialog:not(.is-screen-only) .ac-dialog__acts > :last-child {
+    grid-area: 1 / 3;
   }
 }
 

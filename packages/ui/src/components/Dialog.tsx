@@ -108,7 +108,7 @@ export function Dialog({
           {...(description ? {} : { "aria-describedby": undefined })}
         >
           <div className="ac-dialog__head">
-            {leading}
+            {leading && <span className="ac-dialog__lead">{leading}</span>}
             {subtitle === undefined ? (
               <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
             ) : (
@@ -119,10 +119,12 @@ export function Dialog({
                 </span>
               </span>
             )}
-            {actions}
-            <RDialog.Close asChild>
-              <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} />
-            </RDialog.Close>
+            <span className="ac-dialog__acts ac-acts">
+              {actions}
+              <RDialog.Close asChild>
+                <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} />
+              </RDialog.Close>
+            </span>
           </div>
           {description &&
             (descriptionAside ? (
