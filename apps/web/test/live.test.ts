@@ -154,7 +154,7 @@ describe("receipts", () => {
 
   test("a list read before the decision keeps 'Picking who answers', whichever comes first", () => {
     const undecided = { ...person(), receipts: { seenBy: [], pickedBy: [], handled: [], blocked: [] } } as Message;
-    const picking = { seen: [], status: null, done: false, referenced: [], picking: true };
+    const picking = { seen: [], status: null, done: false, referenced: [], picking: true as const };
     let s = step(seedReceipt({}, person()), { type: "message.routing", messageId: "m1", step: "plan" });
     s = seedReceipt(s, undecided);
     expect(receiptView(s.m1)).toEqual(picking);
