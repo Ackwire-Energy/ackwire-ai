@@ -41,7 +41,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
@@ -50,7 +50,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       ref: ${{ steps.version.outputs.ref }}
     steps:
-      - uses: useblacksmith/checkout@v1 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -132,10 +132,10 @@ jobs:
   # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
   server:
     needs: version
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: useblacksmith/checkout@v1 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.ref }}
 
@@ -169,7 +169,7 @@ jobs:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "macos"]'), inputs.platforms || 'all') }}
     # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
-    runs-on: blacksmith-6vcpu-macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -348,7 +348,7 @@ jobs:
   windows:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "windows"]'), inputs.platforms || 'all') }}
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-latest
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -471,13 +471,13 @@ jobs:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "linux"]'), inputs.platforms || 'all') }}
     # 22.04: an older glibc, so the app runs on more distributions.
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: useblacksmith/checkout@v1 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.ref }}
 
@@ -631,12 +631,12 @@ jobs:
   publish:
     needs: [version, macos, windows, linux]
     if: ${{ needs.version.outputs.tag != '' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - uses: useblacksmith/checkout@v1 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.ref }}
 
