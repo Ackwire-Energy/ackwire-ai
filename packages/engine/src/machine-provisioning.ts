@@ -85,8 +85,26 @@ const NO_WAIT = {
   secondsWaited: null,
 } as const;
 
-/** What `setupStatus` reads of the workspace. */
-type SetupOrg = { createdAt: Date; standing: string };
+/** What `setupStatus` reads of the workspace, and the size its managed computer's runner reported. */
+type SetupOrg = { createdAt: Date; standing: string; size?: schema.MachineSizeRecord | null };
+
+/** The workspace's managed computer, still in it. */
+const managedComputer = and(
+  eq(machines.orgId, organizations.id),
+  eq(machines.kind, "managed"),
+  isNull(machines.deletedAt),
+);
+
+/**
+ * A ready computer's size as its runner reports it (protocol 22), within a container's limit, else what the
+ * provisioner said: once ready the provisioner can't report a resize (`setProvisioning` is refused). Memory is a
+ * whole number, as the provisioner gives it, because the apps print the number as it comes.
+ */
+function setupSpecs(row: ProvisioningRow | null, size: schema.MachineSizeRecord | null | undefined) {
+  if (row?.state !== "ready" || !size) return row?.specs ?? null;
+  const usable = size.limit ?? size;
+  return { cpus: usable.cpus, memoryGb: Math.round(usable.memoryGb), diskGb: size.diskGb };
+}
 
 /**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
@@ -99,6 +117,7 @@ function setupStatus(row: ProvisioningRow | null, org: SetupOrg, emails: boolean
   const readyAt = row?.expectedReadyAt ?? null;
   return {
     ...provisioningStatus(row, org.createdAt),
+    specs: setupSpecs(row, org.size),
     secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
     secondsWaited: Math.round((now - (row?.requestedAt ?? org.createdAt).getTime()) / 1000),
     notifyByEmail: emails,
@@ -113,8 +132,9 @@ async function publishProvisioning(
   machineId: string | null,
 ) {
   const [org] = await deps.db
-    .select({ createdAt: organizations.createdAt, standing: organizations.standing })
+    .select({ createdAt: organizations.createdAt, standing: organizations.standing, size: machines.size })
     .from(organizations)
+    .leftJoin(machines, managedComputer)
     .where(eq(organizations.id, orgId));
   if (!org) return;
   await publishOrgEvent(deps.pubsub, {
@@ -627,15 +647,13 @@ export async function computerSetup(
     .select({
       provisioning: machineProvisioning,
       machineId: machines.id,
+      size: machines.size,
       createdAt: organizations.createdAt,
       standing: organizations.standing,
     })
     .from(organizations)
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
-    .leftJoin(
-      machines,
-      and(eq(machines.orgId, organizations.id), eq(machines.kind, "managed"), isNull(machines.deletedAt)),
-    )
+    .leftJoin(machines, managedComputer)
     .where(eq(organizations.id, orgId));
   return {
     mode: "external" as const,

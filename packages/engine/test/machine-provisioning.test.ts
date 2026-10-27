@@ -123,8 +123,8 @@ async function enrolled(orgId = f.org.id) {
   return { machineId: issued.machineId, token: token.token };
 }
 
-/** A runner saying hello over an in-memory socket (on a server that sends email with `readyEmail`). */
-async function hello(token: string, readyEmail: MachineHubDeps["readyEmail"] = null) {
+/** A runner saying hello over an in-memory socket (on a server that sends email with `readyEmail`), with `more` in it. */
+async function hello(token: string, readyEmail: MachineHubDeps["readyEmail"] = null, more: object = {}) {
   hub ??= createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a", readyEmail });
   const sent: ServerFrame[] = [];
   let closed: string | undefined;
@@ -146,6 +146,7 @@ async function hello(token: string, readyEmail: MachineHubDeps["readyEmail"] = n
       protocol: MACHINE_PROTOCOL_VERSION,
       workspace: "/var/lib/agentes-runner/work",
       exec: true,
+      ...more,
     }),
   );
   const current = hub;
@@ -621,6 +622,35 @@ describe("external provisioning", () => {
     // New agents are born on it.
     const later = await createAgent(f.db, f.owner.id, f.org.id, { name: "Later", handle: "later" }, { model: "auto" });
     expect(later.machineId).toBe(machineId);
+  });
+
+  test("a ready computer's size is what its runner reports, so a resize shows; before, the provisioner's", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const specs = async () => (await computerSetup(f.db, "external", f.owner.id, f.org.id)).specs;
+    const promised = { cpus: 4, memoryGb: 8, diskGb: 100 };
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", specs: promised });
+    const first = await enrolled();
+    // A runner that reports no size leaves the provisioner's.
+    await hello(first.token);
+    expect(await specs()).toEqual(promised);
+    expect(events.at(-1)).toMatchObject({ state: "ready", specs: promised });
+    // The runner rounds memory to half a GB: the apps print whole ones.
+    await hello(first.token, null, { size: { cpus: 4, memoryGb: 7.5, diskGb: 92 } });
+    expect(await specs()).toEqual({ cpus: 4, memoryGb: 8, diskGb: 92 });
+    // Grown once ready, which the provisioner can no longer report.
+    await hello(first.token, null, { size: { cpus: 6, memoryGb: 11.5, diskGb: 184 } });
+    expect(await specs()).toEqual({ cpus: 6, memoryGb: 12, diskGb: 184 });
+    // Inside a container, what the container may use.
+    await hello(first.token, null, { size: { cpus: 6, memoryGb: 11.5, diskGb: 184, limit: { cpus: 2, memoryGb: 4 } } });
+    expect(await specs()).toEqual({ cpus: 2, memoryGb: 4, diskGb: 184 });
+
+    // Removed, then a new one: the provisioner's while it is prepared, its runner's from its first hello on.
+    await revokeManagedMachine(deps(), f.org.id, first.machineId);
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", specs: promised });
+    expect(await specs()).toEqual(promised);
+    await hello((await enrolled()).token, null, { size: { cpus: 4, memoryGb: 8, diskGb: 92 } });
+    expect(events.at(-1)).toMatchObject({ state: "ready", specs: { cpus: 4, memoryGb: 8, diskGb: 92 } });
   });
 
   test("the ready email: to the owners by language, once, when promised; a wait counts from the removal", async () => {
