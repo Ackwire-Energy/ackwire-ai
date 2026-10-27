@@ -269,8 +269,9 @@ export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCod
 
 /**
  * A code typed for an address, under the codes' lock: `verified` (typed right before, still good), `right` (the
- * code waiting), or why not. A wrong one counts as a try. With no code waiting it is wrong, so nobody learns
- * whether one went out.
+ * code waiting), or why not. A wrong one counts against the code waiting and the day's wrong tries. With only a
+ * code typed right left, it still counts against the day, or that code could be guessed for its 30 minutes. With
+ * no code sent it is wrong, so nobody learns whether one went out.
  */
 async function tryCode(
   tx: Executor,
@@ -285,7 +286,11 @@ async function tryCode(
     return row.verifiedUntil && row.verifiedUntil > now ? "verified" : "join.code_expired";
   const mailbox = sha256(mailboxOf(email));
   if ((await codeCounts(tx, orgId, mailbox, now)).wrong >= JOIN_CODE_LIMITS.wrongDay) return "join.code_tries";
-  if (!row?.codeHash) return "join.code_wrong";
+  const wrong = () => tx.insert(codeEvents).values({ orgId, mailbox, kind: "wrong", at: now });
+  if (!row?.codeHash) {
+    if (row) await wrong();
+    return "join.code_wrong";
+  }
   if (row.tries >= JOIN_CODE_TRIES) return "join.code_tries";
   if (row.expiresAt <= now) return "join.code_expired";
   if (row.codeHash === hash) return "right";
@@ -293,7 +298,7 @@ async function tryCode(
     .update(codes)
     .set({ tries: row.tries + 1 })
     .where(codeRow(orgId, email));
-  await tx.insert(codeEvents).values({ orgId, mailbox, kind: "wrong", at: now });
+  await wrong();
   return row.tries + 1 >= JOIN_CODE_TRIES ? "join.code_tries" : "join.code_wrong";
 }
 
