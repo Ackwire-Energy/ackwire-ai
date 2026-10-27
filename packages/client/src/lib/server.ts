@@ -75,6 +75,16 @@ export function serverHost(server: string): string {
   }
 }
 
+/** "https://box.example.com:8443/x?y" → "https://box.example.com:8443". Null when it isn't an http(s) address. */
+export function originOf(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 /** On a Tailscale network: only devices signed in to the same tailnet reach it. */
 export function isTailnet(server: string): boolean {
   try {
