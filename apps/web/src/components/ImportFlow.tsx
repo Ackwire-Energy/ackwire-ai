@@ -49,7 +49,6 @@ import {
   type PickedFile,
   parseImport,
   readImportFiles,
-  SOURCE_MARK,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
@@ -57,8 +56,10 @@ import {
   applyInChunks,
   blockedItems,
   bundleOrigin,
+  CARD_MARK,
   choosable,
   droppedFiles,
+  EXPORT_PROMPT_APPS,
   githubRoot,
   IMPORT_CARDS,
   type ImportCard,
@@ -67,6 +68,7 @@ import {
   itemId,
   NOT_GITHUB,
   picksOf,
+  type RequestCard,
   retryable,
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
@@ -346,7 +348,7 @@ function SourceMark({ card }: { card: ImportCard }) {
       </span>
     );
   }
-  const mark = SOURCE_MARK[card];
+  const mark = CARD_MARK[card];
   return (
     <span className="imp-mark" aria-hidden="true">
       <img src={dark && mark.dark ? mark.dark : mark.icon} alt="" className="imp-mark__img" />
@@ -372,12 +374,12 @@ function Picker({ flow }: { flow: ImportFlowState }) {
     const files = Array.from(list ?? []);
     if (files.length) void flow.read({ files });
   };
-  const cardName = (c: ImportCard) =>
-    c === "other"
-      ? t("onboarding.import.otherName")
-      : c === "agenteschat"
-        ? t("onboarding.import.agenteschatName")
-        : SOURCE_NAME[c];
+  const cardName = (c: ImportCard) => {
+    if (c === "other") return t("onboarding.import.otherName");
+    if (c === "agenteschat") return t("onboarding.import.agenteschatName");
+    if (c === "grok-bot" || c === "chatgpt-dots") return EXPORT_PROMPT_APPS.find((a) => a.app === c)?.name;
+    return SOURCE_NAME[c];
+  };
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the drop zone button and the pickers are the keyboard way
@@ -418,8 +420,8 @@ function Picker({ flow }: { flow: ImportFlowState }) {
         ))}
       </div>
 
-      {flow.card === "other" ? (
-        <OtherApp />
+      {flow.card === "grok-bot" || flow.card === "chatgpt-dots" || flow.card === "other" ? (
+        <OtherApp key={flow.card} card={flow.card} />
       ) : (
         flow.card && (
           <p className="imp-tip ac-iconline">
@@ -530,8 +532,11 @@ function Picker({ flow }: { flow: ImportFlowState }) {
   );
 }
 
-/** "Outro app": the request to paste there; where each app gives the file back is on the help page. */
-function OtherApp() {
+/**
+ * The request to paste in the app, in Grok Bot's or ChatGPT dots' own words on their cards. For any other
+ * app, where each one gives the file back is on the help page.
+ */
+function OtherApp({ card }: { card: RequestCard }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
   const copy = async () => {
@@ -545,38 +550,40 @@ function OtherApp() {
   return (
     <section className="imp-other" aria-labelledby="imp-other-title">
       <h3 id="imp-other-title" className="imp-other__title">
-        {t("onboarding.import.other.title")}
+        {t(`onboarding.import.request.${card}.title`)}
       </h3>
       <ol className="imp-other__steps">
-        <li>{t("onboarding.import.other.steps.copy")}</li>
-        <li>{t("onboarding.import.other.steps.paste")}</li>
-        <li>{t("onboarding.import.other.steps.back")}</li>
+        <li>{t("onboarding.import.request.copyStep")}</li>
+        <li>{t(`onboarding.import.request.${card}.paste`)}</li>
+        <li>{t(`onboarding.import.request.${card}.back`)}</li>
       </ol>
       <Textarea
         readOnly
         rows={6}
         value={EXPORT_PROMPT}
-        aria-label={t("onboarding.import.other.prompt")}
+        aria-label={t("onboarding.import.request.prompt")}
         className="imp-other__prompt"
         onFocus={(e) => e.currentTarget.select()}
       />
       <div className="imp-other__copy">
         <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-          {copied === "ok" ? t("common.copied") : t("onboarding.import.other.copy")}
+          {copied === "ok" ? t("common.copied") : t("onboarding.import.request.copy")}
         </Button>
         <span role="status" className="small muted">
           {copied === "ok"
-            ? t("onboarding.import.other.copied")
+            ? t(`onboarding.import.request.${card}.copied`)
             : copied === "failed"
-              ? t("onboarding.import.other.copyFailed")
+              ? t("onboarding.import.request.copyFailed")
               : ""}
         </span>
       </div>
-      <p className="imp-help">
-        <HelpLink slug="import" section="other-apps">
-          {t("onboarding.import.other.where")}
-        </HelpLink>
-      </p>
+      {card === "other" && (
+        <p className="imp-help">
+          <HelpLink slug="import" section="other-apps">
+            {t("onboarding.import.request.where")}
+          </HelpLink>
+        </p>
+      )}
     </section>
   );
 }
