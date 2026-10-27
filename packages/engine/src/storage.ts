@@ -12,11 +12,12 @@ import { and, asc, type Database, desc, eq, gt, gte, isNull, ne, or, schema, sql
 import { recordAudit } from "./audit";
 import { openSecret, randomToken, sealSecret, sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
+import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 
-const { storageConfigs, storageMigrations, artifactVersions } = schema;
+const { storageConfigs, storageMigrations, artifacts, artifactVersions } = schema;
 
 type StorageConfigRow = typeof storageConfigs.$inferSelect;
 type MigrationRow = typeof storageMigrations.$inferSelect;
@@ -437,6 +438,16 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
     .from(artifactVersions)
     .where(notAt(orgId, target));
   const remaining = counted?.n ?? 0;
+  // Back onto this server's storage, the files count against its limit (those in the trash once restored).
+  if (target === null) {
+    const [moving] = await deps.db
+      .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
+      .from(artifactVersions)
+      .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
+      .where(and(notAt(orgId, null), isNull(artifacts.deletedAt)));
+    const bytes = Number(moving?.bytes ?? 0);
+    if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
+  }
   const resume = last && last.status !== "done" && last.toStorageConfigId === target ? last : null;
   const migration = await deps.db.transaction(async (tx) => {
     let row: MigrationRow | undefined;

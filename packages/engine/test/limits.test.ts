@@ -24,11 +24,13 @@ import {
   postPersonMessage,
   type RouterStrategy,
   resendInvitation,
+  restoreArtifact,
   routeMessage,
   saveSkill,
   saveStorage,
   sendInvitation,
   setOrgLimits,
+  startMigration,
   storageUsage,
   testStorage,
   withJudgeFallback,
@@ -49,6 +51,20 @@ const owner = () => ({ type: "person" as const, userId: f.owner.id });
 const upload = (bytes: number, name = "notes.txt") =>
   createFileArtifact(f.artifactDeps, owner(), f.org.id, { title: name, name, bytes: new Uint8Array(bytes) });
 const blobCount = async () => (await f.platformBlobs.list("")).length;
+/** New files go to the workspace's own bucket (a fake S3 server). */
+async function ownBucket() {
+  const bucket = {
+    endpoint: "https://s3.example.com",
+    region: "us-east-1",
+    bucket: "acme-files",
+    prefix: "agentes",
+    pathStyle: true,
+    accessKeyId: "AKIATEST",
+    secretAccessKey: "secret-test-key-123456",
+  };
+  expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket)).ok).toBe(true);
+  await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket });
+}
 /** An account with this address. */
 async function person(email: string, emailVerified = false) {
   const id = `user_${email.split("@")[0]}`;
@@ -191,17 +207,7 @@ describe("storage", () => {
     await skill("logo.png", 50);
 
     // On its own bucket, nothing counts against the limit.
-    const bucket = {
-      endpoint: "https://s3.example.com",
-      region: "us-east-1",
-      bucket: "acme-files",
-      prefix: "agentes",
-      pathStyle: true,
-      accessKeyId: "AKIATEST",
-      secretAccessKey: "secret-test-key-123456",
-    };
-    expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket)).ok).toBe(true);
-    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket });
+    await ownBucket();
     await upload(500);
     expect((await storageUsage(f.db, f.org.id)).usedBytes).toBe(110);
     expect((await operatorOrg(f.db, f.org.id))?.meters).toEqual({
@@ -210,6 +216,36 @@ describe("storage", () => {
       ownStorage: true,
       platformUsdThisMonth: 0,
     });
+  });
+
+  test("files out of the trash or copied back from its own bucket count again, never as the day's uploads", async () => {
+    f = await setup();
+    await limit({ storageBytes: 100, uploadBytesPerDay: 120 });
+    const first = await upload(60);
+    await deleteArtifact(f.artifactDeps, f.owner.id, f.org.id, first.id);
+    const second = await upload(50);
+    // The trash freed the space a new file took: bringing the old one back would pass the limit.
+    await expect(restoreArtifact(f.artifactDeps, f.owner.id, f.org.id, first.id)).rejects.toMatchObject({
+      code: "storage.full",
+      params: { usedBytes: 50, limitBytes: 100 },
+    });
+    expect((await storageUsage(f.db, f.org.id)).usedBytes).toBe(50);
+    // With room it comes back, though today's uploads (110 of 120 bytes) couldn't take it: it was written before.
+    await deleteArtifact(f.artifactDeps, f.owner.id, f.org.id, second.id);
+    await restoreArtifact(f.artifactDeps, f.owner.id, f.org.id, first.id);
+    expect(await storageUsage(f.db, f.org.id)).toEqual({ usedBytes: 60, uploadBytes24h: 110 });
+
+    // Files on its own bucket count against nothing until they are copied back here.
+    await ownBucket();
+    await upload(70);
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
+    await expect(startMigration(f.storage, f.owner.id, f.org.id)).rejects.toMatchObject({
+      code: "storage.full",
+      params: { usedBytes: 60, limitBytes: 100 },
+    });
+    expect(await f.db.select().from(schema.storageMigrations)).toEqual([]);
+    await limit({ storageBytes: 130, uploadBytesPerDay: 120 });
+    expect(await startMigration(f.storage, f.owner.id, f.org.id)).toMatchObject({ status: "running", total: 1 });
   });
 
   test("at most a day's worth in any 24 hours, the trash included", async () => {

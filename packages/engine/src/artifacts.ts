@@ -1135,6 +1135,13 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
   if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
     throw new ForbiddenError("Only who could delete it can restore it", "artifact.restore_forbidden");
   }
+  // Out of the trash, what it keeps on this server's storage counts against the limit again.
+  const [kept] = await deps.db
+    .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
+    .from(artifactVersions)
+    .where(and(eq(artifactVersions.artifactId, a.id), isNull(artifactVersions.storageConfigId)));
+  const bytes = Number(kept?.bytes ?? 0);
+  if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   const [row] = await deps.db.transaction(async (tx) => {
     const updated = await tx.update(artifacts).set({ deletedAt: null }).where(eq(artifacts.id, a.id)).returning();
     await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });

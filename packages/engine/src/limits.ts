@@ -147,26 +147,28 @@ export async function storageUsage(
 /**
  * Refuses writing `incoming` more bytes to this server's storage past the workspace's limits, before anything is
  * written: `storage.full` or `storage.daily_full` (409), in words an agent can pass on. Its callers skip it for a
- * workspace's own bucket.
+ * workspace's own bucket. `daily: false` for files that come back rather than arrive (out of the trash, or copied
+ * back from the workspace's own bucket): they keep the day they were first written, so the day never counts them.
  * ponytail: the sums are read without a lock, so uploads at the same moment can pass the line together by at most
  * their own sizes (each at most 50 MB); a lock would serialize every upload of a workspace.
  */
-export async function assertStorageRoom(db: Executor, orgId: string, incoming: number) {
-  const limits = await getOrgLimits(db, orgId);
-  if (limits.storageBytes === null && limits.uploadBytesPerDay === null) return;
+export async function assertStorageRoom(db: Executor, orgId: string, incoming: number, { daily = true } = {}) {
+  const { storageBytes, uploadBytesPerDay } = await getOrgLimits(db, orgId);
+  const perDay = daily ? uploadBytesPerDay : null;
+  if (storageBytes === null && perDay === null) return;
   const { usedBytes, uploadBytes24h } = await storageUsage(db, orgId);
-  if (limits.storageBytes !== null && usedBytes + incoming > limits.storageBytes) {
+  if (storageBytes !== null && usedBytes + incoming > storageBytes) {
     throw new ConflictError(
-      `The workspace's file storage is full (${formatBytes(usedBytes)} of ${formatBytes(limits.storageBytes)}): nothing was saved. Tell the person who asked: an admin can free space or raise the limit.`,
+      `The workspace's file storage is full (${formatBytes(usedBytes)} of ${formatBytes(storageBytes)}): nothing was saved. Tell the person who asked: an admin can free space or raise the limit.`,
       "storage.full",
-      { usedBytes, limitBytes: limits.storageBytes },
+      { usedBytes, limitBytes: storageBytes },
     );
   }
-  if (limits.uploadBytesPerDay !== null && uploadBytes24h + incoming > limits.uploadBytesPerDay) {
+  if (perDay !== null && uploadBytes24h + incoming > perDay) {
     throw new ConflictError(
-      `Today's uploads to this workspace reached ${formatBytes(limits.uploadBytesPerDay)}: nothing was saved. Try again in a few hours.`,
+      `Today's uploads to this workspace reached ${formatBytes(perDay)}: nothing was saved. Try again in a few hours.`,
       "storage.daily_full",
-      { limitBytes: limits.uploadBytesPerDay },
+      { limitBytes: perDay },
     );
   }
 }

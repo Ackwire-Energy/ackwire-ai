@@ -41,8 +41,8 @@ ADR 0056 already gives every hook but one: a hold stops a workspace's agents and
 | Limit | Counts | Enforced |
 | --- | --- | --- |
 | `members` | every membership row, blocked accounts included; never agents, invitations or requests to join | when someone joins (accepting an invitation, an approved request), under the workspace's `org-members` lock, so it holds exactly; and before an invitation is sent, resent or a request approved, so a full workspace sends none that can't be accepted (`org.members_full`, 409) |
-| `storageBytes` | the bytes of the files a workspace keeps on this server's storage, files in the trash left out | before any file is written (chat and Drive uploads, a computer's uploads, mail attachments, every version, skill files), as `used + incoming > limit` (`storage.full`, 409); skipped for a workspace on its own bucket |
-| `uploadBytesPerDay` | the bytes written to that storage in the last 24 hours, rolling | at the same places (`storage.daily_full`, 409) |
+| `storageBytes` | the bytes of the files a workspace keeps on this server's storage, files in the trash left out | before any file is written (chat and Drive uploads, a computer's uploads, mail attachments, every version, skill files), as `used + incoming > limit` (`storage.full`, 409); skipped for a workspace on its own bucket. Also before a file comes back from the trash and before files are copied back from the workspace's own bucket, which would otherwise bring back more than the limit |
+| `uploadBytesPerDay` | the bytes written to that storage in the last 24 hours, rolling | where files are written (`storage.daily_full`, 409); never for files that come back, which keep the day they were first written |
 | `platformUsdPerMonth` | usage billed to the platform this UTC calendar month | §5 |
 
 Bytes count in GiB (1024³), the unit the apps print. The storage check takes no lock: uploads at the same moment may pass the line by at most their own sizes, where a lock would serialize every upload of a workspace. The refusals tell agents in plain English what happened and what a person can do.
