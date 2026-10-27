@@ -70,6 +70,7 @@ import type {
   IssueActivity,
   IssueColumn,
   JoinApproval,
+  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -663,6 +664,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ id: string; url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
+      sendCode: (token, input) => request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, { json: input }),
+      checkCode: (token, input) =>
+        request<{ verified: true }>(`/api/app/invitations/${enc(token)}/code/check`, { json: input }),
       ask: (token, input) => request<AskToJoinResult>(`/api/app/invitations/${enc(token)}/requests`, { json: input }),
       requestNew: (token) => request<void>(`/api/app/invitations/${enc(token)}/request-new`, { json: {} }),
     },

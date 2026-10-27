@@ -208,4 +208,5 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Estúdio Alves",
     reason: "Só aceitamos pessoas do time de design por enquanto.",
   },
+  "join_code.en": { kind: "join_code", locale: "en", orgName: "Souza Bakery", code: "482913", url: APP },
 };

@@ -536,6 +536,8 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
       [`GET ${org}/invite-links`]: { status: 200, body: { links: [{ id: "l1", url: null }] } },
       [`DELETE ${org}/invite-links/l1`]: { status: 204 },
       "POST /api/app/invitations/tok/requests": { status: 201, body: { status: "pending", email: "a@x.com" } },
+      "POST /api/app/invitations/tok/code": { status: 202, body: { email: "a@x.com", resendIn: 60 } },
+      "POST /api/app/invitations/tok/code/check": { status: 200, body: { verified: true } },
       "POST /api/app/invitations/tok/request-new": { status: 204 },
       [`GET ${org}/join-requests`]: { status: 200, body: { requests: [{ id: "r1" }] } },
       [`POST ${org}/join-requests/r1/approve`]: { status: 200, body: { outcome: "joined" } },
@@ -554,7 +556,9 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect((await api.invites.createLink("o1")).url).toBe("https://x/invite/t");
     expect(await api.invites.links("o1")).toEqual([expect.objectContaining({ id: "l1", url: null })]);
     await api.invites.turnOff("o1", "l1");
-    expect((await api.invites.ask("tok", { name: "Ana", email: "a@x.com" })).status).toBe("pending");
+    expect(await api.invites.sendCode("tok", { email: "a@x.com" })).toEqual({ email: "a@x.com", resendIn: 60 });
+    expect(await api.invites.checkCode("tok", { email: "a@x.com", code: "123456" })).toEqual({ verified: true });
+    expect((await api.invites.ask("tok", { name: "Ana", email: "a@x.com", code: "123456" })).status).toBe("pending");
     await api.invites.requestNew("tok");
     expect(await api.joinRequests.list("o1")).toEqual([expect.objectContaining({ id: "r1" })]);
     expect(await api.joinRequests.approve("o1", "r1", "admin")).toEqual({ outcome: "joined" });
@@ -562,7 +566,8 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     const sent = (path: string) => calls.find((c) => c.url === path && c.init.method === "POST")?.init.body;
     expect(sent(`${org}/join-requests/r1/approve`)).toBe('{"role":"admin"}');
     expect(sent(`${org}/join-requests/r1/deny`)).toBe('{"reason":"Not now"}');
-    expect(sent("/api/app/invitations/tok/requests")).toBe('{"name":"Ana","email":"a@x.com"}');
+    expect(sent("/api/app/invitations/tok/requests")).toBe('{"name":"Ana","email":"a@x.com","code":"123456"}');
+    expect(sent("/api/app/invitations/tok/code/check")).toBe('{"email":"a@x.com","code":"123456"}');
     // Writes carry JSON (the server's CSRF rule); a DELETE needs no body.
     expect(calls.every((c) => ["GET", "DELETE"].includes(String(c.init.method)) || c.init.body !== undefined)).toBe(
       true,

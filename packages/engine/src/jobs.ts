@@ -14,7 +14,7 @@ import { type EmailArt, sendQueuedEmail } from "./email";
 import { publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
-import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
 import { mentionHandoffs } from "./judge";
 import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
@@ -432,9 +432,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.storage) throw new PermanentJobError("no storage configured");
       await runMigration(deps.storage, String(job.payload.migrationId));
     },
-    "email.send": async (job) => {
-      if (!deps.email) throw new PermanentJobError("no email sender configured");
-      await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
+    "email.send": async (job, ctx) => {
+      try {
+        if (!deps.email) throw new PermanentJobError("no email sender configured");
+        await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
+      } catch (error) {
+        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetJoinCodeEmail(deps.db, job);
+        throw error;
+      }
+      await forgetJoinCodeEmail(deps.db, job);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
