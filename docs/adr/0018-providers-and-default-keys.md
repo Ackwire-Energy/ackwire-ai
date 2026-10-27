@@ -12,4 +12,4 @@
 
 **Defaults.** Creating a key can make it its provider's default in the same call (`makeDefault`, used by onboarding); `POST …/credentials/{id}/make-default` switches it. A default key can't be revoked or deleted until another is the default (409). The org's own calls use the configured cheap model of the provider of its default key (`ROUTER_MODEL`/`SUMMARY_MODEL` for Anthropic, `OPENAI_CHEAP_MODEL` for OpenAI) unless the org overrides them. `GET …/organizations/{orgId}/models` marks each model `available` (the org has a key for its provider, or the platform does) and `recommended`.
 
-**Platform-billed usage.** `usage_records.billed_to` is `org` or `platform`; internal services our platform pays for (the Jev router) are recorded per org with `billed_to = platform` and kept out of the org's usage total.
+**Platform-billed usage.** `usage_records.billed_to` is `org` or `platform`; internal services the server's own keys pay for (Jev, with the installation's TypeSafe key since ADR 0073) are recorded per org with `billed_to = platform` and kept out of the org's usage total.

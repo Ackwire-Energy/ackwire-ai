@@ -373,6 +373,7 @@ export {
   cityOf,
   FALLBACK_ZONES,
   filterZones,
+  isEuropeanTimeZone,
   offsetLabel,
   offsetMinutes,
   parseOffsetQuery,
