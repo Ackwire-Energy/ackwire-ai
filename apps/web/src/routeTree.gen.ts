@@ -20,6 +20,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as DesktopConnectorRouteImport } from './routes/desktop.connector'
 import { Route as DesktopHandoverRouteImport } from './routes/desktop.handover'
 import { Route as DesktopSignInRouteImport } from './routes/desktop.sign-in'
 import { Route as DesktopSignedInRouteImport } from './routes/desktop.signed-in'
@@ -108,6 +109,11 @@ const TermosRoute = TermosRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesktopConnectorRoute = DesktopConnectorRouteImport.update({
+  id: '/desktop/connector',
+  path: '/desktop/connector',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesktopHandoverRoute = DesktopHandoverRouteImport.update({
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/desktop/connector': typeof DesktopConnectorRoute
   '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -343,6 +350,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/desktop/connector': typeof DesktopConnectorRoute
   '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -390,6 +398,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/desktop/connector': typeof DesktopConnectorRoute
   '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -439,6 +448,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/termos'
     | '/terms'
+    | '/desktop/connector'
     | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -486,6 +496,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/termos'
     | '/terms'
+    | '/desktop/connector'
     | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -532,6 +543,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/termos'
     | '/terms'
+    | '/desktop/connector'
     | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -580,6 +592,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
+  DesktopConnectorRoute: typeof DesktopConnectorRoute
   DesktopHandoverRoute: typeof DesktopHandoverRoute
   DesktopSignInRoute: typeof DesktopSignInRoute
   DesktopSignedInRoute: typeof DesktopSignedInRoute
@@ -666,6 +679,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desktop/connector': {
+      id: '/desktop/connector'
+      path: '/desktop/connector'
+      fullPath: '/desktop/connector'
+      preLoaderRoute: typeof DesktopConnectorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/desktop/handover': {
@@ -986,6 +1006,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
+  DesktopConnectorRoute: DesktopConnectorRoute,
   DesktopHandoverRoute: DesktopHandoverRoute,
   DesktopSignInRoute: DesktopSignInRoute,
   DesktopSignedInRoute: DesktopSignedInRoute,
