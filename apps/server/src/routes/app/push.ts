@@ -126,7 +126,7 @@ export function pushRoutes(deps: AppDeps) {
         limit: 600,
         windowMs: 3600_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       const stale = await stalePushNotifications(db, user.id, c.req.valid("json").ids);
       return c.json({ stale }, 200);
     },
