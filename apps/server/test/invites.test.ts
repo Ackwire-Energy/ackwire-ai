@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { orgTopic } from "@agenteschat/adapters";
+import { createMemoryRateLimiter, orgTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -7,7 +7,14 @@ let t: TestServer;
 afterEach(() => t.close());
 
 type Link = { id: string; url: string; expiresAt: string };
-type Request = { id: string; name: string; email: string; note: string | null; confirmed: boolean };
+type Request = {
+  id: string;
+  name: string;
+  email: string;
+  note: string | null;
+  verified: boolean;
+  confirmed: boolean;
+};
 const DAY = 86_400_000;
 
 async function start(env: Record<string, string> = {}) {
@@ -25,6 +32,27 @@ const ask = (b: Browser, token: string, json: Record<string, string>, headers?: 
 const requests = async (b: Browser, orgId: string) =>
   ((await (await b(`/api/app/organizations/${orgId}/join-requests`)).json()) as { requests: Request[] }).requests;
 const mailTo = (to: string) => t.email.sent.filter((m) => m.to.includes(to));
+const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+const sendCode = (b: Browser, token: string, json: { email?: string } = {}, headers?: Record<string, string>) =>
+  b(`/api/app/invitations/${token}/code`, { json, headers });
+/** The code the last code email carries (its subject starts with it). */
+const lastCode = () => t.email.sent.flatMap((m) => /^(\d{6}) /.exec(m.subject)?.[1] ?? []).at(-1) ?? "";
+
+/** Proves an address the way the page does: a code to it, read from its email and typed back. */
+async function codeFor(b: Browser, token: string, email?: string) {
+  const sent = await sendCode(b, token, email ? { email } : {});
+  if (sent.status !== 202) throw new Error(`code: ${sent.status} ${await sent.text()}`);
+  await t.drain();
+  const code = lastCode();
+  const checked = await b(`/api/app/invitations/${token}/code/check`, { json: { ...(email ? { email } : {}), code } });
+  if (checked.status !== 200) throw new Error(`check: ${checked.status} ${await checked.text()}`);
+  return code;
+}
+/** Asks signed out with the address proven. */
+async function provenAsk(token: string, json: { name: string; email: string; note?: string }) {
+  const b = browser(t);
+  return ask(b, token, { ...json, code: await codeFor(b, token, json.email) });
+}
 
 test("a link only asks: the same link every time, no sign-up from it, and an approval invites the address", async () => {
   const { owner, orgId, agentId, status, link, token } = await start();
@@ -53,20 +81,43 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   });
   expect(header.status).toBe(403);
 
-  // A typed request gets the same answer whatever happens behind it.
+  // This server sends email: a typed address proves itself first, with a code from its mailbox.
   const typed = { name: "  Ana   Souza ", email: "Ana@Example.com", note: "Paula's new designer" };
-  for (let i = 0; i < 2; i++) {
-    const res = await ask(anon, token, typed);
-    expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ status: "pending", email: "ana@example.com", emailed: true });
-  }
-  expect((await ask(anon, token, { email: "x@example.com" })).status).toBe(400);
-  // A job files a typed request, apart from the reply.
-  expect(await requests(owner, orgId)).toEqual([]);
+  const unproven = await ask(anon, token, typed);
+  expect(unproven.status).toBe(400);
+  expect(await errorCode(unproven)).toBe("join.code_needed");
+  const sent = await sendCode(anon, token, { email: typed.email });
+  expect(sent.status).toBe(202);
+  expect(await sent.json()).toEqual({ email: "ana@example.com", resendIn: 60 });
+  const soon = await sendCode(anon, token, { email: typed.email });
+  expect(soon.status).toBe(429);
+  const wait = (await soon.json()) as { error: { code: string; params: { retryIn: number } } };
+  expect(wait.error.code).toBe("join.code_wait");
+  expect(wait.error.params.retryIn).toBeGreaterThan(50);
   await t.drain();
+  const code = lastCode();
+  expect(mailTo("ana@example.com").map((m) => m.subject)).toEqual([`${code} é seu código do agentes.chat`]);
+  // Sent, its job's row is gone: the code and the address aren't kept.
+  const jobs = await t.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"));
+  expect(jobs.filter((j) => (j.payload.template as { kind?: string }).kind === "join_code")).toEqual([]);
+  const check = (json: { email: string; code: string }) => anon(`/api/app/invitations/${token}/code/check`, { json });
+  const wrong = await check({ email: typed.email, code: code === "000000" ? "000001" : "000000" });
+  expect(wrong.status).toBe(400);
+  expect(await errorCode(wrong)).toBe("join.code_wrong");
+  expect(await (await check({ email: typed.email, code })).json()).toEqual({ verified: true });
+  const res = await ask(anon, token, { ...typed, code });
+  expect(res.status).toBe(201);
+  expect(await res.json()).toEqual({ status: "pending", email: "ana@example.com", emailed: true });
+  expect((await ask(anon, token, { email: "x@example.com" })).status).toBe(400);
+  // Proven, it is filed at once.
   const [request] = await requests(owner, orgId);
-  expect(request).toMatchObject({ name: "Ana Souza", email: "ana@example.com", note: "Paula's new designer" });
-  expect(request?.confirmed).toBe(false);
+  expect(request).toMatchObject({
+    name: "Ana Souza",
+    email: "ana@example.com",
+    note: "Paula's new designer",
+    verified: true,
+    confirmed: false,
+  });
 
   await t.drain();
   const [toOwner] = mailTo("owner@example.com").filter((m) => m.subject === "Alguém pede para entrar no seu workspace");
@@ -91,8 +142,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(answer).toMatchObject({ outcome: "invited", emailed: true });
   expect(await requests(owner, orgId)).toEqual([]);
   await t.drain();
-  const [toAna] = mailTo("ana@example.com");
-  expect(toAna?.subject).toBe("Seu pedido para entrar foi aprovado");
+  const toAna = mailTo("ana@example.com").find((m) => m.subject === "Seu pedido para entrar foi aprovado");
   expect(toAna?.text).toContain(answer.url);
 
   // The invitation opens sign-up for that address only, and joins as the role picked.
@@ -112,8 +162,67 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   });
 });
 
+test("a server without email keeps the typed ask: no code, and the same answer whatever the address", async () => {
+  const { owner, orgId, token } = await start();
+  Object.assign(t.email, { delivers: false });
+  const anon = browser(t);
+  const noEmail = await sendCode(anon, token, { email: "ana@example.com" });
+  expect(noEmail.status).toBe(409);
+  expect(await errorCode(noEmail)).toBe("join.no_email");
+  for (let i = 0; i < 2; i++) {
+    const res = await ask(anon, token, { name: "Ana", email: "ana@example.com" });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ status: "pending", email: "ana@example.com", emailed: false });
+  }
+  // A job files a typed request, apart from the reply. Nobody proved the address.
+  expect(await requests(owner, orgId)).toEqual([]);
+  await t.drain();
+  expect(await requests(owner, orgId)).toEqual([
+    expect.objectContaining({ email: "ana@example.com", verified: false, confirmed: false }),
+  ]);
+});
+
+test("codes are limited per IP (10 an hour) and per link (40 an hour), checks per IP (30 an hour)", async () => {
+  const { token } = await start();
+  const from = (ip: string, i: number) =>
+    sendCode(browser(t), token, { email: `c${i}-${ip}@example.com` }, { "x-forwarded-for": ip });
+  for (let i = 0; i < 10; i++) expect((await from("203.0.113.1", i)).status).toBe(202);
+  const limited = await from("203.0.113.1", 10);
+  expect(limited.status).toBe(429);
+  expect(await errorCode(limited)).toBe("join.rate_limited");
+  for (const ip of ["203.0.113.2", "203.0.113.3", "203.0.113.4"])
+    for (let i = 0; i < 10; i++) expect((await from(ip, i)).status).toBe(202);
+  expect((await from("203.0.113.5", 0)).status).toBe(429);
+
+  const check = (i: number) =>
+    browser(t)(`/api/app/invitations/${token}/code/check`, {
+      json: { email: `n${i}@example.com`, code: "123456" },
+      headers: { "x-forwarded-for": "198.51.100.7" },
+    });
+  for (let i = 0; i < 30; i++) expect((await check(i)).status).toBe(400);
+  expect((await check(30)).status).toBe(429);
+});
+
+test("an address's limits are in the database: a restart resets none of them", async () => {
+  const { token } = await start();
+  const anon = browser(t);
+  for (let i = 0; i < 5; i++) {
+    expect(
+      (await sendCode(anon, token, { email: "ana@example.com" }, { "x-forwarded-for": `203.0.113.${i}` })).status,
+    ).toBe(202);
+    // As if a minute passed: the next code can go.
+    await t.db.update(schema.organizationJoinCodes).set({ sentAt: new Date(Date.now() - 61_000) });
+  }
+  // A restart empties every count kept in memory.
+  t.adapters.rateLimiter = createMemoryRateLimiter();
+  const sixth = await sendCode(anon, token, { email: "ana@example.com" });
+  expect(sixth.status).toBe(429);
+  expect(await errorCode(sixth)).toBe("join.code_limit");
+});
+
 test("asks are limited per IP (10 an hour) and per link (20 an hour)", async () => {
   const { token } = await start();
+  Object.assign(t.email, { delivers: false });
   const from = (ip: string, i: number) =>
     ask(browser(t), token, { name: `P ${ip} ${i}`, email: `p${i}-${ip}@example.com` }, { "x-forwarded-for": ip });
   for (let i = 0; i < 10; i++) expect((await from("203.0.113.1", i)).status).toBe(201);
@@ -153,16 +262,23 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "admin" })]);
   expect((await ask(bia, token, {})).status).toBe(409);
 
+  // Not confirmed: the account's own address proves itself with a code, which never confirms the account.
   const cris = browser(t);
   await signUp(cris, "cris@example.com");
-  await ask(cris, token, {});
-  await t.drain();
+  expect(await errorCode(await ask(cris, token, {}))).toBe("join.code_needed");
+  const code = await codeFor(cris, token);
+  expect(mailTo("cris@example.com").at(-1)?.subject).toStartWith(code);
+  expect((await ask(cris, token, { code })).status).toBe(201);
   const [unconfirmed] = await requests(owner, orgId);
-  expect(unconfirmed?.confirmed).toBe(false);
+  expect(unconfirmed).toMatchObject({ email: "cris@example.com", verified: true, confirmed: false });
+  const [account] = await t.db.select().from(schema.users).where(eq(schema.users.email, "cris@example.com"));
+  expect(account?.emailVerified).toBe(false);
   const invited = await owner(`/api/app/organizations/${orgId}/join-requests/${unconfirmed?.id}/approve`, {
     json: { role: "member" },
   });
   expect(await invited.json()).toMatchObject({ outcome: "invited" });
+  // Confirmed accounts never need one.
+  expect(await errorCode(await sendCode(bia, token))).toBe("join.verified");
 });
 
 test("members' open apps hear whoever joins, changes role or leaves, to read the people again", async () => {
@@ -190,8 +306,7 @@ test("members' open apps hear whoever joins, changes role or leaves, to read the
 
 test("only admins see and answer requests; asks must come from our own pages", async () => {
   const { owner, orgId, link, token } = await start();
-  await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
-  await t.drain();
+  await provenAsk(token, { name: "Ana", email: "ana@example.com" });
   const [request] = await requests(owner, orgId);
   const member = await joinByInvitation(t, owner, orgId, "member@example.com");
   const calls = (b: Browser) => [
@@ -204,11 +319,13 @@ test("only admins see and answer requests; asks must come from our own pages", a
   ];
   for (const res of await Promise.all(calls(member))) expect(res.status).toBe(403);
   for (const res of await Promise.all(calls(browser(t)))) expect(res.status).toBe(401);
-  const foreign = await browser(t)(`/api/app/invitations/${token}/requests`, {
-    json: { name: "Eve", email: "eve@example.com" },
-    origin: "https://evil.example",
-  });
-  expect(foreign.status).toBe(403);
+  for (const path of ["requests", "code", "code/check"]) {
+    const foreign = await browser(t)(`/api/app/invitations/${token}/${path}`, {
+      json: { name: "Eve", email: "eve@example.com", code: "123456" },
+      origin: "https://evil.example",
+    });
+    expect(foreign.status).toBe(403);
+  }
 
   // Denied with a reason: the person reads it in the email.
   const denied = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, {
@@ -218,15 +335,13 @@ test("only admins see and answer requests; asks must come from our own pages", a
   const again = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, { json: {} });
   expect(((await again.json()) as { error: { code: string } }).error.code).toBe("join.answered");
   await t.drain();
-  const [toAna] = mailTo("ana@example.com");
-  expect(toAna?.subject).toBe("Seu pedido para entrar não foi aprovado");
+  const toAna = mailTo("ana@example.com").find((m) => m.subject === "Seu pedido para entrar não foi aprovado");
   expect(toAna?.html).toContain("We only take people from &lt;the studio&gt;");
 });
 
-test("an account that never confirmed its address reads no one else's answer, nor takes over their request", async () => {
+test("an account that never confirmed its address reads no one else's answer, nor asks without its mailbox", async () => {
   const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
-  await ask(browser(t), token, { name: "Otto", email: "otto@corp.com" });
-  await t.drain();
+  await provenAsk(token, { name: "Otto", email: "otto@corp.com" });
   const [otto] = await requests(owner, orgId);
   const denied = await owner(`/api/app/organizations/${orgId}/join-requests/${otto?.id}/deny`, {
     json: { reason: "Not this team" },
@@ -236,14 +351,16 @@ test("an account that never confirmed its address reads no one else's answer, no
   await signUp(notOtto, "otto@corp.com");
   const preview = (await (await notOtto(`/api/app/invitations/${token}`)).json()) as { you?: unknown };
   expect(preview.you).toEqual({ member: false, email: "otto@corp.com", request: null });
-  expect((await ask(notOtto, token, {})).status).toBe(201);
+  // Asking needs the code from Otto's mailbox.
+  expect(await errorCode(await ask(notOtto, token, {}))).toBe("join.code_needed");
+  expect(await errorCode(await ask(notOtto, token, { code: "123456" }))).toBe("join.code_wrong");
   await t.drain();
   expect(await requests(owner, orgId)).toEqual([]);
 });
 
 test("joining by an email invitation closes the person's request and the admins' notice", async () => {
   const { owner, orgId, token } = await start();
-  await ask(browser(t), token, { name: "Rui", email: "rui@example.com" });
+  await provenAsk(token, { name: "Rui", email: "rui@example.com" });
   await t.drain();
   const inbox = async () =>
     ((await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as { items: { kind: string }[] })
@@ -257,7 +374,7 @@ test("joining by an email invitation closes the person's request and the admins'
 
 test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
   const { owner, orgId, link, token } = await start({ ALLOW_SIGNUP: "true" });
-  await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
+  await provenAsk(token, { name: "Ana", email: "ana@example.com" });
   await t.drain();
   t.email.sent.length = 0;
   expect((await owner(`/api/app/organizations/${orgId}/invite-links`)).status).toBe(200);
@@ -271,7 +388,8 @@ test("a link turned off: its requests close quietly, its page says it no longer 
   });
   const refused = await ask(browser(t), token, { name: "Bia", email: "bia@example.com" });
   expect(refused.status).toBe(404);
-  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("join.link_closed");
+  expect(await errorCode(refused)).toBe("join.link_closed");
+  expect(await errorCode(await sendCode(browser(t), token, { email: "bia@example.com" }))).toBe("join.link_closed");
   expect((await browser(t)(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(404);
   await t.drain();
   expect(t.email.sent).toEqual([]);
