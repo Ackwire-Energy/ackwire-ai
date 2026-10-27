@@ -261,6 +261,10 @@ describe("who picks the agents (ADR 0074)", () => {
     expect((await who(routing, bruna.id)).routing).toMatchObject({ by: "plans", mine: "rules" });
     expect((await who(routingOf({}, { online: false }))).routing).toMatchObject({ by: "rules", mine: "rules" });
     expect((await who(routingOf({}, { protocol: ROUTE_PROTOCOL - 1 }))).routing.by).toBe("rules");
+    // The runner refuses routes on Windows, and with that CLI switched off.
+    expect((await who(routingOf({}, { os: "windows" }))).routing).toMatchObject({ by: "rules", mine: "rules" });
+    const off = { folders: [], tools: { claude: false, codex: true, commands: true } };
+    expect((await who(routingOf({}, { access: off }))).routing).toMatchObject({ by: "rules", mine: "rules" });
     // The Cloud: never a plan.
     const cloud = routingOf({
       plans: {

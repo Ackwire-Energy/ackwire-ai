@@ -1,6 +1,6 @@
 import { type AccountKind, isAccountKind, type PubSub, ROUTE_PROTOCOL, ROUTE_TIMEOUT_MS } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNotNull, isNull, schema } from "@agenteschat/db";
-import { recordPlanUsage } from "./brains/claude-code";
+import { recordPlanUsage, toolOff } from "./brains/claude-code";
 import { publishChannelEvent } from "./events";
 import type { MachineCaller } from "./machine-hub";
 import { parseRouterJson, RouterSkip, type RouterStrategy, routerPrompt, scoresOf } from "./router";
@@ -25,7 +25,7 @@ export interface PlanSignIn {
  * lent to one of their own agents, and the computer's own Claude Code sign-in where the person paired that
  * computer, one of their agents thinks with it and it is signed in with a plan (`claude.ai`). Codex doesn't
  * say how it is signed in, so a computer's own Codex sign-in never counts. Only computers online now that
- * speak `brain.route` and aren't paused.
+ * speak `brain.route`, aren't paused and would run it: not on Windows, and with that CLI switched on there.
  */
 export async function planSignInsOf(
   db: Executor,
@@ -121,6 +121,7 @@ export async function planSignInsOf(
     .filter((s) => {
       const status = statuses.get(s.machineId);
       if (!status?.online || status.protocol < ROUTE_PROTOCOL || status.paused) return false;
+      if (status.os === "windows" || toolOff(status, s.kind === "codex" ? "codex" : "claude")) return false;
       // A sign-in made with a key is neither a plan nor free.
       return s.accountId !== null || status.executors.claude?.authMethod === "claude.ai";
     })

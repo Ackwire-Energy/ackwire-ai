@@ -45,7 +45,14 @@ const answer = (request: Route): RouteReply => ({
 });
 
 /** A fake machine hub: every computer online at `protocol`, signed in with a plan; `reply` answers routes. */
-function fakeHub(over: { protocol?: number; authMethod?: string; reply?: (r: Route) => RouteReply | Error } = {}) {
+function fakeHub(
+  over: {
+    protocol?: number;
+    authMethod?: string;
+    status?: Partial<MachineStatus>;
+    reply?: (r: Route) => RouteReply | Error;
+  } = {},
+) {
   const calls: { machineId: string; request: Route }[] = [];
   const hub = {
     calls,
@@ -62,6 +69,7 @@ function fakeHub(over: { protocol?: number; authMethod?: string; reply?: (r: Rou
           claude: { version: "2.1.311", loggedIn: true, authMethod: over.authMethod ?? "claude.ai", plan: "max" },
           detectedAt: new Date().toISOString(),
         },
+        ...over.status,
       };
     },
     async call(machineId: string, request: Route) {
@@ -205,6 +213,21 @@ describe("the author's own plan", () => {
     await drain(cloud.handlers);
     expect(cloud.hub.calls).toHaveLength(0);
     expect(await decisionOf(m.id)).toMatchObject({ strategy: "none" });
+  });
+
+  test("a computer that won't route, on Windows or with Claude Code switched off: no call, no 'picking'", async () => {
+    const tried = async (status: Partial<MachineStatus>) => {
+      const { hub, handlers } = await plansOnly(fakeHub({ status }));
+      const events = f.listen(f.general.id);
+      const m = await post(f.owner.id, "alguém viu o relatório?");
+      await drain(handlers);
+      expect(await decisionOf(m.id)).toMatchObject({ strategy: "none", error: null });
+      return [hub.calls.length, events.filter((e) => e.type === "message.routing").length];
+    };
+    expect(await tried({ os: "windows" })).toEqual([0, 0]);
+    await f.close();
+    const off = { folders: [], tools: { claude: false, codex: true, commands: true } };
+    expect(await tried({ access: off })).toEqual([0, 0]);
   });
 
   test("the computer's own Claude sign-in counts only when made with a plan", async () => {
