@@ -769,10 +769,10 @@ describe("Onboarding", () => {
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     // For the first agent with no AI in the team's order (Theo, made first), as Connect an AI picks in the app.
-    expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Theo");
+    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Theo");
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
     // Ada picked: another plan's tile keeps her while she has none.
-    const agent = () => screen().getByRole("combobox", { name: "Para qual agente" });
+    const agent = () => screen().getByRole("combobox", { name: "Agentes que usam este plano" });
     agent().focus();
     await act(async () => fireEvent.keyDown(agent(), { key: "Enter" }));
     await click(screen().getByRole("option", { name: "Ada" }));
@@ -833,7 +833,7 @@ describe("Onboarding", () => {
       "TheoClaude Max",
       "AdaSem IA",
     ]);
-    expect(who.textContent).toContain("Cada plano pensa por um agente.");
+    expect(who.textContent).not.toContain("Cada plano pensa por um agente.");
     const keyFor = within(who).getByRole("button", { name: "Chave de API para Ada" });
     expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
       ["claude", "openai"],
@@ -1013,7 +1013,7 @@ describe("Onboarding", () => {
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     const own = within(panel).getByRole("button", { name: /^A conta do Claude com login no MacBook do Walter/ });
     expect(own.getAttribute("aria-pressed")).toBe("true");
-    expect(within(panel).queryByRole("combobox", { name: "Para qual agente" })).toBeNull();
+    expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
     await settle(4);

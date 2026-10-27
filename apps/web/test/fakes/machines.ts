@@ -68,6 +68,8 @@ export interface FakeMachines {
   setSetup(setup: Partial<ComputerSetup>): void;
   /** The newest sign-in started (ADR 0041), with the code box sent for it, if any. */
   lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
+  /** Every sign-in started, oldest first. */
+  logins(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean }[];
   /** The computer finished (or gave up on) a sign-in. */
   endLogin(loginId: string, status: AccountLoginStatus): void;
   /** What "Contas de IA" lists. */
@@ -306,6 +308,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       const l = logins.at(-1);
       return l ? { ...l } : undefined;
     },
+    logins: () => logins.map((l) => ({ ...l })),
     endLogin: (loginId, status) => {
       loginStatus.set(loginId, status);
     },

@@ -9973,19 +9973,57 @@ html[data-menu-overlay] .shell {
   margin: 12px 0 0;
 }
 
-/* The chosen option's panel under the picker: its lead centred on its name's 20px line (as a card's head), the
-   tiers, for which agent at the right (under the name at phone width), a hairline, then its steps. */
+/* The chosen option's panel under the picker, in groups 16px apart: its head (the name's capitals at its mark's top,
+   the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in
+   a well, who signs in, the steps, then its foot. */
+.ai-panel {
+  gap: 16px;
+}
+.ai-panel > .ac-setnote {
+  margin: 0;
+}
 .ai-panel__head {
   flex-wrap: wrap;
   gap: 12px;
-  padding-bottom: 12px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
   line-height: 20px;
 }
-/* Steps under a wait or a line about the computer: a hairline between them too, as under the head. */
-.ai-panel > :not(.ai-panel__head) + .agp-addacct {
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+.ai-panel__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+/* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
+   face and mark centre on it. */
+.ai-panel__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ai-panel__who > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.ai-panel__who > [data-state="done"] {
+  color: var(--ink);
+}
+.ai-panel__each {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
 .ai-panel__title {
   flex: 1 1 180px;
@@ -10055,6 +10093,16 @@ html[data-menu-overlay] .shell {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+}
+/* A plan's mark beside its name and facts: the name's capitals at the mark's top, its actions in the row's middle. */
+.ai-accounts__row {
+  align-items: flex-start;
+}
+.ai-accounts__row > .ac-acts {
+  align-self: center;
+}
+.ai-accounts__name {
+  font-weight: 600;
 }
 .ai-accounts__row .ac-planmeter {
   margin-top: 4px;

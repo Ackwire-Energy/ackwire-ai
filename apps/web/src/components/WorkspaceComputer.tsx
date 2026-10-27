@@ -113,11 +113,9 @@ export function SetupProgress({ view }: { view: SetupView }) {
 
 /**
  * The wait in words, under the steps: the time left, then who hears when it's ready. Only owners get the
- * email, so only they are told so (`promisesEmail`); everyone else is told it shows here. `bell` false: the time
- * left alone, where a line of the caller's own says what happens once it's ready; with no time to give, owners
- * still read that they'll be emailed.
+ * email, so only they are told so (`promisesEmail`); everyone else is told it shows here.
  */
-export function SetupWaitLines({ view, reader, bell = true }: { view: SetupView; reader: WaitReader; bell?: boolean }) {
+export function SetupWaitLines({ view, reader }: { view: SetupView; reader: WaitReader }) {
   const { t } = useTranslation();
   const { eta, email } = useSetupWait(view, reader.held);
   if (!setupPending(view) || reader.held) return null;
@@ -129,12 +127,10 @@ export function SetupWaitLines({ view, reader, bell = true }: { view: SetupView;
           {etaLine(t, eta)}
         </p>
       )}
-      {(bell || (emailed && !eta)) && (
-        <p className="setup-line ac-iconline">
-          <Icon name={emailed ? "mail" : "bell"} size={14} />
-          <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
-        </p>
-      )}
+      <p className="setup-line ac-iconline">
+        <Icon name={emailed ? "mail" : "bell"} size={14} />
+        <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
+      </p>
     </>
   );
 }

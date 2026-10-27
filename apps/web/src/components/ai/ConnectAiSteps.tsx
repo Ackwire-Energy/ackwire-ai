@@ -1,11 +1,12 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
-import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
+import { computerEdition, computerName, etaLine, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AiChoice,
+  ALL_AGENTS,
   KEY_MARKS,
   kindOf,
   PLAN_CHOICES,
@@ -20,9 +21,12 @@ import { isPlanId } from "@agenteschat/client/lib/plans";
 import { keyLooksValid, PROVIDERS, type ProviderId, providerOf } from "@agenteschat/client/lib/providers";
 import {
   type AgentAppearance,
+  AvatarStack,
   Button,
   Card,
+  CardFooter,
   Icon,
+  InfoHint,
   Input,
   LogoMark,
   OptionCard,
@@ -33,12 +37,12 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { KeyMismatch } from "@/components/ProviderKey";
-import { managedOf, SetupProgress, SetupWaitLines, useWaitReader } from "@/components/WorkspaceComputer";
+import { managedOf, SetupProgress, useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
 import { useToast } from "@/lib/toast";
 import { AddAccount, OpenPage, Step, StepTitle } from "./AddAccountFlow";
 
@@ -136,13 +140,16 @@ export function AiPicker({
   );
 }
 
-/** A panel's head: the option's lead on its name's line, what it covers, and (aside) for which agent. */
+/**
+ * A panel's head: the option's mark, its name with what it covers under it (the name's capitals at the mark's top),
+ * and (aside) for whom.
+ */
 function PanelHead({ lead, title, sub, aside }: { lead: ReactNode; title: string; sub: string; aside?: ReactNode }) {
   return (
-    <div className="ai-panel__head ac-iconline">
+    <div className="ai-panel__head ac-faceline">
       {lead}
       <span className="ai-panel__title">
-        <b>{title}</b>
+        <b className="ac-captop">{title}</b>
         <span>{sub}</span>
       </span>
       {aside}
@@ -150,13 +157,27 @@ function PanelHead({ lead, title, sub, aside }: { lead: ReactNode; title: string
   );
 }
 
+/** An agent a plan may think for, as the "For" select and the who row draw it. */
+export interface PlanAgent {
+  id: string;
+  name: string;
+  appearance?: AgentAppearance;
+  initials?: string;
+}
+
+/** An agent of "All agents"; `done`: it already thinks with this plan. */
+export type PlanSetAgent = PlanAgent & { done?: boolean };
+
 export interface PlanPanelProps {
   choice: PlanChoice;
   gates: PlanGates;
   /** The viewer's agents a plan may think for, in the order offered; the select shows with more than one. */
-  agents: { id: string; name: string }[];
-  agentId: string | undefined;
-  onAgent: (id: string) => void;
+  agents: PlanAgent[];
+  /** "All agents" for this plan (`allAgents`): none where it signs in once per account. */
+  all: PlanSetAgent[];
+  /** An agent's id, or `ALL_AGENTS` (`defaultTarget`). */
+  target: string | undefined;
+  onTarget: (target: string) => void;
   /** Why this person connects no plan here (an agent of someone else's, no agent of their own): nothing else shows. */
   locked?: ReactNode;
   /**
@@ -172,19 +193,23 @@ export interface PlanPanelProps {
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
   onComputer: () => void;
-  /** The agent thinks with the plan now: the account it signed in (null: the computer's own sign-in). */
-  onDone: (agentId: string, account: MachineAccount | null) => void;
+  /** These agents think with the plan now: the account they signed in (null: the computer's own sign-in). */
+  onDone: (agentIds: string[], account: MachineAccount | null) => void;
 }
 
-/** A plan's panel: what it covers and for which agent, then its steps, or what they wait for. */
+/** A plan's panel: what it covers and for whom, its steps or what they wait for, then who the agents answer. */
 export function PlanPanel(props: PlanPanelProps) {
   const { t } = useTranslation();
-  const { choice, gates, agents, agentId, onAgent, own, locked } = props;
+  const { choice, gates, agents, all, target, onTarget, own, locked } = props;
   const title = planTitle(t, choice);
   // The computer's own sign-in covers every agent: no agent to choose then.
   const everyAgent =
-    own?.chosen && !isPlanId(choice) && gates.view?.ownSignIn && gates.gateOf(choice).state === "ready";
-  const agent = agents.find((a) => a.id === agentId);
+    own?.chosen === true &&
+    !isPlanId(choice) &&
+    gates.view?.ownSignIn === true &&
+    gates.gateOf(choice).state === "ready";
+  const forWhom: PlanSetAgent[] = target === ALL_AGENTS ? all : agents.filter((a) => a.id === target);
+  const [agent] = forWhom;
   return (
     <Card as="section" className="ai-panel" aria-label={title}>
       <PanelHead
@@ -193,25 +218,14 @@ export function PlanPanel(props: PlanPanelProps) {
         sub={t(`connectAi.plan.${choice}.tiers`)}
         aside={
           agents.length > 1 &&
-          agent &&
-          !everyAgent && (
-            <span className="ai-panel__agent">
-              <span aria-hidden="true">{t("connectAi.agent")}</span>
-              <Select
-                size="sm"
-                aria-label={t("connectAi.agent")}
-                value={agent.id}
-                onValueChange={onAgent}
-                options={agents.map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </span>
-          )
+          forWhom.length > 0 &&
+          !everyAgent && <ForSelect agents={agents} all={all} target={target} onTarget={onTarget} />
         }
       />
       {locked ? (
         <SettingNote icon="lock">{locked}</SettingNote>
       ) : agent ? (
-        <PlanSteps key={agent.id} {...props} agentId={agent.id} agentName={agent.name} />
+        <PlanSteps key={target} {...props} forWhom={forWhom} agent={agent} everyAgent={everyAgent} />
       ) : (
         <Spinner />
       )}
@@ -219,19 +233,61 @@ export function PlanPanel(props: PlanPanelProps) {
   );
 }
 
+/** "For [All agents ▾]": every agent of "All agents" first, with their faces and names, then each agent. */
+function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agents" | "all" | "target" | "onTarget">) {
+  const { t } = useTranslation();
+  const face = (a: PlanAgent) => (
+    <AgentAvatar key={a.id} name={a.name} initials={a.initials} appearance={a.appearance} size="xs" />
+  );
+  return (
+    <span className="ai-panel__agent">
+      <span aria-hidden="true">{t("connectAi.for")}</span>
+      <Select
+        size="sm"
+        aria-label={t("connectAi.agentAria")}
+        value={target}
+        onValueChange={onTarget}
+        options={[
+          ...(all.length > 1
+            ? [
+                {
+                  value: ALL_AGENTS,
+                  label: t("connectAi.all"),
+                  description: joinNames(
+                    all.map((a) => a.name),
+                    t("newAgent.and"),
+                  ),
+                  leading: <AvatarStack>{all.slice(0, 3).map(face)}</AvatarStack>,
+                },
+              ]
+            : []),
+          ...agents.map((a) => ({ value: a.id, label: a.name, leading: face(a) })),
+        ]}
+      />
+    </span>
+  );
+}
+
 function PlanSteps({
   choice,
   gates,
-  agentId,
-  agentName,
+  forWhom,
+  agent,
+  everyAgent,
+  target,
   own,
   hostConnecting,
   justReady,
   onKey,
   onComputer,
   onDone,
-}: PlanPanelProps & { agentId: string; agentName: string }) {
-  const { t } = useTranslation();
+}: PlanPanelProps & {
+  forWhom: PlanSetAgent[];
+  /** The agent it's for, or the first of "All agents". */
+  agent: PlanSetAgent;
+  everyAgent: boolean;
+}) {
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -242,8 +298,14 @@ function PlanSteps({
   const machines = useMachines(org.id, edition !== null);
   const kind = kindOf(choice);
   const coding = isPlanId(choice);
-  const [account, setAccount] = useState<MachineAccount | null>(null);
-  const [assigned, setAssigned] = useState<"saving" | "failed" | "done">("saving");
+  const everyone = target === ALL_AGENTS;
+  // The agents it moved onto the plan (the login each thinks with), one being moved, one whose move failed.
+  const [assigned, setAssigned] = useState<Record<string, MachineAccount>>({});
+  // Whom it signs in for, in order: of "All agents", those that weren't on this plan before it moved them.
+  const todo = everyone ? forWhom.filter((a) => !a.done || assigned[a.id]) : forWhom;
+  const [saving, setSaving] = useState(0);
+  const [failed, setFailed] = useState<{ agentId: string; account: MachineAccount } | null>(null);
+  const [sent, setSent] = useState(false);
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
   // It turns ready while the person watches, or they came because it did: said in place, and again on a way back.
@@ -252,12 +314,14 @@ function PlanSteps({
   useEffect(() => {
     if (gate.state === "preparing") markWaited();
   }, [gate.state, markWaited]);
+  const preparing = gate.state === "preparing" ? gate.view : null;
+  const { eta, email } = useSetupWait(preparing, reader.held);
 
   const computer =
     edition === "cloud" ? computerName(t, org.name, managedOf(machines.data)) : (view?.computer?.name ?? "");
-  const refresh = () => {
+  const refresh = (agentIds: string[]) => {
     for (const key of [
-      keys.agentBrain(org.id, agentId),
+      ...agentIds.map((id) => keys.agentBrain(org.id, id)),
       keys.agents(org.id),
       keys.machines(org.id),
       keys.aiAccounts(org.id),
@@ -265,57 +329,125 @@ function PlanSteps({
     ])
       void qc.invalidateQueries({ queryKey: key });
   };
-  // The sign-in ended: the agent thinks with that account right away (no confirming click).
-  const assign = async (a: MachineAccount) => {
-    setAccount(a);
-    setAssigned("saving");
+  // A sign-in ended: its agent thinks with that account right away (no confirming click).
+  const assign = async (agentId: string, a: MachineAccount) => {
+    setFailed(null);
+    setSaving((n) => n + 1);
     try {
       await api.agents.setBrain(org.id, agentId, { brain: a.kind, account: a.id });
-      setAssigned("done");
-      refresh();
-      onDone(agentId, a);
+      setAssigned((x) => ({ ...x, [agentId]: a }));
+      refresh([agentId]);
     } catch {
-      setAssigned("failed");
+      setFailed({ agentId, account: a });
+    } finally {
+      setSaving((n) => n - 1);
     }
   };
   const saveOwn = async () => {
     try {
-      await api.agents.setBrain(org.id, agentId, { brain: kind, account: null });
+      for (const a of todo) await api.agents.setBrain(org.id, a.id, { brain: kind, account: null });
       setOwnSaved(true);
-      refresh();
-      onDone(agentId, null);
+      refresh(todo.map((a) => a.id));
+      onDone(
+        todo.map((a) => a.id),
+        null,
+      );
     } catch {
       toast.show(t("agentPage.work.failed"), "error");
     }
   };
+  const account = Object.values(assigned)[0];
+  const allDone = todo.length > 0 && todo.every((a) => assigned[a.id]);
+  const told = useRef(false);
+  useEffect(() => {
+    if (!allDone || told.current) return;
+    told.current = true;
+    onDone(
+      todo.map((a) => a.id),
+      account ?? null,
+    );
+  }, [allDone, todo, account, onDone]);
+
+  const ready = gate.state === "ready";
+  const brand = planLabel(t, choice);
+  const footText =
+    everyone || everyAgent ? t("connectAi.foot.all") : t("connectAi.foot.one", agentGrammar(t, agent.name));
+  // Who the agents answer, once for the plan; where the account (or the key) stays, behind its ⓘ.
+  const foot = (
+    <CardFooter icon="audienceOwner">
+      {footText}
+      {computer && (
+        <>
+          {" "}
+          <InfoHint name={t("common.about", { label: footText })}>
+            {coding ? t("aiAccounts.add.keySafe", { computer }) : t("connectAi.foot.signIn", { computer, brand })}
+          </InfoHint>
+        </>
+      )}
+    </CardFooter>
+  );
 
   if (gates.failed) return <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>;
-  if (account) {
-    if (assigned === "saving") return <Spinner />;
-    return assigned === "done" ? (
-      <SettingNote icon="check" live>
-        {t("aiAccounts.done.savedAgent", { agent: agentName, label: account.label })}
-      </SettingNote>
-    ) : (
-      <div className="ai-panel__row">
-        <SettingNote icon="alert" live>
-          {t("connectAi.assignFailed", { label: account.label, agent: agentName })}
+  if (allDone) {
+    return (
+      <>
+        <SettingNote icon="check" live>
+          {everyone
+            ? t("connectAi.doneAll", {
+                names: joinNames(
+                  forWhom.map((a) => a.name),
+                  t("newAgent.and"),
+                ),
+                label: account?.label ?? "",
+              })
+            : t("aiAccounts.done.savedAgent", { agent: agent.name, label: account?.label ?? "" })}
         </SettingNote>
-        <Button size="sm" icon="refresh" onClick={() => void assign(account)}>
-          {t("common.retry")}
-        </Button>
-      </div>
+        {foot}
+      </>
     );
   }
   if (ownSaved) {
     return (
-      <SettingNote icon="check" live>
-        {t("agentPage.work.saved.accountHere", { name: agentName, computer })}
-      </SettingNote>
+      <>
+        <SettingNote icon="check" live>
+          {everyone
+            ? t("connectAi.doneAll", {
+                names: joinNames(
+                  todo.map((a) => a.name),
+                  t("newAgent.and"),
+                ),
+                label: lowerFirst(t("connectAi.own.this", { brand, computer }), i18n.language),
+              })
+            : t("agentPage.work.saved.accountHere", { name: agent.name, computer })}
+        </SettingNote>
+        {foot}
+      </>
     );
   }
+  const retry = failed && (
+    <div className="ai-panel__row">
+      <SettingNote icon="alert" live>
+        {t("connectAi.assignFailed", {
+          label: failed.account.label,
+          agent: forWhom.find((a) => a.id === failed.agentId)?.name ?? "",
+        })}
+      </SettingNote>
+      <Button size="sm" icon="refresh" onClick={() => void assign(failed.agentId, failed.account)}>
+        {t("common.retry")}
+      </Button>
+    </div>
+  );
+  // One agent: its sign-in gives way to the move and what came of it.
+  if (!everyone && (saving > 0 || failed))
+    return saving > 0 ? (
+      <Spinner />
+    ) : (
+      <>
+        {retry}
+        {foot}
+      </>
+    );
 
-  const ready = gate.state === "ready";
   const useKey = (
     <span>
       <Button size="sm" onClick={onKey}>
@@ -333,16 +465,23 @@ function PlanSteps({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
-    const setup = gate.view;
-    const later = t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn");
-    // A hold decides when anything runs there: it speaks alone.
-    wait = hold ? (
-      line(<Icon name="pause" size={14} />, hold)
-    ) : (
-      <div className="setup-wait">
-        {setup && <SetupProgress view={setup} />}
-        {setup && <SetupWaitLines view={setup} reader={reader} bell={false} />}
-        {line(setup ? <Icon name="clock" size={14} /> : <Spinner size={14} />, later)}
+    // The computer's wait in one well: how far it is and the time left, or why it waits. A hold decides when
+    // anything runs there: it speaks alone.
+    wait = (hold || preparing) && (
+      <div className="ai-panel__wait">
+        {hold ? (
+          line(<Icon name="pause" size={14} />, hold)
+        ) : (
+          <>
+            {preparing && <SetupProgress view={preparing} />}
+            {eta && (
+              <p className="setup-eta" aria-live="polite">
+                {etaLine(t, eta)}
+              </p>
+            )}
+            {email && reader.owner && line(<Icon name="mail" size={14} />, t("connectAi.wait.email"))}
+          </>
+        )}
       </div>
     );
   } else if (gate.state === "offline") {
@@ -397,11 +536,15 @@ function PlanSteps({
   const steps = ready || gate.state === "preparing" || (gate.state === "offline" && hostConnecting);
   const ownable = ready && !coding && view?.ownSignIn === true;
   const otherChosen = own ? !own.chosen : other;
-  const brand = planLabel(t, choice);
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
   );
-  const signedOut = current?.status === "signed_out" ? current : undefined;
+  const signedOut = !everyone && current?.status === "signed_out" ? current : undefined;
+  // One sign-in per agent, in turn: the agent signing in now, and the account the first one signed in as.
+  const turn = everyone && !coding ? todo.find((a) => !assigned[a.id]) : undefined;
+  const sameAs = Object.values(assigned).find((a) => a.email)?.email ?? undefined;
+  const stateOf = (a: PlanSetAgent) =>
+    a.done || assigned[a.id] ? "done" : (coding ? sent : a.id === turn?.id) ? "now" : "next";
   return (
     <>
       {wait}
@@ -410,42 +553,79 @@ function PlanSteps({
           {t("connectAi.wait.ready", { computer })}
         </SettingNote>
       )}
+      {everyone && steps && (
+        <ul className="ai-panel__who" aria-label={t("connectAi.agentAria")}>
+          {forWhom.map((a) => {
+            const state = stateOf(a);
+            return (
+              <li key={a.id} data-state={state}>
+                <AgentAvatar name={a.name} initials={a.initials} appearance={a.appearance} size="xs" />
+                <span>{a.name}</span>
+                {state === "done" ? (
+                  <Icon name="check" size={14} label={t("connectAi.who.state.done")} />
+                ) : state === "now" ? (
+                  <Icon name="spinner" size={14} label={t("connectAi.who.state.now")} />
+                ) : (
+                  <span className="ac-visually-hidden">{t("connectAi.who.state.next")}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {everyone && !coding && steps && (
+        <p className="ai-panel__each">
+          <span className="ac-hintline">
+            <span>{t("connectAi.each")}</span>
+            <InfoHint name={t("common.about", { label: t("connectAi.each") })}>{t("connectAi.eachHint")}</InfoHint>
+          </span>
+        </p>
+      )}
+      {retry}
       {ownable && (
-        <>
-          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-          <div className="grid-options" role="group" aria-label={planTitle(t, choice)}>
-            <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
-              <span className="ac-option__text">
-                <span className="ac-option__title">{t("connectAi.own.this", { brand, computer })}</span>
-                <span className="ac-option__desc">{t("connectAi.own.thisText")}</span>
-              </span>
-            </OptionCard>
-            <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
-              <span className="ac-option__text">
-                <span className="ac-option__title">{t("connectAi.own.other", { brand })}</span>
-              </span>
-            </OptionCard>
-          </div>
-          {/* With another account, its steps say it once, for its one agent. */}
-          {!otherChosen && <SettingNote icon="lock">{t("connectAi.own.note")}</SettingNote>}
-        </>
+        // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+        <div className="grid-options" role="group" aria-label={planTitle(t, choice)}>
+          <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
+            <span className="ac-option__text">
+              <span className="ac-option__title">{t("connectAi.own.this", { brand, computer })}</span>
+              <span className="ac-option__desc">{t("connectAi.own.thisText")}</span>
+            </span>
+          </OptionCard>
+          <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
+            <span className="ac-option__text">
+              <span className="ac-option__title">{t("connectAi.own.other", { brand })}</span>
+            </span>
+          </OptionCard>
+        </div>
       )}
       {steps && (!ownable || otherChosen) && (
         <AddAccount
+          key={turn?.id}
           machineId={view?.computer?.machineId ?? ""}
           kind={kind}
           computer={computer}
-          {...(isPlanId(choice) ? { provider: choice } : {})}
+          {...(coding ? { provider: choice } : {})}
           again={signedOut?.id}
-          email={signedOut?.email}
-          askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
+          email={turn && sameAs ? sameAs : signedOut?.email}
+          askEmail={
+            turn && sameAs
+              ? false
+              : view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)
+          }
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          note={!coding && <SettingNote icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</SettingNote>}
-          onAdded={(a) => void assign(a)}
+          waitLine={
+            gate.state === "preparing" && !hold ? t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn") : undefined
+          }
+          privacy={false}
+          {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
+          {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
+          onSent={() => setSent(true)}
+          onAdded={(a, id) => void assign(id ?? turn?.id ?? agent.id, a)}
         />
       )}
+      {(steps || ownable) && foot}
     </>
   );
 }
@@ -571,7 +751,7 @@ export function KeyPanel({
                   </div>
                 )}
               </Step>
-              <SettingNote icon="info">{t("connectAi.key.forAll")}</SettingNote>
+              <SettingNote icon="agent">{t("connectAi.key.forAll")}</SettingNote>
             </>
           ) : (
             <p className="small muted">{t("onboarding.platformKeyDesc")}</p>
@@ -591,7 +771,7 @@ export interface WhoRow {
   thinks: { label: string; mark: string } | null;
 }
 
-/** The setup, once a plan is in and there are several agents: who thinks with what, and one key for the others. */
+/** The setup, once a plan is in and some agent still has no AI: who thinks with what, and one key for the others. */
 export function WhoThinks({ rows, onKey }: { rows: WhoRow[]; onKey: () => void }) {
   const { t } = useTranslation();
   const missing = rows.filter((r) => !r.thinks);
@@ -613,20 +793,17 @@ export function WhoThinks({ rows, onKey }: { rows: WhoRow[]; onKey: () => void }
         ))}
       </ul>
       {missing.length > 0 && (
-        <>
-          <p className="small muted">{t("connectAi.who.line")}</p>
-          <span>
-            <Button size="sm" onClick={onKey}>
-              <ProviderStack ids={KEY_MARKS.slice(0, 2)} />
-              {t("connectAi.who.keyFor", {
-                names: joinNames(
-                  missing.map((r) => r.name),
-                  t("newAgent.and"),
-                ),
-              })}
-            </Button>
-          </span>
-        </>
+        <span>
+          <Button size="sm" onClick={onKey}>
+            <ProviderStack ids={KEY_MARKS.slice(0, 2)} />
+            {t("connectAi.who.keyFor", {
+              names: joinNames(
+                missing.map((r) => r.name),
+                t("newAgent.and"),
+              ),
+            })}
+          </Button>
+        </span>
       )}
     </Card>
   );
