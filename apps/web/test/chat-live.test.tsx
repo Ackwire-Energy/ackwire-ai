@@ -294,6 +294,124 @@ describe("receipts: a check with a popover", () => {
   });
 });
 
+describe("receipts: who picked the agents for a message nobody mentioned", () => {
+  const receiptOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt") as HTMLElement;
+  const popoverOf = async (text: string) => {
+    await act(async () => fireEvent.click(receiptOf(text).querySelector(".ac-receipt__check") as HTMLElement));
+    return screen().getByRole("dialog", { name: "Agentes" });
+  };
+  const closePopover = async (pop: HTMLElement) => {
+    await act(async () => fireEvent.keyDown(pop, { key: "Escape" }));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+  };
+
+  test("no step could pick: 'sem @' with why behind its ⓘ and Chamar um agente; the popover says how agents are picked", async () => {
+    const { socket, state } = await open();
+    await sendText("alguém sabe?");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID, ATLAS_ID],
+      pickedBy: [],
+      strategy: "router",
+      reason: "mention_needed",
+    });
+    const receipt = receiptOf("alguém sabe?");
+    expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
+      "Vista por Ada e Atlas; Nenhum agente vai responder sem @",
+    );
+    const hint = within(receipt).getByRole("button", { name: "Sobre Quem escolhe os agentes" });
+    expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.",
+    );
+    expect(within(receipt).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
+    expect(receipt.textContent).toContain("Nenhum agente vai responder sem @");
+    const pop = await popoverOf("alguém sabe?");
+    expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
+      "https://agentes.chat/help/who-answers?lang=pt-BR",
+    );
+    // Nobody picked: no line naming who did.
+    expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
+  });
+
+  test("'Escolhendo quem responde' with the clock while the author's plan reads it, then who picked", async () => {
+    const { socket, state } = await open();
+    await sendText("revisa o PR?");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, { type: "message.routing", messageId: root?.id, step: "plan" });
+    const picking = receiptOf("revisa o PR?");
+    expect(picking.textContent).toBe("Escolhendo quem responde ·Chamar um agente");
+    expect(picking.querySelector(".ac-receipt__clock path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    expect(picking.querySelector(".ac-receipt__check")).toBeNull();
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID, ATLAS_ID],
+      pickedBy: [ADA_ID],
+      strategy: "router",
+      decidedBy: { step: "plan", brand: "claude", ownerId: "u-walter" },
+    });
+    expect(receiptOf("revisa o PR?").textContent).not.toContain("Escolhendo");
+    const pop = await popoverOf("revisa o PR?");
+    const by = pop.querySelector(".who-by") as HTMLElement;
+    expect(by.textContent).toBe("Escolhido pelo seu plano do Claude");
+    expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");
+    // Under the agents, as the popover's last line.
+    expect(pop.lastElementChild).toBe(by);
+  });
+
+  test("the popover's last line names who picked, with its mark or our icon; a decision for nobody or from before says nothing", async () => {
+    const { socket, state } = await open();
+    const cases: [Record<string, unknown>, string, string | null][] = [
+      [{ step: "jev" }, "Escolhido pelo Jev", "typesafe"],
+      [
+        { step: "model", model: "claude-haiku-5-5", provider: "anthropic" },
+        "Escolhido pelo Claude Haiku 5.5",
+        "claude",
+      ],
+      [{ step: "plan", brand: "chatgpt", ownerId: "u-joao" }, "Escolhido pelo plano do ChatGPT de João", "openai"],
+      [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
+      [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
+      [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
+    ];
+    for (const [i, [decidedBy, words, mark]] of cases.entries()) {
+      const text = `pergunta ${i + 1}`;
+      await sendText(text);
+      await settle(4);
+      await push(socket, {
+        type: "message.routed",
+        messageId: lastPerson(state)?.id,
+        seenBy: [ADA_ID],
+        pickedBy: [ADA_ID],
+        strategy: "router",
+        decidedBy,
+      });
+      const pop = await popoverOf(text);
+      const by = pop.querySelector(".who-by") as HTMLElement;
+      expect([text, by.textContent]).toEqual([text, words]);
+      expect(by.className).toContain("ac-iconline");
+      if (mark) expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe(mark);
+      else expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
+      await closePopover(pop);
+    }
+    for (const [text, routed] of [
+      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
+      ["de antes", { pickedBy: [ADA_ID] }],
+    ] as const) {
+      await sendText(text);
+      await settle(4);
+      await push(socket, { type: "message.routed", messageId: lastPerson(state)?.id, seenBy: [ADA_ID], ...routed });
+      const pop = await popoverOf(text);
+      expect([text, pop.querySelector(".who-by")]).toEqual([text, null]);
+      await closePopover(pop);
+    }
+    expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder ·");
+  });
+});
+
 describe("regression: the router picks nobody (production #general, 'oi' after 'oi @Theo')", () => {
   test("a mention answered, then a no-mention message: no thinking shown, receipt says nobody", async () => {
     // #general with exactly one person and one agent: it is NOT a DM.

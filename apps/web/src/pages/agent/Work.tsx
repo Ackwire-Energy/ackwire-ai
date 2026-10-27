@@ -621,6 +621,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const credentials = useCredentials(org.id, canDo(org.role, "manage_credentials"));
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
+  // Answering through the API needs a key: the workspace's own, or the server's.
+  const apiKey = useAiStatus(org.id).data?.apiKey !== false;
   const update = useUpdateAgent(org.id, agent.id);
   const setTarget = useSetComputerTarget(org.id);
   const [kind, setKind] = useState<BrainKind>(view.brain);
@@ -1022,14 +1024,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onKeep={() => setAsking(false)}
         />
       )}
-      <div className="ac-optcard__foot">
-        <SwitchLabel
-          htmlFor={offId}
-          label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
-          hint={t("agentPage.work.brain.fallbackHint", g)}
-        />
-        <Switch id={offId} aria-describedby={`${offId}-hint`} checked={fallback} onCheckedChange={setFallback} />
-      </div>
+      {apiKey && (
+        <div className="ac-optcard__foot">
+          <SwitchLabel
+            htmlFor={offId}
+            label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
+            hint={t("agentPage.work.brain.fallbackHint", g)}
+          />
+          <Switch id={offId} aria-describedby={`${offId}-hint`} checked={fallback} onCheckedChange={setFallback} />
+        </div>
+      )}
     </>
   );
   const orgRows = can("model") ? (

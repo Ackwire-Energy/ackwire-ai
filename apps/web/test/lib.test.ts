@@ -40,6 +40,7 @@ describe("format (pt-BR, machine numbers precise)", () => {
   test("money", () => {
     expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
+    expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.

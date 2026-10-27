@@ -10040,3 +10040,102 @@ html[data-menu-overlay] .shell {
   margin-top: 4px;
   max-width: 320px;
 }
+/* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
+   now, and Jev's key under it for the installation's owner. */
+.who-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.who-head > .ac-link,
+.jev__foot {
+  font-size: 13px;
+  line-height: 18px;
+}
+.who-line,
+.jev__foot {
+  margin: 0;
+}
+.who-line {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.jev {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jev:focus {
+  outline: none;
+}
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state in the row's middle. */
+.jev__head,
+.jev__key {
+  align-items: flex-start;
+}
+.jev__head > .ac-chip,
+.jev__key > .ac-acts {
+  align-self: center;
+}
+/* On a phone the name and its line wrap, so the state stays on their row. */
+.jev__head > .list-col {
+  flex-basis: 0;
+}
+/* A fact breaks between facts, never inside one ("US$ 0,13"). */
+.jev__fact {
+  white-space: nowrap;
+}
+.jev__title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+.jev__body {
+  flex-direction: column;
+  align-items: stretch;
+}
+.jev__body > .ac-btn {
+  align-self: flex-start;
+}
+/* Why Jev helps: an icon, the reason in bold and its few words, a line each. */
+.jev-why {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.jev-why .ac-icon {
+  color: var(--ink2);
+}
+.jev-why b {
+  font-weight: 600;
+}
+/* Under the key's field: where it is kept, or why it wasn't saved. */
+.jev-steps__below {
+  margin: 0;
+}
+/* "Picking who answers": the receipt's clock where its check goes once an agent has seen the message. */
+.ac-receipt__clock {
+  display: inline-flex;
+  padding: 0 2px;
+}
+.ac-receipt__clock .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
+.who-by {
+  margin-top: 4px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}

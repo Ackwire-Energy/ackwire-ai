@@ -551,6 +551,10 @@ export const ptBR = {
       leadNoComputer:
         "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
+    jev: {
+      title: "Ajude os agentes a trabalhar em equipe",
+      lead: "O Jev, da TypeSafe, toma decisões rápidas por eles.",
+    },
     budget: {
       title: "Limite de gasto por agente",
       label: "Limite mensal por agente, em dólares",
@@ -988,6 +992,32 @@ export const ptBR = {
     popoverTitle: "Agentes",
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
+    mentionNeeded: "Nenhum agente vai responder sem @",
+    mentionNeededHint:
+      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.",
+    picking: "Escolhendo quem responde",
+    by: {
+      jev: "Escolhido pelo Jev",
+      model: "Escolhido pelo {{model}}",
+      planYours: "Escolhido pelo seu plano do {{brand}}",
+      planOf: "Escolhido pelo plano do {{brand}} de {{person}}",
+      reply: "Uma resposta {{for}} {{name}}",
+      only_agent: "Só {{article}} {{name}} responde aqui sem menção",
+      follow_up: "Segue a conversa com {{article}} {{name}}",
+    },
+  },
+  routing: {
+    title: "Quem escolhe os agentes",
+    how: "Como os agentes são escolhidos",
+    by: {
+      jev: "O Jev escolhe quem responde cada mensagem sem menção.",
+      model: "O {{model}} escolhe quem responde cada mensagem sem menção.",
+      plans: "Cada plano escolhe só nas mensagens de quem o conectou.",
+      rules: "Os agentes respondem a menções, respostas e continuações.",
+      off: "Os agentes só respondem quando mencionados.",
+      noSmall:
+        "{{provider}} não tem um modelo pequeno para isso. Os agentes respondem a menções, respostas e continuações.",
+    },
   },
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
@@ -1266,6 +1296,8 @@ export const ptBR = {
     replyHeading: "Quando responde",
     replyAlone: "Sozinho",
     replyAloneHelp: "Responde quando o assunto pede, sem precisar de @",
+    replyAloneRules: "Também responde a respostas e continuações",
+    replyAloneOff: "Por enquanto, responde só quando mencionado",
     replyMention: "Quando chamado",
     replyMentionHelp: "Só responde se alguém escrever @{{handle}}",
     aloneLine: "Entra na conversa sozinho",
@@ -4450,6 +4482,57 @@ export const ptBR = {
     unsaved: "Alterações não salvas",
     keepEditing: "Continuar editando",
     discard: "Descartar",
+  },
+  jev: {
+    title: "Jev",
+    about:
+      "Um modelo rápido da TypeSafe, feito para decisões rápidas. O agentes.chat faz perguntas pequenas a ele, como quem deve responder. Você paga direto à TypeSafe.",
+    lead: "Ajuda os agentes a trabalhar em equipe.",
+    how: "Como o Jev funciona",
+    why: {
+      route: "Escolhe quem responde",
+      routeText: "Mesmo sem @menção.",
+      memory: "Organiza a memória",
+      memoryText: "Percebe repetições ditas de outro jeito.",
+      screen: "Enxerga a tela",
+      screenText: "Os agentes acham botões pela descrição.",
+    },
+    withoutHint:
+      "Sem o Jev, um modelo pequeno numa das suas chaves de API escolhe quem responde. Sem chave, o plano do Claude ou do ChatGPT de cada pessoa escolhe nas mensagens que ela escreve, em alguns segundos. Fora isso, uma resposta ou uma continuação ainda chega ao agente. Mencione um agente para chamá-lo.",
+    setUp: "Configurar o Jev",
+    steps: {
+      account: "Crie uma conta na TypeSafe e adicione crédito",
+      accountHint:
+        "O Jev é pré-pago: US$ {{price}} por milhão de tokens. Escolher quem responde custa cerca de US$ {{call}}.",
+      openSite: "Abrir a TypeSafe",
+      key: "Crie uma chave",
+      openKeys: "Abrir as chaves de API",
+      paste: "Cole aqui",
+      placeholder: "A sua chave da TypeSafe",
+      sealed: "Cifrada neste servidor. Nunca mais aparece.",
+      invalid: "A TypeSafe não aceitou esta chave. Copie de novo na página de chaves.",
+      savedNoCredit: "Salva. Adicione crédito na TypeSafe e o Jev começa sozinho.",
+    },
+    keyName: "Chave da TypeSafe",
+    month_one: "{{count, number}} decisão este mês · {{cost}}",
+    month_other: "{{count, number}} decisões este mês · {{cost}}",
+    state: {
+      off: "Desligado",
+      on: "Ligado",
+      invalid: "Chave recusada",
+      no_credit: "Sem crédito",
+    },
+    line: {
+      invalid: "A TypeSafe não aceitou esta chave. Crie uma nova.",
+      no_credit: "Adicione crédito na TypeSafe. O Jev volta sozinho.",
+      env: "Definida nas configurações deste servidor (TYPESAFE_API_KEY).",
+      envInvalid: "A TypeSafe não aceitou esta chave. Troque nas configurações deste servidor (TYPESAFE_API_KEY).",
+    },
+    checkAgain: "Verificar de novo",
+    remove: {
+      title: "Remover a chave do Jev?",
+      text: "Os agentes continuam trabalhando sem ele.",
+    },
   },
   aiAccounts: {
     share: {

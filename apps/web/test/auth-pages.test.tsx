@@ -930,6 +930,104 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
   });
 
+  describe("Jev, for the server's owner, once an AI is connected", () => {
+    const OFF = { source: null, hint: null, state: "off" as const, month: { decisions: 0, costUsd: 0 } };
+    const TEAM = "Quem mais trabalha com você?";
+    const toJev = async (patch: Parameters<typeof start>[0] = {}) => {
+      const r = await start({ jev: OFF, ...patch });
+      await throughAgents(r.state);
+      return r;
+    };
+    const heading = () => screen().getByRole("heading", { level: 1 });
+
+    test("its own screen after the AI: optional, why, the steps; Continue with nothing typed asks nothing", async () => {
+      const { state } = await toJev();
+      expect(heading().textContent).toBe("Ajude os agentes a trabalhar em equipeopcional");
+      expect(document.querySelector(".onb__lead")?.textContent).toContain(
+        "O Jev, da TypeSafe, toma decisões rápidas por eles.",
+      );
+      // What happens without it is behind the lead's ⓘ, never on the screen.
+      const hint = button("Sobre Jev");
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.hidden).toBe(true);
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+        "Sem o Jev, um modelo pequeno numa das suas chaves de API escolhe quem responde.",
+      );
+      expect(document.body.textContent).toContain("Escolhe quem responde Mesmo sem @menção.");
+      expect(screen().getByRole("link", { name: "Abrir a TypeSafe" }).getAttribute("href")).toBe(
+        "https://console.typesafe.ai",
+      );
+      // The big button saves: no button of the field's own.
+      expect(screen().queryByRole("button", { name: "Salvar chave" })).toBeNull();
+      // Its place on the rail is the AI's: Agentes e IA, still.
+      expect(railStep(/^Agentes e IA/).getAttribute("aria-current")).toBe("step");
+      expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+      await next();
+      expect(calls(state, "system.saveJev")).toHaveLength(0);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("Save and continue keeps a key TypeSafe accepts, and moves on", async () => {
+      const { state } = await toJev();
+      await type("Cole aqui", "ts_1234");
+      expect(button("Salvar e continuar").hasAttribute("disabled")).toBe(true);
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"]]);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key TypeSafe refuses stays, with why under it; then Continue moves on without asking again", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_wrong_0000: "invalid" } });
+      await type("Cole aqui", "ts_wrong_0000");
+      await click(button("Salvar e continuar"), 8);
+      expect(heading().textContent).toContain("Ajude os agentes a trabalhar em equipe");
+      const field = screen().getByLabelText("Cole aqui");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "A TypeSafe não aceitou esta chave. Copie de novo na página de chaves.",
+      );
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(state.jev?.source).toBeNull();
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key with no credit is kept, and the screen says so before moving on", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_empty_5555: "no_credit" } });
+      await type("Cole aqui", "ts_empty_5555");
+      await click(button("Salvar e continuar"), 8);
+      expect(state.jev?.state).toBe("no_credit");
+      expect(document.body.textContent).toContain("Salva. Adicione crédito na TypeSafe e o Jev começa sozinho.");
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("Back goes to the AI; never after Conectar depois, with a key in the server's settings, or for anyone else", async () => {
+      await toJev();
+      await click(button(/Voltar/), 6);
+      expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+      cleanup();
+
+      const later = await start({ jev: OFF });
+      await throughImport(later.state);
+      await skip();
+      await keepOnly("Theo · PM");
+      await click(button(/Criar 1 agente/), 8);
+      await click(button("Conectar depois"), 8);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+      cleanup();
+
+      for (const jev of [{ ...OFF, source: "env" as const, hint: "9f2c", state: "ok" as const }, undefined]) {
+        const { state } = await start({ jev });
+        await throughAgents(state);
+        expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+        expect(document.body.textContent).not.toMatch(/typesafe/i);
+        cleanup();
+      }
+    });
+  });
+
   test("no computer yet: a plan's panel says where it signs in, and goes back to the computer step", async () => {
     const { state } = await start();
     await throughImport(state);

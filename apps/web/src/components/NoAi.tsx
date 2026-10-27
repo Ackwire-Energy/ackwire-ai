@@ -50,11 +50,16 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
     <div className="noai-banner" role="status">
       <span className="noai-banner__text ac-iconline">
         <Icon name="plug" size={16} />
-        <span className="ac-hintline">
+        {/* Asking in the chat is understood only where Jev reads the message (`ai-intent.ts`). */}
+        {status.data.routing?.by === "jev" ? (
+          <span className="ac-hintline">
+            <b>{t("noAi.banner.org")}</b>
+            {/* Named by its topic, the button's: the line beside it is a whole sentence. */}
+            <InfoHint name={t("common.about", { label: action })}>{t("noAi.banner.orgHint")}</InfoHint>
+          </span>
+        ) : (
           <b>{t("noAi.banner.org")}</b>
-          {/* Named by its topic, the button's: the line beside it is a whole sentence. */}
-          <InfoHint name={t("common.about", { label: action })}>{t("noAi.banner.orgHint")}</InfoHint>
-        </span>
+        )}
       </span>
       <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>
         {action}

@@ -148,15 +148,21 @@ export const useJevKey = () => {
   return useQuery({ queryKey: keys.jev, queryFn: () => api.system.jev() });
 };
 
-function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>) {
+function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>, silent = false) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: T) => change(api, input),
-    onSuccess: (jev) => qc.setQueryData(keys.jev, jev),
+    onSuccess: (jev) => {
+      qc.setQueryData(keys.jev, jev);
+      // The key is the server's: who picks the agents may change in every workspace.
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[3] === "ai-status" });
+    },
+    // A refused key is said under its field.
+    ...(silent ? { meta: { silent: true } } : {}),
   });
 }
-export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey));
+export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey), true);
 export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
 export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
 
