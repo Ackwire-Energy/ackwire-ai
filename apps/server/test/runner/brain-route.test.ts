@@ -216,6 +216,10 @@ test.skipIf(!posix)("busy while that sign-in has a process open or another route
   expect(await errorCode(() => slow)).toBe("internal");
   expect(await routeWithPlan(request(), { ...deps, brains })).not.toHaveProperty("busy");
   expect(claude().filter((l) => l.route)).toHaveLength(3);
+  // A background task runs Claude Code on the computer's own sign-in: busy there, not in an account.
+  const tasks = { runningTasks: () => [{ executor: "claude" }] };
+  expect(await routeWithPlan(request({ account: undefined }), { ...deps, tasks })).toEqual({ busy: true });
+  expect(await routeWithPlan(request(), { ...deps, tasks })).not.toHaveProperty("busy");
 });
 
 test.skipIf(!posix)("killed past its time, with what it started; an answer that isn't JSON fails", async () => {

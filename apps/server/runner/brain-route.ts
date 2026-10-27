@@ -176,6 +176,8 @@ export interface RouteDeps {
   /** The processes kept for turns: a sign-in with one open is busy. */
   brains?: { holds(account: string | null): boolean };
   codexApp?: { holds(account: string | null): boolean };
+  /** Background tasks run their CLI on the computer's own sign-in. */
+  tasks?: { runningTasks(): { executor: string }[] };
   signal?: AbortSignal;
   /** Tests: the CLIs, the time limit and where temporary folders go. */
   claudeCommand?: string[];
@@ -212,7 +214,9 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   if (account && !home) throw new RunnerError("not_found", "That account isn't on this computer anymore");
   const key = `${req.kind}:${home ?? "own"}`;
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
-  if (routing.has(key) || open?.holds(account)) return { busy: true };
+  const cli = req.kind === "codex" ? "codex" : "claude";
+  const task = account === null && deps.tasks?.runningTasks().some((t) => t.executor === cli);
+  if (routing.has(key) || open?.holds(account) || task) return { busy: true };
   routing.add(key);
   try {
     if (home && (await planKeyOf(home))) {

@@ -442,6 +442,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
         accounts: ctx.accounts ?? ctx.codex?.accounts,
         brains: ctx.brains,
         codexApp: ctx.codex?.app,
+        tasks: ctx.tasks,
         signal: scope.signal,
       });
     case "git.sync":
