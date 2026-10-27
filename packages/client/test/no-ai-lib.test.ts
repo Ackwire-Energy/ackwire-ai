@@ -5,6 +5,7 @@ import {
   type AgentAi,
   type AiChoice,
   ALL_AGENTS,
+  agentAi,
   allAgents,
   defaultChoice,
   defaultTarget,
@@ -253,6 +254,33 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(defaultTarget({ agents, set: all, hasAi: (id) => id !== "theo" })).toBe("theo");
     expect(defaultTarget({ agents, set: [], hasAi })).toBe("ada");
     expect(defaultTarget({ agents: [], set: [], hasAi })).toBeUndefined();
+  });
+
+  test("a pick holds while the plan allows it: All agents elsewhere is the first with no AI", () => {
+    const hasAi = (id: string) => ai[id] !== null;
+    const zai = allAgents({ choice: "zai", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m1" });
+    expect(defaultTarget({ agents: team, set: zai, hasAi, asked: "theo", picked: ALL_AGENTS })).toBe(ALL_AGENTS);
+    expect(defaultTarget({ agents: team, set: [], hasAi, asked: "theo", picked: ALL_AGENTS })).toBe("ada");
+    expect(defaultTarget({ agents: team, set: zai, hasAi, asked: "theo", picked: "lia" })).toBe("lia");
+    // With no set, whose computer the panel reads: the first with no AI, where All agents is too.
+    expect(defaultTarget({ agents: team, set: [], hasAi, picked: ALL_AGENTS })).toBe("ada");
+    expect(zai[0]?.id).toBe("ada");
+  });
+
+  test("the set is on the first with no AI's computer, even after one on this plan", () => {
+    const agents = [{ id: "lia" }, { id: "ada" }, { id: "theo" }];
+    const aiOf = (id: string): AgentAi => (id === "lia" ? "zai" : null);
+    const machineOf = (id: string) => (id === "lia" ? "m2" : "m1");
+    expect(allAgents({ choice: "zai", agents, aiOf, machineOf }).map((a) => a.id)).toEqual(["ada", "theo"]);
+  });
+
+  test("what an agent thinks with, from its row and its AI status", () => {
+    expect(agentAi({ brain: { kind: "codex", model: null } }, "ready")).toBe("chatgpt");
+    expect(agentAi({ brain: { kind: "claude_code", model: null } }, "no_ai")).toBe("claude");
+    expect(agentAi({ brain: { kind: "claude_code", model: null, provider: "zai" } }, "ready")).toBe("zai");
+    expect(agentAi({ brain: { kind: "model", model: null } }, "ready")).toBe("key");
+    expect(agentAi({ brain: { kind: "model", model: null } }, "no_ai")).toBeNull();
+    expect(agentAi(undefined, undefined)).toBeNull();
   });
 });
 
