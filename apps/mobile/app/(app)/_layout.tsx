@@ -64,6 +64,8 @@ function AppStack() {
       <Stack.Screen name="usage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
@@ -119,7 +121,6 @@ function AppStack() {
       <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="wiki-new" options={wikiSheet} />
       <Stack.Screen name="new" options={newSheet} />
-      <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
       <Stack.Screen name="code" options={formSheet} />

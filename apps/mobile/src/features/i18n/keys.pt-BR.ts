@@ -627,6 +627,22 @@ export const featureKeysPtBR = {
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
   },
+  agentEdit: {
+    missing: "Este agente não existe mais.",
+    saved: "Alterações salvas",
+    rolePlaceholder: "Ex.: Atendimento",
+    adminsOnly: "Só admins mudam o nome, o cargo e as instruções.",
+    discardTitle: "Descartar as alterações?",
+    discardText: "O que você mudou ainda não foi salvo.",
+    discard: "Descartar",
+    keepEditing: "Continuar editando",
+  },
+  newAgent: {
+    leaveTitle: "Sair sem criar?",
+    leaveText: "O agente que você começou não será criado.",
+    keepGoing: "Continuar criando",
+    partly: "O agente foi criado, mas parte do que o papel traz não entrou. Ajuste no perfil dele.",
+  },
   agent: {
     talk: "Conversar",
     task: "Tarefa",

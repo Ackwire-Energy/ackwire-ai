@@ -622,6 +622,22 @@ export const featureKeysEn: FeatureTranslations = {
     empty: "No agents yet.",
     freeSection: "Free",
   },
+  agentEdit: {
+    missing: "This agent no longer exists.",
+    saved: "Changes saved",
+    rolePlaceholder: "E.g. Support",
+    adminsOnly: "Only admins change the name, role and instructions.",
+    discardTitle: "Discard your changes?",
+    discardText: "What you changed hasn't been saved yet.",
+    discard: "Discard",
+    keepEditing: "Keep editing",
+  },
+  newAgent: {
+    leaveTitle: "Leave without creating?",
+    leaveText: "The agent you started won't be created.",
+    keepGoing: "Keep creating",
+    partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
+  },
   agent: {
     talk: "Chat",
     task: "Task",
