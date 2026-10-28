@@ -105,7 +105,8 @@ export function ActionList({ items }: { items: ActionItem[] }) {
  * The bar is opaque by default (`solid`, content lays out below it); `solid={false}` makes content scroll
  * under it (glass on iOS 26, blur before; the screen's scroll view needs
  * `contentInsetAdjustmentBehavior="automatic"`); `plate` puts a clear bar over a full-bleed cover. On Android
- * the right actions float in a `HeaderCapsule` and the back button is a round plate (`usePushedOptions`).
+ * the right actions float in a `HeaderCapsule` and the back button is a round plate (`usePushedOptions`);
+ * its opaque bar takes the screen's color (`grouped`), so no band shows above a grouped gray screen.
  */
 export function PushedHeader({
   title,
@@ -113,6 +114,7 @@ export function PushedHeader({
   right,
   plate = false,
   solid = true,
+  grouped = false,
 }: {
   title?: ReactNode;
   subtitle?: string;
@@ -120,8 +122,12 @@ export function PushedHeader({
   /** Over a sky cover: a clear bar, the back button over the art. */
   plate?: boolean;
   solid?: boolean;
+  /** The screen sits on the grouped gray (the bar matches it where it is opaque: Android). */
+  grouped?: boolean;
 }) {
+  const { colors } = useTheme();
   const scrollUnder = useScrollUnderPushedOptions();
+  const barTone = grouped && Platform.OS === "android" ? colors.grouped : null;
   const text = typeof title === "string" ? title : "";
   const titleNode = useHeaderSlot(typeof title === "string" ? null : title);
   const rightNode = useHeaderSlot(right);
@@ -132,6 +138,7 @@ export function PushedHeader({
   const options = useMemo<NativeStackNavigationOptions>(
     () => ({
       ...(plate ? coverBarOptions : solid ? {} : scrollUnder),
+      ...(barTone && !plate ? { headerStyle: { backgroundColor: barTone } } : null),
       title: text,
       headerTitle: custom ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} /> : text,
       headerRight: hasRight
@@ -144,7 +151,7 @@ export function PushedHeader({
           )
         : undefined,
     }),
-    [plate, solid, scrollUnder, text, custom, subtitle, titleNode, hasRight, rightNode],
+    [plate, solid, scrollUnder, barTone, text, custom, subtitle, titleNode, hasRight, rightNode],
   );
   return <Stack.Screen options={options} />;
 }

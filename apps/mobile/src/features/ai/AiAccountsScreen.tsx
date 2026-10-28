@@ -141,7 +141,7 @@ export function AiAccountsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("mobile.ai.row")} solid={false} />
+      <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
