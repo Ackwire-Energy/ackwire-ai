@@ -100,7 +100,10 @@ function drawWorking(ctx: CanvasRenderingContext2D, x0: number, w: number, rows:
     }
 }
 
-/** Runs a draw function: once (reduced motion, nothing moving) or about 12 times a second while mounted. */
+/**
+ * Runs a draw function: once (reduced motion, nothing moving) or about 12 times a second while mounted, and again as
+ * the theme changes: what it draws reads the theme's colors, and a still one would keep the old ones.
+ */
 export function useCanvas(
   draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, t: number) => void,
   moving: boolean,
@@ -120,6 +123,14 @@ export function useCanvas(
     }, 80);
     return () => clearInterval(timer);
   });
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext?.("2d");
+    if (!canvas || !ctx || typeof MutationObserver === "undefined") return;
+    const theme = new MutationObserver(() => fn.current(ctx, canvas, performance.now() / 1000));
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => theme.disconnect();
+  }, []);
   return ref;
 }
 
@@ -741,7 +752,8 @@ export function SkyStrip({
     const w = Math.max(8, Math.ceil(canvas.clientWidth / 3) || 120);
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== 2) canvas.height = 2;
-    const surface = token(canvas, "--raised", "#ffffff");
+    // Its holder's own ground: inside a raised container (a dialog) the strip itself reads one step up (`--raised-2`).
+    const surface = token(canvas.parentElement ?? canvas, "--raised", "#ffffff");
     const dark = document.documentElement.dataset.theme === "dark";
     const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
     const pal = dark
