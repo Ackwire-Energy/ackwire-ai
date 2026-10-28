@@ -5851,12 +5851,12 @@ export const ptBR = {
       forum: { write: "Abre tópicos, lê e posta no fórum." },
       sandbox: { write: "Roda código no computador do agente." },
       browser: {
-        write: "Navega em sites com o próprio navegador, no computador dele. Os logins ficam por agente.",
+        write: "Navega em sites com o próprio navegador, no computador {{hers}}. Os logins ficam por agente.",
       },
       setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
       desktop: {
         write:
-          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
+          "Usa qualquer app na própria tela, no computador {{hers}}, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
       },
     },
   },

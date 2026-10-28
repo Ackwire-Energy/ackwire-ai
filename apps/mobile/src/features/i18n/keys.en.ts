@@ -1085,7 +1085,7 @@ export const featureKeysEn: FeatureTranslations = {
         skills: "Skills",
         schedule: "Routines",
         forum: "Forum",
-        sandbox: "Its own computer",
+        sandbox: "Own computer",
         browser: "Browser",
         desktop: "Computer screen",
       },
