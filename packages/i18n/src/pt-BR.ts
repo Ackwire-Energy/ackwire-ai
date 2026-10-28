@@ -548,9 +548,9 @@ export const ptBR = {
     },
     keyStep: {
       title: "Qual IA eles vão usar?",
-      lead: "Entre com o seu plano de IA: sem chave de API.",
+      lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
       leadNoComputer:
-        "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
+        "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     },
     jev: {
       title: "Ajude os agentes a trabalhar em equipe",
@@ -1087,10 +1087,10 @@ export const ptBR = {
     onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
-      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem administra liga.",
+      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
       open: "Abrir as configurações do ChatGPT",
     },
-    zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
+    zaiTeam: "Num plano de equipe, use a chave da página Team\u00a0Plan.",
     who: {
       key: "Chave de API · {{provider}}",
       keyFor: "Chave de API para {{names}}",
@@ -1104,7 +1104,7 @@ export const ptBR = {
     foot: {
       one: "Com o seu plano, {{article}} {{name}} só responde a você.",
       all: "Com o seu plano, os seus agentes só respondem a você.",
-      signIn: "A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+      signIn: "A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
     },
     each: "Um login por agente, com a mesma conta.",
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
@@ -1900,12 +1900,12 @@ export const ptBR = {
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: {
-            claude_code: "Entre no Claude",
-            codex: "Entre no ChatGPT",
+            claude_code: "A conta com o seu plano",
+            codex: "A conta com o seu plano",
           },
           /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
-            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
           /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
           stepOneTip: {
             claude_code: "Conta errada? Saia na página do Claude e tente de novo.",

@@ -540,8 +540,8 @@ export const en: Translations = {
     },
     keyStep: {
       title: "Which AI will they use?",
-      lead: "Sign in with your AI plan: no API key needed.",
-      leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
+      lead: "Sign in with your AI plan: no\u00a0API\u00a0key needed.",
+      leadNoComputer: "Your agents think with an API\u00a0key, or with your AI plan on a computer you connect.",
     },
     jev: {
       title: "Help your agents work as a team",
@@ -1071,10 +1071,10 @@ export const en: Translations = {
     onlyYou: "{{name}} will only reply to you.",
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
-      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin does it.",
+      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin\u00a0does\u00a0it.",
       open: "Open ChatGPT settings",
     },
-    zaiTeam: "On a team plan, use the key from your Team Plan page.",
+    zaiTeam: "On a team plan, use the key from your Team\u00a0Plan\u00a0page.",
     who: {
       key: "API key · {{provider}}",
       keyFor: "API key for {{names}}",
@@ -1086,7 +1086,7 @@ export const en: Translations = {
     foot: {
       one: "On your plan, {{name}} only replies to you.",
       all: "On your plan, your agents only reply to you.",
-      signIn: "The account stays only on {{computer}}. Your password goes only to {{brand}}.",
+      signIn: "The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
     },
     each: "One sign-in per agent, with the same account.",
     eachHint: "Each agent keeps its own sign-in. They all share your plan's limits.",
@@ -1879,11 +1879,11 @@ export const en: Translations = {
         add: {
           title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
           stepOne: {
-            claude_code: "Sign in to Claude",
-            codex: "Sign in to ChatGPT",
+            claude_code: "The account with your plan",
+            codex: "The account with your plan",
           },
           stepOneHint:
-            "Wrong account? Sign out there and try again. The account stays only on {{computer}}. Your password goes only to {{brand}}.",
+            "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
           stepOneTip: {
             claude_code: "Wrong account? Sign out on Claude's page and try again.",
             codex: "Wrong account? Sign out on ChatGPT's page and try again.",

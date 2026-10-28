@@ -811,20 +811,20 @@ describe("the onboarding where the workspace gets its own computer", () => {
     // Ada and Theo exist before any AI: leaving now leaves a whole team.
     expect(r.state.calls.filter((c) => c.method === "agents.create")).toHaveLength(2);
     const panel = () => screen().getByRole("region", { name: "Seu plano do Claude" });
-    // The computer's wait in the panel's well, the owner's email line with no address; the sign-in's step says
-    // its own timing.
+    // The computer's wait in the panel's well, the owner's email line with no address. "Ready" is said there once:
+    // the sign-in's step adds no timing of its own.
     const well = panel().querySelector(".ai-panel__wait") as HTMLElement;
     expect(well.textContent).toBe(
       "Passo 3 de 4 · Instalando os programasFaltam uns 10 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
     );
-    expect(panel().querySelector(".agp-addacct__step")?.textContent).toContain(
-      "Você entra aqui assim que o computador ficar pronto.",
-    );
+    expect(panel().textContent?.split("pronto")).toHaveLength(2);
+    expect(well.querySelector(".ac-iconline")).toBeNull();
     expect([...panel().querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
     const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
-    // A plan for the first agent with no AI in the team's order, Theo, as Connect an AI picks; Ada is the other choice.
-    expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Theo");
+    // Ada asks which AI they use, so the plan is for her, as the foot says; Theo is the other choice.
+    expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
+    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("a Ada só responde a você");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -953,12 +953,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(panel.textContent).toContain(
         setup.state === "problem" ? "Algo deu errado ao preparar o computador" : "Esperando um computador disponível",
       );
-      // No time to give: the owner reads when they'll hear, then the sign-in's step what happens once it's ready.
+      // No time to give: the owner reads when they'll hear, once.
       const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
       expect(well.textContent).toContain("Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.");
-      expect(panel.querySelector(".agp-addacct__step")?.textContent).toContain(
-        "Você entra aqui assim que o computador ficar pronto.",
-      );
+      expect(panel.textContent?.split("pronto")).toHaveLength(2);
       expect([...panel.querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
       // A key is the picker's own row, under the panel: no button for it in any wait.
       expect(within(panel).queryByRole("button", { name: "Usar uma chave de API agora" })).toBeNull();

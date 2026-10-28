@@ -217,7 +217,7 @@ export function PlanPanel(props: PlanPanelProps) {
   const forWhom: PlanSetAgent[] = target === ALL_AGENTS ? all : agents.filter((a) => a.id === target);
   const [agent] = forWhom;
   return (
-    <Card as="section" className="ai-panel" aria-label={title}>
+    <Card as="section" className="ai-panel ai-panel--plan" aria-label={title}>
       <PanelHead
         lead={<ProviderLogo id={planMark(choice)} size="sm" />}
         title={title}
@@ -250,6 +250,7 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
       <span aria-hidden="true">{t("connectAi.for")}</span>
       <Select
         size="sm"
+        align="end"
         aria-label={t("connectAi.agentAria")}
         value={target}
         onValueChange={onTarget}
@@ -477,20 +478,31 @@ function PlanSteps({
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits. A hold decides when
-    // anything runs there: it speaks alone.
+    // anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none leads with an
+    // icon.
     wait = (hold || preparing) && (
       <div className="ai-panel__wait">
         {hold ? (
-          line(<Icon name="pause" size={14} />, hold)
+          <p className="setup-line" role="status">
+            {hold}
+          </p>
         ) : (
           <>
-            {preparing && <SetupProgress view={preparing} />}
+            {preparing?.step ? (
+              <SetupProgress view={preparing} />
+            ) : (
+              preparing && (
+                <p className="setup-line" role="status">
+                  {t(preparing.textKey)}
+                </p>
+              )
+            )}
             {eta && (
               <p className="setup-eta" aria-live="polite">
                 {etaLine(t, eta)}
               </p>
             )}
-            {email && reader.owner && line(<Icon name="mail" size={14} />, t("connectAi.wait.email"))}
+            {email && reader.owner && <p className="setup-line">{t("connectAi.wait.email")}</p>}
           </>
         )}
       </div>
@@ -632,9 +644,6 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          waitLine={
-            gate.state === "preparing" && !hold ? t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn") : undefined
-          }
           privacy={false}
           {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
           {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}

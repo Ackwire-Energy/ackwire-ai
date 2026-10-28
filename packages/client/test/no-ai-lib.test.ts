@@ -256,6 +256,18 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(defaultTarget({ agents: [], set: [], hasAi })).toBeUndefined();
   });
 
+  test("the agent whose face asks comes before the first with no AI, while it has none; All agents still comes first", () => {
+    const hasAi = (id: string) => ai[id] !== null;
+    const zai = allAgents({ choice: "zai", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m1" });
+    expect(defaultTarget({ agents: team, set: [], hasAi, host: "theo" })).toBe("theo");
+    expect(defaultTarget({ agents: team, set: [], hasAi, host: "di" })).toBe("di");
+    // Once it has an AI, the next plan goes to the first with none.
+    expect(defaultTarget({ agents: team, set: [], hasAi, host: "lia" })).toBe("ada");
+    expect(defaultTarget({ agents: team, set: zai, hasAi, host: "theo" })).toBe(ALL_AGENTS);
+    expect(defaultTarget({ agents: team, set: [], hasAi, host: "theo", picked: ALL_AGENTS })).toBe("theo");
+    expect(defaultTarget({ agents: team, set: [], hasAi, host: "theo", picked: "ada" })).toBe("ada");
+  });
+
   test("a pick holds while the plan allows it: All agents elsewhere is the first with no AI", () => {
     const hasAi = (id: string) => ai[id] !== null;
     const zai = allAgents({ choice: "zai", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m1" });
