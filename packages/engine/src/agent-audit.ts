@@ -1,5 +1,5 @@
 import { redactCommon } from "@agenteschat/adapters/redact";
-import { and, type Database, desc, eq, type Executor, inArray, lt, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";

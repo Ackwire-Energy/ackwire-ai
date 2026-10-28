@@ -126,9 +126,7 @@ export function AuditScreen() {
             </View>
           ) : null}
           {audit.isSuccess && rows.length === 0 ? (
-            <GroupedFooter>
-              {show === "all" && !agentId ? t("audit.empty") : t("audit.emptyFiltered")}
-            </GroupedFooter>
+            <GroupedFooter>{show === "all" && !agentId ? t("audit.empty") : t("audit.emptyFiltered")}</GroupedFooter>
           ) : null}
           {days.map(([day, list]) => (
             <Fragment key={day}>

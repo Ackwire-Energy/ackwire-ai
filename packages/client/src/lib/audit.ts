@@ -145,8 +145,7 @@ export function auditWhere(t: TFunction, row: AuditRow) {
 }
 
 /** The routine behind a call, by name. */
-export const auditRoutine = (row: AuditRow) =>
-  auditStr((row.details.routine as { name?: unknown } | undefined)?.name);
+export const auditRoutine = (row: AuditRow) => auditStr((row.details.routine as { name?: unknown } | undefined)?.name);
 
 /** Who is behind a call: "pedido por Ana", "rotina Resumo", "por conta própria". */
 export function auditBehind(t: TFunction, row: AuditRow) {

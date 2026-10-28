@@ -154,7 +154,10 @@ describe("agents' tool calls in the audit log", () => {
     await call("drive_delete", { title: "relatorio.pdf" }); // no drive:delete: refused
     await call("search_context", { title: "login" }); // looking around: not kept
     await call("sentry_list_issues", { title: "login" }); // someone's data: kept
-    const asked = await call("close_all_issues", { title: "tudo", why: "the board was cleaned up by hand after the release" });
+    const asked = await call("close_all_issues", {
+      title: "tudo",
+      why: "the board was cleaned up by hand after the release",
+    });
     expect(asked.type).toBe("approval");
 
     const rows = await toolRows(f);
@@ -180,7 +183,10 @@ describe("agents' tool calls in the audit log", () => {
     expect(rows[2]?.details.reason).toContain("lacks the scope drive:delete");
     expect(rows[3]?.details).toMatchObject({ kind: "read", connector: "Sentry", title: "Sentry: List issues" });
     const approvalId = asked.type === "approval" ? asked.approval.id : "";
-    expect(rows[4]?.details).toMatchObject({ approvalId, reason: "the board was cleaned up by hand after the release" });
+    expect(rows[4]?.details).toMatchObject({
+      approvalId,
+      reason: "the board was cleaned up by hand after the release",
+    });
 
     // Waiting on a person: the reader says so until someone answers.
     const waiting = await listAudit(f.db, f.owner.id, f.org.id, { waiting: true });
@@ -193,10 +199,7 @@ describe("agents' tool calls in the audit log", () => {
     const [approved] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.id, approvalId));
     if (!approved) throw new Error("no approval");
     await tools.executeApproved(ctx, approved);
-    const [decision] = await f.db
-      .select()
-      .from(schema.auditLog)
-      .where(eq(schema.auditLog.action, "approval.approved"));
+    const [decision] = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "approval.approved"));
     expect(decision).toMatchObject({
       actorType: "person",
       actorId: f.owner.id,
