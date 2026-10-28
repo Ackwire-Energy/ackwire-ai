@@ -387,6 +387,49 @@ describe("Setting it up here", () => {
       { here: { hold: "start", pace: 10 } },
     ));
 
+  test("it stays where it opened: the room above is pinned as it starts, so the slow line grows it downward", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    expect(css.split("\n.dk-fr__setup > :first-child {")[1]?.split("}")[0]).toContain(
+      "margin-top: var(--dk-setup-lead, auto);",
+    );
+    // The room above the computer as the browser lays it out: the auto margin while the block is centred, or the
+    // room pinned on the block.
+    let room = 94;
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      el instanceof HTMLElement && el.classList.contains("ac-computer")
+        ? ({
+            marginTop: el.parentElement?.style.getPropertyValue("--dk-setup-lead") || `${room}px`,
+          } as CSSStyleDeclaration)
+        : real(el, pseudo);
+    try {
+      await firstRun(
+        "first",
+        async (screen) => {
+          const { el, until } = screen;
+          await startSetup(screen);
+          await until(() => stepOf(el, "Starting")?.dataset.state === "active");
+          const lead = () =>
+            (el.querySelector(".dk-fr__setup") as HTMLElement).style.getPropertyValue("--dk-setup-lead");
+          expect(lead()).toBe("94px");
+          // Taller with the slow line: left to the browser, the room above would shrink and the block move up.
+          room = 82.6;
+          setSystemTime(new Date(Date.now() + 31_000));
+          try {
+            await until(() => stepOf(el, "Starting")?.querySelector(".dk-fr__stepline"));
+            expect(lead()).toBe("94px");
+          } finally {
+            setSystemTime();
+          }
+        },
+        { here: { hold: "start", pace: 10 } },
+      );
+    } finally {
+      g.getComputedStyle = real;
+    }
+  });
+
   test("Cancel stops it, and the form comes back as it was", async () => {
     let cancels = 0;
     let cancelNow: (() => Promise<void>) | null = null;

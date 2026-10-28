@@ -29,7 +29,7 @@ import {
   Switch,
   useNow,
 } from "@agenteschat/ui";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import {
@@ -755,6 +755,7 @@ function HereSetup({
   const { t } = useTranslation();
   const host = useHost();
   const title = useRef<HTMLHeadingElement>(null);
+  const column = useRef<HTMLDivElement>(null);
   const now = useNow(end === "running" ? 1000 : false);
   const states = stepStates(steps, changes);
   // Never every step done and no button: an error with no failed step ends on the step under way.
@@ -765,6 +766,13 @@ function HereSetup({
   useEffect(() => host.onLocalReach(setStage), [host]);
   const reachProblem = changes.find((c) => c.step === "reach" && c.state === "warn")?.reason;
   const clock = stepClock(now - activeAt);
+  // Opens in the window's middle, then stays where it opened: a slow step's line or a failure's words grow the
+  // column downward instead of moving the title and Cancel. The room above is pinned once (the window keeps its size).
+  useLayoutEffect(() => {
+    const el = column.current;
+    const first = el?.firstElementChild;
+    if (el && first) el.style.setProperty("--dk-setup-lead", getComputedStyle(first).marginTop);
+  }, []);
   // Screen readers start where they are, at every run.
   useEffect(() => {
     if (end === "running") title.current?.focus();
@@ -779,7 +787,7 @@ function HereSetup({
     return () => window.removeEventListener("keydown", onKey);
   }, [end, onCancel, onContinue]);
   return (
-    <div className="dk-fr__setup">
+    <div className="dk-fr__setup" ref={column}>
       <ComputerPortrait kind={host.platform} state={failed ? "paused" : "online"} size={96} />
       <h1 ref={title} className="dk-fr__h1sm" tabIndex={-1}>
         {t("desktop.here.setting")}
