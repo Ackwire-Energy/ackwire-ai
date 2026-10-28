@@ -96,7 +96,7 @@ describe("answering without a mention, as true for my own messages as who picks 
     await settle(4);
     return screen().getByRole("region", { name: "Agentes" }).textContent;
   };
-  /** The details' row line of an agent that answers on its own, and its menu's "Sozinho" line. */
+  /** The details' row line of an agent that answers on its own, and its menu's "Por conta própria" line. */
   const onItsOwn = async () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
     await settle(3);
@@ -110,7 +110,7 @@ describe("answering without a mention, as true for my own messages as who picks 
       fireEvent.keyUp(button, { key: "Enter" });
     });
     await settle(1);
-    const option = within(screen().getByRole("menu")).getByRole("menuitemradio", { name: /^Sozinho/ });
+    const option = within(screen().getByRole("menu")).getByRole("menuitemradio", { name: /^Por conta própria/ });
     return { line, option: option.querySelector(".ac-menu__desc")?.textContent };
   };
 
@@ -136,15 +136,15 @@ describe("answering without a mention, as true for my own messages as who picks 
     cleanup();
     await withRouting("off");
     expect(await onItsOwn()).toEqual({
-      line: "Por enquanto, responde só quando mencionado",
-      option: "Por enquanto, responde só quando mencionado",
+      line: "Por enquanto, responde só quando alguém menciona",
+      option: "Por enquanto, responde só quando alguém menciona",
     });
   });
 
   test("Jev picks: it joins in on its own, when the topic calls for it", async () => {
     await withRouting("jev");
     expect(await onItsOwn()).toEqual({
-      line: "Entra na conversa sozinho",
+      line: "Entra na conversa por conta própria",
       option: "Responde quando o assunto pede, sem precisar de @",
     });
   });

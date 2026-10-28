@@ -867,6 +867,12 @@
   align-items: center;
   gap: 4px;
 }
+/* Its keys mean nothing on a touch screen or at phone width. */
+@media (max-width: 760px), (pointer: coarse) {
+  .nt-cmp__hint {
+    display: none;
+  }
+}
 
 /* ── Exit and entrance ──────────────────────────────────────────────────── */
 .is-leaving {

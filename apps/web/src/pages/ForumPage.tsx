@@ -338,7 +338,7 @@ function NeedRow({ need }: { need: ForumNeed }) {
           : t(plan ? "forum.need.planIssues" : "forum.need.issues", { count: need.count });
       case "budget": {
         const name = who.agentName(need.agentId);
-        return t("forum.need.budget", { name, The: who.g(name).The });
+        return t("forum.need.budget", who.g(name));
       }
       default:
         return t("forum.need.stalled");

@@ -186,8 +186,11 @@ export function MachineScreen({ machineId }: { machineId: string }) {
               const line =
                 folders && (folders.length > 0 || !managed)
                   ? folders.length > 0
-                    ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
-                    : t("machines.page.agentOwnFolder")
+                    ? t("machines.page.agentFolders", {
+                        ...agentGrammar(t, a.name),
+                        folders: joinNames(folders, t("newAgent.and")),
+                      })
+                    : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))
                   : null;
               const agentRow = (
                 <GroupedRow

@@ -183,6 +183,22 @@ describe("no AI connected: above the composer", () => {
     expect(banner()).toBeNull();
   });
 
+  test("Connect from an agent's DM is for that agent alone: no For, though the viewer has others with no AI", async () => {
+    const both = () => walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID, ATLAS_ID);
+    await open(both(), `dm/agent/${ADA_ID}`);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
+    const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    expect(shownText(panel)).toContain("Com o seu plano, a Ada só responde a você.");
+    cleanup();
+    // Opened from anywhere else, every agent of the viewer's stays a choice.
+    await open(both());
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);
+    const any = dialog("Conectar uma IA") as HTMLElement;
+    expect(within(any).getByRole("combobox", { name: "Agentes que usam este plano" })).toBeTruthy();
+  });
+
   test("the agent's page: 'Sem IA' by its name opens Connect for that agent", async () => {
     await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }), `agents/${ADA_ID}`);
     await click(screen().getByRole("button", { name: "Sem IA" }));

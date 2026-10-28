@@ -107,7 +107,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     // Letting people in on the owner's plan: the provider's words first; keeping it is the easy answer.
     const body = sharePlanBody(t, kind, current?.plan, planOf(current?.provider)?.maker);
     Alert.alert(t("aiAccounts.share.title", g), body, [
-      { text: t("aiAccounts.share.keep"), style: "cancel" },
+      { text: t("aiAccounts.share.keep", g), style: "cancel" },
       {
         text: t("aiAccounts.share.accept"),
         onPress: () => void save({ onlyOwner: false, acceptPlanTerms: true }, t("aiAccounts.share.savedEveryone", g)),
@@ -226,7 +226,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
             ) : null}
             {kind && agent?.ownerUserId ? (
               <>
-                <GroupedHeader>{t("mobile.ai.audience")}</GroupedHeader>
+                <GroupedHeader>{t("mobile.ai.audience", g)}</GroupedHeader>
                 <GroupedList>
                   <GroupedRow
                     label={
@@ -243,7 +243,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 <GroupedFooter>
                   {view.canUsePlans
                     ? t("aiAccounts.share.hint", g)
-                    : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })}
+                    : t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
                 </GroupedFooter>
               </>
             ) : null}

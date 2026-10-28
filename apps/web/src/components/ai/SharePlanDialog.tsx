@@ -42,7 +42,7 @@ export function SharePlanDialog({
     >
       <DialogFooter>
         <Button variant="ghost" onClick={onKeep}>
-          {t("aiAccounts.share.keep")}
+          {t("aiAccounts.share.keep", g)}
         </Button>
         <Button variant="primary" onClick={onAccept}>
           {t(everyone ? "aiAccounts.share.accept" : "aiAccounts.share.acceptPeople")}

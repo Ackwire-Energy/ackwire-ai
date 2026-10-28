@@ -1642,27 +1642,13 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other options of the group step back. A pressed card
-   also takes a check in the corner, while a radio card's own radio already marks it. */
+/* Chosen (--chosen-*), inside the card's own outline (its line2 ring and e1's line), so neither the card nor the gaps
+   around it move. A pressed card also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
+  --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
   background: var(--chosen-bg);
-  box-shadow: var(--chosen-shadow);
-  transform: var(--chosen-lift);
-}
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow:
-    0 0 0 1px var(--line2),
-    var(--e1);
+  box-shadow: var(--pressed);
 }
 .ac-option[aria-pressed="true"]::after {
   content: "";
@@ -1696,7 +1682,7 @@ textarea.ac-input {
 .ac-option[aria-pressed="true"]:has(:focus-visible),
 .ac-option[data-state="checked"]:has(:focus-visible),
 .ac-option[aria-pressed="true"]:focus-visible {
-  box-shadow: var(--chosen-shadow), var(--field-ring);
+  box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
   display: flex;
@@ -1864,6 +1850,12 @@ textarea.ac-input {
 }
 .ac-dialog__acts > .ac-btn--glyph:last-child {
   --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
+}
+/* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does (a title with a line under
+   it keeps them on the pair's middle). An app measures that middle for its title's face (`--title-cap-mid`): --cap-mid
+   here would resolve in the actions' own font. */
+.ac-dialog__title + .ac-dialog__acts {
+  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
 }
 .ac-dialog__title {
   margin: 0;
@@ -4817,7 +4809,7 @@ a.ac-list__row:focus-visible {
   gap: 4px;
   color: var(--faint);
 }
-@media (hover: none), (pointer: coarse) {
+@media (max-width: 760px), (hover: none), (pointer: coarse) {
   .ac-composer-choice__hint {
     display: none;
   }
@@ -6350,6 +6342,16 @@ button.ac-tools__row:focus-visible {
   .ac-searchfield--sm .ac-searchfield__input {
     font-size: 16px;
   }
+  /* No keyboard hints: a button's keys (its `kbd` or a key among its words), the send button's, a search field's,
+     the palette's and a menu's. */
+  .ac-btn__kbd,
+  .ac-btn > .ac-kbd,
+  .ac-composer__send-text .ac-kbd,
+  .ac-searchfield__hint,
+  .ac-palette .ac-kbd,
+  .ac-mo__kbd {
+    display: none;
+  }
 }
 
 /* Touch: hover-only actions and small controls. */
@@ -6414,11 +6416,6 @@ button.ac-tools__row:focus-visible {
   }
   .ac-menu__item {
     min-height: 40px;
-  }
-  /* No keyboard shortcuts to show on a touch screen. */
-  .ac-composer__send-text .ac-kbd,
-  .ac-btn__kbd {
-    display: none;
   }
 }
 
@@ -6707,7 +6704,6 @@ button.ac-tools__row:focus-visible {
     inset 0 0 0 1px var(--line2),
     var(--field-ring);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other rows step back to a flat hairline. */
 .ac-optrow[data-state="checked"] {
   box-shadow: var(--chosen-shadow);
   background: var(--chosen-bg);
@@ -6715,14 +6711,6 @@ button.ac-tools__row:focus-visible {
 }
 .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
 }
 .ac-optrow__dot {
   width: 18px;

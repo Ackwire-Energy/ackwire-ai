@@ -209,7 +209,7 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     expect(stepText(en, { tool: "desktop_click", detail: null }, "desktop")).toBe("Clicked");
     expect(stepText(en, { tool: "mcp__agentes__desktop_open", detail: "Files" }, "desktop")).toBe("Opened Files");
     expect(stepText(en, { tool: "desktop_open", detail: null }, "desktop")).toBe("Opened an app");
-    expect(stepText(en, { tool: "desktop_something_new", detail: null }, "desktop")).toBe("Used its screen");
+    expect(stepText(en, { tool: "desktop_something_new", detail: null }, "desktop")).toBe("Used the screen");
     const pt = await translator("pt-BR");
     expect(pt("agentComputer.phone.otherApp", { name: "Ada", The: "A" })).toBe(
       "A Ada está usando outro app na própria tela",

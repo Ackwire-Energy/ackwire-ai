@@ -424,11 +424,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > i")).toContain(
       "margin-inline: calc((var(--lead) - 20px) / 2)",
     );
-    // The well's 12px of padding all round start before the words' column, so its words are on it; an option card's
-    // 12px too.
+    // The well spans the panel's content, as far in from its right edge as from its left: its words keep the text's
+    // column on both sides. An option card's 12px of padding start before that column, so its words are on it.
     const well = ruleOf(layout, ".ai-panel__wait");
-    expect(well).toContain("margin-left: calc(var(--text-edge) - 12px)");
-    expect(well).toContain("padding: 12px;");
+    expect(well).toContain("padding: 12px var(--text-edge);");
+    expect(well).not.toContain("margin");
     expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
       "margin-left: calc(var(--text-edge) - var(--space-3))",
     );

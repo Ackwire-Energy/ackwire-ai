@@ -130,7 +130,7 @@ describe("Configurações da missão", () => {
     expect(dialog.textContent).toContain("Nesta missão: 14 liberados automaticamente · 3 perguntados · 0 bloqueados");
     expect(dialog.textContent).toContain("O que já foi liberado");
     expect(dialog.textContent).toContain("Nada liberado ainda");
-    expect(dialog.textContent).toContain("Próximas missões do Ada");
+    expect(dialog.textContent).toContain("Próximas missões da Ada");
     // Mais opções is folded: who does the work and the switch appear when opened, locked after start.
     expect(within(dialog).queryByRole("switch")).toBeNull();
     await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
@@ -201,7 +201,7 @@ describe("Configurações da missão", () => {
     await render(api);
     let dialog = await openSettings();
     expect(dialog.textContent).toContain("Começar com “Só o que é arriscado”");
-    expect(dialog.textContent).toContain("Já é o padrão do Ada.");
+    expect(dialog.textContent).toContain("Já é o padrão da Ada.");
     expect(dialog.querySelector(".ac-setrow .ac-chip")?.textContent).toBe("Padrão");
     await click(within(dialog).getByRole("radio", { name: /^Não pergunta/ }));
     await settle(6);
@@ -211,7 +211,7 @@ describe("Configurações da missão", () => {
     expect(calls(state, "missions.setAgentDefault")).toEqual([[ORG_ID, ADA_ID, "never"]]);
     expect(dialog.querySelector(".ac-setrow .ac-chip")?.textContent).toBe("Padrão");
     expect(within(dialog).queryByRole("button", { name: "Usar como padrão" })).toBeNull();
-    expect((document.querySelector(".ac-toasts") as HTMLElement).textContent).toContain("Padrão do Ada atualizado");
+    expect((document.querySelector(".ac-toasts") as HTMLElement).textContent).toContain("Padrão da Ada atualizado");
 
     // Someone who doesn't look after the agent: the button is there, disabled, with why.
     cleanup();
@@ -223,7 +223,7 @@ describe("Configurações da missão", () => {
     dialog = await openSettings();
     const button = within(dialog).getByRole("button", { name: "Usar como padrão" });
     expect(button.hasAttribute("disabled")).toBe(true);
-    expect(dialog.textContent).toContain("Só quem cuida do Ada ou um admin muda o padrão.");
+    expect(dialog.textContent).toContain("Só quem cuida da Ada ou um admin muda o padrão.");
   });
 
   test("Quem faz o trabalho: the executor's model, changeable after start; saves at once", async () => {

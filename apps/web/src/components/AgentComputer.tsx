@@ -597,7 +597,7 @@ export function AgentComputerPanel({
           )}
         </div>
       )}
-      {target.kind === "machine" && <AgentMachineFolders agentId={agent.id} machineId={target.machineId} />}
+      {target.kind === "machine" && <AgentMachineFolders agent={agent} machineId={target.machineId} />}
     </div>
   );
 }
@@ -607,13 +607,14 @@ export function AgentComputerPanel({
  * its computer this agent may use beyond its own, as the machine reported them.
  * Read-only here: granting happens on the computer.
  */
-function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineId: string }) {
+function AgentMachineFolders({ agent, machineId }: { agent: Agent; machineId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machines = useMachines(org.id);
   const m = machines.data?.find((x) => x.id === machineId);
   if (!m) return null;
-  const folders = foldersOfAgent(m.access, agentId);
+  const folders = foldersOfAgent(m.access, agent.id);
+  const g = agentGrammar(t, agent.name);
   return (
     <div className="stack-4" style={{ gap: 6 }} data-agent-folders>
       <span className="ac-hintline">
@@ -632,10 +633,10 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
             : t("agentPage.computer.foldersHidden", { machine: m.name })}
         </span>
       ) : folders.length === 0 ? (
-        <span className="small muted">{t("agentPage.computer.foldersOwn", { machine: m.name })}</span>
+        <span className="small muted">{t("agentPage.computer.foldersOwn", { ...g, machine: m.name })}</span>
       ) : (
         <>
-          <span className="small muted">{t("agentPage.computer.foldersMore", { machine: m.name })}</span>
+          <span className="small muted">{t("agentPage.computer.foldersMore", { ...g, machine: m.name })}</span>
           <ul className="agent-folders">
             {folders.map((f) => (
               <li key={f.path}>

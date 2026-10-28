@@ -2934,12 +2934,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
-  const joinedTip = joined
-    ? (() => {
-        const g = agentGrammar(t, name);
-        return t("chat.joined.tip", { name, article: g.article, Pronoun: capitalize(g.pronoun) });
-      })()
-    : null;
+  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(t, name)) : null;
   // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
   const issueWork = issueWorkOf(meta);
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
@@ -3516,8 +3511,8 @@ function ChannelDetails({
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
                     : picksForMe(routing)
-                      ? t("channelMembers.aloneLine")
-                      : t(replyAloneKey(routing))}
+                      ? t("channelMembers.aloneLine", agentGrammar(t, r.name))
+                      : t(replyAloneKey(routing), agentGrammar(t, r.name))}
                 </span>
               </span>
               {editable && (
@@ -3536,7 +3531,7 @@ function ChannelDetails({
                   }
                 >
                   <MenuRadioGroup
-                    label={t("channelMembers.replyHeading")}
+                    label={t("channelMembers.replyHeading", agentGrammar(t, r.name))}
                     value={r.autoReply ? "alone" : "mention"}
                     onValueChange={(v) => autoReply.mutate({ agentId: r.id, on: v === "alone" })}
                     options={[
@@ -3544,8 +3539,8 @@ function ChannelDetails({
                         value: "alone",
                         label: (
                           <>
-                            {t("channelMembers.replyAlone")}
-                            <span className="ac-menu__desc">{t(replyAloneKey(routing))}</span>
+                            {t("channelMembers.replyAlone", agentGrammar(t, r.name))}
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(t, r.name))}</span>
                           </>
                         ),
                       },
@@ -3624,6 +3619,7 @@ function ChannelDetails({
         title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
         description={t(
           removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody",
+          agentGrammar(t, removing?.name ?? ""),
         )}
         closeLabel={t("common.close")}
         width={440}
