@@ -6650,7 +6650,7 @@ export const ptBR = {
   },
   database: {
     name: "Banco de dados",
-    cardText: "Postgres: os agentes consultam seus dados para responder, só leitura.",
+    cardText: "Postgres, só leitura: os agentes consultam seus dados.",
     auth: "Endereço e senha",
     connectText:
       "Os agentes leem o seu banco Postgres para responder sobre os seus dados. Eles só leem: nada é alterado.",

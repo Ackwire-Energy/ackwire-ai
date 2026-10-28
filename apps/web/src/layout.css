@@ -3671,6 +3671,10 @@ p {
   gap: 12px;
   min-width: 0;
 }
+/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. */
+.cflow__title > :first-child {
+  translate: 0 calc(-1 * var(--cap-mid));
+}
 .cflow__steps {
   display: flex;
   gap: 6px;
