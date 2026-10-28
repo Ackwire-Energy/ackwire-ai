@@ -175,15 +175,15 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(text).not.toMatch(/Preparando/);
     expect(text).toContain("Passo 3 de 4 · Instalando os programas");
     expect(text).toContain("Faltam uns 6 min");
-    expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(text).toContain("Avisamos\u00a0você\u00a0em walter@acme.com.br quando\u00a0ele\u00a0ficar\u00a0pronto.");
     expect(text).not.toContain("Pode fechar esta página");
-    expect(text).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    expect(text).toContain("4\u00a0CPUs\u00a0· 8\u00a0GB\u00a0de\u00a0memória\u00a0· 100\u00a0GB\u00a0de\u00a0disco");
     // The head already says whose computer this is: no line that Ada waits, no users line, no plans.
     expect(text).not.toMatch(/começa a usar|Um usuário para cada agente|plano de IA/);
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
-    // The wait isn't the screen's frame: no line for steps under it.
+    // No line will come under the wait: its box takes that room, and no line for steps sits under it.
     expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 
@@ -201,7 +201,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
       // In line: the owner's email in place of a time, and no line saying it waits (the head says "Na fila").
       if (setup.state === "waiting") {
         expect(card).not.toContain("Esperando um computador disponível");
-        expect(card).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+        expect(card).toContain("Avisamos\u00a0você\u00a0em walter@acme.com.br quando\u00a0ele\u00a0ficar\u00a0pronto.");
       }
       // Before its first step, nothing says it's being prepared but the head.
       if (setup.state === "preparing") expect(card).not.toContain("Preparando o computador.");
@@ -322,18 +322,20 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
-    // A cover takes the screen's frame, with nothing under it, as the screen that follows it opens.
+    // A cover takes the screen's frame, the line under it kept empty, as the screen that follows it opens.
     expect(box().querySelector(".cmp-stage")).toBeTruthy();
-    expect(box().querySelector(".cmp-steps-row")).toBeNull();
+    expect(box().querySelector(".cmp-body > .cmp-steps-row")?.childElementCount).toBe(0);
   });
 });
 
 describe("the computer dialog, live", () => {
-  test("watching while the agent doesn't work: nothing under the screen, no empty line for steps", async () => {
+  test("watching while the agent doesn't work: the line under the screen keeps its room, with nothing in it", async () => {
     await dialog();
     expect(box().querySelector(".dsk")).toBeTruthy();
-    expect(box().querySelector(".cmp-steps-row")).toBeNull();
-    expect(box().querySelector(".cmp-body")?.lastElementChild?.classList.contains("dsk")).toBe(true);
+    const row = box().querySelector(".cmp-body > .cmp-steps-row");
+    expect(row?.childElementCount).toBe(0);
+    expect(row?.textContent).toBe("");
+    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
   });
 
   test("the steps' line comes under the screen while the agent works there, and goes with its run", async () => {
@@ -365,7 +367,8 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row());
     await ev({ type: "agent.run", ...run, status: "done" });
     await settle(4);
-    expect(row()).toBeNull();
+    // The steps go with the run, and their line stays, empty, so the window keeps its size.
+    expect(row()?.childElementCount).toBe(0);
   });
 
   test("held with a ready computer: watching, under the pause's banner, with no take control", async () => {
@@ -393,12 +396,15 @@ describe("the computer dialog, live", () => {
     expect(calls(t, "browser.takeControl")).toEqual([[ORG_ID, "h-screen"]]);
     await settle(4);
     expect(t.sockets.screens.at(-1)?.url).toContain("mode=control");
-    expect(sub()).toBe("Você no controle · a Ada pediu");
+    expect(sub()).toBe("Você no controle · a\u00a0Ada pediu");
     // Over the screen, where the frame's rule finds it to give it room of its own (computer.css).
     expect(box().querySelector(":scope > .cmp-body > .dsk > .cmp-asked")?.textContent).toBe(
       "“Entrar no banco com o token da empresa”",
     );
-    expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
+    // A check alone says Pronto, so on a phone it shows the check alone (only a take over's Devolver keeps its words).
+    const done = view().getByRole("button", { name: "Pronto" });
+    expect(done.classList.contains("cmp-back")).toBe(true);
+    expect(done.classList.contains("cmp-words")).toBe(false);
     // Its circle alone on a phone, as Pronto shows its check: its words stay its name.
     const couldnt = view().getByRole("button", { name: "Não consegui" });
     expect(couldnt.querySelector(":scope > svg path")?.getAttribute("d")).toBe(icons.block[1]?.[1].d);

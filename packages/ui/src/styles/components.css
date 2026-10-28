@@ -3651,6 +3651,16 @@ a.ac-list__row:focus-visible {
   width: var(--control-icon-lg);
   height: var(--control-icon-lg);
 }
+/*
+ * A leading icon by its ink. A button that says how much air its icon's drawing leaves before it (`--lead-air`) and
+ * how far to lift it (`--lead-rise`: the capitals' `--cap-mid`, plus as far as its ink's middle sits under its box's)
+ * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
+ * folded to its icon, say), the box places it.
+ */
+:where(.ac-btn > .ac-icon:first-child) {
+  margin-inline-start: calc(-1 * var(--lead-air));
+  translate: 0 calc(-1 * var(--lead-rise));
+}
 /* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
 .ac-btn--icon {
   width: var(--control-h-md);

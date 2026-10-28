@@ -19,7 +19,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
-import { endSentence } from "@agenteschat/client/lib/text";
+import { around, endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
@@ -98,12 +98,26 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
 export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
+    const step = t(view.textKey);
+    const label = t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step });
+    // The step's own words stay on one line where they fit (layout.css).
+    const cut = around(label, step);
     return (
       <div className="setup-progress" role="status">
         <Steps
           current={view.stepNumber}
           total={SETUP_STEPS.length}
-          label={t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
+          label={
+            cut ? (
+              <>
+                {cut[0]}
+                <span>{step}</span>
+                {cut[1]}
+              </>
+            ) : (
+              label
+            )
+          }
         />
       </div>
     );

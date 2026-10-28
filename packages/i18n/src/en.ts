@@ -8428,7 +8428,8 @@ export const en: Translations = {
     },
     title: "{{org}}'s computer",
     users: "One user per agent: each one has its own folder.",
-    specs: "{{cpus}} CPUs · {{memoryGb}} GB of memory · {{diskGb}} GB of disk",
+    specs:
+      "{{cpus}}\u00a0CPUs\u00a0· {{memoryGb}}\u00a0GB\u00a0of\u00a0memory\u00a0· {{diskGb}}\u00a0GB\u00a0of\u00a0disk",
     chip: {
       preparing: "Being prepared",
       capacity: "In line",
@@ -8476,7 +8477,7 @@ export const en: Translations = {
       late: "Taking a little longer than expected",
     },
     email: {
-      you: "We'll email you at {{email}} when it's ready.",
+      you: "We'll\u00a0email\u00a0you\u00a0at {{email}} when\u00a0it's\u00a0ready.",
       here: "It shows here as soon as it's ready.",
       /** After the capacity wait's line, for owners. */
       short: "We'll email you.",

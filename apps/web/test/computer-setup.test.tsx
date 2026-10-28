@@ -5,6 +5,7 @@ setupDom();
 
 import type { ComputerSetup, Machine } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
+import { en, ptBR } from "@agenteschat/i18n";
 import { icons } from "@agenteschat/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -330,7 +331,9 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     const card = () => screen().getByRole("region", { name: "Computador da Acme" });
     expect(card().textContent).toContain("Sendo preparado");
     expect(card().textContent).toContain("Passo 2 de 4 · Iniciando");
-    expect(card().textContent).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    expect(card().textContent).toContain(
+      "4\u00a0CPUs\u00a0· 8\u00a0GB\u00a0de\u00a0memória\u00a0· 100\u00a0GB\u00a0de\u00a0disco",
+    );
     // One user per agent is the name's ⓘ, not a line of the card.
     const users = "Um usuário para cada agente: cada um tem a própria pasta.";
     expect(hintOf("Computador da Acme", card()).text).toBe(users);
@@ -380,7 +383,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(shownText(document.body)).not.toContain("Só a própria pasta");
     expect(screen().getByRole("button", { name: "Abrir: Computador da Ada" })).toBeTruthy();
     const page = document.body.textContent ?? "";
-    expect(page).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    expect(page).toContain("4\u00a0CPUs\u00a0· 8\u00a0GB\u00a0de\u00a0memória\u00a0· 100\u00a0GB\u00a0de\u00a0disco");
     expect(page.toLowerCase().split("sempre ligado")).toHaveLength(2);
     expect(page).not.toMatch(TECHNICAL);
     expect(page).not.toContain("Pasta:");
@@ -470,7 +473,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     const wait = { state: "waiting", reason: "capacity", notifyByEmail: true } as const;
     const card = () => screen().getByRole("region", { name: "Computador da Acme" }).textContent ?? "";
     await open(`/org/${ORG_ID}/settings/computers`, wait);
-    expect(card()).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(card()).toContain("Avisamos\u00a0você\u00a0em walter@acme.com.br quando\u00a0ele\u00a0ficar\u00a0pronto.");
     expect(card()).not.toContain("Pode fechar esta página");
     expect(card()).not.toContain("Aparece aqui");
     cleanup();
@@ -604,9 +607,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(step.textContent).toContain("Esperando um computador disponível");
     expect(step.textContent).not.toContain("Nada se perde");
     // Whoever creates the workspace owns it: the email is theirs, and nothing says the page can be closed.
-    expect(step.textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(step.textContent).toContain(
+      "Avisamos\u00a0você\u00a0em walter@acme.com.br quando\u00a0ele\u00a0ficar\u00a0pronto.",
+    );
     expect(step.textContent).not.toContain("Pode fechar esta página");
-    expect(step.textContent).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    expect(step.textContent).toContain(
+      "4\u00a0CPUs\u00a0· 8\u00a0GB\u00a0de\u00a0memória\u00a0· 100\u00a0GB\u00a0de\u00a0disco",
+    );
     // No plans: the AI step is where they are.
     expect(step.textContent).not.toContain("plano de IA");
     // The whole wait in one well, every line in it its own: each starts with its icon, set on its first line of text.
@@ -846,7 +853,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     });
     expect(step()).toContain("Passo 3 de 4 · Atualizando o sistema");
     expect(step()).toContain("Faltam uns 10 min");
-    expect(step()).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(step()).toContain("Avisamos\u00a0você\u00a0em walter@acme.com.br quando\u00a0ele\u00a0ficar\u00a0pronto.");
     expect(pollEvery(r.services.queryClient, "computer-setup")).toBe(5000);
   });
 
@@ -1127,5 +1134,78 @@ describe("the onboarding where the workspace gets its own computer", () => {
     } finally {
       g.getComputedStyle = real;
     }
+  });
+});
+
+describe("the computer's wait in words: one edge for the words, whole phrases, even ink", () => {
+  const sheet = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+  const rule = (text: string, selector: string) => text.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  const preparing = {
+    state: "preparing",
+    step: "starting",
+    stage: "wiping",
+    secondsLeft: 900,
+    notifyByEmail: true,
+    specs: SPECS,
+  } as const;
+
+  test("one edge for every word, the icons hanging before it: in the window, on setup's step and in Settings", async () => {
+    const layout = await sheet("../src/layout.css");
+    // What leads a line is 14 px and the kit's icon line puts 8 px after it: the lines that lead with nothing (the
+    // steps' bar and step, the time left) start 22 px in, where the others' words do.
+    expect(
+      rule(layout, ":is(.setup-wait, .setup-card) > :is(.setup-progress:not(.ac-iconline), .setup-eta)"),
+    ).toContain("margin-left: 22px");
+    expect(rule(await sheet("../../../packages/ui/src/styles/components.css"), ".ac-iconline")).toContain("gap: 8px");
+    // The window keeps that room after the words too, so the words' column is the one centred under the portrait.
+    expect(rule(await sheet("../src/components/computer/computer.css"), ".cmp-prep .setup-wait")).toContain(
+      "padding-inline-end: 22px",
+    );
+    // Settings › Computers: the lines the rule finds, where it finds them, each icon 14 px.
+    await open(`/org/${ORG_ID}/settings/computers`, preparing);
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    expect(card.querySelector(":scope > .setup-progress:not(.ac-iconline) .ac-steps")).toBeTruthy();
+    expect(card.querySelector(":scope > .setup-eta")?.textContent).toBe("Faltam uns 15 min");
+    const led = [...card.querySelectorAll(":scope > .setup-line.ac-iconline")];
+    expect(led).toHaveLength(2);
+    for (const line of led) expect((line.firstElementChild as HTMLElement).style.width).toBe("14px");
+  });
+
+  test("its phrases stay whole: the step's own words where they fit, the email's and the size's by no-break spaces", async () => {
+    expect(rule(await sheet("../src/layout.css"), ".setup-progress .ac-eyebrow > span")).toContain(
+      "display: inline-block",
+    );
+    await open(`/org/${ORG_ID}/settings/computers`, preparing);
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    const step = card.querySelector(".setup-progress .ac-eyebrow");
+    expect(step?.textContent).toBe("Passo 2 de 4 · Limpando para começar do zero");
+    expect(step?.querySelector(":scope > span")?.textContent).toBe("Limpando para começar do zero");
+    // Lines break only between phrases: around the address, and after each of the size's dots.
+    const breaks = (s: string) => s.split(" ");
+    for (const [strings, you, specs] of [
+      [ptBR, ["Avisamos você em", "{{email}}", "quando ele ficar pronto."], ["de memória"]],
+      [en, ["We'll email you at", "{{email}}", "when it's ready."], ["of memory"]],
+    ] as const) {
+      expect(breaks(strings.computerSetup.email.you)).toEqual([...you]);
+      expect(breaks(strings.computerSetup.specs)).toHaveLength(3);
+      expect(strings.computerSetup.specs).toContain(specs[0]);
+    }
+  });
+
+  test("Settings › Computers' card ends as far under its last line's baseline as its drawing starts under its top", async () => {
+    const layout = await sheet("../src/layout.css");
+    // The card's padding under the baseline, as above the drawing (`--cap-top` and `--cap-mid` place the line's
+    // capitals in its box), with the page's 22 px line where the lh unit is missing.
+    expect(rule(layout, ".setup-card > p:last-child")).toContain(
+      "margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px)",
+    );
+    expect(layout.split("\n  .setup-card > p:last-child {")[1]?.split("}")[0]).toContain(
+      "margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh)",
+    );
+    // The size is its last line on the way, a paragraph the rule finds.
+    await open(`/org/${ORG_ID}/settings/computers`, preparing);
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    expect(card.lastElementChild?.matches("p.setup-line")).toBe(true);
+    expect(card.lastElementChild?.textContent).toContain("100 GB de disco");
   });
 });

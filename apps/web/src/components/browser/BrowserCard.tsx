@@ -765,7 +765,7 @@ export function BrowserCard({
     !otherInControl &&
     !blocker &&
     canTakeOver && (
-      <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
+      <Button size="sm" icon="person" className="cmp-take" loading={actions.takeover.isPending} onClick={takeover}>
         <span className="cmp-act-label">{t("desktop.takeover")}</span>
       </Button>
     )
@@ -824,6 +824,7 @@ export function BrowserCard({
           size="sm"
           variant="primary"
           icon="check"
+          className={handoff?.kind === "takeover" ? "cmp-back cmp-words" : "cmp-back"}
           onClick={() => {
             setOpen(true);
             setFailing(false);

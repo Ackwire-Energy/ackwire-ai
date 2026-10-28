@@ -310,6 +310,9 @@ function ComputerStage({
 
   let body: ReactNode;
   let steps: ReactNode = null;
+  // Under the screen or what takes its place, the frame keeps the line's room, so nothing moves when one comes. The
+  // wait has no line to come: its box takes that room.
+  let line = true;
   if (!f || !view.ready) {
     body = (
       <>
@@ -353,6 +356,7 @@ function ComputerStage({
     );
   } else if (surface === "preparing" && f.setup) {
     // The head names it and says where it is; the card says only the rest.
+    line = false;
     body = (
       <>
         <DialogHead sub={t(f.setup.chipKey)} />
@@ -560,7 +564,7 @@ function ComputerStage({
     <DialogHeadContext.Provider value={head}>
       <div className="cmp-body">
         {body}
-        {steps && <div className="cmp-steps-row">{steps}</div>}
+        {line && <div className="cmp-steps-row">{steps}</div>}
       </div>
     </DialogHeadContext.Provider>
   );

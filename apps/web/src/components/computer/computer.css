@@ -67,27 +67,21 @@
 }
 /*
  * One frame for whatever takes the screen's place (the screen, a cover, the agent's page, the wait for the
- * workspace's computer), so the dialog keeps its size from one to the next and the screen opens in place: as large
- * as 96vw × 94vh allow and no larger than the screen itself (1280×900), keeping its shape. Around the screen: the head
- * (70 px), the sky strip (6), the body's padding (20 on every side) and the line under the screen (22 + 8): the run's
- * steps, or in control the line of the keys. What else sits over or under the screen (`--cmp-over`, `--cmp-under`)
- * takes room of its own: the dialog grows by it, or where it can't, narrows, and the screen keeps its 20 px.
+ * workspace's computer), so the dialog keeps its size and its place from one to the next, watching or in control, and
+ * the screen opens in place: as large as 96vw allows with 42 px of the page above and below it (a notice along the
+ * page's top stays whole), and no larger than the screen itself (1280×900), keeping its shape. Around the screen: the
+ * head (70 px), the sky strip (6), the body's padding (20 on every side) and the line under the screen (8 +
+ * `--cmp-line`), kept in every state: the run's steps, in control the line of the keys, or nothing yet. What else sits
+ * over or under the screen (`--cmp-over`, `--cmp-under`) takes room of its own: the dialog grows by it, or where it
+ * can't, narrows, and the screen keeps its 20 px.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
+  --cmp-around: calc(124px + var(--cmp-line));
   --cmp-extra: calc(var(--cmp-over, 0px) + var(--cmp-under, 0px));
-  --cmp-screen: min(96vw - 40px, 1280px, (94dvh - var(--cmp-bar, 0px) - 146px - var(--cmp-extra)) * 1280 / 900);
+  --cmp-room: calc(100dvh - 84px - var(--cmp-bar, 0px) - var(--cmp-around) - var(--cmp-extra));
+  --cmp-screen: min(96vw - 40px, 1280px, var(--cmp-room) * 1280 / 900);
   width: calc(var(--cmp-screen) + 40px);
-  height: calc(var(--cmp-screen) * 900 / 1280 + 146px + var(--cmp-extra));
-}
-/*
- * Nothing under the screen (watching while the agent rests, a cover, the wait): the dialog ends 20 px under it, as on
- * its sides. Centred in every state: a line that comes (the steps, the keys, a note, the page's tools) grows it by its
- * 30 px about its middle, at once: eased, the height would squeeze the screen on the way.
- */
-.ac-dialog.cmp-dialog:where(
-  :has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))
-) {
-  height: calc(var(--cmp-screen) * 900 / 1280 + 116px + var(--cmp-extra));
+  height: calc(var(--cmp-screen) * 900 / 1280 + var(--cmp-around) + var(--cmp-extra));
 }
 /*
  * Over the screen: the request in control (its 22 px line and the gap), or a banner (its 10 px paddings round a line
@@ -96,6 +90,7 @@
  */
 .ac-dialog.cmp-dialog {
   --cmp-button: var(--control-h-sm);
+  --cmp-line: 22px;
 }
 .ac-dialog.cmp-dialog:has(> .cmp-body > .dsk > .cmp-asked) {
   --cmp-over: 30px;
@@ -117,17 +112,10 @@
     --cmp-button: var(--control-h-md);
   }
 }
-/*
- * A tablet: in control the line under the screen holds the Keyboard button, a 40 px touch control, 18 px taller than
- * the 22 px line. The frame keeps room for it, and in control the dialog adds those 18 px, so the screen keeps its
- * size.
- */
+/* A tablet: in control the line under the screen holds the Keyboard button, a 40 px touch control, so it is that tall. */
 @media (pointer: coarse) and (min-width: 721px) {
-  .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
-    --cmp-screen: min(96vw - 40px, 1280px, (94dvh - var(--cmp-bar, 0px) - 164px - var(--cmp-extra)) * 1280 / 900);
-  }
-  .ac-dialog.cmp-dialog:where(:has(.dsk-line)) {
-    height: calc(var(--cmp-screen) * 900 / 1280 + 164px + var(--cmp-extra));
+  .ac-dialog.cmp-dialog {
+    --cmp-line: var(--control-h-md);
   }
 }
 /* The desktop app: its title bar is the page's own top 40 px, so the window centres in the work area under it. */
@@ -139,9 +127,9 @@
 }
 .cmp-steps-row {
   flex: none;
-  height: 22px;
+  height: var(--cmp-line);
 }
-/* In control the line under the screen is the keys' (`.dsk-line`, 22px), and the steps don't show. */
+/* In control the line under the screen is the keys' (`.dsk-line`), and the steps don't show. */
 .cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
   display: none;
 }
@@ -284,6 +272,19 @@
 .cmp-acts > .cmp-full {
   --glyph-air: calc(var(--control-icon-sm) * 2.7 / 20);
   z-index: 1;
+}
+/*
+ * Take control's and Hand back's icons keep the pill's padding by their ink and sit on its words' capitals' middle (the
+ * kit's `--lead-air`, `--lead-rise`): the person leaves 3.4 of its 20 units before it and its ink's middle is 0.4
+ * under its box's, and the check leaves 4.7, on its box's middle.
+ */
+.cmp-acts > .cmp-take {
+  --lead-air: calc(var(--control-icon-sm) * 3.4 / 20);
+  --lead-rise: calc(var(--control-icon-sm) * 0.4 / 20 + var(--cap-mid));
+}
+.cmp-acts > .cmp-back {
+  --lead-air: calc(var(--control-icon-sm) * 4.7 / 20);
+  --lead-rise: var(--cap-mid);
 }
 .cmp-sub:empty::before {
   content: "\00a0";
@@ -478,17 +479,22 @@
 .cmp-prep > :last-child {
   margin-bottom: auto;
 }
-/* Its lines start on one edge, as wide as the widest (the steps' bar spans them), centred under the portrait. */
+/*
+ * Its words start on one edge, as wide as the widest line (the steps' bar spans them), centred under the portrait with
+ * the icons hanging before them: the same room after them keeps the words' column in the middle.
+ */
 .cmp-prep .setup-wait {
   width: fit-content;
   max-width: min(560px, 100%);
+  padding-inline-end: 22px;
 }
 
 /*
- * Web on a phone: a full-screen sheet. A cover, the wait and the agent's page fill it under the head, what they show
- * in their middle. The live screen, as wide as the sheet, keeps what goes with it beside it (a banner, the request,
- * the line under it, the steps): the group sits in the sheet's middle by auto margins, so one taller than the sheet
- * scrolls from its top.
+ * Web on a phone: a full-screen sheet, as the kit's Details is there: clear of the notch and the home bar, what it
+ * shows starting under its head. A cover, the wait and the agent's page fill it, what they show in their middle. The
+ * live screen, as wide as the sheet, sits at its top with what goes with it (a banner, the request over it, the line
+ * under it, the steps): taking control only brings the line under it, and the sheet's foot stays free for the
+ * phone's keyboard.
  */
 @media (max-width: 720px) {
   .ac-dialog.cmp-dialog {
@@ -499,6 +505,10 @@
     height: 100dvh;
     max-height: none;
     border-radius: 0;
+  }
+  .ac-dialog.cmp-dialog:not(.is-full) {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .cmp-body > .cmp-stage,
   .cmp-body > .cmp-prep,
@@ -513,12 +523,6 @@
     flex: none;
     container-type: normal;
   }
-  .cmp-dialog:not(.is-screen-only) .cmp-body:has(> .dsk) > :first-child {
-    margin-top: auto;
-  }
-  .cmp-dialog:not(.is-screen-only) .cmp-body:has(> .dsk) > :last-child {
-    margin-bottom: auto;
-  }
   .cmp-body .dsk-screen,
   .cmp-body .brw-ac__page {
     width: 100%;
@@ -528,10 +532,13 @@
     width: auto;
     aspect-ratio: auto;
   }
-  /* No frame to keep on the sheet: the steps wrap whole. */
+  /* No frame to keep on the sheet: the steps wrap whole, and with none the line takes no room. */
   .cmp-steps-row {
     height: auto;
     min-height: 22px;
+  }
+  .cmp-steps-row:empty {
+    display: none;
   }
   .cmp-steps {
     flex-wrap: wrap;
@@ -542,18 +549,26 @@
   }
 }
 /*
- * A phone: the body takes the head's 16 px inset. The head keeps one row: an action with an icon shows the icon alone
- * (its words, hidden, still its name), so the name never folds beside a row of buttons.
+ * A phone: the body takes the head's 16 px inset. The head keeps one row, with the name and the line under it on a
+ * line each beside the controls, watching or in control: the face steps aside (the title names the agent), Hand back
+ * shows its words alone (a check alone reads as Done), and any other action with an icon shows the icon alone, in
+ * the middle of its square, its words, hidden, still its name.
  */
 @media (max-width: 640px) {
   .cmp-body {
     padding: 16px;
   }
-  .cmp-acts > .ac-btn:has(> .ac-icon) {
+  .cmp-dialog .ac-dialog__lead {
+    display: none;
+  }
+  .cmp-dialog .ac-dialog__title {
+    text-wrap: balance;
+  }
+  .cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words) {
     width: var(--control-h-sm);
     padding: 0;
   }
-  .cmp-acts .cmp-act-label {
+  .cmp-acts > .ac-btn:not(.cmp-words) .cmp-act-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -561,13 +576,20 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  .cmp-acts > .cmp-words > .ac-icon {
+    display: none;
+  }
+  .cmp-acts > :is(.cmp-take, .cmp-back) {
+    --lead-air: initial;
+    --lead-rise: initial;
+  }
   /* "I couldn't" shows its circle alone, which leaves 2.7 of its icon's 20 units on each side, as the arrows do. */
   .cmp-acts > .cmp-couldnt {
     --glyph-air: calc(var(--control-icon-sm) * 2.7 / 20);
   }
 }
 @media (max-width: 640px) and (pointer: coarse) {
-  .cmp-acts > .ac-btn:has(> .ac-icon) {
+  .cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words) {
     width: var(--control-h-md);
   }
 }

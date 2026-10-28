@@ -426,6 +426,7 @@ export function DesktopView({
         <Button
           size="sm"
           icon="person"
+          className="cmp-take"
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
         >
@@ -453,6 +454,8 @@ export function DesktopView({
           size="sm"
           variant="primary"
           icon="check"
+          // A check alone says Done, not Hand back: a take over's keeps its words on a phone.
+          className={cx("cmp-back", handoff?.kind !== "ask" && "cmp-words")}
           onClick={() => {
             // The note opens in the dialog, never over the full-screen screen.
             head?.setFull(false);
