@@ -38,7 +38,13 @@ export {
 } from "./Grouped";
 export { HoldButton, type HoldButtonProps } from "./HoldButton";
 export { haptics } from "./haptics";
-export { type HeaderAction, HeaderCapsule, type SFSymbolName, useHeaderActionOptions } from "./headerActions";
+export {
+  BarPressable,
+  type HeaderAction,
+  HeaderCapsule,
+  type SFSymbolName,
+  useHeaderActionOptions,
+} from "./headerActions";
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps, usePlateEdge } from "./IconButton";
 export { InfoHint, type InfoHintOptions } from "./InfoHint";

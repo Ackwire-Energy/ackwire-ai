@@ -4,6 +4,7 @@ import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
 import {
+  BarPressable,
   Button,
   Card,
   coverBarOptions,
@@ -174,11 +175,13 @@ export function PushedHeader({
         : null),
       headerRight: hasRight
         ? () => (
-            <View style={styles.headerRight}>
-              <HeaderCapsule>
-                <HeaderSlot slot={rightNode} />
-              </HeaderCapsule>
-            </View>
+            <BarPressable>
+              <View style={styles.headerRight}>
+                <HeaderCapsule>
+                  <HeaderSlot slot={rightNode} />
+                </HeaderCapsule>
+              </View>
+            </BarPressable>
           )
         : word !== null && !IOS
           ? () => (
@@ -216,7 +219,10 @@ function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotS
           {text}
         </Text>
       ) : (
-        <HeaderSlot slot={node} />
+        // A title of our own is pressable (the conversation's pill): its tap is its, not the bar's scroll to top.
+        <BarPressable>
+          <HeaderSlot slot={node} />
+        </BarPressable>
       )}
       {subtitle ? (
         <Text variant="caption" tone="faint" numberOfLines={1}>

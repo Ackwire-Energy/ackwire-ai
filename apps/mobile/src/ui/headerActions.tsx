@@ -2,6 +2,7 @@ import type { NativeStackNavigationOptions } from "expo-router";
 import type { SFSymbolIcon } from "expo-router/native-tabs";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { ScrollToTopGuard } from "react-native-screens/experimental";
 import { IconButton, usePlateEdge } from "./IconButton";
 import type { IconName } from "./icons.data";
 import { HeaderSlot, useHeaderSlot } from "./navigation";
@@ -78,7 +79,17 @@ export function useHeaderActionOptions({
               onPress: pressLeft(i),
             }))
         : hasLeft
-          ? () => [{ type: "custom" as const, element: <HeaderSlot slot={leftSlot} />, hidesSharedBackground: true }]
+          ? () => [
+              {
+                type: "custom" as const,
+                element: (
+                  <BarPressable>
+                    <HeaderSlot slot={leftSlot} />
+                  </BarPressable>
+                ),
+                hidesSharedBackground: true,
+              },
+            ]
           : undefined;
     } else {
       options.headerRight = actions.length
@@ -94,6 +105,16 @@ export function useHeaderActionOptions({
     }
     return options;
   }, [signature, hasLeft, leftSlot]);
+}
+
+/**
+ * Our own pressable views in a native bar (its buttons, the conversation's pill, Início's avatar). On iPadOS 26 and
+ * iPhone iOS 27 a tap on the bar also scrolls the screen's list to its top, a tap on one of them included: the
+ * conversation jumped up when its computer or "…" was pressed. The guard keeps the tap theirs (react-native-screens'
+ * workaround until React Native fixes it: react-native#56061); nothing on Android.
+ */
+export function BarPressable({ children }: { children: ReactNode }) {
+  return <ScrollToTopGuard>{children}</ScrollToTopGuard>;
 }
 
 /**
