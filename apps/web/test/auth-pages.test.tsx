@@ -920,6 +920,11 @@ describe("Onboarding", () => {
     expect(rule(desktop, `@media (min-width: 761px) {\n  ${mac} .onb__body`)).toContain(
       `padding-top: calc(var(--titlebar-h) + 8px + ${top - railTop}px)`,
     );
+    // Where the window isn't dragged from the page (full screen, Windows' and Linux's own title bars), no drag strip
+    // lies over Back.
+    expect(
+      rule(desktop, '\nhtml:is([data-fullscreen], [data-desktop="windows"], [data-desktop="linux"]) .titlebar-strip'),
+    ).toContain("display: none");
   });
 
   test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
