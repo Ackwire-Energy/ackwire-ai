@@ -9932,28 +9932,34 @@ html[data-menu-overlay] .shell {
 /*
  * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
  * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
- * mark's. The wait's well starts its 12px of padding before the text's column, so its words are on it too.
+ * mark's. The wait's well and the option cards start their 12px of padding before the text's column, so their words
+ * are on it too. A note inside a step's words is the step's, not the panel's: its icon stays on the step's text.
  */
 .ai-panel--plan {
   --lead: 30px;
   --text-edge: calc(var(--lead) + 12px);
 }
-.ai-panel--plan :is(.ac-setnote, .setup-line, .ac-card__foot, .agp-addacct__step).ac-iconline {
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline,
+.ai-panel--plan .ai-panel__row > .ac-setnote {
   gap: 12px;
 }
-.ai-panel--plan :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child {
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child,
+.ai-panel--plan .ai-panel__row > .ac-setnote > :first-child {
   margin-inline: calc((var(--lead) - 14px) / 2);
 }
 .ai-panel--plan .agp-addacct__step > i {
   margin-inline: calc((var(--lead) - 20px) / 2);
 }
-/* A step's title and the foot's line break into lines of a length, never onto a word or two alone. */
-.ai-panel--plan :is(.agp-addacct__text b, .ac-card__foot) {
+/* A step's title, an option's and the foot's line break into lines of a length, never onto a word or two alone. */
+.ai-panel--plan :is(.agp-addacct__text b, .ac-option__title, .ac-card__foot) {
   text-wrap: balance;
 }
 .ai-panel--plan > :not(.ai-panel__head, .ai-panel__wait, .ai-panel__row, .agp-addacct, .ac-iconline),
 .ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline) {
   margin-left: var(--text-edge);
+}
+.ai-panel--plan > .grid-options {
+  margin-left: calc(var(--text-edge) - var(--space-3));
 }
 .ai-panel__head {
   flex-wrap: wrap;
@@ -10097,6 +10103,15 @@ html[data-menu-overlay] .shell {
   }
   .ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
     margin-left: var(--text-edge);
+  }
+  /* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+     text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+  .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+    gap: calc((var(--lead) - 14px) / 2 + 12px);
+    margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+    margin-left: calc((var(--lead) - 14px) / 2);
   }
   /* With no number, the title's capitals are the step's top. */
   .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {

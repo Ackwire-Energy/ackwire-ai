@@ -84,6 +84,7 @@ async function connect({
   mine = [ADA_ID],
   crew = false,
   path = `/org/${ORG_ID}/settings/keys`,
+  role,
 }: {
   computers?: AiComputer[];
   setup?: Partial<ComputerSetup>;
@@ -95,8 +96,12 @@ async function connect({
   crew?: boolean;
   /** Where the dialog opens: Settings' button, or a link that asks for it. */
   path?: string;
+  /** Walter's role in the workspace, when he isn't its owner. */
+  role?: "admin" | "member";
 } = {}) {
   const state = seedState();
+  const workspace = state.me?.organizations[0];
+  if (role && workspace) workspace.role = role;
   const ada = state.agents[0];
   if (crew && ada) {
     state.agents.push({ ...ada, id: LIA_ID, name: "Lia", handle: "lia" });
@@ -288,7 +293,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).queryByRole("button", { name: "Sobre Cole a chave aqui" })).toBeNull();
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
     expect(hintOf("Com o seu plano, a Ada só responde a você.", foot).text).toBe(
-      "A chave vai criptografada para o MacBook e fica só lá.",
+      "A chave vai criptografada para o MacBook e\u00a0fica\u00a0só\u00a0lá.",
     );
     expect(shownText(panel)).not.toMatch(/Fica em|Num plano de equipe|criptografada/);
     expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("aria-describedby")).toBe(false);
@@ -407,20 +412,33 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const plan = ruleOf(layout, ".ai-panel--plan");
     expect(plan).toContain("--lead: 30px");
     expect(plan).toContain("--text-edge: calc(var(--lead) + 12px)");
-    // 14px icons and 20px numbers, centred in the mark's 30px, 12px before the words.
-    expect(
-      ruleOf(layout, ".ai-panel--plan :is(.ac-setnote, .setup-line, .ac-card__foot, .agp-addacct__step).ac-iconline"),
-    ).toContain("gap: 12px");
-    expect(
-      ruleOf(layout, ".ai-panel--plan :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child"),
-    ).toContain("margin-inline: calc((var(--lead) - 14px) / 2)");
+    // 14px icons and 20px numbers, centred in the mark's 30px, 12px before the words. Only the panel's own lines: a
+    // note inside a step's words ("Isso não parece uma chave…") keeps its icon on the step's text.
+    const own = ".ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline";
+    const row = ".ai-panel--plan .ai-panel__row > .ac-setnote";
+    expect(layout).toContain(`\n${own},\n${row} {\n  gap: 12px;`);
+    expect(layout).toContain(
+      `\n${own} > :first-child,\n${row} > :first-child {\n  margin-inline: calc((var(--lead) - 14px) / 2);`,
+    );
+    expect(layout).not.toContain(".ai-panel--plan :is(.ac-setnote");
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > i")).toContain(
       "margin-inline: calc((var(--lead) - 20px) / 2)",
     );
-    // The well's 12px of padding all round start before the words' column, so its words are on it.
+    // The well's 12px of padding all round start before the words' column, so its words are on it; an option card's
+    // 12px too.
     const well = ruleOf(layout, ".ai-panel__wait");
     expect(well).toContain("margin-left: calc(var(--text-edge) - 12px)");
     expect(well).toContain("padding: 12px;");
+    expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
+      "margin-left: calc(var(--text-edge) - var(--space-3))",
+    );
+    // At phone width a step's wait goes under its words: its spinner in the mark's column, its word on the text's.
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > .agp-addacct__wait")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge))",
+    );
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2)",
+    );
     // The head's hairline runs edge to edge, as the foot's does; for whom centres on the head's mark.
     expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
     expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--lead)");
@@ -457,6 +475,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const { state, dialog } = await connect({ brain: { ownSignIn: true } });
     const own = within(dialog).getByRole("button", { name: /^A conta do Claude com login no MacBook/ });
     expect(own.textContent).toBe("A conta do Claude com login no MacBookTodos os agentes pensam com ela.");
+    // Small columns, so the two cards sit side by side on the panel's text column in the setup too.
+    expect(own.parentElement?.className).toBe("grid-options grid-options--sm");
     // Who it replies to is the foot's, once, either way.
     expect(shownText(dialog).split("Com o seu plano, a Ada só responde a você.")).toHaveLength(2);
     // Another account: its title alone; then the steps, asking which one with nothing under the field.
@@ -581,6 +601,31 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado|seu computador/);
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
+  });
+
+  test("an admin while the Cloud's computer is prepared: no email for them, so the well says when the step turns on", async () => {
+    const { dialog, tile } = await connect({
+      role: "admin",
+      computers: [],
+      brain: { computer: null, machines: [] },
+      setup: {
+        step: "installing",
+        secondsLeft: 330,
+        expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
+        notifyByEmail: true,
+      },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(shownText(panel.querySelector(".ai-panel__wait") as HTMLElement)).toBe(
+      "Passo 3 de 4 · Instalando os programasFaltam uns 6 minVocê entra aqui assim que o computador ficar pronto.",
+    );
+    expect(panel.textContent?.split("pronto")).toHaveLength(2);
+    // A coding plan's step sends a key.
+    await click(tile("GLM Coding"));
+    const glm = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    expect(glm.querySelector(".ai-panel__wait")?.lastElementChild?.textContent).toBe(
+      "Você envia a chave assim que o computador ficar pronto.",
+    );
   });
 
   test("on the Cloud, its computer not answering: said by name, looked after, a key meanwhile", async () => {

@@ -1071,7 +1071,7 @@ export const ptBR = {
     },
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
-      key: "Você envia assim que o computador ficar pronto.",
+      key: "Você envia a chave assim que o computador ficar pronto.",
       email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
       ready: "O {{computer}} está pronto.",
       useKey: "Usar uma chave de API agora",
@@ -4583,7 +4583,7 @@ export const ptBR = {
       keyTitle: "Cole a chave aqui",
       keyLabel: "Chave do {{plan}}",
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
-      keySafe: "A chave vai criptografada para o {{computer}} e fica só lá.",
+      keySafe: "A chave vai criptografada para o {{computer}} e\u00a0fica\u00a0só\u00a0lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },

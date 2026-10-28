@@ -477,9 +477,9 @@ function PlanSteps({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
-    // The computer's wait in one well: how far it is and the time left, or why it waits. A hold decides when
-    // anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none leads with an
-    // icon.
+    // The computer's wait in one well: how far it is and the time left, or why it waits, then when the step under it
+    // turns on, said once (the owner's email line says it for them). A hold decides when anything runs there: it
+    // speaks alone. The well's lines start on the panel's text edge, so none leads with an icon.
     wait = (hold || preparing) && (
       <div className="ai-panel__wait">
         {hold ? (
@@ -502,7 +502,15 @@ function PlanSteps({
                 {etaLine(t, eta)}
               </p>
             )}
-            {email && reader.owner && <p className="setup-line">{t("connectAi.wait.email")}</p>}
+            <p className="setup-line">
+              {t(
+                email && reader.owner
+                  ? "connectAi.wait.email"
+                  : coding
+                    ? "connectAi.wait.key"
+                    : "connectAi.wait.signIn",
+              )}
+            </p>
           </>
         )}
       </div>
@@ -612,8 +620,9 @@ function PlanSteps({
       )}
       {retry}
       {ownable && (
+        // Small columns: indented to the panel's text column, the two still fit side by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-        <div className="grid-options" role="group" aria-label={planTitle(t, choice)}>
+        <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
           <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
             <span className="ac-option__text">
               <span className="ac-option__title">{t("connectAi.own.this", { brand, computer })}</span>
