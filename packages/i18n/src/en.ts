@@ -8516,7 +8516,7 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{key}} C, {{key}} V.",
+      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

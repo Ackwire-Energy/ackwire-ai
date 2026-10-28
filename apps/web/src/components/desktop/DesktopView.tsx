@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, cx, Icon, InfoHint, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, onScreenKeyboard, shortcut, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -363,7 +363,7 @@ export function DesktopView({
   const retrying = <span>{t("desktop.state.retrying")}</span>;
   const notice = (
     <span className="muted">
-      {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
+      {touch ? "" : `${t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })} `}
       {t("desktop.control.notice", g)}
     </span>
   );

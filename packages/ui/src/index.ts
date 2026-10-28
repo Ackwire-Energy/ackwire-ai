@@ -151,7 +151,7 @@ export {
   trackItemAt,
 } from "./components/ForumPixels";
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
-export { isApple, Kbd, modKey } from "./components/Kbd";
+export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";

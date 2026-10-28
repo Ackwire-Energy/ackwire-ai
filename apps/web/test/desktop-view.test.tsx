@@ -503,7 +503,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.activeElement).toBe(view().getByRole("textbox", { name: "Digitar no computador da Ada" }));
     expect(sub()).toBe("Você no controle · a Ada espera");
     expect(line()).toBe(
-      "Copiar e colar como sempre: Ctrl C, Ctrl V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+      "Copiar e colar como sempre: Ctrl+C, Ctrl+V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
     );
     // No box to paste into and no keyboard to pick: the person's own keys paste, and type in their own layout.
     expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
@@ -559,7 +559,7 @@ describe("the agent's screen in the computer dialog", () => {
     // The line's words stay as they are, the ⓘ on their first line.
     const hintLine = document.querySelector(".dsk-line > .ac-hintline") as HTMLElement;
     expect(hintLine.querySelector(":scope > .muted")?.textContent).toBe(
-      "Copiar e colar como sempre: Ctrl C, Ctrl V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+      "Copiar e colar como sempre: Ctrl+C, Ctrl+V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
     );
     const hint = about() as HTMLElement;
     expect(hintLine.contains(hint)).toBe(true);
@@ -788,7 +788,7 @@ describe("the agent's screen in the computer dialog", () => {
     replaceOn(navigator, "platform", "MacIntel");
     const board = clipboard();
     const t = await controlled();
-    expect(line()).toStartWith("Copiar e colar como sempre: ⌘ C, ⌘ V. ");
+    expect(line()).toStartWith("Copiar e colar como sempre: ⌘C, ⌘V. ");
     const field = t.field();
     fireEvent.keyDown(field, { key: "Meta", code: "MetaLeft", metaKey: true });
     fireEvent.keyDown(field, { key: "c", code: "KeyC", metaKey: true });
@@ -872,7 +872,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     await connected();
     expect(said()).toBeUndefined();
-    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl+C, Ctrl+V. ");
   });
 
   test("the newest copy speaks: one kept out right after a Copiado is offered at once, not under the older word", async () => {

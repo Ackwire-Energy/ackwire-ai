@@ -8567,7 +8567,7 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
+      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
