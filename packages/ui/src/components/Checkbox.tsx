@@ -113,7 +113,7 @@ export function RadioCard({
   title: ReactNode;
   description?: ReactNode;
   disabled?: boolean;
-  /** Trailing content, e.g. an "Em breve" chip. */
+  /** Trailing content on the title's line, e.g. an "Em breve" chip. */
   aside?: ReactNode;
 }) {
   return (
@@ -125,10 +125,12 @@ export function RadioCard({
     >
       <Radio value={value} id={id} disabled={disabled} />
       <span className="ac-option__text">
-        <span className="ac-option__title">{title}</span>
+        <span className="ac-option__head">
+          <span className="ac-option__title">{title}</span>
+          {aside && <span className="ac-option__aside">{aside}</span>}
+        </span>
         {description && <span className="ac-option__desc">{description}</span>}
       </span>
-      {aside && <span className="ac-option__aside">{aside}</span>}
     </label>
   );
 }

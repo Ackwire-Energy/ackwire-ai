@@ -907,7 +907,16 @@ export interface ScopeInfo {
 }
 
 /** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+export type ConnectorCategory =
+  | "dev"
+  | "product"
+  | "docs"
+  | "data"
+  | "payments"
+  | "sales"
+  | "support"
+  | "marketing"
+  | "automation";
 
 /** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {
@@ -3628,8 +3637,10 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
-  /** `failed`: the viewer already has this account on that computer (named `label`). */
-  duplicate?: { label: string };
+  /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
+  duplicate?: { label: string; account?: MachineAccount };
+  /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
+  signedInAs?: string;
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

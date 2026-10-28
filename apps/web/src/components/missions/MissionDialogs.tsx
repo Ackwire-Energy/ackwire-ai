@@ -13,6 +13,7 @@ import {
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -200,7 +201,7 @@ export function NewMissionDialog({
                 onClick={() => onOpenChange(false)}
               >
                 <Icon name="settings" size={14} />
-                {t("missions.new.connectComputer", { name: setupAgent.name })}
+                {t("missions.new.connectComputer", agentGrammar(t, setupAgent.name))}
               </Link>
             )}
           </div>
@@ -323,7 +324,7 @@ export function NewMissionDialog({
           </div>
           <span className="mi-hint ac-iconline">
             <Icon name="thread" size={14} />
-            {t("missions.new.homeHint", { name: agent?.name ?? "" })}
+            {t("missions.new.homeHint", agentGrammar(t, agent?.name ?? ""))}
           </span>
         </div>
         {machine && !machine.online && (
@@ -519,6 +520,7 @@ export function ShareMissionDialog({
   const [lend, setLend] = useState(true);
   const [busy, setBusy] = useState(false);
   const lendId = useId();
+  const executor = executorName(mission.executor, dir.agentById.get(mission.agentId)?.name ?? "");
   const list = people.data;
   const taken = new Set([list?.owner?.userId, ...(list?.participants ?? []).map((p) => p.userId)].filter(Boolean));
   const query = q.trim().toLowerCase();
@@ -726,7 +728,8 @@ export function ShareMissionDialog({
         width={480}
         title={t("missions.share.handTitle", { name: handing?.name ?? "" })}
         description={t("missions.share.handText", {
-          executor: executorName(mission.executor, dir.agentById.get(mission.agentId)?.name ?? ""),
+          executor,
+          article: agentGrammar(t, executor).article,
           name: handing?.name ?? "",
         })}
         closeLabel={t("common.cancel")}

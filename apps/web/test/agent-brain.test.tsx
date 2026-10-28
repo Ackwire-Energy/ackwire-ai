@@ -258,15 +258,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("the cell names the account when the computer has more than one; Usar saves the account and the effort", async () => {
     const { state } = await onMac();
     expect(sentence().textContent).toContain("Claude Code · Sonnet");
-    expect(sentence().textContent).toContain("Conta deste MacBook");
+    // The computer's own sign-in by the name the Connect cards give it, never the computer's.
+    expect(sentence().textContent).toContain("A conta que os seus agentes dividem");
+    expect(sentence().textContent).not.toContain("Conta deste MacBook");
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
-    expect(account.textContent).toContain("Conta deste MacBook");
+    expect(account.textContent).toContain("A conta que os seus agentes dividem");
     account.focus();
     await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
     const options = screen().getAllByRole("option");
     expect(options.map((o) => o.textContent)).toEqual([
-      "Conta deste MacBookA que já está no MacBook",
+      "A conta que os seus agentes dividem",
       "Trabalho · Teamwalt@acme.com",
       "Adicionar conta",
     ]);
@@ -315,7 +317,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
     const options = screen().getAllByRole("option");
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
-      ["Conta deste MacBookA que já está no MacBook", false],
+      ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
       ["Pessoal · MaxEm uso por Theo · Mover para cá", false],
       ["Claude Team 2 · TeamDe Ana", true],
@@ -386,27 +388,87 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("only the agent's owner changes the account; an old app on the computer shows nothing about it", async () => {
     await onMac({ canUsePlans: false, canManageAccounts: false });
     let d = await brainDialog();
-    expect(within(d).getByRole("combobox", { name: "Conta do Claude" }).hasAttribute("disabled")).toBe(true);
+    const locked = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    expect(locked.hasAttribute("disabled")).toBe(true);
+    // Someone else's agents don't share the viewer's sign-in: to them it is the computer's.
+    expect(locked.textContent).toContain("Conta deste MacBook");
     expect(d.textContent).toContain("Só João troca");
     cleanup();
     await onMac({ accountsSupported: false });
-    expect(sentence().textContent).not.toContain("Conta deste MacBook");
+    expect(sentence().textContent).not.toMatch(/Conta deste MacBook|A conta que os seus agentes dividem/);
     d = await brainDialog();
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
     expect(within(d).getByRole("slider", { name: "Esforço" })).toBeTruthy();
   });
 
-  test("a signed-out account says so and offers to sign in again", async () => {
-    await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
+  test("a signed-out account says so and offers to sign in again, its own email going to Claude's sign-in unasked", async () => {
+    const { state } = await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
     const d = await brainDialog();
     expect(d.textContent).toContain("Saiu da conta, entre de novo");
-    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
-    account.focus();
-    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
-    expect(screen().getByRole("option", { name: /^Entrar de novo/ })).toBeTruthy();
+    await pick(d, "Conta do Claude", /^Entrar de novo/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    expect(block.querySelector("input")).toBeNull();
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { accountId: "acct_work", email: "walt@acme.com" },
+    ]);
+    expect(shownText(block)).not.toContain("walt@acme.com");
   });
 
-  test("Adicionar conta: the account to sign in to goes with the click, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
+  test("signing in again as another account already connected: both addresses said, and Use picks that one for Ada", async () => {
+    const pessoal: MachineAccount = { ...work, id: "acct_pessoal", label: "Pessoal", email: "walt@gmail.com" };
+    const { state, api } = await onMac({
+      account: "acct_work",
+      accounts: [{ ...work, status: "signed_out" }, pessoal],
+    });
+    fakeMachinesOf.get(api)?.endLogin("login_1", {
+      state: "failed",
+      signedInAs: "walt@gmail.com",
+      duplicate: { label: "Pessoal", account: pessoal },
+    });
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Entrar de novo/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(shownText(block)).toContain(
+      "O Claude entrou como walt@gmail.com, não como walt@acme.com. Saia na página do Claude e tente de novo.",
+    );
+    await click(within(block).getByRole("button", { name: "Usar walt@gmail.com" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_pessoal" });
+  });
+
+  test("the computer's own sign-in, chosen again, is the account the agents share, as the Connect cards name it", async () => {
+    const { state } = await onMac({ account: "acct_work" });
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^A conta que os seus agentes dividem/);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: null });
+    expect(document.body.textContent).toContain("Ada agora pensa com a conta que os seus agentes dividem.");
+  });
+
+  test("Adicionar conta: no address asked, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
@@ -432,16 +494,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
       );
       expect(shownText(block)).not.toContain("digita a senha");
-      fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
-        target: { value: "walt@acme.com" },
-      });
+      // The person already has an account here: still no address to type, Claude's own page picks the account.
+      expect(block.querySelector("input")).toBeNull();
       await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
       await settle(6);
       expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
         ORG_ID,
         "machine_1",
         "claude_code",
-        { email: "walt@acme.com" },
       ]);
       // The window opened on the click itself went to Claude's page, cut off from the app.
       expect(opened).toEqual(["about:blank"]);
@@ -554,11 +614,7 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       screen()
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual([
-      "Conta deste MacBookA que já está no MacBook",
-      "GLM CodingTambém usada por Theo e Lia",
-      "Adicionar conta",
-    ]);
+    ).toEqual(["A conta que os seus agentes dividem", "GLM CodingTambém usada por Theo e Lia", "Adicionar conta"]);
     await click(screen().getByRole("option", { name: /^GLM Coding/ }));
     const block = within(d).getByRole("region", { name: "Conectar GLM Coding" });
     fireEvent.change(within(block).getByLabelText("Chave do GLM Coding"), {

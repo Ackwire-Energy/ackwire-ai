@@ -181,7 +181,7 @@ describe("Canal", () => {
     expect(dialog.textContent).toContain("Agentes");
     expect(dialog.textContent).toContain("Pessoas");
     expect(dialog.textContent).toContain("João");
-    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    expect(dialog.textContent).toContain("Entra na conversa por conta própria");
     expect(within(dialog).queryByRole("searchbox", { name: "Buscar pessoa ou agente" })).toBeNull();
   });
 

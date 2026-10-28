@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { emailTypoFix, excerpt, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, webmailOf } from "../src/lib/text";
 
 test("a misspelled webmail domain gets one fix; anything else is left alone", () => {
   expect(emailTypoFix("Marina@Gmial.com ")).toBe("marina@gmail.com");
@@ -10,6 +10,20 @@ test("a misspelled webmail domain gets one fix; anything else is left alone", ()
   expect(emailTypoFix("ana@acme.com.br")).toBeNull();
   expect(emailTypoFix("ana")).toBeNull();
   expect(emailTypoFix("a@b@gmial.com")).toBeNull();
+});
+
+test("a value put into a sentence: what comes before and after its last place there", () => {
+  expect(around("Passo 2 de 4 · Limpando para começar do zero", "Limpando para começar do zero")).toEqual([
+    "Passo 2 de 4 · ",
+    "",
+  ]);
+  expect(around("Step 2 · Starting it up, then Starting it up", "Starting it up")).toEqual([
+    "Step 2 · Starting it up, then ",
+    "",
+  ]);
+  expect(around("Faltam uns 6 min", "6")).toEqual(["Faltam uns ", " min"]);
+  expect(around("Faltam uns 6 min", "7")).toBeNull();
+  expect(around("Faltam uns 6 min", "")).toBeNull();
 });
 
 test("the webmail to open after sending an e-mail", () => {

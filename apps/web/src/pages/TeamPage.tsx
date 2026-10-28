@@ -1,6 +1,7 @@
 import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
 import { useAiStatus, useCatalog, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { excerpt } from "@agenteschat/client/lib/text";
@@ -435,6 +436,7 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
   const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
+  const g = agentGrammar(t, agent.name);
   const catalog = useCatalog();
   const serviceOf = (k: CapKey) => {
     const def = catalog.data?.connectors.find((c) => c.id === CAP_CONNECTOR[k]);
@@ -480,12 +482,12 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
       </div>
       {summary && (
         <div className="team-card__sec">
-          <span className="team-card__eyebrow">{t("team.does")}</span>
+          <span className="team-card__eyebrow">{t("team.does", g)}</span>
           <p className="team-card__call">{summary}</p>
         </div>
       )}
       <div className="team-card__sec">
-        <span className="team-card__eyebrow">{t("team.canDo")}</span>
+        <span className="team-card__eyebrow">{t("team.canDo", g)}</span>
         <div className="team-card__chips">
           {caps.length === 0 && <Chip icon="message">{t("team.onlyChat")}</Chip>}
           {caps.map((k) => {

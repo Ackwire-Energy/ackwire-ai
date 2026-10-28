@@ -37,6 +37,26 @@ describe("buttons and kbd", () => {
     expect(b.querySelector(".ac-btn__kbd")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("no keyboard hints on a touch screen or at phone width, wherever the kit draws one", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const narrow = css.split("\n@media (max-width: 760px), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    const hidden = narrow.split("{").at(-2)?.split("}").at(-1) ?? "";
+    for (const hint of [
+      ".ac-btn__kbd",
+      ".ac-btn > .ac-kbd",
+      ".ac-composer__send-text .ac-kbd",
+      ".ac-searchfield__hint",
+      ".ac-palette .ac-kbd",
+      ".ac-mo__kbd",
+    ])
+      expect(hidden).toContain(hint);
+    expect(narrow).toMatch(/\.ac-mo__kbd \{\s*display: none;/);
+    // The send choice's line of keys goes with them.
+    expect(css).toMatch(
+      /@media \(max-width: 760px\), \(hover: none\), \(pointer: coarse\) \{\s*\.ac-composer-choice__hint \{\s*display: none;/,
+    );
+  });
+
   test("a Button that toggles stays pushed in while on (aria-pressed), hovered or not; a ghost one keeps its plate", async () => {
     render(<Button aria-pressed>Teclado</Button>);
     expect(body().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("true");
@@ -79,10 +99,15 @@ describe("buttons and kbd", () => {
     expect(off).not.toContain("var(--sunken)");
   });
 
-  test("a chosen option never moves, so a row of options keeps its words on one line in both themes", async () => {
+  test("a chosen option looks the same in both themes and never moves, so a row of options keeps its words on one line", async () => {
     const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
-    const lifts = [...tokens.matchAll(/--chosen-lift: ([^;]+);/g)].map((m) => m[1]);
-    expect(lifts).toEqual(["none", "none"]);
+    // One recipe, in the block both themes share: held down into the page, and neither theme redefines it.
+    const defining = [...tokens.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, , rule]) => (rule ?? "").includes("--chosen-"))
+      .map(([, selector]) => (selector ?? "").trim().replace(/\s+/g, " "));
+    expect(defining).toEqual([":root, [data-theme]"]);
+    expect(tokens).toContain("--chosen-bg: var(--sunken);");
+    expect(tokens).toContain("--chosen-lift: none;");
   });
 });
 

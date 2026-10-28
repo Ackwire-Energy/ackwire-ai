@@ -45,6 +45,7 @@ import {
   defaultTarget,
   gateDims,
   kindOf,
+  ownSignInFor,
   type PlanChoice,
   planLabel,
 } from "@agenteschat/client/lib/no-ai";
@@ -721,12 +722,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
       setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
   };
-  // A computer the person connected: its own sign-in, unless they chose another account.
+  // A computer the person connected and signed in: its own sign-in, unless they chose another account.
   const ownChosen =
-    own &&
-    (choice === "claude" || choice === "chatgpt") &&
-    gates.view?.ownSignIn === true &&
-    gates.gateOf(choice).state === "ready";
+    own && choice !== "key" && ownSignInFor(choice, gates.view, gates.row) && gates.gateOf(choice).state === "ready";
   const keyPending = choice === "key" && draft.provider !== "platform" && !keySaved && draft.apiKey.trim() !== "";
   const aiDone =
     Object.keys(planned).length > 0 || ownChosen || keySaved || (choice === "key" && draft.provider === "platform");

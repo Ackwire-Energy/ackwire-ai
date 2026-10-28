@@ -58,7 +58,7 @@ export function AccessTab() {
         key={r.id}
         icon={<ResourceIcon resource={r} items={items} name={name} />}
         name={name}
-        description={levelText(t, r, level(r))}
+        description={levelText(t, r, level(r), g)}
         asks={asksOf(r)}
         levels={r.levels}
         value={level(r)}

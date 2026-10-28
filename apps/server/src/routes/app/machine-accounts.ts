@@ -54,9 +54,12 @@ const AccountLoginStatus = z
     state: z.enum(["waiting", "done", "failed", "expired"]),
     account: MachineAccount.optional().openapi({ description: "Once `done`: the account, stored." }),
     error: z.string().optional().openapi({ description: "`failed`: why, for people." }),
-    duplicate: z.object({ label: z.string() }).optional().openapi({
+    duplicate: z.object({ label: z.string(), account: MachineAccount }).optional().openapi({
       description:
-        "`failed`: the caller already has this account on this computer (named `label`); the new sign-in is removed there.",
+        "`failed`: the account that signed in is one the caller already has on this computer (named `label`, and `account` itself). A new sign-in is removed there; signing in again leaves the account signed out.",
+    }),
+    signedInAs: z.string().optional().openapi({
+      description: "`failed`: signing in again came back as another account, this email; the account stays signed out.",
     }),
   })
   .openapi("AccountLoginStatus");

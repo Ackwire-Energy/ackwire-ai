@@ -1,6 +1,8 @@
 import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useApi } from "@agenteschat/client";
+import { ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planName, planOf, sharePlanBody } from "@agenteschat/client/lib/plans";
@@ -35,7 +37,7 @@ const PLAN_INTENT = { claude_code: "claude", codex: "chatgpt" } as const;
 export const openAgentAi = (agentId: string) => router.push(`/agent-ai/${agentId}` as never);
 
 export function AgentAiScreen({ agentId }: { agentId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -90,9 +92,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const mayPick = view?.canUsePlans === true && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
+    // The computer's own sign-in is chosen only where it is its owner's: the account their agents share.
     const done = a
       ? t("agentPage.work.saved.account", { ...g, account: a.label })
-      : t("agentPage.work.saved.accountHere", { ...g, computer });
+      : t("aiAccounts.done.savedAgent", { agent: name, label: lowerFirst(t("connectAi.own.shared"), i18n.language) });
     const others = a ? takenFrom(a, name) : [];
     if (!a || others.length === 0) return void save({ account: a?.id ?? null }, done);
     // One account thinks for one agent: picking another agent's takes it from that one.
@@ -107,7 +110,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     // Letting people in on the owner's plan: the provider's words first; keeping it is the easy answer.
     const body = sharePlanBody(t, kind, current?.plan, planOf(current?.provider)?.maker);
     Alert.alert(t("aiAccounts.share.title", g), body, [
-      { text: t("aiAccounts.share.keep"), style: "cancel" },
+      { text: t("aiAccounts.share.keep", g), style: "cancel" },
       {
         text: t("aiAccounts.share.accept"),
         onPress: () => void save({ onlyOwner: false, acceptPlanTerms: true }, t("aiAccounts.share.savedEveryone", g)),
@@ -152,13 +155,8 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 <GroupedList>
                   <GroupedRow
                     leading={<ProviderLogo id={kind} size="sm" />}
-                    label={t("agentPage.work.brain.thisComputer", { computer })}
-                    sub={
-                      view.ownSignIn
-                        ? t("agentPage.work.brain.thisComputerText", { computer })
-                        : t("aiAccounts.share.hereNotYours", { computer })
-                    }
-                    subLines={2}
+                    label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
+                    {...(view.ownSignIn ? {} : { sub: t("aiAccounts.share.hereNotYours", { computer }), subLines: 2 })}
                     checked={view.account === null}
                     // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
                     disabled={!mayPick || (!view.ownSignIn && view.account !== null)}
@@ -226,7 +224,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
             ) : null}
             {kind && agent?.ownerUserId ? (
               <>
-                <GroupedHeader>{t("mobile.ai.audience")}</GroupedHeader>
+                <GroupedHeader>{t("mobile.ai.audience", g)}</GroupedHeader>
                 <GroupedList>
                   <GroupedRow
                     label={
@@ -243,7 +241,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 <GroupedFooter>
                   {view.canUsePlans
                     ? t("aiAccounts.share.hint", g)
-                    : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })}
+                    : t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
                 </GroupedFooter>
               </>
             ) : null}

@@ -13,6 +13,7 @@ import {
   gateDims,
   kindOf,
   onlyOwnerReplies,
+  ownSignInFor,
   PLAN_CHOICES,
   type PlanChoice,
   type PlanGate,
@@ -154,6 +155,21 @@ describe("planGate: what a plan's panel can do now", () => {
       { state: "locked", who: "owner" },
     ];
     expect(lit.map(gateDims)).toEqual([false, false, false, false, false]);
+  });
+
+  test("the computer's own sign-in, to share: the person connected that computer, and Claude is signed in there", () => {
+    const signedIn: AiComputer = { ...MAC, own: { claude_code: { plan: "max" } } };
+    const own = brain({ ownSignIn: true });
+    expect(ownSignInFor("claude", own, signedIn)).toBe(true);
+    // Claude Code isn't signed in there (or the row isn't in yet): no account to share.
+    expect(ownSignInFor("claude", own, MAC)).toBe(false);
+    expect(ownSignInFor("claude", own, undefined)).toBe(false);
+    // ChatGPT's own sign-in isn't reported: taken as there.
+    expect(ownSignInFor("chatgpt", own, MAC)).toBe(true);
+    // A coding plan signs in with its key; someone else's computer's sign-in is never the person's.
+    expect(ownSignInFor("zai", own, signedIn)).toBe(false);
+    expect(ownSignInFor("claude", brain({ ownSignIn: false }), signedIn)).toBe(false);
+    expect(ownSignInFor("claude", undefined, signedIn)).toBe(false);
   });
 });
 

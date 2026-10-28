@@ -6,6 +6,7 @@ import type {
   ThreadMissionSummary,
 } from "@agenteschat/client";
 import { engineOfExecutor } from "@agenteschat/client/lib/brain";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorOnText, type PlanCell, tickFor } from "@agenteschat/client/lib/missions";
 import { Chip, type IconName, PlanStrip, ProviderLogo, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -67,10 +68,11 @@ export function ExecutorChip({
  * its mark (`leading`).
  */
 export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string, agentId?: string) {
+  const g = agentGrammar(t, agentName);
   return executors.map((e) => ({
     value: e,
-    label: t(`missions.executor.${e}` as const, { name: agentName }),
-    description: t(`missions.executor.${e}Text` as const, { name: agentName }),
+    label: t(`missions.executor.${e}` as const, g),
+    description: t(`missions.executor.${e}Text` as const, g),
     leading: <ExecutorMark executor={e} agentId={agentId} agentName={agentName} />,
   }));
 }

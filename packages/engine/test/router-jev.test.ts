@@ -4,6 +4,7 @@ import {
   createAgent,
   createJevJudge,
   createJevKey,
+  createJevRouterStrategy,
   createJobHandlers,
   createLlmJudge,
   drainOutbox,
@@ -109,7 +110,9 @@ describe("routeChain", () => {
 
 /** A fake TypeSafe endpoint: records requests, answers with scripted nouls per handle. */
 function fakeJev(
-  script: (state: Record<string, unknown>) => { nouls: Record<string, number>; needs: number; best?: string } | Error,
+  script: (
+    state: Record<string, unknown>,
+  ) => { nouls: Record<string, number>; needs: number; best?: string; everyone?: number } | Error,
 ) {
   const requests: { headers: Headers; body: Record<string, unknown> }[] = [];
   const fetcher = (async (_url: string, init: RequestInit) => {
@@ -125,6 +128,7 @@ function fakeJev(
       if (key.startsWith("agent_"))
         answers[key] = { type: "noul", noul: r.nouls[q.instructions.agent?.handle ?? ""] ?? 0 };
     }
+    if (body.questions.for_everyone) answers.for_everyone = { type: "noul", noul: r.everyone ?? 0 };
     if (body.questions.best_agent) {
       answers.best_agent = {
         type: "choice",
@@ -140,6 +144,27 @@ function fakeJev(
 
 const post = (fx: Fixture, body: string, threadId?: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body, threadId });
+
+describe("Jev's questions", () => {
+  test("name a message to the room in both languages, for every agent and for each one", async () => {
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0.9 }));
+    await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "e agora, vocês dois?" },
+      thread: [],
+      candidates: [cand("dev"), cand("qa")],
+    });
+    const questions = jev.requests[0]?.body.questions as {
+      for_everyone: { instructions: string };
+      agent_0: { instructions: { question: string } };
+    };
+    for (const phrase of ["everyone", "all of you", "gente", "vocês", "agentes"]) {
+      expect(questions.for_everyone.instructions).toContain(`"${phrase}"`);
+      expect(questions.agent_0.instructions.question).toContain(`"${phrase}"`);
+    }
+  });
+});
 
 describe("Jev strategy end to end", () => {
   test("one request with a Noul per agent, a need Noul and a tie-break Choice; usage billed to the platform", async () => {
@@ -167,6 +192,7 @@ describe("Jev strategy end to end", () => {
       "agent_0",
       "agent_1",
       "best_agent",
+      "for_everyone",
       "needs_agent",
     ]);
     expect(JSON.stringify(req?.body.state)).toContain("is the deploy green?");

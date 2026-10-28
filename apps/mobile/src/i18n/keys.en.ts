@@ -119,7 +119,7 @@ export const mobileEn: MobileTranslations = {
   },
   composer: {
     placeholder: "Write a message",
-    join: "Add to what it is doing",
+    join: "Add to the task in progress",
     now: "Stop and send",
     choice: "How to send while the agent works",
   },

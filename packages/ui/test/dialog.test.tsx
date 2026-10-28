@@ -110,6 +110,29 @@ describe("Dialog", () => {
     expect(head.querySelector(".ac-dialog__lead > .ac-avatar")).not.toBeNull();
   });
 
+  test("beside a title alone, its close sits on the title's capitals' middle (with a line under it, on the pair's)", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar Banco de dados" closeLabel="Fechar">
+        <p>Passos</p>
+      </Dialog>,
+    );
+    const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
+    expect(head.querySelector(".ac-dialog__title + .ac-dialog__acts")).not.toBeNull();
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    // On the middle an app measured for its title's face, --cap-mid without one.
+    expect(css).toContain(
+      "\n.ac-dialog__title + .ac-dialog__acts {\n  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));\n}",
+    );
+    // Nothing else moves the row: a transform beside the translate would be merged away by the build.
+    const moved = [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)].filter(
+      ([, selector, rule]) => /ac-dialog__acts(?![\w-])/.test(selector ?? "") && /transform/.test(rule ?? ""),
+    );
+    expect(moved).toEqual([]);
+  });
+
   test("the close button closes it", async () => {
     render(<Harness />);
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Ajustar orçamento" })));

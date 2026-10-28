@@ -160,9 +160,12 @@ describe("Configurações → Armazenamento", () => {
     const { api } = await go();
     await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
     expect(activate().hasAttribute("disabled")).toBe(true);
-    // Until the bucket is saved, the server's option says it's still the one in use.
-    const inUse = () => [...section().querySelectorAll("label")].filter((l) => l.textContent?.endsWith("Em uso"));
-    expect(inUse().map((l) => l.textContent?.slice(0, 13))).toEqual(["Este servidor"]);
+    // Until the bucket is saved, the server's option says it's still the one in use, on its title's line: the
+    // description under them keeps the card's whole width.
+    const inUse = () =>
+      [...section().querySelectorAll(".ac-option__head")].filter((h) => h.textContent?.endsWith("Em uso"));
+    expect(inUse().map((h) => h.textContent)).toEqual(["Este servidorEm uso"]);
+    expect(inUse()[0]?.nextElementSibling?.textContent).toBe("Os arquivos ficam no disco dele.");
 
     // Empty form: the test does not run, fields explain why.
     await testConnection();

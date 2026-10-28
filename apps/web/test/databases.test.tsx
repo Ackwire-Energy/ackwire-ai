@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { pick, service } from "./catalog";
 import { ADA_ID, createFakeApi, fakeDatabasesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -11,12 +12,6 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-/** Picks a service in "Adicionar conector" (its tile or suggestion) and presses Conectar in its detail pane. */
-const pick = async (dialog: HTMLElement, name: string) => {
-  await click(within(dialog).getByRole("button", { name }));
-  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
-  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
-};
 const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
 
 function databaseApi() {
@@ -39,19 +34,19 @@ describe("Conectores → Banco de dados", () => {
     const { api } = databaseApi();
     const dialog = await openCatalog(api);
     await click(
-      // The categories are a segmented control, each with its count ("Desenvolvimento 3").
+      // The categories, each with its count ("Desenvolvimento 3").
       within(within(dialog).getByRole("radiogroup", { name: "Categorias" })).getByRole("radio", {
         name: /^Desenvolvimento/,
       }),
     );
     const card = within(dialog).getByRole("button", { name: "Banco de dados" });
     expect(card.textContent).toContain("só leitura");
-    // How it connects, and that it never changes anything, in the detail pane.
+    // How it connects, and that it never changes anything, in its dialog.
     await click(card);
-    const detail = within(dialog).getByRole("complementary", { name: "Sobre Banco de dados" });
+    const detail = service("Banco de dados");
     expect(detail.textContent).toContain("Precisa do endereço do banco e de uma senha");
     expect(detail.textContent).toContain("Nunca altera nada");
-    expect(dialog.textContent).not.toMatch(/MCP server|scope/i);
+    expect(`${dialog.textContent} ${detail.textContent}`).not.toMatch(/MCP server|scope/i);
   });
 
   test("connect → o que faz → quem pode usar → regras, with plain errors and the read-only user help", async () => {

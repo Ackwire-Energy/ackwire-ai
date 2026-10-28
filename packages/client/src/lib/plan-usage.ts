@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentUsageSource, PlanAccountInfo, PlanAccountUsage, PlanUsage, PlanWindowParts } from "../api/types";
+import { ownSignInName } from "./ai-accounts";
 import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
 import { planOf } from "./plans";
 
@@ -82,9 +83,9 @@ export function partedUsage(
   };
 }
 
-/** What people call a plan account: its label, or "Conta deste MacBook" for the computer's own sign-in. */
-export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName">) =>
-  a.label ?? t("agentPage.work.brain.thisComputer", { computer: a.machineName });
+/** What people call a plan account: its label, or the computer's own sign-in's name (`ownSignInName`). */
+export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName" | "mine">) =>
+  a.label ?? ownSignInName(t, a.mine, a.machineName);
 
 /** Who makes what an account thinks with: a coding plan's maker, else Claude Code or Codex. */
 export const brandOf = (a: Pick<PlanAccountInfo, "kind" | "provider">) =>
@@ -105,12 +106,14 @@ export function usageSourceName(t: TFunction, s: AgentUsageSource) {
   return t("usageViews.agent.old", { brand: brandOf({ kind: s.kind ?? "claude_code", provider: null }) });
 }
 
-/** A source's share of the agent's month in a sentence: "97% na conta deste MacBook", "3% pela API". */
+/** A source's share of the agent's month in a sentence: "97% na conta que os seus agentes dividem", "3% pela API". */
 export function usageSourcePart(t: TFunction, locale: string, s: AgentUsageSource) {
   const percent = formatPercent(locale, s.share);
   if (s.type === "api") return t("usageViews.agent.apiPart", { percent });
   if (s.account?.accountId === null) {
-    return t("usageViews.agent.computerPart", { percent, computer: s.account.machineName });
+    return s.account.mine
+      ? t("usageViews.agent.sharedPart", { percent })
+      : t("usageViews.agent.computerPart", { percent, computer: s.account.machineName });
   }
   if (s.account) return t("usageViews.agent.accountPart", { percent, account: accountName(t, s.account) });
   if (s.removed) return t("usageViews.agent.removedPart", { percent });

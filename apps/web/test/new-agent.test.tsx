@@ -76,22 +76,22 @@ describe("Criar agente: steps", () => {
     await open();
     await startAs("QA");
     await proceed();
-    expect(title()).toBe("O que o Iris faz");
+    expect(title()).toBe("O que a Iris faz");
     const hint = (name: string) =>
       document.getElementById(screen().getByRole("button", { name }).getAttribute("aria-describedby") ?? "")
         ?.textContent;
-    expect(hint("Sobre O que o Iris faz")).toBe(
-      "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é do Iris.",
+    expect(hint("Sobre O que a Iris faz")).toBe(
+      "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é da Iris.",
     );
     expect(document.querySelector(".newag__note")).toBeNull();
     await proceed();
-    expect(document.querySelector(".onb__lead")?.textContent).toBe("Escolha até onde o Iris vai em cada app.");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Escolha até onde a Iris vai em cada app.");
     expect(document.querySelector(".newag__note")?.textContent).toBe(
       "Merge, deploy e rollback sempre pedem aprovação no chat. Quem aprova é Walter.",
     );
     await proceed(2);
     expect(title()).toBe("Modelo e orçamento");
-    expect(hint("Sobre Orçamento mensal")).toBe("Ao atingir o limite, o Iris para e avisa. Avisamos Walter aos 80%.");
+    expect(hint("Sobre Orçamento mensal")).toBe("Ao atingir o limite, a Iris para e avisa. Avisamos Walter aos 80%.");
     expect(screen().getByText(/^Vazio: o padrão do workspace/).textContent).toBe(
       "Vazio: o padrão do workspace (US$ 50).",
     );
@@ -120,7 +120,7 @@ describe("Criar agente: steps", () => {
     expect(preview.textContent).toContain("@iris");
 
     await proceed();
-    expect(title()).toBe("O que o Iris faz");
+    expect(title()).toBe("O que a Iris faz");
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
       "Reproduz cada bug relatado antes de abrir uma tarefa.",
     );
@@ -158,7 +158,7 @@ describe("Criar agente: steps", () => {
     expect(gpt.getAttribute("aria-pressed")).toBe("false");
 
     await proceed();
-    expect(title()).toBe("Tudo certo com o Iris?");
+    expect(title()).toBe("Tudo certo com a Iris?");
     expect(document.querySelector(".newag__review")?.textContent).toContain("Automático ·");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
@@ -265,6 +265,19 @@ describe("Criar agente: steps", () => {
     await click(railStep("Papel"));
     await press(document.body, "Escape");
     expect(title()).toBe("Qual vai ser o papel?");
+  });
+
+  test("on a touch screen or at phone width, the instructions' ⌘↵ hint goes with its keys", async () => {
+    await open();
+    await startAs("PM");
+    await proceed();
+    expect(title()).toBe("O que o Theo faz");
+    const hint = document.querySelector(".newag__hint");
+    expect(hint?.querySelectorAll(":scope > kbd.ac-kbd")).toHaveLength(2);
+    expect(hint?.textContent).toContain("continua daqui");
+    const css = await Bun.file(new URL("../src/responsive.css", import.meta.url).pathname).text();
+    const touch = css.split("\n@media (max-width: 760px), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    expect(touch).toMatch(/\.newag__hint:has\(> \.ac-kbd\) \{\s*display: none;/);
   });
 
   test("Revisar e criar: each section has Editar, which goes to its step", async () => {
@@ -409,7 +422,7 @@ describe("Criar agente: what gets created", () => {
     expect(title()).toBe("Onde trabalha e com quem");
     await click(screen().getByRole("checkbox", { name: "#general" }));
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /^João/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
     expect(
       within(audience)
         .getByRole("radio", { name: /^Todos do workspace/ })
@@ -434,7 +447,7 @@ describe("Criar agente: what gets created", () => {
     await startAs("QA");
     await proceed(3);
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
     await click(within(audience).getByRole("radio", { name: /^Só o responsável/ }));
     await click(continueButton());
     expect(title()).toBe("Onde trabalha e com quem");

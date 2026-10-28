@@ -21,7 +21,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { endSentence } from "@agenteschat/client/lib/text";
+import { around, endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
@@ -144,6 +144,10 @@ function SetupSays({ view }: { view: SetupView }) {
 export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
+    const step = t(view.textKey);
+    const label = t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step });
+    // The step's own words stay on one line where they fit (layout.css).
+    const cut = around(label, step);
     return (
       <div className="setup-progress setup-progress--steps">
         <SetupSays key={view.textKey} view={view} />
@@ -151,7 +155,17 @@ export function SetupProgress({ view, said = false }: { view: SetupView; said?: 
           <Steps
             current={view.stepNumber}
             total={SETUP_STEPS.length}
-            label={t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
+            label={
+              cut ? (
+                <>
+                  {cut[0]}
+                  <span>{step}</span>
+                  {cut[1]}
+                </>
+              ) : (
+                label
+              )
+            }
           />
         </div>
       </div>
@@ -160,7 +174,7 @@ export function SetupProgress({ view, said = false }: { view: SetupView; said?: 
   if (said && statusRestatesChip(view)) return null;
   // The lines under it lead with 14px too, so every line's words start in one column.
   return (
-    <p className="setup-progress setup-progress--line ac-iconline" role="status">
+    <p className="setup-progress setup-progress--line ac-iconline" role="status" data-phase={view.phase}>
       {PHASE_ICON[view.phase] === "spinner" ? <Spinner size={14} /> : <Icon name={PHASE_ICON[view.phase]} size={14} />}
       <span>{t(view.textKey)}</span>
     </p>

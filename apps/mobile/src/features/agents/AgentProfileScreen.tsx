@@ -267,7 +267,7 @@ function Profile({ id }: { id: string }) {
           {noAi ? (
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
-              label={t("noAi.agent", { name: agent?.name ?? "" })}
+              label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
               onPress={() => openConnectAi({ agentId: id })}
             />
           ) : null}
@@ -300,7 +300,7 @@ function Profile({ id }: { id: string }) {
 
         {forYou.data || forYou.isError ? (
           <Section
-            title={t("mobile.intentAgents.did.title")}
+            title={t("mobile.intentAgents.did.title", agentGrammar(t, name))}
             {...(did.length > DID_SHOWN
               ? {
                   action: {
@@ -360,7 +360,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title")}>
+          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(t, name))}>
             {memories.length > 0 ? (
               <>
                 <Card>
@@ -407,7 +407,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title")}>
+          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(t, name))}>
             {uses.lines.length > 0 ? (
               <Card>
                 {uses.lines.map((u) => (

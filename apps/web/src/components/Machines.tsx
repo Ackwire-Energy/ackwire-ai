@@ -1050,8 +1050,11 @@ export function MachinePage({ machineId }: { machineId: string }) {
                         {folders && (folders.length > 0 || !managed) && (
                           <span className="small muted">
                             {folders.length > 0
-                              ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
-                              : t("machines.page.agentOwnFolder")}
+                              ? t("machines.page.agentFolders", {
+                                  ...agentGrammar(t, a.name),
+                                  folders: joinNames(folders, t("newAgent.and")),
+                                })
+                              : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))}
                           </span>
                         )}
                       </span>

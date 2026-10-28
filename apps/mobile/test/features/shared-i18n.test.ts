@@ -8,7 +8,6 @@ import {
   genderOf,
   greetingKey,
   initialOf,
-  isFeminineName,
   isSafeId,
   joinNames,
   minutesLeft,
@@ -32,11 +31,12 @@ describe("shared helpers", () => {
   });
 
   test("Portuguese grammar by the name", () => {
-    expect(isFeminineName("Iris")).toBe(false);
-    expect(isFeminineName("Nina")).toBe(true);
-    expect(isFeminineName("Luíza")).toBe(true);
+    expect(genderOf("Iris")).toBe("F");
+    expect(genderOf("Nina")).toBe("F");
+    expect(genderOf("Luíza")).toBe("F");
     expect(genderOf("Infra")).toBe("F");
     expect(genderOf("Dev")).toBe("M");
+    expect(genderOf("Theo")).toBe("M");
   });
 
   test("names and initials", () => {
@@ -91,6 +91,11 @@ describe("the screens' strings", () => {
     const vars = (s: string) => (s.match(/{{\w+}}/g) ?? []).sort();
     for (const key of leaves(featureKeysPtBR))
       expect([key, vars(get(featureKeysEn, key) as string)]).toEqual([key, vars(get(featureKeysPtBR, key) as string)]);
+  });
+
+  test("an agent's profile, which says she or he, never calls the agent it", () => {
+    const profile = featureKeysEn.intentAgents;
+    expect(leaves(profile).filter((key) => /\b(it|its)\b/i.test(get(profile, key) as string))).toEqual([]);
   });
 
   test("they never repeat a group of the foundation's strings (both merge under `mobile`)", () => {

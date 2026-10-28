@@ -219,14 +219,18 @@
     height: auto;
     min-height: var(--control-h-md);
   }
-  /* Keyboard shortcuts mean nothing on a touch screen. */
-  .sidebar__jump .ac-kbd {
-    display: none;
-  }
 }
 @media (max-width: 760px), (pointer: coarse) {
   .wiki-editor__text {
     font-size: 16px;
+  }
+  /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
+     follow its keys goes with them. */
+  .sidebar__jump .ac-kbd,
+  .titlebar__search .ac-kbd,
+  .wiki-suggest .ac-kbd,
+  .newag__hint:has(> .ac-kbd) {
+    display: none;
   }
 }
 /* Onboarding: clear the notch (viewport-fit=cover); the home bar and the e-mail chips field: pages/onboarding.css. */
@@ -313,19 +317,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -345,7 +336,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    padding-block: 20px;
+    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -429,19 +420,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -461,7 +439,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    padding-block: 20px;
+    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -485,18 +463,11 @@
   .agp-brainrows__sel {
     width: 100%;
   }
-  .agp-addacct__step {
-    flex-wrap: wrap;
-  }
   .level-row__below {
     padding-left: 0;
   }
   .agp-id {
     flex-direction: column;
-  }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
   }
 }
 

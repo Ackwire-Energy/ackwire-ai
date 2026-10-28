@@ -24,8 +24,17 @@ export interface ConnectorTool {
   onSuccess?: { kind: OutcomeKind; subject: string };
 }
 
-/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, payments, support, marketing, automation. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
+export type ConnectorCategory =
+  | "dev"
+  | "product"
+  | "docs"
+  | "data"
+  | "payments"
+  | "sales"
+  | "support"
+  | "marketing"
+  | "automation";
 
 export interface ConnectorDefinition {
   id: string;

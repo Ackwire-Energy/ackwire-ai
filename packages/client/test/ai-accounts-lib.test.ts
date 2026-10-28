@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { groupPlans, ownSignIns, planWordOf } from "../src/lib/ai-accounts";
+import { groupPlans, ownSignInName, ownSignIns, planWordOf } from "../src/lib/ai-accounts";
+import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
   windows: [{ kind: "five_hour", usedPercent }],
@@ -117,5 +119,39 @@ describe("the computers' own sign-ins", () => {
     expect(planWordOf("max")).toBe("Max");
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+});
+
+describe("the computer's own sign-in by name", () => {
+  const WORDS: Record<string, string> = {
+    "connectAi.own.shared": "The account your agents share",
+    "agentPage.work.brain.thisComputer": "{{computer}}'s account",
+    "usageViews.agent.sharedPart": "{{percent}} on the account your agents share",
+    "usageViews.agent.computerPart": "{{percent}} on {{computer}}'s own account",
+  };
+  const t = ((key: string, o: Record<string, string> = {}) =>
+    (WORDS[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_, k: string) => o[k] ?? "")) as unknown as TFunction;
+
+  test("the viewer's own computer: the account their agents share; someone else's: that computer's", () => {
+    expect(ownSignInName(t, true, "MacBook")).toBe("The account your agents share");
+    expect(ownSignInName(t, false, "MacBook")).toBe("MacBook's account");
+    const own = { label: null, machineName: "MacBook", mine: true };
+    expect(accountName(t, own)).toBe("The account your agents share");
+    expect(accountName(t, { ...own, mine: false })).toBe("MacBook's account");
+    expect(accountName(t, { ...own, label: "Trabalho" })).toBe("Trabalho");
+    const source = (mine: boolean) =>
+      ({
+        key: "m1:claude_code:computer",
+        type: "plan",
+        kind: "claude_code",
+        account: { accountId: null, label: null, machineName: "MacBook", mine },
+        removed: false,
+        tokens: 1000,
+        share: 97,
+        lastDay: null,
+        now: true,
+      }) as unknown as Parameters<typeof usageSourcePart>[2];
+    expect(usageSourcePart(t, "en", source(true))).toBe("97% on the account your agents share");
+    expect(usageSourcePart(t, "en", source(false))).toBe("97% on MacBook's own account");
   });
 });
