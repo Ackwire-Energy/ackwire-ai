@@ -16,6 +16,7 @@ import type {
   ConnectorCatalog,
   ConnectorDef,
   Credential,
+  Edition,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -187,6 +188,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** `system.health`'s edition; unset = the Cloud. */
+  edition?: Edition;
   /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
   brainMachines?: BrainMachine[];
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
@@ -764,7 +767,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   return {
     system: {
-      health: async () => ({ status: "ok", version: "test", edition: "cloud" }),
+      health: async () => ({ status: "ok", version: "test", edition: state.edition ?? "cloud" }),
       telemetry: async () => state.telemetry ?? null,
       setTelemetry: async (enabled) => {
         log("system.setTelemetry", enabled);
