@@ -2,11 +2,8 @@ import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Image, StyleSheet, View } from "react-native";
-import { appHeaders, lastCookie } from "@/lib/auth";
-import { photoSource } from "@/lib/photo";
+import { StyleSheet, View } from "react-native";
 import { pushPermission, unregisterPush } from "@/lib/push";
-import { serverUrl } from "@/lib/server";
 import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
@@ -16,12 +13,11 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
-  Text,
   type ThemePreference,
   useTheme,
   useToast,
 } from "@/ui";
-import { useColors } from "../shared/hooks";
+import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
 /** Você's smaller screens, each pushed from its row: Workspaces, Notificações, Sons, Aparência and Idioma. */
@@ -81,7 +77,7 @@ export function WorkspacesPage() {
         {org.orgs.map((o) => (
           <GroupedRow
             key={o.id}
-            leading={<OrgTile name={o.name} logo={o.logo} />}
+            leading={<OrgAvatar name={o.name} logo={o.logo} />}
             label={o.name}
             checked={o.id === org.orgId}
             onPress={() => {
@@ -186,21 +182,6 @@ export function LanguagePage() {
   );
 }
 
-/** A workspace: its logo, or its initial on a neutral tile. */
-function OrgTile({ name, logo }: { name: string; logo?: string | null | undefined }) {
-  const c = useColors();
-  const source = photoSource(logo, serverUrl(), appHeaders(lastCookie()));
-  if (source) return <Image source={source} style={styles.org} accessibilityIgnoresInvertColors />;
-  return (
-    <View style={[styles.org, { backgroundColor: c.ink2 }]}>
-      <Text variant="label" style={{ color: c.bg }}>
-        {(name.trim()[0] ?? "?").toLocaleUpperCase()}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   gap: { height: 14 },
-  org: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

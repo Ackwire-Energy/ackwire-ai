@@ -9,9 +9,9 @@ import {
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { router, useLocalSearchParams } from "expo-router";
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import {
   Button,
   Filters,
@@ -25,6 +25,7 @@ import {
   PersonAvatar,
   SectionHeader,
   Sky,
+  SwipeRow,
   Text,
   weights,
 } from "@/ui";
@@ -33,7 +34,7 @@ import { agentDmOf, notificationHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
-import { Tile, tapHaptic, useSurface } from "../shared/parts";
+import { Tile, useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import {
@@ -303,7 +304,6 @@ function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; age
   );
 }
 
-const SWIPE = 72;
 /** Stands in for the names in the translated title, so they can be drawn bold. */
 const NAMES = "\u2063names\u2063";
 
@@ -319,7 +319,6 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const c = useColors();
   const when = useWhen();
   const act = useNotificationAction(orgId);
-  const x = useRef(new Animated.Value(0)).current;
   // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
   // an AI while no agent has one.
   const dms = useDms(orgId);
@@ -347,32 +346,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     .join(" ");
   const time = when.short(n.updatedAt);
 
-  const toggleRead = () => {
-    tapHaptic();
-    act.mutate({ type: "read", item: n, read: unread });
-  };
-  const done = () => {
-    tapHaptic();
-    act.mutate({ type: "done", item: n, done: true });
-  };
-  // The pan handlers live as long as the row; they call the latest actions.
-  const actions = useRef({ toggleRead, done });
-  actions.current = { toggleRead, done };
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-        onPanResponderMove: (_e, g) => x.setValue(Math.max(-SWIPE * 1.4, Math.min(SWIPE * 1.4, g.dx))),
-        onPanResponderRelease: (_e, g) => {
-          if (g.dx > SWIPE) actions.current.toggleRead();
-          else if (g.dx < -SWIPE) actions.current.done();
-          Animated.spring(x, { toValue: 0, useNativeDriver: true }).start();
-        },
-        onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: true }).start(),
-      }),
-    [x],
-  );
-
+  // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
+  const toggleRead = () => act.mutate({ type: "read", item: n, read: unread });
+  const done = () => act.mutate({ type: "done", item: n, done: true });
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
@@ -396,51 +372,49 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const a11y = [title, sub, time, unread ? t("mobile.activity.unread") : null].filter(Boolean).join(", ");
   return (
     <View>
-      <View style={[StyleSheet.absoluteFill, styles.under, { backgroundColor: c.sunken }]}>
-        <View style={styles.side}>
-          <Icon name={unread ? "check" : "bell"} size={18} color={c.muted} />
-          <Text variant="caption" tone="muted">
-            {unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread")}
-          </Text>
+      <SwipeRow
+        left={{
+          label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread"),
+          icon: unread ? "check" : "bell",
+          color: c.agent,
+          ink: c.onAgent,
+          onAction: toggleRead,
+        }}
+        // On the green, the page's color reads in both themes (white in light, near black on dark's light green).
+        right={{ label: t("mobile.activity.done"), icon: "archive", color: c.ok, ink: c.bg, onAction: done }}
+      >
+        <View style={{ backgroundColor: c.bg }}>
+          <ListRow
+            onPress={open}
+            accessibilityRole="button"
+            accessibilityLabel={a11y}
+            accessibilityActions={[
+              { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
+              { name: "done", label: t("mobile.activity.done") },
+            ]}
+            onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
+            dot={unread}
+            leading={leading}
+            title={
+              <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
+                {parts.map((part, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
+                  <Fragment key={i}>
+                    {i > 0 ? (
+                      <Text variant="body" tone="ink" style={styles.bold}>
+                        {names}
+                      </Text>
+                    ) : null}
+                    {part}
+                  </Fragment>
+                ))}
+              </Text>
+            }
+            time={time}
+            sub={sub || null}
+          />
         </View>
-        <View style={styles.side}>
-          <Text variant="caption" tone="muted">
-            {t("mobile.activity.done")}
-          </Text>
-          <Icon name="archive" size={18} color={c.muted} />
-        </View>
-      </View>
-      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.bg }} {...responder.panHandlers}>
-        <ListRow
-          onPress={open}
-          accessibilityRole="button"
-          accessibilityLabel={a11y}
-          accessibilityActions={[
-            { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
-            { name: "done", label: t("mobile.activity.done") },
-          ]}
-          onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
-          dot={unread}
-          leading={leading}
-          title={
-            <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
-              {parts.map((part, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
-                <Fragment key={i}>
-                  {i > 0 ? (
-                    <Text variant="body" tone="ink" style={styles.bold}>
-                      {names}
-                    </Text>
-                  ) : null}
-                  {part}
-                </Fragment>
-              ))}
-            </Text>
-          }
-          time={time}
-          sub={sub || null}
-        />
-      </Animated.View>
+      </SwipeRow>
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
     </View>
   );
@@ -485,7 +459,5 @@ const styles = StyleSheet.create({
   front: { position: "absolute", right: -2, bottom: -2, padding: 2 },
   bold: { fontWeight: "600" },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  under: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
-  side: { flexDirection: "row", alignItems: "center", gap: 6 },
   more: { alignItems: "center", paddingVertical: 16 },
 });
