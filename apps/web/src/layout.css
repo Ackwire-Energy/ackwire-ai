@@ -8268,47 +8268,35 @@ a.machine-row__name:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   align-items: start;
-  gap: 48px;
+  gap: 24px;
 }
+/* Each section is the root card (hairline, cut corner) on the page: in dark the dense text no longer
+   floats on the near-black, every block has a face of its own. */
 .agp-col {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
-/* No cards on the agent's page: sections on the white, a hairline between them. */
 .agp-card.ac-card {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
-  min-width: 0;
-  padding: 26px 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
 }
-.agp-card.ac-card + .agp-card.ac-card,
-.agp-attns + .agp-card.ac-card,
-.agp-aside__work + .agp-card.ac-card {
-  border-top: 1px solid var(--line);
-}
-.agp-card.ac-card > .ac-card__foot {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-}
-/* Something changed in it: a bar on its left edge. */
+/* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {
-  padding-left: 14px;
-  box-shadow: inset 2px 0 0 var(--ink);
+  box-shadow:
+    var(--card-shadow),
+    inset 2px 0 0 var(--ink);
 }
-/* The side column: quiet, smaller headings. */
+/* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
 .agp-aside__work {
-  padding: 26px 0;
+  padding: 20px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
 }
 .agp-aside__h {
   margin: 0 0 6px;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -8319,6 +8307,7 @@ a.machine-row__name:hover {
 }
 .agp-aside .agp-workcard {
   padding: 0;
+  border-block: 0;
   background: none;
   box-shadow: none;
 }
@@ -8415,7 +8404,7 @@ a.machine-row__name:hover {
 }
 .agp-prose {
   margin: 0;
-  color: var(--ink2);
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
@@ -8586,13 +8575,13 @@ a.machine-row__name:hover {
 }
 .agp-li__t span,
 .agp-li__when {
-  color: var(--muted);
+  color: var(--ink2);
   font-size: 12.5px;
 }
 .agp-li__when {
   flex: none;
   align-self: center;
-  color: var(--faint);
+  color: var(--muted);
   white-space: nowrap;
 }
 .agp-kv {
@@ -8606,7 +8595,7 @@ a.machine-row__name:hover {
   gap: 6px;
 }
 .agp-k {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
