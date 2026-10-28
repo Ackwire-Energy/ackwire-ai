@@ -56,4 +56,4 @@ export const TECHNICAL =
 
 /** The banned phrases a text holds, ignoring case. */
 export const bannedIn = (text: string, phrases: readonly string[]) =>
-  phrases.filter((p) => text.toLowerCase().includes(p));
+  phrases.filter((p) => text.replaceAll("\u00a0", " ").toLowerCase().includes(p));

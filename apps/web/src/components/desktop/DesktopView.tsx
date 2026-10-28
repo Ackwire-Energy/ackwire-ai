@@ -23,7 +23,7 @@ import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover } from "../computer/covers";
-import { DialogHead, FullButton, useDialogHead, useSayFailed } from "../computer/head";
+import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useScreenKeys } from "./screen-keys";
@@ -346,6 +346,7 @@ export function DesktopView({
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
+  const back = useHandBack(handoff?.kind !== "ask");
   // Over a cover the head says nothing the cover says (opening, the pause, why not): only who holds the screen.
   const sub = inControl
     ? ask
@@ -357,24 +358,29 @@ export function DesktopView({
         ? (head?.watching ?? t("agentComputer.sub.watching"))
         : "";
   const retrying = <span>{t("desktop.state.retrying")}</span>;
-  const notice = (
-    <span className="muted">
-      {touch ? "" : `${t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })} `}
-      {t("desktop.control.notice", g)}
+  const notice = <span className="muted">{t("desktop.control.notice", g)}</span>;
+  // What programs there can see comes first: the window keeps the line to one line, and the keys follow only where it
+  // has room for them (desktop.css). agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ after it.
+  const controlLine = (
+    <span className="dsk-words">
+      {edition === "cloud" ? (
+        <span className="ac-hintline">
+          {notice}
+          <InfoHint name={t("common.about", { label: t("desktop.session.check") })}>
+            {t("desktop.session.screening")}
+          </InfoHint>
+        </span>
+      ) : (
+        notice
+      )}
+      {!touch && (
+        <>
+          {" "}
+          <span className="muted">{t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })}</span>
+        </>
+      )}
     </span>
   );
-  // agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ, so the line stays one line.
-  const controlLine =
-    edition === "cloud" ? (
-      <span className="ac-hintline">
-        {notice}
-        <InfoHint name={t("common.about", { label: t("desktop.session.check") })}>
-          {t("desktop.session.screening")}
-        </InfoHint>
-      </span>
-    ) : (
-      notice
-    );
   const again = (
     <Button size="sm" icon="refresh" onClick={retry}>
       {t("desktop.retry")}
@@ -426,6 +432,7 @@ export function DesktopView({
         <Button
           size="sm"
           icon="person"
+          className="cmp-take"
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
         >
@@ -452,7 +459,8 @@ export function DesktopView({
         <Button
           size="sm"
           variant="primary"
-          icon="check"
+          icon={back.icon}
+          className={back.className}
           onClick={() => {
             // The note opens in the dialog, never over the full-screen screen.
             head?.setFull(false);
