@@ -103,6 +103,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                 leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
                 subtitle={lineOf(t, w, routing)}
+                subtitleLines={w.kind === "agent" ? 2 : 1}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
                 {...(editable && !mine
                   ? {
