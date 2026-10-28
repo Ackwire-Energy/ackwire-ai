@@ -648,23 +648,50 @@ describe("Diff", () => {
   });
 });
 
-describe("Message aside", () => {
-  test("sits on the header line, or after the text for grouped messages", () => {
+describe("Message aside and foot", () => {
+  test("the aside ends the first line, the header's or a grouped message's text's; the foot is a line under both", () => {
     const { container } = render(
       <>
-        <Message author="João" time="10:42" aside={<span>✓</span>}>
+        <Message author="João" time="10:42" aside={<span>✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>oi</MessageText>
         </Message>
-        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>}>
+        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>de novo</MessageText>
         </Message>
       </>,
     );
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
+    // Floated before the text, so the text's first line wraps before it.
+    expect(second?.querySelector(".ac-msg__aside--floating + .ac-msg__text")?.textContent).toBe("de novo");
     expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
-    // A receipt with words takes a line of its own under the text, which keeps its lines.
-    expect(second?.querySelector(".ac-msg__body > :last-child")?.className).toContain("ac-msg__aside--floating");
+    // The same line under the text on both: the text follows the name, and words that come and go never move it.
+    for (const row of [first, second]) {
+      expect(row?.querySelector(".ac-msg__body > :last-child")?.className).toBe("ac-msg__foot");
+      expect(row?.querySelector(".ac-msg__head .ac-msg__foot")).toBeNull();
+    }
+  });
+
+  test("the action bar stands on the row's top edge: it never reaches the row's name, receipt or text", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const bodies = (selector: string) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
+        .map((m) => m[2] ?? "");
+    const bar = bodies(".ac-msg__actions");
+    // Anchored by its bottom, so a taller bar (40px buttons on touch) grows upward, away from the row.
+    expect(bar.some((b) => /bottom:\s*calc\(100% - 2px\)/.test(b))).toBe(true);
+    expect(bar.filter((b) => /(^|;)\s*top:/.test(b))).toEqual([]);
+    // It overlaps the row by 2px at most: no more than the smallest top padding, a grouped row's, before any content.
+    const pad = (selector: string) => {
+      const b = bodies(selector).join(";");
+      return Number(/padding-top:\s*(\d+)px/.exec(b)?.[1] ?? /padding:\s*(\d+)px/.exec(b)?.[1]);
+    };
+    expect(pad(".ac-msg")).toBe(6);
+    expect(pad(".ac-msg--grouped")).toBe(2);
   });
 });
 

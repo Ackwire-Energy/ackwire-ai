@@ -3,9 +3,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { messageLink } from "@/components/MessageMore";
-import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -98,6 +101,72 @@ describe("message action bars", () => {
         .getByRole("button", { name: /1 resposta/ })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+  });
+
+  test("the bar never covers a receipt: a check ends the first line, words go under the text, the bar stands above", async () => {
+    const state = seedState({
+      aiStatus: {
+        any: false,
+        agents: [ADA_ID, ATLAS_ID].map((agentId) => ({ agentId, state: "no_ai" as const, reason: "no_key" })),
+      },
+    });
+    const said = (id: string, body: string, minutes: number, receipts: Message["receipts"], who = "u-walter") =>
+      ({
+        id,
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: who },
+        body,
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date(NOW.getTime() - minutes * 60_000).toISOString(),
+        receipts,
+      }) as Message;
+    const noAi = { seenBy: [], pickedBy: [], handled: [], noAi: true };
+    const answered = {
+      seenBy: [ADA_ID],
+      pickedBy: [ADA_ID],
+      handled: [{ agentId: ADA_ID, runId: "r-a", status: "done" as const }],
+      blocked: [],
+    };
+    state.messages = [
+      said("w1", "Bom dia! Esta semana a gente fecha os rótulos.", 20, noAi),
+      said("w2", "Mando os arquivos para a gráfica na sexta.", 19.5, noAi),
+      said("j1", "Subi a correção do login.", 10, answered, "u-joao"),
+      said("j2", "E aumentei o tempo da sessão.", 9.5, answered, "u-joao"),
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const row = (id: string) => document.querySelector(`article[data-message-id="${id}"]`) as HTMLElement;
+    // Words with an action: the message's last line, on a first and a grouped message alike, never in the header.
+    for (const id of ["w1", "w2"]) {
+      const foot = row(id).querySelector(".ac-msg__body > .ac-msg__foot:last-child") as HTMLElement;
+      expect(foot.textContent).toBe("Ninguém vai responder: falta uma IA ·Conectar");
+      expect(within(foot).getByRole("button", { name: "Conectar" })).toBeTruthy();
+      expect(row(id).querySelector(".ac-msg__head .ac-receipt, .ac-msg__aside .ac-receipt")).toBeNull();
+    }
+    expect(row("w2").className).toContain("ac-msg--grouped");
+    // A check alone: at the end of the name's line, or of a grouped message's first line; nothing under the text.
+    expect(row("j1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check")).not.toBeNull();
+    expect(row("j2").querySelector(".ac-msg__aside--floating .ac-receipt__check")).not.toBeNull();
+    for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.textContent).toBe("");
+    // The bar stands on the row's top edge (the kit's rule, components.test.tsx): no stylesheet of the app moves
+    // it back down onto the row.
+    const src = join(import.meta.dir, "../src");
+    const sheets = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? sheets(join(dir, e.name)) : e.name.endsWith(".css") ? [join(dir, e.name)] : [],
+      );
+    const moved = sheets(src).flatMap((file) =>
+      [
+        ...readFileSync(file, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .matchAll(/([^{}]+)\{([^{}]*)\}/g),
+      ]
+        .filter((m) => (m[1] ?? "").includes("ac-msg__actions") && /(^|;)\s*(top|bottom|inset)\s*:/.test(m[2] ?? ""))
+        .map((m) => `${file.slice(src.length)} ${(m[1] ?? "").trim()}`),
+    );
+    expect(moved).toEqual([]);
   });
 
   test("a thread opened with Responder: the channel keeps what came before, one line opens the rest", async () => {
