@@ -1,3 +1,4 @@
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
@@ -30,7 +31,7 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
       <View style={styles.text}>
         {banner.kind === "agent" ? (
           <Text variant="small" tone="ink2" style={styles.strong}>
-            {t("noAi.agent", { name })}
+            {t("noAi.agent", agentGrammar(t, name))}
           </Text>
         ) : banner.askInChat ? (
           <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">

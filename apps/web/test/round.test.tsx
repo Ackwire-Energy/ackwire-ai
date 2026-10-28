@@ -128,14 +128,14 @@ describe("Detalhes do canal: membros", () => {
     state.channelMembers[GENERAL_ID]?.push({ type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     let dialog = await openDetails();
-    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    expect(dialog.textContent).toContain("Entra na conversa por conta própria");
     const menu = await openMenu("Atlas");
     expect(
       within(menu)
-        .getByRole("menuitemradio", { name: /^Sozinho/ })
+        .getByRole("menuitemradio", { name: /^Por conta própria/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(menu).getByRole("menuitemradio", { name: /^Quando chamado/ }));
+    await click(within(menu).getByRole("menuitemradio", { name: /^Quando alguém chama/ }));
     await settle(4);
     const put = state.calls.find((c) => c.method === "agents.setChannels");
     expect(put?.args[1]).toBe(ATLAS_ID);

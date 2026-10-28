@@ -253,7 +253,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
   return (
     <div className="agp-work">
-      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label")}>
+      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label", g)}>
         <div className="agp-cells">
           {!member && (
             <Cell
@@ -267,7 +267,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
               }
               value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
-              openLabel={t("agentPage.work.open.computer")}
+              openLabel={t("agentPage.work.open.computer", g)}
               // The Cloud's agents all work on the workspace's own computer: nothing to pick.
               onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
             />
@@ -759,7 +759,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
+          label: agent.audience?.userIds?.length
+            ? t("aiAccounts.share.letPeople", g)
+            : t("aiAccounts.share.letEveryone", g),
           run: () =>
             void api.agents
               .setBrain(org.id, agent.id, { onlyOwner: false })
@@ -997,7 +999,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               hint={
                 view.canUsePlans
                   ? t("aiAccounts.share.hint", g)
-                  : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
+                  : t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })
               }
             />
             <Switch
@@ -1283,7 +1285,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("agentPage.work.computer.title", g)}
-      description={t("agentPage.work.computer.sub")}
+      description={t("agentPage.work.computer.sub", g)}
       closeLabel={t("common.close")}
       width={640}
       className="agp-wdlg"

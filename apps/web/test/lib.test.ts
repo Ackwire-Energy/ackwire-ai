@@ -154,6 +154,29 @@ describe("grammar", () => {
     );
   });
 
+  test("one agent, one pronoun: she or he in English as in Portuguese, never it", () => {
+    const english = createI18n("en");
+    const te = english.t.bind(english) as TFunction;
+    const ada = agentGrammar(te, "Ada");
+    const theo = agentGrammar(te, "Theo");
+    // Her page says "her" in both lines it has for her.
+    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI connected.");
+    expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
+    expect(te("agentPage.work.cell.label", ada)).toBe("How she works");
+    expect(te("agentPage.overview.proposes", ada)).toBe("Ada proposes changing her instructions");
+    expect(te("chat.work.block", theo)).toBe("What he did");
+    expect(te("chat.joined.tip", theo)).toBe("Nobody called Theo. He joined to help.");
+    expect(te("channelMembers.removeAgentBody", ada)).toBe(
+      "She stops reading and answering in this channel. You can add her back later.",
+    );
+    // Portuguese says each one's own words, articles and forms too.
+    expect(t("chat.joined.tip", agentGrammar(t, "Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(t("missions.settings.defaults.title", agentGrammar(t, "Ada"))).toBe("Próximas missões da Ada");
+    expect(t("browser.agent.signedIn", agentGrammar(t, "Ada"))).toBe(
+      "A Ada fica com o login feito nos sites em que entrar, neste computador.",
+    );
+  });
+
   test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
     expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
     expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");

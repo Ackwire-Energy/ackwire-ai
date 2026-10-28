@@ -1,4 +1,5 @@
 import { type AiRouting, keys, type RosterMember, useAiStatus, useApi, useRoster } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -43,8 +44,8 @@ const lineOf = (t: TFunction, w: Who, routing: AiRouting | undefined) =>
     ? !w.autoReply
       ? t("channelMembers.mentionLine", { handle: w.handle })
       : picksForMe(routing)
-        ? t("channelMembers.aloneLine")
-        : t(replyAloneKey(routing))
+        ? t("channelMembers.aloneLine", agentGrammar(t, w.name))
+        : t(replyAloneKey(routing), agentGrammar(t, w.name))
     : w.email;
 
 /**
@@ -166,6 +167,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
 /** One member's options (admins): how an agent replies here, and "Tirar do canal" (asked first). */
 function MemberOptions({ channelId, channelName, who }: { channelId: string; channelName: string; who: Who }) {
   const { t } = useTranslation();
+  const g = agentGrammar(t, who.name);
   const orgId = useOrgId();
   const api = useApi();
   const sheet = useSheet();
@@ -205,7 +207,7 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
   const askRemove = () =>
     Alert.alert(
       t("channelMembers.removeTitle", { name: who.name, channel: channelName }),
-      t(who.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody"),
+      t(who.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody", g),
       [
         { text: t("common.cancel"), style: "cancel" },
         { text: t("channelMembers.removeConfirm"), style: "destructive", onPress: () => remove.mutate() },
@@ -224,14 +226,14 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
       {who.kind === "agent" ? (
         <View>
           <Text variant="footnote" tone="faint" style={[styles.bold, styles.heading]}>
-            {t("channelMembers.replyHeading")}
+            {t("channelMembers.replyHeading", g)}
           </Text>
           <ActionList
             items={[
               {
                 key: "alone",
-                label: t("channelMembers.replyAlone"),
-                hint: t(replyAloneKey(routing)),
+                label: t("channelMembers.replyAlone", g),
+                hint: t(replyAloneKey(routing), g),
                 trailing: picked(autoReply),
                 disabled: reply.isPending,
                 onPress: () => !autoReply && reply.mutate(true),

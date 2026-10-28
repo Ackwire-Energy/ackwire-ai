@@ -1020,7 +1020,7 @@ export const featureKeysPtBR = {
     ownerYou: "Responsável: você",
     nowWaiting: "Espera seu ok: {{title}}",
     did: {
-      title: "O que fez por você",
+      title: "O que {{she}} fez por você",
       month_one: "{{count}} este mês",
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
@@ -1053,7 +1053,7 @@ export const featureKeysPtBR = {
       },
     },
     knows: {
-      title: "O que sabe sobre você",
+      title: "O que {{she}} sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
@@ -1079,7 +1079,7 @@ export const featureKeysPtBR = {
     },
     thinks: "Pensa com",
     uses: {
-      title: "O que pode usar",
+      title: "O que {{she}} pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
       area: {
         context: "Memória",
@@ -1430,7 +1430,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem responde",
+    audience: "Para quem {{she}} responde",
     another: "Outra IA",
   },
   crash: {

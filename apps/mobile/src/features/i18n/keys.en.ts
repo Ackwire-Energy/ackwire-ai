@@ -1015,7 +1015,7 @@ export const featureKeysEn: FeatureTranslations = {
     ownerYou: "Owner: you",
     nowWaiting: "Needs your ok: {{title}}",
     did: {
-      title: "What it did for you",
+      title: "What {{she}} did for you",
       month_one: "{{count}} this month",
       month_other: "{{count}} this month",
       seeAll: "See all",
@@ -1048,7 +1048,7 @@ export const featureKeysEn: FeatureTranslations = {
       },
     },
     knows: {
-      title: "What it knows about you",
+      title: "What {{she}} knows about you",
       footF: "Tap to correct or forget.",
       footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
@@ -1074,7 +1074,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     thinks: "Thinks with",
     uses: {
-      title: "What it can use",
+      title: "What {{she}} can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },
       area: {
         context: "Memory",
@@ -1424,7 +1424,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who it replies to",
+    audience: "Who {{she}} replies to",
     another: "Another AI",
   },
   crash: {

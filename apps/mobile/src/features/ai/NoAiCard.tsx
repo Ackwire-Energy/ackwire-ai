@@ -1,4 +1,5 @@
 import { type Message, useAiStatus, useApi } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
@@ -53,7 +54,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", { name });
+        : t("noAi.agent", agentGrammar(t, name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
