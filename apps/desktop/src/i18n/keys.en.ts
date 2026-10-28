@@ -185,6 +185,7 @@ export const desktopEn: DesktopTranslations = {
       "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.",
     reachOff: "Tailscale isn't connected.",
     reachOffTerminal: "Tailscale isn't connected. Connect it in the terminal:",
+    reachTray: "Tailscale isn't connected. Open it from its icon by the clock and log in.",
     reachMissing: "Needs Tailscale, which is free.",
     reachChecking: "Checking whether Tailscale is connected…",
     /** What turning access on or off is doing while it takes. */
@@ -296,6 +297,10 @@ export const desktopEn: DesktopTranslations = {
     phoneOff: "Turn on reach first.",
     showQr: "Show QR code",
     usageRestart: "Changing it restarts agentes.chat for a moment.",
+    jev: "Jev",
+    jevText:
+      "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key.",
+    jevWhere: "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI accounts.",
     reachFailed: "Access from your devices didn't turn on: {{reason}}.",
     backup: "Back up now",
     backedUp: "Backed up: {{file}}",
@@ -539,6 +544,7 @@ export const desktopEn: DesktopTranslations = {
     failing: "agentes.chat isn't starting on this {{device}}",
     tailnetOff: "Connect Tailscale on this {{device}} to open agentes.chat.",
     tailnetUp: "In the terminal: sudo tailscale up",
+    tailnetTray: "Open it from its icon by the clock.",
     onlyHere: "Use only on this {{device}}",
     start: "Start it",
     copy: "Copy details",

@@ -4,6 +4,8 @@
  * banners, the cover's line, Preferences' words). Pure, so it is tested without the app.
  */
 
+import type { Platform } from "./platform";
+
 export type LocalPhase = "off" | "starting" | "updating" | "running" | "stopped" | "failing";
 
 export interface LocalServerStatus {
@@ -36,6 +38,12 @@ export interface LocalServerStatus {
 }
 
 export type Tailnet = { state: "missing" } | { state: "off" } | { state: "on"; device: string };
+/**
+ * Where Tailscale gets connected on this system: its app, which the app opens (a Mac), its icon by the clock
+ * (Windows: tailscale.com/kb/1022/install-windows), or `sudo tailscale up` in the terminal (Linux).
+ */
+export const tailscaleFrom = (platform: Platform): "app" | "tray" | "terminal" =>
+  platform === "mac" ? "app" : platform === "windows" ? "tray" : "terminal";
 /**
  * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale refused, the person
  * stopped waiting for HTTPS, or the server didn't answer again at its new address.
@@ -191,6 +199,12 @@ export function hereBanner(status: LocalServerStatus): "stopped" | "failing" | "
   if (status.phase === "stopped") return "stopped";
   return status.backTo ? "back" : null;
 }
+
+/**
+ * Where the server here keeps uploaded files: `files` in its folder (`FILES_DIR`, apps/server native.ts), written
+ * with the folder's own separator (`C:\Users\ana\.agentes` on Windows).
+ */
+export const filesFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}files`;
 
 /** Whether `server` is the server here, at either of its addresses. */
 export const isHereServer = (status: LocalServerStatus, server: string | null) =>

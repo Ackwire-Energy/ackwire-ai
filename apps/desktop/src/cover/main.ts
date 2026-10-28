@@ -22,6 +22,7 @@ import {
   type LocalServerStatus,
   STEP_SLOW_MS,
   stepClock,
+  tailscaleFrom,
   UPDATE_SLOW_MS,
 } from "../control/local-server";
 import { platformOf } from "../control/platform";
@@ -213,12 +214,12 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>) {
       fill(words.onlyHere),
       () => void invoke("local_server_reach", { on: false }).catch(() => {}),
     ];
-    // Tailscale has an app to open on a Mac; elsewhere it connects from the terminal.
-    if (platform === "mac") {
+    const from = tailscaleFrom(platform);
+    if (from === "app") {
       say(fill(words.tailnetOff));
       buttons([[words.openTailscale, () => void invoke("tailscale_open", { page: "app" }).catch(() => {})], onlyHere]);
     } else {
-      say(`${fill(words.tailnetOff)} ${words.tailnetUp}`);
+      say(`${fill(words.tailnetOff)} ${from === "tray" ? words.tailnetTray : words.tailnetUp}`);
       buttons([onlyHere]);
     }
   }

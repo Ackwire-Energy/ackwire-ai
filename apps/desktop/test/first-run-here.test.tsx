@@ -211,6 +211,19 @@ describe("Run agentes.chat on this Mac", () => {
       },
       { here: { tailscale: "off" } },
     );
+    // Windows: no sudo and no app for this one to open, Tailscale's icon by the clock logs it in.
+    await firstRun(
+      "windows",
+      async ({ el, press, until }) => {
+        await press("Use your own server");
+        await press("Run agentes.chat on this PC");
+        await until(() => switchRows(el)[0]?.line?.startsWith("Tailscale"));
+        const line = el.querySelector(".dk-card > .dk-crow small");
+        expect(line?.textContent).toBe("Tailscale isn't connected. Open it from its icon by the clock and log in.");
+        expect(line?.querySelector("code, button")).toBeNull();
+      },
+      { here: { tailscale: "off" } },
+    );
   });
 });
 

@@ -192,6 +192,7 @@ export const desktopPtBR = {
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
     reachOff: "O Tailscale não está conectado.",
     reachOffTerminal: "O Tailscale não está conectado. Conecte pelo terminal:",
+    reachTray: "O Tailscale não está conectado. Abra pelo ícone perto do relógio e entre na conta.",
     reachMissing: "Precisa do Tailscale, que é grátis.",
     reachChecking: "Vendo se o Tailscale está conectado…",
     /** What turning access on or off is doing while it takes. */
@@ -306,6 +307,10 @@ export const desktopPtBR = {
     phoneOff: "Ligue o acesso primeiro.",
     showQr: "Mostrar o QR code",
     usageRestart: "Mudar reinicia o agentes.chat por um instante.",
+    jev: "Jev",
+    jevText:
+      "Um modelo rápido da TypeSafe que escolhe quem responde, organiza a memória e deixa os agentes enxergarem a tela. Opcional, com uma chave sua.",
+    jevWhere: "No agentes.chat\u00a0›\u00a0Configurações\u00a0›\u00a0Contas de IA.",
     reachFailed: "O acesso pelos aparelhos não ligou: {{reason}}.",
     backup: "Fazer backup agora",
     backedUp: "Backup feito: {{file}}",
@@ -554,6 +559,7 @@ export const desktopPtBR = {
     failing: "O agentes.chat não está iniciando neste {{device}}",
     tailnetOff: "Conecte o Tailscale neste {{device}} para abrir o agentes.chat.",
     tailnetUp: "No terminal: sudo tailscale up",
+    tailnetTray: "Abra pelo ícone perto do relógio.",
     onlyHere: "Usar só neste {{device}}",
     start: "Iniciar",
     copy: "Copiar os detalhes",
