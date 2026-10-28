@@ -6197,7 +6197,6 @@ export const en: Translations = {
     },
     otherConnect: "Connect by address",
     detail: {
-      label: "About {{name}}",
       close: "Close details",
       can: "What agents will be able to do",
       afterText: "No agent uses it until you choose.",
