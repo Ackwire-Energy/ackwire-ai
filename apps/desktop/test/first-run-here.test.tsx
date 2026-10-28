@@ -430,6 +430,72 @@ describe("Setting it up here", () => {
     }
   });
 
+  test("words that would run past the window take the room above, no more: Continue stays in view", async () => {
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle; ResizeObserver: unknown };
+    const real = { style: g.getComputedStyle, observer: g.ResizeObserver };
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      el instanceof HTMLElement && el.classList.contains("ac-computer")
+        ? ({ marginTop: "94px" } as CSSStyleDeclaration)
+        : real.style(el, pseudo);
+    // What the browser reports as the steps, the bar and the buttons grow or shrink.
+    let resized = () => {};
+    g.ResizeObserver = class {
+      report: () => void;
+      constructor(report: () => void) {
+        this.report = report;
+      }
+      observe(target: Element) {
+        if (target.classList.contains("dk-fr__run")) resized = this.report;
+      }
+      unobserve() {}
+      disconnect() {}
+    };
+    try {
+      await firstRun(
+        "first",
+        async (screen) => {
+          const { el, until, button, press } = screen;
+          await press("Use your own server");
+          await press("Run agentes.chat on this Mac");
+          await until(() => el.querySelector("#here-reach:not([disabled])"));
+          await act(async () => typeInto(el.querySelector('input[type="email"]'), "ana@example.com"));
+          await act(async () => (el.querySelector("#here-reach") as HTMLElement).click());
+          await press("Start agentes.chat");
+          await until(() => el.querySelector(".dk-fr__setup"));
+          const setup = el.querySelector(".dk-fr__setup") as HTMLElement;
+          const lead = () => Number.parseFloat(setup.style.getPropertyValue("--dk-setup-lead"));
+          // The window shows 546 px of the column: the room above, then the rest.
+          let rest = 360;
+          const scroller = setup.parentElement as HTMLElement;
+          Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 546 });
+          Object.defineProperty(scroller, "scrollHeight", {
+            configurable: true,
+            get: () => Math.max(546, lead() + rest),
+          });
+          await act(async () => resized());
+          expect(lead()).toBe(94);
+          await until(() => button("Continue"));
+          expect(setup.querySelector(".dk-fr__problem")?.textContent).toContain(
+            "Give that permission once, in the terminal:",
+          );
+          // Tailscale's words and their command, 60 px more than the window shows: the room above gives those 60.
+          rest = 512;
+          await act(async () => resized());
+          expect(lead()).toBe(34);
+          expect(scroller.scrollHeight).toBe(scroller.clientHeight);
+          // Shorter again (as after Try again), it goes back to where it opened.
+          rest = 360;
+          await act(async () => resized());
+          expect(lead()).toBe(94);
+        },
+        { here: { fail: "reach", reason: "operator", pace: 10 } },
+      );
+    } finally {
+      g.getComputedStyle = real.style;
+      g.ResizeObserver = real.observer;
+    }
+  });
+
   test("Cancel stops it, and the form comes back as it was", async () => {
     let cancels = 0;
     let cancelNow: (() => Promise<void>) | null = null;

@@ -767,11 +767,25 @@ function HereSetup({
   const reachProblem = changes.find((c) => c.step === "reach" && c.state === "warn")?.reason;
   const clock = stepClock(now - activeAt);
   // Opens in the window's middle, then stays where it opened: a slow step's line or a failure's words grow the
-  // column downward instead of moving the title and Cancel. The room above is pinned once (the window keeps its size).
+  // column downward instead of moving the title and Cancel. The room above is pinned once (the window keeps its size)
+  // and gives way only by what the column would run past the window, so its last button stays in view.
   useLayoutEffect(() => {
     const el = column.current;
     const first = el?.firstElementChild;
-    if (el && first) el.style.setProperty("--dk-setup-lead", getComputedStyle(first).marginTop);
+    const run = el?.lastElementChild;
+    const scroller = el?.parentElement;
+    if (!el || !first || !run || !scroller) return;
+    const pinned = Number.parseFloat(getComputedStyle(first).marginTop);
+    const fit = () => {
+      el.style.setProperty("--dk-setup-lead", `${pinned}px`);
+      const over = scroller.scrollHeight - scroller.clientHeight;
+      if (over > 0) el.style.setProperty("--dk-setup-lead", `${Math.max(0, pinned - over)}px`);
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const resized = new ResizeObserver(fit);
+    resized.observe(run);
+    return () => resized.disconnect();
   }, []);
   // Screen readers start where they are, at every run.
   useEffect(() => {
