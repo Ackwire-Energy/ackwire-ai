@@ -1,13 +1,23 @@
-import { type Message, type MessageReceipt, useSteerState } from "@agenteschat/client";
+import {
+  type DecidedBy,
+  type Message,
+  type MessageReceipt,
+  receiptView,
+  useModelLabel,
+  useSteerState,
+} from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
+import { deciderOf } from "@agenteschat/client/lib/routing";
+import { helpUrl } from "@agenteschat/client/lib/server";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Card, Icon, InkOrbit, Row, Text, useReducedMotion } from "@/ui";
+import { Button, Card, Icon, type IconName, InkOrbit, ProviderLogo, Row, Text, useReducedMotion } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
+import { Note, OpenPage } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import { phaseKey, type ReceiptLine, receiptLine, receiptRows, receiptShows } from "./agent-receipts";
@@ -125,12 +135,24 @@ function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
       return <Icon name="pause" size={12} color={color} />;
     case "asking":
       return <Icon name="help" size={12} color={color} />;
+    case "picking":
+      return <Icon name="clock" size={12} color={color} />;
     default:
       return null;
   }
 }
 
-/** "Agentes": each agent the message reached and where it is with it, and the line's action. */
+/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk. */
+const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
+  reply: "reply",
+  only_agent: "person",
+  follow_up: "chat",
+};
+
+/**
+ * "Agentes": each agent the message reached and where it is with it, who picked them, and the line's action.
+ * When nothing could pick, why, and how agents are picked.
+ */
 function ReceiptsSheet({
   receipt,
   action,
@@ -140,9 +162,20 @@ function ReceiptsSheet({
   action: "retry" | "connect" | null;
   onAction: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dir = useDirectory();
+  const meId = useMeId();
+  const modelLabel = useModelLabel();
   const rows = receiptRows(receipt);
+  const view = receiptView(receipt);
+  const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
+  const by = deciderOf(t, view, {
+    meId,
+    agent: name,
+    person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
+    model: modelLabel,
+  });
+  const mentionNeeded = view.status?.kind === "nobody" && view.status.mentionNeeded === true;
   return (
     <>
       <SheetTitle title={t("receipts.popoverTitle")} />
@@ -151,11 +184,22 @@ function ReceiptsSheet({
           <Row
             key={r.agentId}
             leading={<AgentFace agentId={r.agentId} size={30} live={false} />}
-            title={dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent")}
+            title={name(r.agentId)}
             subtitle={t(phaseKey(r.phase))}
           />
         ))}
       </Card>
+      {by ? (
+        <Note icon={"logo" in by.mark ? <ProviderLogo id={by.mark.logo} size="xs" /> : RULE_ICON[by.mark.rule]}>
+          {by.text}
+        </Note>
+      ) : null}
+      {mentionNeeded ? (
+        <>
+          <Note icon="info">{t("receipts.mentionNeededHint")}</Note>
+          <OpenPage href={helpUrl("who-answers", i18n.language)} label={t("routing.how")} />
+        </>
+      ) : null}
       {action ? (
         <Button
           variant={action === "connect" ? "primary" : "secondary"}

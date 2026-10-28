@@ -1,5 +1,6 @@
-import { keys, type RosterMember, useApi, useRoster } from "@agenteschat/client";
+import { type AiRouting, keys, type RosterMember, useAiStatus, useApi, useRoster } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useState } from "react";
@@ -36,11 +37,14 @@ function useRefresh(channelId: string) {
   };
 }
 
-const lineOf = (t: TFunction, w: Who) =>
+/** An agent's line says how it answers my messages: on its own only while something reads the ones that mention nobody. */
+const lineOf = (t: TFunction, w: Who, routing: AiRouting | undefined) =>
   w.kind === "agent"
-    ? w.autoReply
-      ? t("channelMembers.aloneLine")
-      : t("channelMembers.mentionLine", { handle: w.handle })
+    ? !w.autoReply
+      ? t("channelMembers.mentionLine", { handle: w.handle })
+      : picksForMe(routing)
+        ? t("channelMembers.aloneLine")
+        : t(replyAloneKey(routing))
     : w.email;
 
 /**
@@ -57,6 +61,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const meId = useMeId();
   const c = useColors();
   const roster = useRoster(orgId, channelId);
+  const routing = useAiStatus(orgId).data?.routing;
   // The channel's creator may too, but the API doesn't say who created it yet: admins only (as on the web).
   const editable = can(org?.role, "configure");
   const [q, setQ] = useState("");
@@ -97,7 +102,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                 key={`${w.kind}:${w.id}`}
                 leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
-                subtitle={lineOf(t, w)}
+                subtitle={lineOf(t, w, routing)}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
                 {...(editable && !mine
                   ? {
@@ -166,6 +171,7 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
   const toast = useToast();
   const c = useColors();
   const refresh = useRefresh(channelId);
+  const routing = useAiStatus(orgId).data?.routing;
   const [autoReply, setAutoReply] = useState(who.autoReply);
   const back = () => sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channelName} />);
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
@@ -212,7 +218,7 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
       <SheetTitle
         leading={<Face who={{ type: who.kind, id: who.id }} size={36} live={false} />}
         title={who.name}
-        subtitle={lineOf(t, { ...who, autoReply })}
+        subtitle={lineOf(t, { ...who, autoReply }, routing)}
       />
       {who.kind === "agent" ? (
         <View>
@@ -224,7 +230,7 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
               {
                 key: "alone",
                 label: t("channelMembers.replyAlone"),
-                hint: t("channelMembers.replyAloneHelp"),
+                hint: t(replyAloneKey(routing)),
                 trailing: picked(autoReply),
                 disabled: reply.isPending,
                 onPress: () => !autoReply && reply.mutate(true),
