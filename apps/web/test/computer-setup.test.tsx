@@ -1411,4 +1411,91 @@ describe("the onboarding where the workspace gets its own computer", () => {
       g.getComputedStyle = real;
     }
   });
+
+  /** The room above the step as the browser lays out the column (`room` of it as it is), or the room pinned on it. */
+  const laidOut = (room: (column: Element) => number) => {
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      pseudo === "::before" && el instanceof HTMLElement && el.classList.contains("onb__body")
+        ? ({ marginTop: el.style.getPropertyValue("--onb-lead") || `${room(el)}px` } as CSSStyleDeclaration)
+        : real(el, pseudo);
+    return {
+      lead: () => (document.querySelector(".onb__body") as HTMLElement).style.getPropertyValue("--onb-lead"),
+      restore: () => {
+        g.getComputedStyle = real;
+      },
+    };
+  };
+
+  test("back from paying, the AI step is placed once its panel is in; another agent under Para moves nothing", async () => {
+    // The page opens on the step: the computer's setup, the plan gates and the agents whose line is over the steps in
+    // the panel's wait are first asked for then.
+    let room: (column: Element) => number = (column) => (column.querySelector(".ai-panel__wait .setup-say") ? 60 : 200);
+    const { lead, restore } = laidOut((column) => room(column));
+    try {
+      const state = seedState({ context: "Clínicas." });
+      state.authConfig = { workspaceComputer: true };
+      const ada = state.agents[0];
+      if (!ada) throw new Error("no agent");
+      state.agents.push({ ...ada, id: "agent-theo", name: "Theo", handle: "theo", role: "PM" });
+      await open(
+        `/org/${ORG_ID}/onboarding`,
+        { state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS, notifyByEmail: true },
+        state,
+      );
+      const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+      expect(panel.querySelector(".ai-panel__wait .setup-say[data-on]")?.textContent).toBe(
+        "O Atlas está colocando ele de pé",
+      );
+      expect(lead()).toBe("60px");
+      // Theo's plan gates are asked for in turn: the step stays where it is.
+      room = () => 30;
+      const forWhom = () => within(panel).getByRole("combobox", { name: "Agentes que usam este plano" });
+      forWhom().focus();
+      await act(async () => fireEvent.keyDown(forWhom(), { key: "Enter" }));
+      await click(screen().getByRole("option", { name: "Theo" }));
+      await settle(4);
+      expect(forWhom().textContent).toContain("Theo");
+      expect(lead()).toBe("60px");
+    } finally {
+      restore();
+    }
+  });
+
+  test("the team's line over the computer's steps and the line under Done's message are in their step where it's placed", async () => {
+    // The agents the team's lines name are first asked for as the computer step opens.
+    const { lead, restore } = laidOut((column) =>
+      column.querySelector(".setup-say")
+        ? 100
+        : column.querySelector(".onb__first-line")
+          ? 70
+          : column.querySelector(".onb__first-text")
+            ? 90
+            : 120,
+    );
+    try {
+      await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+      expect(document.querySelector(".setup-say[data-on]")?.textContent).toBe("O Theo foi atrás dos programas");
+      expect(lead()).toBe("100px");
+      cleanup();
+
+      // Waiting for its first plan, the Team step reads nobody's AI: Done first asks whether its agent has one.
+      const r = await toComputerStep({ state: null });
+      const me = r.state.me;
+      if (!me) throw new Error("no me");
+      r.state.me = {
+        ...me,
+        organizations: me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: "payment" } })),
+      };
+      await r.reported({ state: null });
+      await click(screen().getByRole("button", { name: "Agora não" }));
+      await click(screen().getByRole("button", { name: "Conectar depois" }));
+      await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+      expect(document.querySelector(".onb__first-line")?.textContent).toBe("Theo começa na hora, no #general.");
+      expect(lead()).toBe("70px");
+    } finally {
+      restore();
+    }
+  });
 });
