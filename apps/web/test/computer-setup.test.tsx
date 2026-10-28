@@ -1320,4 +1320,32 @@ describe("the onboarding where the workspace gets its own computer", () => {
       g.getComputedStyle = real;
     }
   });
+
+  test("Done is placed with its first message in it, written just after the step opens; typing moves nothing", async () => {
+    // The room above the step as the browser lays it out: less once the first message is in the column.
+    let room = 90;
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      pseudo === "::before" && el instanceof HTMLElement && el.classList.contains("onb__body")
+        ? ({
+            marginTop:
+              el.style.getPropertyValue("--onb-lead") || `${el.querySelector(".onb__first-text") ? room : 200}px`,
+          } as CSSStyleDeclaration)
+        : real(el, pseudo);
+    try {
+      await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+      await click(screen().getByRole("button", { name: "Continuar" }));
+      await click(screen().getByRole("button", { name: "Conectar depois" }));
+      await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+      const first = screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" });
+      const lead = () => (document.querySelector(".onb__body") as HTMLElement).style.getPropertyValue("--onb-lead");
+      expect(lead()).toBe("90px");
+      room = 60;
+      await act(async () => fireEvent.change(first, { target: { value: "@theo Oi" } }));
+      expect(lead()).toBe("90px");
+    } finally {
+      g.getComputedStyle = real;
+    }
+  });
 });

@@ -431,9 +431,11 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
 
   // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
   // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
-  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with.
+  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with. Done's
+  // first message is written by a layout effect below, after this one ran: the column is placed again once it's in,
+  // still before the first paint.
   const column = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again per step, per screen and with Done's first message
   useLayoutEffect(() => {
     const el = column.current;
     if (!el) return;
@@ -444,7 +446,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     place();
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [step.id, jev]);
+  }, [step.id, jev, firstAsk === null]);
 
   const saveWorkspace = useMutation({
     // Owning a workspace that waits for its first plan is said in place, with the way to that plan.
