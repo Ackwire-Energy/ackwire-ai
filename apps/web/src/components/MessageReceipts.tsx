@@ -29,12 +29,12 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
 };
 
 /**
- * Under a person's message: a small muted check (our icons). Clicking or
- * focusing it opens a popover with each agent and its status, and who picked
- * them. Words only for what you can act on ("Nenhum agente vai responder", a
- * failure, no AI connected), and while the author's own plan picks.
+ * A person's message's receipt: a small muted check (our icons) at the end of its first line (`part="check"`).
+ * Clicking or focusing it opens a popover with each agent and its status, and who picked them. Words only for what
+ * you can act on ("Nenhum agente vai responder", a failure, no AI connected), and while the author's own plan picks:
+ * then the whole receipt is a line under the message (`part="line"`), so the text still follows the name.
  */
-export function MessageReceipts({ message }: { message: Message }) {
+export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -44,6 +44,12 @@ export function MessageReceipts({ message }: { message: Message }) {
   const receipt = useLive((s) => s.receipts[message.id]);
   const view = receiptView(receipt);
   const status = view.status;
+  const worded =
+    view.picking === true ||
+    status?.kind === "nobody" ||
+    status?.kind === "no_ai" ||
+    (status?.kind === "failed" && actions !== null);
+  if (worded !== (part === "line")) return null;
   if (view.picking) {
     return (
       <div className="ac-receipt">

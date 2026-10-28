@@ -2971,14 +2971,15 @@ p {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
-/* Hover is a tint; the current page is a raised key (never the same look). */
+/* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
+   and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
-  box-shadow: var(--card-key);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   color: var(--ink);
   font-weight: 600;
 }
@@ -3669,6 +3670,17 @@ p {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
+   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+.cflow__title > :first-child {
+  translate: 0 calc(-1 * var(--cap-mid));
+}
+.cflow__title:has(> .ac-captop) {
+  align-items: flex-start;
+}
+.cflow__title:has(> .ac-captop) > :first-child {
+  translate: none;
 }
 .cflow__steps {
   display: flex;
@@ -6651,13 +6663,13 @@ a.machine-row__name:hover {
 .onb__steps li {
   position: relative;
 }
-/* The thread joining the markers, filled up to where you are. */
+/* The thread joining the markers, filled up to where you are: 4px from each, the markers centred in 52px steps. */
 .onb__steps li:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 21px;
-  top: 40px;
-  bottom: -8px;
+  top: 42px;
+  bottom: -10px;
   width: 2px;
   border-radius: 1px;
   background: var(--line2);
@@ -6749,15 +6761,6 @@ a.machine-row__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A step with its answer under its name: the number stays on the name's 17.5px line, as an `.ac-iconline` lead. */
-@media (min-width: 761px) {
-  .onb__step:has(.onb__step-sub) {
-    align-items: flex-start;
-  }
-  .onb__step:has(.onb__step-sub) > .onb__n {
-    translate: 0 calc(8.75px - var(--cap-mid) - 50%);
-  }
-}
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
   display: flex;
@@ -6832,6 +6835,16 @@ a.machine-row__name:hover {
     min-height: 0;
     padding: 4px;
   }
+  /* The setup's seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current
+     one's ring, reaching past the strip's edges. Criar agente and the landing's card keep the shared strip. */
+  .onb:not(.newag) .onb__steps {
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
+  }
+  .onb:not(.newag) .onb__step {
+    padding: 2px;
+  }
   .onb__step-text {
     position: absolute;
     width: 1px;
@@ -6840,6 +6853,12 @@ a.machine-row__name:hover {
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+}
+/* Narrower, they fit beside the logo's mark alone. */
+@media (max-width: 384px) {
+  .onb__brand .ac-logo > :not(.ac-logo__mark) {
+    display: none;
   }
 }
 
@@ -8140,15 +8159,24 @@ a.machine-row__name:hover {
   }
 }
 /* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
-   many lines follow the title. A touch screen's small button is the ruler's default step. */
+   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
+   spaced. A touch screen's small button is the ruler's default step. */
 @media (min-width: 641px) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-sm);
+    padding-top: calc((var(--control-h-sm) - 20px) / 2);
   }
 }
 @media (min-width: 641px) and (pointer: coarse) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-md);
+    padding-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
@@ -10135,6 +10163,11 @@ html[data-menu-overlay] .shell {
 .ac-receipt__clock .ac-icon {
   width: 16px;
   height: 16px;
+}
+/* Leading a receipt's line under its message, the icon's 2px of padding reach out, so the icon starts on the text's
+   edge, as the words do. */
+.ac-msg__foot .ac-receipt > :is(.ac-receipt__check, .ac-receipt__clock):first-child {
+  margin-inline-start: -2px;
 }
 /* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
 .who-by {
