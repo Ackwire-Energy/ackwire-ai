@@ -749,7 +749,7 @@ function AgentRow({
               aria-label={chip}
               title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
             >
-              <Icon name="lock" size={12} />
+              <Icon name="lock" size={14} />
             </span>
           </span>
         ) : (
