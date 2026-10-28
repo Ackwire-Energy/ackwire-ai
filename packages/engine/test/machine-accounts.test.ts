@@ -697,7 +697,14 @@ test("the same email twice for one owner on one computer is refused, and the new
   await addAccount(machineId, CLAUDE_ID, "claude_code", { label: "Trabalho", email: "Ana@Example.com" });
   const runner = signingRunner(machineId, () => ({ loggedIn: true, email: "ana@example.com", plan: "max" }));
   const { login, status } = await signIn(runner, f.owner.id, machineId);
-  expect(status).toMatchObject({ state: "failed", duplicate: { label: "Trabalho" } });
+  // Named, and the account itself: its owner may think with it instead.
+  expect(status).toMatchObject({
+    state: "failed",
+    duplicate: {
+      label: "Trabalho",
+      account: { id: CLAUDE_ID, label: "Trabalho", email: "Ana@Example.com", mine: true, status: "active", usedBy: [] },
+    },
+  });
   expect(runner.calls.at(-1)).toEqual({
     op: "account",
     action: "remove",

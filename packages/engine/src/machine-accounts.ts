@@ -916,8 +916,11 @@ export interface AccountLoginStatus {
   account?: MachineAccountView;
   /** `failed`: why, for people. */
   error?: string;
-  /** `failed`: the person already has this account on this computer (the new sign-in is removed there). */
-  duplicate?: { label: string };
+  /**
+   * `failed`: the person already has this account on this computer (the new sign-in is removed there): its name, and
+   * the account itself, theirs to think with instead.
+   */
+  duplicate?: { label: string; account: MachineAccountView };
 }
 
 const LOGIN_STATES: readonly AccountLoginState[] = ["waiting", "done", "failed", "expired"];
@@ -956,7 +959,10 @@ export async function accountLoginStatus(
     return {
       state: "failed",
       error: `That account is already on this computer (${settled.duplicate.label}).`,
-      duplicate: { label: settled.duplicate.label },
+      duplicate: {
+        label: settled.duplicate.label,
+        account: await accountViewOf(deps.db, orgId, settled.duplicate, userId),
+      },
     };
   }
   if (!settled.row || !LISTED_ACCOUNT_STATUSES.includes(settled.row.status)) {

@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
+import { ApiError } from "../src/api/http";
 import { keys } from "../src/api/keys";
+import type { AccountLoginStatus, MachineAccount } from "../src/api/types";
 import {
+  type AccountLoginInput,
   allowFolderCommand,
   allowsInApp,
+  beginLogin,
   commandInReason,
   computerKind,
   computerState,
@@ -12,6 +16,7 @@ import {
   folderName,
   foldersOfAgent,
   formatUserCode,
+  freeDuplicate,
   installCommand,
   isHandheld,
   isPaused,
@@ -175,5 +180,66 @@ describe("connected computers helpers (ADR 0036)", () => {
       type: string;
     });
     expect(stale()).toEqual([true, true]);
+  });
+
+  test("a sign-in starts with no address asked: Claude's hint is the account's own, dropped if the server refuses it", async () => {
+    const sent: AccountLoginInput[] = [];
+    const begin = async (input: AccountLoginInput) => {
+      sent.push(input);
+      return input;
+    };
+    // A first sign-in names nothing; signing in again names the account, and Claude gets its email as the hint.
+    expect(await beginLogin(begin, "claude_code", {})).toEqual({});
+    expect(await beginLogin(begin, "claude_code", { again: "a1", hint: "walt@acme.com" })).toEqual({
+      accountId: "a1",
+      email: "walt@acme.com",
+    });
+    // ChatGPT and a coding plan's key take no hint.
+    expect(await beginLogin(begin, "codex", { again: "a2", hint: "walt@acme.com" })).toEqual({ accountId: "a2" });
+    expect(await beginLogin(begin, "claude_code", { provider: "zai", hint: "walt@acme.com" })).toEqual({
+      provider: "zai",
+    });
+    // The hint only steered Claude's page: refused, the sign-in starts without it; anything else stays an error.
+    const strict = async (input: AccountLoginInput) => {
+      if (input.email) throw new ApiError(400, "account.invalid_email", "Use a plain email address");
+      return begin(input);
+    };
+    sent.length = 0;
+    expect(await beginLogin(strict, "claude_code", { again: "a1", hint: "o'brien@acme.com" })).toEqual({
+      accountId: "a1",
+    });
+    expect(sent).toEqual([{ accountId: "a1" }]);
+    const offline = async (): Promise<AccountLoginInput> => {
+      throw new ApiError(409, "machine.offline", "Offline");
+    };
+    expect(await beginLogin(offline, "claude_code", { hint: "walt@acme.com" }).catch((e) => e.code)).toBe(
+      "machine.offline",
+    );
+  });
+
+  test("the account a sign-in came back as, already there: theirs to use while it's signed in and thinks for no one", () => {
+    const account: MachineAccount = {
+      id: "a1",
+      kind: "claude_code",
+      label: "Claude Max",
+      email: "walt@acme.com",
+      plan: "max",
+      status: "active",
+      ownerId: "u1",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    };
+    const failed = (duplicate: AccountLoginStatus["duplicate"]): AccountLoginStatus => ({ state: "failed", duplicate });
+    expect(freeDuplicate(failed({ label: "Claude Max", account }))).toBe(account);
+    expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, usedBy: ["Theo"] } }))).toBeNull();
+    expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, status: "signed_out" } }))).toBeNull();
+    // An older server names it only.
+    expect(freeDuplicate(failed({ label: "Claude Max" }))).toBeNull();
+    expect(freeDuplicate({ state: "failed" })).toBeNull();
+    expect(freeDuplicate(undefined)).toBeNull();
   });
 });
