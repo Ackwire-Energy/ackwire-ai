@@ -9983,12 +9983,17 @@ html[data-menu-overlay] .shell {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-left: calc(var(--text-edge) - 12px);
-  padding: 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
+}
+.ai-panel__wait {
+  margin-left: calc(var(--text-edge) - 12px);
+  padding: 12px;
   /* Short lines: wrapped, they break into two of a length. */
   text-wrap: balance;
+}
+.onb__wait {
+  padding: 12px 14px;
 }
 /*
  * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
