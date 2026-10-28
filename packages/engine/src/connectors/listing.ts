@@ -61,6 +61,11 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   contentful: { file: "contentful", color: "#2478CC" },
   jotform: { file: "jotform", color: "#FF6100" },
   tally: { file: "tally", color: null },
+  expo: { file: "expo", color: null },
+  revenuecat: { file: "revenuecat", color: "#F2545B" },
+  superwall: { file: "superwall", color: null },
+  paddle: { file: "paddle", color: null },
+  abacatepay: { file: "abacatepay", color: "#337D63" },
 };
 
 export interface ConnectorListingEntry {
