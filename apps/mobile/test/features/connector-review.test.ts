@@ -13,7 +13,6 @@ import {
   emptyReview,
   firstStep,
   isWaiting,
-  opensTools,
   returnHref,
   reviewAgain,
   reviewTarget,
@@ -95,13 +94,6 @@ describe("where the sheet is", () => {
     // Back from a sign-in: on its tools, reviewed or not; never for someone who can't change them.
     expect(firstStep({ needsReview: false }, true, "review")).toBe("review");
     expect(firstStep({ needsReview: true }, false, "review")).toBe("who");
-  });
-
-  test("a connection whose tools wait for a review opens them, for admins only (as the web's Revisar)", () => {
-    expect(opensTools({ needsReview: true }, true)).toBe(true);
-    expect(opensTools({ needsReview: false }, true)).toBe(false);
-    expect(opensTools({ needsReview: true }, false)).toBe(false);
-    expect(opensTools(undefined, true)).toBe(false);
   });
 
   test("each step has a name in both languages, and the dashes say where the flow is", async () => {

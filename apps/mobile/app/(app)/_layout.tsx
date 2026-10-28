@@ -63,6 +63,7 @@ function AppStack() {
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen
         name="connectors/oauth"
         options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}

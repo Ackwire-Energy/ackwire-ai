@@ -297,16 +297,18 @@ function ConnectedSteps({
           }}
         />
       ) : null}
-      {admin && live ? <DisconnectButton item={live} name={name} /> : null}
+      {admin && live ? <DisconnectButton item={live} name={name} onDone={sheet.close} /> : null}
     </>
   );
 }
 
-/** Disconnecting, closing the sheet with a note on the screen behind it, or saying in the sheet that it failed. */
-function DisconnectButton({ item, name }: { item: ConnectedItem; name: string }) {
+/**
+ * Disconnecting: `onDone` leaves (the sheet closes, the screen goes back) with a note on the screen behind it, or
+ * it says in place that it failed.
+ */
+export function DisconnectButton({ item, name, onDone }: { item: ConnectedItem; name: string; onDone: () => void }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const sheet = useSheet();
   const toast = useToast();
   const disconnect = useDisconnect(orgId);
   const { disconnect: disconnectServer } = useCustomServerAction(orgId);
@@ -323,7 +325,7 @@ function DisconnectButton({ item, name }: { item: ConnectedItem; name: string })
           const done = {
             onSuccess: () => {
               successHaptic();
-              sheet.close();
+              onDone();
               toast({ title: t("mobile.connectors.disconnected", { name }) });
             },
             onError: () => {
@@ -577,7 +579,7 @@ function ConnectStep({
 }
 
 /** Who uses this connection and how far: one choice per agent (admins and each agent's owner change it). */
-function AgentLevels({ connectionId }: { connectionId: string }) {
+export function AgentLevels({ connectionId }: { connectionId: string }) {
   const dir = useDirectory();
   const qc = useQueryClient();
   const orgId = useOrgId();
@@ -653,7 +655,8 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   );
 }
 
-function SafeNote() {
+/** What always asks, whatever the level (deleting, publishing, answering customers). */
+export function SafeNote() {
   const { t } = useTranslation();
   const c = useColors();
   return (
