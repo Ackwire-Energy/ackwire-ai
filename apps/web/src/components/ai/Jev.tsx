@@ -1,5 +1,12 @@
 import type { AiRouting, JevKey } from "@agenteschat/client";
-import { useAiStatus, useCheckJevKey, useJevKey, useRemoveJevKey, useSaveJevKey } from "@agenteschat/client";
+import {
+  useAiStatus,
+  useCheckJevKey,
+  useJevKey,
+  useModelLabel,
+  useRemoveJevKey,
+  useSaveJevKey,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatDecimal, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -24,7 +31,6 @@ import { Fragment, type ReactNode, type Ref, useEffect, useId, useRef, useState 
 import { useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { useOrg } from "@/components/org-context";
-import { useModelLabel } from "@/hooks/useModelLabel";
 import { OpenPage, Step, StepTitle } from "./AddAccountFlow";
 
 /*

@@ -264,6 +264,12 @@ export const useModels = () => {
   return useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
 };
 
+/** A catalog model's name ("Claude Haiku 5.5") once the list is in: its id for one the list doesn't have, null before. */
+export function useModelLabel() {
+  const models = useModels();
+  return (id: string) => (models.data ? (models.data.models.find((m) => m.id === id)?.label ?? id) : null);
+}
+
 export const useCredentials = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.credentials(orgId), queryFn: () => api.agents.credentials(orgId), enabled });
