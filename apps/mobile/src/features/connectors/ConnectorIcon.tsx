@@ -6,12 +6,13 @@ import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { Icon, type IconName, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { brandOf, iconUri, monogram, serverIconUri } from "./logic";
+import { brandOf, iconUri, monogram, ownMarkUri, serverIconUri } from "./logic";
 
 /**
- * A service's mark on a tile (the web's brand icons, CC0, tinted in the brand's color; the ink for near-black
- * brands); else the icon a server connected by address gave (`image`, in its own colors, loaded with the
- * session); else a monogram. `check`: a small check on the corner once it is connected (no tags).
+ * A service's mark on a tile, as the web draws it: a one-color brand icon tinted in the brand's color (the ink for
+ * near-black brands), else a mark in its own colors (the web's `/brands/` files, or the icon a server connected by
+ * address gave as `image`, loaded with the session), else a monogram. `check`: a small check on the corner once it
+ * is connected (no tags).
  */
 export function ConnectorIcon({
   def,
@@ -28,11 +29,13 @@ export function ConnectorIcon({
 }) {
   const c = useColors();
   const uri = def ? iconUri(serverUrl(), def.iconUrl) : null;
-  // Stable per URL, so the image isn't fetched again on every render.
+  const mark = def ? ownMarkUri(serverUrl(), def.iconUrl) : null;
+  // Stable per URL, so the image isn't fetched again on every render. The web's own files are public: no session.
   const own = useMemo(() => {
+    if (mark) return { uri: mark };
     const at = uri ? null : serverIconUri(serverUrl(), image);
     return at ? { uri: at, headers: appHeaders(lastCookie()) } : null;
-  }, [uri, image]);
+  }, [uri, mark, image]);
   const tint = (def ? brandOf(def.brandColor) : null) ?? c.ink;
   const radius = Math.round(size * 0.3);
   return (

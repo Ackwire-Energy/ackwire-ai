@@ -1,4 +1,5 @@
 import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import { CONNECTOR_MARK, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import type { MailChoice } from "@agenteschat/client/lib/mail";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { Button, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
@@ -33,13 +34,6 @@ export function authKind(d: ConnectorDef): "oneClick" | "oauthOrKey" | "key" {
   return d.oauthConfigured && d.auth.includes("oauth") ? "oauthOrKey" : "key";
 }
 
-/** Only our own icons (`/connectors/{name}.svg`), never an arbitrary URL in CSS. */
-const ICON_URL = /^\/connectors\/[a-z0-9-]+\.svg$/;
-/** Our own mark in its maker's colors (`/brands/{name}.svg`). */
-const OWN_MARK = /^\/brands\/[a-z0-9-]+\.svg$/;
-/** A server's own icon, as the backend keeps and serves it (never the server's URL). */
-const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
-
 /**
  * The service's one-color brand icon drawn as a mask in its brand color (the
  * ink for near-black brands); else a mark in its own colors, ours or the
@@ -57,7 +51,8 @@ export function ConnectorIcon({
   image?: string | null;
 }) {
   const cls = `connector-icon${size === "lg" ? " connector-icon--lg" : ""}`;
-  if (def?.iconUrl && ICON_URL.test(def.iconUrl)) {
+  // Only a file of ours goes into the CSS `url()`.
+  if (def?.iconUrl && CONNECTOR_MARK.test(def.iconUrl)) {
     const style = {
       "--connector-icon": `url("${def.iconUrl}")`,
       ...(def.brandColor && /^#[0-9a-fA-F]{6}$/.test(def.brandColor) ? { "--connector-color": def.brandColor } : {}),
