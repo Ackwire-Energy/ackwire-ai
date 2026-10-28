@@ -159,6 +159,43 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
   };
 }
 
+/**
+ * The team's playful lines while the computer is prepared (`computerSetup.lines.<said>.<agent>`), keyed by what the
+ * status line says (`setupView`): its stage when it has words, else its step. Each line names one of the
+ * onboarding's agents, by the handle the onboarding gives it.
+ */
+const SETUP_LINES = {
+  reserving: ["atlas", "theo", "lia"],
+  ordering: ["ada", "atlas", "theo"],
+  wiping: ["ada", "atlas", "lia"],
+  starting: ["atlas", "ada", "theo"],
+  booting: ["ada", "atlas", "theo"],
+  updating: ["lia", "ada", "theo"],
+  restarting: ["ada", "atlas", "theo"],
+  network: ["lia", "atlas", "theo"],
+  firewall: ["atlas", "lia", "theo"],
+  installing: ["theo", "lia", "ada"],
+  connecting: ["ada", "atlas", "lia"],
+} as const satisfies Record<SetupStage | ComputerSetupStep, readonly string[]>;
+type Said = keyof typeof SETUP_LINES;
+type SetupLineKey = { [S in Said]: `computerSetup.lines.${S}.${(typeof SETUP_LINES)[S][number]}` }[Said];
+/** The lines that give the computer's memory: left out until its size is known. */
+const MEMORY_LINES: readonly SetupLineKey[] = ["computerSetup.lines.ordering.ada", "computerSetup.lines.booting.ada"];
+
+/**
+ * The lines for where it is now, in order, each with the agent it names: only an agent on the team; none while it
+ * isn't being prepared within a step.
+ */
+export function setupLines<A extends { handle: string }>(view: SetupView, team: readonly A[]) {
+  const said = (view.step ? view.textKey.slice(view.textKey.lastIndexOf(".") + 1) : null) as Said | null;
+  const named: readonly string[] = said ? SETUP_LINES[said] : [];
+  return named.flatMap((handle) => {
+    const agent = team.find((a) => a.handle === handle);
+    const key = `computerSetup.lines.${said}.${handle}` as SetupLineKey;
+    return agent && (view.specs || !MEMORY_LINES.includes(key)) ? [{ key, agent }] : [];
+  });
+}
+
 /** The time left as the preparing screens say it (`computerSetup.eta.*`). */
 export type EtaView =
   | { kind: "minutes"; count: number }

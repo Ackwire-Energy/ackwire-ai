@@ -8521,6 +8521,64 @@ export const en: Translations = {
       firewall: "Setting up its protection",
     },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
+    /** One at a time while it's prepared (`setupLines`), each naming the agent it's about. */
+    lines: {
+      reserving: {
+        atlas: "{{name}} is setting one aside for us",
+        theo: "{{name}} put our name on it",
+        lia: "{{name}} is checking it's all ours",
+      },
+      ordering: {
+        ada: "{{name}} asked for {{gb}} GB of memory",
+        atlas: "{{name}} ordered a brand new one",
+        theo: "{{name}} is keeping an eye on the order",
+      },
+      wiping: {
+        ada: "{{name}} is giving it a good scrub",
+        atlas: "{{name}} is taking out the trash",
+        lia: "{{name}} is checking nothing old is left",
+      },
+      starting: {
+        atlas: "{{name}} is getting it on its feet",
+        ada: "{{name}} is warming up the engines",
+        theo: "{{name}} waved the starting flag",
+      },
+      booting: {
+        ada: "{{name}} is counting all {{gb}} GB of memory",
+        atlas: "{{name}} is checking every part is there",
+        theo: "{{name}} is letting it load in peace",
+      },
+      updating: {
+        lia: "{{name}} is fetching the latest updates",
+        ada: "{{name}} is tightening every screw",
+        theo: "{{name}} is ticking off each update",
+      },
+      restarting: {
+        ada: "{{name}} says this restart is normal",
+        atlas: "{{name}} is making the update stick",
+        theo: "{{name}} is counting to ten",
+      },
+      network: {
+        lia: "{{name}} is running the cables",
+        atlas: "{{name}} is making sure it finds us",
+        theo: "{{name}} is drawing it a map",
+      },
+      firewall: {
+        atlas: "{{name}} is locking every door",
+        lia: "{{name}} put a bouncer out front",
+        theo: "{{name}} is writing the guest list",
+      },
+      installing: {
+        theo: "{{name}} is looking for the apps",
+        lia: "{{name}} is unpacking the apps",
+        ada: "{{name}} is laying out the tools",
+      },
+      connecting: {
+        ada: "{{name}} is waiting for its first hello",
+        atlas: "{{name}} is handing over the keys",
+        lia: "{{name}} is introducing it to the team",
+      },
+    },
     status: {
       preparing: "Getting the computer ready.",
       capacity: "Waiting for an available computer",

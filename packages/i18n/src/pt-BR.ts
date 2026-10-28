@@ -8574,6 +8574,64 @@ export const ptBR = {
       firewall: "Configurando a proteção",
     },
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
+    /** One at a time while it's prepared (`setupLines`), each naming the agent it's about. */
+    lines: {
+      reserving: {
+        atlas: "{{The}} {{name}} está separando um para a gente",
+        theo: "{{The}} {{name}} colocou o nosso nome nele",
+        lia: "{{The}} {{name}} está conferindo se é só nosso",
+      },
+      ordering: {
+        ada: "{{The}} {{name}} pediu {{gb}} GB de memória",
+        atlas: "{{The}} {{name}} encomendou um novinho",
+        theo: "{{The}} {{name}} está de olho no pedido",
+      },
+      wiping: {
+        ada: "{{The}} {{name}} está dando um banho nele",
+        atlas: "{{The}} {{name}} está tirando o lixo",
+        lia: "{{The}} {{name}} está vendo se não sobrou nada",
+      },
+      starting: {
+        atlas: "{{The}} {{name}} está colocando ele de pé",
+        ada: "{{The}} {{name}} está esquentando os motores",
+        theo: "{{The}} {{name}} deu a largada",
+      },
+      booting: {
+        ada: "{{The}} {{name}} está contando os {{gb}} GB de memória",
+        atlas: "{{The}} {{name}} confere se tem todas as peças",
+        theo: "{{The}} {{name}} deixa ele carregar em paz",
+      },
+      updating: {
+        lia: "{{The}} {{name}} está baixando as novidades",
+        ada: "{{The}} {{name}} está apertando cada parafuso",
+        theo: "{{The}} {{name}} vai riscando cada atualização",
+      },
+      restarting: {
+        ada: "{{The}} {{name}} diz que esse reinício é normal",
+        atlas: "{{The}} {{name}} garante que a atualização pegue",
+        theo: "{{The}} {{name}} está contando até dez",
+      },
+      network: {
+        lia: "{{The}} {{name}} está passando os cabos",
+        atlas: "{{The}} {{name}} garante que ele ache a gente",
+        theo: "{{The}} {{name}} está desenhando um mapa",
+      },
+      firewall: {
+        atlas: "{{The}} {{name}} está trancando as portas",
+        lia: "{{The}} {{name}} pôs um segurança na entrada",
+        theo: "{{The}} {{name}} está fazendo a lista VIP",
+      },
+      installing: {
+        theo: "{{The}} {{name}} foi atrás dos programas",
+        lia: "{{The}} {{name}} está desembrulhando os programas",
+        ada: "{{The}} {{name}} está arrumando as ferramentas",
+      },
+      connecting: {
+        ada: "{{The}} {{name}} espera o primeiro oi dele",
+        atlas: "{{The}} {{name}} está entregando as chaves",
+        lia: "{{The}} {{name}} está apresentando ele à equipe",
+      },
+    },
     status: {
       preparing: "Preparando o computador.",
       capacity: "Esperando um computador disponível",
