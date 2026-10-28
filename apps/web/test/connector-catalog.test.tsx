@@ -192,7 +192,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(flow().textContent).toContain("Classificamos as 5 ferramentas do Linear.");
     const decide = within(flow()).getByRole("region", { name: "Precisam da sua decisão · 1" });
     expect(decide.textContent).toContain("Fechar chamado");
-    expect(decide.textContent).toContain("Sugestão: muda coisas — muda coisas, mas não apaga nada nem gasta dinheiro");
+    expect(decide.textContent).toContain("Sugestão: muda coisas, porque muda coisas, mas não apaga nada nem gasta dinheiro");
     expect(flow().textContent).toContain("Falta 1 decisão. Se continuar, vale a sugestão.");
     expect(within(flow()).queryByRole("region", { name: "Pronto. Tudo revisado." })).toBeNull();
     await click(within(decide).getByRole("button", { name: "Aceitar as sugestões" }));

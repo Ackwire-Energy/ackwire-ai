@@ -510,7 +510,7 @@ describe("last-message previews in the reader's language", () => {
     const i18n = i18next.createInstance();
     await i18n.init({ lng: "pt-BR", fallbackLng: "pt-BR", resources });
     expect(previewBody(i18n.t, last?.text ?? "", last?.meta ?? null)).toBe(
-      "O Claude Code não está disponível agora; respondo quando ele voltar.",
+      "O Claude Code não está disponível agora. Respondo quando ele voltar.",
     );
     await i18n.changeLanguage("en");
     expect(previewBody(i18n.t, last?.text ?? "", last?.meta ?? null)).toBe(

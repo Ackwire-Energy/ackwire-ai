@@ -310,7 +310,7 @@ describe("an invitation link asks to join", () => {
     expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
     expect(note?.querySelector("b")?.textContent).toBe("Recado:");
     expect(note?.querySelector("i")).toBeNull();
-    expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você por e-mail.");
+    expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você.");
     cleanup();
 
     await openLink({ ...LINK, you: you({ request: { status: "approved", reason: null } }) }, { signedIn: true });
@@ -629,11 +629,9 @@ describe("Members › Invitation link", () => {
     expect(writes).toEqual(["http://localhost:3000/invite/k3J"]);
     expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
     // Who can get in through a shared link stays on screen, not behind an ⓘ.
-    const linkLine = within(invite).getByText(
-      /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
-    );
+    const linkLine = within(invite).getByText(/^Um admin aprova cada pessoa que pedir\. Vale até \S+/);
     expect(linkLine.closest("[hidden]")).toBeNull();
-    expect(invite.textContent).toMatch(/Link anterior · criado .+ por João · vale até /);
+    expect(invite.textContent).toMatch(/Link anterior, criado por João .+\. Vale até /);
 
     const [turnOff] = within(invite).getAllByRole("button", { name: "Desativar" });
     await click(turnOff as HTMLElement);

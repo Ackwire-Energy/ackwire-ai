@@ -72,7 +72,7 @@ describe("help pages", () => {
 
   test("code reads as code: a path in a line, and a command in a block of its own", async () => {
     await renderApp("/help/run-on-your-computer?lang=en", { api: signedOut() });
-    expect([...document.querySelectorAll(".lp-help__doc p code")].map((c) => c.textContent)).toContain("~/.agentes");
+    expect([...document.querySelectorAll(".lp-help__doc p code")].map((c) => c.textContent)).toContain(".agentes");
     cleanup();
     render(<Block block={{ code: "curl -fsSL https://agentes.chat/install | sh" }} />);
     expect(document.querySelector("pre > code")?.textContent).toBe("curl -fsSL https://agentes.chat/install | sh");

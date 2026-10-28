@@ -89,7 +89,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect(card("Antiga em UTC").textContent).toContain("(UTC)");
     await menu("Antiga em UTC", "Editar");
     const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
-    expect(dialog.textContent).toContain("Esta rotina está em UTC; quer usar o horário de Brasília?");
+    expect(dialog.textContent).toContain("Esta rotina está em UTC. Quer usar o horário de Brasília?");
     expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
       "Horário de Brasília · UTC−3",
     );

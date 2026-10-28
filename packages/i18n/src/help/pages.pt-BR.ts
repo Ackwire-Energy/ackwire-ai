@@ -5,13 +5,13 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
   "run-on-your-computer": {
     title: "Rodar o agentes.chat no seu computador",
     summary:
-      "O app do agentes.chat também roda o próprio agentes.chat, num Mac ou num computador com Linux, para você ou uma equipe pequena.",
+      "O app do agentes.chat também roda o próprio agentes.chat, num Mac, num PC ou num computador com Linux, para você ou uma equipe pequena.",
     sections: [
       {
         id: "how",
         heading: "Como ele roda",
         blocks: [
-          "Ele roda dentro do app, com um banco de dados embutido, e guarda tudo numa pasta deste computador, `~/.agentes`. Nada mais para instalar: sem Docker, sem banco para configurar.",
+          "Ele roda dentro do app, com um banco de dados embutido, e guarda tudo numa pasta deste computador, a `.agentes` da sua pasta pessoal. Nada mais para instalar: sem Docker, sem banco para configurar.",
           "Ele liga junto com o app e para quando você fecha o app. Fechar pergunta antes, porque ninguém consegue usar o agentes.chat até o app abrir de novo.",
         ],
       },
@@ -40,7 +40,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "backups",
         heading: "Backup e mudança",
         blocks: [
-          "**Fazer backup agora**, em **Preferências\u00a0›\u00a0Servidores**, guarda o banco de dados, os arquivos e os ajustes em `~/.agentes/backups`.",
+          "**Fazer backup agora**, em **Preferências\u00a0›\u00a0Servidores**, guarda o banco de dados, os arquivos e os ajustes em `.agentes/backups`, na sua pasta pessoal.",
         ],
       },
     ],
@@ -48,13 +48,13 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
   computers: {
     title: "Computadores para os agentes",
     summary:
-      "Os agentes rodam código e mexem em arquivos nos computadores que você conecta: um Mac com o app do agentes.chat, ou um servidor.",
+      "Os agentes rodam código e mexem em arquivos nos computadores que você conecta: um Mac ou um PC com o app do agentes.chat, ou um servidor.",
     sections: [
       {
         id: "mac",
-        heading: "Um Mac, com o app",
+        heading: "Um Mac ou um PC, com o app",
         blocks: [
-          "O app do agentes.chat abre o seu servidor numa janela própria e, com um clique, os agentes dele trabalham nesse Mac, em pastas só deles. Instale o app, abra, escolha **Usar o seu próprio servidor\u00a0›\u00a0Conectar ao meu servidor** e digite o endereço do seu servidor. Depois, já dentro, clique em **Usar este Mac** em **Configurações\u00a0›\u00a0Computadores**.",
+          "O app do agentes.chat abre o seu servidor numa janela própria e, com um clique, os agentes dele trabalham nesse computador, em pastas só deles. Instale o app, abra, escolha **Usar o seu próprio servidor\u00a0›\u00a0Conectar ao meu servidor** e digite o endereço do seu servidor. Depois, já dentro, clique em **Usar este Mac** (**Usar este PC** no Windows, **Usar este computador** no Linux) em **Configurações\u00a0›\u00a0Computadores**.",
         ],
       },
       {
@@ -68,14 +68,14 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "folders",
         heading: "Pastas",
         blocks: [
-          "Cada agente sempre tem a própria pasta, em `~/agentes/<organização>`. Pastas a mais se liberam no próprio computador, nunca pelo site: no app, em **Preferências\u00a0›\u00a0Pastas**. Cada organização libera as próprias pastas: o que você libera para uma vale só para os agentes dela. Remover uma pasta não apaga nada; só tira o acesso.",
+          "Cada agente sempre tem a própria pasta, em `~/agentes/<organização>`. Pastas a mais se liberam no próprio computador, nunca pelo site: no app, em **Preferências\u00a0›\u00a0Pastas**, ou com `agentes-runner folders allow` num servidor. Cada organização libera as próprias pastas: o que você libera para uma vale só para os agentes dela. Remover uma pasta não apaga nada. Só tira o acesso.",
         ],
       },
       {
         id: "pausing",
         heading: "Pausar",
         blocks: [
-          "Quem conectou um computador pode pausar os agentes nele mesmo, pela barra de menus do app. Nada novo começa até retomar; o que já rodava termina.",
+          "Com o app, quem conectou um computador pode pausar os agentes nele, pelo ícone do agentes.chat perto do relógio. Nada novo começa até retomar. O que já rodava termina.",
         ],
       },
       {
@@ -142,8 +142,8 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "never",
         heading: "O que nunca vem",
         blocks: [
-          "Chaves, senhas, logins e histórico de conversa nunca vêm: os agentes usam o modelo e a chave do workspace. Algumas coisas ainda não têm equivalente aqui, ou nunca devem viajar num arquivo; dá para recriar depois.",
-          "Arquivos e pastas são lidos no seu navegador; um link do GitHub passa pelo servidor do workspace. Arquivos de chaves e de login nunca são abertos, e nada muda até você confirmar.",
+          "Chaves, senhas, logins e histórico de conversa nunca vêm: os agentes pensam com a IA do workspace. Algumas coisas ainda não têm equivalente aqui, ou nunca devem viajar num arquivo. Dá para recriar depois.",
+          "Arquivos e pastas são lidos no seu navegador. Um link do GitHub passa pelo servidor do workspace. Arquivos de chaves e de login nunca são abertos, e nada muda até você confirmar.",
         ],
       },
       {
@@ -264,7 +264,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "who",
         heading: "Quem aprova",
         blocks: [
-          "Quem é responsável pelo agente aprova os pedidos dele; num agente sem responsável, os admins aprovam.",
+          "Quem é responsável pelo agente aprova os pedidos dele. Num agente sem responsável, os admins aprovam.",
         ],
       },
       {

@@ -5,13 +5,13 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   "run-on-your-computer": {
     title: "Run agentes.chat on your computer",
     summary:
-      "The agentes.chat app can also run agentes.chat itself, on a Mac or a Linux computer, for you or a small team.",
+      "The agentes.chat app can also run agentes.chat itself, on a Mac, a PC or a Linux computer, for you or a small team.",
     sections: [
       {
         id: "how",
         heading: "How it runs",
         blocks: [
-          "It runs inside the app, with its own database built in, and keeps everything in one folder on this computer, `~/.agentes`. Nothing else to install: no Docker, no database to set up.",
+          "It runs inside the app, with its own database built in, and keeps everything in one folder on this computer, `.agentes` in your home folder. Nothing else to install: no Docker, no database to set up.",
           "It starts with the app and stops when you quit it. Quitting asks first, because nobody can use agentes.chat until the app opens again.",
         ],
       },
@@ -40,7 +40,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "backups",
         heading: "Backups and moving",
         blocks: [
-          "**Back up now**, in **Preferences\u00a0›\u00a0Servers**, saves the database, the files and the settings in `~/.agentes/backups`.",
+          "**Back up now**, in **Preferences\u00a0›\u00a0Servers**, saves the database, the files and the settings in `.agentes/backups`, in your home folder.",
         ],
       },
     ],
@@ -48,13 +48,13 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   computers: {
     title: "Computers for your agents",
     summary:
-      "Agents run code and work with files on computers you connect: a Mac with the agentes.chat app, or a server.",
+      "Agents run code and work with files on computers you connect: a Mac or a PC with the agentes.chat app, or a server.",
     sections: [
       {
         id: "mac",
-        heading: "A Mac, with the app",
+        heading: "A Mac or a PC, with the app",
         blocks: [
-          "The agentes.chat app opens your server in a window of its own, and with one click its agents work on that Mac, in folders of their own. Install the app, open it, choose **Use your own server\u00a0›\u00a0Connect to my server** and type your server's address. Then, signed in, click **Use this Mac** in **Settings\u00a0›\u00a0Computers**.",
+          "The agentes.chat app opens your server in a window of its own, and with one click its agents work on that computer, in folders of their own. Install the app, open it, choose **Use your own server\u00a0›\u00a0Connect to my server** and type your server's address. Then, signed in, click **Use this Mac** (**Use this PC** on Windows, **Use this computer** on Linux) in **Settings\u00a0›\u00a0Computers**.",
         ],
       },
       {
@@ -68,14 +68,14 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "folders",
         heading: "Folders",
         blocks: [
-          "Each agent always has its own folder, in `~/agentes/<organization>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**. Each organization allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing; it only takes the access away.",
+          "Each agent always has its own folder, in `~/agentes/<organization>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**, or with `agentes-runner folders allow` on a server. Each organization allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing. It only takes the access away.",
         ],
       },
       {
         id: "pausing",
         heading: "Pausing",
         blocks: [
-          "Whoever connected a computer can pause its agents on the computer itself, from the app's menu bar. Nothing new starts until they resume; what was running finishes.",
+          "With the app, whoever connected a computer can pause its agents there, from the agentes.chat icon by the clock. Nothing new starts until they resume. What was running finishes.",
         ],
       },
       {
@@ -142,8 +142,8 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "never",
         heading: "What never comes along",
         blocks: [
-          "Keys, passwords, logins and chat history never come along: the agents use the workspace's model and key. Some things have no equivalent here yet, or should never travel in a file; you can recreate them later.",
-          "Files and folders are read in your browser; a GitHub link goes through the workspace's server. Key and login files are never opened, and nothing changes until you confirm.",
+          "Keys, passwords, logins and chat history never come along: the agents think with the workspace's AI. Some things have no equivalent here yet, or should never travel in a file. You can recreate them later.",
+          "Files and folders are read in your browser. A GitHub link goes through the workspace's server. Key and login files are never opened, and nothing changes until you confirm.",
         ],
       },
       {
@@ -263,7 +263,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
       {
         id: "who",
         heading: "Who approves",
-        blocks: ["The agent's owner approves its requests; for an agent without one, the admins do."],
+        blocks: ["The agent's owner approves its requests. For an agent without an owner, the admins do."],
       },
       {
         id: "refusing",

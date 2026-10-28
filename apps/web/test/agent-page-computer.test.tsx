@@ -70,7 +70,7 @@ describe("the agent page's one entry: its status line", () => {
   test("Cloud, waiting for a computer: owners are promised the email when the server sends it; nobody else is", async () => {
     const wait = { state: "waiting" as const, reason: "capacity" as const, notifyByEmail: true };
     expect(line(await entryOf({ setup: wait, machine: null }))).toBe(
-      "Esperando um computador disponível · avisamos por e-mail",
+      "Esperando um computador disponível. Avisamos por e-mail.",
     );
     cleanup();
     expect(line(await entryOf({ setup: wait, machine: null, role: "admin" }))).toBe(

@@ -1,14 +1,29 @@
 import { readFileSync } from "node:fs";
+import { leaves } from "./leaves";
 import { sourceFiles } from "./maker-words";
 
 /**
  * Words people read use no semicolon and no em dash: two short sentences read plainer, and both marks read as
- * machine-written.
+ * machine-written. A "·" separates data and never two clauses, which review checks, not this file.
  */
 export const MARKS = /[;—]/;
 
-/** An `apiError(c, status, code, "…")`, or an engine error the API answers with, up to its `(`. */
-const SERVER_WORDS = /\b(?:apiError|new (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential)Error)\(/g;
+/** Code the landing shows as code. */
+const CODE_SAMPLES: ReadonlySet<string> = new Set(["landing.bento.db.read", "landing.bento.db.write"]);
+
+/** Code keeps its marks: `code` spans, help code blocks (`….code`) and HTML entities (`&amp;`). */
+const outsideCode = (text: string) => text.replace(/&#?\w+;/g, "").replace(/`[^`]*`/g, "");
+
+/** A string tree's leaves that break the rule, as "key: text", for one readable failure. */
+export const unplainLeaves = (tree: unknown) =>
+  leaves(tree)
+    .filter((leaf): leaf is [string, string] => typeof leaf[1] === "string")
+    .filter(([key, text]) => !CODE_SAMPLES.has(key) && !key.endsWith(".code") && MARKS.test(outsideCode(text)))
+    .map(([key, text]) => `${key}: ${text}`);
+
+/** An `apiError(c, status, code, "…")`, or an engine or runner error the API answers with, up to its `(`. */
+const SERVER_WORDS =
+  /\b(?:apiError|new (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential|Runner)Error)\(/g;
 
 /**
  * Reads code from `i` to the bracket that closes the one just before it, and returns the index after that bracket.

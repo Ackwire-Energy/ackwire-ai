@@ -2,7 +2,12 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { resources } from "@agenteschat/i18n";
+import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
+import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
+import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
+import nativeEn from "../assets/locales/en.json";
+import nativePtBR from "../assets/locales/pt-BR.json";
 import { featureKeysEn } from "../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../src/features/i18n/keys.pt-BR";
 import { mobileEn } from "../src/i18n/keys.en";
@@ -50,6 +55,21 @@ test("every key the phone reads by name exists in both languages, so a deleted l
 test("Claude and ChatGPT, not their makers, in what the phone shows", () => {
   const app = join(import.meta.dir, "..");
   expect(filesNamingMakers([join(app, "src"), join(app, "app")]).map((f) => relative(app, f))).toEqual([]);
+});
+
+test("no semicolon, no em dash in what the phone shows", () => {
+  const trees = [featureKeysEn, featureKeysPtBR, mobileEn, mobilePtBR, nativeEn, nativePtBR];
+  expect(trees.flatMap((tree) => unplainLeaves(tree))).toEqual([]);
+});
+
+test("the phone's words are true in every setup", () => {
+  const phone = (...trees: object[]) =>
+    trees.flatMap((tree) => entries(tree).map(([k, v]): [string, string] => [`mobile.${k}`, String(v)]));
+  const en = phone(mobileEn, featureKeysEn);
+  const pt = phone(mobilePtBR, featureKeysPtBR);
+  expect([...misplaced(en, "en"), ...misplaced(pt, "pt-BR")]).toEqual([]);
+  const keys = [...en, ...pt].map(([k]) => k);
+  expect(staleLines(keys, "mobile.")).toEqual([]);
 });
 
 test("the app's strings are added under `mobile` in every namespace", () => {

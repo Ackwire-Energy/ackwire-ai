@@ -279,7 +279,7 @@ describe("the workspace's computer on its way, on Conversas", () => {
     const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
     expect(setupNoticeLine(t, wait, setupEta(wait, NOW), false)).toBe("Esperando um computador disponível");
     expect(setupNoticeLine(t, wait, setupEta(wait, NOW), true)).toBe(
-      "Esperando um computador disponível · avisamos por e-mail",
+      "Esperando um computador disponível. Avisamos por e-mail.",
     );
     // On hold no time is said: where it is instead.
     expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");

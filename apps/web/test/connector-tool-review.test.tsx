@@ -169,9 +169,9 @@ describe("the tools step", () => {
     const track = within(g).getByRole("radiogroup", { name: "Nível de Registrar pixel" });
     expect(checked(track)).toBe("Muda");
     expect(row("pixel_track")?.textContent).toContain(
-      "Sugestão: muda coisas — muda coisas, mas não apaga nada nem gasta dinheiro",
+      "Sugestão: muda coisas, porque muda coisas, mas não apaga nada nem gasta dinheiro",
     );
-    expect(row("report_task_run")?.textContent).toContain("Sugestão: pede aprovação — não deu para saber pelo nome");
+    expect(row("report_task_run")?.textContent).toContain("Sugestão: pede aprovação, porque não deu para saber pelo nome");
     // The sparkle sits in the reason; the technical name only on hover.
     expect(row("pixel_track")?.querySelector(".tr-row__why .ac-toolpx-spark")).toBeTruthy();
     expect(row("pixel_track")?.textContent).not.toContain("pixel_track");
