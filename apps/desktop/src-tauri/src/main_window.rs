@@ -354,12 +354,23 @@ const LIGHTS_AGAIN: Duration = Duration::from_millis(300);
 
 #[cfg(target_os = "macos")]
 fn place_now(app: &AppHandle) {
+    // A move made while placing (AppKit moves the next button from inside our own notice) is answered by
+    // placing once more, not dropped. A few rounds at most.
     if PLACING.with(|p| p.replace(true)) {
+        AGAIN.with(|a| a.set(true));
         return;
     }
-    if let Some(window) = app.get_window(LABEL) {
-        if !window.is_fullscreen().unwrap_or(false) {
-            place_lights(&window);
+    for _ in 0..3 {
+        AGAIN.with(|a| a.set(false));
+        if let Some(window) = app.get_window(LABEL) {
+            if window.is_fullscreen().unwrap_or(false) {
+                LIGHTS_AT.with(|a| a.borrow_mut().clear());
+            } else {
+                place_lights(&window);
+            }
+        }
+        if !AGAIN.with(|a| a.get()) {
+            break;
         }
     }
     PLACING.with(|p| p.set(false));
@@ -430,15 +441,19 @@ fn watch_lights(app: &AppHandle, window: &tauri::Window) {
     }
 }
 
-/// Gives a window button a subclass of its own class whose `layout` places it again afterwards. The zoom
-/// button lays its layer out natively when it lays itself out (on a new title) with its frame unchanged, so
-/// no frame notice comes; `setFrameOrigin:` puts the layer back under the frame.
+/// Gives a window button a subclass of its own class that keeps it where it was placed. On a new title AppKit
+/// moves each button back to its own spot (`-[NSThemeFrame _updateButtonPositions]` calls
+/// `setFrameOrigin:ignoreRentry:`), the last one from inside our own frame notice, so it stayed there until the
+/// later placement: the subclass answers that call with the placed spot instead (outside full screen, where the
+/// buttons are AppKit's). Its `layout` also places it again afterwards (the layer laid out natively with the
+/// frame unchanged).
 ///
-/// SAFETY: `button` is a live window button, on the main thread. The subclass adds no ivars and only
-/// overrides `layout`, calling its superclass's first.
+/// SAFETY: `button` is a live window button, on the main thread. The subclass adds no ivars and overrides
+/// `layout` and `setFrameOrigin:ignoreRentry:` (only if its class has it), calling its superclass's.
 #[cfg(target_os = "macos")]
 unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
-    use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
+    use crate::notch::native::CGPoint;
+    use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
     use objc2::{msg_send, sel};
     use std::ffi::CString;
 
@@ -446,10 +461,16 @@ unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
         let Some(this) = (unsafe { this.as_ref() }) else { return };
         let Some(superclass) = this.class().superclass() else { return };
         let _: () = unsafe { msg_send![super(this, superclass), layout] };
-        let key = this as *const AnyObject as usize;
-        if let Some(origin) = LIGHTS_AT.with(|at| at.borrow().iter().find(|(b, _)| *b == key).map(|(_, o)| *o)) {
+        if let Some(origin) = placed_at(this) {
             let _: () = unsafe { msg_send![this, setFrameOrigin: origin] };
         }
+    }
+
+    unsafe extern "C-unwind" fn set_origin(this: *mut AnyObject, _: Sel, origin: CGPoint, ignore: Bool) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
+        let Some(superclass) = this.class().superclass() else { return };
+        let origin = placed_at(this).filter(|_| !unsafe { full_screen(this) }).unwrap_or(origin);
+        let _: () = unsafe { msg_send![super(this, superclass), setFrameOrigin: origin, ignoreRentry: ignore] };
     }
 
     let class = unsafe { &*button }.class();
@@ -464,11 +485,40 @@ unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
             let Some(mut builder) = ClassBuilder::new(&name, class) else { return };
             unsafe {
                 builder.add_method(sel!(layout), layout as unsafe extern "C-unwind" fn(*mut AnyObject, Sel));
+                let moved = sel!(setFrameOrigin:ignoreRentry:);
+                if class.instance_method(moved).is_some() {
+                    builder.add_method(
+                        moved,
+                        set_origin as unsafe extern "C-unwind" fn(*mut AnyObject, Sel, CGPoint, Bool),
+                    );
+                }
             }
             builder.register()
         }
     };
     unsafe { AnyObject::set_class(&*button, sub) };
+}
+
+/// Where `place_lights` last put this button, if anywhere.
+#[cfg(target_os = "macos")]
+fn placed_at(button: &objc2::runtime::AnyObject) -> Option<crate::notch::native::CGPoint> {
+    let key = button as *const objc2::runtime::AnyObject as usize;
+    LIGHTS_AT.with(|at| at.borrow().iter().find(|(b, _)| *b == key).map(|(_, o)| *o))
+}
+
+/// Whether the button's window is full screen (NSWindowStyleMaskFullScreen), or it has none.
+///
+/// SAFETY: `button` is a live view, on the main thread.
+#[cfg(target_os = "macos")]
+unsafe fn full_screen(button: &objc2::runtime::AnyObject) -> bool {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    let window: *mut AnyObject = unsafe { msg_send![button, window] };
+    if window.is_null() {
+        return true;
+    }
+    let mask: usize = unsafe { msg_send![window, styleMask] };
+    mask & (1 << 14) != 0
 }
 
 /// The prefix of the buttons' own subclasses (`follow_layout`).
@@ -477,8 +527,10 @@ const FOLLOWING: &str = "AgentesFollowing";
 
 #[cfg(target_os = "macos")]
 thread_local! {
-    /// Placing the buttons moves them too: their own frame notices are not answered again.
+    /// Placing the buttons moves them too: their own frame notices don't start another placement.
     static PLACING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A button moved while placing: placed once more.
+    static AGAIN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// From one button's left edge to the next's, as AppKit lays them out.
     static LIGHTS_STEP: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
     /// Where each button was placed last (by its address), for `follow_layout`.
