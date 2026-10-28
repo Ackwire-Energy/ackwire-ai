@@ -61,9 +61,10 @@ import { useToast } from "@/lib/toast";
  * mailbox has (replies go out from the one the email arrived at).
  */
 
-/** Brand masks (Simple Icons, CC0). Outlook was removed from Simple Icons at Microsoft's request: a monogram. */
-const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string }>> = {
+/** Each mailbox's mark: Gmail's and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. */
+const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string | null }>> = {
   gmail: { iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
+  outlook: { iconUrl: "/brands/outlook.svg", brandColor: null },
   icloud: { iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
 };
 

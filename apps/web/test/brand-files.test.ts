@@ -3,13 +3,17 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import { cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
+import { I18nextProvider } from "react-i18next";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { DatabaseIcon } from "@/components/DatabaseConnect";
+import { MailIcon, mailChoices } from "@/components/MailConnect";
+import { createI18n } from "@/i18n";
 import { POSTGRES_MARK } from "@/lib/brands";
+import { MAIL_PROVIDERS } from "./fakes/mail";
 
 afterEach(() => cleanup());
 
@@ -65,5 +69,23 @@ describe("the brand files the app serves", () => {
     expect([paypal?.className, paypal?.getAttribute("src")]).toEqual(["connector-icon__img", "/brands/paypal.svg"]);
     // Only a file of ours, by its name.
     expect(icon("/brands/../paypal.svg").textContent).toBe("P");
+  });
+
+  test("every mailbox card but 'Outro email' draws its maker's mark, a file here, never a letter", () => {
+    const i18n = createI18n("pt-BR");
+    const choices = mailChoices(MAIL_PROVIDERS);
+    expect(choices).toEqual(["gmail", "outlook", "icloud", "other"]);
+    for (const choice of choices.filter((c) => c !== "other")) {
+      const tile = render(createElement(I18nextProvider, { i18n }, createElement(MailIcon, { choice }))).container
+        .firstElementChild as HTMLElement;
+      const mask = tile.querySelector<HTMLElement>(".connector-icon__mark")?.style.getPropertyValue("--connector-icon");
+      const file = tile.querySelector("img")?.getAttribute("src") ?? mask?.match(/^url\("(.+)"\)$/)?.[1];
+      expect([
+        choice,
+        tile.classList.contains("connector-icon--mono"),
+        file && existsSync(PUBLIC + file.slice(1)),
+      ]).toEqual([choice, false, true]);
+      cleanup();
+    }
   });
 });
