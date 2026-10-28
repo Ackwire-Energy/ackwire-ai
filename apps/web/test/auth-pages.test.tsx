@@ -1260,6 +1260,30 @@ describe("Onboarding", () => {
     expect(within(panel).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
   });
 
+  test("an agent made after the team went to a computer: leaving the step on that computer again sends it there too", async () => {
+    const { state, api } = await start();
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    await toComputer(state);
+    await next();
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    // Back to the Computer step, another computer only looked at, then back to the agents: Lia joins, on none yet.
+    await click(button("Voltar"), 4);
+    await click(button(/Outro computador/), 8);
+    await click(button("Voltar"), 4);
+    await click(button(/Lia · Pesquisa/), 1);
+    await click(button(/Criar 1 agente/), 8);
+    expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
+    // This server's computer again, as the team had it: Lia goes too.
+    await click(button(/Computador deste servidor/), 4);
+    await next();
+    const lia = agentId(state, "Lia");
+    expect(
+      calls(state, "sandbox.setTarget")
+        .filter((c) => c.args[2] === host?.id)
+        .map((c) => c.args[1]),
+    ).toContain(lia);
+  });
+
   test("a computer's own sign-in that some agents can't switch to: the toast names the plan and the computer", async () => {
     const { state, api, services } = await start();
     await toComputer(state);

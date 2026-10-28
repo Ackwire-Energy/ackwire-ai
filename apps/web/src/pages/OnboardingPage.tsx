@@ -365,8 +365,9 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
   // Computer (after the agents, before the AI): where they work, and where a plan signs in.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
-  // The computer the team was last sent to: leaving the step again with the same choice moves nobody.
-  const placedOn = useRef<string | null>(null);
+  // The computer the team was last sent to: leaving the step again with the same choice moves nobody. Undefined: some
+  // are on none, made after the rest went to one.
+  const placedOn = useRef<string | null | undefined>(null);
   // Team
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -589,9 +590,13 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
           `${STORAGE_KEYS.onboardingImports}.${created.orgId}`,
           JSON.stringify(crewSoFar.map((c) => [c.id, c.model])),
         );
-      if ((computer !== "machine" && computer !== "host") || !machine) return;
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
-      for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
+      if ((computer === "machine" || computer === "host") && machine) {
+        for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
+        placedOn.current = machine.id;
+      } else if (all.length > crew.length && placedOn.current !== null) {
+        placedOn.current = undefined;
+      }
     },
   });
 
