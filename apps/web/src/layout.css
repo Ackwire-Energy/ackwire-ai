@@ -6365,6 +6365,13 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
+/* The workspace's computer on its cards (here and on the setup's Computer step): its drawing, not its box, takes its
+   row, so the drawing starts on the card's padding line, as far from the card's top as its words from the other edges,
+   and the words beside it centre on the drawing. */
+.setup-card .computers-card__head > .ac-computer,
+.onb__workspace-computer .ac-computer {
+  margin-block: calc(-1 * var(--art-top)) calc(-1 * var(--art-bottom));
+}
 /* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
 .setup-progress {
   margin: 0;
@@ -6374,10 +6381,7 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 10px;
 }
-.setup-progress--steps > .ac-chip {
-  align-self: flex-start;
-}
-/* A plate, so it shows on a sunken well too (the AI step's wait). */
+/* A plate, so it shows on a sunken well too (the AI step's wait, the setup's Computer step). */
 .setup-progress--steps .ac-chip {
   background: var(--plate);
 }
@@ -8166,7 +8170,7 @@ a.machine-row__name:hover {
    Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 112px;
+  min-width: 102px;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -9962,24 +9966,100 @@ html[data-menu-overlay] .shell {
    a well, who signs in, the steps, then its foot. */
 .ai-panel {
   gap: 16px;
+  text-wrap: pretty;
 }
 .ai-panel > .ac-setnote {
   margin: 0;
 }
+/*
+ * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
+ * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
+ * mark's. The wait's well and the option cards start their 12px of padding before the text's column, so their words
+ * are on it too. A note inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ */
+.ai-panel--plan {
+  --lead: 30px;
+  --text-edge: calc(var(--lead) + 12px);
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline,
+.ai-panel--plan .ai-panel__row > .ac-setnote {
+  gap: 12px;
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child,
+.ai-panel--plan .ai-panel__row > .ac-setnote > :first-child {
+  margin-inline: calc((var(--lead) - 14px) / 2);
+}
+.ai-panel--plan .agp-addacct__step > i {
+  margin-inline: calc((var(--lead) - 20px) / 2);
+}
+/* A step's title, an option's and the foot's line break into lines of a length, never onto a word or two alone. */
+.ai-panel--plan :is(.agp-addacct__text b, .ac-option__title, .ac-card__foot) {
+  text-wrap: balance;
+}
+.ai-panel--plan > :not(.ai-panel__head, .ai-panel__wait, .ai-panel__row, .agp-addacct, .ac-iconline),
+.ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline) {
+  margin-left: var(--text-edge);
+}
+.ai-panel--plan > .grid-options {
+  margin-left: calc(var(--text-edge) - var(--space-3));
+}
 .ai-panel__head {
   flex-wrap: wrap;
   gap: 12px;
-  padding-bottom: 16px;
+  /* Its hairline runs edge to edge, as the foot's does. */
+  margin-inline: calc(-1 * var(--card-pad));
+  padding: 0 var(--card-pad) 16px;
   border-bottom: 1px solid var(--line);
   line-height: 20px;
 }
-.ai-panel__wait {
+/* The computer's wait in a well, sunk into its card in both themes: here, and on the setup's Computer step. */
+.ai-panel__wait,
+.onb__wait {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
+}
+.ai-panel__wait {
+  margin-left: calc(var(--text-edge) - 12px);
+  padding: 12px;
+  /* Short lines: wrapped, they break into two of a length. */
+  text-wrap: balance;
+}
+.onb__wait {
+  padding: 12px 14px;
+}
+/*
+ * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
+ * its 12px: their first capitals that far under what is above, their last baseline that far over what is below
+ * (`--cap-top` and `--cap-mid` place a line's capitals in its box).
+ */
+.ai-panel__wait > p:first-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-top: calc(var(--cap-top) - 11px);
+}
+.ai-panel__wait > p:last-child {
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+.ai-panel--plan > .ac-setnote {
+  /* The note's 18px line. */
+  margin-block: calc(var(--cap-top) - 9px) calc(var(--cap-top) - 2 * var(--cap-mid) - 9px);
+}
+@supports (top: 1lh) {
+  .ai-panel__wait > p:first-child {
+    margin-top: calc(var(--cap-top) - 0.5lh);
+  }
+  .ai-panel__wait > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+  .ai-panel--plan > .ac-setnote {
+    margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* The Computer step's lines are the well's own, at its gap. */
+.onb__wait > .setup-wait {
+  display: contents;
 }
 /* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
    face and mark centre on it. */
@@ -10026,10 +10106,12 @@ html[data-menu-overlay] .shell {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* For whom: as tall as the head's mark, so it centres on the mark's middle. */
 .ai-panel__agent {
   display: flex;
   align-items: center;
-  align-self: center;
+  align-self: flex-start;
+  height: var(--lead);
   gap: 8px;
   font-size: 13px;
   color: var(--ink-muted);
@@ -10059,12 +10141,41 @@ html[data-menu-overlay] .shell {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* At phone width for whom goes under the name, and a step's button under its words, on the text's column. */
 @media (max-width: 640px) {
   .ai-panel__agent {
-    flex-basis: 100%;
+    flex-basis: calc(100% - var(--text-edge));
+    height: auto;
+    margin-left: var(--text-edge);
   }
   .ai-panel__agent > .ac-select {
     flex: 1;
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
+    flex-basis: calc(100% - var(--text-edge));
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+    margin-left: var(--text-edge);
+  }
+  /* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+     text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+  .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+    gap: calc((var(--lead) - 14px) / 2 + 12px);
+    margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+    margin-left: calc((var(--lead) - 14px) / 2);
+  }
+  /* With no number, the title's capitals are the step's top. */
+  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+    flex-basis: 100%;
+    /* Browsers without the lh unit: the step's 20px line. */
+    margin-top: calc(var(--cap-top) - 10px);
+  }
+  @supports (top: 1lh) {
+    .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+      margin-top: calc(var(--cap-top) - 0.5lh);
+    }
   }
 }
 /* Who thinks (the setup, after a plan): each agent and what it thinks with. */

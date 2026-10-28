@@ -101,6 +101,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+/** A part of the screen with colors of its own (a sheet's content): the same theme, other colors. */
+export function ThemeColorsOverride({ colors, children }: { colors: AppColors; children: ReactNode }) {
+  const theme = useTheme();
+  const value = useMemo(() => ({ ...theme, colors }), [theme, colors]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 const fallback: Theme = { ...makeTheme("light"), preference: "system", setPreference: () => {} };
 
 /** The current theme (light outside a provider). */

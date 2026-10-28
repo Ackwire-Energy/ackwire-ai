@@ -14,7 +14,7 @@ const SAYS: ReadonlySet<string> = new Set(["needsYou", "needsOther", "working", 
  * profile's entry shows to the same people) once it has one, it opens it full screen. While the agent needs
  * someone there or works on it, a screen reader hears that too.
  */
-export function DmComputerButton({ agentId }: { agentId: string }) {
+export function DmComputerButton({ agentId, onOpen }: { agentId: string; onOpen?: () => void }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const view = useAgentComputer(agentId);
@@ -40,6 +40,7 @@ export function DmComputerButton({ agentId }: { agentId: string }) {
       label={says ? `${t("agentComputer.button")}, ${says}` : t("agentComputer.button")}
       onPress={() => {
         tapHaptic();
+        onOpen?.();
         openComputer(agentId);
       }}
     />

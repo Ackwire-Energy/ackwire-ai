@@ -40,6 +40,8 @@ export const STORED = {
   pushAsked: "push-asked",
   /** The person turned notifications off in the app (no silent re-registration). */
   pushOff: "push-off",
+  /** How many times our notifications sheet opened by itself (lib/push-offer.ts). */
+  pushOffers: "push-offers",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
@@ -48,6 +50,8 @@ export const STORED = {
   invite: "invite",
   /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
   sounds: "sounds",
+  /** Offline-computer notices the person closed, by outage (JSON list; features/outages). */
+  outagesDismissed: "outages-dismissed",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

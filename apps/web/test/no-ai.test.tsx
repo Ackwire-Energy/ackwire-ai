@@ -301,7 +301,11 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Faltam uns 6 min");
-    expect(panel.textContent).toContain("Você entra aqui assim que o computador ficar pronto.");
+    // The well says how far it is and, with no email to promise, when the sign-in under it turns on: once.
+    expect(panel.querySelector(".ai-panel__wait")?.lastElementChild?.textContent).toBe(
+      "Você entra aqui assim que o computador ficar pronto.",
+    );
+    expect(panel.textContent?.split("pronto")).toHaveLength(2);
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
     await click(option(plan, /^Chave de API/));
     expect(within(plan).getByRole("region", { name: "Chave de API" })).toBeTruthy();

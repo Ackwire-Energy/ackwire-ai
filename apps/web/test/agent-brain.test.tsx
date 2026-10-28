@@ -428,10 +428,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       // Nothing runs on the computer before the person goes on.
       expect(fakeMachinesOf.get(api)?.lastLogin()).toBeUndefined();
       // Where the account stays is the sign-in step's ⓘ.
-      expect(hintOf("Entre no Claude", block).text).toBe(
-        "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. A sua senha vai só para o Claude.",
+      expect(hintOf("A conta com o seu plano", block).text).toBe(
+        "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
       );
-      expect(shownText(block)).not.toContain("senha vai só");
+      expect(shownText(block)).not.toContain("digita a senha");
       fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
         target: { value: "walt@acme.com" },
       });

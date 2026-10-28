@@ -206,13 +206,14 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
 }
 
 /**
- * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the
- * computer, then the hold, the pause, a request waiting, the agent at work.
+ * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the computer, then
+ * the agent at work. The hold, the pause and a request waiting each have a banner over the stage that says them, so
+ * the line says "Ao vivo" alone.
  */
 export function liveSubLine(
   t: TFunction,
   f: AgentComputerFacts,
-  w: Pick<EntryWords, "computer" | "person"> & { name: string; nowMs?: number },
+  w: Pick<EntryWords, "person"> & { name: string; nowMs?: number },
 ): string {
   const nowMs = w.nowMs ?? Date.now();
   const g = agentGrammar(t, w.name);
@@ -221,15 +222,8 @@ export function liveSubLine(
     if (h.controllerUserId !== f.userId) return t("desktop.sub.hidden", { person: w.person(h.controllerUserId) });
     return t(h.kind === "ask" ? "desktop.sub.controlAsked" : "desktop.sub.control", g);
   }
-  if (f.held) return t("agentComputer.sub.held");
-  if (f.edition === "selfhost" && f.machine && isPaused(f.machine, nowMs)) {
-    return t("agentComputer.sub.paused", { computer: w.computer });
-  }
-  if (h && isWaitingHandoff(h, nowMs)) {
-    return asksMe(h, f.userId)
-      ? t("agentComputer.sub.needsYou", g)
-      : t("agentComputer.sub.askedOther", { ...g, person: w.person(h.requestedForUserId ?? "") });
-  }
+  const paused = f.edition === "selfhost" && f.machine !== null && isPaused(f.machine, nowMs);
+  if (f.held || paused || (h && isWaitingHandoff(h, nowMs))) return t("browser.watch.live");
   return f.working ? t("agentComputer.sub.working", g) : t("agentComputer.sub.watching");
 }
 

@@ -166,6 +166,37 @@ samp {
 .ac-acts > .ac-btn--ghost:not(.ac-btn--icon) {
   padding-inline: var(--ghost-plate);
 }
+/*
+ * A ghost whose icon leaves air inside its box (`--glyph-air` on each side, e.g. the ×'s 5.2 of its 20 units) reaches
+ * out by that air too, so the row's gap stands between what shows. Its plate and focus ring keep to the box less that
+ * air: they end where a neighbour's plate starts, under its glyph.
+ */
+.ac-acts > .ac-btn--glyph {
+  margin-inline: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
+}
+.ac-btn--ghost.ac-btn--glyph {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph::before {
+  content: "";
+  position: absolute;
+  inset: 0 var(--glyph-air, 0px);
+  border-radius: inherit;
+  transition: inherit;
+}
+.ac-btn--ghost.ac-btn--glyph > * {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+}
+.ac-btn--ghost.ac-btn--glyph:hover::before {
+  background: var(--plate);
+}
+.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+  box-shadow: var(--focus-ring);
+}
 
 /* Button */
 .ac-btn {
@@ -1803,9 +1834,16 @@ textarea.ac-input {
   align-self: flex-start;
   translate: 0 calc(12px - var(--cap-mid) - 50%);
 }
-/* The head's actions and its close, in one `.ac-acts` row: the close's icon on the head's padding line. */
+/*
+ * The head's actions and its close, in one `.ac-acts` row. The close's × spans 9.6 of its icon's 20 units, so it reaches
+ * out by the 5.2 units of air on each side too (`.ac-btn--glyph`): its ink ends on the head's padding line, as far from
+ * the edge as the face starts, and stands as far from the shape before it as the row's gap.
+ */
 .ac-dialog__acts {
   flex: none;
+}
+.ac-dialog__acts > .ac-btn--glyph:last-child {
+  --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
 }
 .ac-dialog__title {
   margin: 0;
@@ -3575,10 +3613,12 @@ a.ac-list__row:focus-visible {
 .ac-btn--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
+/* Off: a faint plate over whatever it sits on, so its shape shows on a page, a card or a well, in both themes (a
+   sunken fill is nearly the dark page's own color). */
 .ac-btn[disabled],
 .ac-btn[aria-disabled="true"] {
   color: var(--faint);
-  background: var(--sunken);
+  background: var(--plate);
   box-shadow: none;
   filter: none;
 }
@@ -4131,6 +4171,7 @@ a.ac-list__row:focus-visible {
   box-sizing: border-box;
   max-width: min(280px, calc(100vw - 32px));
   padding: 8px 12px;
+  text-wrap: pretty;
   border-radius: 12px;
   color: var(--ink2);
   font-size: 13px;
@@ -5357,9 +5398,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-tools__line {
   border-radius: var(--radius-item);
-}
-.ac-tools__line[data-s="fail"] {
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
 }
 .ac-tools__row {
   display: flex;

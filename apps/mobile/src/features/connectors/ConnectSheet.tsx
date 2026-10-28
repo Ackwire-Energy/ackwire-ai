@@ -45,6 +45,7 @@ import {
 import { Problem } from "./Problem";
 import { ADDRESS_STEPS, CATALOG_STEPS, firstStep, STEP_KEYS, type Step } from "./review";
 import { ReviewStep } from "./ToolReview";
+import { openTools } from "./ToolsScreen";
 
 /** Where the browser brings the answer back (APP_OAUTH_REDIRECT on the server). */
 const RETURN_URL = "agenteschat://connectors/oauth";
@@ -52,9 +53,9 @@ const RETURN_URL = "agenteschat://connectors/oauth";
 /**
  * One service in a sheet over the gallery, in four steps as on the web: what agents could do there (what
  * always asks marked "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) →
- * its tools ("O que faz") → who uses it and how far. A connected one opens on who uses it, or on its tools while
- * they wait for a review (`item`: that connection, when the service is connected more than once; `start`, back
- * from a sign-in that finished elsewhere, with `fresh` saying it just connected).
+ * its tools ("O que faz") → who uses it and how far. A connected one opens on who uses it (its tools are a screen
+ * of their own; `item`: that connection, when the service is connected more than once; `start`, back from a
+ * sign-in that finished elsewhere, with `fresh` saying it just connected).
  */
 export function ConnectSheet({
   def,
@@ -231,8 +232,8 @@ export function ServerSheet({ item, start, fresh = false }: { item: ConnectedIte
 
 /**
  * After connecting, the web's last two steps: its tools ("O que faz", then Continuar) and who uses it (one level
- * per agent). Admins go back to the tools from who uses it, as the web's "Ferramentas" (or "Revisar" while they
- * wait); anyone else is told when they still wait for an admin.
+ * per agent). From who uses it admins open the tools on their own screen, as the web's "Ferramentas" (or
+ * "Revisar" while they wait); anyone else is told when they still wait for an admin.
  */
 function ConnectedSteps({
   step,
@@ -290,19 +291,24 @@ function ConnectedSteps({
           variant="ghost"
           wide
           label={live?.needsReview ? t("connectors.review") : t("connectors.tools")}
-          onPress={() => onStep("review")}
+          onPress={() => {
+            sheet.close();
+            openTools(connectionId);
+          }}
         />
       ) : null}
-      {admin && live ? <DisconnectButton item={live} name={name} /> : null}
+      {admin && live ? <DisconnectButton item={live} name={name} onDone={sheet.close} /> : null}
     </>
   );
 }
 
-/** Disconnecting, closing the sheet with a note on the screen behind it, or saying in the sheet that it failed. */
-function DisconnectButton({ item, name }: { item: ConnectedItem; name: string }) {
+/**
+ * Disconnecting: `onDone` leaves (the sheet closes, the screen goes back) with a note on the screen behind it, or
+ * it says in place that it failed.
+ */
+export function DisconnectButton({ item, name, onDone }: { item: ConnectedItem; name: string; onDone: () => void }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const sheet = useSheet();
   const toast = useToast();
   const disconnect = useDisconnect(orgId);
   const { disconnect: disconnectServer } = useCustomServerAction(orgId);
@@ -319,7 +325,7 @@ function DisconnectButton({ item, name }: { item: ConnectedItem; name: string })
           const done = {
             onSuccess: () => {
               successHaptic();
-              sheet.close();
+              onDone();
               toast({ title: t("mobile.connectors.disconnected", { name }) });
             },
             onError: () => {
@@ -573,7 +579,7 @@ function ConnectStep({
 }
 
 /** Who uses this connection and how far: one choice per agent (admins and each agent's owner change it). */
-function AgentLevels({ connectionId }: { connectionId: string }) {
+export function AgentLevels({ connectionId }: { connectionId: string }) {
   const dir = useDirectory();
   const qc = useQueryClient();
   const orgId = useOrgId();
@@ -649,7 +655,8 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   );
 }
 
-function SafeNote() {
+/** What always asks, whatever the level (deleting, publishing, answering customers). */
+export function SafeNote() {
   const { t } = useTranslation();
   const c = useColors();
   return (

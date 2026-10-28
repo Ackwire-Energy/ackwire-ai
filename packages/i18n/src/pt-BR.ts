@@ -549,12 +549,12 @@ export const ptBR = {
     },
     keyStep: {
       title: "Qual IA eles vão usar?",
-      lead: "Entre com o seu plano de IA: sem chave de API.",
+      lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
       paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
       /** Back from paying, until the billing service lifts the workspace's hold (ADR 0077). */
       confirming: "Pagamento recebido. Ativando o plano do agentes.chat deste workspace.",
       leadNoComputer:
-        "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
+        "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     },
     jev: {
       title: "Ajude os agentes a trabalhar em equipe",
@@ -1098,7 +1098,7 @@ export const ptBR = {
     },
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
-      key: "Você envia assim que o computador ficar pronto.",
+      key: "Você envia a chave assim que o computador ficar pronto.",
       email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
       ready: "O {{computer}} está pronto.",
       useKey: "Usar uma chave de API agora",
@@ -1114,10 +1114,10 @@ export const ptBR = {
     onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
-      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem administra liga.",
+      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
       open: "Abrir as configurações do ChatGPT",
     },
-    zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
+    zaiTeam: "Num plano de equipe, use a chave da página Team\u00a0Plan.",
     who: {
       key: "Chave de API · {{provider}}",
       keyFor: "Chave de API para {{names}}",
@@ -1131,7 +1131,7 @@ export const ptBR = {
     foot: {
       one: "Com o seu plano, {{article}} {{name}} só responde a você.",
       all: "Com o seu plano, os seus agentes só respondem a você.",
-      signIn: "A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+      signIn: "A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
     },
     each: "Um login por agente, com a mesma conta.",
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
@@ -1927,12 +1927,12 @@ export const ptBR = {
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: {
-            claude_code: "Entre no Claude",
-            codex: "Entre no ChatGPT",
+            claude_code: "A conta com o seu plano",
+            codex: "A conta com o seu plano",
           },
           /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
-            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
           /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
           stepOneTip: {
             claude_code: "Conta errada? Saia na página do Claude e tente de novo.",
@@ -4612,7 +4612,7 @@ export const ptBR = {
       keyTitle: "Cole a chave aqui",
       keyLabel: "Chave do {{plan}}",
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
-      keySafe: "A chave vai criptografada para o {{computer}} e fica só lá.",
+      keySafe: "A chave vai criptografada para o {{computer}} e\u00a0fica\u00a0só\u00a0lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
@@ -4645,6 +4645,7 @@ export const ptBR = {
       usedBy_one: "{{agents}} pensa com ela",
       usedBy_other: "{{agents}} pensam com ela",
       noAgent: "Nenhum agente ainda",
+      ownOn: "Login no {{computer}} · os agentes de lá pensam com ela",
       signedOut: "Saiu da conta. Entre de novo para os agentes voltarem a usá-la.",
       signedOutFor_one: "{{agents}} ficou sem login.",
       signedOutFor_other: "{{agents}} ficaram sem login.",
@@ -8294,7 +8295,6 @@ export const ptBR = {
       askedIn: "{{name}} pediu · {{where}}",
       watching: "Assistindo {{article}} {{name}}",
       inControl: "Você está no controle",
-      otherInControl: "{{name}} está no controle",
       otherInControlHelp: "Só assistindo. {{name}} está fazendo o pedido.",
       watchOnly: "Ao vivo",
       takeover: "Assumir",
@@ -8687,7 +8687,7 @@ export const ptBR = {
     sub: {
       control: "Você no controle · {{article}} {{name}} espera",
       controlAsked: "Você no controle · {{article}} {{name}} pediu",
-      hidden: "{{person}} no controle · tela oculta",
+      hidden: "{{person}} no controle",
     },
     state: {
       busy: "Muita gente assistindo agora.",
@@ -8715,7 +8715,7 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
+      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
@@ -8797,13 +8797,8 @@ export const ptBR = {
     },
     screen: "Tela {{of}} {{name}}, ao vivo",
     sub: {
-      opening: "Abrindo…",
       watching: "Ao vivo · você está assistindo",
       working: "Ao vivo · {{article}} {{name}} está trabalhando",
-      needsYou: "Ao vivo · {{article}} {{name}} precisa de você",
-      askedOther: "Ao vivo · {{article}} {{name}} pediu para {{person}}",
-      held: "Em pausa por enquanto · dá para assistir",
-      paused: "Pausado no {{computer}} · dá para assistir",
       notAnswering: "Sem resposta",
       offline: "Offline desde {{time}}",
     },
@@ -8818,7 +8813,6 @@ export const ptBR = {
       heldHelp: "Ninguém assume o controle até a pausa acabar.",
       paused: "O {{computer}} está pausado até {{time}}",
       pausedPlain: "O {{computer}} está pausado",
-      notAnswering: "O {{computer}} não está respondendo",
       notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando.",
       offline: "O {{computer}} está offline",
       offlineHelpPlain: "{{The}} {{name}} espera o computador voltar.",

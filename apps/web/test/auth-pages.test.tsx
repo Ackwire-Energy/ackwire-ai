@@ -739,7 +739,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     // No computer here: the API key first, and the plans (all six, dimmed) wait for one.
     expect(document.body.textContent).toContain(
-      "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
+      "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     );
     expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
     for (const name of [/^Claude$/, /^ChatGPT$/, /^GLM Coding$/, /^Kimi Code$/, /^MiniMax$/, /^OpenCode Go$/])
@@ -1209,11 +1209,14 @@ describe("Onboarding", () => {
     ])
       expect(option(name)).toBeTruthy();
     expect(option(/^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    expect(document.querySelector(".onb__lead")?.textContent).toBe("Entre com o seu plano de IA: sem chave de API.");
+    // "sem chave de API" stays on one line.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
+    );
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    // For the first agent with no AI in the team's order (Theo, made first), as Connect an AI picks in the app.
-    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Theo");
+    // For Ada, whose face asks the step's question, before Theo (made first, the team's first with no AI).
+    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
     // Ada picked: another plan's tile keeps her while she has none.
     const agent = () => screen().getByRole("combobox", { name: "Agentes que usam este plano" });
@@ -1226,7 +1229,7 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
 
-  test("a plan for Theo: he thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
+  test("a plan for Ada, who asks: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
     // The computer finishes the sign-in as soon as the code goes.
@@ -1264,19 +1267,19 @@ describe("Onboarding", () => {
       window.open = realOpen;
     }
     await settle(6);
-    // No "Usar" to click: Theo thinks with it as soon as it's in.
+    // No "Usar" to click: Ada thinks with it as soon as it's in.
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
       { brain: "claude_code", account: "acct_max" },
     ]);
-    expect(document.body.textContent).toContain("Theo agora pensa com Claude Max.");
+    expect(document.body.textContent).toContain("Ada agora pensa com Claude Max.");
     // In the team's order, as the workspace lists them.
     const who = screen().getByRole("region", { name: "Quem pensa" });
     expect([...who.querySelectorAll(".ai-who__row")].map((r) => r.textContent)).toEqual([
-      "TheoClaude Max",
-      "AdaSem IA",
+      "TheoSem IA",
+      "AdaClaude Max",
     ]);
     expect(who.textContent).not.toContain("Cada plano pensa por um agente.");
-    const keyFor = within(who).getByRole("button", { name: "Chave de API para Ada" });
+    const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });
     expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
       ["claude", "openai"],
     );

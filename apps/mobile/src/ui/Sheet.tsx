@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -36,7 +37,7 @@ const RADIUS = 34;
 /**
  * The bottom sheet (no dialogs on the phone): floats 8 points from the edges, its bottom corners following
  * the screen's curve, glass on iOS and an opaque surface on Android, a grabber to drag down, a scrim to tap
- * away. Keyboard-aware for forms.
+ * away. Keyboard-aware for forms: with the keyboard up it fits the room above it and scrolls.
  */
 export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
   const { colors, shadows, reducedMotion } = useTheme();
@@ -62,6 +63,9 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: only `open` drives the animation
   useEffect(() => {
     if (open) {
+      // The screen's own field (the composer) lets go of the keyboard first. Kept, iOS gave the keyboard back
+      // when the sheet closed and the composer stayed under it.
+      if (!mounted) Keyboard.dismiss();
       setMounted(true);
       y.value = height;
       y.value = withTiming(0, { duration: ms, easing: ease });
@@ -104,7 +108,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
       </Animated.View>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.dock}
+        style={[styles.dock, { paddingTop: insets.top + INSET }]}
         pointerEvents="box-none"
       >
         <Animated.View
@@ -136,7 +140,8 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
 
 const styles = StyleSheet.create({
   dock: { flex: 1, justifyContent: "flex-end" },
-  sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS },
+  // Shrinks to the room above the keyboard (its content scrolls), never past the status bar.
+  sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS, flexShrink: 1 },
   surface: { borderRadius: RADIUS, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
   grab: { alignItems: "center", paddingTop: 4, paddingBottom: 10 },
   grabBar: { width: 38, height: 5, borderRadius: 3 },

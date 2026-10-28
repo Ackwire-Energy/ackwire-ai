@@ -1,0 +1,732 @@
+import {
+  type Routine,
+  useChannels,
+  useMailAccounts,
+  useMailFolders,
+  useRoutineAction,
+  useRoutines,
+  useRuleDescribe,
+  useRuleParse,
+} from "@agenteschat/client";
+import { splitAddresses } from "@agenteschat/client/lib/mail";
+import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
+import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
+import { router } from "expo-router";
+import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrg } from "@/providers/org";
+import {
+  Button,
+  fieldText,
+  GroupedField,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  type IconName,
+  Segmented,
+  Text,
+  useToast,
+} from "@/ui";
+import { ZoneList } from "../me/AccountPage";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { goBack, PushedHeader, successHaptic } from "../shared/parts";
+import { TextArea } from "../shared/TextArea";
+import { useFailed, useMyZone, useSay, useTargetLabel } from "./hooks";
+import {
+  draftChanges,
+  draftInput,
+  draftOf,
+  everyMinutes,
+  FORUM_ROUNDS,
+  type ForumRounds,
+  forumAgentsOf,
+  INBOX,
+  inboxOf,
+  isDoneOnce,
+  isInbox,
+  isUtc,
+  PRESETS,
+  phraseOf,
+  ROUTINE_EVENTS,
+  type RoutineDraft,
+  ruleOf,
+  TARGET_ARTIFACT,
+  TARGET_DM,
+  TARGET_FORUM,
+  TARGET_KEEP,
+  type TriggerKind,
+  targetChoice,
+  targetIcon,
+  toastParts,
+  wasUtc,
+  zoneOf,
+} from "./logic";
+import { fromApiRule, nextLabel, ruleSentence, runLabel, toApiRule, upcomingLabels } from "./rule";
+import { setRoutineZone, useRoutineZone } from "./zone";
+
+type Open = "agent" | "target" | "mailbox" | "folder" | null;
+
+const close = () => (router.canGoBack() ? router.back() : router.replace("/routines"));
+
+/** A zone as the form says it: "Horário de Brasília" (a friendly name) or the city. */
+const zoneLabel = (zone: string, locale: string) =>
+  zoneDisplayName(zone, locale) ?? (zone.split("/").pop() ?? zone).replace(/_/g, " ");
+
+/**
+ * "Nova rotina" and "Editar rotina" (`?edit=<id>`), a screen pushed over Rotinas with the native bar (back, the
+ * title, "Criar" or "Salvar"), the web's form for the phone: a starting point (new and empty), the agent, where it
+ * delivers (a channel, the DM, a Drive document, a forum topic with its agents and rounds; a routine made in the
+ * chat keeps its conversation), what to do, a name, and when: a phrase the server reads ("toda segunda às 9h")
+ * shown back as a sentence with the next runs and its time zone (a screen of its own), an event, or an email.
+ * Then when it speaks and what it may do on its own. Editing saves only what changed.
+ */
+export function RoutineForm({ editId }: { editId: string | null }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const routines = useRoutines(useOrgId());
+  const routine = editId ? routines.data?.find((r) => r.id === editId) : undefined;
+  if (editId && !routine)
+    return (
+      <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+        <PushedHeader title={t("routines.editTitle")} solid={false} grouped />
+        <View style={styles.center}>
+          {routines.isLoading ? (
+            <ActivityIndicator color={c.muted} />
+          ) : (
+            <Text tone="muted" style={styles.centerText}>
+              {routines.isError && !routines.data ? t("mobile.routines.loadFailed") : t("mobile.notFound.subtitle")}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  return <Form key={routine?.id ?? "new"} routine={routine} />;
+}
+
+function Form({ routine }: { routine: Routine | undefined }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const insets = useSafeAreaInsets();
+  const orgId = useOrgId();
+  const { org } = useOrg();
+  const toast = useToast();
+  const failed = useFailed();
+  const say = useSay();
+  const dir = useDirectory();
+  const channels = useChannels(orgId);
+  const mailboxes = useMailAccounts(orgId);
+  const targetLabel = useTargetLabel();
+  const action = useRoutineAction(orgId);
+  const agents = dir.agents;
+  const editing = Boolean(routine);
+  const myZone = useMyZone("America/Sao_Paulo");
+  const savedZone = zoneOf(routine);
+  // A routine still read in UTC (made before time zones) starts in my zone, with a hint to keep UTC.
+  const utc = wasUtc(routine);
+  const [d, setD] = useState<RoutineDraft>(() => draftOf(routine, utc ? myZone : savedZone || myZone));
+  const set = (patch: Partial<RoutineDraft>) => setD((x) => ({ ...x, ...patch }));
+  // What the routine had, to tell whether "when" changed.
+  const [savedRule] = useState(() => JSON.stringify(toApiRule(ruleOf(routine, savedZone || myZone))));
+  const [open, setOpen] = useState<Open>(null);
+  const toggle = (o: Exclude<Open, null>) => setOpen((v) => (v === o ? null : o));
+
+  // My zone may arrive after the form opens (the people list loads): follow it until a zone is picked.
+  const [zoneTouched, setZoneTouched] = useState(false);
+  const followsMyZone = !routine || utc;
+  const setZone = (zone: string) => {
+    setZoneTouched(true);
+    setD((x) => ({ ...x, rule: { ...x.rule, timezone: zone } }));
+  };
+  useEffect(() => {
+    if (followsMyZone && !zoneTouched)
+      setD((x) => (x.rule.timezone === myZone ? x : { ...x, rule: { ...x.rule, timezone: myZone } }));
+  }, [myZone, followsMyZone, zoneTouched]);
+  // "Fuso horário" is a screen of its own: the zone picked there comes back through its store.
+  const picked = useRoutineZone();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new pick applies
+  useEffect(() => {
+    if (picked && picked !== d.rule.timezone) setZone(picked);
+  }, [picked]);
+  useEffect(() => () => setRoutineZone(null), []);
+  const pickZone = () => {
+    setRoutineZone(d.rule.timezone);
+    router.push("/routines/zone");
+  };
+
+  // The first agent and channel until the person picks.
+  useEffect(() => {
+    const first = agents[0];
+    if (!d.agentId && first) setD((x) => ({ ...x, agentId: first.id }));
+  }, [d.agentId, agents]);
+  useEffect(() => {
+    const first = channels.data?.[0];
+    if (!d.target && first) setD((x) => ({ ...x, target: first.id }));
+  }, [d.target, channels.data]);
+
+  // What the person typed, in any language: the server reads it (never the phone) and it becomes the rule.
+  const [phrase, setPhrase] = useState(phraseOf(routine));
+  const [phraseTyped, setPhraseTyped] = useState(false);
+  const typePhrase = (text: string) => {
+    setPhrase(text);
+    setPhraseTyped(true);
+  };
+  const typed = useDeferredValue(phrase.trim());
+  const schedule = d.kind === "schedule";
+  const once = d.rule.freq === "once";
+  const parsed = useRuleParse(orgId, typed, schedule && phraseTyped && typed.length > 0, d.rule.timezone);
+  const parsedRule = parsed.data?.ok ? parsed.data.rule : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: apply each new parse once
+  useEffect(() => {
+    if (parsedRule && phraseTyped)
+      setD((x) => ({ ...x, rule: { ...fromApiRule(parsedRule, x.rule.start), timezone: x.rule.timezone } }));
+  }, [parsedRule]);
+  const described = useRuleDescribe(orgId, schedule && !once ? toApiRule(d.rule) : null);
+  const info = described.data?.ok ? described.data : null;
+  const upcoming = info?.nextRuns.length
+    ? info.nextRuns.slice(0, 3).map((iso) => runLabel(i18n.language, iso, d.rule.timezone))
+    : upcomingLabels(i18n.language, d.rule);
+  const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
+  // Still reading the phrase: saving now would keep the rule from before it.
+  const parsing = schedule && phraseTyped && phrase.trim().length > 0 && (phrase.trim() !== typed || parsed.isFetching);
+  // A routine kept as a cron (every N minutes) says so until a phrase replaces it.
+  // A phrase read into a rule replaces it; one typed and erased doesn't (the form's rule is still a placeholder).
+  const ruleTyped = phraseTyped && phrase.trim().length > 0;
+  const cron = routine?.trigger.type === "schedule" && !routine.trigger.rule && !ruleTyped ? routine.trigger : null;
+  const every = cron ? everyMinutes(cron.cron) : null;
+  const sentence = cron
+    ? every
+      ? t("recurrence.s.minutely", { count: every })
+      : cron.description
+    : ruleSentence(t, i18n.language, d.rule, new Date(), false);
+  const phraseError = (() => {
+    if (!phraseFailed || !parsed.data || parsed.data.ok) return null;
+    const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const code = parsed.data.code;
+    return code
+      ? tt(`routines.form.parseError.${code.replace(/\./g, "_")}`, { defaultValue: parsed.data.error })
+      : parsed.data.error;
+  })();
+
+  // "Quando chegar um email": the first mailbox and its inbox until the person picks.
+  const mailList = mailboxes.data ?? [];
+  const hasMail = d.kind === "email" || mailList.length > 0;
+  const folders = useMailFolders(orgId, d.kind === "email" && d.email.accountId ? d.email.accountId : null);
+  useEffect(() => {
+    const first = mailboxes.data?.[0];
+    if (d.kind === "email" && !d.email.accountId && first)
+      setD((x) => ({ ...x, email: { ...x.email, accountId: first.id, folder: "" } }));
+  }, [d.kind, d.email.accountId, mailboxes.data]);
+  useEffect(() => {
+    if (d.email.accountId && !d.email.folder && (folders.data || folders.isError))
+      setD((x) => ({ ...x, email: { ...x.email, folder: inboxOf(folders.data) } }));
+  }, [d.email.accountId, d.email.folder, folders.data, folders.isError]);
+  const folderName = (id: string, name?: string, role?: string) =>
+    isInbox(id) || role === "inbox" ? t("mail.routine.inbox") : (name ?? id);
+  const folderOptions = folders.data?.length
+    ? folders.data.map((f) => ({ id: f.id, label: folderName(f.id, f.name, f.role) }))
+    : [{ id: d.email.folder || INBOX, label: folderName(d.email.folder || INBOX) }];
+  const folderLabel = folderOptions.find((f) => f.id === d.email.folder)?.label ?? folderName(d.email.folder || INBOX);
+  const mailbox = mailList.find((a) => a.id === d.email.accountId);
+  // "De": addresses or @domains, typed with commas or spaces; one that isn't keeps the form from saving.
+  const [fromText, setFromText] = useState(() => (d.email.filter.from ?? []).join(", "));
+  const from = splitAddresses(fromText);
+  const setFrom = (text: string) => {
+    setFromText(text);
+    const { valid } = splitAddresses(text);
+    setD((x) => ({ ...x, email: { ...x.email, filter: { ...x.email.filter, from: valid } } }));
+  };
+  const setFilter = (patch: { subject?: string; text?: string }) =>
+    setD((x) => ({ ...x, email: { ...x.email, filter: { ...x.email.filter, ...patch } } }));
+  const fromBad = d.kind === "email" && from.invalid.length > 0;
+
+  // A routine on someone's computer that runs hourly or more often: how often it wakes that computer.
+  const brain = dir.agentById.get(d.agentId)?.brain;
+  const busy =
+    schedule && !once && brain
+      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(d.rule)))
+      : null;
+
+  const promptHidden = routine !== undefined && routine.prompt === null;
+  const scheduleOk =
+    d.kind === "event" || (d.kind === "email" ? Boolean(d.email.accountId) && !fromBad : !phraseFailed);
+  const ready =
+    !action.isPending && Boolean(d.agentId) && (promptHidden || d.prompt.trim().length > 0) && scheduleOk && !parsing;
+
+  /** A starting point: what to do, a name and when (its phrase is read by the server, like a typed one). */
+  const applyPreset = (p: (typeof PRESETS)[number]) => {
+    setD((x) => ({
+      ...x,
+      prompt: t(`routines.presets.${p.key}.prompt`),
+      name: t(`routines.presets.${p.key}.name`),
+      kind: p.kind,
+      ...(p.kind === "event" ? { event: p.event } : {}),
+    }));
+    if (p.kind === "schedule") typePhrase(t(`routines.presets.${p.key}.phrase`));
+  };
+
+  const submit = () => {
+    if (!ready) return;
+    if (routine) {
+      const patch = draftChanges(routine, d, savedRule, ruleTyped);
+      if (Object.keys(patch).length === 0) {
+        close();
+        return;
+      }
+      action.mutate(
+        { type: "update", id: routine.id, patch },
+        {
+          onSuccess: (saved) => {
+            const next = (saved as Routine | undefined)?.nextRunAt;
+            successHaptic();
+            toast({
+              ...toastParts(
+                next
+                  ? t("routines.form.saved", { next: t("routines.next", { when: nextLabel(i18n.language, next) }) })
+                  : t("routines.form.savedNoNext"),
+              ),
+              agentId: d.agentId,
+            });
+            close();
+          },
+          onError: failed,
+        },
+      );
+      return;
+    }
+    action.mutate(
+      { type: "create", input: draftInput(d) },
+      {
+        onSuccess: () => {
+          successHaptic();
+          toast({ title: t("routines.form.created"), agentId: d.agentId });
+          close();
+        },
+        onError: failed,
+      },
+    );
+  };
+
+  const agent = dir.agentById.get(d.agentId);
+  const targets: { key: string; icon: IconName; label: string }[] = [
+    // A routine made in the chat (a thread or a DM) keeps its conversation.
+    ...(routine && targetChoice(routine.target) === TARGET_KEEP
+      ? [{ key: TARGET_KEEP, icon: targetIcon(routine.target), label: targetLabel(routine.target) }]
+      : []),
+    ...(channels.data ?? []).map((ch) => ({ key: ch.id, icon: "hash" as const, label: `#${ch.name}` })),
+    { key: TARGET_DM, icon: "chat", label: t("routines.target.dm") },
+    { key: TARGET_ARTIFACT, icon: "doc", label: t("routines.target.artifact") },
+    { key: TARGET_FORUM, icon: "members", label: t("routines.target.forum") },
+  ];
+  const target = targets.find((o) => o.key === d.target);
+  const toggleForumAgent = (id: string, on: boolean) =>
+    setD((x) => {
+      const base = forumAgentsOf(x);
+      return { ...x, forumAgents: on ? [...new Set([...base, id])] : base.filter((y) => y !== id) };
+    });
+  const input = [fieldText("callout"), styles.input, { color: c.ink }];
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader
+        title={editing ? t("routines.editTitle") : t("routines.new")}
+        solid={false}
+        grouped
+        action={{ label: editing ? t("common.save") : t("mobile.routines.create"), disabled: !ready, onPress: submit }}
+      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+      >
+        {agents.length === 0 && !dir.loading ? <GroupedFooter>{t("routines.form.noAgents")}</GroupedFooter> : null}
+        {!editing && !d.prompt.trim() ? (
+          <>
+            <GroupedHeader>{t("routines.presets.title")}</GroupedHeader>
+            <GroupedList>
+              {PRESETS.map((p) => (
+                <GroupedRow
+                  key={p.key}
+                  icon={p.icon}
+                  label={t(`routines.presets.${p.key}.name`)}
+                  sub={t(`routines.presets.${p.key}.text`)}
+                  subLines={2}
+                  onPress={() => applyPreset(p)}
+                />
+              ))}
+            </GroupedList>
+          </>
+        ) : null}
+
+        <GroupedHeader>{t("routines.form.agent")}</GroupedHeader>
+        <GroupedList>
+          <GroupedRow
+            label={agent?.name ?? ""}
+            leading={agent ? <AgentFace agentId={agent.id} size={26} live={false} /> : undefined}
+            icon={agent ? undefined : "agent"}
+            value={agent?.role || undefined}
+            chevron
+            onPress={() => toggle("agent")}
+          />
+          {open === "agent"
+            ? agents
+                .filter((a) => a.id !== d.agentId)
+                .map((a) => (
+                  <GroupedRow
+                    key={a.id}
+                    label={a.name}
+                    leading={<AgentFace agentId={a.id} size={26} live={false} />}
+                    value={a.role || undefined}
+                    onPress={() => {
+                      set({ agentId: a.id });
+                      setOpen(null);
+                    }}
+                  />
+                ))
+            : null}
+        </GroupedList>
+
+        <GroupedHeader>{t("routines.form.target")}</GroupedHeader>
+        <GroupedList>
+          <GroupedRow
+            icon={target?.icon ?? "hash"}
+            label={target?.label ?? "#"}
+            chevron
+            onPress={() => toggle("target")}
+          />
+          {open === "target"
+            ? targets
+                .filter((o) => o.key !== d.target)
+                .map((o) => (
+                  <GroupedRow
+                    key={o.key}
+                    icon={o.icon}
+                    label={o.label}
+                    onPress={() => {
+                      set({ target: o.key });
+                      setOpen(null);
+                    }}
+                  />
+                ))
+            : null}
+        </GroupedList>
+        {d.target === TARGET_FORUM ? (
+          <>
+            <GroupedHeader>{t("routines.form.forumAgents")}</GroupedHeader>
+            <GroupedList>
+              {agents.map((a) => {
+                const on = forumAgentsOf(d).includes(a.id);
+                return (
+                  <GroupedRow
+                    key={a.id}
+                    label={a.name}
+                    leading={<AgentFace agentId={a.id} size={26} live={false} />}
+                    checked={on}
+                    onPress={() => toggleForumAgent(a.id, !on)}
+                  />
+                );
+              })}
+            </GroupedList>
+            <GroupedHeader>{t("forum.form.rounds")}</GroupedHeader>
+            <Segmented
+              items={FORUM_ROUNDS.map((n) => ({ key: n, label: n }))}
+              value={d.forumRounds}
+              onChange={(k) => set({ forumRounds: k as ForumRounds })}
+            />
+          </>
+        ) : null}
+
+        <GroupedHeader>{t("routines.form.what")}</GroupedHeader>
+        {promptHidden ? (
+          <GroupedFooter>{t("routines.detailsHidden")}</GroupedFooter>
+        ) : (
+          <TextArea
+            value={d.prompt}
+            onChangeText={(prompt) => set({ prompt })}
+            placeholder={t("routines.form.whatPlaceholder")}
+            accessibilityLabel={t("routines.form.what")}
+            minHeight={110}
+          />
+        )}
+        <GroupedHeader>{editing ? t("routines.form.title") : t("routines.form.name")}</GroupedHeader>
+        <TextArea
+          value={d.name}
+          onChangeText={(name) => set({ name })}
+          accessibilityLabel={editing ? t("routines.form.title") : t("routines.form.name")}
+          multiline={false}
+          minHeight={50}
+          returnKeyType="done"
+          maxLength={200}
+        />
+
+        <GroupedHeader>{t("routines.form.when")}</GroupedHeader>
+        <Segmented
+          items={[
+            { key: "schedule", label: t("routines.form.kind.schedule") },
+            { key: "event", label: t("routines.form.kind.event") },
+            ...(hasMail ? [{ key: "email", label: t("routines.form.kind.email") }] : []),
+          ]}
+          value={d.kind}
+          onChange={(k) => set({ kind: k as TriggerKind })}
+        />
+        {schedule ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <View style={styles.sentence}>
+                <Text variant="body" accessibilityLiveRegion="polite">
+                  {sentence}
+                </Text>
+                {!cron && upcoming.length > 0 ? (
+                  <Text variant="footnote" tone="muted">
+                    {`${t("routines.form.next")}: ${upcoming.join(" · ")}`}
+                  </Text>
+                ) : null}
+              </View>
+              {/* A cron keeps its own zone until a phrase replaces it: nothing here could change it. */}
+              {cron ? null : (
+                <GroupedField label={t("routines.form.timezone")} onPress={pickZone}>
+                  <Text variant="callout" numberOfLines={1}>
+                    {zoneLabel(d.rule.timezone, i18n.language)}
+                  </Text>
+                </GroupedField>
+              )}
+            </GroupedList>
+            {utc && !cron && !isUtc(d.rule.timezone) ? (
+              <View style={styles.utc}>
+                <Text variant="footnote" tone="faint">
+                  {t("routines.form.utcHint", { zone: timezoneName(d.rule.timezone, i18n.language) })}
+                </Text>
+                <Pressable onPress={() => setZone("UTC")} accessibilityRole="button" hitSlop={8}>
+                  <Text variant="footnote" tone="ink2" style={styles.link}>
+                    {t("routines.form.keepUtc")}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <GroupedHeader>{t("routines.form.frequency")}</GroupedHeader>
+            <TextArea
+              value={phrase}
+              onChangeText={typePhrase}
+              placeholder={t("recurrence.phrasePlaceholder")}
+              accessibilityLabel={t("routines.form.frequency")}
+              multiline={false}
+              minHeight={50}
+              autoCorrect={false}
+              returnKeyType="done"
+              maxLength={300}
+            />
+            {phraseError ? (
+              <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
+                {phraseError}
+              </Text>
+            ) : null}
+            {busy ? <GroupedFooter>{say(busy)}</GroupedFooter> : null}
+          </>
+        ) : null}
+        {d.kind === "event" ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              {ROUTINE_EVENTS.map((e) => (
+                <GroupedRow
+                  key={e}
+                  icon="bolt"
+                  label={t(`routines.event.${e}`)}
+                  checked={d.event === e}
+                  onPress={() => set({ event: e })}
+                />
+              ))}
+            </GroupedList>
+            <GroupedFooter>{t("routines.form.eventHelp", { org: org?.name ?? "" })}</GroupedFooter>
+          </>
+        ) : null}
+        {d.kind === "email" ? (
+          mailboxes.isSuccess && mailList.length === 0 ? (
+            <View style={styles.noMail}>
+              <Text variant="footnote" tone="faint">
+                {t("mail.routine.noMailbox")}
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="bolt"
+                label={t("mail.routine.openConnectors")}
+                onPress={() => router.push("/connectors")}
+              />
+            </View>
+          ) : (
+            <>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="mail"
+                  label={t("mail.routine.mailbox")}
+                  value={mailbox?.address}
+                  chevron={mailList.length > 1}
+                  onPress={mailList.length > 1 ? () => toggle("mailbox") : undefined}
+                />
+                {open === "mailbox"
+                  ? mailList
+                      .filter((a) => a.id !== d.email.accountId)
+                      .map((a) => (
+                        <GroupedRow
+                          key={a.id}
+                          label={a.address}
+                          onPress={() => {
+                            setD((x) => ({ ...x, email: { ...x.email, accountId: a.id, folder: "" } }));
+                            setOpen(null);
+                          }}
+                        />
+                      ))
+                  : null}
+                <GroupedRow
+                  icon="archive"
+                  label={t("mail.routine.folder")}
+                  value={folderLabel}
+                  chevron
+                  onPress={() => toggle("folder")}
+                />
+                {open === "folder"
+                  ? folderOptions
+                      .filter((f) => f.id !== d.email.folder)
+                      .map((f) => (
+                        <GroupedRow
+                          key={f.id}
+                          label={f.label}
+                          onPress={() => {
+                            setD((x) => ({ ...x, email: { ...x.email, folder: f.id } }));
+                            setOpen(null);
+                          }}
+                        />
+                      ))
+                  : null}
+              </GroupedList>
+              <GroupedHeader>{t("mail.routine.filters")}</GroupedHeader>
+              <GroupedList>
+                <StackedField label={t("mail.routine.from")}>
+                  <TextInput
+                    value={fromText}
+                    onChangeText={setFrom}
+                    placeholder={t("mail.list.placeholder")}
+                    placeholderTextColor={c.faint}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel={t("mail.routine.from")}
+                    style={input}
+                  />
+                </StackedField>
+                <StackedField label={t("mail.routine.subject")}>
+                  <TextInput
+                    value={d.email.filter.subject ?? ""}
+                    onChangeText={(subject) => setFilter({ subject })}
+                    accessibilityLabel={t("mail.routine.subject")}
+                    style={input}
+                  />
+                </StackedField>
+                <StackedField label={t("mail.routine.text")}>
+                  <TextInput
+                    value={d.email.filter.text ?? ""}
+                    onChangeText={(text) => setFilter({ text })}
+                    accessibilityLabel={t("mail.routine.text")}
+                    style={input}
+                  />
+                </StackedField>
+              </GroupedList>
+              {fromBad ? (
+                <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
+                  {t("mail.list.invalid")}
+                </Text>
+              ) : (
+                <GroupedFooter>{t("mail.routine.fromHelp")}</GroupedFooter>
+              )}
+            </>
+          )
+        ) : null}
+
+        <GroupedHeader>{t("routines.form.report")}</GroupedHeader>
+        <GroupedList>
+          {(["always", "when_new"] as const).map((v) => (
+            <GroupedRow
+              key={v}
+              label={t(`routines.report.${v}`)}
+              checked={d.report === v}
+              onPress={() => set({ report: v })}
+            />
+          ))}
+        </GroupedList>
+        <GroupedHeader>{t("routines.form.access")}</GroupedHeader>
+        <GroupedList>
+          {(["read", "act"] as const).map((v) => (
+            <GroupedRow
+              key={v}
+              label={t(`routines.access.${v}`)}
+              checked={d.access === v}
+              onPress={() => set({ access: v })}
+            />
+          ))}
+        </GroupedList>
+        <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
+        {routine && !isDoneOnce(routine) ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow
+                label={t("routines.form.active")}
+                toggle={d.active}
+                onPress={() => set({ active: !d.active })}
+              />
+            </GroupedList>
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** A field with its label above it (long labels: "Assunto contém"). */
+function StackedField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={styles.stacked}>
+      <Text variant="footnote" tone="muted">
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+/** "Fuso horário" of the routine form, pushed over it: a pick goes back into the form. */
+export function RoutineZonePage() {
+  const { t } = useTranslation();
+  const zone = useRoutineZone();
+  return (
+    <ZoneList
+      title={t("routines.form.timezone")}
+      value={zone}
+      onPick={(picked) => {
+        if (picked) setRoutineZone(picked);
+        goBack();
+      }}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  in: { paddingHorizontal: 16, paddingTop: 4 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  centerText: { textAlign: "center" },
+  gap: { height: 10 },
+  sentence: { paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
+  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
+  stacked: { paddingHorizontal: 14, paddingTop: 10 },
+  utc: { paddingTop: 7, paddingHorizontal: 16, gap: 4 },
+  link: { fontWeight: "600", textDecorationLine: "underline" },
+  error: { paddingTop: 7, paddingHorizontal: 16 },
+  noMail: { paddingTop: 10, paddingHorizontal: 16, gap: 10, alignItems: "flex-start" },
+});

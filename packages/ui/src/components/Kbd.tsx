@@ -12,3 +12,6 @@ export const isApple = () =>
 
 /** "⌘" on Apple platforms, "Ctrl" elsewhere. */
 export const modKey = () => (isApple() ? "⌘" : "Ctrl");
+
+/** A shortcut in a sentence, as the platform writes it: "⌘C" on Apple platforms, "Ctrl+C" elsewhere. */
+export const shortcut = (key: string) => (isApple() ? `⌘${key}` : `Ctrl+${key}`);

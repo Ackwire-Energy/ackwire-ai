@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, cx, Icon, InfoHint, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, onScreenKeyboard, shortcut, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -346,24 +346,20 @@ export function DesktopView({
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
-  const failed = shown === "unavailable" || shown === "outdated" || shown === "ended" || shown === "noRoom";
+  // Over a cover the head says nothing the cover says (opening, the pause, why not): only who holds the screen.
   const sub = inControl
     ? ask
       ? t("desktop.sub.controlAsked", g)
       : t("desktop.sub.control", g)
     : shown === "hidden"
       ? t("desktop.sub.hidden", { person: controllerName })
-      : held
-        ? t("agentComputer.sub.held")
-        : live
-          ? (head?.watching ?? t("agentComputer.sub.watching"))
-          : failed || shown === "forbidden"
-            ? ""
-            : t("agentComputer.sub.opening");
+      : live
+        ? (head?.watching ?? t("agentComputer.sub.watching"))
+        : "";
   const retrying = <span>{t("desktop.state.retrying")}</span>;
   const notice = (
     <span className="muted">
-      {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
+      {touch ? "" : `${t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })} `}
       {t("desktop.control.notice", g)}
     </span>
   );
@@ -398,14 +394,7 @@ export function DesktopView({
   );
   const cover: Record<Exclude<DesktopViewState, "live">, ReactNode> = {
     connecting: <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />,
-    hidden: (
-      <Cover
-        color={color}
-        icon="eyeOff"
-        text={t("browser.live.otherInControl", { name: controllerName })}
-        help={t("browser.inCard.hiddenHelp", g)}
-      />
-    ),
+    hidden: <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />,
     offline: <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} help={retrying} />,
     busy: <Cover color={color} spinner text={t("desktop.state.busy")} help={retrying} />,
     noRoom: <Cover color={color} icon="alert" text={t("agentComputer.state.noRoom", { computer })} action={again} />,
@@ -440,7 +429,7 @@ export function DesktopView({
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
         >
-          {t("desktop.takeover")}
+          <span className="cmp-act-label">{t("desktop.takeover")}</span>
         </Button>
       )}
     </>
@@ -448,8 +437,15 @@ export function DesktopView({
   const controlActs = (
     <>
       {ask && (
-        <Button size="sm" variant="ghost" loading={actions.failed.isPending} onClick={giveUp}>
-          {t("browser.inCard.couldnt")}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="block"
+          className="cmp-couldnt ac-btn--glyph"
+          loading={actions.failed.isPending}
+          onClick={giveUp}
+        >
+          <span className="cmp-act-label">{t("browser.inCard.couldnt")}</span>
         </Button>
       )}
       {!handingBack && (
@@ -463,7 +459,7 @@ export function DesktopView({
             setHandingBack(true);
           }}
         >
-          {handBackLabel}
+          <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
     </>

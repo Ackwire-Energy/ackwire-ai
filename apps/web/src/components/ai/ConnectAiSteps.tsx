@@ -217,7 +217,7 @@ export function PlanPanel(props: PlanPanelProps) {
   const forWhom: PlanSetAgent[] = target === ALL_AGENTS ? all : agents.filter((a) => a.id === target);
   const [agent] = forWhom;
   return (
-    <Card as="section" className="ai-panel" aria-label={title}>
+    <Card as="section" className="ai-panel ai-panel--plan" aria-label={title}>
       <PanelHead
         lead={<ProviderLogo id={planMark(choice)} size="sm" />}
         title={title}
@@ -250,6 +250,7 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
       <span aria-hidden="true">{t("connectAi.for")}</span>
       <Select
         size="sm"
+        align="end"
         aria-label={t("connectAi.agentAria")}
         value={target}
         onValueChange={onTarget}
@@ -476,21 +477,40 @@ function PlanSteps({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
-    // The computer's wait in one well: how far it is and the time left, or why it waits. A hold decides when
-    // anything runs there: it speaks alone.
+    // The computer's wait in one well: how far it is and the time left, or why it waits, then when the step under it
+    // turns on, said once (the owner's email line says it for them). A hold decides when anything runs there: it
+    // speaks alone. The well's lines start on the panel's text edge, so none leads with an icon.
     wait = (hold || preparing) && (
       <div className="ai-panel__wait">
         {hold ? (
-          line(<Icon name="pause" size={14} />, hold)
+          <p className="setup-line" role="status">
+            {hold}
+          </p>
         ) : (
           <>
-            {preparing && <SetupProgress view={preparing} />}
+            {preparing?.step ? (
+              <SetupProgress view={preparing} />
+            ) : (
+              preparing && (
+                <p className="setup-line" role="status">
+                  {t(preparing.textKey)}
+                </p>
+              )
+            )}
             {eta && (
               <p className="setup-eta" aria-live="polite">
                 {etaLine(t, eta)}
               </p>
             )}
-            {email && reader.owner && line(<Icon name="mail" size={14} />, t("connectAi.wait.email"))}
+            <p className="setup-line">
+              {t(
+                email && reader.owner
+                  ? "connectAi.wait.email"
+                  : coding
+                    ? "connectAi.wait.key"
+                    : "connectAi.wait.signIn",
+              )}
+            </p>
           </>
         )}
       </div>
@@ -600,8 +620,9 @@ function PlanSteps({
       )}
       {retry}
       {ownable && (
+        // Small columns: indented to the panel's text column, the two still fit side by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-        <div className="grid-options" role="group" aria-label={planTitle(t, choice)}>
+        <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
           <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
             <span className="ac-option__text">
               <span className="ac-option__title">{t("connectAi.own.this", { brand, computer })}</span>
@@ -632,9 +653,6 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          waitLine={
-            gate.state === "preparing" && !hold ? t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn") : undefined
-          }
           privacy={false}
           {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
           {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}

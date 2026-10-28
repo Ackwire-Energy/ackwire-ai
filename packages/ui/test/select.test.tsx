@@ -86,4 +86,17 @@ describe("Select", () => {
     expect(changes).toEqual([]);
     expect(trigger.textContent).toContain("Membro");
   });
+
+  test("the list opens on the trigger's start edge, or on its end edge for a select that ends its row", async () => {
+    for (const align of [undefined, "end"] as const) {
+      const { unmount } = render(
+        <Select aria-label="Papel" value="member" onValueChange={() => {}} options={roles} align={align} />,
+      );
+      const trigger = body().getByRole("combobox", { name: "Papel" });
+      trigger.focus();
+      await key(trigger, "Enter");
+      expect(body().getByRole("listbox").getAttribute("data-align")).toBe(align ?? "start");
+      unmount();
+    }
+  });
 });

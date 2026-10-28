@@ -214,9 +214,9 @@ export function allAgents<A extends { id: string }>({
 
 /**
  * Whom a plan's panel is for: the agent picked or asked for, all of `set` (`allAgents`) when picked or while two or
- * more of them have no AI yet, else the first agent with no AI, else the first. "All agents" picked where the plan
- * signs in once per account is the first with no AI. With no set it is the agent whose computer the panel reads,
- * the same for "All agents", which is on that agent's computer.
+ * more of them have no AI yet, else the first agent with no AI (`host` before the others), else the first. "All
+ * agents" picked where the plan signs in once per account is that same agent. With no set it is the agent whose
+ * computer the panel reads, the same for "All agents", which is on that agent's computer.
  */
 export function defaultTarget<A extends { id: string }>({
   agents,
@@ -224,6 +224,7 @@ export function defaultTarget<A extends { id: string }>({
   hasAi,
   asked,
   picked,
+  host,
 }: {
   agents: readonly A[];
   set: readonly { id: string }[];
@@ -231,11 +232,14 @@ export function defaultTarget<A extends { id: string }>({
   asked?: string;
   /** What the "For" select says (`ALL_AGENTS` or an agent's id), once someone chose. */
   picked?: string;
+  /** The agent whose face asks the question (the setup's AI step): the one the panel is for, while it has no AI. */
+  host?: string;
 }): string | undefined {
-  if (picked === ALL_AGENTS) return set.length >= 2 ? ALL_AGENTS : firstAgent(agents, hasAi)?.id;
+  const first = (agents.find((a) => a.id === host && !hasAi(a.id)) ?? firstAgent(agents, hasAi))?.id;
+  if (picked === ALL_AGENTS) return set.length >= 2 ? ALL_AGENTS : first;
   for (const id of [picked, asked]) if (id && agents.some((a) => a.id === id)) return id;
   if (set.filter((a) => !hasAi(a.id)).length >= 2) return ALL_AGENTS;
-  return firstAgent(agents, hasAi)?.id;
+  return first;
 }
 
 /**

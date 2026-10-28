@@ -122,7 +122,14 @@ export function Dialog({
             <span className="ac-dialog__acts ac-acts">
               {actions}
               <RDialog.Close asChild>
-                <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="close"
+                  className="ac-btn--glyph"
+                  aria-label={closeLabel}
+                />
               </RDialog.Close>
             </span>
           </div>

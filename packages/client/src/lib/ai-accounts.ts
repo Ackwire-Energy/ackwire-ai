@@ -1,4 +1,4 @@
-import type { MachineAccount, PlanUsage } from "../api/types";
+import type { AiAccounts, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -41,3 +41,38 @@ export function groupPlans<A extends MachineAccount & { machineId?: string }>(
     signedOut: logins.filter((l) => l.status === "signed_out"),
   }));
 }
+
+/** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */
+export interface OwnSignInRow {
+  key: string;
+  machineId: string;
+  computer: string;
+  kind: MachineAccountKind;
+  /** The plan the CLI reported (`max`, `pro`…), as it said it. */
+  plan: string | null;
+  usage: PlanUsage | null;
+}
+
+/** The viewer's computers' own sign-ins, Claude Code first on each computer (the computers' order kept). */
+export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
+  const out: OwnSignInRow[] = [];
+  for (const c of view?.computers ?? []) {
+    for (const kind of ["claude_code", "codex"] as const) {
+      const own = c.own?.[kind];
+      if (!own) continue;
+      out.push({
+        key: `${c.machineId}:${kind}`,
+        machineId: c.machineId,
+        computer: c.name,
+        kind,
+        plan: own.plan ?? null,
+        usage: own.usage ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+/** The plan's name as people know it ("Max", "Pro"): the CLI's word with a capital, or nothing. */
+export const planWordOf = (plan: string | null) =>
+  plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;

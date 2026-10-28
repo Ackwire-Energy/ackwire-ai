@@ -717,7 +717,8 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   // The crew shares one computer here.
   const setOf = (c: AiChoice) =>
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
-  const aimed = { agents: crewAgents, hasAi, picked: aiTarget };
+  // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
+  const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.ai] };
   // With no set, the agent whose computer the panel reads, "All agents" too.
   const gates = usePlanGates(
     created?.orgId ?? "",
@@ -737,7 +738,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     setAiPicked(next);
     // Another plan moves on to whoever still has no AI once a plan thinks for someone.
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
-      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, set: setOf(next) }));
+      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
   };
   // A computer the person connected: its own sign-in, unless they chose another account.
   const ownChosen =
@@ -1870,14 +1871,14 @@ function ComputerStep({
 
       {computer === "cloud" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{t("onboarding.computer.cloudReady")}</span>
         </p>
       )}
 
       {computer === "host" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{host?.online ? t("onboarding.computer.hostReady") : t("onboarding.computer.hostConnecting")}</span>
         </p>
       )}
@@ -1887,7 +1888,7 @@ function ComputerStep({
           {machine ? (
             <>
               <p className="onb__status ac-iconline" role="status">
-                <Icon name="check" />
+                <Icon name="check" size={14} />
                 <span>{t("onboarding.computer.thisMacConnected", { name: machine.name })}</span>
               </p>
               <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -1920,7 +1921,7 @@ function ComputerStep({
         <Card as="div">
           {machine ? (
             <p className="onb__status ac-iconline" role="status">
-              <Icon name="check" />
+              <Icon name="check" size={14} />
               <span>
                 {t("onboarding.computer.connected", {
                   name: machine.name,
@@ -2061,19 +2062,22 @@ function WorkspaceComputerStep({
           </ComputerTitle>
         </span>
       </div>
-      {hold && (
-        <p className="setup-line ac-iconline" role="status">
-          <Icon name="pause" size={14} />
-          <span>{hold}</span>
-        </p>
-      )}
-      <SetupWait view={view} reader={reader} />
-      {setupPending(view) && (
-        <p className="onb__status ac-iconline">
-          <Icon name="check" />
-          <span>{t("computerSetup.continue")}</span>
-        </p>
-      )}
+      {/* The whole wait in one well, as the AI step's: every line's icon and words on one column. */}
+      <div className="onb__wait">
+        {hold && (
+          <p className="setup-line ac-iconline" role="status">
+            <Icon name="pause" size={14} />
+            <span>{hold}</span>
+          </p>
+        )}
+        <SetupWait view={view} reader={reader} />
+        {setupPending(view) && (
+          <p className="setup-line ac-iconline">
+            <Icon name="check" size={14} />
+            <span>{t("computerSetup.continue")}</span>
+          </p>
+        )}
+      </div>
     </Card>
   );
 }

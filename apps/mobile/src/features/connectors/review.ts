@@ -34,8 +34,8 @@ export const STEP_KEYS: Record<Step, string> = {
 };
 
 /**
- * Where a sheet opens. A new service: on what it does. A connection: on who uses it, or (admins only, as the
- * web's "Revisar") on its tools while they wait for a review; `start` asks for a step (back from a sign-in).
+ * Where a sheet opens. A new service: on what it does. A connection: on who uses it (a connection opens its own
+ * screen from the gallery); `start` asks for a step (back from a sign-in, the tools still in the flow).
  */
 export function firstStep(
   existing: Pick<ConnectedItem, "needsReview"> | undefined,
@@ -44,7 +44,7 @@ export function firstStep(
 ): Step {
   if (!existing) return "about";
   if (start === "review" || start === "who") return start === "review" && !admin ? "who" : start;
-  return admin && existing.needsReview ? "review" : "who";
+  return "who";
 }
 
 /** What the review shows for a connection: a server's own tools, ours by scope, or nothing yet. */

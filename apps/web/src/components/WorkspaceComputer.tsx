@@ -11,9 +11,11 @@ import {
   setupEta,
   setupLines,
   setupNoticeKey,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
@@ -32,7 +34,7 @@ import {
   Spinner,
   Steps,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -99,10 +101,10 @@ const LINE_MS = 3500;
  * While it's prepared, the team's lines about what it's doing (`setupLines`), one at a time, crossfading every 3.5 s;
  * with reduced motion the one shown stays until the step changes. Followed by its key, so a line that comes meanwhile
  * (its memory, once the size is known) waits for its turn instead of taking the shown one's place. Only for sighted
- * readers: the step under it is what's announced. With no line for this team, the plain chip where it stands for the
- * card's own (`chip`), else nothing.
+ * readers: the step under it is what's announced. With no line for this team, nothing: the step's label already says
+ * where it is.
  */
-function SetupSays({ view, chip }: { view: SetupView; chip: boolean }) {
+function SetupSays({ view }: { view: SetupView }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const lines = setupLines(view, useAgents(org.id).data ?? []);
@@ -117,7 +119,7 @@ function SetupSays({ view, chip }: { view: SetupView; chip: boolean }) {
     const timer = setInterval(() => setShown((key) => keys[(keys.indexOf(key ?? "") + 1) % keys.length]), LINE_MS);
     return () => clearInterval(timer);
   }, [still, said]);
-  if (!on) return chip ? <Chip icon={PHASE_ICON[view.phase]}>{t(view.chipKey)}</Chip> : null;
+  if (!on) return null;
   return (
     <span className="setup-says" aria-hidden="true">
       {lines.map(({ key, agent }) => (
@@ -136,14 +138,15 @@ function SetupSays({ view, chip }: { view: SetupView; chip: boolean }) {
 
 /**
  * While it's on its way: the team's line, then the four steps as bars ("Passo 2 de 4 · Iniciando"); or why it waits,
- * in one line. `chip`: the team's line stands for the card's own chip.
+ * in one line. `said`: a chip or the window's head beside it says where it is, so a line that would only say it again
+ * stays out.
  */
-export function SetupProgress({ view, chip = false }: { view: SetupView; chip?: boolean }) {
+export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
     return (
       <div className="setup-progress setup-progress--steps">
-        <SetupSays key={view.textKey} view={view} chip={chip} />
+        <SetupSays key={view.textKey} view={view} />
         <div role="status">
           <Steps
             current={view.stepNumber}
@@ -154,6 +157,7 @@ export function SetupProgress({ view, chip = false }: { view: SetupView; chip?: 
       </div>
     );
   }
+  if (said && statusRestatesChip(view)) return null;
   // The lines under it lead with 14px too, so every line's words start in one column.
   return (
     <p className="setup-progress setup-progress--line ac-iconline" role="status">
@@ -215,12 +219,12 @@ export function ComputerTitle({ children, name }: { children: ReactNode; name: s
 
 /**
  * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left, who
- * hears when it's ready, then the size.
+ * hears when it's ready, then the size. `said` as `SetupProgress`'s.
  */
-export function SetupWait({ view, reader }: { view: SetupView; reader: WaitReader }) {
+export function SetupWait({ view, reader, said }: { view: SetupView; reader: WaitReader; said?: boolean }) {
   return (
     <div className="setup-wait">
-      <SetupProgress view={view} />
+      <SetupProgress view={view} said={said} />
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
     </div>
@@ -277,15 +281,13 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
               )}
             </h2>
           </ComputerTitle>
-          {/* Being prepared within a step, the chip is the progress's own, over its steps. */}
-          {!view.step && (
-            <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <SetupChip view={view} machine={machine} />
-            </span>
-          )}
+          {/* The card says where it is only here, so here a screen reader hears it change. */}
+          <span className="row" role="status" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <SetupChip view={view} machine={machine} />
+          </span>
         </span>
       </div>
-      {view.phase !== "ready" && <SetupProgress view={view} chip />}
+      {view.phase !== "ready" && <SetupProgress view={view} said />}
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (
@@ -310,14 +312,19 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 }
 
 /**
- * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), or the
- * wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents that wait for it,
- * each named by its label. Everyone sees it; closed, it stays closed until the state (or the step) changes.
+ * "Preparando o computador da Acme" (in line, its name alone): the notice at the top of the work area while the
+ * workspace's own computer is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam
+ * uns 6 min"), or the wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents
+ * that wait for it, each named by its label. Everyone sees it, except on Settings › Computers, where its See leads and
+ * the card says it; closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const there = useMatchRoute()({
+    to: "/org/$orgId/settings/$section",
+    params: { orgId: org.id, section: "computers" },
+  });
   const reader = useWaitReader();
   const view = useSetupView(org.id);
   const pending = setupPending(view);
@@ -325,7 +332,7 @@ export function ComputerSetupNotice() {
   const machines = useMachines(org.id, pending);
   const { eta, email } = useSetupWait(view, reader.held);
   const [hidden, setHidden] = useState(() => storage.get(STORAGE_KEYS.setupNoticeHidden));
-  if (!pending) return null;
+  if (!pending || there) return null;
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
@@ -344,7 +351,7 @@ export function ComputerSetupNotice() {
       <div className="outage setup-notice" role="status" data-phase={view.phase}>
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
-          <b>{t("computerSetup.notice.title", { org: org.name })}</b>
+          <b>{t(setupNoticeTitleKey(view), { org: org.name })}</b>
           <span>{line}</span>
         </span>
         <span className="outage__crew">

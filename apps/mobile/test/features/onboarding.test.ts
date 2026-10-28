@@ -161,12 +161,12 @@ test("each step's question and its one line: the phone's own where it can't do w
   expect(stepText(en, "agents", acme)).toEqual(["Keep this team?", "Check who else joins."]);
   expect(stepText(en, "ai", acme)).toEqual([
     "Which AI will they use?",
-    "Sign in with your AI plan: no API key needed.",
+    "Sign in with your AI plan: no\u00a0API\u00a0key needed.",
   ]);
   expect(stepText(en, "ai", { ...acme, aiSaved: true })[1]).toBe("Saved. Every agent without a plan thinks with it.");
   // A self-hosted workspace with no computer yet: a plan has nowhere to sign in.
   expect(stepText(en, "ai", { ...acme, noComputer: true })[1]).toBe(
-    "Your agents think with an API key, or with your AI plan on a computer you connect.",
+    "Your agents think with an API\u00a0key, or with your AI plan on a computer you connect.",
   );
   expect(stepText(en, "ai", { ...acme, noComputer: true, aiSaved: true })[1]).toBe(
     "Saved. Every agent without a plan thinks with it.",

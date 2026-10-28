@@ -498,7 +498,7 @@ export const featureKeysEn: FeatureTranslations = {
     noAgents: "No agent can run missions yet. Connect a computer on the website.",
     reason: {
       no_computer: "Needs a connected computer",
-      cloud_computer: "Missions on Daytona sandboxes are coming soon",
+      cloud_computer: "Missions on a cloud computer are coming soon",
       exec_off: "The computer doesn't allow running commands",
       runner_outdated: "The computer needs an update",
       not_in_audience: "Doesn't work with you",
@@ -776,6 +776,12 @@ export const featureKeysEn: FeatureTranslations = {
     connectors: "Connectors",
     usage: "Usage",
     preferences: "Preferences",
+    editProfile: "Edit profile",
+    switchWorkspace: "Switch workspace",
+    yourAgents: "Your agents",
+    newAgent: "New",
+    thinksWith: "They think with",
+    ownOn: "Signed in on {{computer}}",
     on: "On",
     off: "Off",
     notificationsPhone: "Notifications on this phone",
@@ -945,6 +951,12 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't load the Drive.",
     more: "Show more",
   },
+  // Rotinas (the rest of its words are the web's, `routines.*`).
+  routines: {
+    loadFailed: "Couldn't load the routines.",
+    anyAgent: "All agents",
+    create: "Create",
+  },
   // intentional: chats/activity/ui
   homeNow: {
     working_one: "{{count}} working",
@@ -1092,6 +1104,7 @@ export const featureKeysEn: FeatureTranslations = {
     tasks_one: "{{count}} task",
     tasks_other: "{{count}} tasks",
     switch: "Switch computer",
+    dismiss: "Close notice",
     rowWaiting: "Waiting for {{computer}}",
     rowWaitingLabel: "{{name}}, waiting for {{computer}}",
     waiting: {
@@ -1114,9 +1127,9 @@ export const featureKeysEn: FeatureTranslations = {
       submit_other: "Switch {{count}} agents",
       later: "Not now",
       on: "On",
-      cloud: "Daytona sandbox",
+      cloud: "Cloud computer",
       cloudTag: "Always on",
-      cloudDesc: "An isolated computer on Daytona",
+      cloudDesc: "An isolated computer in the cloud",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
       and: " and ",
@@ -1151,7 +1164,7 @@ export const featureKeysEn: FeatureTranslations = {
       target_not_found: "That computer isn't connected anymore. Choose another one.",
       target_same: "Choose a computer other than {{computer}}.",
       target_paused: "That computer is paused. Choose another one.",
-      target_cloud_unavailable: "Daytona sandboxes aren't available right now.",
+      target_cloud_unavailable: "The cloud computer isn't available right now.",
       not_found: "{{computer}} isn't in the computers list anymore.",
     },
     card: {
@@ -1404,6 +1417,8 @@ export const featureKeysEn: FeatureTranslations = {
     saving: "Saving…",
     row: "AI accounts",
     rowNone: "None",
+    rowPlans_one: "{{count}} plan",
+    rowPlans_other: "{{count}} plans",
     rowKeys_one: "{{count}} key",
     rowKeys_other: "{{count}} keys",
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
@@ -1412,9 +1427,33 @@ export const featureKeysEn: FeatureTranslations = {
     audience: "Who it replies to",
     another: "Another AI",
   },
+  crash: {
+    title: "Something went wrong on this screen",
+    subtitle: "The app hit an error showing this. Try again. If it keeps happening, send us the text below.",
+    retry: "Try again",
+  },
   notFound: {
     title: "We couldn't find that",
     subtitle: "The link may have changed or you can't see it.",
     home: "Go to chats",
+  },
+  settings: {
+    edit: "Edit workspace",
+    access: {
+      how: "Tap a row to change its level: No access, Read, Read and write.",
+    },
+    logo: {
+      failed: "Couldn't upload the logo",
+      tooBig: "That image is too big. Try another one.",
+    },
+    machine: {
+      toolsHow: "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself.",
+    },
+    import: {
+      onComputer:
+        "Bringing agents, skills and channels from another app happens on a computer: open agentes.chat in a browser, in Settings\u00a0›\u00a0Import and export.",
+      preparing: "Preparing the file…",
+      failed: "Couldn't download the file. Try again.",
+    },
   },
 };

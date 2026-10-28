@@ -541,11 +541,11 @@ export const en: Translations = {
     },
     keyStep: {
       title: "Which AI will they use?",
-      lead: "Sign in with your AI plan: no API key needed.",
+      lead: "Sign in with your AI plan: no\u00a0API\u00a0key needed.",
       paid: "Your agentes.chat plan is active. Their computer is on its way.",
       /** Back from paying, until the billing service lifts the workspace's hold (ADR 0077). */
       confirming: "Payment received. Starting this workspace's agentes.chat plan.",
-      leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
+      leadNoComputer: "Your agents think with an API\u00a0key, or with your AI plan on a computer you connect.",
     },
     jev: {
       title: "Help your agents work as a team",
@@ -1082,7 +1082,7 @@ export const en: Translations = {
     },
     wait: {
       signIn: "You sign in here as soon as the computer is ready.",
-      key: "You send it as soon as the computer is ready.",
+      key: "You send the key as soon as the computer is ready.",
       email: "We'll email you when it's ready. You can close this page.",
       ready: "{{computer}} is ready.",
       useKey: "Use an API key now",
@@ -1097,10 +1097,10 @@ export const en: Translations = {
     onlyYou: "{{name}} will only reply to you.",
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
-      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin does it.",
+      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin\u00a0does\u00a0it.",
       open: "Open ChatGPT settings",
     },
-    zaiTeam: "On a team plan, use the key from your Team Plan page.",
+    zaiTeam: "On a team plan, use the key from your Team\u00a0Plan\u00a0page.",
     who: {
       key: "API key · {{provider}}",
       keyFor: "API key for {{names}}",
@@ -1112,7 +1112,7 @@ export const en: Translations = {
     foot: {
       one: "On your plan, {{name}} only replies to you.",
       all: "On your plan, your agents only reply to you.",
-      signIn: "The account stays only on {{computer}}. Your password goes only to {{brand}}.",
+      signIn: "The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
     },
     each: "One sign-in per agent, with the same account.",
     eachHint: "Each agent keeps its own sign-in. They all share your plan's limits.",
@@ -1905,11 +1905,11 @@ export const en: Translations = {
         add: {
           title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
           stepOne: {
-            claude_code: "Sign in to Claude",
-            codex: "Sign in to ChatGPT",
+            claude_code: "The account with your plan",
+            codex: "The account with your plan",
           },
           stepOneHint:
-            "Wrong account? Sign out there and try again. The account stays only on {{computer}}. Your password goes only to {{brand}}.",
+            "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
           stepOneTip: {
             claude_code: "Wrong account? Sign out on Claude's page and try again.",
             codex: "Wrong account? Sign out on ChatGPT's page and try again.",
@@ -4610,6 +4610,7 @@ export const en: Translations = {
       usedBy_one: "{{agents}} thinks with it",
       usedBy_other: "{{agents}} think with it",
       noAgent: "No agent yet",
+      ownOn: "Signed in on {{computer}} · its agents think with it",
       signedOut: "Signed out. Sign in again so your agents can use it.",
       signedOutFor_one: "{{agents}} is signed out.",
       signedOutFor_other: "{{agents}} are signed out.",
@@ -8245,7 +8246,6 @@ export const en: Translations = {
       askedIn: "{{name}} asked · {{where}}",
       watching: "Watching {{name}}",
       inControl: "You're in control",
-      otherInControl: "{{name}} is in control",
       otherInControlHelp: "Just watching. {{name}} is doing what was asked.",
       watchOnly: "Live",
       takeover: "Take over",
@@ -8635,7 +8635,7 @@ export const en: Translations = {
     sub: {
       control: "You're in control · {{name}} waits",
       controlAsked: "You're in control · {{name}} asked",
-      hidden: "{{person}} is in control · screen hidden",
+      hidden: "{{person}} is in control",
     },
     state: {
       busy: "Too many people are watching right now.",
@@ -8663,7 +8663,7 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{key}} C, {{key}} V.",
+      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
@@ -8745,13 +8745,8 @@ export const en: Translations = {
     },
     screen: "{{name}}'s screen, live",
     sub: {
-      opening: "Opening…",
       watching: "Live · you're watching",
       working: "Live · {{name}} is working",
-      needsYou: "Live · {{name}} needs you",
-      askedOther: "Live · {{name}} asked {{person}}",
-      held: "Paused for now · you can watch",
-      paused: "Paused on {{computer}} · you can watch",
       notAnswering: "Not answering",
       offline: "Offline since {{time}}",
     },
@@ -8766,7 +8761,6 @@ export const en: Translations = {
       heldHelp: "Nobody takes control until the pause ends.",
       paused: "{{computer}} is paused until {{time}}",
       pausedPlain: "{{computer}} is paused",
-      notAnswering: "{{computer}} isn't answering",
       notAnsweringHelp: "It usually comes back within a few minutes. We're on it.",
       offline: "{{computer}} is offline",
       offlineHelpPlain: "{{name}} waits for the computer to come back.",

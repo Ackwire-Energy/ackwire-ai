@@ -127,7 +127,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("mobile.intentAgents.thinks")} solid={false} />
+      <PushedHeader title={t("mobile.intentAgents.thinks")} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}

@@ -81,9 +81,14 @@ export function targetBlock(
 /** The option value of a target in the picker. */
 export const targetValue = (target: OutageTarget) => (target.kind === "cloud" ? "cloud" : target.machineId);
 
-/** The targets offered for an outage: never the offline computer itself. */
-export const targetsFor = (data: MachineOutages | undefined, machineId: string) =>
-  (data?.targets ?? []).filter((x) => x.kind === "cloud" || x.machineId !== machineId);
+/**
+ * The targets offered for an outage: never the offline computer itself, and the cloud computer only where this
+ * server has it and it runs one of the agents' `brains` (today it runs none: a row nobody could pick).
+ */
+export const targetsFor = (data: MachineOutages | undefined, machineId: string, brains: ComputerBrain[]) =>
+  (data?.targets ?? []).filter((x) =>
+    x.kind === "cloud" ? x.available && brains.some((b) => (x.brains ?? []).includes(b)) : x.machineId !== machineId,
+  );
 
 /** "2 rotinas e 1 conversa esperando"; null when nothing waits. */
 export function waitingText(t: TFunction, waiting: OutageAgent["waiting"]): string | null {

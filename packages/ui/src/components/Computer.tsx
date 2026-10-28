@@ -62,8 +62,9 @@ export function ComputerPortrait({ kind, state, size = 48, label, className }: C
           width: (cols * size) / COMPUTER_GRID,
           height: size,
           imageRendering: "pixelated",
-          // Where the drawing starts under the box's top: a face line puts the text there.
+          // Where the drawing starts under the box's top (a face line puts the text there), and ends over its bottom.
           "--art-top": `${(COMPUTER_ROWS[kind][0] * size) / COMPUTER_GRID}px`,
+          "--art-bottom": `${((COMPUTER_GRID - COMPUTER_ROWS[kind][0] - COMPUTER_ROWS[kind][1]) * size) / COMPUTER_GRID}px`,
         } as CSSProperties
       }
       data-kind={kind}

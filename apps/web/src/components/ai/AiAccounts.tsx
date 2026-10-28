@@ -1,6 +1,6 @@
 import type { AiAccounts as AiAccountsView } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi } from "@agenteschat/client";
-import { groupPlans, type PlanAccount } from "@agenteschat/client/lib/ai-accounts";
+import { groupPlans, ownSignIns, type PlanAccount, planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
@@ -31,8 +31,10 @@ import { AddAccount } from "./AddAccountFlow";
  * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
  * accounts on every computer, each with its plan's meter and the agents it
  * thinks for, its logins (one per agent) in one row; renamed, signed in again
- * (a new key for a coding plan, to every login) or disconnected here. Never
- * blank: with none, one way to connect one.
+ * (a new key for a coding plan, to every login) or disconnected here. First, the
+ * sign-ins of the computers they connected ("Conta deste computador"): the
+ * agents there think with them, so they are plans too. Never blank: with none,
+ * one way to connect one.
  */
 
 type Row = AiAccountsView["accounts"][number];
@@ -54,6 +56,7 @@ export function AiAccountsSection() {
   }, [api, org.id]);
   const rows = ai.data?.accounts ?? [];
   const accounts = groupPlans(rows);
+  const own = ownSignIns(ai.data);
   const several = new Set(rows.map((r) => r.machineId)).size > 1;
   const names = (list: string[]) => joinNames(list, t("newAgent.and"));
   const meterText = planMeterText(t, i18n.language);
@@ -96,7 +99,25 @@ export function AiAccountsSection() {
       </div>
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
-      {ai.isSuccess && rows.length === 0 && <p className="small muted">{t("aiAccounts.page.empty")}</p>}
+      {ai.isSuccess && rows.length === 0 && own.length === 0 && (
+        <p className="small muted">{t("aiAccounts.page.empty")}</p>
+      )}
+      {own.length > 0 && (
+        <List>
+          {own.map((o) => (
+            <div key={o.key} className="ac-list__row ai-accounts__row">
+              <ProviderLogo id={o.kind} size="sm" />
+              <span className="list-col">
+                <span className="ai-accounts__name ac-captop">
+                  {[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                </span>
+                <span className="small muted">{t("aiAccounts.page.ownOn", { computer: o.computer })}</span>
+                {o.usage && <PlanMeter usage={o.usage} text={meterText} compact />}
+              </span>
+            </div>
+          ))}
+        </List>
+      )}
       {accounts.length > 0 && (
         <List>
           {accounts.map((account) => {
