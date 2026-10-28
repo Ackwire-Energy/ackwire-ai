@@ -449,8 +449,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     }
     expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
     expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
-    // A key's field can narrow to 112px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
-    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 112px");
+    // A key's field can narrow to 102px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
+    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
   });
 
   test("a computer the person connected: its own sign-in, saved for the agent at once; or another account", async () => {

@@ -8128,7 +8128,7 @@ a.machine-row__name:hover {
    Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 112px;
+  min-width: 102px;
 }
 .agp-addacct__code output {
   font-size: 24px;
