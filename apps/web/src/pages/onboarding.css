@@ -37,8 +37,10 @@
   min-width: 0;
 }
 /*
- * One calm column per step: the host asks, the answer, one big action. It is as tall as the screen at least, so the
- * step's actions rest at the screen's bottom however short the step is. On a desktop the step centres in the room
+ * One calm column per step: the host asks, the answer, one big action. Every step starts at the same top, so nothing
+ * a step loads later moves its question. The top is the line through the middle of the rail's logo (the rail's 24px
+ * padding and 14px, half the logo's 27.5px), where Back's middle sits (its -16px top margin). The column is as tall
+ * as the screen at least, so the step's actions rest at the screen's bottom however short the step is, the room left
  * above them.
  */
 .onb__body {
@@ -48,15 +50,17 @@
   gap: 24px;
   width: 100%;
   max-width: 600px;
-  padding: 48px var(--onb-gutter) 0;
+  padding: 38px var(--onb-gutter) 0;
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
 }
-/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. The page pins
-   that room as the step opens (`--onb-lead`), so what changes in the step grows or shrinks it downward. */
-.onb__body::before {
-  content: "";
-  margin-block: var(--onb-lead, auto) -24px;
+/* With no Back (the first step), an empty row in its place: the host starts where it does on every step. */
+@media (min-width: 761px) {
+  .onb__body:not(:has(> .onb__back))::before {
+    content: "";
+    height: 32px;
+    margin: -16px 0 -8px;
+  }
 }
 @keyframes onb-in {
   from {
@@ -283,8 +287,7 @@ textarea.onb__big.ac-input {
   margin-inline: auto;
 }
 /* A step with no bar (the plan offer: its one action is its banner) keeps the bar's auto top margin and its clearance
-   of the home bar in an empty last row, so it centres like the others and its last line stays the column's gap above
-   the screen's bottom. */
+   of the home bar in an empty last row: its last line stays the column's gap above the screen's bottom. */
 .onb__body:not(:has(> .onb__actions))::after {
   content: "";
   margin-top: auto;
@@ -662,10 +665,6 @@ html:has(.onb) {
   }
   .onb__body {
     padding-top: 24px;
-  }
-  /* The step starts under the step bar, and the spare room all goes above the actions. */
-  .onb__body::before {
-    display: none;
   }
   .onb__ask .onb__title {
     font-size: 18px;

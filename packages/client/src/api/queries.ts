@@ -242,9 +242,9 @@ export function useRevokeInvitation(orgId: string) {
 
 // ── Agents ──────────────────────────────────────────────────────────────────
 
-export const useAgents = (orgId: string, enabled = true) => {
+export const useAgents = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000, enabled });
+  return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */

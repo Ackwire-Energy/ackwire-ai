@@ -876,8 +876,6 @@ describe("Onboarding", () => {
     // bar's own auto top margin takes the room left, so it rests at the bottom, in the same place on every step.
     expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
     expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
-    // The room above the step is the one the page pins as the step opens (computer-setup.test.tsx).
-    expect(rule("\n.onb__body::before")).toContain("margin-block: var(--onb-lead, auto) -24px");
     // A text button that doesn't fit beside Continue goes above it: Continue keeps its place on every step.
     expect(rule("\n.onb__actions")).toContain("flex-wrap: wrap-reverse");
     // Its ground spans the column's gutters, and its bottom clears the home bar at every width.
@@ -892,6 +890,35 @@ describe("Onboarding", () => {
     expect(rule("\nhtml:has(.onb)")).toContain("scroll-padding-bottom: 104px");
     expect(rule("  html:has(.onb)", phone)).toContain(
       "scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px)",
+    );
+  });
+
+  test("every step starts at one top: Back on the line through the middle of the rail's logo, in the Mac app too", () => {
+    const sheet = (path: string) => readFileSync(join(import.meta.dir, "../src", path), "utf8");
+    const css = sheet("pages/onboarding.css");
+    const desktop = sheet("desktop.css");
+    const rule = (from: string, selector: string) => from.slice(from.indexOf(`${selector} {`)).split("}")[0] ?? "";
+    const px = (decls: string, prop: string) => Number(decls.match(new RegExp(`\\n\\s*${prop}: (-?[\\d.]+)px`))?.[1]);
+    // No room above the step that follows what's in it, centring it or pinned as it opens.
+    const rows = css.match(/\.onb__body[^{]*::before \{[^}]*\}/g) ?? [];
+    expect(rows.filter((r) => /auto|--onb-lead/.test(r))).toEqual([]);
+    // Back's middle (the column's top padding, its top margin and half its height) on the 22px logo's (the rail's
+    // padding and half its 1.25em mark).
+    const railTop = px(rule(sheet("layout.css"), "\n.onb__rail"), "padding");
+    const top = px(rule(css, "\n.onb__body"), "padding");
+    const back = rule(css, "\n.onb__back");
+    expect(Math.abs(top + px(back, "margin") + px(back, "height") / 2 - (railTop + (22 * 1.25) / 2))).toBeLessThan(0.5);
+    // The first step has no Back: a row of its height and margins keeps its room. A phone keeps its first step under
+    // the step bar.
+    const row = rule(css, "@media (min-width: 761px) {\n  .onb__body:not(:has(> .onb__back))::before");
+    expect(row).toContain('content: ""');
+    expect(px(row, "height")).toBe(px(back, "height"));
+    expect(back).toContain(`margin: ${row.match(/\n\s*margin: ([^;]+);/)?.[1]}`);
+    // Under the Mac's buttons the column moves down with the rail; a window narrow enough for the step bar doesn't.
+    const mac = 'html[data-desktop="mac"]:not([data-fullscreen])';
+    expect(rule(desktop, `\n${mac} .onb__rail`)).toContain("padding-top: calc(var(--titlebar-h) + 8px)");
+    expect(rule(desktop, `@media (min-width: 761px) {\n  ${mac} .onb__body`)).toContain(
+      `padding-top: calc(var(--titlebar-h) + 8px + ${top - railTop}px)`,
     );
   });
 

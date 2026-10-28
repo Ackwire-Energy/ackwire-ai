@@ -120,6 +120,13 @@ html[data-desktop] .auth__logo {
 html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
   padding-top: calc(var(--titlebar-h) + 8px);
 }
+/* The onboarding's step stays on the logo's line, 14px under the rail's padding (onboarding.css). A window narrow
+   enough for the step bar keeps the phone's: the bar on top clears the buttons. */
+@media (min-width: 761px) {
+  html[data-desktop="mac"]:not([data-fullscreen]) .onb__body {
+    padding-top: calc(var(--titlebar-h) + 8px + 14px);
+  }
+}
 
 /*
  * An app, not a page: the interface's own words don't select (messages, pages and

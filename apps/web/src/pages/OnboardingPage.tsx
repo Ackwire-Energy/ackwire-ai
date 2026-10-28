@@ -4,7 +4,6 @@ import {
   keys,
   meQuery,
   newClientId,
-  useAgents,
   useAiStatus,
   useAuthConfig,
   useComputerSetup,
@@ -643,10 +642,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   const aiOpen = step.id === "ai" && !jev;
   const jevOpen = step.id === "ai" && jev;
-  // The team's line over the computer's steps (`SetupSays`), on the computer step and in the AI panel's wait: the
-  // agents it names, asked for as the step opens.
-  const teamLine = (step.id === "computer" || aiOpen) && workspaceComputer?.step != null;
-  const teamRead = useAgents(created?.orgId ?? "", Boolean(created) && teamLine);
   // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
   const jevKey = useJevKey();
   const saveJev = useSaveJevKey();
@@ -858,35 +853,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         }),
       }
     : null;
-
-  // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
-  // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
-  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with. Done's
-  // first message is written by the layout effect above, after the step opened: the column is placed again once it's
-  // in, still before the first paint. Some of a step comes from reads first made as it opens (the AI panel from the
-  // computer's setup and the plan gates, the team's line over the computer's steps from the agents, the line under
-  // Done's message from the AI status): placed again once they first answer, the step sits where that content puts
-  // it. Asked again later (another agent under "Para", a poll), they move nothing.
-  const settled =
-    (!teamLine || teamRead.isFetched) &&
-    (!aiOpen || (setup.isFetched && (gates.view !== undefined || gates.failed))) &&
-    (step.id !== "done" || (firstAsk !== null && (speaker === undefined || aiNow.isFetched)));
-  const screen = `${step.id}-${jev}`;
-  const [settledOn, setSettledOn] = useState("");
-  if (settled && settledOn !== screen) setSettledOn(screen);
-  const column = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again per screen, with Done's first message and once its reads answered
-  useLayoutEffect(() => {
-    const el = column.current;
-    if (!el) return;
-    const place = () => {
-      el.style.removeProperty("--onb-lead");
-      el.style.setProperty("--onb-lead", getComputedStyle(el, "::before").marginTop);
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [screen, firstAsk === null, settledOn === screen]);
 
   const finish = useMutation({
     mutationFn: async (message: { body: string; clientId: string } | null) => {
@@ -1153,7 +1119,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
           void advance().catch(() => {});
         }}
       >
-        <div className="onb__body" key={screen} ref={column}>
+        <div className="onb__body" key={`${step.id}-${jev}`}>
           {index > 0 ? (
             <button type="button" className="onb__back" onClick={back} disabled={busy}>
               <Icon name="chevronLeft" size={16} />
