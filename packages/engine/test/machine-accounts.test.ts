@@ -501,7 +501,8 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
       canAdd: true,
       keys: true,
       brains: { claude_code: expect.any(Boolean), codex: expect.any(Boolean) },
-      own: {},
+      // Its Claude Code is signed in on its own, with no plan or usage known yet.
+      own: { claude_code: {} },
     },
   ]);
   expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).accounts).toEqual([]);

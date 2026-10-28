@@ -186,13 +186,7 @@ export function PushedHeader({
         : word !== null && !IOS
           ? () => (
               <View style={styles.headerRight}>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  label={word}
-                  disabled={wordOff}
-                  onPress={() => press.current?.()}
-                />
+                <Button size="sm" variant="primary" label={word} disabled={wordOff} onPress={() => press.current?.()} />
               </View>
             )
           : undefined,
