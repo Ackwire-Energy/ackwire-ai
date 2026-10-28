@@ -2419,7 +2419,7 @@ p {
   color: var(--ink2);
   cursor: pointer;
 }
-/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its first line. */
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its line. */
 .ac-hintline:has(> .ac-field__label) {
   font-size: 13px;
   line-height: 18px;
@@ -6480,6 +6480,38 @@ a.machine-row__name:hover {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/*
+ * One edge for the wait's words, its icons hanging in a column before it (an icon line's 14 px icon and 8 px gap): the
+ * steps' bar, the step and the time left start where the icon lines' words do, in the computer's window, on setup's
+ * Computer step and on Settings › Computers. Wrapped, a line keeps its phrases whole: the step's own words where they
+ * fit, the rest by the copy's no-break spaces.
+ */
+:is(.setup-wait, .setup-card) > :is(.setup-progress:not(.ac-iconline), .setup-eta) {
+  margin-left: 22px;
+}
+:is(.setup-wait, .setup-card) > * {
+  text-wrap: pretty;
+}
+/*
+ * A problem's line ends on a phrase its no-break spaces keep whole ("We're on it."): `pretty` would take it for a
+ * short last line and pull the sentence before's last word under it, so this line wraps plainly.
+ */
+:is(.setup-wait, .setup-card) > .setup-progress--line[data-phase="problem"] {
+  text-wrap: wrap;
+}
+.setup-progress .ac-eyebrow > span {
+  display: inline-block;
+}
+/* Settings › Computers' card: its last line's baseline as far over its foot as its drawing starts under its top. */
+.setup-card > p:last-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+@supports (top: 1lh) {
+  .setup-card > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
   flex-wrap: wrap;
@@ -8124,7 +8156,7 @@ a.machine-row__name:hover {
   gap: 10px;
 }
 /*
- * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
  * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
  */
 .agp-brainoff {

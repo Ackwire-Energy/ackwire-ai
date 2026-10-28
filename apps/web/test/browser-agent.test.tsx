@@ -162,7 +162,7 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
     expect(card().classList.contains("is-control")).toBe(true);
     expect(card().textContent).toContain("Digite um endereço acima para abrir um site.");
-    expect(sub()).toBe("Você no controle · a Ada espera");
+    expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
 
     // Outside the agent's sites: said under the field, nothing opens.
     const address = within(card()).getByRole("textbox", { name: "Endereço do site" });

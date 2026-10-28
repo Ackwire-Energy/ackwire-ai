@@ -28,6 +28,14 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   follow_up: "thread",
 };
 
+function ReceiptDot() {
+  return (
+    <span className="ac-receipt__dot" aria-hidden="true">
+      ·
+    </span>
+  );
+}
+
 /**
  * A person's message's receipt: a small muted check (our icons) at the end of its first line (`part="check"`).
  * Clicking or focusing it opens a popover with each agent and its status, and who picked them. Words only for what
@@ -56,7 +64,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <span className="ac-receipt__clock">
           <Icon name="waiting" />
         </span>
-        <span>{t("receipts.picking")} ·</span>
+        <span>{t("receipts.picking")}</span>
+        <ReceiptDot />
         <CallAgentMenu />
       </div>
     );
@@ -135,7 +144,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
       {status?.kind === "failed" && actions && (
         <>
-          <span>{t("receipts.failedShort")} ·</span>
+          <span>{t("receipts.failedShort")}</span>
+          <ReceiptDot />
           <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
             {t("receipts.retry")}
           </button>
@@ -150,36 +160,37 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                 {t("receipts.mentionNeededHint")}
               </InfoHint>
             </span>
-            <span>·</span>
+            <ReceiptDot />
             <CallAgentMenu />
           </>
         ) : (
           <>
-            <span>{t("receipts.nobody")} ·</span>
+            <span>{t("receipts.nobody")}</span>
+            <ReceiptDot />
             <CallAgentMenu />
           </>
         ))}
       {status?.kind === "no_ai" && (
         <>
-          <span>
-            {t("noAi.receipt")}
-            {connect && " ·"}
-          </span>
+          <span>{t("noAi.receipt")}</span>
           {connect && (
-            <button
-              type="button"
-              className="ac-receipt__action"
-              onClick={() =>
-                connect.open({
-                  intent: receipt?.noAi?.intent,
-                  provider: receipt?.noAi?.provider,
-                  agentId: status.agents.length === 1 ? status.agents[0] : undefined,
-                  from: message.id,
-                })
-              }
-            >
-              {t("noAi.action")}
-            </button>
+            <>
+              <ReceiptDot />
+              <button
+                type="button"
+                className="ac-receipt__action"
+                onClick={() =>
+                  connect.open({
+                    intent: receipt?.noAi?.intent,
+                    provider: receipt?.noAi?.provider,
+                    agentId: status.agents.length === 1 ? status.agents[0] : undefined,
+                    from: message.id,
+                  })
+                }
+              >
+                {t("noAi.action")}
+              </button>
+            </>
           )}
         </>
       )}

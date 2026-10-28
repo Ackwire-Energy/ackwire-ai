@@ -560,7 +560,8 @@ function ComputerStage({
     <DialogHeadContext.Provider value={head}>
       <div className="cmp-body">
         {body}
-        {steps && <div className="cmp-steps-row">{steps}</div>}
+        {/* Under whatever holds the screen's place, kept empty too, so nothing moves when a line comes. */}
+        <div className="cmp-steps-row">{steps}</div>
       </div>
     </DialogHeadContext.Provider>
   );

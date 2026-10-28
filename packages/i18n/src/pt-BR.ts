@@ -606,7 +606,7 @@ export const ptBR = {
       lead: "Convide por e-mail ou compartilhe o link.",
       leadLink: "Compartilhe o link de convite com eles.",
       emails: "E-mails",
-      placeholder: "nome@empresa.com, outra@empresa.com",
+      placeholder: "nome@empresa.com",
       more: "Mais e-mails…",
       emailsHint: "Cada pessoa recebe um convite por e-mail e entra direto.",
       invalid: "confira",
@@ -2633,7 +2633,7 @@ export const ptBR = {
     subtitle_other: "Quem faz parte da {{org}}: {{people}} pessoas e {{agents}} agentes.",
     inviteTitle: "Convidar pessoas",
     emails: "E-mails, separados por vírgula",
-    emailsPlaceholder: "nome@empresa.com.br, outra@empresa.com.br",
+    emailsPlaceholder: "nome@empresa.com.br",
     role: "Papel",
     invite: "Convidar",
     invalidEmails: "Nenhum e-mail válido. Use algo como nome@empresa.com.br.",
@@ -6753,7 +6753,7 @@ export const ptBR = {
     namePlaceholder: "Ex.: Produção",
     url: "Endereço do banco",
     urlHelp: "Começa com postgres://. Fica cifrado no servidor. Ninguém vê depois, nem os agentes.",
-    urlPlaceholder: "postgres://usuario:senha@servidor:5432/banco",
+    urlPlaceholder: "postgres://usuario:senha@host/banco",
     urlInvalid: "Cole um endereço que comece com postgres://, ou preencha os campos em Avançado.",
     howTitle: "Como criar um usuário só de leitura?",
     howText: "Os agentes só fazem consultas, mas um usuário só de leitura garante isso no próprio banco.",
@@ -8428,9 +8428,9 @@ export const ptBR = {
       openingHelp: "Na primeira vez neste computador pode levar um minuto.",
       subWorking: "{{name}} · {{now}}",
       subStarting: "{{name}} está abrindo o navegador",
-      subControl: "Você no controle · {{site}} · {{article}} {{name}} pediu",
-      subControlAsked: "Você no controle · {{article}} {{name}} pediu",
-      subTakeover: "Você no controle · {{article}} {{name}} espera",
+      subControl: "Você no controle · {{site}} · {{article}}\u00a0{{name}} pediu",
+      subControlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
+      subTakeover: "Você no controle · {{article}}\u00a0{{name}} espera",
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
@@ -8568,7 +8568,8 @@ export const ptBR = {
     title: "Computador da {{org}}",
     /** The ⓘ on the computer's name. */
     users: "Um usuário para cada agente: cada um tem a própria pasta.",
-    specs: "{{cpus}} CPUs · {{memoryGb}} GB de memória · {{diskGb}} GB de disco",
+    specs:
+      "{{cpus}}\u00a0CPUs\u00a0· {{memoryGb}}\u00a0GB\u00a0de\u00a0memória\u00a0· {{diskGb}}\u00a0GB\u00a0de\u00a0disco",
     chip: {
       preparing: "Sendo preparado",
       capacity: "Na fila",
@@ -8595,7 +8596,7 @@ export const ptBR = {
     status: {
       preparing: "Preparando o computador.",
       capacity: "Esperando um computador disponível",
-      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+      problem: "Algo deu errado ao preparar o computador. Já\u00a0estamos\u00a0cuidando.",
       ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
@@ -8616,7 +8617,7 @@ export const ptBR = {
       late: "Demorando um pouco mais que o previsto",
     },
     email: {
-      you: "Avisamos você em {{email}} quando ele ficar pronto.",
+      you: "Avisamos\u00a0você\u00a0em {{email}} quando\u00a0ele\u00a0ficar\u00a0pronto.",
       here: "Aparece aqui assim que ficar pronto.",
       /** After the capacity wait's line, for owners. */
       short: "Avisamos por e-mail.",
@@ -8625,8 +8626,8 @@ export const ptBR = {
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
     sub: {
-      control: "Você no controle · {{article}} {{name}} espera",
-      controlAsked: "Você no controle · {{article}} {{name}} pediu",
+      control: "Você no controle · {{article}}\u00a0{{name}} espera",
+      controlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
       hidden: "{{person}} no controle",
     },
     state: {
@@ -8656,7 +8657,7 @@ export const ptBR = {
     },
     control: {
       keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
-      notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
     session: {
