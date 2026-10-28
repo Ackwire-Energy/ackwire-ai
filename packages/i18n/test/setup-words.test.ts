@@ -43,6 +43,9 @@ describe("words true in every setup", () => {
     expect(misplaced([["storage.agentesText", "This server"]], "en")).toHaveLength(1);
     expect(misplaced([["machines.download.text", "Install it on this Mac"]], "en")).toHaveLength(1);
     expect(misplaced([["machines.download.step1", "Install it on this Mac"]], "en")).toEqual([]);
+    expect(misplaced([["machines.download.text", "Download the app for Mac"]], "en")).toHaveLength(1);
+    expect(misplaced([["machines.download.text", "Baixar o app para Mac"]], "pt-BR")).toHaveLength(1);
+    expect(misplaced([["machines.download.step1", "Download the app for Mac"]], "en")).toEqual([]);
     expect(misplaced([["onboarding.done.sent", "We emailed 2 invitations."]], "en")).toHaveLength(1);
     expect(misplaced([["onboarding.done.sent", "We'll email you."]], "en")).toHaveLength(1);
     expect(misplaced([["onboarding.done.invited_other", "We emailed 2 invitations."]], "en")).toEqual([]);

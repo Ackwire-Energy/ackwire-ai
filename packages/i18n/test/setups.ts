@@ -55,9 +55,10 @@ export const PHRASES: Record<Condition, Record<Locale, readonly RegExp[]>> = {
   },
   /** One system's words: say {{device}} or {{system}}, or list the key with the code that checks the system. */
   system: {
-    en: [/\b(this|the) Mac\b/i, /\bmenu bar\b/i, /\bFinder\b/, /\bApplications\b/, /\bsudo\b/],
+    en: [/\b(this|the) Mac\b/i, /\bfor (the )?Mac\b/i, /\bmenu bar\b/i, /\bFinder\b/, /\bApplications\b/, /\bsudo\b/],
     "pt-BR": [
       /\b(este|neste|deste|desse|esse) Mac\b/i,
+      /\bpara (o )?Mac\b/i,
       /\bbarra de menus\b/i,
       /\bFinder\b/,
       /\bAplicativos\b/,
