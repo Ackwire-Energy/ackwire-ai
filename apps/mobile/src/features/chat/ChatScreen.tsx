@@ -485,9 +485,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
   // marks the first of it, and the pill lands there when it is far.
   const listRef = useRef<LegendListRef>(null);
-  // The person is dragging the list, and the hold on their place (see "Keeping the place"): either lets go of it.
+  // The person dragging the list, a new hold on their place (see "Keeping the place") and the app moving it on
+  // purpose (sending, the pill, a pin): each lets go of a held place.
   const dragging = useRef(false);
   const holding = useRef(0);
+  const aimed = useRef(0);
+  const letGo = useCallback(() => {
+    holding.current++;
+    aimed.current++;
+  }, []);
   const scrollRows = useMemo<ScrollRow[]>(
     () =>
       rows.map((r) => ({
@@ -541,18 +547,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return [...rows.slice(0, at), { kind: "unseen", key: DIVIDER_KEY, fading: divider.fading }, ...rows.slice(at)];
   }, [rows, divider]);
   const toEnd = useCallback(() => {
-    // Going to the end on purpose (sending, the pill) lets go of a held place.
-    holding.current++;
+    letGo();
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
-  }, []);
+  }, [letGo]);
   // The pill: to the "Novas" line when it is far, else to the end.
   const toUnseen = useCallback(() => {
     const state = listRef.current?.getState();
     const index = shownRows.findIndex((r) => r.key === DIVIDER_KEY);
     const far = state && landsOnDivider(state.contentLength, state.positionByKey(DIVIDER_KEY), state.scrollLength);
     if (far && index >= 0) {
-      holding.current++;
+      letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: 12 });
       // What is new is in view now: the pill goes, the line fades after a while.
       setSeenKey(latestSeen);
@@ -560,7 +565,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       return;
     }
     toEnd();
-  }, [shownRows, latestSeen, toEnd]);
+  }, [shownRows, latestSeen, toEnd, letGo]);
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);
@@ -838,7 +843,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const goToPin = (pin: MessagePin) => {
     sheet.close();
     // The pin is where the list goes now, not where it was under the sheet.
-    holding.current++;
+    letGo();
     const shown = rowsRef.current;
     const target = pinTarget(pin, new Set(shown.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))));
     if (target.kind === "scroll") {
@@ -964,12 +969,21 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // them (the header's, a message's, the composer's).
   useEffect(() => {
     let place: Place | null = null;
+    let aimedAt = 0;
     return sheet.subscribe((open) => {
       if (open) {
-        place = covered.current ? place : placeNow();
+        // A sheet opened from another keeps the place taken by the first.
+        if (!covered.current) {
+          place = placeNow();
+          aimedAt = aimed.current;
+        }
         cover();
-      } else uncover();
-      holdPlace(place);
+        holdPlace(place);
+        return;
+      }
+      uncover();
+      // Unless the app moved the list on purpose meanwhile (a message sent from the sheet).
+      if (aimed.current === aimedAt) holdPlace(place);
     });
   }, [sheet, cover, uncover, placeNow, holdPlace]);
   // The agent's computer opens full screen: where the conversation was is kept, and given back on return.
