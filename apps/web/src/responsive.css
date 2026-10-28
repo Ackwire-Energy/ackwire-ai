@@ -313,19 +313,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -428,19 +415,6 @@
     height: 44px;
     padding: 0 10px;
     font-size: 13.5px;
-  }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
   }
   .agp-quick {
     margin-left: 0;
