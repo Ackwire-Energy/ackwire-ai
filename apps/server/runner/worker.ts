@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import {
   type AgentScope,
+  LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
   MAX_FRAME_BYTES,
   type MachineErrorCode,
@@ -13,7 +14,7 @@ import {
 import { lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
-import { BrowserManager, type BrowserManagerOptions } from "./browser";
+import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
@@ -24,7 +25,9 @@ import { readLines } from "./lines";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
+import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
 import { agentSecrets, secretValue } from "./secrets";
+import { systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
   UPLOAD_CHUNK_BYTES,
@@ -60,8 +63,11 @@ export interface WorkerOptions {
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
   desktop?: Pick<DesktopManagerOptions, "system" | "command">;
-  /** Tests: how `agent-browser` and Chrome start. */
-  browser?: Pick<BrowserManagerOptions, "command" | "chrome" | "startChrome" | "isOurChrome">;
+  /** Tests: how `agent-browser` and Chrome start, and Chrome's debugging endpoint. */
+  browser?: Pick<
+    BrowserManagerOptions,
+    "command" | "chrome" | "startChrome" | "isOurChrome" | "fetch" | "windowDrawMs"
+  >;
 }
 
 /**
@@ -96,6 +102,8 @@ export class WorkerLink {
   private readonly uploads = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "upload.reply" }>) => void>();
   private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
   private nextEnsure = 0;
+  private readonly enters = new Map<string, () => void>();
+  private nextEnter = 0;
   onState: (state: WorkerState) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
@@ -118,7 +126,7 @@ export class WorkerLink {
   }
 
   private ended() {
-    this.unanswered("The runner is stopping; try again in a minute");
+    this.unanswered("The runner is stopping. Try again in a minute.");
     this.onEnd();
   }
 
@@ -171,6 +179,9 @@ export class WorkerLink {
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
         return;
+      case "scope.entered":
+        if (typeof f.enterId === "string") this.enters.get(f.enterId)?.();
+        return;
       case "browser.show": {
         const agent = f.agent as Partial<AgentScope> | undefined;
         if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
@@ -219,6 +230,30 @@ export class WorkerLink {
   /** Its agent's Chrome is in use on the agent's desktop: root doesn't stop that desktop as idle for a while. */
   browserOnDesktop() {
     this.write(JSON.stringify({ type: "browser.desktop" } satisfies WorkerLinkFrame));
+  }
+
+  /**
+   * Root moves its process `pid` (held, `scope-gate.ts`) into the agent's slice for `kind`: settles once root
+   * answered, whatever it says, or after `ENTER_MS` (a root that doesn't know the frame never answers).
+   */
+  readonly enterScope = (pid: number, kind: ScopeKind): Promise<void> => {
+    const enterId = String(++this.nextEnter);
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(late);
+        this.enters.delete(enterId);
+        resolve();
+      };
+      const late = setTimeout(done, ENTER_MS);
+      late.unref?.();
+      this.enters.set(enterId, done);
+      this.write(JSON.stringify({ type: "scope.enter", enterId, pid, kind } satisfies WorkerLinkFrame));
+    });
+  };
+
+  /** What its agent's Chrome sent and received since the last time (protocol 23); nothing when it moved nothing. */
+  traffic({ up, down }: { up: number; down: number }) {
+    if (up > 0 || down > 0) this.write(JSON.stringify({ type: "browser.traffic", up, down } satisfies WorkerLinkFrame));
   }
 
   /**
@@ -273,6 +308,12 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const socketPath = mcpSocketPath(home);
   const mcpCommand = { socketPath, command: self.command };
   let state = NOTHING_ALLOWED;
+  const link = new WorkerLink(o.input, o.output);
+  // Under systemd the agent's Chrome and AI CLIs start in slices of their own, root moving them there first.
+  const gated = (kind: ScopeKind): Spawn | undefined =>
+    systemdBooted() ? (file, args, options) => spawnGated(kind, file, args, options, link.enterScope) : undefined;
+  const cli = gated("cli");
+  const chrome = gated("browser");
   const tasks = new TaskManager({
     mcp: mcpCommand,
     root: path.join(home, "tasks"),
@@ -283,6 +324,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     agentFolder: (agent) => agentWorkspace(workspaceReal, agent),
     secrets: (agent) => agentSecrets(secretsDir, agent),
     ...(self.compiled ? { wrapperCommand: [...self.command, "task-wrapper"] } : {}),
+    ...(cli ? { spawnCli: cli } : {}),
   });
   await tasks.init();
   const brainLimits = () => ({
@@ -296,10 +338,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     mcp: mcpCommand,
     accounts,
     ...brainLimits(),
+    ...(cli ? { spawn: cli } : {}),
     log,
   });
   const codexRuns = new Map<string, McpTaskInfo>();
-  const codexApp = new CodexAppServers({ runs: codexRuns, ...brainLimits(), log });
+  const codexApp = new CodexAppServers({ runs: codexRuns, ...brainLimits(), ...(cli ? { spawn: cli } : {}), log });
   const mcp = new McpBridge({
     socketPath,
     task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
@@ -308,7 +351,6 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   await mcp
     .listen()
     .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
-  const link = new WorkerLink(o.input, o.output);
   let live: RunnerConnection | null = null;
   // The desktop is root's: this worker's helper and Chrome run on it as the agent's own user, where root says.
   let desktop: WorkerDesktop | null = null;
@@ -332,10 +374,14 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
       status: () => ({ running: desktop !== null, streams: state.desktopViewers ?? 0 }),
     },
     onChange: () => queueMicrotask(lease),
+    ...(chrome ? { startChrome: (exe, args, profile, env) => launchChrome(exe, args, profile, env, chrome) } : {}),
     ...o.browser,
   });
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
   leases.unref?.();
+  // Root sums its agents' browsers' traffic for the computer's own count.
+  const counted = setInterval(() => link.traffic(browser.takeTraffic()), LOAD_SAMPLE_MS);
+  counted.unref?.();
   void browser.closeAll();
   link.onShow = (showId, agent) => {
     const shown =
@@ -372,7 +418,14 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     gitDir: path.join(home, "git"),
     tasks,
     brains,
-    codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp, accounts },
+    codex: {
+      runnerHome: home,
+      mcp: mcpCommand,
+      runs: codexRuns,
+      app: codexApp,
+      accounts,
+      ...(cli ? { spawn: cli } : {}),
+    },
     paused: () => state.paused.paused,
     access: () => state.access,
     browser,
@@ -422,11 +475,13 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   log(`agentes-runner ${RUNNER_VERSION}: worker of agent ${o.agentId} (folder ${workspaceReal})`);
   await connection.run();
   clearInterval(leases);
+  clearInterval(counted);
   desktopUse.stopAll();
   tasks.close();
   brains.close();
   codexApp.close();
   await browser.close().catch(() => undefined);
+  link.traffic(browser.takeTraffic());
   await mcp.close().catch(() => undefined);
   return 0;
 }

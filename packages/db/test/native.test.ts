@@ -14,6 +14,8 @@ import {
   PG_MAJOR,
   PGLITE_VERSION,
   PgMajorMismatchError,
+  pgliteFolder,
+  pgliteUrl,
   restorePglite,
 } from "../src/pglite";
 import { users } from "../src/schema";
@@ -30,6 +32,16 @@ beforeAll(async () => {
   await first.close();
 });
 afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+test("a folder's URL and back, on a Mac or Linux and on Windows", () => {
+  expect(pgliteUrl("/home/ana/.agentes/db")).toBe("pglite:///home/ana/.agentes/db");
+  expect(pgliteFolder("pglite:///home/ana/.agentes/db")).toBe("/home/ana/.agentes/db");
+  expect(pgliteUrl("C:\\Users\\ana\\.agentes\\db")).toBe("pglite:///C:\\Users\\ana\\.agentes\\db");
+  expect(pgliteFolder("pglite:///C:\\Users\\ana\\.agentes\\db")).toBe("C:\\Users\\ana\\.agentes\\db");
+  expect(pgliteFolder("pglite:///D:/data/db")).toBe("D:/data/db");
+  expect(pgliteFolder("pglite://relative/db")).toBeNull();
+  expect(pgliteFolder("postgres://db.example.com/agentes")).toBeNull();
+});
 
 test("a folder keeps its data across a reopen and records what wrote it", async () => {
   expect(folderVersion(db)).toEqual({ pglite: PGLITE_VERSION, pgMajor: PG_MAJOR });
@@ -108,23 +120,26 @@ test("a query made while the database still starts waits for it, then answers", 
 test("queries queued at once still leave room for timers between them", async () => {
   const { pg, ready } = openPglite(db);
   await ready;
-  const busy = "select count(*) from generate_series(1, 20000)";
-  let last = performance.now();
-  let longest = 0;
-  const timer = setInterval(() => {
-    const now = performance.now();
-    longest = Math.max(longest, now - last);
-    last = now;
-  }, 1);
-  const start = performance.now();
+  let ticks = 0;
+  const timer = setInterval(() => ticks++, 1);
+  const seen: number[] = [];
   try {
-    // A page's requests, the workers and a run's streaming, all querying at the same moment.
-    await Promise.all(Array.from({ length: 100 }, () => pg.query(busy)));
+    // A page's requests, the workers and a run's streaming, all querying at the same moment. Each answer then
+    // holds the thread for 2 ms, past the timer's 1 ms, so the timer is due before the next query may start.
+    await Promise.all(
+      Array.from({ length: 100 }, () =>
+        pg.query("select 1").then(() => {
+          seen.push(ticks);
+          Bun.sleepSync(2);
+        }),
+      ),
+    );
   } finally {
     clearInterval(timer);
     await pg.close();
   }
-  expect(longest).toBeLessThan((performance.now() - start) / 4);
+  // The timer ran between every two answers: no two answers saw the same count.
+  expect(new Set(seen).size).toBe(seen.length);
 });
 
 test("commits reach the disk: Postgres syncs, and its syncs reach the system", async () => {

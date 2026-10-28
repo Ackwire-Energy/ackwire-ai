@@ -50,8 +50,10 @@ export const STORAGE_KEYS = {
   menuLook: "agentes.desktop.menu",
   /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */
   noAiOpened: "agentes.noAi.opened",
-  /** The keyboard layout the person chose for agents' screens they control (`DESKTOP_KEYBOARDS`). */
-  screenKeyboard: "agentes.screen.keyboard",
   /** In `sessionStore`: the address this tab signed up with, when the server emailed it a confirmation link. */
   confirmationSent: "agentes.confirmation.sent",
+  /** The app's sounds on this device: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
+  sounds: "agentes.sounds",
+  /** In `sessionStore`, this tab's id; in `storage`, the tab the person used last (it plays sounds while hidden). */
+  soundTab: "agentes.sounds.tab",
 } as const;

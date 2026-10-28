@@ -1,7 +1,8 @@
 import { resources } from "@agenteschat/i18n";
 import { appLocale } from "@agenteschat/i18n/locale";
 import i18n, { type i18n as I18n } from "i18next";
-import { initReactI18next } from "react-i18next";
+import { useEffect, useState } from "react";
+import { initReactI18next, useTranslation } from "react-i18next";
 
 /** pt-BR is the primary locale and the default; English is the alternative. */
 export const locales = [
@@ -10,6 +11,13 @@ export const locales = [
 ] as const;
 export type LocaleCode = (typeof locales)[number]["code"];
 export const DEFAULT_LOCALE: LocaleCode = "pt-BR";
+
+/**
+ * `<Trans>` props for values people typed (a name): interpolated escaped, then shown as the same text. The app's
+ * `escapeValue: false` leaves escaping to React, but `<Trans>` parses the interpolated string first, so a typed
+ * `<strong>` would become an element.
+ */
+export const TYPED_VALUES = { tOptions: { interpolation: { escapeValue: true } }, shouldUnescape: true };
 
 const STORAGE_KEY = "agentes.locale";
 
@@ -43,6 +51,18 @@ export function loadLocale(code: LocaleCode, instance: I18n = i18n): Promise<voi
   return bundles[code]().then((strings) => {
     instance.addResourceBundle(code, "translation", strings);
   });
+}
+
+/** `t` in `lang` for a page shown in another language than the app's: the app's until `lang` has downloaded. */
+export function usePageT(lang: LocaleCode) {
+  const { i18n: instance } = useTranslation();
+  const [loaded, setLoaded] = useState<LocaleCode | null>(null);
+  useEffect(() => {
+    loadLocale(lang, instance)
+      .then(() => setLoaded(lang))
+      .catch(() => {});
+  }, [lang, instance]);
+  return instance.getFixedT(loaded === lang ? lang : instance.language);
 }
 
 /** The language picked last (a slower download of an earlier pick must not win). */

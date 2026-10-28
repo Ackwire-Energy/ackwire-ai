@@ -175,6 +175,38 @@ test("connectors API: the phone app's OAuth hands the code back to the app, whic
   });
   expect(no.headers.get("location")).toBe("agenteschat://connectors/oauth?error=access_denied");
 
+  // Started in the desktop app's window: the browser hands it back to the app, with the organization, and the
+  // window finishes with its own session, landing where it started.
+  const desktop = await start("desktop:/org/x/settings/connectors");
+  const toDesktop = await systemBrowser(`/api/app/connectors/oauth/callback?state=${desktop}&code=abc`, {
+    origin: null,
+  });
+  const desktopLink = new URL(toDesktop.headers.get("location") ?? "");
+  expect(`${desktopLink.protocol}//${desktopLink.host}${desktopLink.pathname}`).toBe(
+    "agenteschat://desktop/connectors/oauth",
+  );
+  expect(desktopLink.searchParams.get("org")).toBe(orgId);
+  expect(desktopLink.searchParams.get("state")).toBe(desktop);
+  const stolenDesktop = await stranger(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state: desktop, code: "abc" },
+  });
+  expect([403, 404]).toContain(stolenDesktop.status);
+  const fromWindow = await app(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state: desktop, code: "abc" },
+  });
+  expect(fromWindow.status).toBe(200);
+  expect(await fromWindow.json()).toMatchObject({ connector: "github", returnTo: "/org/x/settings/connectors" });
+  const refusedDesktop = await start("desktop:/org/x/settings/connectors");
+  const noDesktop = await systemBrowser(
+    `/api/app/connectors/oauth/callback?state=${refusedDesktop}&error=access_denied`,
+    { origin: null },
+  );
+  expect(noDesktop.headers.get("location")).toBe(
+    `agenteschat://desktop/connectors/oauth?org=${orgId}&error=access_denied`,
+  );
+
   // A web callback without our session asks to sign in instead of failing silently.
   const webAgain = await start("/settings");
   const signedOut = await systemBrowser(`/api/app/connectors/oauth/callback?state=${webAgain}&code=abc`, {
@@ -217,12 +249,14 @@ test("catalog: one list of our connectors and the one-click MCP servers, one ent
   // Ours: GitHub (API key at least) and Drive (asks for the server address).
   expect(byId("github")).toMatchObject({ kind: "catalog", category: "dev", available: true });
   expect(byId("drive")).toMatchObject({ kind: "catalog", iconUrl: "/connectors/googledrive.svg" });
-  // No icon in Simple Icons: a monogram.
-  expect(byId("canva")?.iconUrl).toBeNull();
-  // Every icon the catalog names exists in the web app.
+  // A one-color mark (Square's black) and two in their makers' colors.
+  expect(byId("square")).toMatchObject({ iconUrl: "/connectors/square.svg", brandColor: null });
+  expect(byId("paypal")).toMatchObject({ iconUrl: "/brands/paypal.svg", brandColor: null });
+  expect(byId("canva")).toMatchObject({ iconUrl: "/brands/canva.svg", brandColor: null });
+  // Every connector in the catalog has its mark, a file in the web app: none is left a monogram.
   const publicDir = new URL("../../web/public", import.meta.url).pathname;
   for (const c of connectors) {
-    if (c.iconUrl) expect(existsSync(`${publicDir}${c.iconUrl}`)).toBe(true);
+    expect([c.id, c.iconUrl !== null && existsSync(`${publicDir}${c.iconUrl}`)]).toEqual([c.id, true]);
   }
 });
 

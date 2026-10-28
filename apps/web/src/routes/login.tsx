@@ -1,5 +1,5 @@
-import { authConfigQuery, meQuery } from "@agenteschat/client";
-import { safeRedirect } from "@agenteschat/client/lib/guards";
+import { authConfigQuery, invitationQuery, meQuery } from "@agenteschat/client";
+import { safeRedirect, signInFor } from "@agenteschat/client/lib/guards";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AuthPage } from "@/pages/AuthPage";
 
@@ -9,11 +9,14 @@ export const Route = createFileRoute("/login")({
     email: typeof search.email === "string" ? search.email : undefined,
   }),
   beforeLoad: async ({ context, search }) => {
+    const goal = signInFor(search.redirect);
     const [me, config] = await Promise.all([
       context.queryClient.ensureQueryData(meQuery(context.api)),
       context.queryClient.ensureQueryData(authConfigQuery(context.api)),
+      // The page names the invitation's workspace from the first frame (`AuthPage`).
+      goal && "invite" in goal ? context.queryClient.prefetchQuery(invitationQuery(context.api, goal.invite)) : null,
     ]);
-    if (me) throw redirect({ to: search.redirect ?? "/" });
+    if (me) throw redirect({ href: search.redirect ?? "/" });
     // A brand-new instance has nobody to sign in: go straight to the first account.
     if (config.firstRun) throw redirect({ to: "/signup", search: { redirect: search.redirect } });
   },

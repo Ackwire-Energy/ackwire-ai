@@ -54,7 +54,7 @@ export function SettingNote({
 }) {
   return (
     <p
-      className={cx("ac-setnote", quiet && "ac-setnote--quiet", live && "ac-setnote--live")}
+      className={cx("ac-setnote ac-iconline", quiet && "ac-setnote--quiet", live && "ac-setnote--live")}
       aria-live={live ? "polite" : undefined}
     >
       <Icon name={icon} size={14} />

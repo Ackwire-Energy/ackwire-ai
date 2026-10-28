@@ -1,9 +1,7 @@
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { sharePlanBody } from "@agenteschat/client/lib/plans";
 import { Button, Dialog, DialogFooter } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-
-/** Team and enterprise seats are one person's each, not a personal subscription. */
-const SEATS = new Set(["team", "enterprise"]);
 
 /**
  * "Agora a Ada responde a todos" (ADR 0059 §5): before an agent answers other
@@ -32,11 +30,7 @@ export function SharePlanDialog({
 }) {
   const { t } = useTranslation();
   const g = agentGrammar(t, agentName);
-  const body = maker
-    ? t("aiAccounts.share.body.other", { maker })
-    : SEATS.has(plan?.toLowerCase() ?? "")
-      ? t("aiAccounts.share.body.seat", { maker: brain === "codex" ? "OpenAI" : "Anthropic" })
-      : t(`aiAccounts.share.body.${brain}`);
+  const body = sharePlanBody(t, brain, plan, maker);
   return (
     <Dialog
       open

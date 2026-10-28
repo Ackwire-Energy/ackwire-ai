@@ -61,7 +61,7 @@ export const pt = {
       hint: "Você é a {{name}} aqui",
       refusedLesson: "Recusado por {{name}} · vira lição para o {{agent}}",
       yes: "Rollback feito. Nenhum erro nos últimos 2 minutos. Abri a tarefa #88 para o {{agent}} corrigir.",
-      no: "Combinado, não mexo em produção. O {{agent}} abriu o PR #213 com a correção; o merge também vai pedir sua aprovação.",
+      no: "Combinado, não mexo em produção. O {{agent}} abriu o PR #213 com a correção. O merge também vai pedir sua aprovação.",
       again: "Ver o pedido de novo",
     },
     ledger: {
@@ -140,7 +140,7 @@ export const en: Widen<typeof pt> = {
       hint: "You're {{name}} here",
       refusedLesson: "Declined by {{name}} · becomes a lesson for {{agent}}",
       yes: "Rollback done. No errors in the last 2 minutes. I opened task #88 for {{agent}} to fix it.",
-      no: "Understood, I won't touch production. {{agent}} opened PR #213 with the fix; the merge will also ask for your approval.",
+      no: "Understood, I won't touch production. {{agent}} opened PR #213 with the fix. The merge will also ask for your approval.",
       again: "See the request again",
     },
     ledger: {

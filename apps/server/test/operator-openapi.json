@@ -33,9 +33,43 @@
           },
           "version": {
             "type": "string"
+          },
+          "botCheck": {
+            "$ref": "#/components/schemas/OperatorBotCheck"
           }
         },
-        "required": ["ok", "version"]
+        "required": ["ok", "version", "botCheck"]
+      },
+      "OperatorBotCheck": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["off", "ok", "unreachable", "secret_refused"],
+            "description": "`off` without both Turnstile keys. While `unreachable` (this server can't reach Cloudflare) or `secret_refused` (Cloudflare refuses `TURNSTILE_SECRET_KEY`), every request goes through unchecked."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it took this state."
+          },
+          "blocked": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Networks refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`), each counted once: an IPv4 address, or an IPv6 /64. Any client can claim its page couldn't load it, so read it beside `passed`."
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tokens Cloudflare passed in the last 10 minutes. When the widget is down for everyone, `blocked` rises while this falls. Clients claiming it is down don't move it."
+          },
+          "testing": {
+            "type": "boolean",
+            "description": "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets. They refuse real tokens, and the one that passes takes a public dummy token from anyone. Right only on a test server."
+          }
+        },
+        "required": ["state", "since", "blocked", "passed", "testing"],
+        "description": "The bot check before public forms (ADR 0075)."
       },
       "Error": {
         "type": "object",
@@ -211,7 +245,7 @@
       "OperatorStandingNotice": {
         "type": "string",
         "enum": ["shown", "silent"],
-        "description": "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it."
+        "description": "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it. Use `silent` only when an authority's order forbids telling them."
       },
       "Role": {
         "type": "string",
@@ -361,7 +395,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -383,7 +417,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["run", "task"]
+            "enum": ["run", "task", "session"]
           },
           "id": {
             "type": "string",
@@ -463,6 +497,10 @@
             "type": ["string", "null"],
             "enum": ["reserving", "starting", "installing", "connecting", null]
           },
+          "stage": {
+            "type": ["string", "null"],
+            "description": "With `preparing`: the stage you gave."
+          },
           "reason": {
             "type": ["string", "null"],
             "enum": ["capacity", null]
@@ -477,13 +515,13 @@
           },
           "expectedReadyAt": {
             "type": ["string", "null"],
-            "description": "With `preparing`: the ready time you gave, kept while it is past (any moment now)."
+            "description": "With `preparing`: the earliest ready time you gave in this wait."
           },
           "specs": {
             "$ref": "#/components/schemas/OperatorMachineSpecs"
           }
         },
-        "required": ["state", "step", "reason", "since", "requestedAt", "expectedReadyAt", "specs"],
+        "required": ["state", "step", "stage", "reason", "since", "requestedAt", "expectedReadyAt", "specs"],
         "description": "What you last said about it; null: nothing yet."
       },
       "OperatorMachineSpecs": {
@@ -565,7 +603,7 @@
     "/health": {
       "get": {
         "tags": ["Operator"],
-        "summary": "The token works and this server answers",
+        "summary": "The token works and this server answers, with its bot check's state",
         "responses": {
           "200": {
             "description": "OK",
@@ -809,7 +847,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Hold, suspend or restore a workspace",
-        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), and it is a request again once active. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
         "parameters": [
           {
             "schema": {
@@ -835,7 +873,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64,
-                    "description": "Shown to the workspace with the notice `shown`."
+                    "description": "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on."
                   },
                   "note": {
                     "type": "string",
@@ -898,7 +936,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Hold one agent, or let it go",
-        "description": "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. At once in this process, within 5 seconds in the others.",
+        "description": "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. On agentes.chat Cloud it reads the hold's kind with how to contest it (`network` for a reason starting with `network.`, else `operator`), and the agent's responsible person and the workspace's owners and admins get a notice, replaced when it is held again for another kind and closed when the agent is let go. At once in this process, within 5 seconds in the others.",
         "parameters": [
           {
             "schema": {
@@ -988,7 +1026,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Block an account, or let it back",
-        "description": "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces.",
+        "description": "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces. On agentes.chat Cloud the refused sign-in reads the block's kind, never its reason: `abuse` for `abuse.resignup`, `legal` for `legal_hold`, else `other`.",
         "parameters": [
           {
             "schema": {
@@ -1132,13 +1170,13 @@
     "/review/{kind}/{id}": {
       "get": {
         "tags": ["Operator"],
-        "summary": "What one run or task did, as one redacted text block",
-        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), or the prompt, command and output (a task). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
+        "summary": "What one run, task or screened session did, as one redacted text block",
+        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), the prompt, command and output (a task), or the text a person in control of an agent's screen had on it (a session of `desktop_control.ended`, on a server with `SESSION_SCREENING`: from memory only, until 10 minutes after the segment ended, then 404). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "enum": ["run", "task"]
+              "enum": ["run", "task", "session"]
             },
             "required": true,
             "name": "kind",
@@ -1287,7 +1325,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Say how far the workspace's computer is",
-        "description": "Its people see it live, with the time left. The time `since` restarts only when the state, step or reason change. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
         "parameters": [
           {
             "schema": {
@@ -1316,6 +1354,11 @@
                     "enum": ["reserving", "starting", "installing", "connecting"],
                     "description": "With `preparing`: reserving, starting, installing or connecting; ignored otherwise."
                   },
+                  "stage": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step."
+                  },
                   "reason": {
                     "type": "string",
                     "enum": ["capacity", "approval"],
@@ -1324,7 +1367,7 @@
                   "expectedReadyAt": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A time already past means any moment now, and while the stored one is past too it stays, so people see the wait run over."
+                    "description": "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one, or a report without one, leaves it as it is, so people see the wait run over."
                   },
                   "etaSeconds": {
                     "type": "integer",
@@ -1364,6 +1407,16 @@
           },
           "401": {
             "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The workspace isn't active",
             "content": {
               "application/json": {
                 "schema": {
@@ -1551,7 +1604,7 @@
       "delete": {
         "tags": ["Operator"],
         "summary": "Take the workspace's computer away",
-        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now (one held or suspended waits for none). 404 when the workspace has no such managed computer (also when it was already removed).",
         "parameters": [
           {
             "schema": {

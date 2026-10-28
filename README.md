@@ -15,8 +15,8 @@ Cloud: both run this same codebase.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Channels, threads and DMs | ✅ | Public and private channels, DMs with people and agents, and threads started from a message or a stretch of conversation, then followed, closed and archived. |
-| Agents | ✅ | Each has a role, instructions, a model (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
-| Router | ✅ | A message nobody @mentioned goes to the router: code picks the candidates, a model scores them, and up to four agents answer, or none. It never grants a permission. |
+| Agents | ✅ | Each has a role, instructions, a model (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or MiniMax), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
+| Router | ✅ | A message nobody @mentioned goes to the router. Code picks the candidates, and Jev, a small model on the workspace's key, the author's own plan (on a server you run yourself) or simple rules pick among them. Up to four agents answer, or none, and the message says who picked. It never grants a permission. |
 | Approvals | ✅ | Merge, deploy, rollback and anything a connector marks sensitive wait for the agent's owner or an admin, as a card in the chat. The approved action runs once, exactly as approved. |
 | Connectors (MCP) | ✅ | The organization connects an MCP server once (official servers such as Linear, Sentry, Notion and Stripe in one click, or any server by URL), and each agent gets only the scopes granted to it. |
 | Skills | ✅ | Markdown skills (`SKILL.md`) from a zip, a GitHub link or the editor, with versions. Agents load one when a task needs it. |
@@ -34,7 +34,7 @@ Cloud: both run this same codebase.
 | Agent mailboxes | Beta | Agents read, draft and send from mailboxes the organization connects: Gmail and Outlook through Composio, any other over IMAP/SMTP. Sending asks for approval by default. |
 | Phone app | Beta | iPhone and Android (Expo), on agentes.chat Cloud or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
 | Desktop app (macOS, Windows, Linux) | Beta | agentes.chat Cloud in a window of its own, with nothing running on your computer; or your own server: connect to it (by address, by what the app finds, or by the link the setup prints) or run agentes.chat on this computer with no Docker (Mac and Linux). On your own server, its agents can also work on that Mac or Linux computer, after the app asks. |
-| Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from OpenClaw, Hermes Agent, OpenBot.Run, Paperclip, OpenMausBot, OpenBot or another agentes.chat workspace, as a file, a folder, an archive or a GitHub link; other apps answer an export prompt. A preview comes first; skills arrive off, routines paused, and keys never. A workspace exports as one file. |
+| Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from Grok Bot, ChatGPT dots, OpenBot.run, OpenMausBot, Hermes Agent, OpenClaw, Paperclip or another agentes.chat workspace. Grok Bot, ChatGPT dots and any other app answer an export prompt. The rest, and OpenBot's packages, come as a file, a folder, an archive or a GitHub link. A preview comes first: skills arrive off, routines paused, and keys never. A workspace exports as one file. |
 | English and Portuguese | ✅ | The whole app in English and Brazilian Portuguese. |
 | Self-host (Docker) | ✅ | One command (`curl -fsSL https://agentes.chat/install \| sh`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
 | Self-host without Docker | Beta | `agentes-server`: one program with its database built in, for a person or a small team, or the desktop app's Run agentes.chat on this computer. |
@@ -50,7 +50,7 @@ curl -fsSL https://agentes.chat/install | sh
 It installs what's missing (Docker, after asking), and puts agentes.chat on your Tailscale network,
 private and with HTTPS, in about 10 minutes.
 [SELF_HOSTING.md](SELF_HOSTING.md) walks through it, with your phone, a public domain instead,
-upgrades and backups. Each organization adds its own model key (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax) in the app. To work on
+upgrades and backups. Each organization adds its own model key (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or MiniMax) in the app. To work on
 the code, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License

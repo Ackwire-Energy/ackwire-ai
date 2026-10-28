@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 22;
+export const MACHINE_PROTOCOL_VERSION = 25;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -168,26 +168,6 @@ export const DESKTOP_PROTOCOL = 18;
  */
 export const DESKTOP_SIZE = { width: 1280, height: 900 } as const;
 
-/**
- * The keyboard layouts a person in control can give the agent's desktop (ADR 0058 §5), as XKB layout and
- * variant: noVNC sends key codes, and the desktop's layout turns them into characters, so it must be the
- * person's own. A closed list: the value ends up in `setxkbmap`'s arguments.
- */
-export const DESKTOP_KEYBOARDS = {
-  br: ["br"],
-  us: ["us"],
-  "us-intl": ["us", "intl"],
-  gb: ["gb"],
-  pt: ["pt"],
-  es: ["es"],
-  fr: ["fr"],
-  de: ["de"],
-  it: ["it"],
-} as const satisfies Record<string, readonly [string] | readonly [string, string]>;
-export type DesktopKeyboard = keyof typeof DESKTOP_KEYBOARDS;
-export const isDesktopKeyboard = (v: unknown): v is DesktopKeyboard =>
-  typeof v === "string" && Object.hasOwn(DESKTOP_KEYBOARDS, v);
-
 /** Protocol 21: the largest parts of a `desktop.act`. */
 export const DESKTOP_LIMITS = {
   /** Characters typed or filled in one action. */
@@ -315,6 +295,35 @@ export interface MachineLoad {
 
 /** How often a computer's load is sampled (protocol 22). */
 export const LOAD_SAMPLE_MS = 5 * 60_000;
+
+/**
+ * From this protocol on: how much data the agents' browsers send and receive.
+ * A `pong` carries `browserTraffic`, the last day's sum, after each new sample
+ * (every `LOAD_SAMPLE_MS`), counted from the network events of the Chromes the
+ * runner started, never from the rest of the machine. Nothing new goes to the
+ * runner, so an older one simply never says.
+ */
+export const BROWSER_TRAFFIC_PROTOCOL = 23;
+
+/** Protocol 23: what the agents' browsers sent (`up`) and received (`down`), in bytes, over the last `hours`. */
+export interface BrowserTraffic {
+  up: number;
+  down: number;
+  hours: number;
+}
+
+/**
+ * From this protocol on (ADR 0076): `desktop.text`, the text on an agent's
+ * screen, read on the computer (tesseract, as the agent's own user) from a
+ * capture like `desktop.capture`'s, for screening a person in control on
+ * agentes.chat Cloud. The image never leaves the computer. A screen whose
+ * capture didn't change since the last read answers `same`. Served where
+ * desktop use is (`desktop_unavailable` without tesseract). The server never
+ * sends it to an older runner.
+ */
+export const DESKTOP_TEXT_PROTOCOL = 25;
+/** The most text one `desktop.text` answers (characters). */
+export const DESKTOP_TEXT_MAX = 16_000;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -558,10 +567,13 @@ export const STREAM_CLOSE = {
   unreachable: 4503,
 } as const;
 
-/** What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. */
+/**
+ * What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. An older
+ * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
+ * (ADR 0058 §16).
+ */
 export type StreamRequest =
-  /** `keyboard` (control only): the desktop takes the person's layout as their control starts. */
-  | { kind: "desktop"; mode: "watch" | "control"; keyboard?: DesktopKeyboard }
+  | { kind: "desktop"; mode: "watch" | "control" }
   | { kind: "terminal"; cols: number; rows: number };
 
 /**
@@ -979,6 +991,45 @@ export const BRAIN_LIMITS = {
   message: 2000,
 } as const;
 
+/**
+ * From this protocol on (ADR 0074): `brain.route`, a person's own Claude or
+ * ChatGPT plan picking who answers their message nobody mentioned. Claude
+ * Code or Codex answers once with every tool off, nothing of the folder or
+ * its owner loaded and no session kept, in a temporary folder, as the
+ * request's agent's user. A sign-in with a key is refused. While that
+ * sign-in's folder has a process open (a turn, or the one kept after it) the
+ * answer is `busy` at once. The server never sends it to an older runner.
+ */
+export const ROUTE_PROTOCOL = 24;
+/** The runner kills a route's CLI after this long. */
+export const ROUTE_TIMEOUT_MS = 30_000;
+/** Largest `brain.route` fields (characters; the schema as JSON). */
+export const ROUTE_LIMITS = { system: 8000, prompt: 32_000, schema: 8000 } as const;
+
+/** `brain.route` (protocol 24): one answer in `schema`'s shape from the account's CLI. */
+export interface BrainRouteRequest {
+  kind: AccountKind;
+  /** The account folder (`accounts/<kind>/<id>`); absent: the computer's own sign-in. */
+  account?: string;
+  system: string;
+  /** Read by the CLI on its standard input. */
+  prompt: string;
+  /** JSON Schema of the answer. */
+  schema: Record<string, unknown>;
+}
+
+/** What a route answers: the CLI's answer as a JSON object, or `busy` while that sign-in has a process open. */
+export type BrainRouteReply =
+  | {
+      json: Record<string, unknown>;
+      /** The model that answered, as the CLI reports it. */
+      model: string;
+      /** Every input token it read (cache included); `cacheRead` and `cacheWrite` say how much was cache. */
+      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+      durationMs: number;
+    }
+  | { busy: true };
+
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
 export interface RunnerTask {
   taskId: string;
@@ -1189,6 +1240,8 @@ export type MachineRequest = (
   | ({ op: "brain.turn" } & BrainTurnRequest)
   /** Protocol 15: messages for a brain turn in progress (live steering). */
   | ({ op: "brain.steer" } & BrainSteerRequest)
+  /** Protocol 24: a plan picks who answers a message (ADR 0074); the request's agent is the one it is lent to. */
+  | ({ op: "brain.route" } & BrainRouteRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
   /** Protocol 14: the mission's worktree (ADR 0044). */
@@ -1272,6 +1325,8 @@ export type MachineRequest = (
   | { op: "desktop.capture"; region?: DesktopRegion }
   /** Protocol 21: the apps the agent can start. */
   | { op: "desktop.apps" }
+  /** Protocol 25: the text on the agent's screen, read on the computer. */
+  | { op: "desktop.text" }
 ) & { agent?: AgentScope };
 
 /** One command of a `browser.batch` (protocol 17). */
@@ -1299,6 +1354,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.output",
   "brain.turn",
   "brain.steer",
+  "brain.route",
   "git.sync",
   "mission.worktree",
   "access.request",
@@ -1318,6 +1374,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.act",
   "desktop.capture",
   "desktop.apps",
+  "desktop.text",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1364,6 +1421,7 @@ export interface MachineReplies {
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
   "brain.steer": BrainSteerReply;
+  "brain.route": BrainRouteReply;
   "git.sync": { repos: GitSyncRepo[] };
   /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
@@ -1416,6 +1474,8 @@ export interface MachineReplies {
   };
   /** The apps a person could start from the menu: what `launch` takes, and their names. */
   "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
+  /** The screen's text (trimmed, `DESKTOP_TEXT_MAX` at most), or `same`: the capture didn't change since the last read. */
+  "desktop.text": { text: string } | { same: true };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -1507,8 +1567,11 @@ export type RunnerFrame =
   | { type: "output"; id: string; stream: "stdout" | "stderr"; chunk: string }
   | { type: "result"; id: string; ok: true; data: unknown }
   | { type: "result"; id: string; ok: false; error: { code: MachineErrorCode; message: string } }
-  /** Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed). */
-  | { type: "pong"; at: number; load?: MachineLoad }
+  /**
+   * Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed);
+   * protocol 23: `browserTraffic` the same way.
+   */
+  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -1579,7 +1642,7 @@ export const MCP_TOOLS_MAX = 200;
 /** Largest `mcp.call` arguments (JSON characters). */
 export const MCP_ARGS_MAX_CHARS = 64 * 1024;
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";
 const cut = (v: unknown, max: number) => (isString(v) ? v.slice(0, max) : undefined);
 const fileList = (v: unknown) =>
@@ -1945,7 +2008,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
     case "pong": {
       if (typeof f.at !== "number") return null;
       const load = parseMachineLoad(f.load);
-      return { type: "pong", at: f.at, ...(load ? { load } : {}) };
+      const browserTraffic = parseBrowserTraffic(f.browserTraffic);
+      return { type: "pong", at: f.at, ...(load ? { load } : {}), ...(browserTraffic ? { browserTraffic } : {}) };
     }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;
@@ -2478,7 +2542,8 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
   };
 }
 
-const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
+/** A whole number from `min` to `max`. */
+export const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
 /** A small JSON text frame, parsed; null when it is too long or not JSON. */
@@ -2517,6 +2582,14 @@ export function parseMachineLoad(v: unknown): MachineLoad | null {
   if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
   if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
   return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
+}
+
+/** `pong.browserTraffic` (protocol 23): whole bytes up to 1e15 and at most 24 hours, else none. */
+export function parseBrowserTraffic(v: unknown): BrowserTraffic | null {
+  if (!isObject(v) || !inRange(v.up, [0, 1e15]) || !inRange(v.down, [0, 1e15]) || !between(v.hours, 0, 24)) {
+    return null;
+  }
+  return { up: v.up, down: v.down, hours: v.hours };
 }
 
 /** `hello.desktop` (protocol 18), cut; a size only when both sides are sane. */

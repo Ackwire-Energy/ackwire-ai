@@ -1,16 +1,18 @@
 import type { Message } from "@agenteschat/client";
+import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
+import { ConsultationCard } from "./cards";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
 
 /**
  * An automatic line of the conversation, not a voice (the web's `NoticeLine`): what reached an agent's
- * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "@Infra
- * respondeu", "Nota de @Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
+ * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "Infra
+ * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
  */
 export function EventLine({ message }: { message: Message }) {
@@ -19,10 +21,19 @@ export function EventLine({ message }: { message: Message }) {
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
+  // An answer from another agent that carries the consultation (who asked whom, the question and the
+  // answer apart): the same card as a reply that waited for it, not the text written for the agent.
+  const consulted = consultationOfNotice(message.meta);
   const line = eventLineOf(message, {
     author: dir.nameOf(message.author) || t("channel.unknownAgent"),
     agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
   });
+  if (consulted)
+    return (
+      <View style={styles.line}>
+        <ConsultationCard askerId={consulted.askerId} consultation={consulted.consultation} />
+      </View>
+    );
   if (!line) return null;
   return (
     <View style={styles.line}>

@@ -4,18 +4,22 @@ import {
   applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
+  applyReceiptEvent,
   type ChannelEvent,
   type ConsultsState,
   cacheApproval,
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
+  cacheMessageMemories,
+  catchUpChannel,
   consultSeeds,
   consultsIn,
   dismissRun,
   dropProvisional,
   emptyStreams,
   expectReply,
+  guessReceipt,
   keys,
   type LiveConsult,
   type LiveRun,
@@ -23,14 +27,17 @@ import {
   markStopping,
   type OpenConsult,
   type ReactionCount,
+  type ReceiptsState,
   reconcileConsults,
   reconcileRuns,
   runsInChannel,
   type StreamsState,
+  seedReceipt,
   staleProvisional,
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useConnection } from "../shared/hooks";
@@ -40,20 +47,23 @@ import { withContinued } from "./turn";
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
  * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
- * working, agents asking agents). The database stays the truth: on open and
- * after a reconnect the active runs come from the server.
+ * working, agents asking agents) and the agents' receipts on people's messages (who saw it, who answers;
+ * `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the active runs
+ * come from the server, and the lists' receipts seed the rest.
  */
 
 interface LiveState {
   streams: StreamsState;
   consults: ConsultsState;
+  receipts: ReceiptsState;
 }
 
 type Action =
   | { type: "event"; event: ChannelEvent; at: number }
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
   | { type: "consults"; channelId: string; open: OpenConsult[]; at: number; askedAt: number }
-  | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number }
+  | { type: "expect"; channelId: string; threadId: string; messageId: string; agentIds: string[]; at: number }
+  | { type: "seed"; messages: readonly Message[] }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
@@ -65,10 +75,22 @@ export const PROVISIONAL_TTL_MS = 20_000;
 function reduce(state: LiveState, action: Action): LiveState {
   switch (action.type) {
     case "event": {
-      const streams = applyChannelEvent(state.streams, action.event, action.at);
-      const consults = applyConsultEvent(state.consults, action.event, action.at);
-      // Most events (typing, receipts) change neither: no re-render.
-      return streams === state.streams && consults === state.consults ? state : { streams, consults };
+      const { event } = action;
+      const streams = applyChannelEvent(state.streams, event, action.at);
+      const consults = applyConsultEvent(state.consults, event, action.at);
+      // A person's new message starts its receipt before the event itself lands on it (as on the web).
+      const seeded =
+        event.type === "message.created" && event.message ? seedReceipt(state.receipts, event.message) : state.receipts;
+      const receipts = applyReceiptEvent(seeded, event);
+      // An event that changes none of them (a person typing) doesn't re-render.
+      return streams === state.streams && consults === state.consults && receipts === state.receipts
+        ? state
+        : { streams, consults, receipts };
+    }
+    case "seed": {
+      let receipts = state.receipts;
+      for (const m of action.messages) receipts = seedReceipt(receipts, m);
+      return receipts === state.receipts ? state : { ...state, receipts };
     }
     case "reconcile":
       return {
@@ -84,7 +106,8 @@ function reduce(state: LiveState, action: Action): LiveState {
       let streams = state.streams;
       for (const agentId of action.agentIds)
         streams = expectReply(streams, { channelId: action.channelId, threadId: action.threadId, agentId }, action.at);
-      return { ...state, streams };
+      // The message's receipt guesses the same agents until the server says (unconfirmed; the sweep drops it).
+      return { ...state, streams, receipts: guessReceipt(state.receipts, action.messageId, action.agentIds) };
     }
     case "stopping":
       return { ...state, streams: markStopping(state.streams, action.runId, action.byUserId) };
@@ -95,7 +118,12 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "sweep": {
       const stale = staleProvisional(state.streams, action.at, PROVISIONAL_TTL_MS);
       if (stale.length === 0) return state;
-      return { ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))) };
+      const threads = new Set(stale.map((r) => r.threadId));
+      // A guess the server never confirmed goes with its "pensando…" (the conversation resyncs right after).
+      const receipts = Object.fromEntries(
+        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+      );
+      return { ...state, streams: dropProvisional(state.streams, threads), receipts };
     }
   }
 }
@@ -164,6 +192,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message && !event.message.threadId)
         qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
+      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it.
+      if (event.message?.threadId)
+        void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
@@ -184,6 +215,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);
+      break;
+    case "message.memories":
+      // What an agent saved from a person's message: the memory mark under it.
+      cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);
       break;
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.
@@ -225,8 +260,12 @@ export interface ChatLive {
   runs: LiveRun[];
   /** Agents asking agents right now. */
   consults: LiveConsult[];
-  /** Right after sending: "pensando…" for the agents that will answer (an agent DM). */
-  expect: (threadId: string, agentIds: string[]) => void;
+  /** Agents' receipts on people's messages, by message id (`receiptView` reads one). */
+  receipts: ReceiptsState;
+  /** Right after sending: "pensando…" for the agents that will answer (an agent DM), on `messageId`'s receipt too. */
+  expect: (threadId: string, agentIds: string[], messageId?: string) => void;
+  /** Messages loaded over HTTP: their receipts (`message.receipts`) start or catch up. */
+  seed: (messages: readonly Message[]) => void;
   /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
   stop: (runId: string, byUserId: string) => void;
 }
@@ -235,7 +274,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const connection = useConnection();
   const qc = useQueryClient();
   const api = useApi();
-  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {} });
+  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {} });
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -248,7 +287,9 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     [channelId],
   );
 
-  // On open and after every reconnect: the server's active runs replace what we guessed.
+  // On open and after every reconnect: the server's active runs replace what we guessed. The channel's events reach
+  // us only once the server confirms its subscription (the first, and after every reconnect): then the runs are
+  // checked again and what the lists missed before then (an answer posted while the conversation opened) is added.
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
@@ -266,9 +307,15 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       check();
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
     });
+    const offSubscribed = connection?.onSubscribed((id) => {
+      if (id !== channelId) return;
+      check();
+      void catchUpChannel(api, qc, orgId, channelId);
+    });
     return () => {
       alive = false;
       off?.();
+      offSubscribed?.();
     };
   }, [api, connection, enabled, orgId, channelId, qc]);
 
@@ -295,15 +342,17 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   }, [hasProvisional, qc, orgId, channelId]);
 
   const expect = useCallback(
-    (threadId: string, agentIds: string[]) => {
-      if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, agentIds, at: Date.now() });
+    (threadId: string, agentIds: string[], messageId: string = threadId) => {
+      if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, messageId, agentIds, at: Date.now() });
     },
     [channelId],
   );
+  const seed = useCallback((messages: readonly Message[]) => dispatch({ type: "seed", messages }), []);
 
   const stop = useCallback(
     (runId: string, byUserId: string) => {
       dispatch({ type: "stopping", runId, byUserId });
+      playSound("stop");
       api.agents.cancelRun(orgId, runId).catch((err: unknown) => {
         // 409 `run_finished`: it ended on its own meanwhile; its message is on the way (or already here).
         if (err instanceof ApiError && err.status === 409) {
@@ -319,9 +368,11 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     () => ({
       runs: runsInChannel(state.streams, channelId),
       consults: consultsIn(state.consults, channelId),
+      receipts: state.receipts,
       expect,
+      seed,
       stop,
     }),
-    [state, channelId, expect, stop],
+    [state, channelId, expect, seed, stop],
   );
 }

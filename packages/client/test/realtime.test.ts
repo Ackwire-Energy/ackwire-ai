@@ -104,6 +104,29 @@ describe("RealtimeConnection", () => {
     expect(statuses).toEqual(["connecting", "open", "reconnecting", "open"]);
   });
 
+  test("says when the server confirms a channel's subscription, again after a reconnect: its events start there", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    const conn = new RealtimeConnection({ url: "ws://x", createSocket: factory, timers: clock.timers, pingMs: 0 });
+    const live: string[] = [];
+    const off = conn.onSubscribed((channelId) => live.push(channelId));
+    conn.subscribe("c1", () => {});
+    conn.start();
+    sockets[0]?.open();
+    // Asked for, not confirmed yet: whatever the channel sends meanwhile doesn't reach us.
+    expect(live).toEqual([]);
+    sockets[0]?.push({ type: "subscribed", channelId: "c1" });
+    expect(live).toEqual(["c1"]);
+    sockets[0]?.drop();
+    clock.runNext();
+    sockets[1]?.open();
+    sockets[1]?.push({ type: "subscribed", channelId: "c1" });
+    expect(live).toEqual(["c1", "c1"]);
+    off();
+    sockets[1]?.push({ type: "subscribed", channelId: "c1" });
+    expect(live).toEqual(["c1", "c1"]);
+  });
+
   test("stop closes the socket and never reconnects", () => {
     const { factory, last } = fakeSockets();
     const clock = manualTimers();

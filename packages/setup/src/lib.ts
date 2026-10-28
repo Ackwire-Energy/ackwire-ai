@@ -67,6 +67,7 @@ export interface Options {
   computer?: (typeof YES_NO)[number];
   computerCommands?: (typeof YES_NO)[number];
   telemetry?: OnOff;
+  typesafeKey?: string;
   start: boolean;
   tailscaleStatus?: string;
   timeout: number;
@@ -89,6 +90,7 @@ const OPTIONS = {
   computer: { type: "string" },
   "computer-commands": { type: "string" },
   telemetry: { type: "string" },
+  "typesafe-key": { type: "string" },
   "no-start": { type: "boolean" },
   "tailscale-status": { type: "string" },
   timeout: { type: "string" },
@@ -142,6 +144,7 @@ export function parseOptions(
     ["smtp-url", text("smtp-url"), smtpUrlProblem],
     ["email-api-url", text("email-api-url"), httpUrlProblem],
     ["email-from", text("email-from"), emailFromProblem],
+    ["typesafe-key", text("typesafe-key"), jevKeyProblem],
   ];
   for (const [name, value, problem] of checks) {
     const found = value === undefined ? null : problem(value);
@@ -163,6 +166,7 @@ export function parseOptions(
       ...(computer ? { computer } : {}),
       ...(commands ? { computerCommands: commands } : {}),
       ...(telemetry ? { telemetry } : {}),
+      ...optional("typesafeKey", text("typesafe-key")),
       start: !flag("no-start"),
       ...optional("tailscaleStatus", text("tailscale-status")),
       timeout,
@@ -179,6 +183,31 @@ const optional = <K extends string>(key: K, value: string | undefined) =>
 function isOneOf<T extends string>(value: string, list: readonly T[]): value is T {
   return (list as readonly string[]).includes(value);
 }
+
+/** A problem said as a sentence of its own: the options' messages start lowercase, after `--flag: `. */
+export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * A command's output line as the line under a wait shows it: no colors, and no mark of the agentes.chat look,
+ * in its ASCII form too (where the font lacks the marks, they are followed by two spaces).
+ */
+export const outputLine = (line: string) =>
+  line
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: a terminal's escapes are what it leaves out
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/^\s*(?:[◇◆●○▲■◒◐◓◑│]\s+|[ox?*!-] {2})?/u, "")
+    .trim();
+
+/** What a command said last: its last line with words, as `outputLine` shows it (a failure's reason). */
+export const lastLine = (output: string) =>
+  output
+    .split(/\r\n|\r|\n/)
+    .map(outputLine)
+    .filter(Boolean)
+    .pop() ?? "";
+
+/** A step whose command is on a line of its own (`\n$ `), as one plain sentence: `--json` returns it that way. */
+export const plainStep = (step: string) => step.replaceAll("\n$ ", " ");
 
 /** A typed answer to a numbered list: its number, or the value itself (`2` or `domain`). */
 export function resolveChoice<T extends string>(answer: string, values: readonly T[]): T | null {
@@ -237,11 +266,21 @@ export function httpUrlProblem(url: string): string | null {
     : "that isn't an address like https://api.resend.com.";
 }
 
+/** The name every email is sent under: the server's own default sender's (`SENDER_NAME` in packages/engine/src/email.ts). */
+const SENDER_NAME = "agentes.chat";
+
+/** A sender at `domain`, as the server's default one reads. */
+export const senderAt = (domain: string) => `${SENDER_NAME} <ola@${domain}>`;
+
+/** The sender the setup offers: at a public domain only, which a provider can verify (a ts.net name or localhost no). */
+export const senderFor = (network: Network, domain: string | null) =>
+  network === "domain" && domain ? senderAt(domain) : undefined;
+
 /** The shapes `EMAIL_FROM` takes: a bare address, or `Name <address>`. */
 export const emailFromProblem = (from: string) =>
   /^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/.test(from)
     ? null
-    : 'that isn\'t a sender like "agentes <ola@example.com>".';
+    : `that isn't a sender like "${senderAt("example.com")}".`;
 
 function parseUrl(url: string): URL | null {
   try {
@@ -606,7 +645,7 @@ export function diagnoseAppLogs(logs: string): Problem | null {
   const issues = [...logs.slice(at).matchAll(/^\s+- (.+)$/gm)].map((m) => (m[1] ?? "").trim()).slice(0, 5);
   return {
     check: "app.config",
-    error: `The app refused its configuration${issues.length ? `: ${issues.join("; ")}` : ""}.`,
+    error: `The app refused its configuration${issues.length ? `: ${issues.join(". ")}` : ""}.`,
     fix: "Fix those values in .env, then run the setup again. docker compose logs agentes shows the whole message.",
   };
 }
@@ -616,7 +655,8 @@ export function diagnoseAppLogs(logs: string): Problem | null {
 /** The question's words are the web app's switch's (Settings → General), so every place says the same. */
 export const TELEMETRY_TEXT = [
   "Send anonymous usage statistics to agentes.chat: counts such as people, agents,",
-  "machine sizes and AI tokens used. Never messages, files or names.",
+  "machine sizes, AI tokens used and how much data the agents' browsers send and",
+  "receive. Never messages, files, names or sites.",
 ];
 
 export function telemetryOf(content: string | null): OnOff | null {
@@ -633,6 +673,98 @@ export function decideTelemetry(p: { flag?: OnOff; content: string | null; answe
   const now = telemetryOf(p.content);
   const value: OnOff = p.flag ?? now ?? (p.answer === false ? "off" : "on");
   return { ask: !p.flag && !now, value, kept: value === now, entries: value === now ? {} : { TELEMETRY: value } };
+}
+
+// ── Jev ─────────────────────────────────────────────────────────────────────
+
+/** TypeSafe's console, and its page where keys are made. */
+export const TYPESAFE_CONSOLE = "https://console.typesafe.ai";
+export const TYPESAFE_KEYS = `${TYPESAFE_CONSOLE}/keys`;
+
+/** A whole key is printable ASCII: a pasted curly quote or space can't go in a request, which would read as no answer. */
+export const jevKeyProblem = (key: string) =>
+  /^[\x21-\x7E]{8,512}$/.test(key) ? null : `that isn't a whole TypeSafe key. Copy it again from ${TYPESAFE_KEYS}.`;
+
+/**
+ * What a TypeSafe answer says about a key, first match first, as the server reads it (`jevStateOf` in
+ * packages/engine/src/jev-key.ts). The setup is standalone, so it keeps this copy: the same fixture table in both
+ * packages' tests keeps the two alike. Null: the request's own fault, which says nothing about the key.
+ */
+export function jevStateOf(status: number, body?: unknown) {
+  if (status >= 200 && status < 300) return "ok" as const;
+  const detail = (body as { detail?: { error_type?: unknown; message?: unknown } | string } | null | undefined)?.detail;
+  const words = typeof detail === "string" ? detail : `${detail?.error_type ?? ""} ${detail?.message ?? ""}`;
+  if (status === 402 || /credit|balance|billing|payment|funds/i.test(words)) return "no_credit" as const;
+  // 403 is TypeSafe's answer to a request without a key.
+  if (status === 401 || status === 403) return "invalid" as const;
+  if (status === 429) return "rate_limited" as const;
+  if (status >= 500) return "down" as const;
+  return null;
+}
+
+export type JevCheck = "ok" | "invalid" | "no_credit" | "unchecked";
+
+/** One tiny call (about 50 tokens), as the server's check: only a real call says a key has no credit. */
+export async function checkJevKey(key: string, fetchFn: typeof fetch = fetch): Promise<JevCheck> {
+  const question = {
+    type: "noul",
+    instructions: "Is the state the word ok?",
+    criteria: { true: "The state is the word ok.", false: "The state is something else." },
+  };
+  try {
+    const res = await fetchFn("https://api.typesafe.ai/v1/systemone", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({ model: "jev-latest", state: "ok", questions: { ok: question } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const state = jevStateOf(res.status, await res.json().catch(() => null));
+    return state === "ok" || state === "invalid" || state === "no_credit" ? state : "unchecked";
+  } catch {
+    return "unchecked";
+  }
+}
+
+export type JevChoice = JevCheck | "kept" | "off";
+
+/**
+ * Jev's key: `--typesafe-key` is checked with TypeSafe (never in a dry run) and goes into .env unless TypeSafe
+ * refuses it, which writes nothing. Without it, or with the key .env already has, .env stays as it is: the app
+ * asks the server's owner after the setup.
+ */
+export async function jevStep(p: {
+  flag?: string;
+  content: string | null;
+  dryRun: boolean;
+  check: (key: string) => Promise<JevCheck>;
+}): Promise<
+  { problem: Problem } | { value: JevChoice; entries: Record<string, string>; said?: { ok: boolean; text: string } }
+> {
+  const now = envValue(p.content, "TYPESAFE_API_KEY");
+  if (!p.flag || p.flag === now) return { value: now ? "kept" : "off", entries: {} };
+  if (p.dryRun) return { value: "unchecked", entries: {} };
+  const state = await p.check(p.flag);
+  if (state === "invalid") {
+    return {
+      problem: {
+        check: "jev",
+        error: "TypeSafe didn't accept --typesafe-key.",
+        fix: `Copy the key again from ${TYPESAFE_KEYS}, or leave the option out and add it later in Settings › AI accounts.`,
+      },
+    };
+  }
+  const said = {
+    ok: { ok: true, text: "Jev: key checked" },
+    no_credit: {
+      ok: false,
+      text: `Jev: the key works but has no credit. Add credit at ${TYPESAFE_CONSOLE} and Jev starts by itself.`,
+    },
+    unchecked: {
+      ok: false,
+      text: "Jev: TypeSafe didn't answer, so the key wasn't checked. agentes.chat checks it when it uses it.",
+    },
+  }[state];
+  return { value: state, entries: { TYPESAFE_API_KEY: p.flag }, said };
 }
 
 // ── The agents' computer ────────────────────────────────────────────────────
@@ -727,7 +859,7 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
   return {
     mac,
     yes: false,
-    why: `This machine has ${gb} GB of memory; each agent's screen needs about 0.2 GB and its browser 0.6 GB more.`,
+    why: `This machine has ${gb} GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.`,
   };
 }
 
@@ -996,17 +1128,12 @@ export const sshTunnel = (port: string, to: SshTarget) =>
 /**
  * A public domain's first start: private (PUBLIC_URL http://localhost:<port>) until the owner's account
  * exists, created through an SSH tunnel to the domain so nobody else can claim the instance; then the domain
- * goes live.
+ * goes live. The tunnel's command is a line of its own (`$ `), to copy whole.
  */
-export function privateStart(p: { domain: string; port: string; ssh: SshTarget; interactive: boolean }) {
+export function privateStart(p: { domain: string; port: string; ssh: SshTarget }) {
   return {
-    // Without a terminal the setup doesn't wait for the account: the domain goes live in this run if the account
-    // exists already, else in a later one, as the lines after this say.
-    note: p.interactive
-      ? `Starting agentes.chat privately first (docker compose up -d): ${p.domain} goes live once your account exists. The first time downloads about 2 GB…`
-      : "Starting agentes.chat privately first (docker compose up -d). The first time downloads about 2 GB…",
     steps: [
-      `From your computer, open a tunnel to this server: ${sshTunnel(p.port, { ...p.ssh, host: p.domain })}`,
+      `From your computer, open a tunnel to this server:\n$ ${sshTunnel(p.port, { ...p.ssh, host: p.domain })}`,
       `Open http://localhost:${p.port} and create your account: the first one owns the instance. It has to be port ${p.port} on your computer too: until ${p.domain} goes live, sign-up works only at that address.`,
     ],
   };
@@ -1029,7 +1156,7 @@ export function theEnd(p: {
   url: string;
   app: { health: Record<string, unknown>; firstRun: boolean } | null;
   keyExpiry: string | null;
-  choices: { computer: ComputerPlan["state"]; telemetry: OnOff } | null;
+  choices: { computer: ComputerPlan["state"]; telemetry: OnOff; jev: JevChoice } | null;
   first?: string[];
   failed: Problem | null;
   ssh: SshTarget;
@@ -1087,6 +1214,8 @@ export interface PlanInput {
   computer: ComputerPlan;
   /** The usage statistics' answer, and whether .env already had it. */
   telemetry: { value: OnOff; kept: boolean };
+  /** Jev's key: `--typesafe-key` to check, kept from .env, or none. */
+  jev: JevChoice;
   compose: string | null;
   start: boolean;
   image: boolean;
@@ -1116,7 +1245,7 @@ export function planSteps(p: PlanInput): string[] {
   const steps: string[] = [];
   if (p.image) steps.push("Docker: not checked here (setup inside the image)");
   else if (p.docker) steps.push(p.docker);
-  if (p.questions.length) steps.push(`asks: ${p.questions.join("; ")}`);
+  if (p.questions.length) steps.push(`asks: ${p.questions.join(", ")}`);
   steps.push(
     p.envExists
       ? `.env: keep it and add only what's missing${p.newSecrets.length ? ` (${p.newSecrets.join(", ")})` : ""}`
@@ -1136,7 +1265,7 @@ export function planSteps(p: PlanInput): string[] {
   } else if (p.network === "domain") {
     steps.push(`network: public domain ${p.domain ?? "(asked)"}, HTTPS by Caddy on ports 80 and 443`);
   } else if (p.network === "proxy") {
-    steps.push(`network: your own proxy or tunnel at ${p.publicUrl.now}; PUBLIC_URL and COMPOSE_PROFILES stay`);
+    steps.push(`network: your own proxy or tunnel at ${p.publicUrl.now} (PUBLIC_URL and COMPOSE_PROFILES stay)`);
   } else {
     steps.push("network: this machine only, http://localhost");
   }
@@ -1153,6 +1282,8 @@ export function planSteps(p: PlanInput): string[] {
   );
   steps.push(computerStep(p.computer));
   steps.push(telemetryStep(p.telemetry));
+  if (p.jev === "kept") steps.push("Jev: keep what .env has (TYPESAFE_API_KEY)");
+  else if (p.jev !== "off") steps.push("Jev: TYPESAFE_API_KEY from --typesafe-key, checked when the setup runs");
   steps.push(p.compose ? `compose: use ${p.compose}` : `compose: download docker-compose.yml from ${COMPOSE_URL}`);
   if (p.image || !p.start) {
     steps.push("start: print the commands to run (docker compose up -d) and how to finish");
@@ -1222,7 +1353,7 @@ export function nextSteps(p: {
   } else {
     const port = new URL(p.url).port || "80";
     steps.push(`Open ${p.url} and ${account}.`);
-    steps.push(`On a server, open it from your computer through an SSH tunnel: ${sshTunnel(port, p.ssh)}`);
+    steps.push(`On a server, open it from your computer through an SSH tunnel:\n$ ${sshTunnel(port, p.ssh)}`);
   }
   return steps;
 }

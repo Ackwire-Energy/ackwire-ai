@@ -22,7 +22,7 @@ describe("looksLikeApiKey", () => {
   test("normal text with sk- words, prefixes alone and hyphenated names is not a key", () => {
     for (const text of [
       "o sk-learn resolve isso",
-      "chaves da Anthropic começam com sk-ant-",
+      "as chaves de API do Claude começam com sk-ant-",
       "a branch sk-this-is-a-very-long-branch-name está pronta",
       "task-1234567890123456789012 no Linear",
       "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

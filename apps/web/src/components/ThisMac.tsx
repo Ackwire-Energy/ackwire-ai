@@ -3,7 +3,7 @@ import { Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { inDesktopApp, thisMac } from "@/lib/desktop";
+import { desktopRevealsFiles, inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -48,6 +48,18 @@ export function useAgentsHere(): boolean {
     meta: { quiet: true },
   });
   return inDesktopApp() && here.data === true;
+}
+
+/** "Show the folder": in an app that opens it (`desktopRevealsFiles`), on the server it runs on this computer. */
+export function useRevealsFiles(): boolean {
+  const local = useQuery({
+    queryKey: THIS_MAC_KEY,
+    queryFn: thisMac.status,
+    enabled: desktopRevealsFiles(),
+    select: (s) => s.local === true,
+    meta: { quiet: true },
+  });
+  return desktopRevealsFiles() && local.data === true;
 }
 
 /** An organization's name, for the app's own dialog before it pairs this computer. */

@@ -4,7 +4,6 @@ import path from "node:path";
 import {
   type AgentScope,
   type FileEntry,
-  isDesktopKeyboard,
   isStreamId,
   isTerminalSize,
   MAX_INLINE_FILE_BYTES,
@@ -22,6 +21,7 @@ import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
+import { routeWithPlan } from "./brain-route";
 import type { BrowserManager } from "./browser";
 import type { DesktopManager } from "./desktop";
 import type { DesktopSessions } from "./desktop-session";
@@ -33,6 +33,7 @@ import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
+import type { Spawn } from "./scope-gate";
 import { agentSecrets, handleSecret } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
@@ -41,9 +42,15 @@ import type { Terminals } from "./terminal";
 export const MAX_CONCURRENT_REQUESTS = 8;
 /**
  * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
- * would otherwise keep people from watching or taking control. Short, and capped per agent on both sides.
+ * would otherwise keep people from watching or taking control, or a person in control from being screened
+ * (`desktop.text`). Short, and capped per agent on both sides.
  */
-const PEOPLE_OPS: ReadonlySet<string> = new Set(["stream.open", "desktop.session.status", "desktop.session.stop"]);
+const PEOPLE_OPS: ReadonlySet<string> = new Set([
+  "stream.open",
+  "desktop.session.status",
+  "desktop.session.stop",
+  "desktop.text",
+]);
 export const MAX_LIST_ENTRIES = 5000;
 
 /** Ops that start new work: refused while the owner paused the computer (protocol 9). Reads of status, output and cancel still go. */
@@ -55,6 +62,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "push",
   "task.start",
   "brain.turn",
+  "brain.route",
   "git.sync",
   "browser.act",
   "browser.batch",
@@ -88,6 +96,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "task.output": "agent",
   "brain.turn": "agent",
   "brain.steer": "agent",
+  // As the agent's own user: the account folder is lent to it, as for a turn.
+  "brain.route": "agent",
   "git.sync": "agent",
   "mission.worktree": "agent",
   "access.request": "machine",
@@ -110,6 +120,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.act": "agent",
   "desktop.capture": "agent",
   "desktop.apps": "agent",
+  "desktop.text": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -153,6 +164,8 @@ export interface HandlerContext {
     app?: CodexAppServers;
     /** System mode, in a worker: the account folders lent to this agent (`accounts` is root's). */
     accounts?: { accountDir(kind: "claude_code" | "codex", id: string): string | null };
+    /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+    spawn?: Spawn;
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
@@ -268,7 +281,7 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
   for (const file of secrets.files) {
     const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
     if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {
-      throw new RunnerError("bad_request", `${requested} holds a secret; it stays on this computer`);
+      throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
     }
   }
 }
@@ -364,7 +377,7 @@ async function doList(
   return { entries };
 }
 
-const PAUSED = "The owner paused this computer; nothing new starts here until it is resumed";
+export const PAUSED = "The owner paused this computer. Nothing new starts here until it's resumed.";
 
 /** Protocol 18: a stream that is new work (control of a desktop, a terminal); watching one that runs isn't. */
 const workStream = (req: MachineRequest) =>
@@ -378,7 +391,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     if (!ctx.workers) {
       throw new RunnerError(
         "not_allowed",
-        "This computer runs each agent as its own user, and its runner can't do that yet; update the runner on this computer",
+        "This computer runs each agent as its own user, and its runner can't do that yet. Update the runner on this computer.",
       );
     }
     // An op this runner doesn't know (`OP_ROUTES` has no row) goes nowhere.
@@ -423,7 +436,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     req.op === "desktop.look" ||
     req.op === "desktop.act" ||
     req.op === "desktop.capture" ||
-    req.op === "desktop.apps"
+    req.op === "desktop.apps" ||
+    req.op === "desktop.text"
   ) {
     return handleDesktopUse(ctx, req);
   }
@@ -431,6 +445,17 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   switch (req.op) {
     case "brain.turn":
       return doBrainTurn(ctx, req, scope, secrets);
+    case "brain.route":
+      // Never the agent's secrets: the route reads other people's messages.
+      requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
+      if (!req.agent) throw new RunnerError("bad_request", "A route runs for an agent");
+      return routeWithPlan(req, {
+        accounts: ctx.accounts ?? ctx.codex?.accounts,
+        brains: ctx.brains,
+        codexApp: ctx.codex?.app,
+        tasks: ctx.tasks,
+        signal: scope.signal,
+      });
     case "git.sync":
       // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
       if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
@@ -450,7 +475,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       // The runner's own git in the agent's folder (like `git.sync`). Making a folder is new work; removing one isn't.
       if (!req.agent) throw new RunnerError("bad_request", "A mission's folder belongs to an agent");
       if (req.action === "ensure" && ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+        throw new RunnerError("paused", PAUSED);
       }
       return missionWorktree(ctx.workspaceReal, req);
     case "exec":
@@ -508,11 +533,15 @@ function handleDesktop(
 /**
  * Protocol 21: the agent uses its own desktop (ADR 0062). That runs commands
  * as the agent (its desktop has a terminal), so it needs the machine's
- * desktop switch and its commands switch.
+ * desktop switch and its commands switch. Protocol 25's `desktop.text` goes
+ * through the same helper, behind the same switches.
  */
 function handleDesktopUse(
   ctx: HandlerContext,
-  req: Extract<MachineRequest, { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" }>,
+  req: Extract<
+    MachineRequest,
+    { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" | "desktop.text" }
+  >,
 ) {
   const desktop = ctx.desktopUse;
   if (!desktop) throw new RunnerError("desktop_unavailable", "This runner doesn't serve desktop use");
@@ -528,6 +557,8 @@ function handleDesktopUse(
       return desktop.capture(req.agent, req.region);
     case "desktop.apps":
       return desktop.apps(req.agent);
+    case "desktop.text":
+      return desktop.text(req.agent);
   }
 }
 
@@ -545,7 +576,7 @@ async function handleStream(
   const streams = ctx.streams;
   if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
   if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
-  const dial = () => streams.dial(streamId, scope.signal);
+  const dial = () => streams.dial(streamId, req.kind, scope.signal);
   if (req.kind === "desktop") {
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
@@ -555,8 +586,7 @@ async function handleStream(
       if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
       await ctx.desktops.ensure(agent);
     }
-    const keyboard = req.mode === "control" && isDesktopKeyboard(req.keyboard) ? req.keyboard : undefined;
-    await openDesktopStream(ctx.desktops, agent, req.mode, dial, keyboard);
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
   } else if (req.kind === "terminal") {
     requireTool(ctx, "terminal");
     if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");
@@ -635,7 +665,7 @@ async function handleAccount(
   switch (req.action) {
     case "begin":
       if (ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+        throw new RunnerError("paused", PAUSED);
       }
       return accounts.begin(
         req.kind,
@@ -801,6 +831,7 @@ async function doCodexTurn(
         ...(ctx.grants ? { grants: ctx.grants } : {}),
         ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
         ...(codex.app ? { app: codex.app } : {}),
+        ...(codex.spawn ? { spawn: codex.spawn } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {
@@ -885,6 +916,9 @@ function describeOp(req: MachineRequest): string {
     case "brain.steer":
       // Never the text: how many messages, for which run.
       return `brain.steer ${String(req.runId ?? "")} (${Array.isArray(req.messages) ? req.messages.length : 0} messages)`;
+    case "brain.route":
+      // Never the prompt: other people's messages.
+      return `brain.route (${String(req.kind ?? "")}${req.account ? ", an account" : ""})`;
     case "git.sync": {
       const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
       return `git.sync ${repos || "(existing checkouts)"}`;
@@ -985,7 +1019,8 @@ export class RequestRunner {
       req.op === "browser.input" ||
       req.op === "desktop.look" ||
       req.op === "desktop.act" ||
-      req.op === "desktop.capture";
+      req.op === "desktop.capture" ||
+      req.op === "desktop.text";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));

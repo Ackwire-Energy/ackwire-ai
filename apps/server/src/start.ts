@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   type Adapters,
   createComposioClient,
@@ -21,11 +21,15 @@ import {
   createPostgresSearchResolver,
   createS3BlobStore,
   createSmtpEmailSender,
+  createTurnstileCheck,
+  createWebPushSender,
   type EmailSender,
   envPlatformCredentials,
+  type KeyWrapper,
   MAIL_PRESETS,
   type MailAdapters,
   postgresJsNotifier,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import {
@@ -38,12 +42,18 @@ import {
 import {
   adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
+  defaultEmailFrom,
   drainLocalRuns,
+  emailArtFor,
   enableCaches,
   enableOperatorEvents,
+  enablePersonalPlans,
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
+  setRestrictionNotices,
+  vapidKeys,
+  vapidSubject,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
@@ -51,6 +61,7 @@ import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
+import { checkHumanCheckAtBoot } from "./http/human-check";
 import { createLogger, type Logger } from "./logger";
 import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
@@ -109,13 +120,17 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     (error: unknown) => log.warn("couldn't check this server's computer's tokens", { error: String(error) }),
   );
 
+  // Browser push's VAPID key is sealed with the installation's key wrappers, read once modules had their
+  // say (`resolved`, ADR 0071).
+  const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
+  let resolved: Adapters | null = null;
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
     // PGlite (native mode) is one process: nothing to tell other replicas.
     pubsub: database.client ? await createPostgresPubSub(postgresJsNotifier(database.client)) : createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
-    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    keyWrapper: localKeyWrapper,
     legacyKeyWrappers: [],
     email: emailSender(config, log),
     platformCredentials: envPlatformCredentials({
@@ -132,14 +147,32 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
       : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
+    webPush: webPushSender(
+      config,
+      database.db,
+      () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])],
+      log,
+    ),
     mail: mailAdapters(config),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
+    // agentes.chat Cloud's bot check (ADR 0075), only with both keys: without them nothing reaches Cloudflare.
+    humanCheck:
+      config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY
+        ? createTurnstileCheck({
+            siteKey: config.TURNSTILE_SITE_KEY,
+            secretKey: config.TURNSTILE_SECRET_KEY,
+            hostnames: [new URL(config.PUBLIC_URL).hostname],
+            log,
+          })
+        : null,
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
+  log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
@@ -148,16 +181,47 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     createModelProviders(),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  resolved = adapters;
+  try {
+    await checkHumanCheckAtBoot(adapters.humanCheck, log);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
   const ctx: ModuleContext = { ...base, adapters };
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // Where workspaces get their computer from this server, an agent on a plan answers only its owner.
+  enablePersonalPlans(config.MACHINE_PROVISIONING === "external");
+  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
+  setRestrictionNotices(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   if (config.OPERATOR_API_TOKEN) {
     enableOperatorEvents();
     // Before the API serves a page: a caller restarting after a restore must find these rows first.
     const adopted = await adoptRestoredOperatorEvents(database.db);
     if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
+  const webDir = resolve(config.WEB_DIR);
+  const emailArt = await emailArtFor(config.PUBLIC_URL, existsSync(webDir) ? webDir : undefined, config.EMAIL_ART);
+  const because = {
+    attach: "EMAIL_ART=attach",
+    blocked: "PUBLIC_URL's host is private",
+    unreachable: "PUBLIC_URL's host didn't resolve, until a restart",
+  };
+  const pictures = {
+    from: emailArt.base ?? "attached to each message",
+    ...(emailArt.attached && { because: because[emailArt.attached] }),
+  };
+  // A failed lookup attaches them for the whole run, though the host may well be public.
+  if (emailArt.attached === "unreachable") log.warn("email pictures", pictures);
+  else log.info("email pictures", pictures);
+  if (!existsSync(join(webDir, "email", "logo-ink.png"))) {
+    log.warn("emails' pictures not found: their logo and art won't show", { dir: join(webDir, "email") });
   }
   const engine = buildEngine({
     db: database.db,
@@ -166,7 +230,11 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     modelProviders,
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
     onRunProfile: (p) => log.debug("run profile", p),
+    emailArt,
+    log,
   });
+  // The saved Jev key, before anything calls Jev (vision reads it synchronously).
+  await engine.jevKey.ready();
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -181,8 +249,14 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   });
   const telemetry = startTelemetry({ db: database.db, config, log });
 
-  const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
-  const webDir = resolve(config.WEB_DIR);
+  const auth = createAuth({
+    db: database.db,
+    config,
+    log,
+    emailDelivers: adapters.email.delivers,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition,
     version,
@@ -204,6 +278,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         streams: engine.streams,
         talker: engine.talker,
         router: engine.router,
+        jevKey: engine.jevKey,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
       },
@@ -258,10 +333,13 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     pubsub: adapters.pubsub,
     hub: engine.machineHub,
     emails: adapters.email.delivers,
+    humanCheck: adapters.humanCheck,
+    sessions: engine.sessions,
   });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
   }
+  if (engine.sessions) log.info("session screening on: screens are read while people are in control (ADR 0076)");
 
   for (const module of modules) await module.onStart?.(ctx);
 
@@ -319,8 +397,7 @@ export async function prepareDatabase(database: DatabaseHandle, log: Logger, mig
 
 /** MillionSend (or another Resend-compatible API) when keyed, else SMTP when `SMTP_URL` is set, else only the log. */
 function emailSender(config: Config, log: Logger): EmailSender {
-  // The Cloud (PUBLIC_URL https://agentes.chat) sends as ola@agentes.chat.
-  const from = config.EMAIL_FROM ?? `agentes <ola@${new URL(config.PUBLIC_URL).hostname}>`;
+  const from = config.EMAIL_FROM ?? defaultEmailFrom(config.PUBLIC_URL);
   const replyTo = config.EMAIL_REPLY_TO;
   if (config.MILLIONSEND_API_KEY) {
     return createMillionSendSender({
@@ -348,6 +425,43 @@ function platformBlobStore(config: Config, db: Database) {
     secretAccessKey: S3_SECRET_ACCESS_KEY,
     pathStyle: config.S3_PATH_STYLE,
   });
+}
+
+/** At most one log line this often about push services refusing this server's signature. */
+const WEB_PUSH_REFUSED_LOG_MS = 10 * 60_000;
+
+/**
+ * Browser push, unless `WEB_PUSH=off`. Endpoints come from browsers, so hosts on our own network are refused;
+ * a DNS that doesn't answer is a failure to retry (`resolveHostDns` throws), never a refused host.
+ */
+function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[], log: Logger): WebPushSender | null {
+  if (config.WEB_PUSH === "off") return null;
+  const sender = createWebPushSender({
+    vapid: () => vapidKeys(db, wrappers(), config),
+    checkHost: async (host) => {
+      const addresses = await resolveHostDns(host);
+      if (addresses.length === 0) throw new Error(`no address for ${host}`);
+      return !addresses.some(isBlockedAddress);
+    },
+  });
+  // A push service refusing the signature (401/403) keeps the subscription (ADR 0071) and is the operator's to
+  // see: for a while after the key changed it's expected, all the time it's this server's key or contact.
+  let loggedAt = 0;
+  return {
+    id: sender.id,
+    async send(message) {
+      const result = await sender.send(message);
+      if (result.unauthorized && Date.now() - loggedAt > WEB_PUSH_REFUSED_LOG_MS) {
+        loggedAt = Date.now();
+        log.warn("a browser's push service refused this server's Web Push signature", {
+          pushService: new URL(message.endpoint).host,
+          error: result.error,
+          contact: vapidSubject(config),
+        });
+      }
+      return result;
+    },
+  };
 }
 
 /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */

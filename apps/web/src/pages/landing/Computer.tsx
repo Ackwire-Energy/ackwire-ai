@@ -76,6 +76,19 @@ const START: View = {
   downloading: false,
 };
 
+/** How it ends: all there is with reduced motion. */
+const END: View = {
+  phase: "done",
+  point: 2,
+  page: "invoices",
+  email: EMAIL,
+  dots: 10,
+  focus: null,
+  cursor: { x: "calc(100% - 70px)", y: 28 },
+  steps: ["open", "back", "download", "check", "drive"],
+  downloading: true,
+};
+
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 
 /** The card's header: a dithered band of the agent's sky, light on the left. Decorative. */
@@ -114,7 +127,7 @@ export function Computer() {
   const { reduced } = useLanding();
   const runner = useRunner();
   const joy = useJoy();
-  const [view, setView] = useState<View>(START);
+  const [view, setView] = useState<View>(reduced ? END : START);
   const [state, setState] = useState<AgentState>("idle");
   const card = useRef<HTMLDivElement>(null);
   const visible = useRef(false);
@@ -124,7 +137,7 @@ export function Computer() {
   const release = useRef<(() => void) | null>(null);
   const agent = nina.name;
 
-  // Waits for the button or, when nobody clicks, for `ms` (not shortened with reduced motion).
+  // Waits for the button or, when nobody clicks, for `ms`.
   const waitFor = (ms: number) =>
     new Promise<void>((resolve) => {
       const done = () => {
@@ -189,11 +202,11 @@ export function Computer() {
     if (!(await go(900))) return;
     set({ steps: ["open", "back", "download", "check"], point: 2 });
     if (!(await go(900))) return;
-    set({ steps: ["open", "back", "download", "check", "drive"], phase: "done" });
+    set(END);
     setState("idle");
     joy.trigger(2200);
-    // Plays again while on screen (not with reduced motion: the end stays).
-    if (reduced || !(await go(6000))) return;
+    // Plays again while on screen.
+    if (!(await go(6000))) return;
     if (visible.current) runner.start(script);
     else pending.current = true;
   };
@@ -202,7 +215,8 @@ export function Computer() {
     card,
     (on) => {
       visible.current = on;
-      if (on && (!started.current || pending.current)) {
+      // With reduced motion it shows how it ends from the start, and nothing plays.
+      if (on && !reduced && (!started.current || pending.current)) {
         started.current = true;
         pending.current = false;
         runner.start(script);

@@ -9,6 +9,14 @@ import type { Instance } from "../api/types";
 
 export const CLOUD_SERVER = "https://agentes.chat";
 
+/**
+ * A help page on agentes.chat, in the reader's language ("en…" → English, else Portuguese), at a section. Every
+ * edition and app links there, with only the page, the language and the section: no server, organization or
+ * person.
+ */
+export const helpUrl = (slug: string, locale: string, section?: string) =>
+  `${CLOUD_SERVER}/help/${slug}?lang=${locale.startsWith("en") ? "en" : "pt-BR"}${section ? `#${section}` : ""}`;
+
 /** The app API contract these apps speak; a server serves its `minApi` up to its `api` (`GET /api/instance`). */
 export const APP_API = 1;
 
@@ -64,6 +72,16 @@ export function serverHost(server: string): string {
     return new URL(server).host;
   } catch {
     return server;
+  }
+}
+
+/** "https://box.example.com:8443/x?y" → "https://box.example.com:8443". Null when it isn't an http(s) address. */
+export function originOf(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
   }
 }
 

@@ -1,4 +1,10 @@
-import type { Adapters, BrainTurnRequest, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
+import {
+  type Adapters,
+  type BrainTurnRequest,
+  type S3Fetch,
+  type SandboxProvider,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -30,6 +36,7 @@ import {
   createHandOffToolSource,
   createIssueToolSource,
   createJevJudge,
+  createJevKey,
   createJobHandlers,
   createLlmJudge,
   createMachineHub,
@@ -43,6 +50,7 @@ import {
   createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
+  createSessionScreening,
   createSetupToolSource,
   createSkillToolSource,
   createStreamBroker,
@@ -50,6 +58,8 @@ import {
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
+  type EmailArt,
+  emailArtAt,
   type GitProxyDeps,
   hubBrainLink,
   type JobDeps,
@@ -68,12 +78,16 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  smallModelFor,
   standingJudge,
   streamClosed,
   type ToolSource,
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+
+/** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
+export const NO_TERMINAL = "no_terminal";
 
 export interface EngineOptions {
   db: Database;
@@ -107,6 +121,9 @@ export interface EngineOptions {
   replicaId?: string;
   /** Tools on demand (ADR 0043; default on). Tests turn it off: every granted tool is listed. */
   toolsOnDemand?: boolean;
+  /** Where emails get their pictures (`emailArtFor` at boot); default: linked from `PUBLIC_URL`'s `/email/`. */
+  emailArt?: EmailArt;
+  log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
 /**
@@ -148,23 +165,38 @@ export function buildEngine(o: EngineOptions) {
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
     },
   };
-  // Semantic judgments (stop requests, hand-offs, permission changes): Jev when its platform key is
-  // set, with the org's cheap model as fallback; the cheap model alone otherwise.
+  // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
+  const jevKey = createJevKey({
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    envKey: config.TYPESAFE_API_KEY,
+    fetch: o.jevFetch,
+  });
+  // The small model that routes and judges on an organization's keys (ADR 0074): the deployment's own on a
+  // Claude or an OpenAI key, the catalog's routing pick on the others.
+  const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
+  // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
+  // with the org's small model as fallback.
   if (!context.judge) {
-    const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
-    context.judge = config.TYPESAFE_API_KEY
-      ? withJudgeFallback(
-          createJevJudge({
-            apiKey: config.TYPESAFE_API_KEY,
-            gateway,
-            timeoutMs: config.JEV_TIMEOUT_MS,
-            visionModel: config.JEV_VISION_MODEL,
-            fetch: o.jevFetch,
-          }),
-          llmJudge,
-        )
-      : llmJudge;
+    const llmJudge = createLlmJudge({
+      gateway,
+      resolveModel: (orgId) => smallModelFor({ db, gateway }, orgId, smallModels),
+    });
+    context.judge = withJudgeFallback(
+      createJevJudge({
+        key: jevKey,
+        gateway,
+        timeoutMs: config.JEV_TIMEOUT_MS,
+        visionModel: config.JEV_VISION_MODEL,
+        fetch: o.jevFetch,
+      }),
+      llmJudge,
+      () => jevKey.usable(),
+    );
   }
+  // Screenshots go only to Jev's vision model: with a fake judge (tests) nothing looks at them.
+  const vision = o.judge ? undefined : () => jevKey.usable();
   // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
   context.judge = standingJudge(db, context.judge);
   // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
@@ -284,14 +316,14 @@ export function buildEngine(o: EngineOptions) {
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
         judge: context.judge,
-        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+        vision,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
         judge: context.judge,
-        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+        vision,
       }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
@@ -310,14 +342,22 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
+  // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
+  const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
   // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
-  // its access checked again while open; control changing hands closes the views it hides.
+  // its access checked again while open; control changing hands closes the views it hides. Where sessions are
+  // screened no terminal opens: a shell nobody screens would be the way around it.
   const streams = createStreamBroker({
     db,
     hub: machineHub,
-    authorize: (input) => authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    authorize: async (input) =>
+      sessions && input.request.kind === "terminal"
+        ? { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL }
+        : authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
     recheck: (stream) => recheckStream(db, stream),
-    onClosed: (stream) => streamClosed(db, stream),
+    onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
+    onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
+    log: o.log,
   });
   const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
@@ -377,7 +417,12 @@ export function buildEngine(o: EngineOptions) {
     context,
     search: adapters.search,
     email: adapters.email,
+    emailArt: o.emailArt ?? emailArtAt(config.PUBLIC_URL),
     push: adapters.push,
+    // Browsers (ADR 0071): full text, encrypted to the browser.
+    webPush: adapters.webPush,
+    // A push not waiting on the person holds while they have the app open (ADR 0071 §7).
+    presence: adapters.presence,
     storage,
     artifacts,
     sandbox,
@@ -394,13 +439,15 @@ export function buildEngine(o: EngineOptions) {
     onRunProfile: o.onRunProfile,
     router: {
       enabled: config.ROUTER_ENABLED,
-      model: config.ROUTER_MODEL,
-      cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
+      model: smallModels.anthropic,
+      cheapModels: { openai: smallModels.openai },
+      // The author's own plan on their computer, where the server isn't the Cloud's (ADR 0074).
+      plans: { hub: machineHub, publicUrl: config.PUBLIC_URL },
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
-      // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
-      ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"
-        ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
+      // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
+      ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
+        ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
         : {}),
     },
   };
@@ -428,9 +475,13 @@ export function buildEngine(o: EngineOptions) {
     machineHub,
     browserLive,
     streams,
+    /** Screened sessions (ADR 0076), for the operator API's review door; null where nothing is screened. */
+    sessions,
     desktops,
     mail,
     talker,
+    /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
+    jevKey,
   };
 }
 

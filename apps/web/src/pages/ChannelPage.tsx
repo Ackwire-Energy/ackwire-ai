@@ -38,6 +38,7 @@ import {
   sendHelpers,
   typingIn,
   useAddChannelMember,
+  useAiStatus,
   useApproval,
   useApprovals,
   useChannelMembers,
@@ -75,7 +76,7 @@ import {
 } from "@agenteschat/client/lib/chat";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
-import { errorCode, errorText, standingRefusalText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -99,6 +100,7 @@ import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/out
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -172,6 +174,7 @@ import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
+import { ApprovalAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -188,7 +191,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
-import { LiveCodeToggle, LiveWorkList, type SteerNote } from "@/components/LiveCode";
+import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -196,7 +199,6 @@ import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
-import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -224,6 +226,7 @@ import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
+import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -333,9 +336,8 @@ const GESTURE_MS = 1500;
 const IDLE_CATCH_UP_MS = 20_000;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
-/** Per channel, for this session: older pages already loaded, and channels with no more. */
-const olderPages = new Map<string, MessageType[]>();
-const olderDone = new Set<string>();
+/** Older pages a channel already loaded, and whether there are no more. */
+type OlderPages = { pages: MessageType[]; done: boolean };
 /** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
 const MAX_ATTACHMENTS = 10;
 
@@ -727,10 +729,12 @@ function ChannelView({
     if (messages.data) live.seed(messages.data);
   }, [messages.data, live]);
 
-  // Older pages, loaded on scroll-up (kept for this session per channel).
-  const [older, setOlder] = useState<MessageType[]>(() => olderPages.get(channel.id) ?? []);
+  // Older pages, loaded on scroll-up. Kept in the query cache, so they belong to this session: signing
+  // out clears them, and they never show to whoever signs in next in the same tab.
+  const olderKey = keys.olderPages(org.id, channel.id);
+  const [older, setOlder] = useState<MessageType[]>(() => qc.getQueryData<OlderPages>(olderKey)?.pages ?? []);
   const [olderState, setOlderState] = useState<"idle" | "loading" | "done">(() =>
-    olderDone.has(channel.id) ? "done" : "idle",
+    qc.getQueryData<OlderPages>(olderKey)?.done ? "done" : "idle",
   );
   const anchor = useRef<{ height: number; top: number } | null>(null);
   const loadOlder = () => {
@@ -751,10 +755,9 @@ function ChannelView({
         setOlder((prev) => {
           const known = new Set(prev.map((m) => m.id));
           const next = [...page.filter((m) => !known.has(m.id)), ...prev];
-          olderPages.set(channel.id, next);
+          qc.setQueryData<OlderPages>(olderKey, { pages: next, done: page.length < OLDER_PAGE });
           return next;
         });
-        if (page.length < OLDER_PAGE) olderDone.add(channel.id);
         setOlderState(page.length < OLDER_PAGE ? "done" : "idle");
       })
       .catch(() => setOlderState("idle"));
@@ -1603,16 +1606,18 @@ function ChannelView({
                   <h1 className="channel__title"># {channel.name}</h1>
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
-                <ChannelMembersStack
-                  channelId={channel.id}
-                  people={channelPeople}
-                  agents={channelAgents}
-                  onDetails={() => setDetailsOpen(true)}
-                />
-                {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                <Button size="sm" onClick={() => setDetailsOpen(true)}>
-                  {t("channel.details")}
-                </Button>
+                <div className="channel__acts ac-acts">
+                  <ChannelMembersStack
+                    channelId={channel.id}
+                    people={channelPeople}
+                    agents={channelAgents}
+                    onDetails={() => setDetailsOpen(true)}
+                  />
+                  {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  <Button size="sm" onClick={() => setDetailsOpen(true)}>
+                    {t("channel.details")}
+                  </Button>
+                </div>
               </header>
             )}
             {!chrome && isMember && (
@@ -1720,7 +1725,7 @@ function ChannelView({
                           ) : undefined
                         }
                       >
-                        {chrome?.emptyText ?? t("channel.empty")}
+                        {chrome?.emptyText}
                       </EmptyState>
                     </div>
                   )}
@@ -2288,7 +2293,7 @@ function LiveNotices({ channelId }: { channelId: string }) {
         const agent = dir.agentById.get(n.agentId);
         const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name) : "";
         return (
-          <p key={n.key} className="channel__notice" role="status">
+          <p key={n.key} className="channel__notice ac-iconline" role="status">
             <Icon name="lock" size={16} />
             <span>{known || n.text}</span>
           </p>
@@ -2453,7 +2458,7 @@ function StoppedLine({
 /**
  * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
  * "Theo parou para ler" when the person asked it to stop and read now (or it woke a wait); "Theo
- * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão no card" while an approval
+ * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão" while an approval
  * holds it; "encerrou o pedido de ajuda" when it ended the wait.
  */
 function SteerLine({ steer }: { steer: SteerState }) {
@@ -2570,7 +2575,7 @@ function ConnectionBanner({ status }: { status: ConnectionStatus }) {
   }, [down]);
   if (!down && !back) return null;
   return (
-    <p className="channel__conn" data-back={!down || undefined} role="status">
+    <p className="channel__conn ac-iconline" data-back={!down || undefined} role="status">
       <Icon name={down ? "cloud" : "check"} size={16} />
       {down ? t("channel.offline") : t("channel.backOnline")}
     </p>
@@ -2794,10 +2799,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   const qc = useQueryClient();
   const dismissRun = useDismissRun();
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
-  const revealed = useRevealedText(live?.text ?? "");
+  const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   // Refused by the workspace's standing: its own words, not the server's English.
-  const refusal = liveFailed ? standingRefusalText(t, live?.errorCode, live?.errorParams) : null;
+  const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
@@ -3063,7 +3068,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               }
             : undefined
       }
-      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
+      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
+      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
       stacked={Boolean(card)}
     >
       {live ? (
@@ -3077,8 +3083,14 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </MessageText>
           )}
-          {/* Steps, the messages it read, and each tool call (the same list folds when it is done). */}
-          <LiveWorkList work={opening.work} steerNote={steerNote} agentId={live.agentId} stopped={liveStopped} />
+          {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
+          <LiveTools
+            work={opening.work}
+            agentName={name}
+            color={colorOf(agent)}
+            steerNote={steerNote}
+            stopped={liveStopped}
+          />
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
@@ -3123,10 +3135,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       ) : (
         <>
           {keptWork?.length && seenLive ? (
-            <LiveWorkList
+            <LiveTools
               work={keptWork}
+              agentName={name}
+              color={colorOf(agent)}
               steerNote={steerNote}
-              agentId={seenLive.agentId}
               done
               stopped={stopped.canceled}
             />
@@ -3138,6 +3151,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
             ))}
           {!missionCard &&
+            // A request says its action itself ("Pedido de aprovação: …" would repeat it).
+            !approvalId &&
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&
@@ -3221,7 +3236,13 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
-            <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} skipScreens={onCards} />
+            <SavedTools
+              runId={m.agentRunId}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              color={colorOf(agent)}
+              skipScreens={onCards}
+            />
           )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
           {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
@@ -3305,7 +3326,7 @@ const inlineButton = {
   color: "inherit",
 };
 
-/** The card of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+/** The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
 function MessageApproval({
   approvalId,
   agent,
@@ -3321,6 +3342,8 @@ function MessageApproval({
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
   if (!approval) return null;
+  // Waiting: the agent asking, in the conversation; decided: one line.
+  if (approval.status === "pending") return <ApprovalAsk approval={approval} agent={agent} members={members} />;
   return <InlineApproval approval={approval} agent={agent} members={members} />;
 }
 
@@ -3347,6 +3370,8 @@ function ChannelDetails({
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
   const roster = useRoster(org.id, channel.id, open && channel.isMember);
+  // What "on its own" means for my messages: who reads the ones that mention nobody.
+  const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
   // The channel's creator may too, but the API doesn't say who created it yet: admins only.
   const editable = can(org.role, "configure");
@@ -3487,7 +3512,11 @@ function ChannelDetails({
               <span className="list-col">
                 <span style={{ fontWeight: 600 }}>{r.name}</span>
                 <span className="small muted">
-                  {r.autoReply ? t("channelMembers.aloneLine") : t("channelMembers.mentionLine", { handle: r.handle })}
+                  {!r.autoReply
+                    ? t("channelMembers.mentionLine", { handle: r.handle })
+                    : picksForMe(routing)
+                      ? t("channelMembers.aloneLine")
+                      : t(replyAloneKey(routing))}
                 </span>
               </span>
               {editable && (
@@ -3515,7 +3544,7 @@ function ChannelDetails({
                         label: (
                           <>
                             {t("channelMembers.replyAlone")}
-                            <span className="ac-menu__desc">{t("channelMembers.replyAloneHelp")}</span>
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing))}</span>
                           </>
                         ),
                       },

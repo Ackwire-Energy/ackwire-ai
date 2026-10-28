@@ -6,6 +6,7 @@
  * into words.
  */
 import type {
+  AiStatus,
   AppNotification,
   NotificationCounts,
   NotificationFilter,
@@ -18,8 +19,11 @@ export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "w
 /** Kinds counted under "Menções": someone talks to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 
-/** Waiting ones in this order: an agent's question, my turn at the table, an approval. */
-const WAITING_ORDER: NotificationKind[] = ["agent_question", "forum_turn", "approval"];
+/**
+ * Waiting ones in this order: an agent's question, my turn at the table, an approval, then someone asking to join
+ * (nobody's work waits on it).
+ */
+const WAITING_ORDER: NotificationKind[] = ["agent_question", "forum_turn", "approval", "join_request"];
 
 export const isSnoozed = (n: Pick<AppNotification, "snoozedUntil">, now = Date.now()) =>
   !!n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now;
@@ -159,8 +163,17 @@ export function groupByDay(list: AppNotification[], now = new Date()): [DayGroup
 export const channelOf = (n: AppNotification) => n.source.channelId ?? n.source.dmId ?? null;
 
 /**
- * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed): its
- * headline's key, the whole of what it says; null for what someone did.
+ * Who asks to join in a request notice: the first people who asked, in that order (the notice's time is the first
+ * one's), and how many asked in all. A notice from before it kept the names has the newest one's only.
+ */
+export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
+  names: n.latest.names?.length ? n.latest.names : [n.latest.title ?? ""],
+  total: n.count,
+});
+
+/**
+ * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed, one of its
+ * agents was held): its headline's key, the held agent's name as `name` (`source.label`); null for what someone did.
  */
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
@@ -170,7 +183,22 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
     ? ("standing.notification.suspended" as const)
     : to === "active"
       ? ("standing.notification.active" as const)
-      : ("standing.notification.hold" as const);
+      : to === "agent_hold"
+        ? ("standing.notification.agentHold" as const)
+        : ("standing.notification.hold" as const);
+}
+
+/**
+ * The restriction a notice of agentes.chat Cloud tells, as `restrictionLine` reads it: an agent held (its kind, as a
+ * refused run carries it), or the workspace held or suspended with a reason (`latest.cloud`), so `review` reads as the
+ * review line and an operator's reason with how to contest it. Null for any other notice, which keeps its own text.
+ */
+export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
+  const l = n.latest;
+  if (n.kind !== "org_standing") return null;
+  if (l.statusTo === "agent_hold") return { code: "agent.paused", facts: { kind: l.holdKind, cloud: true } };
+  if (!l.cloud || !l.text || (l.statusTo !== "hold" && l.statusTo !== "suspended")) return null;
+  return { code: l.statusTo === "hold" ? "org.paused" : "org.suspended", facts: { reason: l.text, cloud: true } };
 }
 
 /** Grouped (several replies or comments): it expands to show them. */
@@ -221,7 +249,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } };
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -238,6 +266,8 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
+  // Requests to join are answered in Members (ADR 0068).
+  if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   if (n.kind === "machine_connected" || n.kind === "computer_ready")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
@@ -264,6 +294,15 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
 }
+
+/**
+ * The workspace's computer is ready and its agents have no AI yet: opening it opens "Conectar uma IA" (the one
+ * next step there is) instead of a page. `ai` unknown yet: the page.
+ */
+export const opensConnectAi = (
+  n: Pick<AppNotification, "kind">,
+  ai: Pick<AiStatus, "any" | "agents"> | undefined,
+): boolean => n.kind === "computer_ready" && ai !== undefined && !ai.any && ai.agents.length > 0;
 
 /** Mission and routine steps as strip cells: done, the one it stopped at, the rest to do. */
 export function stepCells(steps: { done: number; total: number; failedAt?: number }) {

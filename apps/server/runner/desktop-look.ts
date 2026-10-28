@@ -4,7 +4,7 @@ import { type AgentScope, DESKTOP_SIZE } from "@agenteschat/adapters/machine-pro
 import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
 import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
 import { shQuote } from "./install-script";
-import { xmlEscape } from "./xml";
+import { xmlEscape, xmlUnescape } from "./xml";
 
 /**
  * The agents' desktops' own look (ADR 0058 §15): the agentes.chat wallpaper and a dock floating at the bottom
@@ -16,7 +16,8 @@ import { xmlEscape } from "./xml";
  *   computer's settings, so a self-hosted computer's own desktop stays as it is.
  * - Versioned: the HOME's marker names the look written there. A desktop gets it at its first start, and again
  *   once when anything it writes changes (its version, the theme or dock the computer has, the HOME's own path,
- *   the agent's name, how Browser reaches the runner); what a person changes in between stays until then.
+ *   the agent's name, how Browser reaches the runner); what a person changes in between stays until then. One
+ *   already running gets it in place (`lookCommand`'s live mode, from desktop-session.ts), its windows untouched.
  * - The dock is xfce4-docklike-plugin where it is installed, so an app's windows show on its own launcher; else
  *   the panel's own launchers, then a button for each window. Desktop use (ADR 0062) reads the panel's own
  *   plugins only: docklike runs in a process of its own, outside what the agent reads of the screen.
@@ -28,7 +29,7 @@ import { xmlEscape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 3;
+export const LOOK_VERSION = 5;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -75,15 +76,24 @@ export const desktopName = (agent: Pick<AgentScope, "name" | "handle">) =>
 /** The look's own files and its marker, under HOME. */
 export const LOOK_DIR = ".local/share/agentes";
 export const LOOK_MARKER = `${LOOK_DIR}/look`;
+/** XFCE's settings files (xfconf's channels), under HOME. */
+const XFCONF = ".config/xfce4/xfconf/xfce-perchannel-xml";
 
 /** The agent's Chrome on its desktop has this window class (`browser.ts`), so the dock shows it on Browser. */
 export const BROWSER_WM_CLASS = "agentes-browser";
-/** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
-export const BROWSER_ICON = "org.xfce.webbrowser";
 /**
- * The window that says why Browser didn't open (`desktop-browser.ts`) has a class of its own: with Browser's, a
- * click on Browser would only bring that window up, where it should try again.
+ * The icon theme's globe, next to its Files and Terminal icons. Not its web browser's (`org.xfce.webbrowser`, a link
+ * to `web-browser`): that globe has a mouse pointer drawn into it, which reads as a stray pointer on the dock.
+ * elementary-xfce has this one at every size, 16 to 128 px, in 0.16 to 0.21 (Ubuntu 22.04 and 24.04, Debian 12
+ * and 13).
  */
+export const BROWSER_ICON = "applications-internet";
+/**
+ * Browser's notes (`desktop-browser.ts`) have window classes of their own: with Browser's, docklike would show them
+ * on Browser, and a click there would only raise or hide the note, never reach the runner, where it is told `busy`
+ * while the browser opens (the wait) or tries again (the one that says why it didn't open).
+ */
+export const WAIT_WM_CLASS = "agentes-wait";
 export const NOTE_WM_CLASS = "agentes-note";
 export const NOTE_ICON = "dialog-warning";
 
@@ -98,6 +108,13 @@ const MARK = Buffer.from(MARK_BASE64, "base64");
 
 /** The ink of the sky's agents (the wallpaper's logo): the dock's lines and its window bars. */
 const INK = "4, 32, 63";
+/** The dock's rounded ends; its frame is 1 px. */
+const DOCK_RADIUS = 16;
+/**
+ * The dock's hairline as it shows on its glass, in one colour: the ink at 0.18 over white at 0.88. Where a ring
+ * draws it on nothing (docklike's corners), it lands on the wallpaper in the same tone as the dock's own frame.
+ */
+const HAIRLINE_ON_GLASS = "rgba(205, 210, 217, 0.9)";
 
 /** Browser, Files and Terminal, in the dock's and the menu's order. */
 interface DockApp {
@@ -163,15 +180,15 @@ const desktopEntry = (app: DockApp) =>
     "",
   ].join("\n");
 
-/** The note's entry, out of the menu: docklike shows the note's window with its icon. Opened, it is Browser's command. */
-const noteEntry = (browser: DockApp) =>
+/** A note's entry, out of the menu: docklike shows the note's window with its icon. Opened, it is Browser's command. */
+const noteEntry = (browser: DockApp, wmClass: string, icon: string) =>
   [
     "[Desktop Entry]",
     "Type=Application",
     `Name=${browser.name}`,
     `Exec=${browser.exec}`,
-    `Icon=${NOTE_ICON}`,
-    `StartupWMClass=${NOTE_WM_CLASS}`,
+    `Icon=${icon}`,
+    `StartupWMClass=${wmClass}`,
     "StartupNotify=false",
     "NoDisplay=true",
     "",
@@ -255,9 +272,9 @@ ${own}  </property>
 
 /**
  * docklike's own settings: Browser, Files and Terminal pinned; a click on one with windows brings them up (or
- * down), a middle click opens another (1; 0 would close them all); icons at the mark's 32 px; under an app with
- * windows a short bar (style 2) at the bottom (orientation 1: the automatic one finds no edge on a floating panel
- * and draws none), in the sky's ink, solid under the active window's app.
+ * down), a middle click opens another (1; 0 would close them all); icons at the mark's 32 px. Its own marks off
+ * (style 5): it draws them at the very bottom of its buttons, inside the margin the look gives them, which GTK
+ * leaves out of what a button draws. The look's CSS marks the apps with windows instead (`GTK_CSS`).
  */
 const dockSettings = (apps: DockApp[]) => `[user]
 pinned=${apps.map((app) => `${app.id};`).join("")}
@@ -266,12 +283,8 @@ iconSize=32
 noWindowsListIfSingle=true
 showPreviews=false
 middleButtonBehavior=1
-indicatorOrientation=1
-indicatorStyle=2
-inactiveIndicatorStyle=2
-indicatorColorFromTheme=false
-indicatorColor=rgb(${INK})
-inactiveColor=rgba(${INK}, 0.65)
+indicatorStyle=5
+inactiveIndicatorStyle=5
 `;
 
 /** One workspace, the wallpaper zoomed (an image of the screen's size: 1:1) over the bottom band's tone, no icons. */
@@ -399,15 +412,22 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
   background-color: rgba(255, 255, 255, 0.88);
   background-image: none;
   border: 1px solid rgba(${INK}, 0.18);
-  border-radius: 16px;
+  border-radius: ${DOCK_RADIUS}px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.9);
 }
 
-/* docklike draws in a window of its own process, inside the dock: the dock's glass there, not a second frame. */
+/*
+ * docklike draws in a window of its own process that fills the dock's right end inside the frame's 1 px, and the
+ * dock's own drawing never shows under it: there that window is the dock. The glass and its light, no frame of its
+ * own; its right corners rounded like the dock's, and the hairline around them a 1 px ring outside it (only the
+ * corners fall inside the window; the dock draws the straight edges itself), in the hairline's tone over the glass,
+ * since the ring lies on the wallpaper. GTK's CSS can't tell docklike's window from another plugin's that runs in a
+ * process of its own: one added to the dock gets these corners too.
+ */
 #XfcePanelWindowWrapper.xfce4-panel.background {
   border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: 0 ${DOCK_RADIUS - 1}px ${DOCK_RADIUS - 1}px 0;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px ${HAIRLINE_ON_GLASS};
 }
 
 .xfce4-panel.background button {
@@ -439,15 +459,20 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
   -XfceTasklist-minimized-icon-lucency: 100;
 }
 
-/* A short bar under each window's icon; a longer, darker one under the active window's. */
-.xfce4-panel.background .tasklist button {
+/*
+ * A short bar under the icon of each app with windows, a longer, darker one under the active window's: docklike's
+ * launchers say which by their classes, the panel's own dock has a button for each window.
+ */
+.xfce4-panel.background .tasklist button,
+.xfce4-panel.background button.open_group {
   background-image: linear-gradient(rgba(${INK}, 0.65), rgba(${INK}, 0.65));
   background-size: 8px 3px;
   background-repeat: no-repeat;
   background-position: 50% 100%;
 }
 
-.xfce4-panel.background .tasklist button:checked {
+.xfce4-panel.background .tasklist button:checked,
+.xfce4-panel.background button.active_group {
   background-image: linear-gradient(rgb(${INK}), rgb(${INK}));
   background-size: 16px 3px;
 }
@@ -502,6 +527,14 @@ const HIDDEN: Record<string, string> = {
 };
 const hidden = (name: string) => `[Desktop Entry]\nType=Application\nName=${name}\nHidden=true\n`;
 
+/**
+ * XFCE's Internet menu (there once some other network app is installed) has Browser's globe for its icon: it gets
+ * the theme's network sphere instead, a purple one, at every size in elementary-xfce 0.16 to 0.21. The file takes
+ * the place of XFCE's own (`xfce-network.directory`), with its name and comment.
+ */
+const INTERNET_MENU =
+  "[Desktop Entry]\nVersion=1.0\nType=Directory\nName=Internet\nComment=Applications for Internet access\nIcon=preferences-system-network\n";
+
 interface LookFile {
   /** Under HOME. */
   path: string;
@@ -510,7 +543,6 @@ interface LookFile {
 
 /** Every file of the look, by its path under HOME. */
 export function lookFiles(home: string, o: LookOptions): LookFile[] {
-  const xfconf = ".config/xfce4/xfconf/xfce-perchannel-xml";
   const apps = dockApps(o.browser);
   const bash = path.basename(o.shell) === "bash" ? o.shell : null;
   const dock: [string, string][] =
@@ -521,16 +553,18 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
           desktopEntry(apps[i] as DockApp),
         ]);
   const files: [string, string | Buffer][] = [
-    [`${xfconf}/xfce4-panel.xml`, panel(home, o.dock)],
-    [`${xfconf}/xfce4-desktop.xml`, backdrop(home)],
-    [`${xfconf}/xfwm4.xml`, windowManager(o.theme)],
-    [`${xfconf}/xsettings.xml`, settings(o.theme)],
-    [`${xfconf}/xfce4-terminal.xml`, terminal(home, bash)],
+    [`${XFCONF}/xfce4-panel.xml`, panel(home, o.dock)],
+    [`${XFCONF}/xfce4-desktop.xml`, backdrop(home)],
+    [`${XFCONF}/xfwm4.xml`, windowManager(o.theme)],
+    [`${XFCONF}/xsettings.xml`, settings(o.theme)],
+    [`${XFCONF}/xfce4-terminal.xml`, terminal(home, bash)],
     ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
+    [".local/share/desktop-directories/xfce-network.directory", INTERNET_MENU],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
-    [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp)],
+    [`.local/share/applications/${WAIT_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, WAIT_WM_CLASS, BROWSER_ICON)],
+    [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, NOTE_WM_CLASS, NOTE_ICON)],
     ...Object.entries(HIDDEN).map(([id, name]): [string, string] => [
       `.local/share/applications/${id}.desktop`,
       hidden(name),
@@ -551,28 +585,129 @@ const idOf = (o: LookOptions, files: LookFile[]) => {
 
 export const lookId = (home: string, o: LookOptions) => idOf(o, lookFiles(home, o));
 
+const TAG = /<(\/?)(property|value)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g;
+const ATTR = /([\w-]+)="([^"]*)"/g;
+
+/** One channel's settings (`lookSettings`), read from the file the look writes for it. */
+function channelSettings(xml: string): string[][] {
+  const channel = /<channel name="([^"]+)"/.exec(xml)?.[1] ?? "";
+  const out: string[][] = [];
+  const open: { path: string; type: string; value: string; items: string[] }[] = [];
+  const close = () => {
+    const p = open.pop();
+    if (p?.type === "array") out.push(["-c", channel, "-p", p.path, "-n", "-a", ...p.items]);
+    else if (p && p.type !== "empty") out.push(["-c", channel, "-p", p.path, "-n", "-t", p.type, "-s", p.value]);
+  };
+  for (const [, ending, tag, attrs = "", selfClosing] of xml.matchAll(TAG)) {
+    const a = Object.fromEntries([...attrs.matchAll(ATTR)].map(([, k, v]) => [k, xmlUnescape(v ?? "")]));
+    if (tag === "value") open.at(-1)?.items.push("-t", a.type ?? "", "-s", a.value ?? "");
+    else if (ending) close();
+    else {
+      open.push({
+        path: `${open.at(-1)?.path ?? ""}/${a.name}`,
+        type: a.type ?? "empty",
+        value: a.value ?? "",
+        items: [],
+      });
+      if (selfClosing) close();
+    }
+  }
+  return out;
+}
+
+/** The wallpaper's setting (`backdrop`): the screen's one monitor and workspace. */
+const WALLPAPER_SETTING = "/backdrop/screen0/monitorVNC-0/workspace0/last-image";
+
+const settingsOf = (files: LookFile[]) =>
+  files
+    .flatMap((f) => (f.path.startsWith(`${XFCONF}/`) ? channelSettings(f.data.toString()) : []))
+    .flatMap((args) =>
+      args[1] === "xfce4-desktop" && args[3] === WALLPAPER_SETTING
+        ? [["-c", "xfce4-desktop", "-p", WALLPAPER_SETTING, "-r"], args]
+        : [args],
+    );
+
+/**
+ * The look's xfconf settings for a running session, each as the arguments of the `xfconf-query` call that sets it
+ * (made where it isn't there): every property of its channels' files that has a value, an array with each item's
+ * type. A running session's xfconfd holds its channels in memory and writes them over their files, and the
+ * session's programs (xfwm4, xfsettingsd, xfdesktop, the terminal) follow what it says changed: set through it,
+ * they show at once. xfconfd says nothing of a value set again as it was, and xfdesktop loads the wallpaper's
+ * image again only when it hears its setting change, where a new look's image keeps its path: that setting is
+ * unset right before it is set, so a run stopped part-way doesn't leave the screen without its wallpaper.
+ */
+export const lookSettings = (home: string, o: LookOptions) => settingsOf(lookFiles(home, o));
+
 /**
  * Run as the agent (`lookCommand`), the files on its stdin, a `<path under HOME> <base64>` line each: unless the
- * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, then the
- * marker once all of them are. As the agent's own process it writes nothing the agent couldn't itself: a link the
- * agent made in its home leads only to the agent's own files. What sits at a temporary name goes first and only a
- * plain file is read as the marker, so a pipe left in the home can't hold the desktop's start.
+ * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, and the
+ * marker last. As the agent's own process it writes nothing the agent couldn't itself: a link the agent made in its
+ * home leads only to the agent's own files. What sits at a temporary name goes first and only a plain file is read
+ * as the marker, so a pipe left in the home can't hold the desktop's start.
+ *
+ * Live (`$5`, where the processes are listed: `/proc`), on a desktop that runs, with its `DISPLAY`: between the
+ * files and the marker, the settings (`lookSettings`, a line each after the files: the arguments, each ended by a
+ * NUL, in base64) go through the session's own xfconfd, on the bus of its session or panel on exactly that display
+ * (in single-user mode one user runs every agent's desktop: the display tells them apart), then the panel starts
+ * over to read its new settings, gtk.css and docklike's file, which a panel reads only as it starts. That is the
+ * panel's D-Bus Terminate, the call `xfce4-panel --restart` makes, which runs the restart from the panel's main
+ * loop: its SIGUSR1 runs it inside a plain signal handler (XFCE 4.16 to 4.20), and `--restart` itself opens a
+ * dialog on the agent's screen when it fails. The agent's apps and their windows stay as they are. A marker that
+ * names this look already means the session shows it (it started with it, or took it here), and nothing is set
+ * again. A run stopped part-way leaves the marker as it was, so the desktop's next start writes every file again,
+ * over what xfconfd wrote back. Exits 1: a file wasn't written; 2: no session on that display; 3: a setting wasn't
+ * taken; 4: the panel didn't start over.
  */
 export const LOOK_SCRIPT = [
   'h=$1 v=$2 m="$1/$3" n=$4 && umask 077',
   '[ -f "$m" ] && [ "$(cat "$m")" = "$v" ] && exit 0',
   'while [ "$n" -gt 0 ] && read -r p b; do f="$h/$p" && mkdir -p "$(dirname "$f")" && rm -f "$f.new" && printf %s "$b" | base64 -d > "$f.new" && mv -f "$f.new" "$f" || exit 1; n=$((n - 1)); done',
-  '[ "$n" -eq 0 ] && mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
+  '[ "$n" -eq 0 ] || exit 1',
+  'if [ -n "$5" ]; then',
+  "  s= q=",
+  '  for d in "$5"/[0-9]*; do',
+  '    read -r c 2>/dev/null < "$d/comm" || continue',
+  "    case $c in xfce4-session|xfce4-panel) ;; *) continue ;; esac",
+  String.raw`    e=$(tr '\0' '\n' 2>/dev/null < "$d/environ") || continue`,
+  String.raw`    printf '%s\n' "$e" | grep -qxF "DISPLAY=$DISPLAY" || continue`,
+  '    [ "$c" = xfce4-panel ] && q=1',
+  String.raw`    [ -n "$s" ] || s=$(printf '%s\n' "$e" | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p')`,
+  "  done",
+  '  [ -n "$DISPLAY" ] && [ -n "$s" ] || exit 2',
+  '  export DBUS_SESSION_BUS_ADDRESS="$s"',
+  '  while read -r l; do printf %s "$l" | base64 -d | xargs -0 xfconf-query || exit 3; done',
+  '  [ -z "$q" ] || dbus-send --session --print-reply --dest=org.xfce.Panel /org/xfce/Panel org.xfce.Panel.Terminate boolean:true > /dev/null || exit 4',
+  "fi",
+  'mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
 ].join("\n");
 
 /**
- * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count>`, the files as its input. Not as
- * arguments: in system mode systemd-run names the agent's scope after its command line, and the journal logs it.
+ * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count> [/proc]`, the files (live, then the
+ * settings) as its input, and the look's id. Not as arguments: in system mode systemd-run names the agent's scope
+ * after its command line, and the journal logs it.
  */
-export function lookCommand(home: string, o: LookOptions): { argv: string[]; input: string } {
+export function lookCommand(home: string, o: LookOptions, live = false): { argv: string[]; input: string; id: string } {
   const files = lookFiles(home, o);
+  const id = idOf(o, files);
+  const lines = files.map((f) => `${f.path} ${f.data.toString("base64")}\n`);
+  if (live) {
+    for (const args of settingsOf(files)) {
+      lines.push(`${Buffer.from(args.map((a) => `${a}\0`).join("")).toString("base64")}\n`);
+    }
+  }
   return {
-    argv: ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, idOf(o, files), LOOK_MARKER, String(files.length)],
-    input: files.map((f) => `${f.path} ${f.data.toString("base64")}\n`).join(""),
+    argv: [
+      "/bin/sh",
+      "-c",
+      LOOK_SCRIPT,
+      "agentes-look",
+      home,
+      id,
+      LOOK_MARKER,
+      String(files.length),
+      ...(live ? ["/proc"] : []),
+    ],
+    input: lines.join(""),
+    id,
   };
 }

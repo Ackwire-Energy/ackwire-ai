@@ -5,7 +5,7 @@ setupDom();
 
 import { afterEach } from "bun:test";
 import { cleanup } from "@testing-library/react";
-import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -51,6 +51,21 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
   });
 
+  test("a redirect back to a deep link keeps its query, out of the last parameter", async () => {
+    const target = `/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=budget`;
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(target)}`, { api: createFakeApi() });
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
+  });
+
+  test("an email's Connect your AI: #general with the dialog open, and the address drops the request", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}?connect=ai`, { api: createFakeApi() });
+    await settle();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
+    expect(router.state.location.search).toEqual({});
+  });
+
   test("open redirects are dropped", async () => {
     const { router } = await renderApp("/login?redirect=//evil.example", {
       api: createFakeApi(seedState({ me: null })),
@@ -67,8 +82,26 @@ describe("route guards", () => {
     await renderApp(`/org/${ORG_ID}/threads`, { api: createFakeApi() });
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
+    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
     expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Responda a uma mensagem para abrir uma thread.",
+    );
     cleanup();
+    for (const [tab, title] of [
+      ["working", "Nenhum agente trabalhando agora"],
+      ["closed", "Nada fechado por aqui"],
+      ["archived", "Nenhuma thread arquivada"],
+    ]) {
+      await renderApp(`/org/${ORG_ID}/threads?tab=${tab}`, { api: createFakeApi() });
+      await settle();
+      const empty = document.querySelector(".ac-empty") as HTMLElement;
+      expect(empty.querySelector(".ac-empty__title")?.textContent).toBe(title);
+      expect(empty.querySelector(".ac-empty__text")).toBeNull();
+      expect(screen().getByRole("button", { name: "Ver todas as threads" })).toBeTruthy();
+      cleanup();
+    }
     await renderApp(`/org/${ORG_ID}/threads/x`, { api: createFakeApi() });
     await settle();
     expect(screen().getByText("Thread não encontrada")).toBeTruthy();

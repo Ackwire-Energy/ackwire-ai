@@ -128,13 +128,9 @@ export function VaultDropZone({
         </div>
       )}
       {compact && (
-        <p className="small muted">
-          <button type="button" className="ac-link vault-drop__link" onClick={() => dir.current?.click()}>
-            {t("wiki.import.pickFolderShort")}
-          </button>
-          {" · "}
-          {t("wiki.import.howToZip")}
-        </p>
+        <Button size="sm" variant="ghost" icon="drive" onClick={() => dir.current?.click()}>
+          {t("onboarding.import.pickFolder")}
+        </Button>
       )}
       {children}
       <VaultInputs onFiles={onFiles} zipRef={zip} dirRef={dir} />
@@ -223,7 +219,7 @@ export function VaultLines({ lines }: { lines: Line[] }) {
     <ul className="vault-lines">
       {lines.map((l, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list per report
-        <li key={i} data-tone={l.tone}>
+        <li key={i} className="ac-iconline" data-tone={l.tone}>
           <Icon name={l.icon} size={16} />
           <span>
             <b>{l.title}</b>
@@ -540,7 +536,7 @@ export function WikiImportDialog({
     body = (
       <>
         <VaultDropZone onFiles={(f, n) => void read(f, n)} />
-        <p className="vault-notice">
+        <p className="vault-notice ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("wiki.import.howTo")}</span>
         </p>

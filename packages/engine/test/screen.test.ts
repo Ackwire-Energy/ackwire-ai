@@ -751,7 +751,7 @@ describe("the judge with images", () => {
   test("Jev: the vision model, the images header, assets and boxes", async () => {
     const sent: { headers: Record<string, string>; body: Record<string, unknown> }[] = [];
     const judge = createJevJudge({
-      apiKey: "tk",
+      key: "tk",
       gateway: { recordExternalUsage: async () => null },
       visionModel: "jev-vision-test",
       fetch: (async (_url: string, init?: RequestInit) => {

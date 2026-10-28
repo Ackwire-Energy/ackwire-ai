@@ -73,6 +73,14 @@ export interface MachineLoadRecord {
   at: string;
 }
 
+/** What its agents' browsers sent and received over the last day (protocol 23: `BrowserTraffic`), and when it said so. */
+export interface MachineTrafficRecord {
+  up: number;
+  down: number;
+  hours: number;
+  at: string;
+}
+
 /**
  * What the machine allows beyond the agents' own folders (ADR 0036 §8,
  * protocol 10), as its runner last reported it (`hello.access`,
@@ -151,6 +159,8 @@ export const machines = pgTable(
     size: jsonb().$type<MachineSizeRecord>(),
     /** Its last day's load (protocol 22); null: unknown. */
     load: jsonb().$type<MachineLoadRecord>(),
+    /** Its agents' browsers' last day of traffic, in bytes (protocol 23); null: unknown. */
+    browserTraffic: jsonb().$type<MachineTrafficRecord>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /**
@@ -192,8 +202,10 @@ export const machineProvisioning = pgTable("machine_provisioning", {
     .references(() => organizations.id, { onDelete: "cascade" }),
   state: text().notNull(),
   step: text(),
+  /** With `preparing`: what the computer is doing within its step, in the provisioner's word (`updating`, `apps`…). */
+  stage: text(),
   reason: text(),
-  /** With `preparing`: when the provisioner expects it ready (already past: any moment now). */
+  /** With `preparing`: the earliest ready time this wait was told (already past: it runs over). */
   expectedReadyAt: timestamp({ withTimezone: true }),
   /** When people started waiting: set when the computer is taken away; null: since the workspace was created. */
   requestedAt: timestamp({ withTimezone: true }),

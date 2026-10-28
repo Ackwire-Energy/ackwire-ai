@@ -27,6 +27,7 @@ import {
   Meter,
   RunMark,
   Steps,
+  Textarea,
 } from "../src";
 
 const body = () => within(document.body);
@@ -159,6 +160,13 @@ describe("ApprovalCard", () => {
     expect(within(card).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
   });
 
+  test("the detail sits in a well in both themes, never in the page's tone (the light card's own white)", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-approval")).toContain("background: var(--surface-raised);");
+    expect(rule(".ac-approval__detail")).toContain("background: var(--surface-sunken);");
+  });
+
   test("decided card shrinks and uses a done/neutral chip", () => {
     const { container } = render(
       <>
@@ -213,6 +221,104 @@ describe("Card", () => {
     expect(container.querySelector(".ac-card__sub")).toBeNull();
     expect(container.querySelector(".ac-card__action")).toBeNull();
   });
+
+  test("the key and the foot's icon lead their first line; without an icon nothing is moved", async () => {
+    const { container } = render(
+      <>
+        <CardHeader
+          icon="wallet"
+          title="Limite de gastos por agente"
+          subtitle="Por mês"
+          action={<Button>US$</Button>}
+        />
+        <CardHeader title="Só título" />
+        <CardFooter>Ninguém gasta além disso</CardFooter>
+        <CardFooter icon={null}>Sem ícone</CardFooter>
+      </>,
+    );
+    const [withKey, plain] = [...container.querySelectorAll(".ac-card__head")];
+    expect(withKey?.className).toBe("ac-card__head ac-iconline");
+    expect(withKey?.firstElementChild?.className).toBe("ac-card__key");
+    expect(plain?.className).toBe("ac-card__head");
+    const [foot, bare] = [...container.querySelectorAll(".ac-card__foot")];
+    expect(foot?.className).toBe("ac-card__foot ac-iconline");
+    expect(foot?.firstElementChild?.tagName.toLowerCase()).toBe("svg");
+    expect(bare?.className).toBe("ac-card__foot");
+    // The key follows the title's 20px line, not the title and its quiet line; the action stays in the middle.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-card__head")).toContain("line-height: 20px");
+    expect(rule(".ac-card__head")).toContain("align-items: flex-start");
+    expect(rule(".ac-card__head:not(:has(.ac-card__sub))")).toContain("align-items: center");
+    expect(rule(".ac-card__action")).toContain("align-self: center");
+    for (const row of [".ac-card__foot", ".ac-setnote", ".ac-alert"]) {
+      expect(rule(row)).not.toContain("display:");
+      expect(rule(row)).not.toContain("align-items:");
+    }
+    // A note is small text on its own 13/18 line, as a panel's other small lines: never the 22px line of the dialog
+    // or the page it sits in, which spreads a note's lines apart.
+    expect(rule(".ac-setnote")).toContain("font-size: 13px");
+    expect(rule(".ac-setnote")).toContain("line-height: 18px");
+  });
+});
+
+test("an avatar's initials sit in the middle of its tile at any size: it brings its own line height", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  expect(rule(".ac-avatar")).toContain("place-items: center;");
+  expect(rule(".ac-avatar")).toContain("line-height: 1;");
+});
+
+describe("single-line controls", () => {
+  test("buttons, inputs and selects centre their text in the box: the line is the text's own", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    for (const selector of [
+      ".ac-btn",
+      ".ac-input",
+      ".ac-input-affix",
+      ".ac-select__trigger",
+      ".ac-palette__q input",
+      ".ac-seg__item",
+      ".ac-filtertoggle",
+      ".ac-composer__pill,\n.ac-composer__agent",
+      ".ac-recur__day",
+      ".ac-react",
+    ]) {
+      const body = rule(selector);
+      expect(body).toContain("line-height: normal");
+      // After `font: inherit`, which would reset it.
+      if (body.includes("font: inherit")) expect(body.indexOf("line-height")).toBeGreaterThan(body.indexOf("font:"));
+    }
+    // Text that wraps keeps its line.
+    expect(rule("textarea.ac-input")).toContain("line-height: 22px");
+  });
+});
+
+describe("links", () => {
+  test("any link reads as ours, never the browser's blue; .ac-link is underlined in the house hairline", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    // Zero specificity: a class that styles its link still wins.
+    expect(rule(":where(a)")).toContain("color: inherit");
+    expect(rule(":where(a)")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(":where(a)")).toContain("text-underline-offset: 3px");
+    expect(rule(":where(a:hover)")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link")).toContain("text-decoration: underline");
+    expect(rule(".ac-link")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(".ac-link")).toContain("text-underline-offset: 3px");
+    expect(rule(".ac-link:hover")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link--muted:hover")).toContain("color: var(--ink)");
+    // A link that is a button has no box of its own and the sentence's whole type (the browser's button font would
+    // drop the page's size adjustment and figures). It comes first, so `.ac-link`'s weight and size classes win.
+    const button = rule(":where(button).ac-link");
+    expect(button).toContain("border: 0");
+    expect(button).toContain("background: none");
+    expect(button).toContain("font: inherit");
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeGreaterThan(-1);
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link {"));
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link--muted {"));
+  });
 });
 
 describe("Composer", () => {
@@ -256,6 +362,78 @@ describe("Composer", () => {
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Enviar" })));
     expect(sent).toEqual(["oi"]);
   });
+});
+
+describe("boxes as tall as their text", () => {
+  /** happy-dom lays nothing out: a box's text is 22 px a line under 20 px of padding, inside a 2 px border. */
+  const measured = async (run: () => Promise<void>) => {
+    const proto = HTMLTextAreaElement.prototype;
+    const lines = (el: HTMLTextAreaElement) => el.value.split("\n").length;
+    Object.defineProperty(proto, "scrollHeight", {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return 20 + 22 * lines(this);
+      },
+    });
+    Object.defineProperty(proto, "clientHeight", { configurable: true, get: () => 100 });
+    Object.defineProperty(proto, "offsetHeight", { configurable: true, get: () => 102 });
+    try {
+      await run();
+    } finally {
+      for (const key of ["scrollHeight", "clientHeight", "offsetHeight"]) Reflect.deleteProperty(proto, key);
+    }
+  };
+  const type = (box: HTMLElement, value: string) => act(async () => fireEvent.change(box, { target: { value } }));
+
+  test("Textarea autoGrow grows with its text, border included, and shrinks back; without it, its height is left alone", () =>
+    measured(async () => {
+      function Box({ grow }: { grow: boolean }) {
+        const [value, setValue] = useState("uma linha");
+        return (
+          <Textarea
+            autoGrow={grow}
+            aria-label={grow ? "Cresce" : "Fixa"}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        );
+      }
+      render(
+        <>
+          <Box grow />
+          <Box grow={false} />
+        </>,
+      );
+      const box = body().getByRole("textbox", { name: "Cresce" }) as HTMLTextAreaElement;
+      expect(box.style.height).toBe("44px");
+      await type(box, "um\ndois\ntrês");
+      expect(box.style.height).toBe("88px");
+      await type(box, "um");
+      expect(box.style.height).toBe("44px");
+      expect((body().getByRole("textbox", { name: "Fixa" }) as HTMLTextAreaElement).style.height).toBe("");
+    }));
+
+  test("the composer grows the same way", () =>
+    measured(async () => {
+      function Chat() {
+        const [value, setValue] = useState("");
+        return (
+          <Composer
+            value={value}
+            onChange={setValue}
+            onSend={() => {}}
+            label="Mensagem"
+            sendLabel="Enviar"
+            attachLabel="Anexar"
+          />
+        );
+      }
+      render(<Chat />);
+      const box = body().getByRole("textbox", { name: "Mensagem" });
+      expect(box.style.height).toBe("44px");
+      await type(box, "um\ndois");
+      expect(box.style.height).toBe("66px");
+    }));
 });
 
 describe("Message", () => {
@@ -470,21 +648,88 @@ describe("Diff", () => {
   });
 });
 
-describe("Message aside", () => {
-  test("sits on the header line, or floats for grouped messages", () => {
+describe("Message aside and foot", () => {
+  test("the aside ends the first line, the header's or a grouped message's text's; the foot is a line under both", () => {
     const { container } = render(
       <>
-        <Message author="João" time="10:42" aside={<span>✓</span>}>
+        <Message author="João" time="10:42" aside={<span>✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>oi</MessageText>
         </Message>
-        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>}>
+        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>de novo</MessageText>
         </Message>
       </>,
     );
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
+    // Floated before the text, so the text's first line wraps before it.
+    expect(second?.querySelector(".ac-msg__aside--floating + .ac-msg__text")?.textContent).toBe("de novo");
     expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
+    // The same line under the text on both: the text follows the name, and words that come and go never move it.
+    for (const row of [first, second]) {
+      expect(row?.querySelector(".ac-msg__body > :last-child")?.className).toBe("ac-msg__foot");
+      expect(row?.querySelector(".ac-msg__head .ac-msg__foot")).toBeNull();
+    }
+  });
+
+  test("the action bar sits on the first line, left of the check, clear of the lines around it", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const bodies = (selector: string) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
+        .map((m) => m[2] ?? "")
+        .join(";");
+    const value = (selector: string, prop: string) =>
+      new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(bodies(selector))?.[1]?.trim();
+    const bar = ".ac-msg__actions";
+    // Placed by its middle, never by its bottom: the 46px touch bar grows as much down as up.
+    expect(value(bar, "translate")).toBe("0 -50%");
+    expect(bodies(bar)).not.toMatch(/(^|;)\s*bottom:/);
+    // The name's capitals start at the row's top padding. A grouped row's first line is its text's, under the row's
+    // and the text's top margins.
+    expect(value(".ac-msg", "padding")).toBe("6px var(--msg-inline)");
+    expect(value(bar, "top")).toBe("calc(6px + var(--cap-top) - var(--cap-mid))");
+    const line =
+      Number.parseFloat(value(".ac-msg__text", "font-size") ?? "") * Number(value(".ac-msg__text", "line-height"));
+    expect(line).toBeCloseTo(26.35, 3);
+    expect(value(".ac-msg--grouped", "padding-top")).toBe("2px");
+    expect(value(".ac-msg__text", "margin")).toBe("2px 0 0");
+    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(
+      "calc(4px + 13.175px - var(--cap-mid))",
+    );
+    // A grouped row with a line under one line of text: between the row above's last line (its 6px bottom padding
+    // up) and that line (2px under the text), the room is under the touch bar's 46px. The bar takes its middle, so it
+    // reaches both lines' edges by the same few pixels, short of their letters, and the 38px mouse bar fits whole.
+    const footed =
+      ".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions";
+    const above = -6;
+    const under = 2 + 2 + line + 2;
+    expect(Number.parseFloat(value(footed, "top") ?? "")).toBeCloseTo((above + under) / 2, 3);
+    expect(under - above).toBeGreaterThanOrEqual(38);
+    expect((46 - (under - above)) / 2).toBeLessThan(4);
+    // Left of the check (a 16px icon, 2px each side) and 8px from it, past the row's own side padding.
+    expect(
+      value(".ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions", "right"),
+    ).toBe("calc(var(--msg-inline) + 28px)");
+    expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
+    expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");
+  });
+
+  test("an aside or a foot with nothing in it takes no room, in a stacked body too", async () => {
+    const Nothing = () => null;
+    const { container } = render(
+      <Message author="João" time="10:42" grouped stacked aside={<Nothing />} foot={<Nothing />}>
+        <div className="ac-card">Issue</div>
+      </Message>,
+    );
+    for (const part of [".ac-msg__aside", ".ac-msg__foot"]) {
+      expect(container.querySelector(part)?.childNodes.length).toBe(0);
+    }
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toContain(".ac-msg__aside:empty,\n.ac-msg__foot:empty {\n  display: none;\n}");
   });
 });
 

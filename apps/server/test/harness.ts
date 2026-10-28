@@ -2,16 +2,19 @@ import {
   type Adapters,
   createFakeEmailSender,
   createFakePushSender,
+  createFakeWebPushSender,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   type DatabaseDriver,
+  type HumanCheck,
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
   type SandboxProvider,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -20,6 +23,7 @@ import {
   createFakeScheduleReader,
   createLocalKeyWrapper,
   drainOutbox,
+  type EmailArt,
   type FakeScheduleAnswers,
   type McpConnect,
   type ResolveHost,
@@ -80,6 +84,16 @@ export async function createTestServer(
     mail?: MailAdapters;
     /** Fake database driver (ADR 0039); absent = no database connector. */
     databases?: DatabaseDriver;
+    /** Where emails get their pictures; absent = linked from `PUBLIC_URL`. */
+    emailArt?: EmailArt;
+    /** Fake TypeSafe (checks of the Jev key). */
+    jevFetch?: typeof fetch;
+    /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
+    humanCheck?: HumanCheck;
+    /** The server's own file store's kind (`disk`, `postgres`, `s3`); it keeps files in memory either way. */
+    platformKind?: string;
+    /** Browser push (ADR 0071); absent = a fake that records, null = off. */
+    webPush?: WebPushSender | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -91,7 +105,8 @@ export async function createTestServer(
   const log = createLogger("error");
   const email = createFakeEmailSender();
   const push = createFakePushSender();
-  const platformBlobs = createMemoryBlobStore();
+  const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
+  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),
@@ -103,8 +118,10 @@ export async function createTestServer(
     email,
     platformBlobs,
     push,
+    webPush,
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
+    humanCheck: options.humanCheck ?? null,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -125,9 +142,20 @@ export async function createTestServer(
     judge: createFakeJudge(options.judge),
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
     toolsOnDemand: false,
+    emailArt: options.emailArt,
+    jevFetch: options.jevFetch,
   });
+  // As at boot: the saved Jev key is read before anything serves.
+  await engine.jevKey.ready();
   const { handlers } = engine;
-  const auth = createAuth({ db, config, log, emailDelivers: true });
+  const auth = createAuth({
+    db,
+    config,
+    log,
+    emailDelivers: true,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition: "selfhost",
     version: "test",
@@ -153,6 +181,7 @@ export async function createTestServer(
         browserLive: engine.browserLive,
         router: engine.router,
         streams: engine.streams,
+        jevKey: engine.jevKey,
       },
     },
     log,
@@ -180,6 +209,7 @@ export async function createTestServer(
     embeddings,
     email,
     push,
+    webPush,
     platformBlobs,
     engine,
     app,
@@ -248,13 +278,36 @@ export function browser(t: TestServer) {
 
 export type Browser = ReturnType<typeof browser>;
 
-export async function signUp(b: Browser, email: string, options: { inviteToken?: string } = {}) {
+export async function signUp(b: Browser, email: string) {
   const res = await b("/api/auth/sign-up/email", {
     json: { email, password: "correct horse battery", name: email.split("@")[0] },
-    headers: options.inviteToken ? { "x-invite-token": options.inviteToken } : undefined,
   });
   if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
   return res;
+}
+
+/**
+ * Someone joins `orgId` the way people do (ADR 0068): `admin` invites the address by email, a new browser signs
+ * up with it (the invitation opens sign-up on this closed server) and accepts. `as`: an account already signed in
+ * with that address accepts instead.
+ */
+export async function joinByInvitation(
+  t: TestServer,
+  admin: Browser,
+  orgId: string,
+  email: string,
+  options: { role?: "member" | "admin"; as?: Browser } = {},
+) {
+  const invited = await admin(`/api/app/organizations/${orgId}/invitations`, {
+    json: { email, role: options.role ?? "member" },
+  });
+  if (invited.status !== 201) throw new Error(`invite failed: ${invited.status} ${await invited.text()}`);
+  const token = ((await invited.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  const b = options.as ?? browser(t);
+  if (!options.as) await signUp(b, email);
+  const accepted = await b(`/api/app/invitations/${token}/accept`, { json: {} });
+  if (accepted.status !== 200) throw new Error(`accept failed: ${accepted.status} ${await accepted.text()}`);
+  return b;
 }
 
 /**

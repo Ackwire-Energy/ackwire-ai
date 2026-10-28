@@ -252,6 +252,16 @@ describe("sending", () => {
 
 test("agentes telemetry prints exactly the next report, on or off, and sends nothing", async () => {
   const { clock, http, config } = await start({});
+  // A computer whose agents' browsers said how much they moved (protocol 23).
+  const [org] = await db.insert(schema.organizations).values({ name: "Org" }).returning();
+  await db.insert(schema.machines).values({
+    orgId: org?.id as string,
+    name: "Box",
+    os: "linux",
+    arch: "x64",
+    lastSeenAt: new Date(clock.now()),
+    browserTraffic: { up: 5_200_000, down: 81_000_000, hours: 1.5, at: new Date(clock.now()).toISOString() },
+  });
   const out: string[] = [];
   const err: string[] = [];
   const print = (c = config) =>
@@ -266,6 +276,9 @@ test("agentes telemetry prints exactly the next report, on or off, and sends not
   await clock.fire(FIRST_REPORT_MS);
   expect(http.calls).toHaveLength(1);
   expect(JSON.parse(out.join(""))).toEqual(http.calls[0]?.body);
+  expect(JSON.parse(out.join("")).computers).toEqual([
+    expect.objectContaining({ count: 1, browserTraffic: { upMb: 5, downMb: 81, hours: 1.5, computers: 1 } }),
+  ]);
   expect(err.join("")).toContain("On: sent once a day to https://telemetry.agentes.chat/v1/report");
 
   await setTelemetryEnabled(db, false);
@@ -301,6 +314,24 @@ describe("the switch in Settings", () => {
     expect(((await off.json()) as { enabled: boolean }).enabled).toBe(false);
     const [row] = await db.select().from(schema.instanceTelemetry).where(eq(schema.instanceTelemetry.id, 1));
     expect(row?.enabled).toBe(false);
+  });
+
+  test("once the first account deletes itself, nobody inherits the switch", async () => {
+    const { owner, other } = await server();
+    expect((await owner("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    expect((await other("/api/app/telemetry")).status).toBe(404);
+    expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
+  });
+
+  test("once no account is left, the next first account has the switch", async () => {
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const first = browser(t);
+    await signUp(first, "first@example.com");
+    expect((await first("/api/app/telemetry")).status).toBe(200);
+    expect((await first("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    const next = browser(t);
+    await signUp(next, "next@example.com");
+    expect((await next("/api/app/telemetry")).status).toBe(200);
   });
 
   test("with TELEMETRY=off the page says so", async () => {

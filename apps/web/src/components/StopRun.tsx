@@ -3,6 +3,7 @@ import { ApiError, continuedRunIdOf, keys, useContinuedRun } from "@agenteschat/
 import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
+import { playSound } from "@agenteschat/client/lib/sounds";
 import { PixelStop, Spinner } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -52,7 +53,13 @@ export function useStopRun() {
   };
   const canStop = (r: RunOwner) =>
     can(org.role, "manage_agents") || dir.agentById.get(r.agentId)?.ownerUserId === me.user.id || startedByMe(r);
-  return { canStop, stop: (r: LiveRun) => stop.mutate(r.runId) };
+  return {
+    canStop,
+    stop: (r: LiveRun) => {
+      playSound("stop");
+      stop.mutate(r.runId);
+    },
+  };
 }
 
 /**

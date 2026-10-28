@@ -6,7 +6,7 @@
 //! minute, at once when the site reports a new organization, and with `--rotate` for a home whose token the
 //! server refused. A new home gets the app's first tools from the popover (`host://new`).
 
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::{Condvar, Mutex};
 use std::time::Duration;
 
@@ -16,6 +16,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::local_server;
 
 const EVERY: Duration = Duration::from_secs(60);
+/// `host --once` answers in a second or two: past this it is stuck (it holds the sync's lock meanwhile), and the
+/// next minute's sync tries again.
+const SYNC_WAIT: Duration = Duration::from_secs(60);
 pub const NEW_HOME_EVENT: &str = "host://new";
 
 #[derive(Default)]
@@ -71,17 +74,15 @@ pub fn sync_now(app: &AppHandle, rotate: &[String]) {
         .args(["host", "--once", "--server", &server, "--token-file"])
         .arg(folder.host_token())
         .arg("--state")
-        .arg(home.join(".agentes-runner"))
-        .stdin(Stdio::null())
-        .stderr(Stdio::null());
+        .arg(home.join(".agentes-runner"));
     if let Some(name) = computer_name() {
         command.args(["--name", &name]);
     }
     for org in rotate {
         command.args(["--rotate", org]);
     }
-    let Ok(out) = command.output() else { return };
-    let Some((homes, gone)) = parse(&out.stdout) else { return };
+    let Ok(ran) = crate::run_program(&mut command, SYNC_WAIT, &|| local_server::cancelled(app)) else { return };
+    let Some((homes, gone)) = parse(ran.out.as_bytes()) else { return };
     let runners = app.state::<crate::runners::Runners>();
     for org in &gone {
         let _ = runners.remove(app, org);

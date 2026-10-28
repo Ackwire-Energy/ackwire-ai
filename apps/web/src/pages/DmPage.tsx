@@ -68,7 +68,7 @@ export function DmPage({ target }: { target: DmTarget }) {
       <NavToggle />
       {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-        <h1 className="channel__title">
+        <h1 className={agent || person ? "channel__title ac-captop" : "channel__title"}>
           {name}
           {agent && <AudienceChip agent={agent} />}
         </h1>
@@ -78,7 +78,7 @@ export function DmPage({ target }: { target: DmTarget }) {
             {thinks?.text && (
               <>
                 {" · "}
-                <span className="channel__brain">
+                <span className="channel__brain ac-iconline">
                   {thinks.mark ? (
                     <ProviderLogo id={thinks.mark} size="xs" />
                   ) : (
@@ -113,7 +113,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         dmAgentId: agent?.id,
         dmPersonId: person?.userId,
         locked: agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
-        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
+        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : undefined,
         emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
         suggestions: agent ? greetingSuggestions(t, agent.role) : [],
       }}

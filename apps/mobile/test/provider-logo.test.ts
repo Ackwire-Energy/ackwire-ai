@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrainLine } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { KEY_MARKS, PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import { resources } from "@agenteschat/i18n";
 import { markOf, PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import i18next, { type TFunction } from "i18next";
 import { featureKeysEn } from "../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../src/features/i18n/keys.pt-BR";
 import { withMobileKeys } from "../src/i18n/merge";
+import { LOGO_SIZES, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "../src/ui/provider-marks";
 
 async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
   const i18n = i18next.createInstance();
@@ -52,5 +54,63 @@ describe("Pensa com: the brain by its maker's mark", () => {
     expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Codex · Automático");
     expect(pt("mobile.intentAgents.thinks")).toBe("Pensa com");
     expect(en("mobile.intentAgents.thinks")).toBe("Thinks with");
+  });
+});
+
+describe("the marks as the phone draws them", () => {
+  const INK = "#1c1c1e";
+
+  test("in the maker's own colors: a second color as its own shape, the gradient, the dark files' parts", () => {
+    // Claude for the `anthropic` provider, in Clay.
+    expect(markShapes("anthropic", "light", INK)).toEqual({
+      key: "claude",
+      image: false,
+      gradient: null,
+      shapes: [{ d: PROVIDER_MARKS.claude.path, fill: "#D97757" }],
+    });
+    // Kimi's K in ink, its dot always blue.
+    expect(markShapes("moonshot", "dark", INK)?.shapes.map((s) => s.fill)).toEqual([INK, "#1783FF"]);
+    // OpenCode's block is darker on a dark theme, as in its own dark file.
+    expect(markShapes("opencode", "light", INK)?.shapes.map((s) => s.fill)).toEqual([INK, "#CFCECD"]);
+    expect(markShapes("opencode", "dark", INK)?.shapes.map((s) => s.fill)).toEqual([INK, "#4B4646"]);
+    // MiniMax: its gradient, never a flat color.
+    const minimax = markShapes("minimax", "light", INK);
+    expect(minimax?.gradient).toEqual(["#E21680", "#FF633A"]);
+    expect(minimax?.shapes[0]?.fill).toBe(`url(#${MARK_GRADIENT})`);
+    // A one-color mark takes the ink it is given, with no color of its own.
+    expect(markShapes("codex", "light", INK)?.shapes).toEqual([{ d: PROVIDER_MARKS.openai.path, fill: INK }]);
+    expect(markShapes("newplan", "light", INK)).toBeNull();
+  });
+
+  test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {
+    const images = Object.entries(PROVIDER_MARKS).flatMap(([id, mark]) =>
+      "image" in mark ? [{ id, image: mark.image }] : [],
+    );
+    expect(images).toEqual([{ id: "gemini", image: "/brands/gemini.png" }]);
+    const source = await Bun.file(new URL("../src/ui/ProviderLogo.tsx", import.meta.url).pathname).text();
+    for (const { id, image } of images) {
+      expect(markShapes(id, "dark", INK)).toEqual({ key: id, image: true, gradient: null, shapes: [] });
+      const file = image.slice("/brands/".length);
+      const phone = await Bun.file(new URL(`../assets/images/brands/${file}`, import.meta.url).pathname).bytes();
+      const web = await Bun.file(new URL(`../../web/public${image}`, import.meta.url).pathname).bytes();
+      expect(phone).toEqual(web);
+      // Bundled under the mark's id: the file just compared.
+      expect(source).toContain(`${id}: require("../../assets/images/brands/${file}")`);
+    }
+  });
+
+  test("a stack: 20 pt chips with a 12 pt mark, in the order given, each over the one before", () => {
+    const [chip, mark] = LOGO_SIZES.chip;
+    expect([chip, mark]).toEqual([20, 12]);
+    const chips = stackChips(["claude_code", "codex", "zai", "kimi"]);
+    expect(chips.map((c) => markOf(c.id))).toEqual(["claude", "openai", "zai", "kimi"]);
+    expect(chips.map((c) => c.marginLeft)).toEqual([0, -2, -2, -2]);
+    // The next chip and its ring cover only the space around a mark, never the mark itself.
+    for (const c of chips.slice(1)) expect(-c.marginLeft + STACK_RING).toBeLessThanOrEqual((chip - mark) / 2);
+    // The computer's plan line, as on the web.
+    expect(stackChips(PLAN_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "zai", "kimi"]);
+    // The API key row's quad: Gemini's sparkle is its third mark, drawn from the phone's own file.
+    expect(stackChips(KEY_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "gemini", "deepseek"]);
+    expect(markShapes("gemini", "light", INK)?.image).toBe(true);
   });
 });

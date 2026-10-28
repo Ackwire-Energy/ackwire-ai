@@ -19,6 +19,26 @@ export interface ServerTelemetry {
   report: Record<string, unknown>;
 }
 
+/** The installation's Jev key, for its pinned owner on a self-hosted server (`GET /api/app/jev`, ADR 0073). */
+export interface JevKey {
+  /** `env`: `TYPESAFE_API_KEY`, read-only here. `settings`: added in Settings. Null: none. */
+  source: "env" | "settings" | null;
+  /** The key's last 4 characters (the key itself is never returned). */
+  hint: string | null;
+  /** What its owner can fix: TypeSafe refused the key, or its account is out of credit. Else `ok`. */
+  state: "off" | "ok" | "invalid" | "no_credit";
+  /** Jev's calls this month (UTC), every workspace together. */
+  month: { decisions: number; costUsd: number };
+}
+
+/**
+ * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
+ * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
+ */
+export type PushDeviceInput =
+  | { platform: "ios" | "android"; token: string; locale: string }
+  | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -36,6 +56,8 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
+  /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
+  turnstileSiteKey?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -94,6 +116,8 @@ export type StandingState = "active" | "hold" | "suspended";
 export interface OrgStanding {
   state: StandingState;
   reason: string | null;
+  /** agentes.chat Cloud: a reason reads with how to contest it, and `review` as the automatic hold's line. */
+  cloud?: boolean;
 }
 
 export interface OrgSummary {
@@ -145,9 +169,72 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
-  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
+  /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
+  moreAgents?: number;
+  /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
+  closed?: true;
+  /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
+  you?: JoinStatus;
 }
+
+/** A signed-in person and a workspace's invitation link: in or not, and their latest request with its answer. */
+export interface JoinStatus {
+  member: boolean;
+  /** Only when they are a member. */
+  orgId?: string;
+  email: string;
+  request: { status: "pending" | "approved" | "denied"; reason: string | null } | null;
+}
+
+/** `invites.ask`: asking is all a link does; the admins answer. `emailed`: this server sends email. */
+export interface AskToJoinResult {
+  status: "pending";
+  email: string;
+  emailed: boolean;
+}
+
+/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
+export interface JoinCodeSent {
+  email: string;
+  resendIn: number;
+}
+
+/** A workspace's invitation link people can still ask with (admins). */
+export interface InviteLink {
+  id: string;
+  /** Null for a link made before links could be shown again: it can only be turned off. */
+  url: string | null;
+  expiresAt: string;
+  createdAt: string;
+  /** Who made it (their name). */
+  createdBy: string | null;
+  /** Requests made through it, still waiting. */
+  waiting: number;
+}
+
+/** Someone who asked to join through a link, waiting for an admin (ADR 0068). */
+export interface JoinRequest {
+  id: string;
+  name: string;
+  email: string;
+  /** Their words: shown here only, never in an email or a push. */
+  note: string | null;
+  /**
+   * A code proved the address, or a confirmed account with it asked (ADR 0072). False only on a server without
+   * email, or for a request typed before codes: approving can't add anyone at once then.
+   */
+  verified: boolean;
+  /** @deprecated Read `verified`. Kept for phone builds from before it: approving lets an account in at once. */
+  confirmed: boolean;
+  createdAt: string;
+  /** Closes unanswered after this. */
+  expiresAt: string;
+}
+
+/** An approval: in at once, or an invitation to the address (`emailed: false`: hand them `url` yourself). */
+export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: string; emailed: boolean };
 
 export interface Credential {
   id: string;
@@ -378,6 +465,32 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** Who picked the agents for it (ADR 0074); absent on a decision from before. */
+  decidedBy?: DecidedBy;
+  /** No step could read it and no rule fit: only a mention reaches an agent. */
+  reason?: "mention_needed";
+}
+
+/**
+ * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule.
+ */
+export type DecidedBy =
+  | { step: "jev" }
+  | { step: "model"; model: string; provider: string }
+  | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+
+/**
+ * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
+ * the person asking (a plan picks only for its owner's own messages). `off`: only mentions. `model`: the small
+ * model while it picks. `noSmallModel`: with `rules`, the default key's provider, which has none (Kimi).
+ */
+export interface AiRouting {
+  by: "jev" | "model" | "plans" | "rules" | "off";
+  mine: "jev" | "model" | "plan" | "rules" | "off";
+  model: string | null;
+  noSmallModel: string | null;
 }
 
 /** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
@@ -387,6 +500,10 @@ export type ConnectIntent = "claude" | "chatgpt" | "api_key" | "any" | "task";
 export interface AiStatus {
   /** An agent that isn't archived is ready, or waits for its computer. */
   any: boolean;
+  /** Who picks the agents (absent from an older server). */
+  routing?: AiRouting;
+  /** The organization has a key of its own, or the server's own Claude key. */
+  apiKey?: boolean;
   agents: {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */
@@ -603,13 +720,20 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
-      /** `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer. */
+      /**
+       * `no_ai`: the organization has no AI connected. `mention_needed`: no step could pick an agent (no Jev, no
+       * small model, no plan of the author, no rule): a mention still calls one.
+       */
       reason?: string;
+      /** Who picked (ADR 0074). */
+      decidedBy?: DecidedBy;
       /** With `no_ai`: the Connect step the message asked for, and whether it opens by itself (Jev ≥ 0.9). */
       intent?: ConnectIntent;
       provider?: string;
       autoOpen?: boolean;
     }
+  /** The author's own plan is picking who answers (seconds): until `message.routed`. */
+  | { type: "message.routing"; channelId: string; messageId: string; step: "plan" }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId?: string }
   | {
       type: "message.handled";
@@ -760,7 +884,16 @@ export interface ScopeInfo {
 }
 
 /** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+export type ConnectorCategory =
+  | "dev"
+  | "product"
+  | "docs"
+  | "data"
+  | "payments"
+  | "sales"
+  | "support"
+  | "marketing"
+  | "automation";
 
 /** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {
@@ -782,7 +915,7 @@ export interface ConnectorDef {
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
-  /** Brand icon served by this app (`/connectors/github.svg`); null = a monogram. */
+  /** Brand icon served by this app, null for a monogram: one color (`/connectors/github.svg`) or its maker's colors (`/brands/paypal.svg`). */
   iconUrl: string | null;
   /** Tint of the icon; null = the ink. */
   brandColor: string | null;
@@ -1115,6 +1248,8 @@ export interface CustomServer {
   serverUrl: string;
   label: string;
   authType: "oauth" | "api_key";
+  /** The server's own icon, kept and served by the backend (`/api/app/connector-icons/…`); null = a monogram. */
+  iconUrl?: string | null;
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
@@ -1426,11 +1561,21 @@ export interface S3Input {
   secretAccessKey?: string;
 }
 
+/**
+ * Where the server keeps the files of workspaces without a bucket of their own: its disk, its database or the bucket
+ * its operator set. `folder`: that disk's folder, absolute, only where the server isn't in a container.
+ */
+export interface StoragePlatform {
+  kind: "disk" | "database" | "bucket";
+  folder: string | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
+  platform: StoragePlatform;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";
@@ -2178,15 +2323,21 @@ export type ComputerSetupStep = "reserving" | "starting" | "installing" | "conne
  */
 export interface ComputerSetup {
   mode: "external" | "pair";
+  /** With `external`, null while the workspace is on hold and its computer isn't ready: it waits for none. */
   state: "preparing" | "waiting" | "problem" | "ready" | null;
   /** While `preparing`. */
   step: ComputerSetupStep | null;
-  /** While `waiting`: `capacity` (taking longer than usual). */
+  /**
+   * While `preparing`, when the provisioner says: what it is doing within its step (`updating`, `restarting`…), in
+   * its own word; one the app has no words for reads as its step. Absent from an older server.
+   */
+  stage?: string | null;
+  /** While `waiting`: `capacity` (no computer on its way yet). */
   reason: "capacity" | null;
   since: string | null;
   /** When people started waiting: the workspace's creation, or the computer's last revoke. */
   requestedAt: string | null;
-  /** When the provisioner expects it ready; null while it can't say. */
+  /** The earliest ready time this wait was told, never moved later; null while the provisioner can't say. */
   expectedReadyAt: string | null;
   /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
   secondsLeft: number | null;
@@ -3403,6 +3554,11 @@ export interface AiComputer {
   keys: boolean;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
+  /**
+   * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
+   * too old to say). Its plan and usage when the computer reported them.
+   */
+  own?: Partial<Record<MachineAccountKind, { plan?: string; usage?: PlanUsage }>>;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -3791,10 +3947,18 @@ export type NotificationKind =
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
-  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  /**
+   * ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`:
+   * why. On agentes.chat Cloud also an agent held (`statusTo: "agent_hold"`, `latest.holdKind`, `source.agentId`).
+   */
   | "org_standing"
   /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
-  | "computer_ready";
+  | "computer_ready"
+  /**
+   * ADR 0068: someone asks to join through the invitation link (owners and admins). Waiting; no actor;
+   * `latest.title` the newest name, `count` how many asked while it was unread. Opens Members.
+   */
+  | "join_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -3821,6 +3985,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
+  /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
+  agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -3852,6 +4018,12 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /** `org_standing` to `agent_hold` (agentes.chat Cloud): `network` or `operator`, never the hold's reason. */
+  holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: `text` is the reason a restriction reads with (`restrictionOf`). */
+  cloud?: boolean;
+  /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
+  names?: string[];
 }
 
 export interface AppNotification {

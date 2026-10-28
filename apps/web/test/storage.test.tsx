@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { keys } from "@agenteschat/client";
+import { keys, type StoragePlatform } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createMockStorage } from "./fakes/storage";
 import { renderApp, screen, settle } from "./render";
 
@@ -51,25 +51,118 @@ describe("Configurações → Armazenamento", () => {
     expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
-  test("defaults to our storage; Google Drive and OneDrive are coming soon", async () => {
+  test("on a server people run, files stay on this server: its disk, the folder, its database or its bucket", async () => {
     await go();
     const s = section();
-    const ours = within(s).getByRole("radio", { name: /Armazenamento do agentes/ });
-    expect(ours.getAttribute("aria-checked")).toBe("true");
-    expect(s.textContent).toContain("Seus arquivos ficam no nosso armazenamento, separados por workspace.");
-    expect(s.textContent).toContain("Em uso");
+    const server = within(s).getByRole("radio", { name: /Este servidor/ });
+    expect(server.getAttribute("aria-checked")).toBe("true");
+    // The page's title names the card, so the choices come first, and the radio alone says which is in use.
+    expect(s.querySelector("h2, h3")).toBeNull();
+    expect(s.textContent?.indexOf("Este servidor")).toBe(0);
+    expect(server.closest("label")?.textContent).toBe("Este servidorOs arquivos ficam no disco dele.");
+    // Our storage is the Cloud's: never said where the server is someone's own.
+    expect(s.textContent).not.toMatch(/nosso armazenamento|Armazenamento do agentes/);
     for (const name of ["Google Drive", "OneDrive"]) {
       const radio = within(s).getByRole("radio", { name: new RegExp(name) });
       expect(radio.hasAttribute("disabled")).toBe(true);
       expect(radio.closest("label")?.textContent).toContain("Em breve");
     }
     expect(within(s).queryByLabelText("Endpoint")).toBeNull();
+
+    const line = async (platform: StoragePlatform) => {
+      cleanup();
+      await go(seedState({ storagePlatform: platform }));
+      return within(section())
+        .getByRole("radio", { name: /Este servidor/ })
+        .closest("label") as HTMLElement;
+    };
+    expect((await line({ kind: "database", folder: null })).textContent).toContain(
+      "Os arquivos ficam no banco de dados dele.",
+    );
+    expect((await line({ kind: "bucket", folder: null })).textContent).toContain(
+      "Os arquivos ficam no bucket configurado para ele.",
+    );
+    const folder = await line({ kind: "disk", folder: "/Users/walter/.agentes/files" });
+    expect(folder.textContent).toContain("Os arquivos ficam em /Users/walter/.agentes/files.");
+    expect(folder.querySelector("code")?.textContent).toBe("/Users/walter/.agentes/files");
+    // Show the folder is the desktop app's, on its own server: never in a browser.
+    expect(within(section()).queryByRole("button", { name: "Mostrar a pasta" })).toBeNull();
+  });
+
+  test("on the Cloud, agentes storage keeps its words", async () => {
+    const api = createFakeApi(seedState());
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+    await settle(5);
+    const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
+    expect(ours.getAttribute("aria-checked")).toBe("true");
+    expect(ours.closest("label")?.textContent).toBe(
+      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.",
+    );
+    expect(section().textContent).not.toContain("Este servidor");
+  });
+
+  test("the General tiles say where files stay: this server, or agentes storage on the Cloud", async () => {
+    const tile = async (cloud: boolean) => {
+      cleanup();
+      const api = createFakeApi(seedState());
+      if (cloud) fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+      await renderApp(`/org/${ORG_ID}/settings`, { api });
+      await settle(6);
+      const link = document.querySelector('a.settings-tile[href$="/settings/storage"]');
+      return link?.querySelector(".settings-tile__state")?.textContent;
+    };
+    expect(await tile(false)).toBe("Este servidor");
+    expect(await tile(true)).toBe("Armazenamento do agentes");
+  });
+
+  test("Show the folder: in the desktop app on its own server, once the app opens it", async () => {
+    const win = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+    const asked: Record<string, unknown>[] = [];
+    const app = (flags: Record<string, unknown>, local: boolean) => {
+      win.__agentesDesktop = { version: "0.6.0", ...flags };
+      win.__TAURI_INTERNALS__ = {
+        invoke: async (_cmd: string, args: { request: Record<string, unknown> }) => {
+          asked.push(args.request);
+          return args.request.kind === "status" ? { orgs: [], local } : {};
+        },
+      };
+    };
+    const show = async (platform: StoragePlatform) => {
+      cleanup();
+      await go(seedState({ storagePlatform: platform }));
+      return within(section()).queryByRole("button", { name: "Mostrar a pasta" });
+    };
+    const folder: StoragePlatform = { kind: "disk", folder: "/Users/walter/.agentes/files" };
+    try {
+      // An app from before it could: nothing.
+      app({}, true);
+      expect(await show(folder)).toBeNull();
+      // Another server's page in the app: nothing.
+      app({ files: true }, false);
+      expect(await show(folder)).toBeNull();
+      // Its own server, keeping files in a database: no folder to show.
+      app({ files: true }, true);
+      expect(await show({ kind: "database", folder: null })).toBeNull();
+      const button = await show(folder);
+      // Under the options: an option is a label, which can't hold a button.
+      expect(button?.closest("label")).toBeNull();
+      expect(button?.parentElement?.previousElementSibling?.getAttribute("role")).toBe("radiogroup");
+      await click(button as HTMLElement);
+      expect(asked.at(-1)).toEqual({ kind: "files" });
+    } finally {
+      delete win.__agentesDesktop;
+      delete win.__TAURI_INTERNALS__;
+    }
   });
 
   test("a failing step shows its error; Ativar waits for a passing test of the same settings", async () => {
     const { api } = await go();
     await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
     expect(activate().hasAttribute("disabled")).toBe(true);
+    // Until the bucket is saved, the server's option says it's still the one in use.
+    const inUse = () => [...section().querySelectorAll("label")].filter((l) => l.textContent?.endsWith("Em uso"));
+    expect(inUse().map((l) => l.textContent?.slice(0, 13))).toEqual(["Este servidor"]);
 
     // Empty form: the test does not run, fields explain why.
     await testConnection();
@@ -105,6 +198,7 @@ describe("Configurações → Armazenamento", () => {
     await click(activate());
     await settle(4);
     const s = section();
+    expect(inUse()).toEqual([]);
     expect(s.textContent).toContain("Arquivos antigos continuam onde estão. Novos arquivos vão para o seu bucket.");
     expect(s.textContent).toContain("Usando acme-arquivos em https://s3.amazonaws.com.");
     // Keys are masked: only hints, inputs empty.
@@ -140,20 +234,40 @@ describe("Configurações → Armazenamento", () => {
     expect(within(section()).getByRole("meter").getAttribute("aria-valuenow")).toBe("120");
   });
 
-  test("switch back to our storage after confirming", async () => {
-    const { api } = await go();
-    await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
-    await fillBucket("acme-arquivos");
-    await testConnection();
-    await click(activate());
-    await settle(4);
-    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do agentes" }));
-    const dialog = screen().getByRole("dialog", { name: "Voltar para o armazenamento do agentes?" });
-    expect(dialog.textContent).toContain("O que já está no seu bucket continua lá.");
-    await click(within(dialog).getByRole("button", { name: "Voltar para o armazenamento do agentes" }));
+  test("switch back to this server after confirming, or to agentes storage on the Cloud", async () => {
+    const back = async (cloud: boolean) => {
+      cleanup();
+      const api = createFakeApi(seedState());
+      if (cloud) fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+      await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+      await settle(5);
+      await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
+      await fillBucket("acme-arquivos");
+      await testConnection();
+      await click(activate());
+      await settle(4);
+      return api;
+    };
+    const api = await back(false);
+    expect(section().textContent).toContain("Copia para o seu bucket os arquivos que este servidor ainda guarda.");
+    await click(within(section()).getByRole("button", { name: "Voltar para este servidor" }));
+    const dialog = screen().getByRole("dialog", { name: "Voltar para este servidor?" });
+    expect(dialog.textContent).toContain(
+      "Novos arquivos voltam para este servidor. O que já está no seu bucket continua lá.",
+    );
+    await click(within(dialog).getByRole("button", { name: "Voltar para este servidor" }));
     await settle(4);
     expect((await api.storage.get(ORG_ID)).kind).toBe("agentes");
     expect(section().textContent).not.toContain("Novos arquivos vão para o seu bucket.");
+    expect(document.body.textContent).toContain("Armazenamento trocado para este servidor.");
+
+    await back(true);
+    expect(section().textContent).toContain(
+      "Copia para o seu bucket os arquivos que o armazenamento do agentes ainda guarda.",
+    );
+    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do agentes" }));
+    const cloud = screen().getByRole("dialog", { name: "Voltar para o armazenamento do agentes?" });
+    expect(cloud.textContent).toContain("Novos arquivos voltam para o armazenamento do agentes.");
   });
 });
 

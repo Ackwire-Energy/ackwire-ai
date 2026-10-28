@@ -17,6 +17,7 @@ import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
 import { agentWorkspace, isInside, resolveForAgent } from "./paths";
+import type { Spawn } from "./scope-gate";
 import { agentSecrets } from "./secrets";
 
 /**
@@ -471,6 +472,8 @@ export interface CodexTurnOptions {
   codexVersion?: () => string | undefined;
   /** Tests: the codex executable. */
   bin?: string;
+  /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+  spawn?: Spawn;
   platform?: NodeJS.Platform;
   /**
    * Protocol 15: the long-lived `codex app-server` processes
@@ -521,7 +524,7 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   const version = (opts.codexVersion ?? (() => detected().codex?.version))();
   if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
   if (!codexVersionOk(version)) {
-    return fail("codex_too_old", `Codex here is ${version}; agents need ${CODEX_MIN_VERSION} or newer.`);
+    return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);
   }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
   if (opts.app) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
@@ -566,7 +569,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
 
   let child: ChildProcess;
   try {
-    child = spawn(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
+    child = (opts.spawn ?? spawn)(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
       cwd: input.cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -662,6 +665,7 @@ export interface CodexBrainContext {
   accounts?: { accountDir(kind: AccountKind, id: string): string | null };
   /** Protocol 15: the app-server processes (live steering); without it every turn is `codex exec`. */
   app?: CodexAppRunner;
+  spawn?: Spawn;
 }
 
 const threadStores = new Map<string, CodexThreads>();
@@ -744,6 +748,7 @@ export async function handleCodexBrainTurn(
       ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
       ...(ctx.bin ? { bin: ctx.bin } : {}),
       ...(ctx.app ? { app: ctx.app } : {}),
+      ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
     },
   );
 }

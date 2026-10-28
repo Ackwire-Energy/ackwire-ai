@@ -3,6 +3,7 @@ import { type FocusEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type RailStep, StepRail } from "@/components/StepRail";
 import { CAST, ORGS, PEOPLE, type PersonKey } from "./cast";
+import { useLanding } from "./context";
 import { useJoy, useVisible } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 import "./onboarding.css";
@@ -97,11 +98,12 @@ const emailOf = (p: PersonKey) => `${PEOPLE[p].short.toLowerCase()}@${ORG.slug}.
 /**
  * "Começar": Ada hosts the onboarding, one question per step with the answer
  * already suggested, the rail on the left filling up. It plays by itself while
- * on screen (paused under the pointer or keyboard focus) and loops; every
- * button and rail step works.
+ * on screen (paused under the pointer or keyboard focus, held still with reduced
+ * motion) and loops; every button and rail step works.
  */
 export function Onboarding() {
   const { t } = useTranslation();
+  const { reduced } = useLanding();
   const ref = useRef<HTMLDivElement>(null);
   const visible = useVisible(ref, { threshold: 0.35 });
   const [step, setStep] = useState(0);
@@ -116,13 +118,13 @@ export function Onboarding() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: each new step (and each retry tick) arms the timer again
   useEffect(() => {
-    if (!visible || hover || focus) return;
+    if (!visible || hover || focus || reduced) return;
     const timer = setTimeout(() => {
       if (document.hidden) setTick((n) => n + 1);
       else setStep((s) => (s + 1) % STEPS.length);
     }, STEP_MS);
     return () => clearTimeout(timer);
-  }, [step, visible, hover, focus, tick]);
+  }, [step, visible, hover, focus, reduced, tick]);
 
   useEffect(() => {
     if (step === LAST) trigger(2400);

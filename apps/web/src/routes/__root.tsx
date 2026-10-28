@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
 import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
-import { askForPhone, asksForPhone, inDesktopApp, pageReady } from "@/lib/desktop";
+import { askForPhone, asksForPhone, inDesktopApp, pageReady, routeNewWindowLinks } from "@/lib/desktop";
+import { dispatchPushOpen } from "@/lib/push-open";
+import { listenForPushOpens } from "@/lib/web-push";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: Root,
@@ -19,6 +21,12 @@ function Root() {
   // In the app: once this first screen is on the glass, the app's cover over the window goes.
   useEffect(() => {
     if (inDesktopApp()) requestAnimationFrame(() => requestAnimationFrame(pageReady));
+  }, []);
+  // In the app: a link to another site opens in the browser, one to this server in the window (main_window.rs).
+  useEffect(() => {
+    const root = document.getElementById("root");
+    if (!inDesktopApp() || !root) return;
+    return routeNewWindowLinks(root);
   }, []);
   // The app opens a page of the site that is already open (the tray, a notification, ⌘-click) without
   // loading it again: the route moves (main_window.rs). Downloads and the API go as a plain load.
@@ -36,6 +44,12 @@ function Root() {
       delete w.__agentesNavigate;
     };
   }, [router]);
+  // A click on a browser notification while the app is open in a tab (ADR 0071): the open workspace opens it
+  // where its inbox would (`PushOpens`); on any other page the tab moves to its address.
+  useEffect(
+    () => listenForPushOpens((click) => dispatchPushOpen(click, (path) => router.history.push(path))),
+    [router],
+  );
   return (
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}

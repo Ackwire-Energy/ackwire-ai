@@ -34,6 +34,7 @@ import {
   type TaskExecutor,
   type TaskStart,
 } from "@agenteschat/adapters/machine-protocol";
+import { yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
 import { readJson, writeJson } from "./json-file";
@@ -51,6 +52,7 @@ import {
 } from "./mcp";
 import { commitPathspecs, excludeLocally, git, gitWhy } from "./mission-worktree";
 import { isInside, resolveForAgent } from "./paths";
+import type { Spawn } from "./scope-gate";
 
 export { excludeLocally };
 
@@ -220,6 +222,8 @@ export interface TaskManagerOptions {
   mcp?: { socketPath: string; command: string[] };
   /** macOS: keep the machine awake while tasks run (default on darwin). */
   caffeinate?: boolean;
+  /** How a Claude Code or Codex task's wrapper starts (a worker under systemd: in the agent's AI CLIs slice). */
+  spawnCli?: Spawn;
   now?: () => number;
 }
 
@@ -845,7 +849,7 @@ export class TaskManager {
   }
 
   /** Starts the wrapper for a task folder, detached (it outlives this runner). */
-  private spawnWrapper(dir: string, env: NodeJS.ProcessEnv): ChildProcess {
+  private spawnWrapper(dir: string, env: NodeJS.ProcessEnv, executor: TaskExecutor): ChildProcess {
     let command = this.opts.wrapperCommand;
     if (!command?.length) {
       const wrapper = path.join(this.opts.root, "wrap.mjs");
@@ -853,7 +857,8 @@ export class TaskManager {
       command = [this.opts.runtime ?? process.execPath, wrapper];
     }
     const [file, ...args] = command;
-    return spawn(file as string, [...args, dir], { cwd: dir, env, stdio: "ignore", detached: true, windowsHide: true });
+    const start = (executor !== "shell" && this.opts.spawnCli) || spawn;
+    return start(file as string, [...args, dir], { cwd: dir, env, stdio: "ignore", detached: true, windowsHide: true });
   }
 
   /**
@@ -874,7 +879,7 @@ export class TaskManager {
     if (this.running >= max) {
       throw new RunnerError(
         "no_slot",
-        `This computer already runs ${max} background tasks (its limit); wait for one to finish or cancel one`,
+        `This computer already runs ${max} background tasks (its limit). Wait for one to finish or cancel one.`,
       );
     }
     const executor: TaskExecutor = req.executor === "claude" || req.executor === "codex" ? req.executor : "shell";
@@ -1032,6 +1037,9 @@ export class TaskManager {
     });
     if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
+    // Claude Code and Codex tasks run on the computer's own sign-in: a route there stops first (two processes on
+    // one sign-in race on its refresh token), right before the task starts.
+    if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code");
     let child: ChildProcess;
     try {
       // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.
@@ -1047,7 +1055,7 @@ export class TaskManager {
               { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
             : {};
       // The agent's secrets (ADR 0027) through the environment only, never on disk here.
-      child = this.spawnWrapper(dir, { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv });
+      child = this.spawnWrapper(dir, { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv }, executor);
     } catch (err) {
       throw new RunnerError("internal", `Couldn't start the task: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1368,7 +1376,7 @@ export class TaskManager {
       for (const f of ["exit.json", "alive", "child.pid", "cancel"]) rmSync(path.join(dir, f), { force: true });
       for (const f of ["stdout.log", "stderr.log"]) writeFileSync(path.join(dir, f), "", { mode: 0o600 });
       const secrets = (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null)) ?? null;
-      const child = this.spawnWrapper(dir, secrets ? { ...process.env, ...secrets.env } : process.env);
+      const child = this.spawnWrapper(dir, secrets ? { ...process.env, ...secrets.env } : process.env, t.executor);
       (child as unknown as EventEmitter).on("error", () => {});
       child.unref();
       if (!child.pid) throw new Error("no pid");

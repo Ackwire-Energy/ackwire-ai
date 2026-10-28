@@ -16,6 +16,13 @@ const go = async (path: string, state = seedState()) => {
 };
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** A help line's link: to the page on agentes.chat in Portuguese, in a new tab with no referrer. */
+const expectHelpLink = (link: HTMLElement, page: string) => {
+  expect(link.getAttribute("href")).toBe(`https://agentes.chat/help/${page}?lang=pt-BR`);
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(link.className).toBe("ac-link ac-link--muted");
+};
 
 describe("Aprovações", () => {
   const pills = () =>
@@ -45,6 +52,30 @@ describe("Aprovações", () => {
     expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
     expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
     expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+  });
+
+  test("nothing waiting: All decided and one link to how approvals work; the header says no more", async () => {
+    const state = seedState();
+    state.approvals = [];
+    await go("approvals", state);
+    const empty = document.querySelector(".ac-empty") as HTMLElement;
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Tudo decidido");
+    const link = within(empty).getByRole("link", { name: "Como as aprovações funcionam" });
+    expectHelpLink(link, "approvals");
+    expect(empty.querySelector(".ac-empty__text")?.textContent).toBe("Como as aprovações funcionam");
+    expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  test("refusing asks why, optional; the exact action is approved only for its values", async () => {
+    await go("approvals?open=ap-merge");
+    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
+    expect(within(dialog).getByRole("region", { name: "A ação exata" }).textContent).toContain(
+      "Só para estes valores: qualquer mudança precisa de nova aprovação.",
+    );
+    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
+    const why = within(dialog).getByLabelText("Por que não?");
+    expect(why.getAttribute("placeholder")).toBe("Opcional");
+    expect(dialog.textContent).toContain("Vira uma lição na memória da Ada");
   });
 
   test("a normal-risk approval goes with one click", async () => {
@@ -123,6 +154,13 @@ describe("Memória e propostas", () => {
   test("tabs, search, pin, archive and edit with history", async () => {
     await go(`agents/${ADA_ID}/memory`);
     expect(screen().getByRole("heading", { level: 1, name: "O que a Ada sabe" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    // How memory works is a page on the site, linked once under the list.
+    const how = screen().getByRole("link", { name: "Como a memória funciona" });
+    expectHelpLink(how, "memory");
+    expect(how.closest(".page__note")?.textContent).toBe("Como a memória funciona");
     const tabs = screen().getByRole("tablist", { name: "Tipo" });
     expect(
       within(tabs)
@@ -164,8 +202,10 @@ describe("Memória e propostas", () => {
     expect(added.length).toBe(2);
     expect(removed.length).toBe(1);
     expect(removed[0]?.textContent).toBe("−Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    expect(detail.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
     await click(within(detail).getByRole("button", { name: "Editar antes de aceitar" }));
     const text = within(detail).getByLabelText("Texto final das instruções");
+    expect(text.getAttribute("aria-describedby")).toBeNull();
     await type(text, "Programa em branches, nunca direto na main.");
     await click(within(detail).getByRole("button", { name: "Aceitar com ajustes" }));
     await settle(4);
@@ -392,6 +432,37 @@ describe("Equipe", () => {
     const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
     expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
     expect(atlas.textContent).not.toContain("Disponível");
+  });
+
+  test("the card names another company's service by its own mark, from the connector catalog", async () => {
+    const api = createFakeApi(seedState());
+    const team = api.agents.team;
+    api.agents.team = async (orgId) => {
+      const t = await team(orgId);
+      return {
+        ...t,
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "gdrive", "sentry", "browser"] })),
+      };
+    };
+    await renderApp(`/org/${ORG_ID}/team`, { api });
+    await settle(4);
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    const mark = (name: string) => {
+      const chip = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name);
+      const el = chip?.querySelector<HTMLElement>(".connector-icon__mark");
+      return el && [el.style.getPropertyValue("--connector-icon"), el.style.getPropertyValue("--connector-color")];
+    };
+    expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
+    expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
+    expect(mark("Google Drive")).toEqual(['url("/connectors/googledrive.svg")', "#4285F4"]);
+    // A service's mark sits beside the service's own name.
+    expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
+    // Our own abilities keep their icons.
+    expect(mark("Navegador")).toBeNull();
+    const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");
+    expect(browser?.querySelector("svg.ac-icon")).not.toBeNull();
   });
 
   test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {

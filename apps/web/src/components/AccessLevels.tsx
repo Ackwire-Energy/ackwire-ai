@@ -15,7 +15,7 @@ import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/clien
 import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { can } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
-import { Card, Chip, Icon, type IconName, Segmented } from "@agenteschat/ui";
+import { Card, Chip, Icon, type IconName, InfoHint, Segmented } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { type ReactNode, useMemo, useState } from "react";
@@ -79,7 +79,8 @@ export function ResourceIcon({
   name: string;
 }) {
   if (resource.connectionId) {
-    return <ConnectorIcon def={items.get(resource.connectionId)?.def ?? null} label={name} />;
+    const item = items.get(resource.connectionId);
+    return <ConnectorIcon def={item?.def ?? null} image={item?.image} label={name} />;
   }
   return (
     <span className="connector-icon connector-icon--mono" aria-hidden="true">
@@ -168,10 +169,10 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row" data-changed={changed || undefined}>
+    <li className="level-row ac-faceline" data-changed={changed || undefined}>
       {icon}
       <span className="level-row__text">
-        <span className="level-row__name">
+        <span className="level-row__name ac-captop">
           {name}
           {tag}
         </span>
@@ -227,6 +228,7 @@ export function AccessMatrixSection() {
   if (!admin) return null;
   const first = list.map((a) => access.byAgent.get(a.id)).find((x) => x !== undefined);
   const columns = first ? resourcesOf(first).filter((r) => r.kind === kind) : [];
+  const table = first !== undefined && columns.length > 0 && !access.loading;
   const busyAgents = new Set(Object.keys(pending).map((k) => k.split("|")[0]));
   const levelLabel = (l: LevelState) => t(`access.level.${l}`);
 
@@ -250,12 +252,12 @@ export function AccessMatrixSection() {
 
   return (
     <Card aria-labelledby="sec-access">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+      <div className="row" style={{ gap: 12 }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-access" className="ac-card__title">
             {t("access.matrixTitle")}
           </h2>
-          <span className="small muted">{t("access.matrixSubtitle")}</span>
+          <InfoHint name={t("common.about", { label: t("access.matrixTitle") })}>{t("access.matrixHint")}</InfoHint>
         </div>
         <Segmented
           size="sm"
@@ -268,17 +270,13 @@ export function AccessMatrixSection() {
           ]}
         />
       </div>
-      <p className="level-note small muted">
-        <Icon name="lock" />
-        {t("access.matrixNote")}
-      </p>
       {access.unavailable && <p className="small muted">{t("access.unavailable")}</p>}
       {(agents.isLoading || (list.length > 0 && access.loading)) && (
         <LoadingList count={Math.min(Math.max(list.length, 2), 5)} trailing />
       )}
       {agents.isSuccess && list.length === 0 && <p className="small muted">{t("access.noAgents")}</p>}
       {first && columns.length === 0 && <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>}
-      {first && columns.length > 0 && !access.loading && (
+      {table && (
         <div className="level-matrix">
           <table>
             <thead>
@@ -354,17 +352,20 @@ export function AccessMatrixSection() {
           </table>
         </div>
       )}
-      <div className="level-legend small muted">
-        {(["none", "read", "write"] as const).map((l) => (
-          <span key={l} className="level-pill level-pill--static" data-level={l}>
-            {levelLabel(l)}
+      {table && (
+        <div className="level-legend small muted">
+          <span>{t("access.matrixHow")}</span>
+          {(["none", "read", "write"] as const).map((l) => (
+            <span key={l} className="level-pill level-pill--static" data-level={l}>
+              {levelLabel(l)}
+            </span>
+          ))}
+          <span className="level-legend__asks">
+            <Icon name="lock" />
+            {t("access.asksLegend")}
           </span>
-        ))}
-        <span className="level-legend__asks">
-          <Icon name="lock" />
-          {t("access.asksLegend")}
-        </span>
-      </div>
+        </div>
+      )}
     </Card>
   );
 }

@@ -76,6 +76,36 @@ describe("Calendário: views, moves and series", () => {
     expect(within(col).getByRole("button", { name: "Standup, 09:00–09:30" })).toBeTruthy();
   });
 
+  test("an invitation's link opens its event on the event's week; closing it drops the link", async () => {
+    const api = createFakeApi(seedState());
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 21, 15);
+    const event = await api.calendar.create(ORG_ID, {
+      title: "Revisão trimestral",
+      start: day.toISOString(),
+      end: new Date(day.getTime() + 3600_000).toISOString(),
+      recurrence: "none",
+      participants: [],
+    });
+    const { router } = await renderApp(`/org/${ORG_ID}/calendar?open=${event.id}&day=${toYmd(day)}`, { api });
+    await settle(8);
+    const details = screen().getByRole("region", { name: "Revisão trimestral" });
+    expect(details.textContent).toContain("15:00");
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(3);
+    expect(screen().queryByRole("region", { name: "Revisão trimestral" })).toBeNull();
+    expect(router.state.location.search).toEqual({});
+    expect(screen().getByRole("button", { name: "Revisão trimestral, 15:00–16:00" })).toBeTruthy();
+  });
+
+  test("a link whose day doesn't exist opens on today's week", async () => {
+    for (const day of ["2026-13-45", "2026-02-30", "garbage", "20261028"]) {
+      await renderApp(`/org/${ORG_ID}/calendar?open=x&day=${day}`, { api: createFakeApi(seedState()) });
+      await settle(8);
+      expect(document.querySelector(`[data-day="${toYmd(today)}"]`), day).not.toBeNull();
+      cleanup();
+    }
+  });
+
   test("views: Mês and Agenda; T goes back to today; arrows move the day", async () => {
     await go();
     const range = () => document.querySelector(".cal-page__range")?.textContent ?? "";
@@ -132,6 +162,11 @@ describe("Calendário: views, moves and series", () => {
     expect(text.indexOf("Diária 1")).toBeGreaterThanOrEqual(0);
     expect(text.indexOf("Diária 1")).toBeLessThan(text.indexOf("Diária 7"));
     expect(list.querySelectorAll(".cal-runs__item").length).toBeGreaterThanOrEqual(7);
+    // The agent's face leads its routine's name, on the name's line.
+    for (const item of list.querySelectorAll(".cal-runs__item")) {
+      expect(item.firstElementChild?.matches(".ac-avatar")).toBe(true);
+      expect(item.classList.contains("ac-iconline")).toBe(true);
+    }
     expect(within(list).getAllByRole("link", { name: "Abrir rotina" })[0]?.getAttribute("href")).toContain("?open=");
   });
 
@@ -173,6 +208,34 @@ describe("Calendário: views, moves and series", () => {
     const chip = within(col).getByRole("button", { name: "Planejamento, 05:00–06:00" });
     // The event leaves the 16px lane (plus its 4px gutter) free.
     expect(chip.style.width).toContain("20px");
+  });
+
+  test("an event an agent made: its face leads the title's line; a chip without a face has no lead", async () => {
+    await go(async (api) => {
+      await api.calendar.create(ORG_ID, {
+        title: "Planejamento",
+        start: at(14).toISOString(),
+        end: at(15).toISOString(),
+        recurrence: "none",
+        participants: [],
+      });
+      const agentId = seedState().agents[0]?.id ?? "";
+      const range = api.calendar.range;
+      api.calendar.range = async (...args) => {
+        const out = await range(...args);
+        const byAgent = { type: "agent" as const, id: agentId };
+        return {
+          ...out,
+          events: out.events.map((e) => (e.title === "Planejamento" ? { ...e, createdBy: byAgent } : e)),
+        };
+      };
+    });
+    const chip = screen().getByRole("button", { name: "Planejamento, 14:00–15:00" });
+    expect(chip.firstElementChild?.matches(".ac-avatar.cal-chip__avatar")).toBe(true);
+    expect(chip.classList.contains("ac-iconline")).toBe(true);
+    const person = screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" });
+    expect(person.querySelector(".cal-chip__avatar")).toBeNull();
+    expect(person.classList.contains("ac-iconline")).toBe(false);
   });
 
   test("Próximos: neutral rows (avatar or event icon, title, day · time), no source bar", async () => {

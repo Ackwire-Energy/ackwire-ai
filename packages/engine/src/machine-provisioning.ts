@@ -12,7 +12,7 @@ import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
-import { assertCanWork } from "./standing";
+import { assertCanWork, OrgPausedError, STANDING_COLUMNS } from "./standing";
 
 const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
 
@@ -58,28 +58,49 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
   return {
     state: (row?.state ?? "preparing") as ProvisioningState,
     step: (row?.step ?? null) as ProvisioningStep | null,
+    /** With `preparing`: what the computer is doing within its step, as the provisioner said it. */
+    stage: row?.stage ?? null,
     reason: currentReason(row?.reason),
     /** When this state (and step or reason) began; null before anything was reported. */
     since: row?.since.toISOString() ?? null,
     /** When people started waiting: the computer's last removal, else the workspace's creation. */
     requestedAt: (row?.requestedAt ?? orgCreatedAt).toISOString(),
-    /** With `preparing`: when it should be ready; a time already past means any moment now. */
+    /** With `preparing`: the earliest ready time this wait was told; a time already past means it runs over. */
     expectedReadyAt: row?.expectedReadyAt?.toISOString() ?? null,
     specs: row?.specs ?? null,
   };
 }
 
+/** No computer on its way to tell of: where people connect their own (`pair`), or a workspace that isn't active. */
+const NO_WAIT = {
+  state: null,
+  step: null,
+  stage: null,
+  reason: null,
+  since: null,
+  requestedAt: null,
+  expectedReadyAt: null,
+  specs: null,
+  secondsLeft: null,
+  secondsWaited: null,
+} as const;
+
+/** What `setupStatus` reads of the workspace. */
+type SetupOrg = { createdAt: Date; standing: string };
+
 /**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
- * whether the owners get the ready email.
+ * whether the owners get the ready email. A workspace on hold or suspended waits for no computer
+ * (`setOrgStanding`): no state at all, unless its computer is ready.
  */
-function setupStatus(row: ProvisioningRow | null, orgCreatedAt: Date, emails: boolean, now = Date.now()) {
+function setupStatus(row: ProvisioningRow | null, org: SetupOrg, emails: boolean, now = Date.now()) {
+  if (org.standing !== "active" && row?.state !== "ready") return { ...NO_WAIT, notifyByEmail: emails };
   const readyAt = row?.expectedReadyAt ?? null;
   return {
-    ...provisioningStatus(row, orgCreatedAt),
+    ...provisioningStatus(row, org.createdAt),
     secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
-    secondsWaited: Math.round((now - (row?.requestedAt ?? orgCreatedAt).getTime()) / 1000),
+    secondsWaited: Math.round((now - (row?.requestedAt ?? org.createdAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
 }
@@ -92,14 +113,14 @@ async function publishProvisioning(
   machineId: string | null,
 ) {
   const [org] = await deps.db
-    .select({ createdAt: organizations.createdAt })
+    .select({ createdAt: organizations.createdAt, standing: organizations.standing })
     .from(organizations)
     .where(eq(organizations.id, orgId));
   if (!org) return;
   await publishOrgEvent(deps.pubsub, {
     type: "org.broadcast",
     orgId,
-    event: { type: "machine.provisioning", ...setupStatus(row, org.createdAt, deps.emails === true), machineId },
+    event: { type: "machine.provisioning", ...setupStatus(row, org, deps.emails === true), machineId },
   });
 }
 
@@ -173,9 +194,14 @@ export interface ProvisioningInput {
   state: Exclude<ProvisioningState, "ready">;
   /** Kept with `preparing` only. */
   step?: ProvisioningStep | null;
+  /**
+   * Kept with `preparing` only: what the computer is doing within its step (`updating`, `apps`…). Any word is kept:
+   * the apps read one they don't know as its step.
+   */
+  stage?: string | null;
   /** Kept with `waiting` only; `approval` reads as `capacity`. */
   reason?: ProvisioningReason | "approval" | null;
-  /** Kept with `preparing` only: when it should be ready. A time already past means any moment now. */
+  /** Kept with `preparing` only: when it should be ready, unless the wait was told an earlier time; none keeps it. */
   expectedReadyAt?: Date | null;
   /** An older provisioner's countdown, read as that many seconds from now. */
   etaSeconds?: number | null;
@@ -183,28 +209,16 @@ export interface ProvisioningInput {
   specs?: MachineSpecs | null;
 }
 
-/** How far ahead of this server's clock the provisioner's may run: its "now" can arrive that far in the future. */
-const CLOCK_SKEW_MS = 15_000;
-
-/**
- * When a report says it should be ready. While the last part runs over its estimate the provisioner keeps
- * sending the time of sending ("any moment now"): a time that is now by its clock never replaces a stored one
- * already past, so how long ago the first one was tells "almost ready" from "taking a little longer".
- */
-function readyTime(input: ProvisioningInput, stored: Date | null, now: Date): Date | null {
-  const reported =
-    input.expectedReadyAt ?? (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000));
-  if (!reported) return null;
-  const overdue = stored !== null && stored.getTime() <= now.getTime();
-  return overdue && reported.getTime() <= now.getTime() + CLOCK_SKEW_MS ? stored : reported;
-}
-
 /**
  * The provisioner says how far the workspace's computer is; its members see it live (`machine.provisioning`)
  * when something they see changed. `ready` is not the provisioner's to say: it comes with the computer's
- * first hello, and stays until that computer is removed (`ConflictError` meanwhile). A wait said to take
- * over a minute (a ready time that far ahead, `waiting` or `problem`) promises the owners the ready email,
- * until it is ready. False: no such workspace.
+ * first hello, and stays until that computer is removed (`ConflictError` meanwhile). One wait (`preparing` until
+ * ready or another state) counts down to the earliest ready time it was told: a part running long moves the
+ * provisioner's time later with the clock, so a later time is kept out and people see the wait run over, never a
+ * countdown that goes back up. A wait said to take over a minute (a ready time that far ahead, `waiting` or
+ * `problem`) promises the owners the ready email, until it is ready. Only an active workspace waits for one
+ * (`OrgPausedError` otherwise): a report sent as it was held would say again that a computer is on its way. False:
+ * no such workspace.
  */
 export async function setProvisioning(
   deps: ProvisioningDeps,
@@ -212,32 +226,49 @@ export async function setProvisioning(
   input: ProvisioningInput,
 ): Promise<boolean> {
   const { db } = deps;
-  const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId));
-  if (!org) return false;
-  const [before] = await db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   const now = new Date();
   const step = input.state === "preparing" ? (input.step ?? null) : null;
+  const stage = input.state === "preparing" ? (input.stage ?? null) : null;
   const reason = input.state === "waiting" ? currentReason(input.reason) : null;
-  const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
-  const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
-  const long =
-    input.state !== "preparing" ||
-    (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
-  const next = {
-    state: input.state,
-    step,
-    reason,
-    expectedReadyAt,
-    emailWhenReady: long || before?.emailWhenReady === true,
-    specs: input.specs ?? before?.specs ?? null,
-    since: same && before ? before.since : now,
-    updatedAt: now,
-  };
-  const [row] = await db
-    .insert(machineProvisioning)
-    .values({ orgId, ...next })
-    .onConflictDoUpdate({ target: machineProvisioning.orgId, set: next, setWhere: notReady })
-    .returning();
+  const done = await db.transaction(async (tx) => {
+    // The standing as it is now, not the 5 s cache, under a lock its change waits for (`setOrgStanding` drops the
+    // wait in the same transaction): a hold set first refuses this report, one set meanwhile drops it.
+    const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId)).for("share");
+    if (!org) return null;
+    if (org.state !== "active") throw new OrgPausedError(org);
+    const [before] = await tx.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
+    const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
+    const reported =
+      input.state !== "preparing"
+        ? null
+        : (input.expectedReadyAt ??
+          (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000)));
+    // A report without a time is still the same wait: it keeps the earliest time the wait was told.
+    const kept = input.state === "preparing" && before?.state === "preparing" ? before.expectedReadyAt : null;
+    const expectedReadyAt = !reported || (kept && kept.getTime() < reported.getTime()) ? kept : reported;
+    const long =
+      input.state !== "preparing" ||
+      (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
+    const next = {
+      state: input.state,
+      step,
+      stage,
+      reason,
+      expectedReadyAt,
+      emailWhenReady: long || before?.emailWhenReady === true,
+      specs: input.specs ?? before?.specs ?? null,
+      since: same && before ? before.since : now,
+      updatedAt: now,
+    };
+    const [row] = await tx
+      .insert(machineProvisioning)
+      .values({ orgId, ...next })
+      .onConflictDoUpdate({ target: machineProvisioning.orgId, set: next, setWhere: notReady })
+      .returning();
+    return { before, row, same };
+  });
+  if (!done) return false;
+  const { before, row, same } = done;
   if (!row) {
     throw new ConflictError(
       "This workspace's computer is ready: remove it first (DELETE …/machines/{machineId}) to prepare another one",
@@ -245,7 +276,8 @@ export async function setProvisioning(
     );
   }
   const moved = before?.expectedReadyAt?.getTime() !== row.expectedReadyAt?.getTime();
-  if (!same || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
+  // A new stage is told without restarting `since`: the step is still the same one.
+  if (!same || before?.stage !== row.stage || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
     const [managed] = await db
       .select({ id: machines.id })
       .from(machines)
@@ -382,8 +414,9 @@ export async function operatorMachines(db: Database, orgId: string) {
 
 /**
  * Takes the workspace's computer away (the provisioner wipes or retires it): its token and unused codes stop
- * working, its socket closes, its agents are left with no computer, and the workspace is back to waiting for
- * one from now (a request again while it is active). False: the workspace has no such managed computer.
+ * working, its socket closes, its agents are left with no computer, and an active workspace is back to waiting
+ * for one from now (a request again); one held or suspended waits for none until it is active again. False: the
+ * workspace has no such managed computer.
  */
 export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string, machineId: string) {
   const [machine] = await deps.db
@@ -402,6 +435,7 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   const waiting = {
     state: "preparing",
     step: null,
+    stage: null,
     reason: null,
     expectedReadyAt: null,
     requestedAt: now,
@@ -412,6 +446,16 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   };
   await removeMachine(deps, machine, { type: "system", id: null }, async (tx) => {
     await supersedeCodes(tx, machine.id, now);
+    // Locked as a report locks it (`setProvisioning`): a hold set meanwhile drops the wait this starts.
+    const [org] = await tx
+      .select({ state: organizations.standing })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .for("share");
+    if (org?.state !== "active") {
+      await tx.delete(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
+      return;
+    }
     await tx
       .insert(machineProvisioning)
       .values({ orgId, ...waiting })
@@ -513,7 +557,15 @@ export async function onManagedMachineHello(
   const { orgId } = machine;
   const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
-  const ready = { state: "ready", step: null, reason: null, expectedReadyAt: null, since: now, updatedAt: now };
+  const ready = {
+    state: "ready",
+    step: null,
+    stage: null,
+    reason: null,
+    expectedReadyAt: null,
+    since: now,
+    updatedAt: now,
+  };
   const done = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .insert(machineProvisioning)
@@ -570,24 +622,14 @@ export async function computerSetup(
   emails = false,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  if (mode !== "external") {
-    return {
-      mode: "pair" as const,
-      state: null,
-      step: null,
-      reason: null,
-      since: null,
-      requestedAt: null,
-      expectedReadyAt: null,
-      specs: null,
-      secondsLeft: null,
-      secondsWaited: null,
-      notifyByEmail: false,
-      machineId: null,
-    };
-  }
+  if (mode !== "external") return { mode: "pair" as const, ...NO_WAIT, notifyByEmail: false, machineId: null };
   const [row] = await db
-    .select({ provisioning: machineProvisioning, machineId: machines.id, createdAt: organizations.createdAt })
+    .select({
+      provisioning: machineProvisioning,
+      machineId: machines.id,
+      createdAt: organizations.createdAt,
+      standing: organizations.standing,
+    })
     .from(organizations)
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
     .leftJoin(
@@ -597,7 +639,7 @@ export async function computerSetup(
     .where(eq(organizations.id, orgId));
   return {
     mode: "external" as const,
-    ...setupStatus(row?.provisioning ?? null, row?.createdAt ?? new Date(), emails),
+    ...setupStatus(row?.provisioning ?? null, row ?? { createdAt: new Date(), standing: "active" }, emails),
     machineId: row?.machineId ?? null,
   };
 }

@@ -1,5 +1,6 @@
 import type { Agent, Member } from "@agenteschat/client";
-import { agentStateIn, usePeople, useRoster } from "@agenteschat/client";
+import { agentStateIn, useAiStatus, usePeople, useRoster } from "@agenteschat/client";
+import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, AvatarStack, Button, Popover } from "@agenteschat/ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -130,8 +131,12 @@ function MembersList({
   const { org, me } = useOrg();
   const presence = usePeople(org.id);
   const roster = useRoster(org.id, channelId);
+  const routing = useAiStatus(org.id).data?.routing;
   const online = new Set((presence.data ?? []).filter((p) => p.online).map((p) => p.userId));
-  const autoReply = new Set((roster.data ?? []).filter((r) => r.type === "agent" && r.autoReply).map((r) => r.id));
+  // "Answers without a mention" only while something reads this person's messages that mention nobody.
+  const autoReply = new Set(
+    picksForMe(routing) ? (roster.data ?? []).filter((r) => r.type === "agent" && r.autoReply).map((r) => r.id) : [],
+  );
   // ↑/↓ move between the rows (each row is a button).
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;

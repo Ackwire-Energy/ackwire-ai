@@ -1,7 +1,10 @@
 import {
   browserHandoffOf,
+  browserTrailOf,
+  desktopTrailOf,
   keys,
   type Message,
+  type ScreenKind,
   type ThreadInfo,
   useApi,
   useContinuedRun,
@@ -19,6 +22,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -36,17 +40,19 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
+import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
+import { routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
-import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
-import { FoldingWork } from "./LiveRows";
 import { cacheContinued } from "./live";
 import {
   approvalIdOf,
@@ -60,17 +66,22 @@ import {
   reactionPills,
   workStepsOf,
 } from "./logic";
+import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
+import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stoppedOf } from "./turn";
+
+/** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
+const TRAIL_RECENT_MS = 12 * 60 * 60_000;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
- * actions (the screen's sheet). An agent's reply takes its live block's place: the work folds into
- * "N passos" above the words, and a stopped one says so with "Continuar". Under my own message sent
- * while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
+ * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
+ * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". Under my own
+ * message sent while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -98,6 +109,7 @@ export const MessageRow = memo(function MessageRow({
   const isAgent = m.author.type === "agent";
   const agent = isAgent && m.author.id ? dir.agentById.get(m.author.id) : undefined;
   const accent = agent ? agentLook(agent).color : undefined;
+  const color = agentLook(agent).color;
   const name = dir.nameOf(m.author) || t("mobile.chat.someone");
   const meta = m.meta;
   // What a routine found, told by its agent (as on the web): a small tag, and the report it answers on demand
@@ -124,8 +136,8 @@ export const MessageRow = memo(function MessageRow({
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
-  // This reply just took its live block's place here: the block's work folds away above it.
-  const [folds] = useState(() => Boolean(isAgent && m.agentRunId && recentTurn(m.agentRunId, Date.now())));
+  // This reply just took its live block's place here: the same tools (and the messages it read) stay.
+  const [kept] = useState(() => (isAgent && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -137,6 +149,20 @@ export const MessageRow = memo(function MessageRow({
   const question = isAgent ? questionOf(meta) : null;
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
+  // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
+  const trails =
+    isAgent && m.author.id && !m.local
+      ? {
+          browser: browserTrailOf(meta),
+          desktop: desktopTrailOf(meta),
+          recent: Date.now() - Date.parse(m.createdAt) < TRAIL_RECENT_MS,
+        }
+      : null;
+  // Calls that have their own card under the message (where it browsed, its desktop) stay out of its tools.
+  const onCards: ScreenKind[] = [
+    ...(trails?.browser.length ? (["browser"] as const) : []),
+    ...(trails?.desktop.length ? (["desktop"] as const) : []),
+  ];
   // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
@@ -235,12 +261,26 @@ export const MessageRow = memo(function MessageRow({
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
             {routine ? (
+              // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
               <Tag
                 icon="clock"
                 label={t("channel.routineTag", { name: routine.name })}
-                onPress={report ? () => setReportOpen((o) => !o) : undefined}
-                hint={report ? t(reportOpen ? "channel.routineReportHide" : "channel.routineReport") : undefined}
+                onPress={() => router.push(routineHref(routine.id))}
+                hint={t("channel.routineTagTip")}
               />
+            ) : null}
+            {routine && report ? (
+              <Pressable
+                onPress={() => setReportOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: reportOpen }}
+                hitSlop={6}
+                style={styles.shrink}
+              >
+                <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+                  {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
+                </Text>
+              </Pressable>
             ) : null}
             {talker ? (
               <Text
@@ -280,8 +320,24 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {folds && m.agentRunId && m.author.id ? <FoldingWork runId={m.agentRunId} agentId={m.author.id} /> : null}
-        {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
+        {kept ? (
+          <TurnTools
+            items={kept.items}
+            agentName={agent?.name ?? name}
+            color={color}
+            quoteOf={(id) => kept.quotes[id]}
+            done
+            settled
+          />
+        ) : steps && m.agentRunId ? (
+          <SavedTools
+            runId={m.agentRunId}
+            meta={meta}
+            agentName={agent?.name ?? name}
+            color={color}
+            skipScreens={onCards}
+          />
+        ) : null}
         {brainWait ? (
           <BrainWait
             message={m}
@@ -295,9 +351,28 @@ export const MessageRow = memo(function MessageRow({
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
+        {isAgent ? <NoAiCard message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
+        {trails && m.author.id && trails.browser.length > 0 ? (
+          <TrailCard
+            agentId={m.author.id}
+            runId={m.agentRunId ?? null}
+            steps={trails.browser}
+            stopped={stopped}
+            recent={trails.recent}
+          />
+        ) : null}
+        {trails && m.author.id && trails.desktop.length > 0 ? (
+          <TrailCard
+            agentId={m.author.id}
+            runId={m.agentRunId ?? null}
+            steps={trails.desktop}
+            stopped={stopped}
+            screen="desktop"
+          />
+        ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {cards}
       </View>
@@ -448,7 +523,7 @@ function StoppedLine({
 
 /**
  * A small neutral chip next to the name ("Lembrete", "Rotina «Bom dia»"): icon, no colored dot. With
- * `onPress` it unfolds what it stands for (the report a routine's message answers).
+ * `onPress` it opens what it stands for (the routine a message answers).
  */
 function Tag({
   icon,
@@ -489,7 +564,7 @@ function PinMark() {
   );
 }
 
-/** People's pills show a count (mine outlined); an agent that reacted shows its face. */
+/** People's pills show a count (mine outlined); an agent that reacted shows its face; then the memory marks. */
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -497,7 +572,9 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
   const pills = reactionPills(cached.data ?? m.reactions, meId);
-  if (pills.length === 0 || m.local) return null;
+  // What an agent saved to memory from this message comes last in the row (the web's memory mark).
+  const remembered = (m.memories?.length ?? 0) > 0;
+  if ((pills.length === 0 && !remembered) || m.local) return null;
   return (
     <View style={styles.reacts}>
       {pills.flatMap((p) => [
@@ -539,6 +616,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
           </View>
         )),
       ])}
+      {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
     </View>
   );
 }

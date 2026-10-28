@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { desc, eq, schema, sql } from "@agenteschat/db";
+import { setRestrictionNotices } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
 import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -75,7 +76,7 @@ test("without OPERATOR_API_TOKEN nothing listens; the public listener never serv
   try {
     const base = `http://127.0.0.1:${server.port}`;
     const health = await fetch(`${base}/api/operator/v1/health`, { headers: { authorization: BEARER } });
-    expect(await health.json()).toEqual({ ok: true, version: "test" });
+    expect(await health.json()).toMatchObject({ ok: true, version: "test", botCheck: { state: "off" } });
     // Only the operator API there, not the app.
     expect((await fetch(`${base}/api/health`, { headers: { authorization: BEARER } })).status).toBe(404);
   } finally {
@@ -106,8 +107,31 @@ test("401 without the right bearer token, on every path under the prefix", async
   expect((await op("/nope")).status).toBe(404);
 });
 
-test("health", async () => {
-  expect(await body(await op("/health"))).toEqual({ ok: true, version: "test" });
+test("health, with the bot check: off without its keys, else its state, since when, the networks it refused and the tokens it passed", async () => {
+  const off = await body<{ ok: boolean; version: string; botCheck: Record<string, unknown> & { since: string } }>(
+    await op("/health"),
+  );
+  expect(off).toEqual({
+    ok: true,
+    version: "test",
+    botCheck: { state: "off", since: off.botCheck.since, blocked: 0, passed: 0, testing: false },
+  });
+  expect(off.botCheck.since).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+
+  const since = new Date("2026-10-27T12:00:00.000Z");
+  const humanCheck = {
+    siteKey: "1x00000000000000000000AA",
+    verify: async () => null,
+    probe: async () => "unreachable" as const,
+    status: () => ({ state: "unreachable" as const, since, blocked: 21, passed: 3, testing: false }),
+  };
+  const app = createOperatorApp({ ...deps, humanCheck }, TOKEN);
+  const res = await app.request("/api/operator/v1/health", { headers: { authorization: BEARER } });
+  expect(await body(res)).toEqual({
+    ok: true,
+    version: "test",
+    botCheck: { state: "unreachable", since: "2026-10-27T12:00:00.000Z", blocked: 21, passed: 3, testing: false },
+  });
 });
 
 test("org search: by id, part of the name or of a member's email, any case; no wildcards", async () => {
@@ -382,7 +406,10 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect(await (await bia("/api/app/me")).json()).toMatchObject({ organizations: [] });
   const refused = await signIn();
   expect(refused.status).toBe(403);
-  expect(await refused.json()).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+  const said = await refused.json();
+  expect(said).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+  // A self-hosted server says nothing more.
+  expect(said).not.toHaveProperty("kind");
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({
     blockedAt: blocked.blockedAt,
     blockedReason: "Phishing",
@@ -398,6 +425,29 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect((await signIn()).status).toBe(200);
   expect((await members()).status).toBe(200);
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({ blockedAt: null, blockedReason: null });
+});
+
+test("on agentes.chat Cloud a blocked sign-in says the block's kind, never its reason", async () => {
+  setRestrictionNotices("https://agentes.chat");
+  try {
+    const cid = browser(t);
+    await signUp(cid, "cid@acme.test");
+    const [row] = await t.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, "cid@acme.test"));
+    if (!row) throw new Error("no user");
+    await put(`/users/${row.id}/block`, { blocked: true, reason: "abuse.resignup" });
+    const refused = await cid("/api/auth/sign-in/email", {
+      json: { email: "cid@acme.test", password: "correct horse battery" },
+    });
+    expect(refused.status).toBe(403);
+    const said = await refused.json();
+    expect(said).toMatchObject({ code: "ACCOUNT_BLOCKED", kind: "abuse", cloud: true });
+    expect(JSON.stringify(said)).not.toContain("resignup");
+  } finally {
+    setRestrictionNotices("http://localhost:3000");
+  }
 });
 
 test("external provisioning: requests, progress, the workspace's computer and its single-use code", async () => {
@@ -432,9 +482,18 @@ test("external provisioning: requests, progress, the workspace's computer and it
     { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
     { state: "preparing", expectedReadyAt: "in ten minutes" },
     { state: "preparing", expectedReadyAt: new Date(Date.now() + 8 * 86_400_000).toISOString() },
+    { state: "preparing", step: "installing", stage: "a".repeat(65) },
   ]) {
     expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
   }
+  // A stage of any shape is kept as said rather than the whole report refused: the apps read one they don't know as
+  // its step.
+  const odd = { state: "preparing", step: "installing", stage: "Re-wiping" };
+  expect((await put(`/orgs/${orgId}/provisioning`, odd)).status).toBe(204);
+  const oddly = await body<Requests>(
+    await external.request("/api/operator/v1/machine-requests?limit=200", { headers: { authorization: BEARER } }),
+  );
+  expect(oddly.requests.find((r) => r.orgId === orgId)?.provisioning).toMatchObject({ stage: "Re-wiping" });
   expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/provisioning", { state: "problem" })).status).toBe(404);
   const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
   // A time already past is normal: any moment now.
@@ -444,6 +503,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
       await put(`/orgs/${orgId}/provisioning`, {
         state: "preparing",
         step: "connecting",
+        stage: "connecting",
         specs,
         expectedReadyAt: readyAt,
       })
@@ -455,6 +515,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
   expect(progress.requests.find((r) => r.orgId === orgId)?.provisioning).toEqual({
     state: "preparing",
     step: "connecting",
+    stage: "connecting",
     reason: null,
     since: expect.any(String),
     requestedAt: listed.requests.find((r) => r.orgId === orgId)?.createdAt,
@@ -471,6 +532,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
     mode: "pair",
     state: null,
     step: null,
+    stage: null,
     reason: null,
     since: null,
     requestedAt: null,
@@ -525,6 +587,16 @@ test("external provisioning: requests, progress, the workspace's computer and it
   const after = await body<{ machines: { id: string }[] }>(await call("GET", `/orgs/${orgId}/machines`));
   expect(after.machines.map((m) => m.id)).not.toContain(issued.machineId);
   expect((await call("GET", "/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/machines")).status).toBe(404);
+
+  // Held (ended, say), it waits for no computer: a report for it is refused until it is active again.
+  expect((await put(`/orgs/${orgId}/standing`, { state: "hold", reason: "ended", notice: "shown" })).status).toBe(200);
+  const late = await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" });
+  expect({ status: late.status, code: ((await late.json()) as { error: { code: string } }).error.code }).toEqual({
+    status: 403,
+    code: "org.paused",
+  });
+  expect((await put(`/orgs/${orgId}/standing`, { state: "active", reason: "back", notice: "shown" })).status).toBe(200);
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" })).status).toBe(204);
 });
 
 test("no answer carries a secret or a field named like one", async () => {

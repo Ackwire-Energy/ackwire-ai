@@ -2,7 +2,8 @@
  * The desktop app's own strings (pt-BR, the primary locale), under `desktop.*`. `./index.ts` merges
  * them into the shared resources (`@agenteschat/i18n`); `keys.en.ts` has exactly the same shape.
  * Never "runner", "MCP" or "protocolo". `{{device}}` is this computer's name (`device.*`), filled in by
- * `./index.ts` for every string.
+ * `./index.ts` for every string. A path to a setting ("Preferências › Servidores") has no-break spaces around
+ * its `›` (`\u00a0`), so a line never breaks inside it.
  */
 export const desktopPtBR = {
   /** This computer's name in the copy: "este {{device}}", "neste {{device}}" (all masculine). */
@@ -96,18 +97,15 @@ export const desktopPtBR = {
     reconnect: "Reconectar",
     reconnecting: "Reconectando…",
     offlineTitle: "Sem internet. Tentando de novo…",
-    offlineBody:
-      "O que já começou continua rodando aqui e manda o resultado quando a conexão voltar. Nada novo começa até lá.",
+    offlineBody: "O que já começou continua rodando aqui e manda o resultado quando a conexão voltar.",
     unreachable: "Sem acesso a {{host}}. Tentando de novo…",
     unreachableBody: "O que já começou continua rodando aqui e manda o resultado quando o servidor voltar.",
     pausedUntil: "Pausado até {{time}}",
     pausedUntilResume: "Pausado até você retomar",
-    pausedBody:
-      "Nenhum agente, de nenhuma organização, começa nada novo neste {{device}}. Se alguém pedir, o agente avisa no chat que você pausou.",
+    pausedBody: "Nenhum agente, de nenhuma organização, começa nada novo neste {{device}}.",
     resumeNow: "Retomar agora",
     plusHour: "+1 hora",
     updateTitle: "Versão {{version}} disponível",
-    updateBody: "O app se atualiza e reabre em segundos. Seus servidores e configurações continuam.",
     updateSee: "Ver novidades",
     requiredTitle: "Atualize para continuar",
     requiredBody: "Esta versão do app ficou antiga para o servidor.",
@@ -150,8 +148,8 @@ export const desktopPtBR = {
     connect: "Conectar ao meu servidor",
     connectText: "Ele roda em outro computador: um Mac mini, um notebook sobrando ou um servidor na internet.",
     here: "Rodar o agentes.chat neste {{device}}",
-    hereLater: "Por enquanto, no Mac e no Linux.",
-    hereText: "Este {{device}} vira o servidor, com um clique.",
+    hereText: "Este {{device}} vira o servidor, enquanto estiver ligado.",
+    which: "Qual escolher?",
   },
   connect: {
     title: "Conectar ao meu servidor",
@@ -166,8 +164,7 @@ export const desktopPtBR = {
     foundHere: "O agentes.chat está rodando aqui",
     use: "Usar",
     none: "Ainda não tem? Rode isto nele",
-    noneText:
-      "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que abre este app e pergunta se quer conectá-lo a esse servidor.",
+    noneText: "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que conecta este app a ele.",
     invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
     httpRefused:
       "{{host}} usa http sem cadeado, que só funciona neste {{device}}. Use o endereço do Tailscale ou um com https.",
@@ -184,29 +181,35 @@ export const desktopPtBR = {
   /** "Rodar o agentes.chat neste computador" (FirstRun.tsx), and on Windows the two ways for now. */
   here: {
     title: "Rodar o agentes.chat neste {{device}}",
-    how: "Ele roda dentro deste app, com um banco de dados embutido, e guarda tudo numa pasta deste {{device}}. Nada mais para instalar: sem Docker, sem banco para configurar.",
+    how: "Ele roda dentro deste app, com um banco de dados embutido, e guarda tudo numa pasta deste {{device}}.",
     again: "Ele já rodou aqui, e os dados continuam em {{path}}.",
     name: "Seu nome",
     nameNeeded: "Escreva o seu nome.",
     email: "Seu e-mail",
-    emailHint: "A sua equipe vê.",
     emailNeeded: "Escreva o seu e-mail, como ana@exemplo.com.",
     reach: "Acessar pelo celular e pela equipe",
     reachText:
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
-    reachOff: "O Tailscale está neste {{device}}, mas desconectado. Abra o Tailscale e conecte.",
-    reachOffTerminal: "O Tailscale está neste {{device}}, mas desconectado. Conecte pelo terminal:",
-    reachMissing:
-      "Instale o Tailscale, que é grátis, para acessar o agentes.chat pelo celular e convidar a equipe. Dá para fazer depois.",
+    reachOff: "O Tailscale não está conectado.",
+    reachOffTerminal: "O Tailscale não está conectado. Conecte pelo terminal:",
+    reachTray: "O Tailscale não está conectado. Conecte pelo ícone perto do relógio.",
+    reachMissing: "Precisa do Tailscale, que é grátis.",
+    reachChecking: "Vendo se o Tailscale está conectado…",
+    /** What turning access on or off is doing while it takes. */
+    reachStage: {
+      sharing: "Pedindo ao Tailscale para compartilhar…",
+      approve:
+        "O Tailscale pede para ligar o HTTPS na sua rede. Ligue na página dele: o resto continua sozinho quando você ligar.",
+      restarting: "Reiniciando o agentes.chat no endereço novo…",
+      signingIn: "Entrando de novo no endereço novo…",
+    },
+    approveOpen: "Abrir a página do Tailscale",
+    approveStop: "Parar de esperar",
     openTailscale: "Abrir o Tailscale",
     getTailscale: "Baixar o Tailscale",
     usage: "Enviar estatísticas de uso anônimas ao agentes.chat",
     usageText:
-      "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
-    agents:
-      "Os agentes também trabalham aqui, em pastas só deles, com um navegador e com o Claude Code ou o Codex quando estão neste {{device}}. Comandos ficam desligados até você ligar.",
-    limits:
-      "Feito para você ou uma equipe pequena, enquanto este {{device}} estiver ligado. Para uma equipe maior ou um servidor sempre ligado, instale num servidor e escolha Conectar ao meu servidor; os dados podem ir para lá depois.",
+      "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
     start: "Iniciar o agentes.chat",
     setting: "Preparando o agentes.chat neste {{device}}",
     step: {
@@ -226,35 +229,32 @@ export const desktopPtBR = {
     },
     fail: {
       start: "O agentes.chat não iniciou neste {{device}}.",
+      database: "O banco de dados não foi preparado.",
       account: "A sua conta não foi criada.",
-      reach:
-        "O acesso pelos aparelhos não ligou: {{reason}}. Enquanto isso, o agentes.chat funciona neste {{device}}; tente de novo nas Preferências.",
+      reach: "O acesso pelos aparelhos não ligou: {{reason}}. Tente de novo em Preferências\u00a0›\u00a0Servidores.",
     },
     reason: {
       https: "o HTTPS está desligado na sua rede do Tailscale",
-      serve: "o Tailscale deste {{device}} não consegue compartilhar; instale o Tailscale pelo tailscale.com",
+      serve: "o Tailscale deste {{device}} não consegue compartilhar",
       operator: "o Tailscale precisa da sua permissão antes",
+      stopped: "você parou de esperar o HTTPS ser ligado",
+      start: "o agentes.chat não voltou a responder no endereço novo",
     },
+    serveFix: "Instale o Tailscale pelo tailscale.com.",
     operatorRun: "Dê essa permissão uma vez, no terminal:",
     turnOn: "Ligar",
-    copyDiagnostics: "Copiar o diagnóstico",
+    copyDetails: "Copiar os detalhes",
+    slow: "Demorando um pouco mais que o previsto",
+    notifyFailed: "A preparação do agentes.chat neste {{device}} não terminou",
+    notifyFailedBody: "Abra o agentes.chat para ver o que aconteceu.",
     already: "O agentes.chat já está instalado neste {{device}}",
     alreadyText: "Ele roda sozinho, instalado pelo terminal, em {{url}}.",
     useIt: "Usar",
     notRunning: "O agentes.chat está instalado neste {{device}}, mas não está rodando",
     notRunningText: "Ele foi instalado pelo terminal, em {{path}}. Inicie por lá e tente de novo.",
     running: "O agentes.chat já roda neste {{device}}",
-    runningText: "Este app roda ele, em {{url}}. Os ajustes ficam em Preferências › Servidores.",
+    runningText: "Este app roda ele, em {{url}}.",
     openIt: "Abrir",
-    win: {
-      title: "Rodar o agentes.chat neste PC",
-      lead: "No Windows, isso vem depois. Por enquanto, dois caminhos:",
-      later:
-        "No Windows, isso vem depois. Por enquanto, rode o agentes.chat em outro computador, um Mac, um Linux ou um servidor na internet, e escolha Conectar ao meu servidor.",
-      other:
-        "Em outro computador, um Mac, um Linux ou um servidor na internet: rode a instalação de um comando e escolha Conectar ao meu servidor.",
-      wsl: "Neste PC, com o WSL 2: abra o Ubuntu pelo menu Iniciar, rode isto e escolha Conectar ao meu servidor. Ele encontra aqui.",
-    },
   },
   /** A link to a server (`agenteschat://connect`): the server in large type, nothing changes before Connect. */
   link: {
@@ -272,7 +272,7 @@ export const desktopPtBR = {
   /** Preferências › Servidores, the Servers menu and the tray. */
   servers: {
     title: "Servidores",
-    lead: "Onde este app abre o agentes.chat. Cada um guarda o próprio login.",
+    lead: "Onde este app abre o agentes.chat.",
     cloud: "agentes.chat",
     cloudSub: "Cloud",
     ownSub: "Seu servidor",
@@ -307,7 +307,10 @@ export const desktopPtBR = {
     phoneOff: "Ligue o acesso primeiro.",
     showQr: "Mostrar o QR code",
     usageRestart: "Mudar reinicia o agentes.chat por um instante.",
-    usageBoth: "Desligado aqui ou em Configurações › Geral do agentes.chat, nada é enviado.",
+    jev: "Jev",
+    jevText:
+      "Um modelo rápido da TypeSafe que escolhe quem responde, organiza a memória e deixa os agentes enxergarem a tela. Opcional, com uma chave sua.",
+    jevWhere: "No agentes.chat\u00a0›\u00a0Configurações\u00a0›\u00a0Contas de IA.",
     reachFailed: "O acesso pelos aparelhos não ligou: {{reason}}.",
     backup: "Fazer backup agora",
     backedUp: "Backup feito: {{file}}",
@@ -318,23 +321,21 @@ export const desktopPtBR = {
     restart: "Reiniciar",
     stopHere: "Parar de rodar aqui…",
     stopHereTitle: "Parar o agentes.chat neste {{device}}?",
-    stopHereBody:
-      "Ele para agora e não liga mais com o app. Os dados continuam em {{path}}: dá para iniciar aqui de novo quando quiser.",
+    stopHereBody: "Ele para agora e não liga mais com o app. Os dados continuam em {{path}}.",
     stopHereConfirm: "Parar",
     notHere: "Não está rodando aqui. Os dados continuam em {{path}}.",
     startHere: "Iniciar aqui",
     stoppedBanner: "O agentes.chat parou neste {{device}}",
     stoppedBody: "Ninguém consegue usar até ele iniciar de novo.",
     failingBanner: "O agentes.chat não está iniciando neste {{device}}",
-    failingBody: "Tente de novo, ou copie o diagnóstico para quem for te ajudar.",
     version: "Versão {{version}}, atualizada com o app",
     updatesWithApp: "Atualizar o app atualiza também o agentes.chat neste {{device}}.",
-    updateBack: "A atualização não iniciou; o agentes.chat voltou para a {{version}}.",
+    updateBack: "A atualização não iniciou. O agentes.chat voltou para a {{version}}.",
   },
   /** The system's own dialog before a page pairs this computer (main_window.rs draws it). */
   pair: {
     title: "Deixar os agentes de {{org}} trabalharem neste {{device}}?",
-    body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados; você libera mais nas Preferências.",
+    body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados.",
     allow: "Permitir",
     notNow: "Agora não",
   },
@@ -348,19 +349,16 @@ export const desktopPtBR = {
     claudeName: "Claude Code",
     claudeDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do Claude.",
     codexName: "Codex",
-    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta da OpenAI.",
-    notInstalled: "Não está instalado neste {{device}}. Se instalar depois, ele aparece aqui.",
+    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do ChatGPT.",
     found: "Encontrado",
     notFound: "Não encontrado",
     loggedOut: "Sem login",
     commandsName: "Comandos",
-    commandsDesc: "Rodar testes, builds e outros comandos do Terminal.",
-    commandsWarn:
-      "Comandos podem chegar a outras partes do {{device}}, não só às pastas liberadas. Você vê cada um em Atividade.",
-    commandsWarnOrgs:
-      "Comandos podem chegar a outras partes do {{device}}, não só às pastas liberadas, inclusive às pastas de outra organização. O modo protegido vai evitar isso. Cada comando fica em Atividade.",
+    commandsDesc: "Testes, builds e outros comandos do Terminal. Cada um aparece em Atividade.",
+    commandsWarn: "Comandos alcançam o resto deste {{device}}, não só as pastas liberadas.",
+    commandsWarnOrgs: "Comandos alcançam o resto deste {{device}}, inclusive as pastas de outras organizações.",
     commandsWarnHere:
-      "Comandos rodam como você e alcançam outras partes deste {{device}}, inclusive os dados deste agentes.chat. Você vê cada um na Atividade.",
+      "Comandos rodam como você e alcançam o resto deste {{device}}, inclusive os dados do próprio agentes.chat.",
     commandsSome: "Ligado só para {{orgs}}. Ligue para todas as organizações daqui.",
     browserName: "Navegador",
     browserDesc: "Abre sites para os agentes num navegador só deles, sem os seus logins.",
@@ -394,22 +392,18 @@ export const desktopPtBR = {
     },
     general: {
       title: "Geral",
-      lead: "Como o app abre e avisa você.",
       thisMac: "Este {{device}}",
       name: "Nome",
-      nameDesc: "Como ele aparece para as equipes.",
       nameLabel: "Nome do computador",
       save: "Salvar",
       saved: "Nome salvo",
       orgs: "Organizações",
-      orgsHint: "Os agentes delas trabalham neste {{device}}. Cada uma tem as próprias pastas e tarefas.",
       agents_one: "{{count}} agente pode usar",
       agents_other: "{{count}} agentes podem usar",
       noAgents: "Nenhum agente usa ainda",
       leave: "Sair",
       leaveTitle: "Desconectar {{org}} deste {{device}}?",
-      leaveBody:
-        "Os agentes de {{org}} param de usar este {{device}} na hora. As pastas dos agentes ficam no disco. As outras organizações continuam.",
+      leaveBody: "Os agentes dela param de usar este {{device}} na hora. As pastas deles ficam no disco.",
       leaveConfirm: "Desconectar",
       left: "{{org}} desconectada",
       behavior: "Comportamento",
@@ -419,20 +413,19 @@ export const desktopPtBR = {
       notifySiteTitle: "Avisar sobre mensagens e pedidos",
       notifySiteDesc: "Menções, mensagens diretas e o que espera por você, com o app em segundo plano.",
       notifyTitle: "Avisar quando um agente pedir uma pasta",
-      notifyDesc: "Pedidos de acesso a pastas deste {{device}}.",
       notifyBrowserTitle: "Avisar quando um agente precisar de você no navegador",
-      notifyBrowserDesc: "O pedido já chega no celular e no site; isto avisa também aqui.",
+      notifyBrowserDesc: "O pedido já chega no celular e no site. Isto avisa aqui também.",
       dockTitle: "Mostrar no Dock",
       dockDesc:
         "Com o número do que espera por você. Desligado, o app fica só na barra de menus quando não há janela aberta.",
       menuBarTitle: "Mostrar na barra de menus",
-      menuBarDesc: "O ícone lá em cima: o que espera por você, e o atalho para o app.",
       notchTitle: "Mostrar os agentes no notch",
       notchDesc: "Em MacBooks com notch: quem está trabalhando aparece em volta da câmera.",
     },
     folders: {
       title: "Pastas",
-      lead: "O que os agentes podem ver e mudar neste {{device}}. Liberar só acontece aqui, nunca pelo site.",
+      lead: "O que os agentes podem ver e mudar neste {{device}}.",
+      how: "Como as pastas funcionam",
       add: "Adicionar pasta",
       org: "Organização",
       agents: "Agentes",
@@ -441,7 +434,6 @@ export const desktopPtBR = {
       noOrgAgents: "Nenhum agente desta organização usa este {{device}} ainda.",
       noneTitle: "Nenhuma pasta extra em {{org}}",
       noneBody: "Os agentes dela usam só as próprias pastas.",
-      note: "Cada organização libera as próprias pastas: o que está aqui vale só para os agentes de {{org}}. Cada agente sempre tem a própria pasta em {{path}}. Remover não apaga nada, só tira o acesso.",
       removeLabel: "Remover {{folder}}",
       removeTitle: "Remover {{folder}}?",
       removeBody: "Os agentes deixam de usar esta pasta na hora. Nada é apagado.",
@@ -451,7 +443,7 @@ export const desktopPtBR = {
     },
     tools: {
       title: "Ferramentas",
-      lead: "O que os agentes de todas as organizações podem rodar neste {{device}}, sempre dentro das pastas liberadas.",
+      lead: "O que os agentes de todas as organizações podem rodar neste {{device}}.",
       connected: "Conectado",
       protection: "Proteção",
       protectedTitle: "Modo protegido",
@@ -461,7 +453,7 @@ export const desktopPtBR = {
     },
     accounts: {
       titleClaude: "Contas do Claude",
-      titleCodex: "Contas do Codex",
+      titleCodex: "Contas do ChatGPT",
       org: "Organização",
       thisMac: "Conta deste {{device}}",
       thisMacHint: "A que está no {{tool}}",
@@ -476,13 +468,13 @@ export const desktopPtBR = {
         "Os agentes que usam esta conta voltam para a Conta deste {{device}}. Para cortar o acesso de vez, saia também em {{site}}.",
       removed: "Conta removida",
       signInClaude: "Entre no Claude pelo navegador",
-      signInClaudeLead:
-        "Abrimos o Claude no seu navegador. Entre com a conta que quer adicionar e clique em Autorizar.",
+      signInClaudeLead: "Entre com a conta que quer adicionar e clique em Autorizar.",
       signInCodex: "Entre no ChatGPT pelo navegador",
-      signInCodexLead: "Abrimos o ChatGPT no seu navegador. Entre com a conta que quer adicionar.",
+      signInCodexLead: "Entre com a conta que quer adicionar.",
       codeHint: "Digite este código na página que abrir.",
       codeAria: "Código {{code}}",
-      wrongAccount: "Se ele entrar sozinho na conta errada, saia do {{product}} lá e tente de novo.",
+      wrongAccount: "Entrou sozinho na conta errada? Saia do {{product}} lá e tente de novo.",
+      wrongAccountAbout: "Sobre a conta errada",
       opening: "Abrindo o navegador…",
       waiting: "Esperando você entrar…",
       notOpened: "O navegador não abriu?",
@@ -499,7 +491,6 @@ export const desktopPtBR = {
     },
     updates: {
       title: "Atualizações",
-      lead: "O app se atualiza e reabre em segundos. Seus servidores e configurações continuam.",
       upToDate: "Em dia",
       newer: "Versão {{version}} disponível",
       required: "Atualize para continuar",
@@ -509,6 +500,8 @@ export const desktopPtBR = {
       checkFailed: "Não deu para procurar agora. Tente mais tarde.",
       latestAlready: "Você já está na versão mais nova",
       install: "Atualizar e reabrir",
+      downloading: "Baixando…",
+      installing: "Instalando…",
       installFailed: "Não deu para atualizar sozinho. Baixe e instale à mão.",
       download: "Baixar a versão {{version}}",
       howTitle: "Atualizar à mão",
@@ -524,8 +517,8 @@ export const desktopPtBR = {
       lead: "Tudo o que os agentes fizeram neste {{device}}.",
       all: "Todas",
       org: "Organização",
-      copyDiag: "Copiar diagnóstico",
-      diagCopied: "Diagnóstico copiado, sem senhas nem arquivos",
+      copyDiag: "Copiar os detalhes",
+      diagCopied: "Detalhes copiados, sem senhas nem arquivos",
       showMore: "Mostrar mais",
       empty: "Nada por aqui ainda.",
       today: "Hoje",
@@ -538,17 +531,18 @@ export const desktopPtBR = {
     },
     advanced: {
       title: "Avançado",
-      lead: "Só mexa se o {{device}} estiver lento ou pesado. O padrão serve para quase todo mundo. Os limites valem para cada organização.",
+      lead: "Só mexa se o {{device}} estiver lento ou pesado.",
       defaults: "Voltar ao padrão",
       defaultsDone: "Padrão de volta",
       longJobs: "Trabalhos longos",
       concurrent: "Ao mesmo tempo",
-      concurrentDesc: "Quantos trabalhos longos rodam juntos, como builds e testes.",
+      concurrentDesc: "Quantos trabalhos longos, como builds e testes, rodam juntos em cada organização.",
       maxTime: "Tempo máximo de cada um",
       maxTimeDesc: "Depois disso o trabalho para e o agente avisa.",
       claude: "Claude Code",
       brainMax: "Conversas abertas",
-      brainMaxDesc: "Mais conversas abertas respondem mais rápido e usam mais memória.",
+      brainMaxDesc:
+        "Quantas ficam abertas em cada organização. Mais conversas abertas respondem mais rápido, mas usam mais memória.",
       brainIdle: "Fechar conversa parada depois de",
       folder: "Pasta dos agentes",
       folderDesc: "Uma pasta por organização, com uma pasta para cada agente.",
@@ -563,15 +557,16 @@ export const desktopPtBR = {
     migrating: "Atualizando o agentes.chat neste {{device}}. Pode levar um minuto.",
     stopped: "O agentes.chat parou neste {{device}}",
     failing: "O agentes.chat não está iniciando neste {{device}}",
-    tailnetOff:
-      "O agentes.chat está rodando, mas abre pelo endereço do Tailscale, e o Tailscale não está conectado neste {{device}}.",
-    tailnetUp: "Para conectar, rode sudo tailscale up no terminal.",
+    tailnetOff: "Conecte o Tailscale neste {{device}} para abrir o agentes.chat.",
+    tailnetUp: "No terminal: sudo tailscale up",
+    tailnetTray: "Abra pelo ícone perto do relógio.",
     onlyHere: "Usar só neste {{device}}",
     start: "Iniciar",
-    copy: "Copiar o diagnóstico",
+    copy: "Copiar os detalhes",
     copied: "Copiado",
     retry: "Tentar de novo",
     openTailscale: "Abrir o Tailscale",
+    otherServer: "Usar outro servidor",
   },
   /** The menu bar (menus.rs) and the tray's own menu on Windows and Linux (tray.rs): one label per item id. */
   menu: {

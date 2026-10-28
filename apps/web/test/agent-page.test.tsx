@@ -37,6 +37,13 @@ const openTab = async (name: RegExp) => {
   await settle(4);
 };
 const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
+/** The hidden text of the ⓘ named `About <label>`. */
+const hintText = (inside: HTMLElement, label: string) => {
+  const about = within(inside).getByRole("button", { name: `Sobre ${label}` });
+  return document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent;
+};
+const CONTEXT_RULE =
+  "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é da Ada.";
 const asMember = (state = seedState()) => {
   if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
   return state;
@@ -112,6 +119,20 @@ describe("agent page: tabs and the URL", () => {
 });
 
 describe("agent page: what it does", () => {
+  test("what it does and how it works: the workspace context rule is the title's ⓘ, not a line or a note", async () => {
+    await go();
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    expect(hintText(does, "O que a Ada faz")).toBe(CONTEXT_RULE);
+    expect(does.querySelector(".ac-card__foot")).toBeNull();
+    cleanup();
+    await go("?tab=instructions");
+    const how = screen().getByRole("region", { name: "Como a Ada trabalha" });
+    expect(hintText(how, "Como a Ada trabalha")).toBe(CONTEXT_RULE);
+    // Under the field, only the character count; beside it, no note.
+    expect(how.querySelector(".newag__ta-meta")?.children).toHaveLength(1);
+    expect(document.querySelector(".newag__note")).toBeNull();
+  });
+
   test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
@@ -392,6 +413,31 @@ describe("agent page: memory and proposals", () => {
     expect(second.state.calls.find((c) => c.method === "proposals.refuse")?.args).toEqual([ORG_ID, "prop-1"]);
   });
 
+  test("a proposal someone else decides names who: the person, or an admin", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (!prop) throw new Error("no prop-1");
+    prop.canDecide = false;
+    await go("?tab=memory", state);
+    const card = () => screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(within(card()).queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
+    expect(within(card()).getByText("João decide.")).toBeTruthy();
+    cleanup();
+    prop.decider = { type: "admins" };
+    await go("?tab=memory", state);
+    expect(within(card()).getByText("Um admin decide.")).toBeTruthy();
+  });
+
+  test("the side column is one link to how memory works", async () => {
+    await go("?tab=memory");
+    const link = screen().getByRole("link", { name: "Como a memória funciona" });
+    expect(link.getAttribute("href")).toBe("https://agentes.chat/help/memory?lang=pt-BR");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(card.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
+  });
+
   test("what it knows: kinds and search", async () => {
     await go("?tab=memory");
     const kinds = screen().getByRole("radiogroup", { name: "Tipo" });
@@ -428,6 +474,13 @@ describe("agent page: activity", () => {
     const state = seedState();
     state.runs.push(
       extra({ id: "run-f", what: "roda a suíte de checkout", status: "failed", errorCode: "run.budget_exceeded" }),
+      extra({
+        id: "run-k",
+        what: "resume o canal",
+        status: "failed",
+        errorCode: "run.missing_credential",
+        errorParams: { provider: "Claude" },
+      }),
       extra({ id: "run-w", what: "faz o merge do PR #42", status: "waiting_approval" }),
     );
     await go("?tab=activity", state);
@@ -440,6 +493,7 @@ describe("agent page: activity", () => {
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
     expect(runs.textContent).toContain("roda a suíte de checkout");
     expect(runs.textContent).toContain("O orçamento do mês acabou.");
+    expect(runs.textContent).toContain("Falta uma chave do Claude no workspace.");
     expect(runs.textContent).not.toContain("faz o merge");
     await click(within(filters).getByRole("radio", { name: /^Esperando/ }));
     expect(runs.textContent).toContain("faz o merge do PR #42");

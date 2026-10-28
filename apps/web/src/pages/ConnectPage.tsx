@@ -210,7 +210,7 @@ export function ConnectPage({ code }: { code: string }) {
             {formatUserCode(code)}
           </p>
           <div className="connect-page__computer">
-            <ComputerPortrait className="machine-row__icon" kind={computerKind(request.os)} state="online" />
+            <ComputerPortrait kind={computerKind(request.os)} state="online" />
             <span className="list-col" style={{ minWidth: 0 }}>
               <span className="machine-row__name">{request.name}</span>
               <span className="small muted">

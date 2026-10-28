@@ -9,7 +9,7 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { canReduceAccess, commandInReason } from "@agenteschat/client/lib/machines";
+import { allowsInApp, canReduceAccess, commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -101,7 +101,6 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         id="sec-machine-browser"
         icon="globe"
         title={t("browser.title")}
-        subtitle={t("browser.machine.description")}
         action={
           switchedOn &&
           canReduceAccess(m) && (
@@ -127,21 +126,33 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {!switchedOn && (
-        <div className="brw-note">
-          <Icon name="computer" size={16} />
-          {here ? (
-            <div className="row" style={{ flex: 1, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ flex: 1, minWidth: 200 }}>{t("machines.thisMac.toolsHere")}</span>
-              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-            </div>
-          ) : (
+      {!switchedOn &&
+        (here ? (
+          <div className="brw-note brw-note--act">
+            <span className="brw-note__text ac-iconline">
+              <Icon name="computer" size={16} />
+              <span>{t("machines.thisMac.toolsHere")}</span>
+            </span>
+            <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+          </div>
+        ) : allowsInApp(m.os) ? (
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
             <div>{t("browser.machine.offHelp")}</div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          // A Linux computer may be a server without the app: the command too.
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
+            <div className="stack-4" style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <span>{t("browser.machine.offHelp")}</span>
+              <span>{t("machines.access.grantTerminal")}</span>
+              <CommandBlock command={toolOnCommand(m, "browser")} />
+            </div>
+          </div>
+        ))}
       {switchedOn && !ready && m.browser?.reason && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {m.browser.reason}
@@ -153,7 +164,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         <>
           <h3 className="brw-gh">{t("browser.machine.inUse")}</h3>
           {uses.length === 0 ? (
-            <div className="brw-note" style={{ marginTop: 8 }}>
+            <div className="brw-note ac-iconline" style={{ marginTop: 8 }}>
               <Icon name="globe" size={16} />
               <div>{t("browser.machine.nobody")}</div>
             </div>

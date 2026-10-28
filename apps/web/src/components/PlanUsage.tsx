@@ -2,7 +2,7 @@ import type { OrgPlanUsage, PlanAccountInfo, PlanAccountUsage } from "@agentesch
 import { useApi, usePlanUsage } from "@agenteschat/client";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
-import { Card, CardFooter, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
+import { Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,7 +76,7 @@ export function PlanUsageCards() {
           id="sec-usage-plans"
           icon="computer"
           title={t("usageViews.accounts.title")}
-          subtitle={t("usageViews.accounts.subtitle")}
+          hint={{ name: t("common.about", { label: t("usageViews.accounts.title") }), text: t("usageViews.estimate") }}
         />
         {data.accounts.length === 0 ? (
           <p className="plan-empty">{t("usageViews.accounts.empty")}</p>
@@ -95,7 +95,6 @@ export function PlanUsageCards() {
             ))}
           </div>
         )}
-        {data.accounts.length > 0 && <CardFooter>{t("usageViews.estimate")}</CardFooter>}
       </Card>
       <ApiCard data={data} />
     </>
@@ -158,12 +157,7 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
   if (data.api.length === 0) return null;
   return (
     <Card aria-labelledby="sec-usage-api">
-      <CardHeader
-        id="sec-usage-api"
-        icon="key"
-        title={t("usageViews.api.title")}
-        subtitle={t("usageViews.api.subtitle")}
-      />
+      <CardHeader id="sec-usage-api" icon="key" title={t("usageViews.api.title")} />
       <div className="plan-api">
         {data.api.map((a) => {
           const name = dir.agentById.get(a.agentId)?.name ?? a.name;

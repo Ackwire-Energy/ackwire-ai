@@ -1,16 +1,24 @@
-import { StyleSheet, TextInput, type TextInputProps } from "react-native";
+import type { Ref } from "react";
+import { StyleSheet, TextInput, type TextInputInstance, type TextInputProps } from "react-native";
 import { systemText } from "@/ui";
 import { useColors } from "./hooks";
 
 /**
  * A multi-line field on a raised surface (sheets: reason to refuse, a new
  * agent, a task, a mission's goal). The design system has the composer and
- * the search field but no plain text area, so it is composed here.
+ * the search field but no plain text area, so it is composed here. `ref`: the
+ * field, for a screen that focuses it (an idea added to a text).
  */
-export function TextArea({ style, minHeight = 84, ...props }: TextInputProps & { minHeight?: number }) {
+export function TextArea({
+  style,
+  minHeight = 84,
+  ref,
+  ...props
+}: Omit<TextInputProps, "ref"> & { minHeight?: number; ref?: Ref<TextInputInstance | null> }) {
   const c = useColors();
   return (
     <TextInput
+      ref={ref}
       multiline
       textAlignVertical="top"
       placeholderTextColor={c.faint}

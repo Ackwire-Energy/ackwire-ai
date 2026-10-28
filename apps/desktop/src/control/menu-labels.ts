@@ -38,5 +38,7 @@ export function menuLabels(t: TFunction): Record<string, string> {
     hereStoppedBody: t("desktop.server.stoppedBody"),
     hereFailing: t("desktop.server.failingBanner"),
     hereBack: t("desktop.server.updateBack", { version: "{version}" }),
+    setupFailed: t("desktop.here.notifyFailed"),
+    setupFailedBody: t("desktop.here.notifyFailedBody"),
   };
 }

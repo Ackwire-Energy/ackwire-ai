@@ -45,54 +45,41 @@ export {
 } from "./shared";
 
 export type ImportSource =
-  | "openclaw"
-  | "hermes"
   | "openbotrun"
-  | "paperclip"
   | "openmausbot"
+  | "hermes"
+  | "openclaw"
+  | "paperclip"
   | "openbot"
   | "agenteschat";
-/** The source cards, in the order they are offered. */
+/** Every app the parsers read. */
 export const IMPORT_SOURCES: ImportSource[] = [
-  "openclaw",
-  "hermes",
   "openbotrun",
-  "paperclip",
   "openmausbot",
+  "hermes",
+  "openclaw",
+  "paperclip",
   "openbot",
   "agenteschat",
 ];
 /** Brand names (not translated). */
 export const SOURCE_NAME: Record<ImportSource, string> = {
-  openclaw: "OpenClaw",
-  hermes: "Hermes Agent",
-  openbotrun: "OpenBot.Run",
-  paperclip: "Paperclip",
+  openbotrun: "OpenBot.run",
   openmausbot: "OpenMausBot",
+  hermes: "Hermes Agent",
+  openclaw: "OpenClaw",
+  paperclip: "Paperclip",
   openbot: "OpenBot",
   agenteschat: "agentes.chat",
-};
-/**
- * Each source's tile: its own mark (apps/web/public/brands/README.md), or letters where we ship none, so no two
- * tiles look alike.
- */
-export const SOURCE_MARK: Record<ImportSource, { icon: string } | { letters: string }> = {
-  openclaw: { letters: "OC" },
-  hermes: { letters: "H" },
-  openbotrun: { letters: "OR" },
-  paperclip: { letters: "P" },
-  openmausbot: { icon: "/brands/openmausbot.png" },
-  openbot: { icon: "/brands/openbot.png" },
-  agenteschat: { icon: "/favicon.svg" },
 };
 const ARCHIVES = ".zip,.tar.gz,.tgz,.tar,application/zip,application/gzip,application/x-tar";
 /** What the file picker offers for each source. */
 export const SOURCE_ACCEPT: Record<ImportSource, string> = {
-  openclaw: `.md,.json,.json5,${ARCHIVES}`,
-  hermes: `.md,.yaml,.yml,.json,${ARCHIVES}`,
   openbotrun: `.json,${ARCHIVES}`,
-  paperclip: `.md,.yaml,.yml,${ARCHIVES}`,
   openmausbot: ".json,.md,.markdown,.yaml,.yml,.txt,application/json,text/markdown",
+  hermes: `.md,.yaml,.yml,.json,${ARCHIVES}`,
+  openclaw: `.md,.json,.json5,${ARCHIVES}`,
+  paperclip: `.md,.yaml,.yml,${ARCHIVES}`,
   openbot: `.yaml,.yml,${ARCHIVES}`,
   agenteschat: ".json,.txt,.md,application/json",
 };

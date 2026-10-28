@@ -19,6 +19,7 @@ import {
   useThreadMutation,
   useToggleReaction,
 } from "@agenteschat/client";
+import { summaryParts } from "@agenteschat/client/lib/missions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -493,6 +494,7 @@ export function ChannelOptions({
   leading,
   agentId,
   onPins,
+  onMembers,
 }: {
   channelId: string;
   title: string;
@@ -501,6 +503,8 @@ export function ChannelOptions({
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
   onPins: () => void;
+  /** A channel: who is in it (and, for admins, adding and removing). */
+  onMembers?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -512,6 +516,9 @@ export function ChannelOptions({
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
       <ActionList
         items={[
+          ...(onMembers
+            ? [{ key: "members", icon: "members" as const, label: t("shell.members"), onPress: onMembers }]
+            : []),
           {
             key: "pins",
             icon: "pin",
@@ -659,7 +666,7 @@ function whereText(t: TFunction, a: MissionEligibleAgent, cloud: boolean) {
 
 // ── /summary of a mission ────────────────────────────────────────────────────
 
-/** Where the mission stands, from the database (only for me). */
+/** Where the mission stands (only for me), in the web card's lines: the server's `text` is English. */
 export function MissionSummaryView({ missionId }: { missionId: string }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -679,7 +686,9 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
         <ActivityIndicator color={c.muted} />
       ) : (
         <Text variant="body" tone="ink2">
-          {summary.data.text}
+          {summaryParts(summary.data)
+            .map((p) => t(`missions.summary.${p.key}`, { count: p.count, total: p.total ?? 0 }))
+            .join("\n")}
         </Text>
       )}
     </>

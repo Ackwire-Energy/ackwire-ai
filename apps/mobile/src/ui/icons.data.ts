@@ -56,6 +56,7 @@ export const ICONS = {
     c(12, 12.5, 3.5),
   ],
   mic: [r(9, 3.5, 6, 11, 3), p("M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5")],
+  sound: [p("M4 9.5v5h3.5l5 4.5V5L7.5 9.5Z"), p("M16 9a4.2 4.2 0 0 1 0 6M18.6 6.4a7.8 7.8 0 0 1 0 11.2")],
   target: [c(12, 12, 8), c(12, 12, 4), c(12, 12, 0.8, true)],
   list: [p("M9 6.5h11M9 12h11M9 17.5h11"), p("M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01", 2.6)],
   reply: [p("M4 5h16v9H11l-4 3.5V14H4Z"), p("M9 9h6")],
@@ -117,6 +118,8 @@ export const ICONS = {
   flag: [p("M6 21V4M6 4h11l-2 4 2 4H6")],
   // The question card, "Conversa com…" and "Livre".
   help: [c(12, 12, 8.5), p("M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01", 2)],
+  // The ⓘ beside a label that shows its explanation (`InfoHint`).
+  info: [c(12, 12, 8.5), p("M12 11v5M12 8h.01", 2)],
   compose: [
     p("M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"),
     p("M16.5 4.5a2 2 0 0 1 3 3L12 15l-3.5.5L9 12Z"),
@@ -144,6 +147,15 @@ export const ICONS = {
   eye: [p("M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"), c(12, 12, 2.6)],
   down: [p("M12 5v14M6 13l6 6 6-6")],
   wifi: [p("M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"), p("M12 19h.01")],
+  // The web's Membros icon on this grid: someone asking to join.
+  members: [
+    c(9.6, 8.4, 3.4),
+    p("M3.6 19.2c.7-3.1 3-4.8 6-4.8s5.3 1.7 6 4.8M16.2 5.4a3.1 3.1 0 0 1 0 6M18 14.8c1.3.7 2.2 2.3 2.4 4.4"),
+  ],
+  // The web's person on this grid: the one person in a channel with an agent.
+  person: [c(12, 8.4, 3.8), p("M5 20.4c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5")],
+  // The web's reply arrow on this grid. `reply` here is the web's thread drawing.
+  replyTo: [p("M9.6 6 4.8 10.8l4.8 4.8M4.8 10.8h8.4a6 6 0 0 1 6 6v1.8")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

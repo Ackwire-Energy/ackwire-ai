@@ -1,10 +1,12 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { realpath } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   type AgentScope,
   DESKTOP_LIMITS,
+  DESKTOP_TEXT_MAX,
   type DesktopAction,
   type DesktopLookReply,
   type DesktopPoint,
@@ -78,6 +80,12 @@ const INSTALL = "sudo apt install --no-install-recommends python3 python3-gi pyt
 /** The command in backticks: the computer's page shows it to copy (`commandInReason`). */
 const installReason = (missing: readonly string[]) =>
   `Install what desktop use needs: \`${INSTALL}\` (missing: ${missing.join(", ")})`;
+const NO_TESSERACT =
+  "Reading the screen's text needs tesseract: `sudo apt install --no-install-recommends tesseract-ocr tesseract-ocr-por`";
+/** Reading a screen's text: at the lowest priority, in English and Portuguese, killed after this long. */
+const OCR_MS = 10_000;
+const OCR_LANGUAGES = "eng+por";
+const userPath = () => process.env.PATH || "/usr/local/bin:/usr/bin:/bin";
 
 /** After an action, the browser's numbers: quiet 120 ms after its first change, 400 ms for a late one, 2 s at most. */
 const SETTLE: HelperSettle = { lateMs: 400, quietMs: 120, capMs: 2000 };
@@ -268,6 +276,7 @@ export const DESKTOP_USE_OPS: ReadonlySet<string> = new Set([
   "desktop.act",
   "desktop.capture",
   "desktop.apps",
+  "desktop.text",
 ]);
 
 /**
@@ -331,6 +340,8 @@ interface Use {
   lastUsed: number;
   /** The helper's own failures in a row (`internal`, `unavailable`). */
   failures: number;
+  /** The hash of the last capture whose text `desktop.text` read. */
+  read?: string;
 }
 
 /** Where an action lands: a point, and the element of the last look it is on. */
@@ -491,7 +502,7 @@ class Helper {
       const last = this.stderr.trim().split("\n").pop()?.slice(0, 200) ?? "";
       const why = `it exited (${signal ?? `code ${code}`})${last ? `: ${last}` : ""}`;
       this.finish(
-        new RunnerError("desktop_unavailable", "The desktop helper stopped; it starts again on the next use"),
+        new RunnerError("desktop_unavailable", "The desktop helper stopped. It starts again on the next use."),
         why,
       );
     });
@@ -545,7 +556,7 @@ class Helper {
 
   private violation(why: string) {
     this.finish(
-      new RunnerError("internal", `The desktop helper misbehaved (${why}); it starts again on the next use`),
+      new RunnerError("internal", `The desktop helper misbehaved (${why}). It starts again on the next use.`),
       why,
     );
     this.child.kill("SIGKILL");
@@ -564,7 +575,10 @@ class Helper {
   }
 }
 
-/** Each agent's use of its own desktop (ADR 0062): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`. */
+/**
+ * Each agent's use of its own desktop (ADR 0062): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`;
+ * and `desktop.text`, its screen's text for screening a person in control (ADR 0076).
+ */
 export class DesktopManager {
   private readonly uses = new Map<string, Use>();
   private readonly queue = new KeyedQueue();
@@ -647,6 +661,24 @@ export class DesktopManager {
     });
   }
 
+  /**
+   * The screen's text, read here by tesseract as the agent's own user from a capture; the image never leaves.
+   * No look is taken, so the agent's refs and its last look stay as they were.
+   */
+  async text(agent: AgentScope): Promise<MachineReplies["desktop.text"]> {
+    const tesseract = this.sys.which("tesseract");
+    if (!tesseract) throw new RunnerError("desktop_unavailable", NO_TESSERACT);
+    return this.serial(agent, async (use) => {
+      const shot = await this.call(use, "capture", { quality: JPEG_QUALITY });
+      if (!isRecord(shot) || !isString(shot.jpeg)) throw this.malformed(use, "screenshot");
+      const hash = createHash("sha256").update(shot.jpeg).digest("base64");
+      if (hash === use.read) return { same: true };
+      const text = await this.ocr(use, tesseract, Buffer.from(shot.jpeg, "base64"));
+      use.read = hash;
+      return { text };
+    });
+  }
+
   /** The apps a person could start from the menu, by name; those that end the session aren't offered. */
   apps(agent: AgentScope): Promise<MachineReplies["desktop.apps"]> {
     return this.serial(agent, async (use) => {
@@ -705,7 +737,7 @@ export class DesktopManager {
     if (refusal) throw new RunnerError("desktop_unavailable", refusal);
     const started = await this.opts.desktops.ensure(agent);
     const s = this.opts.desktops.session(agent.id);
-    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again.");
     const at = Date.parse(started.startedAt);
     const since = Number.isFinite(at) ? at : 0;
     let use = this.uses.get(agent.id);
@@ -1007,6 +1039,34 @@ export class DesktopManager {
     }
   }
 
+  /** tesseract on a capture, as this process's user (or the launcher's). The error never carries its output. */
+  private ocr(use: Use, tesseract: string, jpeg: Buffer): Promise<string> {
+    const [file = "", ...args] = [
+      ...(this.opts.launcher?.prefix ?? []),
+      ...["nice", "-n", "19", tesseract, "stdin", "stdout", "-l", OCR_LANGUAGES],
+    ];
+    return new Promise((resolve, reject) => {
+      const child = execFile(
+        file,
+        args,
+        {
+          cwd: use.home,
+          env: { HOME: use.home, PATH: userPath() },
+          timeout: OCR_MS,
+          killSignal: "SIGKILL",
+          maxBuffer: 1024 * 1024,
+        },
+        (err, stdout) => {
+          if (!err) return resolve(stdout.trim().slice(0, DESKTOP_TEXT_MAX));
+          const why = err.killed ? `took over ${OCR_MS / 1000} s` : `failed (${err.code ?? "no exit code"})`;
+          reject(new RunnerError("internal", `Reading the screen's text ${why}`));
+        },
+      );
+      child.stdin?.on("error", () => undefined);
+      child.stdin?.end(jpeg);
+    });
+  }
+
   /**
    * A helper for the agent's desktop, as this process's user (or the launcher's), with the desktop's display and
    * cookie and a UTF-8 locale. A desktop that just started gets a few seconds for its accessibility bus to come up.
@@ -1016,7 +1076,7 @@ export class DesktopManager {
     if (!this.opts.command && !python) throw new RunnerError("desktop_unavailable", installReason(["python3"]));
     const env: Record<string, string> = {
       HOME: use.home,
-      PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+      PATH: userPath(),
       DISPLAY: `:${use.display}`,
       XAUTHORITY: use.xauthority,
       ...HELPER_ENV,
@@ -1069,7 +1129,7 @@ export class DesktopManager {
   /** The helper broke the protocol: it stops (starting again on the next use), and the request fails. */
   private malformed(use: Use, what: string) {
     this.stop(use);
-    return new RunnerError("internal", `The desktop helper sent a malformed ${what}; it starts again on the next use`);
+    return new RunnerError("internal", `The desktop helper sent a malformed ${what}. It starts again on the next use.`);
   }
 
   private stop(use: Use) {
@@ -1097,7 +1157,7 @@ function lastLook(use: Use, points: DesktopPoint[]): NonNullable<Use["last"]> {
   const ref = points.find((p) => "ref" in p);
   throw ref && "ref" in ref
     ? staleRef(ref.ref)
-    : new RunnerError("not_found", "stale: the desktop isn't as last seen; look at it again");
+    : new RunnerError("not_found", "stale: the desktop isn't as last seen. Look at it again.");
 }
 
 /** A window is activated by its id: what `focus` does, and a click on a window's own line. */

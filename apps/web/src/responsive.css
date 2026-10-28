@@ -139,7 +139,7 @@
     padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 8px;
   }
   .channel__header > .ac-btn,
-  .channel__header > .members-stack {
+  .channel__header > .ac-acts {
     flex: none;
   }
   .channel__title {
@@ -161,9 +161,8 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
   }
   .channel__messages .ac-msg {
+    --msg-inline: 12px;
     gap: 10px;
-    padding-right: 12px;
-    padding-left: 12px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
@@ -314,19 +313,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -346,7 +332,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    padding-block: 20px;
+    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -430,19 +416,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -462,7 +435,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    padding-block: 20px;
+    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -495,10 +468,6 @@
   .agp-id {
     flex-direction: column;
   }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
 }
 
 /* ── Offline computer notice on phones: the words, then the buttons sharing the width ── */
@@ -514,6 +483,10 @@
   }
   .outage__crew {
     display: none;
+  }
+  /* The setup notice names no one: its faces are who waits for the computer. */
+  .setup-notice .outage__crew {
+    display: inline-flex;
   }
   .outage__acts {
     flex-basis: 100%;

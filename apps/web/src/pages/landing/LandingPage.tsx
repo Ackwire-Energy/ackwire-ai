@@ -1,5 +1,10 @@
 import { ApiError } from "@agenteschat/client";
-import { legalDocument } from "@agenteschat/i18n/legal";
+import {
+  HUMAN_CHECK_BLOCKED,
+  HUMAN_CHECK_REFUSED,
+  type HumanCheck,
+  withHumanCheck,
+} from "@agenteschat/client/lib/human-check";
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +13,6 @@ import { useApi } from "@/api/context";
 import { type LocaleCode, setLocale } from "@/i18n";
 import { loadAnalytics, track } from "@/lib/analytics";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
-import { useTheme } from "@/lib/theme";
 import { Bento } from "./Bento";
 import { Closing } from "./Closing";
 import { Computer } from "./Computer";
@@ -18,8 +22,9 @@ import { DemoWorkspace } from "./DemoWorkspace";
 import { Devices } from "./Devices";
 import { GIANT_LOOKS } from "./data";
 import { Faq } from "./Faq";
+import { Footer } from "./Footer";
 import { Hero } from "./Hero";
-import { readReducedMotion, useJoy } from "./hooks";
+import { readReducedMotion, useJoy, useLandingTheme } from "./hooks";
 import { LpIcon } from "./icons";
 import { Missions } from "./Missions";
 import { Onboarding } from "./Onboarding";
@@ -44,9 +49,9 @@ const hash = (id: string) => `#${id}`;
 export function LandingPage() {
   const { t, i18n } = useTranslation();
   const api = useApi();
-  const { preference, setPreference } = useTheme();
   const [reduced] = useState(readReducedMotion);
-  const [theme, setTheme] = useState<"light" | "dark">(preference === "light" ? "light" : "dark");
+  const root = useRef<HTMLDivElement>(null);
+  const { theme, toggleTheme } = useLandingTheme(root);
 
   // Agents that turn toward the pointer: the engine's gaze, for avatars inside a registered element.
   const locked = useRef(false);
@@ -64,26 +69,6 @@ export function LandingPage() {
     [],
   );
   useEffect(() => () => setGaze(null), []);
-  // The page behind the landing takes its background, so no app-theme strip shows at the edges or in the scroll bounce.
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const html = document.documentElement;
-    const bg = root.current ? getComputedStyle(root.current).backgroundColor : "";
-    const before = { bg: html.style.backgroundColor, scheme: html.style.colorScheme };
-    html.style.backgroundColor = bg;
-    html.style.colorScheme = theme;
-    // The phone's status bar too (theme-color), back to the app's colors on the way out.
-    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
-    const colors = metas.map((m) => m.content);
-    for (const m of metas) if (bg) m.content = bg;
-    return () => {
-      html.style.backgroundColor = before.bg;
-      html.style.colorScheme = before.scheme;
-      metas.forEach((m, i) => {
-        m.content = colors[i] ?? m.content;
-      });
-    };
-  }, [theme]);
   useEffect(() => {
     if (reduced) return;
     const onMove = (e: PointerEvent) => {
@@ -125,12 +110,6 @@ export function LandingPage() {
     ],
     [t],
   );
-
-  const toggleTheme = () => {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    setPreference(next);
-  };
 
   // The giant: a click cycles its look and makes it hop; it writes while someone types the email.
   const [giantLook, setGiantLook] = useState(0);
@@ -186,17 +165,19 @@ export function LandingPage() {
     );
     void navigate({ to: "/", search: {}, replace: true });
   }, [api, confirmToken, hop, navigate]);
-  const join = async (email: string): Promise<JoinResult> => {
+  const join = async (email: string, check: HumanCheck | null): Promise<JoinResult> => {
     busy.current = true;
     clearTimeout(typingTimer.current);
     setGiantState("thinking");
     try {
-      await api.waitlist.join({ email, locale });
+      await withHumanCheck(check, (token) => api.waitlist.join({ email, locale }, token));
     } catch (error) {
       busy.current = false;
       setGiantState("idle");
       if (error instanceof ApiError) {
         if (error.code === "invalid_email") return "invalid";
+        if (error.code === HUMAN_CHECK_REFUSED) return "human";
+        if (error.code === HUMAN_CHECK_BLOCKED) return "blocked";
         if (error.status === 429 || error.code === "rate_limited") return "rate";
       }
       return "failed";
@@ -306,27 +287,7 @@ export function LandingPage() {
           />
         </main>
 
-        <footer className="lp-footer">
-          <div className="lp-wrap">
-            <Logo variant="expanded" size={18} />
-            <span>{t("landing.footer")}</span>
-            {/* The legal pages open in English (the reader can switch on the page). */}
-            <nav className="lp-footer__legal">
-              <a href="/terms">{legalDocument("terms", "en").title}</a>
-              <a href="/privacy">{legalDocument("privacy", "en").title}</a>
-              <a
-                href="https://x.com/agentes_chat"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("landing.footerX")}
-                title={t("landing.footerX")}
-              >
-                𝕏
-              </a>
-            </nav>
-            <p className="lp-footer__company">{t("landing.footerCompany")}</p>
-          </div>
-        </footer>
+        <Footer t={t} />
       </div>
     </LandingContext.Provider>
   );

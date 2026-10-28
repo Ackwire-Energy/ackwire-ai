@@ -12,9 +12,15 @@ import {
   timeLeft,
   whenAt,
 } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
-import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@agenteschat/client/lib/onboarding";
+import {
+  addInvites,
+  firstAskOrder,
+  ONBOARDING_STEPS,
+  splitEmails,
+  validInvites,
+} from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
 import { en, ptBR } from "@agenteschat/i18n";
@@ -34,6 +40,7 @@ describe("format (pt-BR, machine numbers precise)", () => {
   test("money", () => {
     expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
+    expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
@@ -117,6 +124,10 @@ describe("text", () => {
     ]);
     expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["import", "computer", "team"]);
   });
+  test("onboarding's first message: Lia offers it where the agents can browse, Theo where they can't, then Ada", () => {
+    expect(firstAskOrder(true)).toEqual(["lia", "theo", "ada"]);
+    expect(firstAskOrder(false)).toEqual(["theo", "lia", "ada"]);
+  });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");
     expect(passwordState("curta")).toBe("short");
@@ -135,7 +146,29 @@ describe("grammar", () => {
     expect(isFeminineName("Theo")).toBe(false);
     expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
     expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
-    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toContain("entra no contexto dela");
+    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    expect(t("agent.instructionsHelp", { ...agentGrammar(t, "Atlas"), org: "Acme" })).toEndWith(
+      "escreva aqui só o que é do Atlas.",
+    );
+  });
+
+  test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
+    expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
+    expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");
+    expect(providerGrammar(t, "Claude")).toEqual({ provider: "Claude", of: "do" });
+    // One this app doesn't know keeps its name, with the usual "da".
+    expect(providerGrammar(t, "mistral")).toEqual({ provider: "mistral", of: "da" });
+    expect(t("agentPage.activity.errors.missing_credential", runErrorGrammar(t, { provider: "Claude" }))).toBe(
+      "Falta uma chave do Claude no workspace.",
+    );
+    expect(
+      t(
+        "agentPage.activity.errors.credential_wrong_provider",
+        runErrorGrammar(t, { modelProvider: "Claude", keyProvider: "DeepSeek" }),
+      ),
+    ).toBe("O modelo é do Claude, mas a chave é da DeepSeek.");
   });
 });
 

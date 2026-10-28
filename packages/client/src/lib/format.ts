@@ -5,10 +5,10 @@ import type { TFunction } from "i18next";
  * 1.240 tokens · US$ 0,004"). Locale-aware; pt-BR uses "," for decimals.
  */
 
-/** US$ with 2 decimals, or more for tiny amounts (US$ 0,004). */
+/** US$ with 2 decimals, or more for tiny amounts (US$ 0,004, a few Jev decisions' US$ 0,0003). */
 export function formatUsd(t: TFunction, locale: string, value: number) {
   const abs = Math.abs(value);
-  const digits = abs === 0 ? 2 : abs < 0.01 ? 3 : 2;
+  const digits = abs === 0 ? 2 : abs < 0.001 ? 4 : abs < 0.01 ? 3 : 2;
   const text = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
     value,
   );
@@ -25,6 +25,10 @@ export function formatPercent(locale: string, value: number) {
 
 /** "1.240" */
 export const formatInt = (locale: string, value: number) => new Intl.NumberFormat(locale).format(Math.round(value));
+
+/** "0,042" / "0.0001": a price of a fraction of a cent, in the locale's decimal sign. */
+export const formatDecimal = (locale: string, value: number) =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(value);
 
 /** "3,1 mi" / "12 mil" / "940" */
 export function formatTokensShort(t: TFunction, locale: string, value: number) {
@@ -59,7 +63,7 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 export const daysBetween = (iso: string, now: Date) =>
   Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
 
 /** A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). */
 export const lowerFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleLowerCase(locale) + s.slice(1) : s);

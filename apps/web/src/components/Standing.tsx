@@ -1,5 +1,5 @@
 import { type Me, type OrgSummary, useAuthConfig } from "@agenteschat/client";
-import { holdText } from "@agenteschat/client/lib/errors";
+import { holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -14,20 +14,21 @@ import { useOrg } from "@/components/org-context";
  * move both live.
  */
 
-/** "Precisa de ajuda? Escreva para …" when the server says where (`SUPPORT_EMAIL`), else to ask who runs it. */
+/** "Precisa de ajuda? Escreva para …", or to ask who runs the server, as `supportLineOf` says. */
 export function SupportLine() {
   const { t } = useTranslation();
-  const email = useAuthConfig().data?.supportEmail;
+  const line = supportLineOf(useAuthConfig().data);
+  if (!line) return null;
   return (
     <span className="support-line">
-      {email ? (
+      {line === "ask" ? (
+        t("support.ask")
+      ) : (
         <>
           {t("support.writeBefore")}
-          <a href={`mailto:${email}`}>{email}</a>
+          <a href={`mailto:${line.email}`}>{line.email}</a>
           {t("support.writeAfter")}
         </>
-      ) : (
-        t("support.ask")
       )}
     </span>
   );
@@ -58,7 +59,6 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const reason = org.standing?.reason;
   const others = me.organizations.filter((o) => o.id !== org.id && o.standing?.state !== "suspended");
   return (
     <div className="page page--mid suspended-page">
@@ -80,7 +80,7 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
           </Button>
         }
       >
-        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")}
+        {suspendedText(t, org.standing)}
         <SupportLine />
       </EmptyState>
       {others.length > 0 && (

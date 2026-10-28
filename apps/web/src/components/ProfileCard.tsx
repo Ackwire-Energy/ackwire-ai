@@ -5,9 +5,9 @@ import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
-import { Avatar, Button, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, Button, hoverPointer, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
@@ -52,7 +52,6 @@ export function ProfileTrigger({
     },
     [],
   );
-  const hoverable = (e: PointerEvent) => e.pointerType === "mouse" || e.pointerType === "pen";
   const later = (next: boolean, ms: number) => {
     clear();
     timer.current = setTimeout(() => {
@@ -70,8 +69,8 @@ export function ProfileTrigger({
       label={t("profile.cardLabel")}
       side="bottom"
       className="profile-card"
-      onContentPointerEnter={(e) => hoverable(e) && clear()}
-      onContentPointerLeave={(e) => hoverable(e) && later(false, HOVER_CLOSE_MS)}
+      onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}
+      onContentPointerLeave={(e) => hoverPointer(e.pointerType) && later(false, HOVER_CLOSE_MS)}
       trigger={
         <button
           type="button"
@@ -81,10 +80,10 @@ export function ProfileTrigger({
           tabIndex={decorative ? -1 : undefined}
           aria-hidden={decorative || undefined}
           onPointerEnter={(e) => {
-            if (hoverable(e) && !open) later(true, HOVER_OPEN_MS);
+            if (hoverPointer(e.pointerType) && !open) later(true, HOVER_OPEN_MS);
           }}
           onPointerLeave={(e) => {
-            if (!hoverable(e)) return;
+            if (!hoverPointer(e.pointerType)) return;
             if (open) later(false, HOVER_CLOSE_MS);
             else clear();
           }}
@@ -221,7 +220,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         <dt>{t("profile.model")}</dt>
         <dd>
           {thinks ? (
-            <span className="profile-card__brain">
+            <span className="profile-card__brain ac-iconline">
               {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
               {thinks.text}
             </span>

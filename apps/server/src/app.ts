@@ -28,6 +28,7 @@ import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
+import { jevRoutes } from "./routes/app/jev";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { machineAccountRoutes } from "./routes/app/machine-accounts";
 import { mailRoutes } from "./routes/app/mail";
@@ -95,6 +96,7 @@ export interface AppOptions {
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
  * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
+ * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -158,6 +160,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
+    api.route("/app", jevRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);
@@ -235,6 +238,24 @@ export function createApp(options: AppOptions) {
       if (!res) return c.text("Not found", 404);
       res.headers.set("cache-control", "no-cache");
       if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
+      return res;
+    });
+    // The service worker (browser push, ADR 0071): at the root so it controls the whole app, always
+    // revalidated so a new deploy's worker takes over, JavaScript, and never the SPA when missing.
+    app.get("/sw.js", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "no-cache");
+      res.headers.set("content-type", "text/javascript; charset=utf-8");
+      return res;
+    });
+    // Emails' pictures and font: fetched by mail clients and Gmail's image proxy, so readable without a
+    // session and from any origin; never the SPA when missing. A changed picture gets a new name.
+    app.get("/email/*", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "public, max-age=31536000, immutable");
+      res.headers.set("access-control-allow-origin", "*");
       return res;
     });
     // Hashed build files never change: the browser (and the Mac app's window) opens them from disk.

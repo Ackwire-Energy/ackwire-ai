@@ -1,13 +1,18 @@
+import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
 
-const toResult = (error: { status?: number; message?: string; code?: string } | null | undefined): AuthResult =>
+const toResult = (
+  error: { status?: number; message?: string; code?: string; kind?: unknown; cloud?: unknown } | null | undefined,
+): AuthResult =>
   error
     ? {
         ok: false,
         status: error.status ?? 500,
         message: error.message ?? "",
         ...(error.code ? { code: error.code } : {}),
+        ...(typeof error.kind === "string" ? { kind: error.kind } : {}),
+        ...(error.cloud === true ? { cloud: true } : {}),
       }
     : { ok: true };
 
@@ -26,13 +31,29 @@ export function createBetterAuthClient(origin = window.location.origin, language
     },
   });
   return {
-    signIn: async ({ email, password }) => toResult((await client.signIn.email({ email, password })).error),
-    signUp: async ({ name, email, password }) => toResult((await client.signUp.email({ name, email, password })).error),
+    signIn: async ({ email, password }, humanCheck) =>
+      toResult(
+        (await client.signIn.email({ email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
+          .error,
+      ),
+    signUp: async ({ name, email, password }, humanCheck) =>
+      toResult(
+        (await client.signUp.email({ name, email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
+          .error,
+      ),
     sendVerificationEmail: async (email) => toResult((await client.sendVerificationEmail({ email })).error),
     signInSocial: async (provider, callbackURL) =>
       toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
-    requestPasswordReset: async ({ email, redirectTo }) =>
-      toResult((await client.requestPasswordReset({ email, redirectTo })).error),
+    requestPasswordReset: async ({ email, redirectTo }, humanCheck) =>
+      toResult(
+        (
+          await client.requestPasswordReset({
+            email,
+            redirectTo,
+            fetchOptions: { headers: humanCheckHeaders(humanCheck) },
+          })
+        ).error,
+      ),
     resetPassword: async ({ token, newPassword }) =>
       toResult((await client.resetPassword({ token, newPassword })).error),
     signOut: async () => {

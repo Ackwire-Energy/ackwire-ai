@@ -9,6 +9,7 @@ import {
   formatTokensShort,
   formatUsd,
 } from "@agenteschat/client/lib/format";
+import { runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { covers } from "@agenteschat/client/lib/repos";
 import {
   type AgentColor,
@@ -44,7 +45,10 @@ type TT = (key: string, options?: Record<string, unknown>) => string;
 function failure(t: TFunction, run: Run) {
   const code = run.errorCode?.replace(/^run\./, "");
   if (code && code !== "failed") {
-    const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, { ...run.errorParams, defaultValue: "" });
+    const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, {
+      ...runErrorGrammar(t, run.errorParams),
+      defaultValue: "",
+    });
     if (text) return text;
   }
   return run.errorParams?.detail ?? run.error ?? t("agentPage.activity.errors.unknown");
@@ -304,13 +308,13 @@ export function ActivityTab() {
                             {x.routine && <Chip icon="routines">{t("agentPage.activity.routine")}</Chip>}
                           </span>
                           {r.status === "failed" && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {failure(t, r)}
                             </span>
                           )}
                           {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {t("repos.deniedRun", { repo: r.deniedRepo, ...g })}
                             </span>

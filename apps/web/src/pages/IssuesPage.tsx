@@ -795,7 +795,7 @@ function NewIssueDialog({
             </Field>
           </div>
           {agent && (
-            <p className="issue-agent-note">
+            <p className="issue-agent-note ac-iconline">
               <Icon name="shield" size={14} />
               {t("issues.form.agentStarts", agentGrammar(t, agent.name))}
             </p>

@@ -22,7 +22,7 @@ import {
   useRuleParse,
 } from "@agenteschat/client";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
-import { formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
+import { capitalize, formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -59,6 +59,7 @@ import {
   FilterChip,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Menu,
   MenuItem,
@@ -301,10 +302,6 @@ export function RoutinesPage() {
           <div>
             <h1>{t("routines.title")}</h1>
             <p className="routines-head__sub">{t("routines.subtitle")}</p>
-            <p className="routines-head__guard">
-              <Icon name="shield" size={14} />
-              {t("routines.guard")}
-            </p>
           </div>
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             {t("routines.new")}
@@ -323,9 +320,7 @@ export function RoutinesPage() {
                 {t("routines.new")}
               </Button>
             }
-          >
-            {t("routines.empty")}
-          </EmptyState>
+          />
         )}
         {list.length > 0 && (
           <>
@@ -469,9 +464,12 @@ function useRunWords() {
     label: (r: Routine) => {
       const runs = runPixels(r.recentRuns).slice(0, RUN_SLOTS);
       if (runs.length === 0) return t("routines.stripNone");
-      return t("routines.stripLabel", {
-        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join("; "),
+      // A sentence per run. The first follows the label's colon, so only the others start with a capital.
+      const list = runs.map((x, i) => {
+        const when = whenAt(t, i18n.language, x.at);
+        return `${i > 0 ? capitalize(when, i18n.language) : when}: ${t(`routines.statusWord.${x.status}`)}`;
       });
+      return t("routines.stripLabel", { list: list.join(". ") });
     },
   };
 }
@@ -663,7 +661,7 @@ function RoutineRow({
           {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
-      <div className="routine-row__when">
+      <div className="routine-row__when ac-iconline">
         <span className="routine-row__when-icon" aria-hidden="true">
           <Icon
             name={
@@ -1109,19 +1107,24 @@ function RoutineDetails({
       <DetailsSection title={t("routines.panel.runsOn")}>
         <p className="routine-details__sentence">{say(whereItRuns(r.brain))}</p>
         {busy && (
-          <p className="routine-note small">
+          <p className="routine-note small ac-iconline">
             <Icon name="computer" size={14} />
             <span>{say(busy)}</span>
           </p>
         )}
       </DetailsSection>
       <DetailsSection title={t("routines.panel.access")}>
-        <p className="routine-details__sentence">{t(`routines.access.${r.access}`)}</p>
-        <p className="small muted">{t(`routines.access.${r.access}Help`)}</p>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.access.${r.access}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
+              {t("routines.access.hint")}
+            </InfoHint>
+          </span>
+        </p>
       </DetailsSection>
       <DetailsSection title={t("routines.panel.report")}>
         <p className="routine-details__sentence">{t(`routines.report.${r.report}`)}</p>
-        <p className="small muted">{t(`routines.report.${r.report}Help`)}</p>
       </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
@@ -1675,7 +1678,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </>
           )}
           {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-            <p className="routine-utc-hint small">
+            <p className="routine-utc-hint small ac-iconline">
               <Icon name="waiting" size={14} />
               <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
               <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
@@ -1687,7 +1690,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             <Field
               label={t("routines.form.event")}
               id="nr-event"
-              help={t("routines.form.eventHelp", { org: org.name })}
+              hint={{
+                name: t("common.about", { label: t("routines.form.event") }),
+                text: t("routines.form.eventHelp", { org: org.name }),
+              }}
             >
               <Select
                 value={event}
@@ -1697,7 +1703,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </Field>
           )}
           {busy && (
-            <p className="routine-note small" role="status">
+            <p className="routine-note small ac-iconline" role="status">
               <Icon name="computer" size={14} />
               <span>{say(busy)}</span>
             </p>
@@ -1710,17 +1716,20 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               onValueChange={setReport}
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
-            <p className="small muted">{t(`routines.report.${report}Help`)}</p>
           </div>
           <div className="routine-kind">
-            <span className="ac-field__label">{t("routines.form.access")}</span>
+            <span className="ac-hintline">
+              <span className="ac-field__label">{t("routines.form.access")}</span>
+              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
+                {t("routines.access.hint")}
+              </InfoHint>
+            </span>
             <Segmented
               label={t("routines.form.access")}
               value={access}
               onValueChange={setAccess}
               options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
             />
-            <p className="small muted">{t(`routines.access.${access}Help`)}</p>
           </div>
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">

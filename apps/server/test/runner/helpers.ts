@@ -35,6 +35,21 @@ export async function waitFor(cond: () => boolean, timeoutMs = 3000) {
   }
 }
 
+/** Everything a Unix socket answers one connection that says `word`, until it closes. */
+export function socketAnswer(socket: string, word: string): Promise<string> {
+  return new Promise((resolve) => {
+    let got = "";
+    const conn = net.createConnection(socket);
+    conn.setEncoding("utf8");
+    conn.on("connect", () => conn.write(word));
+    conn.on("data", (chunk: string) => {
+      got += chunk;
+    });
+    conn.on("error", () => resolve(got));
+    conn.on("close", () => resolve(got));
+  });
+}
+
 /**
  * A stream's data socket in memory, the person's side in the test's hands:
  * what the runner sent, how it closed, how much it "holds" queued.
@@ -177,11 +192,10 @@ export async function fakeXvnc(dir: string) {
 
 /**
  * An agent's desktop as `openDesktopStream` sees it: running on that socket (or not yet: `state.running`, which
- * `ensure` sets, recording who it started for), counting its viewers and the layouts it got.
+ * `ensure` sets, recording who it started for), counting its viewers.
  */
 export function desktopOn(socketPath: string, over: { running?: boolean } = {}) {
   const holds = { taken: 0, released: 0 };
-  const keyboards: string[] = [];
   const state = { running: over.running ?? true, started: [] as string[] };
   const desktops = {
     status: () => ({ running: state.running, streams: holds.taken - holds.released }),
@@ -199,9 +213,6 @@ export function desktopOn(socketPath: string, over: { running?: boolean } = {}) 
         held = false;
       };
     },
-    setKeyboard: async (_agent: unknown, keyboard: string) => {
-      keyboards.push(keyboard);
-    },
   };
-  return { desktops, holds, keyboards, state };
+  return { desktops, holds, state };
 }

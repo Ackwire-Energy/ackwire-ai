@@ -3,6 +3,7 @@ import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/typ
 import { handoffMinutesLeft, handoffScreen, isWaitingHandoff } from "../browser";
 import {
   type EtaView,
+  etaLine,
   type SetupView,
   setupEta,
   setupPending,
@@ -12,6 +13,7 @@ import {
 import { clockAt, lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
 import { type ComputerKind, type ComputerState, computerKind, isPaused } from "./machines";
+import { endSentence } from "./text";
 
 /*
  * The agent's computer as one entry and one dialog, on the web and the phone: what its status line says
@@ -26,7 +28,7 @@ export interface AgentComputerFacts {
   /** The workspace's own computer (the Cloud's), else null. */
   setup: SetupView | null;
   /** The computer the agent works on, from the computers list; null: none. */
-  machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused"> | null;
+  machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused" | "desktopUse"> | null;
   /** Its screen as `GET …/desktop` says it; null while unknown. */
   desktop: Pick<DesktopStatus, "available" | "reason"> | null;
   /** Its browser can run on its computer now. */
@@ -45,7 +47,7 @@ export interface AgentComputerFacts {
 export type EntryState =
   | { kind: "held" }
   | { kind: "preparing"; eta: EtaView | null }
-  | { kind: "slow" }
+  | { kind: "waiting" }
   | { kind: "problem" }
   | { kind: "offline" }
   | { kind: "paused"; until: string | null }
@@ -56,6 +58,8 @@ export type EntryState =
   | { kind: "working" }
   | { kind: "unavailable"; outdated: boolean }
   | { kind: "noScreen" }
+  /** `noScreen` on a computer with no screens for agents (a Mac, a PC): only its browser could show there. */
+  | { kind: "noBrowser" }
   | { kind: "noComputer" }
   | { kind: "available" };
 
@@ -75,7 +79,7 @@ export const asksMe = (h: BrowserHandoff, userId: string) =>
 export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryState {
   if (f.held) return { kind: "held" };
   if (waitsForWorkspace(f) && f.setup) {
-    if (f.setup.phase === "waiting") return { kind: "slow" };
+    if (f.setup.phase === "waiting") return { kind: "waiting" };
     if (f.setup.phase === "problem") return { kind: "problem" };
     return { kind: "preparing", eta: setupEta(f.setup, nowMs) };
   }
@@ -98,7 +102,10 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
   if (!shown && !neither && (f.machine || f.edition === "cloud")) {
     return { kind: "unavailable", outdated: f.desktop?.reason === "runner_outdated" };
   }
-  if (neither) return { kind: "noScreen" };
+  if (neither) {
+    const screens = f.edition === "cloud" || f.machine?.desktopUse?.available !== false;
+    return { kind: screens ? "noScreen" : "noBrowser" };
+  }
   if (!f.machine && f.edition === "selfhost") return { kind: "noComputer" };
   return { kind: "available" };
 }
@@ -113,7 +120,7 @@ export const entryKind = (edition: Edition, machine: Pick<Machine, "kind" | "os"
 
 /** The portrait's light: dimmed while it is prepared, dark when it doesn't answer, paused while held or paused. */
 export function entryPortrait(s: EntryState, setup: SetupView | null): ComputerState {
-  if (s.kind === "preparing" || s.kind === "slow" || s.kind === "problem") {
+  if (s.kind === "preparing" || s.kind === "waiting" || s.kind === "problem") {
     return setup ? setupPortrait(setup, false) : "paused";
   }
   if (s.kind === "offline") return "offline";
@@ -150,12 +157,13 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
     case "held":
       return t("agentComputer.status.held");
     case "preparing":
-      if (s.eta?.kind === "minutes") return t("agentComputer.status.preparing", { count: s.eta.count });
-      return s.eta?.kind === "underMinute" || s.eta?.kind === "almost"
-        ? t("agentComputer.status.preparingSoon")
+      return s.eta
+        ? `${t("agentComputer.status.preparingPlain")} · ${lowerFirst(etaLine(t, s.eta), w.locale)}`
         : t("agentComputer.status.preparingPlain");
-    case "slow":
-      return w.emailPromised ? t("agentComputer.status.slow") : t("agentComputer.status.slowPlain");
+    case "waiting":
+      return w.emailPromised
+        ? `${endSentence(t("computerSetup.status.capacity"))} ${t("computerSetup.email.short")}`
+        : t("computerSetup.status.capacity");
     case "problem":
       return t("agentComputer.status.problem");
     case "offline":
@@ -188,6 +196,8 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
         : t("agentComputer.status.unavailable");
     case "noScreen":
       return t("agentComputer.status.noScreen");
+    case "noBrowser":
+      return t("agentComputer.status.noBrowser");
     case "noComputer":
       return t("agentComputer.status.noComputer");
     default:
@@ -196,13 +206,14 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
 }
 
 /**
- * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the
- * computer, then the hold, the pause, a request waiting, the agent at work.
+ * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the computer, then
+ * the agent at work. The hold, the pause and a request waiting each have a banner over the stage that says them, so
+ * the line says "Ao vivo" alone.
  */
 export function liveSubLine(
   t: TFunction,
   f: AgentComputerFacts,
-  w: Pick<EntryWords, "computer" | "person"> & { name: string; nowMs?: number },
+  w: Pick<EntryWords, "person"> & { name: string; nowMs?: number },
 ): string {
   const nowMs = w.nowMs ?? Date.now();
   const g = agentGrammar(t, w.name);
@@ -211,15 +222,8 @@ export function liveSubLine(
     if (h.controllerUserId !== f.userId) return t("desktop.sub.hidden", { person: w.person(h.controllerUserId) });
     return t(h.kind === "ask" ? "desktop.sub.controlAsked" : "desktop.sub.control", g);
   }
-  if (f.held) return t("agentComputer.sub.held");
-  if (f.edition === "selfhost" && f.machine && isPaused(f.machine, nowMs)) {
-    return t("agentComputer.sub.paused", { computer: w.computer });
-  }
-  if (h && isWaitingHandoff(h, nowMs)) {
-    return asksMe(h, f.userId)
-      ? t("agentComputer.sub.needsYou", g)
-      : t("agentComputer.sub.askedOther", { ...g, person: w.person(h.requestedForUserId ?? "") });
-  }
+  const paused = f.edition === "selfhost" && f.machine !== null && isPaused(f.machine, nowMs);
+  if (f.held || paused || (h && isWaitingHandoff(h, nowMs))) return t("browser.watch.live");
   return f.working ? t("agentComputer.sub.working", g) : t("agentComputer.sub.watching");
 }
 

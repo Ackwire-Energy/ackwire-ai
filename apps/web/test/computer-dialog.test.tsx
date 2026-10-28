@@ -12,10 +12,12 @@ import type {
   Machine,
   SocketFactory,
 } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
-import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { useChannelRealtime } from "@/realtime/context";
+import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { renderApp, renderPage, screen, settle } from "./render";
 
@@ -152,7 +154,7 @@ afterEach(() => {
 });
 
 describe("the computer dialog, Cloud: the workspace's own computer", () => {
-  test("being prepared: the steps, the time left, the email to owners, the plans; no screen yet", async () => {
+  test("being prepared: the steps, the time left, the email to owners, the size; no screen yet", async () => {
     const t = await dialog({
       setup: {
         step: "installing",
@@ -168,18 +170,46 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     expect(sub()).toBe("Sendo preparado");
     const text = box().textContent ?? "";
-    expect(text).toContain("Preparando o computador da Acme");
+    // One name and one status: the head's. The card says neither again.
+    expect(text).not.toContain("Computador da Acme");
+    expect(text).not.toMatch(/Preparando/);
     expect(text).toContain("Passo 3 de 4 · Instalando os programas");
     expect(text).toContain("Faltam uns 6 min");
-    expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.");
-    expect(text).toContain("A Ada começa a usar assim que ele ficar pronto.");
-    expect(text).toContain("O Claude Code e o Codex já vêm nele.");
+    expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(text).not.toContain("Pode fechar esta página");
     expect(text).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    // The head already says whose computer this is: no line that Ada waits, no users line, no plans.
+    expect(text).not.toMatch(/começa a usar|Um usuário para cada agente|plano de IA/);
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
     // The wait isn't the screen's frame: no line for steps under it.
     expect(box().querySelector(".cmp-steps-row")).toBeNull();
+  });
+
+  test("its header says where the wait is, as the chip does: being prepared, in line, a problem; the card never again", async () => {
+    const heads: (string | null)[] = [];
+    for (const setup of [
+      { step: "installing" },
+      { state: "waiting", reason: "capacity", notifyByEmail: true },
+      { state: "preparing" },
+      { state: "problem" },
+    ] as const) {
+      await dialog({ setup, machine: null, desktop: { available: false, reason: "no_computer" } });
+      heads.push(sub());
+      const card = box().querySelector(".cmp-prep")?.textContent ?? "";
+      // In line: the owner's email in place of a time, and no line saying it waits (the head says "Na fila").
+      if (setup.state === "waiting") {
+        expect(card).not.toContain("Esperando um computador disponível");
+        expect(card).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+      }
+      // Before its first step, nothing says it's being prepared but the head.
+      if (setup.state === "preparing") expect(card).not.toContain("Preparando o computador.");
+      // A problem says what happens next.
+      if (setup.state === "problem") expect(card).toContain("Algo deu errado ao preparar o computador");
+      cleanup();
+    }
+    expect(heads).toEqual(["Sendo preparado", "Na fila", "Sendo preparado", "Com problema"]);
   });
 
   test("ready: it flashes Pronto, then opens with nothing to click", async () => {
@@ -202,24 +232,29 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
       }),
     );
     await settle(8);
-    expect(sub()).toBe("Pronto");
-    expect(box().textContent).toContain("Pronto");
+    // The cover says it; the head says nothing over it.
+    expect(sub()).toBe("");
+    expect(box().textContent?.match(/Pronto/g)).toHaveLength(1);
     await act(async () => new Promise((r) => setTimeout(r, 1600)));
     await settle(8);
     // Opening, then the screen: no step of the person's.
     expect(t.sockets.screens.length).toBeGreaterThan(0);
     expect(box().textContent).toContain("Abrindo o computador da Ada…");
+    expect(sub()).toBe("");
   });
 
-  test("on hold before the computer is ready: the pause alone, never a countdown", async () => {
+  test("on hold before the computer is ready: the pause alone, said once, never a countdown", async () => {
     await dialog({
       setup: { secondsLeft: 330, expectedReadyAt: new Date(Date.now() + 330_000).toISOString() },
       machine: null,
       desktop: { available: false, reason: "no_computer", held: true },
     });
-    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    // Nothing to watch here: the cover alone says the pause.
+    expect(sub()).toBe("");
     expect(box().textContent).toContain("A Ada está em pausa por enquanto");
-    expect(box().textContent).toContain("Dá para assistir. Ninguém assume o controle até a pausa acabar.");
+    expect(box().textContent).toContain("Ninguém assume o controle até a pausa acabar.");
+    expect(box().textContent?.match(/pausa por enquanto/g)).toHaveLength(1);
+    expect(box().textContent).not.toMatch(/assistir/i);
     expect(box().textContent).not.toContain("min");
   });
 
@@ -233,36 +268,28 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     t.fake.desktops.set(ADA_ID, { available: false, reason: "no_computer", held: true });
     await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
     await settle(8);
-    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(sub()).toBe("");
     expect(box().textContent).not.toContain("Pronto");
     expect(box().textContent).toContain("A Ada está em pausa por enquanto");
   });
 
-  test("its computer not answering: said by name, looked after, nothing to do and no other computer", async () => {
-    // Its browser was there before it stopped answering: no page to show from a computer that doesn't answer.
+  test("its computer not answering: once, under the window's one name; looked after, nothing to do, no other computer", async () => {
+    // Its browser was there before it stopped answering: no page to show from a computer that doesn't answer. Its
+    // first owner's language named it in English: no name of its own shows, in either language.
     const t = await dialog({
       setup: { state: "ready" },
-      machine: { name: "Computador da Acme", kind: "managed", os: "other", online: false },
+      machine: { name: "Acme's computer", kind: "managed", os: "other", online: false },
       desktop: { available: false, reason: "offline" },
       browser: true,
     });
     expect(sub()).toBe("Sem resposta");
-    expect(box().textContent).toContain("O Computador da Acme não está respondendo");
-    expect(box().textContent).toContain(
-      "Costuma voltar em poucos minutos. Já estamos cuidando: nada a fazer do seu lado.",
-    );
+    const text = box().textContent ?? "";
+    expect(text).toContain("Costuma voltar em poucos minutos. Já estamos cuidando.");
+    expect(text).toContain("Tentando de novo…");
+    expect(text).not.toMatch(/Computador da Acme|Acme's computer|não está respondendo/);
+    expect(text).not.toContain("nada a fazer");
     expect(view().queryByRole("button", { name: "Trocar computador" })).toBeNull();
     expect(t.sockets.screens).toHaveLength(0);
-  });
-
-  test("named in this reader's words, though its first owner's language named it in English", async () => {
-    await dialog({
-      setup: { state: "ready" },
-      machine: { name: "Acme's computer", kind: "managed", os: "other", online: false },
-      desktop: { available: false, reason: "offline" },
-    });
-    expect(box().textContent).toContain("O Computador da Acme não está respondendo");
-    expect(box().textContent).not.toContain("Acme's computer");
   });
 
   test("back while this tab was away: the reconnect asks for the computers again, and its screen opens", async () => {
@@ -295,22 +322,61 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
-    // A cover takes the screen's frame, its steps' line included: the screen that follows opens in place.
-    expect(box().querySelector(".cmp-body > .cmp-steps-row")).toBeTruthy();
+    // A cover takes the screen's frame, with nothing under it, as the screen that follows it opens.
+    expect(box().querySelector(".cmp-stage")).toBeTruthy();
+    expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 });
 
 describe("the computer dialog, live", () => {
-  test("the steps' line stays under the screen, empty while the agent doesn't work: a run never resizes it", async () => {
+  test("watching while the agent doesn't work: nothing under the screen, no empty line for steps", async () => {
     await dialog();
-    const row = box().querySelector(".cmp-body > .cmp-steps-row");
-    expect(row?.textContent).toBe("");
-    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
+    expect(box().querySelector(".dsk")).toBeTruthy();
+    expect(box().querySelector(".cmp-steps-row")).toBeNull();
+    expect(box().querySelector(".cmp-body")?.lastElementChild?.classList.contains("dsk")).toBe(true);
+  });
+
+  test("the steps' line comes under the screen while the agent works there, and goes with its run", async () => {
+    const b = await backend();
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    /** The conversation the agent works in, open in this tab: its runs come live. */
+    function Listening() {
+      useChannelRealtime(ORG_ID, ENG_ID, true);
+      return null;
+    }
+    await renderPage(
+      <>
+        <Listening />
+        <ComputerDialog agent={ada} open onClose={() => {}} />
+      </>,
+      { api: b.api, org: true, createSocket: b.sockets.factory },
+    );
+    await settle(8);
+    const socket = b.sockets.realtime.last();
+    await act(async () => socket.open());
+    const ev = (event: Record<string, unknown>) =>
+      act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
+    const run = { threadId: null, runId: "r-desktop", agentId: ADA_ID };
+    await ev({ type: "agent.thinking", ...run });
+    await ev({ type: "agent.tool", ...run, tool: "desktop_click", toolUseId: "c1" });
+    await settle(4);
+    const row = () => box().querySelector(".cmp-body > .cmp-steps-row");
+    expect(row()?.querySelectorAll("li")).toHaveLength(1);
+    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row());
+    await ev({ type: "agent.run", ...run, status: "done" });
+    await settle(4);
+    expect(row()).toBeNull();
   });
 
   test("held with a ready computer: watching, under the pause's banner, with no take control", async () => {
     await dialog({ desktop: { ...RUNNING, held: true } });
     expect(box().querySelector(".cmp-banner")?.textContent).toContain("A Ada está em pausa por enquanto");
+    // Its two lines, where the frame's rule finds them to give the banner its room (computer.css).
+    expect(box().querySelector(":scope > .cmp-body > .cmp-banner > .cmp-banner__t > span")?.textContent).toBe(
+      "Ninguém assume o controle até a pausa acabar.",
+    );
+    // The banner says the pause: the head never says it again.
+    expect(sub()).not.toMatch(/pausa/i);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
   });
 
@@ -319,22 +385,61 @@ describe("the computer dialog, live", () => {
     const banner = box().querySelector(".cmp-banner") as HTMLElement;
     expect(banner.dataset.tone).toBe("warn");
     expect(banner.textContent).toContain("A Ada precisa de você: “Entrar no banco com o token da empresa” · 4 min");
+    // Who asks and what: the banner's alone. Its line beside a button, where the frame's rule finds them.
+    expect(sub()).not.toMatch(/precisa de você|pediu/);
+    expect(box().querySelector(":scope > .cmp-body > .cmp-banner > .ac-btn")?.textContent).toBe("Ajudar");
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
     await click(within(banner).getByRole("button", { name: "Ajudar" }));
     expect(calls(t, "browser.takeControl")).toEqual([[ORG_ID, "h-screen"]]);
     await settle(4);
     expect(t.sockets.screens.at(-1)?.url).toContain("mode=control");
     expect(sub()).toBe("Você no controle · a Ada pediu");
-    expect(box().querySelector(".cmp-asked")?.textContent).toBe("“Entrar no banco com o token da empresa”");
+    // Over the screen, where the frame's rule finds it to give it room of its own (computer.css).
+    expect(box().querySelector(":scope > .cmp-body > .dsk > .cmp-asked")?.textContent).toBe(
+      "“Entrar no banco com o token da empresa”",
+    );
     expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
-    expect(view().getByRole("button", { name: "Não consegui" })).toBeTruthy();
+    // Its circle alone on a phone, as Pronto shows its check: its words stay its name.
+    const couldnt = view().getByRole("button", { name: "Não consegui" });
+    expect(couldnt.querySelector(":scope > svg path")?.getAttribute("d")).toBe(icons.block[1]?.[1].d);
+    expect(couldnt.querySelector(":scope > .cmp-act-label")?.textContent).toBe("Não consegui");
+    expect(couldnt.className).toContain("cmp-couldnt ac-btn--glyph");
+  });
+
+  test("Ajudar refused (someone got there first): said in the head for a moment, not in a toast over the window", async () => {
+    const t = await dialog({ handoff: screenAsk() });
+    t.api.browser.takeControl = async () => {
+      throw new ApiError(409, "conflict", "Someone else is in control");
+    };
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    const said = box().querySelector(".ac-dialog__sub > .cmp-said");
+    expect(said?.textContent).toBe("Outra pessoa já está ajudando.");
+    expect(said?.getAttribute("role")).toBe("alert");
+    expect(box().querySelector(".cmp-sub")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+  });
+
+  test("full screen on the agent's page keeps the dialog's layout: only its screen goes alone", async () => {
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: () => Promise.resolve(),
+    });
+    try {
+      await dialog({ desktop: { available: false, reason: "no_desktop" }, browser: true });
+      await click(view().getByRole("button", { name: "Tela cheia" }));
+      expect(box().classList.contains("is-full")).toBe(true);
+      expect(box().classList.contains("is-screen-only")).toBe(false);
+    } finally {
+      delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
+    }
   });
 
   test("whoever may take over the browser but not the screen takes the browser: the page shows", async () => {
     const t = await dialog({ desktop: { ...RUNNING, canControl: false }, browser: true });
-    // Watching the screen; not connected yet: no take control until it's live.
+    // Watching the screen; not connected yet: no take control until it's live, and the cover alone says it opens.
     expect(t.sockets.screens).toHaveLength(1);
-    expect(sub()).toBe("Abrindo…");
+    expect(sub()).toBe("");
+    expect(box().textContent).toContain("Abrindo o computador da Ada…");
   });
 });
 
@@ -344,7 +449,9 @@ describe("the computer dialog, self-host", () => {
     await dialog({ machine: { paused: { until: until.toISOString() } } });
     const banner = box().querySelector(".cmp-banner") as HTMLElement;
     expect(banner.textContent).toContain("O Servidor de casa está pausado até");
-    expect(banner.textContent).toContain("Quem conectou pausou os agentes no próprio computador.");
+    expect(banner.textContent).toContain("Pausado no próprio computador por quem o conectou.");
+    // The banner names the computer and its pause: the head names neither again.
+    expect(sub()).not.toMatch(/Servidor de casa|[Pp]ausado/);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
   });
 
@@ -358,7 +465,9 @@ describe("the computer dialog, self-host", () => {
       browser: true,
     });
     expect(box().textContent).toContain("O Servidor de casa está offline");
-    expect(box().textContent).toMatch(/Desde \d\d:\d\d\. A Ada espera o computador voltar\./);
+    // Since when is the head's: the cover says only that Ada waits.
+    expect(box().textContent).toContain("A Ada espera o computador voltar.");
+    expect(box().textContent).not.toMatch(/Desde \d\d:\d\d/);
     expect(sub()).toMatch(/^Offline desde \d\d:\d\d$/);
     // The switch shows where the server lists the outage.
     expect(view().queryByRole("button", { name: "Trocar computador" })).toBeNull();
@@ -408,7 +517,7 @@ describe("the computer dialog, self-host", () => {
     });
     expect(box().textContent).toContain("O navegador da Ada está desligado no Mac mini");
     expect(box().textContent).toContain(
-      "Só quem está no computador liga: no app agentes, em Preferências → Ferramentas.",
+      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.",
     );
     expect(box().textContent).not.toContain("A tela da Ada não pode ser mostrada agora");
   });
@@ -420,10 +529,10 @@ describe("the computer dialog, self-host", () => {
     expect(view().getByRole("button", { name: "Escolher um computador" })).toBeTruthy();
   });
 
-  test("neither its screen nor its browser: where to allow them", async () => {
+  test("neither its screen nor its browser: where to allow them is the button", async () => {
     await dialog({ desktop: { available: false, reason: "no_desktop" } });
     expect(box().textContent).toContain("A Ada não tem tela para mostrar aqui");
-    expect(box().textContent).toContain("Libere a tela ou o navegador em Ferramentas e acesso.");
+    expect(box().textContent).not.toContain("Libere a tela ou o navegador");
     expect(view().getByRole("button", { name: "Abrir Ferramentas e acesso" })).toBeTruthy();
   });
 

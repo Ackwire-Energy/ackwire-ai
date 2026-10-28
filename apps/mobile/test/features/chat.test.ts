@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { toolCalls } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -32,6 +33,7 @@ import {
   fadeTail,
   OPENERS,
   openingRuns,
+  outputTail,
   pruneMarks,
   recentTurn,
   rememberTurn,
@@ -40,7 +42,6 @@ import {
   turnOpener,
   turnPhase,
   turnRuns,
-  turnSteps,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -459,7 +460,7 @@ describe("an agent's turn as one block", () => {
     expect(turnPhase(run({ runId: "e", status: "canceled", text: "Ontem" }))).toBe("stopped");
   });
 
-  test("its work in order: steps (running or done), what it said, the messages it read", () => {
+  test("its work in order, as the tool block's items: calls (running or done), what it said, what it read", () => {
     const items = turnItems(
       run({
         runId: "r",
@@ -471,11 +472,19 @@ describe("an agent's turn as one block", () => {
         ],
       }),
     );
-    expect(items.map((x) => x.kind)).toEqual(["step", "say", "read", "step"]);
-    expect(items[0]).toMatchObject({ kind: "step", running: false, activity: { kind: "consulting", app: "Sentry" } });
-    expect(items[2]).toMatchObject({ kind: "read", messageId: "m2", now: true });
-    expect(items[3]).toMatchObject({ kind: "step", running: true });
-    expect(turnSteps(items)).toBe(2);
+    expect(items.map((x) => x.kind)).toEqual(["call", "say", "steer", "call"]);
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "done", kind: "consulting", app: "Sentry" } });
+    expect(items[2]).toMatchObject({ kind: "steer", messageId: "m2", now: true });
+    expect(items[3]).toMatchObject({ kind: "call", line: { state: "run" } });
+    expect(toolCalls(items)).toBe(2);
+  });
+
+  test("the same call again, nothing said between: one line counting both", () => {
+    const items = turnItems(
+      run({ runId: "r", work: [call("1", "sentry_list_issues", false), call("2", "sentry_list_issues", true)] }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "run", count: 2 } });
   });
 
   test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
@@ -492,7 +501,7 @@ describe("an agent's turn as one block", () => {
     });
     const opened = turnOpener(said, turnItems(said));
     expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
-    expect(opened.lines.map((x) => x.kind)).toEqual(["step"]);
+    expect(opened.lines.map((x) => x.kind)).toEqual(["call"]);
 
     expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
     expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
@@ -503,9 +512,17 @@ describe("an agent's turn as one block", () => {
     expect(openingRuns(runs).map((r) => r.runId)).toEqual(["a", "c"]);
   });
 
-  test("a stopped run's steps are not running any more", () => {
+  test("a stopped run's call that was running shows as stopped", () => {
     const items = turnItems(run({ runId: "r", status: "canceled", work: [call("1", "sentry_list_issues", true)] }));
-    expect(items[0]).toMatchObject({ running: false });
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "stop" } });
+  });
+
+  test("an open code line shows what it printed, its end when long", () => {
+    expect(outputTail([{ text: "a\n" }, { text: "b" }])).toBe("a\nb");
+    const long = outputTail([{ text: "x".repeat(50) }, { text: "end" }], 10);
+    expect(long).toHaveLength(10);
+    expect(long.startsWith("…")).toBe(true);
+    expect(long.endsWith("end")).toBe(true);
   });
 
   test("blocks: every run at work (a guess too) and a stopped one; one in its browser has its card", () => {
@@ -614,14 +631,14 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
   });
 
-  test("another agent's answer and note say its name, not the agent-facing handle", () => {
+  test("another agent's answer and note say its name, not the agent-facing handle (no @)", () => {
     const reply = eventLineOf(agentMsg("n1", { notice: { kind: "consult_reply", text: "ok", from: "@infra" } }), names);
-    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "@Infra" } });
+    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "Infra" } });
     const unknown = eventLineOf(
       agentMsg("n2", { notice: { kind: "agent_note", text: "ok", refs: { agentHandle: "@zed" } } }),
       names,
     );
-    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "@zed" } });
+    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "zed" } });
     const anon = eventLineOf(agentMsg("n3", { notice: { kind: "consult_reply", text: "ok" } }), names);
     expect(anon?.key).toBe("chat.notice.consultReplyAnon");
   });

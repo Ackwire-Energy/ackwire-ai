@@ -1,19 +1,20 @@
 import {
   type AppNotification,
   type Routine,
-  useDms,
+  useAiStatus,
   useNotificationAction,
   useNotifications,
   useRoutines,
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { restrictionLine } from "@agenteschat/client/lib/errors";
+import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import {
   Button,
-  Card,
   Filters,
   Fuse,
   Icon,
@@ -22,17 +23,19 @@ import {
   LIST_INSET,
   LineIcon,
   ListRow,
+  PersonAvatar,
   SectionHeader,
   Sky,
+  SwipeRow,
   Text,
   weights,
 } from "@/ui";
 import { ApprovalWhy } from "../approvals/parts";
-import { agentDmOf, notificationHref } from "../links/logic";
+import { notificationHref, routineHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
-import { Tile, tapHaptic, useSurface } from "../shared/parts";
+import { Tile, useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import {
@@ -40,6 +43,7 @@ import {
   activitySections,
   type DayGroup,
   emojisOf,
+  joinRequestLine,
   nextRoutine,
   placeOf,
   type SayWords,
@@ -76,7 +80,6 @@ export function ActivityScreen() {
     <LargeTitleScreen
       title={t("mobile.activity.title")}
       {...header}
-      grouped
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters
@@ -102,11 +105,10 @@ export function ActivityScreen() {
       {days.map(([group, groupItems]) => (
         <View key={group}>
           <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
-          <Card style={styles.inset}>
-            {groupItems.map((n, i) => (
-              <ActivityRow key={n.id} item={n} divider={i > 0} />
-            ))}
-          </Card>
+          {/* Loose rows on the page, as Conversas' (no card around them). */}
+          {groupItems.map((n, i) => (
+            <ActivityRow key={n.id} item={n} divider={i > 0} />
+          ))}
         </View>
       ))}
       {list.hasNextPage ? (
@@ -137,10 +139,12 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const card = waitingCardOf(n);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
-  const title = card.kind === "approval" && request ? approvalTitle(t, request) : card.title;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
-  const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  // Someone asking to join: who asked (the first names, how many in all), with their faces.
+  const join = card.kind === "join" ? joinRequestLine(t, n) : null;
+  const title = card.kind === "approval" && request ? approvalTitle(t, request) : join ? join.text : card.title;
+  // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, ai);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -165,6 +169,16 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     >
       <View style={styles.hd}>
         {who ? <Face who={who} size={22} live={false} /> : null}
+        {join ? (
+          <View style={styles.faces}>
+            {join.faces.map((face, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: two names at most, and two people can share one
+              <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
+                <PersonAvatar name={face} size={22} />
+              </View>
+            ))}
+          </View>
+        ) : null}
         {name ? (
           <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
             {name}
@@ -207,7 +221,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   );
 }
 
-const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe" } as const;
+const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe", join: "members" } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
 const CREW = 3;
@@ -243,7 +257,12 @@ function AllClear() {
         {t("mobile.activityNow.clear.text")}
       </Text>
       {next ? (
-        <View style={[styles.next, { backgroundColor: c.sunken }]}>
+        // The routine opens on a tap (Rotinas).
+        <Pressable
+          onPress={() => router.push(routineHref(next.id))}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.next, { backgroundColor: c.sunken }, pressed && styles.wpressed]}
+        >
           {nextAgent ? <AgentFace agentId={nextAgent.id} size={26} live={false} /> : <Tile icon="clock" size={26} />}
           <View style={styles.grow}>
             <Text variant="small" tone="ink2" numberOfLines={1}>
@@ -251,7 +270,7 @@ function AllClear() {
             </Text>
             <NextWhen routine={next} agent={nextAgent?.name ?? ""} />
           </View>
-        </View>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -289,7 +308,6 @@ function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; age
   );
 }
 
-const SWIPE = 72;
 /** Stands in for the names in the translated title, so they can be drawn bold. */
 const NAMES = "\u2063names\u2063";
 
@@ -305,20 +323,26 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const c = useColors();
   const when = useWhen();
   const act = useNotificationAction(orgId);
-  const x = useRef(new Animated.Value(0)).current;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
-  const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, ai);
   const unread = n.readAt === null;
 
+  // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
+  const restriction = restrictionOf(n);
+  const held = restriction?.code === "agent.paused";
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
-  const names = who.second
-    ? who.more > 0
-      ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
-      : t("mobile.names.two", { first: who.first, second: who.second })
-    : who.first;
+  const names = held
+    ? (n.source.label ?? "")
+    : who.second
+      ? who.more > 0
+        ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
+        : t("mobile.names.two", { first: who.first, second: who.second })
+      : who.first;
   const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
-  const template = t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
+  const template = held
+    ? t("standing.notification.agentHold", { name: NAMES })
+    : t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.
@@ -326,37 +350,14 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
     return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
   };
-  const sub = [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")]
-    .filter(Boolean)
-    .join(" ");
+  const sub = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
+    : [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
-  const toggleRead = () => {
-    tapHaptic();
-    act.mutate({ type: "read", item: n, read: unread });
-  };
-  const done = () => {
-    tapHaptic();
-    act.mutate({ type: "done", item: n, done: true });
-  };
-  // The pan handlers live as long as the row; they call the latest actions.
-  const actions = useRef({ toggleRead, done });
-  actions.current = { toggleRead, done };
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-        onPanResponderMove: (_e, g) => x.setValue(Math.max(-SWIPE * 1.4, Math.min(SWIPE * 1.4, g.dx))),
-        onPanResponderRelease: (_e, g) => {
-          if (g.dx > SWIPE) actions.current.toggleRead();
-          else if (g.dx < -SWIPE) actions.current.done();
-          Animated.spring(x, { toValue: 0, useNativeDriver: true }).start();
-        },
-        onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: true }).start(),
-      }),
-    [x],
-  );
-
+  // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
+  const toggleRead = () => act.mutate({ type: "read", item: n, read: unread });
+  const done = () => act.mutate({ type: "done", item: n, done: true });
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
@@ -372,7 +373,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
         <View style={styles.back}>
           <Face who={faceOf(faces[0])} size={STACKED} live={false} />
         </View>
-        <View style={[styles.front, { backgroundColor: c.raised, borderRadius: STACKED / 2 + 2 }]}>
+        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED / 2 + 2 }]}>
           <Face who={faceOf(faces[1])} size={STACKED} live={false} />
         </View>
       </View>
@@ -380,51 +381,50 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const a11y = [title, sub, time, unread ? t("mobile.activity.unread") : null].filter(Boolean).join(", ");
   return (
     <View>
-      <View style={[StyleSheet.absoluteFill, styles.under, { backgroundColor: c.sunken }]}>
-        <View style={styles.side}>
-          <Icon name={unread ? "check" : "bell"} size={18} color={c.muted} />
-          <Text variant="caption" tone="muted">
-            {unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread")}
-          </Text>
+      <SwipeRow
+        left={{
+          label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread"),
+          icon: unread ? "check" : "bell",
+          color: c.agent,
+          ink: c.onAgent,
+          onAction: toggleRead,
+        }}
+        // On the green, the page's color reads in both themes (white in light, near black on dark's light green).
+        right={{ label: t("mobile.activity.done"), icon: "archive", color: c.ok, ink: c.bg, onAction: done }}
+      >
+        <View style={{ backgroundColor: c.bg }}>
+          <ListRow
+            onPress={open}
+            accessibilityRole="button"
+            accessibilityLabel={a11y}
+            accessibilityActions={[
+              { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
+              { name: "done", label: t("mobile.activity.done") },
+            ]}
+            onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
+            dot={unread}
+            leading={leading}
+            title={
+              <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
+                {parts.map((part, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
+                  <Fragment key={i}>
+                    {i > 0 ? (
+                      <Text variant="body" tone="ink" style={styles.bold}>
+                        {names}
+                      </Text>
+                    ) : null}
+                    {part}
+                  </Fragment>
+                ))}
+              </Text>
+            }
+            time={time}
+            sub={sub || null}
+            subLines={restriction ? 0 : undefined}
+          />
         </View>
-        <View style={styles.side}>
-          <Text variant="caption" tone="muted">
-            {t("mobile.activity.done")}
-          </Text>
-          <Icon name="archive" size={18} color={c.muted} />
-        </View>
-      </View>
-      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.raised }} {...responder.panHandlers}>
-        <ListRow
-          onPress={open}
-          accessibilityRole="button"
-          accessibilityLabel={a11y}
-          accessibilityActions={[
-            { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
-            { name: "done", label: t("mobile.activity.done") },
-          ]}
-          onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
-          dot={unread}
-          leading={leading}
-          title={
-            <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
-              {parts.map((part, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
-                <Fragment key={i}>
-                  {i > 0 ? (
-                    <Text variant="body" tone="ink" style={styles.bold}>
-                      {names}
-                    </Text>
-                  ) : null}
-                  {part}
-                </Fragment>
-              ))}
-            </Text>
-          }
-          time={time}
-          sub={sub || null}
-        />
-      </Animated.View>
+      </SwipeRow>
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
     </View>
   );
@@ -436,11 +436,12 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
   a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
 
 const styles = StyleSheet.create({
-  inset: { marginHorizontal: 16 },
   cards: { gap: 10, paddingHorizontal: 16 },
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
+  faces: { flexDirection: "row" },
+  overlap: { marginLeft: -6 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
   ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },
   fuse: { flex: 0, width: 90 },
@@ -468,7 +469,5 @@ const styles = StyleSheet.create({
   front: { position: "absolute", right: -2, bottom: -2, padding: 2 },
   bold: { fontWeight: "600" },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  under: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
-  side: { flexDirection: "row", alignItems: "center", gap: 6 },
   more: { alignItems: "center", paddingVertical: 16 },
 });

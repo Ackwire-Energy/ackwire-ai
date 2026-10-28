@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { BrowserHandoff } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
@@ -88,13 +89,32 @@ describe("a help request opens the agent's browser in its card", () => {
         .map((b) => b.getAttribute("aria-label")),
     ).toEqual(["Tab", "Enter", "Apagar", "Esc"]);
 
+    // Desistir asks what happened: its note is one line in the middle of its field that grows as it wraps.
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desistir" })));
+    expect(card.textContent).toContain("O que aconteceu?");
+    const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
+    expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
+
     // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
-    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(note);
+    // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
+    expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
+      "TEXTAREA",
+      "1",
+      "ac-input brw-ac__note",
+    ]);
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
-    await act(async () => fireEvent.keyDown(note, { key: "Enter" }));
+    // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.
+    expect(fireEvent.keyDown(note, { key: "Enter", shiftKey: true })).toBe(true);
+    let typed = true;
+    await act(async () => {
+      typed = fireEvent.keyDown(note, { key: "Enter" });
+    });
+    expect(typed).toBe(false);
     await settle(4);
     expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([
       [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],
@@ -139,6 +159,11 @@ describe("the card in the message", () => {
     expect(card.textContent).toContain("Clique para expandir");
     await act(async () => fireEvent.click(card.querySelector(".brw-ac__tt") as HTMLElement));
     expect(card.classList.contains("is-open")).toBe(true);
+    // Full screen and back, as in the computer's window: corners pulled apart, then pushed together.
+    const glyph = (name: string) => within(card).getByRole("button", { name }).querySelector("path")?.getAttribute("d");
+    expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
+    expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
   });
 
   test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {

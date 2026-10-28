@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
+import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
@@ -16,7 +17,7 @@ import { approvalSaid, approvalTable, approvalTraits } from "./logic";
 /**
  * The exact request, in reading order: the action in words, the action itself (an email as it will be,
  * else the details table: Por onde, then the values it runs with), what the agent said, what it affects
- * as chips, and the amber fuse until it expires. The chat's card and the sheet draw the same pieces.
+ * as chips, and the amber fuse until it expires. The chat's question and the sheet draw the same pieces.
  */
 
 const TRAIT_ICON = {
@@ -46,6 +47,45 @@ export function useOriginShort(a: Pick<Approval, "origin">) {
   if (!origin) return null;
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return tt(origin.key, origin.values);
+}
+
+/**
+ * The app a request goes through, as a mark on a tile: the connector's (a server connected by address goes by
+ * its preset's mark), a mailbox for an email, our shield for our own tools. Its name is read aloud.
+ */
+export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; size?: number }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const catalog = useCatalog();
+  const customId = a.connector?.startsWith("custom:") ? a.connector.slice("custom:".length) : null;
+  const servers = useCustomServers(orgId, customId !== null);
+  if (a.email)
+    return (
+      <View accessible accessibilityLabel={a.email.mailbox}>
+        <IconTile name="mail" size={size} />
+      </View>
+    );
+  if (!a.connector)
+    return (
+      <View accessible accessibilityLabel={t("approvals.panel.builtIn")}>
+        <IconTile name="shield" size={size} />
+      </View>
+    );
+  const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
+  const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
+  const def = custom ? custom.def : (catalog.data?.connectors.find((d) => d.id === a.connector) ?? null);
+  const name = custom
+    ? itemName(t, custom)
+    : customId
+      ? t("approvals.panel.orgConnector")
+      : def
+        ? connectorName(t, def)
+        : a.connector;
+  return (
+    <View accessible accessibilityLabel={name}>
+      <ConnectorIcon def={def} image={custom?.image} label={name} size={size} />
+    </View>
+  );
 }
 
 /**

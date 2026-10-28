@@ -53,12 +53,15 @@ export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "com
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
- * classify) and `?mail=connected|failed` (back from Gmail/Outlook).
+ * classify), `?mail=connected|failed` (back from Gmail/Outlook) and
+ * `?request={id}&do=approve|deny` (a request to join, from the admins' email).
  */
 export const settingsSearch = (
   search: Record<string, unknown>,
-): { connected?: string; review?: string; mail?: string } => ({
+): { connected?: string; review?: string; mail?: string; request?: string; do?: "approve" | "deny" } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   review: search.review === undefined ? undefined : String(search.review),
   mail: typeof search.mail === "string" ? search.mail : undefined,
+  request: typeof search.request === "string" ? search.request : undefined,
+  do: search.do === "approve" || search.do === "deny" ? search.do : undefined,
 });

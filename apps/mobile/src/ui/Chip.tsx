@@ -27,13 +27,15 @@ export function Chip({ icon, label, leading }: ChipProps) {
         borderRadius: 999,
         backgroundColor: colors.chip,
         alignSelf: "flex-start",
+        // In a tight row the label ends in "…" instead of the chip leaving the row.
+        maxWidth: "100%",
       }}
     >
       {leading ?? (icon ? <Icon name={icon} size={13} color={colors.muted} /> : null)}
       <RNText
         numberOfLines={1}
         maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={[systemText("caption", weights.semibold), { color: colors.muted }]}
+        style={[systemText("caption", weights.semibold), { color: colors.muted, flexShrink: 1 }]}
       >
         {label}
       </RNText>

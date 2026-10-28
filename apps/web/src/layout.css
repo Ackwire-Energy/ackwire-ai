@@ -110,9 +110,56 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
-/* A provider by its mark and name: one line, centered on the mark. */
-.onb__provider {
+/* The AI picker's plans and the key's makers: three tiles in the setup's column and in the dialog, two at 390px
+   wide; each a mark and its name on one line, centred on the mark, chosen or not ("OpenCode Go" is the longest). */
+.grid-options--plans {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.grid-options--plans > .ac-option {
   align-items: center;
+  gap: 10px;
+  padding-inline: 10px;
+}
+.grid-options--plans .ac-option__title {
+  font-size: 14px;
+}
+/* A one-line tile's check sits in its middle, as its mark and its name do. */
+.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
+  top: calc(50% - 9px);
+}
+/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.grid-options--plans > .ac-option.ai-picker__key::after {
+  /* Browsers without the lh unit: the page's 22px line. */
+  top: calc(var(--space-3) + 11px - 9px);
+}
+/* Behind @supports: a declaration holding var() parses even where lh is unknown, so as a second `top` it would
+   replace the fallback there and then compute to auto. */
+@supports (top: 1lh) {
+  .grid-options--plans > .ac-option.ai-picker__key::after {
+    top: calc(var(--space-3) + 0.5lh - 9px);
+  }
+}
+/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
+   nothing comes between an option and its steps. */
+.grid-options--plans > .ai-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.ai-picker__or {
+  grid-column: 1 / -1;
+  margin: 6px 0 -2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
+.grid-options--plans > .ai-picker__key {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
+.grid-options--plans > .ai-key__ours {
+  grid-column: 1 / -1;
 }
 .grid-fields {
   display: grid;
@@ -298,18 +345,12 @@ p {
   color: var(--ink-muted);
 }
 .outage-dialog__hint {
-  display: flex;
-  gap: 8px;
   margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   font-size: 13px;
   color: var(--ink-muted);
-}
-.outage-dialog__hint .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 
 /* The agent's one card while it waits for its computer (instead of repeated messages). */
@@ -323,9 +364,6 @@ p {
   background: var(--surface-sunken);
 }
 .waitcard__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 600;
 }
 .waitcard__top .ac-icon {
@@ -335,15 +373,10 @@ p {
   color: var(--success);
 }
 .waitcard p {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
-}
-.waitcard p > .ac-brand {
-  margin-top: 2px;
 }
 .waitcard__acts {
   display: flex;
@@ -558,7 +591,6 @@ p {
 }
 .sidebar__user {
   display: flex;
-  align-items: center;
   gap: 10px;
   width: 100%;
   padding: 4px 8px 4px 4px;
@@ -570,6 +602,10 @@ p {
   text-align: left;
   cursor: pointer;
 }
+/* A name alone centres on the face; with the budget under it the card is an `.ac-faceline`. */
+.sidebar__user:not(.ac-faceline) {
+  align-items: center;
+}
 .sidebar__user:hover {
   background: var(--surface);
 }
@@ -577,16 +613,17 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Two tight lines, as in the workspace header above: the name, then the budget. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
+  line-height: 18px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -597,16 +634,18 @@ p {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  line-height: 16px;
 }
 .sidebar__usage-label {
   font-size: 11px;
   color: var(--ink-muted);
 }
+/* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background: var(--surface-sunken);
+  background: var(--line2);
   overflow: hidden;
 }
 .sidebar__usage-bar {
@@ -780,11 +819,14 @@ p {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
+/* Its reset at no weight, so a rise to the face's top (`.ac-captop`) wins it. */
+:where(.channel__title) {
+  margin: 0;
+}
 .channel__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -794,20 +836,19 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
+   whatever else the header holds. A name that doesn't rise stays centred on the face. */
+.channel__header > .ac-avatar:has(+ div > .ac-captop),
+.channel__header > .ac-avatar + div:has(> .ac-captop) {
+  align-self: flex-start;
+}
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
-/* The engine line: the icon sits with the first line when the text wraps. */
 .profile-card__brain {
   display: inline-flex;
-  align-items: flex-start;
   gap: 6px;
   vertical-align: top;
-}
-.profile-card__brain > .ac-icon,
-.profile-card__brain > .ac-brand,
-.channel__brain > .ac-brand {
-  flex: none;
-  margin-top: 2px;
 }
 .channel__messages {
   flex: 1;
@@ -858,19 +899,25 @@ p {
 }
 /* "O Theo só responde a Walter.": muted, only for me. */
 .channel__notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 4px 24px;
   padding: 4px 12px;
   font-size: 13px;
   color: var(--ink-muted);
 }
-.channel__notice .ac-icon {
-  flex: none;
+/* The role, then a lock when not everyone can talk to the agent (the tooltip says who). */
+.sidebar__item-meta--audience {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.sidebar__item-meta .audience-chip--compact {
-  font-size: 11px;
+.sidebar__item-meta--audience > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__lock {
+  display: inline-flex;
+  flex: none;
 }
 /* First-message suggestions in an empty conversation: neutral buttons that wrap */
 .channel__suggestions {
@@ -991,6 +1038,20 @@ p {
   display: flex;
   flex-direction: column;
 }
+/*
+ * A list row led by a face beside its two lines (a member: the name, the email): the face on the name's 22px line, as
+ * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle. A name alone (an
+ * agent in Settings › Computers) stays centred with the rest of the row.
+ */
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
+  align-items: flex-start;
+}
+.ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) > :not(.ac-avatar, .list-col) {
+  align-self: center;
+}
 
 /* Memory and proposals */
 .tabs-bar {
@@ -1069,13 +1130,10 @@ p {
   gap: 6px;
 }
 .evidence li {
-  display: flex;
-  gap: var(--space-2);
   font-size: 14px;
   line-height: 20px;
 }
 .evidence .ac-icon {
-  margin-top: 2px;
   color: var(--ink-muted);
 }
 
@@ -1614,10 +1672,6 @@ p {
   border-bottom: 1px solid var(--line);
   padding-bottom: 12px;
 }
-.code-viewer .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
-}
 .code-viewer__body.ac-dialog__body {
   flex: 1 1 auto;
   padding: 12px 0 20px;
@@ -1710,10 +1764,6 @@ p {
   font-size: 12.5px;
   line-height: 17px;
   color: var(--faint);
-}
-.chart-card__top .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
 }
 .chart-card__body {
   padding: 8px 16px 16px;
@@ -2369,6 +2419,11 @@ p {
   color: var(--ink2);
   cursor: pointer;
 }
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its first line. */
+.ac-hintline:has(> .ac-field__label) {
+  font-size: 13px;
+  line-height: 18px;
+}
 /* Participant / member picker inside forms */
 .people-picker {
   display: flex;
@@ -2552,12 +2607,10 @@ p {
   margin: 0;
   padding: 0;
 }
-/* Icon, text and the level control line up on the name's row; long tool lists stay at two lines. */
+/* An `.ac-faceline`: the tile, the name's capitals and the level control start at one top; long tool lists stay at
+   two lines. */
 .level-row {
-  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
@@ -2590,14 +2643,14 @@ p {
 .level-row__asks .ac-chip {
   margin-left: 0;
 }
-.level-note,
 .level-legend__asks {
   display: flex;
   align-items: center;
+}
+.level-legend__asks {
   gap: 6px;
   margin: 0;
 }
-.level-note .ac-icon,
 .level-legend__asks .ac-icon {
   flex: none;
   width: 15px;
@@ -2659,6 +2712,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
@@ -2834,11 +2888,19 @@ p {
   align-items: center;
   gap: 4px;
 }
+/* The same insets and gap as the workspace header's button, so both cards line up. */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px 10px 10px;
+  gap: var(--space-2);
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
+}
+/* The person's face about as tall as its two lines (32px). */
+.sidebar__me > .sidebar__user > .ac-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
@@ -2921,14 +2983,15 @@ p {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
-/* Hover is a tint; the current page is a raised key (never the same look). */
+/* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
+   and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
-  box-shadow: var(--card-key);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   color: var(--ink);
   font-weight: 600;
 }
@@ -3117,6 +3180,7 @@ p {
   gap: 8px;
   align-items: center;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
 .computer-error {
   display: flex;
   align-items: center;
@@ -3125,7 +3189,6 @@ p {
   color: var(--ink);
 }
 .computer-error .ac-icon {
-  flex: none;
   color: var(--ink-muted);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -3151,7 +3214,7 @@ p {
   height: min(740px, calc(100dvh - 48px));
 }
 .catalog .ac-dialog__head {
-  padding: 24px 24px 14px 28px;
+  padding: 24px 28px 14px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
@@ -3170,20 +3233,80 @@ p {
 .catalog__search {
   max-width: 360px;
 }
-/* The categories: one line that scrolls sideways (never wraps). */
-.catalog__filters {
-  align-self: flex-start;
-}
 .catalog__body {
   position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
   border-top: 1px solid var(--line);
 }
-.catalog__body[data-pane] {
-  grid-template-columns: minmax(0, 1fr) 340px;
+/* The categories beside the grid: one per line, the count at the end; a rule under "Conectados". */
+.catalog__cats {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--line);
+}
+.catalog__cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px 10px 10px 3px;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.catalog__cat:hover {
+  background: var(--plate-soft);
+}
+.catalog__cat:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.catalog__cat[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+  font-weight: 600;
+}
+.catalog__cat[data-rule] {
+  position: relative;
+  margin-bottom: 13px;
+}
+.catalog__cat[data-rule]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -8px;
+  height: 1px;
+  background: var(--line);
+}
+.catalog__cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog__cat-count {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* The row of categories is for phones only. */
+.catalog__filters {
+  display: none;
 }
 .catalog__list {
   min-height: 0;
@@ -3254,12 +3377,6 @@ p {
 .catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-}
-.catalog-feat__card[aria-pressed="true"],
-.catalog-tile[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--top);
 }
 .catalog-feat__card {
   position: relative;
@@ -3364,117 +3481,128 @@ p {
   height: 12px;
   stroke-width: 2.4;
 }
-/* The detail pane. */
-.catalog-detail {
-  position: relative;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
+/*
+ * A service over the catalog (ServiceDialog): the brand's pixel sky on top, the icon on its edge, the name in the
+ * display face; what agents could do on a sunken plate; how it connects beside Conectar at the foot.
+ */
+.ac-dialog.catalog-svc {
+  overflow: hidden;
+}
+/* Behind the head (z-index -1 inside the dialog's own stacking context): the head's icon overlaps its edge. */
+.catalog-svc .catalog-feat__sky {
+  order: -1;
+  z-index: -1;
+  flex: none;
+  height: 112px;
+  margin: 0;
+}
+.catalog-svc .ac-dialog__head {
   flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  background: var(--side, var(--surface-sunken));
-  border-left: 1px solid var(--line);
-  animation: catalog-pane 0.24s var(--out);
+  gap: 14px;
+  margin-top: -36px;
+  padding: 0 24px 4px;
 }
-.catalog-detail:focus {
-  outline: none;
-}
-@keyframes catalog-pane {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-.catalog-detail__close {
+.catalog-svc .ac-dialog__acts {
   position: absolute;
   top: 12px;
   right: 12px;
 }
-.catalog-detail .connector-icon--lg {
-  width: 56px;
-  height: 56px;
-  border-radius: 17px;
-  font-size: 20px;
+.catalog-svc .ac-dialog__lead .connector-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 19px 19px 19px 5px;
+  font-size: 22px;
+  background: var(--raised);
+  box-shadow:
+    0 0 0 4px var(--surface-raised),
+    inset 0 0 0 1px var(--line2),
+    var(--e1);
 }
-.catalog-detail__name {
-  margin: 0;
+.catalog-svc .ac-dialog__title {
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
   font-size: 28px;
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: -0.025em;
 }
-.catalog-detail__desc,
-.catalog-detail__text {
-  margin: 4px 0 0;
-  color: var(--ink-muted);
-  font-size: 14px;
+.catalog-svc .ac-dialog__desc {
+  padding: 0 24px;
+  color: var(--ink2);
 }
-.catalog-detail__text {
-  margin: 0;
-  font-size: 13px;
+.catalog-svc__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 24px;
 }
-.catalog-detail__part {
-  align-self: stretch;
+.catalog-svc__part {
+  padding: 14px 16px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.catalog-detail__h {
+.catalog-svc__h {
   margin: 0 0 8px;
   font-size: 12.5px;
   font-weight: 650;
   color: var(--ink-muted);
 }
-.catalog-detail__caps {
+.catalog-svc__caps {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.catalog-detail__caps li {
-  display: flex;
-  align-items: flex-start;
   gap: 8px;
-  font-size: 13.5px;
-  color: var(--ink2);
 }
-.catalog-detail__caps .ac-icon {
-  margin-top: 3px;
+.catalog-svc__caps li {
+  font-size: 14px;
+  color: var(--ink);
+}
+.catalog-svc__caps .ac-icon {
+  color: var(--ok);
+}
+.catalog-svc__caps li[data-asks] .ac-icon {
+  color: var(--warn);
+}
+.catalog-svc__text {
+  margin: 0;
   color: var(--ink-muted);
+  font-size: 13.5px;
 }
-.catalog-detail__act {
-  align-self: stretch;
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.catalog-detail__how {
+.catalog-svc__act {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-size: 12.5px;
-  color: var(--faint);
-  text-align: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+}
+.catalog-svc__how {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.catalog-svc__how[data-ok] .ac-icon {
+  color: var(--ok);
 }
 @media (max-width: 760px) {
-  .catalog__body[data-pane] {
+  .catalog__body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .catalog-detail {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    max-height: 75%;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 20px 20px 0 0;
-    box-shadow: var(--e3);
-    animation-name: catalog-sheet;
+  .catalog__cats {
+    display: none;
+  }
+  .catalog__filters {
+    display: flex;
+    align-self: flex-start;
+    max-width: 100%;
   }
   .catalog__tools,
   .catalog__list {
@@ -3490,15 +3618,12 @@ p {
   .catalog__search {
     max-width: none;
   }
-}
-@keyframes catalog-sheet {
-  from {
-    transform: translateY(24px);
-    opacity: 0;
+  .catalog-svc__act {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .catalog-detail,
   .catalog-feat__card,
   .catalog-tile {
     animation: none;
@@ -3506,7 +3631,7 @@ p {
   }
 }
 
-/* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
+/* A connector's one-color brand icon as a mask in its color, a mark in its own colors, or a monogram. */
 .connector-icon {
   flex: none;
   width: 36px;
@@ -3538,6 +3663,26 @@ p {
   background: var(--connector-color, var(--ink));
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
+}
+/* A mark in its maker's own colors (PostgreSQL's, PayPal's, Canva's), which a mask would flatten to one color. */
+.connector-icon__img {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+}
+/* A service in a chip: its bare mark in the box of the chip's icons, a little smaller since it fills its square. */
+.ac-chip > .connector-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: none;
+  background: transparent;
+  font-size: 8px;
+}
+.ac-chip > .connector-icon > .connector-icon__mark,
+.ac-chip > .connector-icon > .connector-icon__img {
+  width: 12px;
+  height: 12px;
 }
 
 /* Settings → Conectores: one row per connected service. */
@@ -3603,6 +3748,17 @@ p {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
+   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+.cflow__title > :first-child {
+  translate: 0 calc(-1 * var(--cap-mid));
+}
+.cflow__title:has(> .ac-captop) {
+  align-items: flex-start;
+}
+.cflow__title:has(> .ac-captop) > :first-child {
+  translate: none;
 }
 .cflow__steps {
   display: flex;
@@ -4087,17 +4243,12 @@ p {
 }
 /* The mark sits on the first line (centered on its 18px line box), so wrapped text never pushes it down. */
 .tr-row__why {
-  display: flex;
-  align-items: flex-start;
   gap: 7px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
   margin-top: 1px;
   min-width: 0;
-}
-.tr-row__why .ac-toolpx-spark {
-  margin-top: 4px;
 }
 .tr-row__why span {
   min-width: 0;
@@ -4121,6 +4272,7 @@ p {
   border-radius: var(--control-r-sm);
   font-weight: 600;
   font-size: var(--control-fs-sm);
+  line-height: normal;
   background: var(--raised);
   color: var(--ink);
   box-shadow: var(--e1), var(--top);
@@ -4404,7 +4556,7 @@ p {
  */
 .channel__messages .ac-msg {
   content-visibility: auto;
-  contain-intrinsic-size: auto 72px;
+  contain-intrinsic-size: auto 56px;
 }
 .channel__messages .ac-msg:is(:hover, :focus-within, .ac-msg--streaming),
 .channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]) {
@@ -4548,6 +4700,7 @@ p {
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--faint);
   cursor: pointer;
   text-align: left;
@@ -4641,14 +4794,10 @@ p {
   align-self: flex-start;
 }
 .sandbox-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   color: var(--ink);
 }
 .sandbox-warning .ac-icon {
-  flex: none;
   color: var(--warn);
 }
 
@@ -4673,6 +4822,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .live-code-toggle__btn:hover {
@@ -5101,53 +5251,40 @@ p {
   }
 }
 
-/* Live work in a reply: narration lines and tool calls, stacked like a mini timeline. */
-.live-work {
+/* What a reply said and read before its first tool call (its tools go in the ToolBlock, ToolCalls.tsx). */
+.live-work-notes {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 2px 0 6px;
-  padding-left: 12px;
-  border-left: 2px solid var(--line);
 }
 .live-work__say {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
 }
-.live-call {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* A call's logo in the tool block: the connector's mark or one of our icons, a 20px tile (18px in its head). */
+.ac-tools .connector-icon,
+.tool-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 1;
 }
-.live-call__head {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  margin: 0;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: var(--radius-item);
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink2);
-  cursor: pointer;
-}
-button.live-call__head:hover {
-  background: var(--plate);
-}
-.live-call__head:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-call__head--static {
-  cursor: default;
+.tool-logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
 }
-.live-call__head .ac-icon {
-  color: var(--faint);
+.ac-tools__logos .connector-icon,
+.ac-tools__logos .tool-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
 }
 /* "Parar": a small round icon button (stop square in a circle); a danger tint only on hover. */
 .run-status {
@@ -5214,6 +5351,7 @@ button.live-call__head:hover {
   font: inherit;
   font-size: 12.5px;
   font-weight: 650;
+  line-height: normal;
   color: var(--ink);
   cursor: pointer;
   transition: transform 0.18s var(--spring);
@@ -5243,8 +5381,6 @@ button.live-call__head:hover {
 }
 /* "Leu seu recado · …" inside the work: a well, like the design's mark. */
 .live-work__steer {
-  display: flex;
-  align-items: center;
   gap: 7px;
   width: max-content;
   max-width: 100%;
@@ -5274,8 +5410,6 @@ button.live-call__head:hover {
 }
 /* Editing a routine still read in UTC: a quiet hint under the zone. */
 .routine-utc-hint {
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   margin: -4px 0 0;
@@ -5534,6 +5668,11 @@ button.live-call__head:hover {
 }
 .members-stack:hover {
   background: var(--plate-soft);
+}
+/* In a row of actions its faces are what shows: its plate reaches into the gap, as a ghost button's does. */
+.ac-acts > .members-stack {
+  padding-right: var(--ghost-plate);
+  margin-right: calc(-1 * var(--ghost-plate));
 }
 .members-stack:focus-visible {
   outline: none;
@@ -5841,6 +5980,26 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
+/*
+ * The workspace's sky (Sky.tsx WorkspaceSky): behind the header, from the sidebar's top edge to the header's
+ * foot (16px of the sidebar's padding + the 48px header), edge to edge but for the hairline against the page.
+ */
+.sidebar__top {
+  position: relative;
+  isolation: isolate;
+}
+.workspace-sky {
+  position: absolute;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.workspace-sky--side {
+  top: -16px;
+  left: -12px;
+  right: -11px;
+  height: 64px;
+}
 /* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
   border-radius: 12px;
@@ -6101,6 +6260,13 @@ button.live-call__head:hover {
 .machine-row__icon {
   flex: none;
 }
+/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. The drawing
+   starts at the row's edge like any other lead: centred, the narrow tower would leave a gap before it. */
+.machine-row__pic {
+  display: flex;
+  flex: none;
+  width: 48px;
+}
 .machine-row__name {
   font-weight: 600;
   color: inherit;
@@ -6114,16 +6280,22 @@ button.live-call__head:hover {
   font-size: 12.5px;
   word-break: break-all;
 }
-/* A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the corner. */
+/*
+ * A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the
+ * corner, beside the code rather than over it, so a command wider than a phone never runs under it.
+ */
 .machine-command {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
   border-radius: var(--control-r-md);
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .machine-command__code {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  padding: 10px 44px 10px 12px;
+  padding: 10px 8px 10px 12px;
   overflow-x: auto;
   overflow-y: hidden;
   font-size: 12px;
@@ -6132,9 +6304,8 @@ button.live-call__head:hover {
   scrollbar-width: thin;
 }
 .machine-command__copy {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  flex: none;
+  margin: 4px 4px 0 0;
 }
 .machine-pair__steps {
   display: flex;
@@ -6177,6 +6348,10 @@ button.live-call__head:hover {
   border-radius: var(--radius-md);
   background: #fff;
   box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr[data-loading] {
+  display: grid;
+  place-items: center;
 }
 .phone-code__qr svg {
   display: block;
@@ -6239,6 +6414,10 @@ a.machine-row__name:hover {
   gap: 8px;
   min-width: 0;
 }
+/* "SHA-256" and its ⓘ keep their width: the hash gives way. */
+.machine-connect__sha > .ac-hintline {
+  flex: none;
+}
 .machine-connect__hash {
   flex: 1;
   min-width: 0;
@@ -6250,103 +6429,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the two kinds, the cloud card, your computers, each agent's. */
-.computers-kinds {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-@media (max-width: 900px) {
-  .computers-kinds {
-    grid-template-columns: 1fr;
-  }
-}
-.computers-kind {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-/* Runs to the card's edges (no white frame around it), fading into the card below. */
-.computers-kind__pic {
-  display: flex;
-  justify-content: center;
-  margin: -20px -20px 0;
-  padding: 26px 0 2px;
-  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
-  background: linear-gradient(180deg, var(--plate), transparent);
-}
-.computers-kind__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: var(--font-display-weight, 300);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.computers-kind__points {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--ink2);
-  font-size: 13.5px;
-}
-.computers-kind__points li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.computers-kind__points .ac-icon {
-  margin-top: 3px;
-  color: var(--ok);
-}
-.computers-kind__points .ac-brand {
-  margin-top: 3px;
-}
-.computers-kind__head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-/* The numbers behind the ⓘ: one line each, the icon then the count. */
-.computers-kind__info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 8px;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink2);
-}
-.computers-kind__info li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.computers-kind__info .ac-icon {
-  color: var(--muted);
-}
-.computers-kind__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-height: 44px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.computers-kind__foot > .ac-btn {
-  flex: none;
-}
+/* Configurações → Computadores: the cloud card, your computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -6360,40 +6443,22 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
-/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size and users. */
+/* The workspace's computer on its cards (here and on the setup's Computer step): its drawing, not its box, takes its
+   row, so the drawing starts on the card's padding line, as far from the card's top as its words from the other edges,
+   and the words beside it centre on the drawing. */
+.setup-card .computers-card__head > .ac-computer,
+.onb__workspace-computer .ac-computer {
+  margin-block: calc(-1 * var(--art-top)) calc(-1 * var(--art-bottom));
+}
+/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
 .setup-progress {
   margin: 0;
 }
 .setup-progress--line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 13px;
   color: var(--ink-muted);
 }
-.setup-progress--line > :first-child {
-  flex: none;
-  margin-top: 1px;
-}
-.setup-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink-muted);
-}
-.setup-facts li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.setup-facts--stack {
-  flex-direction: column;
-}
-/* The wait in words: the time left, then who hears when it's ready, the plans. */
+/* The wait in words: the time left, then who hears when it's ready, the size. */
 .setup-wait {
   display: flex;
   flex-direction: column;
@@ -6406,16 +6471,9 @@ a.machine-row__name:hover {
   font-variant-numeric: tabular-nums;
 }
 .setup-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.setup-line > :first-child {
-  flex: none;
-  margin-top: 2px;
 }
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
@@ -6445,18 +6503,12 @@ a.machine-row__name:hover {
   flex-basis: 100%;
 }
 .computers-note {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--plate);
   color: var(--ink-muted);
-}
-.computers-note .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .computers-empty {
   display: flex;
@@ -6516,17 +6568,14 @@ a.machine-row__name:hover {
   min-width: 0;
   gap: 6px;
 }
-/* The facts line up under the name, past the portrait (96px + the 18px gap). */
+/*
+ * The facts start at the card's edge, under the portrait, as on Configurações → Computadores: a portrait is as wide
+ * as its drawing (a tower half a laptop's), so an indent past it lines up with nothing.
+ */
 .machine-page__facts {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-left: 114px;
-}
-@media (max-width: 640px) {
-  .machine-page__facts {
-    padding-left: 0;
-  }
 }
 /* Agents using the computer: one row each (face, name, what it may use), to its page. */
 .machine-page__agents {
@@ -6699,13 +6748,13 @@ a.machine-row__name:hover {
 .onb__steps li {
   position: relative;
 }
-/* The thread joining the markers, filled up to where you are. */
+/* The thread joining the markers, filled up to where you are: 4px from each, the markers centred in 52px steps. */
 .onb__steps li:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 21px;
-  top: 40px;
-  bottom: -8px;
+  top: 42px;
+  bottom: -10px;
   width: 2px;
   border-radius: 1px;
   background: var(--line2);
@@ -6812,12 +6861,17 @@ a.machine-row__name:hover {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* The step title's type, also read by the line that sets its ⓘ (new-agent.css). */
+:root {
+  --onb-title-size: clamp(30px, 4vw, 42px);
+  --onb-title-leading: 1.08;
+}
 .onb__title {
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 42px);
-  line-height: 1.08;
+  font-size: var(--onb-title-size);
+  line-height: var(--onb-title-leading);
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
@@ -6866,6 +6920,16 @@ a.machine-row__name:hover {
     min-height: 0;
     padding: 4px;
   }
+  /* The setup's seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current
+     one's ring, reaching past the strip's edges. Criar agente and the landing's card keep the shared strip. */
+  .onb:not(.newag) .onb__steps {
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
+  }
+  .onb:not(.newag) .onb__step {
+    padding: 2px;
+  }
   .onb__step-text {
     position: absolute;
     width: 1px;
@@ -6874,6 +6938,12 @@ a.machine-row__name:hover {
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+}
+/* Narrower, they fit beside the logo's mark alone. */
+@media (max-width: 384px) {
+  .onb__brand .ac-logo > :not(.ac-logo__mark) {
+    display: none;
   }
 }
 
@@ -7035,8 +7105,6 @@ a.machine-row__name:hover {
   font-weight: 500;
 }
 .newag__note {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin: 12px 0 0;
   padding: 12px 14px;
@@ -7044,10 +7112,6 @@ a.machine-row__name:hover {
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
-}
-.newag__note svg {
-  flex: none;
-  margin-top: 2px;
 }
 .newag__note b {
   color: var(--ink);
@@ -7057,14 +7121,6 @@ a.machine-row__name:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-.newag__chip .connector-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  box-shadow: none;
-  background: transparent;
-  font-size: 8px;
 }
 .newag__pills {
   display: flex;
@@ -7137,14 +7193,10 @@ a.machine-row__name:hover {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* An `.ac-faceline` with room above it for the face's hat: the name's capitals at the face's top. */
 .newag__role-top {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
   min-height: 58px;
-}
-.newag__role .newag__role-agent {
-  margin-top: 18px;
+  padding-top: 18px;
 }
 .newag__role-name {
   display: flex;
@@ -7571,6 +7623,7 @@ a.machine-row__name:hover {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     transform 0.18s var(--spring),
@@ -7874,7 +7927,7 @@ a.machine-row__name:hover {
   position: relative;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 14px;
-  align-items: center;
+  align-items: start;
   gap: 10px;
   min-width: 0;
   padding: 10px 10px 10px 12px;
@@ -7907,6 +7960,10 @@ a.machine-row__name:hover {
   width: 1px;
   background: var(--line);
 }
+/*
+ * The key on its label's 16px line, in the label's type so the capitals are the label's: an icon's middle on their
+ * middle (an `.ac-iconline` lead's place), a logo tile's top at their top (an `.ac-faceline` picture's).
+ */
 .agp-cell__key {
   display: grid;
   place-items: center;
@@ -7914,6 +7971,11 @@ a.machine-row__name:hover {
   height: 30px;
   border-radius: 10px 10px 10px 3px;
   color: var(--muted);
+  font-size: 12px;
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+.agp-cell__key:has(> .ac-brand) {
+  translate: 0 calc(8px - var(--cap-top));
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -7958,6 +8020,7 @@ a.machine-row__name:hover {
   line-height: 17px;
 }
 .agp-cell__chev {
+  align-self: center;
   color: var(--faint);
 }
 .agp-workcard__foot {
@@ -8000,9 +8063,6 @@ a.machine-row__name:hover {
 }
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.4;
@@ -8010,10 +8070,6 @@ a.machine-row__name:hover {
 .agp-wdlg__note b {
   color: var(--ink);
   font-weight: 600;
-}
-.agp-wdlg__note > .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .agp-wdlg__link {
   display: inline-flex;
@@ -8062,24 +8118,22 @@ a.machine-row__name:hover {
 .agp-brainsel .newag__sel-value {
   gap: 10px;
 }
-/* The card's foot: "Se o … desligar, responder pela API" and what it does now, the switch at the end. */
+/*
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ */
 .agp-brainoff {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  min-width: 0;
+  font-size: 13.5px;
   line-height: 1.35;
+}
+.agp-brainoff label {
   cursor: pointer;
 }
 .agp-brainoff b {
-  font-size: 13.5px;
   font-weight: 600;
 }
-.agp-brainoff span {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-/* "Só responde a você", under the account: what it means now, the switch at the end. */
+/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
 .agp-brainshare {
   display: flex;
   align-items: center;
@@ -8110,18 +8164,19 @@ a.machine-row__name:hover {
   font-size: 15px;
   font-weight: 650;
 }
+/* A step (an `.ac-iconline`): its number centred on the title's 14/20 line. */
 .agp-addacct__step {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  font-size: 14px;
+  line-height: 20px;
 }
 .agp-addacct__step > i {
-  flex: none;
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
-  margin-top: 1px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
@@ -8140,7 +8195,8 @@ a.machine-row__name:hover {
   font-size: 14px;
   font-weight: 600;
 }
-.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code) {
+/* The lines under a title; the title's own line (with its ⓘ) keeps the step's 14/20. */
+.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code):not(.ac-hintline) {
   font-size: 13px;
   line-height: 1.4;
   color: var(--muted);
@@ -8153,9 +8209,11 @@ a.machine-row__name:hover {
   gap: 8px;
   margin: 4px 0;
 }
+/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel, in English and in
+   Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 160px;
+  min-width: 102px;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -8173,9 +8231,37 @@ a.machine-row__name:hover {
   font-weight: 600;
   color: var(--faint);
 }
+/* At phone width a step's words take the row, and its button goes under them, in their column. */
 @media (max-width: 640px) {
   .agp-addacct__step {
     flex-wrap: wrap;
+  }
+  .agp-addacct__step.ac-iconline > .agp-addacct__text {
+    flex-basis: calc(100% - 32px);
+  }
+  .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+    margin-left: 32px;
+  }
+}
+/* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
+   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
+   spaced. A touch screen's small button is the ruler's default step. */
+@media (min-width: 641px) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-sm);
+    padding-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+}
+@media (min-width: 641px) and (pointer: coarse) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-md);
+    padding-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
@@ -8231,7 +8317,11 @@ a.machine-row__name:hover {
   color: var(--warn);
 }
 .agp-view {
-  padding: 8px var(--agp-gutter) 0;
+  /* Room under the tabs before the first card, and the same 16px between whatever a tab stacks. */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px var(--agp-gutter) 0;
   animation: agp-in 0.3s var(--out) both;
 }
 @keyframes agp-in {
@@ -8248,47 +8338,35 @@ a.machine-row__name:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   align-items: start;
-  gap: 48px;
+  gap: 24px;
 }
+/* Each section is the root card (hairline, cut corner) on the page: in dark the dense text no longer
+   floats on the near-black, every block has a face of its own. */
 .agp-col {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
-/* No cards on the agent's page: sections on the white, a hairline between them. */
 .agp-card.ac-card {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
-  min-width: 0;
-  padding: 26px 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
 }
-.agp-card.ac-card + .agp-card.ac-card,
-.agp-attns + .agp-card.ac-card,
-.agp-aside__work + .agp-card.ac-card {
-  border-top: 1px solid var(--line);
-}
-.agp-card.ac-card > .ac-card__foot {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-}
-/* Something changed in it: a bar on its left edge. */
+/* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {
-  padding-left: 14px;
-  box-shadow: inset 2px 0 0 var(--ink);
+  box-shadow:
+    var(--card-shadow),
+    inset 2px 0 0 var(--ink);
 }
-/* The side column: quiet, smaller headings. */
+/* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
 .agp-aside__work {
-  padding: 26px 0;
+  padding: 20px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
 }
 .agp-aside__h {
   margin: 0 0 6px;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -8299,6 +8377,7 @@ a.machine-row__name:hover {
 }
 .agp-aside .agp-workcard {
   padding: 0;
+  border-block: 0;
   background: none;
   box-shadow: none;
 }
@@ -8367,8 +8446,6 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 .agp-readonly {
-  display: flex;
-  align-items: center;
   gap: 10px;
   margin: 0 0 14px;
   padding: 10px 14px;
@@ -8376,9 +8453,6 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font-size: 13px;
-}
-.agp-readonly svg {
-  flex: none;
 }
 .agp-ro {
   display: flex;
@@ -8400,7 +8474,7 @@ a.machine-row__name:hover {
 }
 .agp-prose {
   margin: 0;
-  color: var(--ink2);
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
@@ -8427,15 +8501,9 @@ a.machine-row__name:hover {
 }
 /* "N ações pedem sua aprovação antes · Ver": one line, the lock on the first line of text. */
 .agp-asks {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   line-height: 20px;
-}
-.agp-asks .ac-icon {
-  flex: none;
-  margin-top: 3px;
 }
 .agp-asks__t {
   min-width: 0;
@@ -8518,10 +8586,8 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 8px;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the button in the row's middle. */
 .agp-attn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--raised);
@@ -8536,6 +8602,9 @@ a.machine-row__name:hover {
 .agp-attn__t b {
   font-weight: 600;
 }
+.agp-attn > .ac-btn {
+  align-self: center;
+}
 .agp-attn__t span {
   color: var(--muted);
   font-size: 12.5px;
@@ -8547,10 +8616,8 @@ a.machine-row__name:hover {
   padding: 0;
   list-style: none;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the time in the row's middle. */
 .agp-li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   min-width: 0;
   padding: 11px 0;
   border-top: 1px solid var(--line);
@@ -8578,12 +8645,13 @@ a.machine-row__name:hover {
 }
 .agp-li__t span,
 .agp-li__when {
-  color: var(--muted);
+  color: var(--ink2);
   font-size: 12.5px;
 }
 .agp-li__when {
   flex: none;
-  color: var(--faint);
+  align-self: center;
+  color: var(--muted);
   white-space: nowrap;
 }
 .agp-kv {
@@ -8597,7 +8665,7 @@ a.machine-row__name:hover {
   gap: 6px;
 }
 .agp-k {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -8872,41 +8940,6 @@ a.machine-row__name:hover {
   }
 }
 /* Memória */
-.agp-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.agp-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
-.agp-tile small {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-.agp-tile b {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: var(--font-display-weight, 300);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.agp-tile span {
-  color: var(--faint);
-  font-size: 12px;
-}
 .agp-why {
   margin: 0;
   color: var(--muted);
@@ -8973,8 +9006,6 @@ a.machine-row__name:hover {
   overflow-wrap: anywhere;
 }
 .agp-run__fail {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   color: var(--danger);
   font-size: 12.5px;
@@ -9432,16 +9463,17 @@ a.machine-row__name:hover {
 .agp-look {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+/* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   min-width: 0;
 }
 .agp-look__row .newag__swatch {
@@ -9462,10 +9494,6 @@ a.machine-row__name:hover {
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
-  }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
   }
 }
 
@@ -9712,79 +9740,6 @@ html[data-menu-overlay] .shell {
 
 /* ── Messages fluidity ── */
 
-/* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
-.live-call__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-.live-call[data-s="stop"] .live-call__head {
-  color: var(--faint);
-  text-decoration: line-through;
-  text-decoration-color: var(--line2);
-}
-/* When the answer is done the steps fold into "3 passos" (same element: it closes smoothly). */
-.live-work-fold {
-  display: grid;
-  grid-template-rows: 1fr;
-}
-.live-work-fold > .live-work {
-  min-height: 0;
-  overflow: hidden;
-}
-.live-work-fold[data-folded] {
-  grid-template-rows: 0fr;
-  opacity: 0;
-}
-.live-work-fold[data-folded] > .live-work {
-  margin: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work-fold {
-    transition:
-      grid-template-rows 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 0.3s;
-  }
-}
-.live-work__sum {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: max-content;
-  height: 24px;
-  margin: 2px 0 4px -6px;
-  padding: 0 8px 0 6px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-.live-work__sum:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.live-work__sum:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-work__chev {
-  transition: transform 0.2s;
-}
-.live-work__sum[aria-expanded="true"] .live-work__chev {
-  transform: rotate(90deg);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work__sum {
-    animation: ac-fade-in 0.4s ease-out both;
-  }
-}
-
 /*
  * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
  * At the right edge like "Visto": on the left, the agent's face read as the author of my next message.
@@ -9861,6 +9816,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink);
   white-space: nowrap;
   cursor: pointer;
@@ -9904,9 +9860,6 @@ html[data-menu-overlay] .shell {
 
 /* Above the box when the connection drops, then "Conectado de novo". */
 .channel__conn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-height: 30px;
   margin: 0 4px 6px;
   padding: 4px 10px;
@@ -10002,42 +9955,373 @@ html[data-menu-overlay] .shell {
   text-decoration: underline;
 }
 .agp-files__note {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 12px 0 0;
 }
 
-/* Contas de IA: the connect choices (one that no computer of the person's can take says why) and the rows. */
-.ai-connect__choices {
+/* The chosen option's panel under the picker, in groups 16px apart: its head (the name's capitals at its mark's top,
+   the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in
+   a well, who signs in, the steps, then its foot. */
+.ai-panel {
+  gap: 16px;
+  text-wrap: pretty;
+}
+.ai-panel > .ac-setnote {
+  margin: 0;
+}
+/*
+ * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
+ * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
+ * mark's. The wait's well and the option cards start their 12px of padding before the text's column, so their words
+ * are on it too. A note inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ */
+.ai-panel--plan {
+  --lead: 30px;
+  --text-edge: calc(var(--lead) + 12px);
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline,
+.ai-panel--plan .ai-panel__row > .ac-setnote {
+  gap: 12px;
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child,
+.ai-panel--plan .ai-panel__row > .ac-setnote > :first-child {
+  margin-inline: calc((var(--lead) - 14px) / 2);
+}
+.ai-panel--plan .agp-addacct__step > i {
+  margin-inline: calc((var(--lead) - 20px) / 2);
+}
+/* A step's title, an option's and the foot's line break into lines of a length, never onto a word or two alone. */
+.ai-panel--plan :is(.agp-addacct__text b, .ac-option__title, .ac-card__foot) {
+  text-wrap: balance;
+}
+.ai-panel--plan > :not(.ai-panel__head, .ai-panel__wait, .ai-panel__row, .agp-addacct, .ac-iconline),
+.ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline) {
+  margin-left: var(--text-edge);
+}
+.ai-panel--plan > .grid-options {
+  margin-left: calc(var(--text-edge) - var(--space-3));
+}
+.ai-panel__head {
+  flex-wrap: wrap;
+  gap: 12px;
+  /* Its hairline runs edge to edge, as the foot's does. */
+  margin-inline: calc(-1 * var(--card-pad));
+  padding: 0 var(--card-pad) 16px;
+  border-bottom: 1px solid var(--line);
+  line-height: 20px;
+}
+/* The computer's wait in a well, sunk into its card in both themes: here, and on the setup's Computer step. */
+.ai-panel__wait,
+.onb__wait {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.ai-panel__wait {
+  margin-left: calc(var(--text-edge) - 12px);
+  padding: 12px;
+  /* Short lines: wrapped, they break into two of a length. */
+  text-wrap: balance;
+}
+.onb__wait {
+  padding: 12px 14px;
+}
+/*
+ * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
+ * its 12px: their first capitals that far under what is above, their last baseline that far over what is below
+ * (`--cap-top` and `--cap-mid` place a line's capitals in its box).
+ */
+.ai-panel__wait > p:first-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-top: calc(var(--cap-top) - 11px);
+}
+.ai-panel__wait > p:last-child {
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+.ai-panel--plan > .ac-setnote {
+  /* The note's 18px line. */
+  margin-block: calc(var(--cap-top) - 9px) calc(var(--cap-top) - 2 * var(--cap-mid) - 9px);
+}
+@supports (top: 1lh) {
+  .ai-panel__wait > p:first-child {
+    margin-top: calc(var(--cap-top) - 0.5lh);
+  }
+  .ai-panel__wait > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+  .ai-panel--plan > .ac-setnote {
+    margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* The Computer step's lines are the well's own, at its gap. */
+.onb__wait > .setup-wait {
+  display: contents;
+}
+/* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
+   face and mark centre on it. */
+.ai-panel__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   margin: 0;
   padding: 0;
-  border: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
-.ai-connect__choices legend {
-  margin-bottom: 8px;
-  padding: 0;
-  font-weight: 600;
-}
-.ai-connect__choices .ac-option {
+.ai-panel__who > li {
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
-.ai-connect__choices .ac-option:disabled {
-  cursor: default;
-  opacity: 0.6;
-  box-shadow: none;
+.ai-panel__who > [data-state="done"] {
+  color: var(--ink);
 }
-.ai-accounts__empty {
+.ai-panel__each {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ai-panel__title {
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.ai-panel__title > b {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.ai-panel__title > span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* For whom: as tall as the head's mark, so it centres on the mark's middle. */
+.ai-panel__agent {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  height: var(--lead);
   gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/* What went wrong and its button (Try again): the note in the button's middle, beside it or on the line above it. */
+.ai-panel__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.ai-panel__row > .ac-setnote {
+  flex: 1 1 240px;
+  margin: 0;
+}
+/* Its two actions (the wrong account's): one under the other when they don't fit, and a long email ends in "…"
+   (the note above says it whole). */
+.ai-panel__row > .ac-acts {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  min-width: 0;
+}
+.ai-panel__row > .ac-acts > .ac-btn {
+  max-width: 100%;
+}
+.ai-panel__use {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* At phone width for whom goes under the name, and a step's button under its words, on the text's column. */
+@media (max-width: 640px) {
+  .ai-panel__agent {
+    flex-basis: calc(100% - var(--text-edge));
+    height: auto;
+    margin-left: var(--text-edge);
+  }
+  .ai-panel__agent > .ac-select {
+    flex: 1;
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
+    flex-basis: calc(100% - var(--text-edge));
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+    margin-left: var(--text-edge);
+  }
+  /* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+     text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+  .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+    gap: calc((var(--lead) - 14px) / 2 + 12px);
+    margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+  }
+  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+    margin-left: calc((var(--lead) - 14px) / 2);
+  }
+  /* With no number, the title's capitals are the step's top. */
+  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+    flex-basis: 100%;
+    /* Browsers without the lh unit: the step's 20px line. */
+    margin-top: calc(var(--cap-top) - 10px);
+  }
+  @supports (top: 1lh) {
+    .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+      margin-top: calc(var(--cap-top) - 0.5lh);
+    }
+  }
+}
+/* Who thinks (the setup, after a plan): each agent and what it thinks with. */
+.ai-who__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-who__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.ai-who__name {
+  flex: 0 0 72px;
+  font-weight: 600;
+}
+.ai-who__thinks {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* A plan's mark beside its name and facts: the name's capitals at the mark's top, its actions in the row's middle. */
+.ai-accounts__row {
+  align-items: flex-start;
+}
+.ai-accounts__row > .ac-acts {
+  align-self: center;
+}
+.ai-accounts__name {
+  font-weight: 600;
 }
 .ai-accounts__row .ac-planmeter {
   margin-top: 4px;
   max-width: 320px;
+}
+/* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
+   now, and Jev's key under it for the installation's owner. */
+.who-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.who-head > .ac-link,
+.jev__foot {
+  font-size: 13px;
+  line-height: 18px;
+}
+.who-line,
+.jev__foot {
+  margin: 0;
+}
+.who-line {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.jev {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jev:focus {
+  outline: none;
+}
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state in the row's middle. */
+.jev__head,
+.jev__key {
+  align-items: flex-start;
+}
+.jev__head > .ac-chip,
+.jev__key > .ac-acts {
+  align-self: center;
+}
+/* On a phone the name and its line wrap, so the state stays on their row. */
+.jev__head > .list-col {
+  flex-basis: 0;
+}
+/* A fact breaks between facts, never inside one ("US$ 0,13"). */
+.jev__fact {
+  white-space: nowrap;
+}
+.jev__title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+.jev__body {
+  flex-direction: column;
+  align-items: stretch;
+}
+.jev__body > .ac-btn {
+  align-self: flex-start;
+}
+/* Why Jev helps: an icon, the reason in bold and its few words, a line each. */
+.jev-why {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.jev-why .ac-icon {
+  color: var(--ink2);
+}
+.jev-why b {
+  font-weight: 600;
+}
+/* Under the key's field: where it is kept, or why it wasn't saved. */
+.jev-steps__below {
+  margin: 0;
+}
+/* On a phone the key's field takes its row, so its placeholder fits, and Save and Cancel go under it together. */
+@media (max-width: 640px) {
+  .jev-steps .agp-addacct__paste .ac-input {
+    flex-basis: 100%;
+  }
+}
+/* "Picking who answers": the receipt's clock where its check goes once an agent has seen the message. */
+.ac-receipt__clock {
+  display: inline-flex;
+  padding: 0 2px;
+}
+.ac-receipt__clock .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+/* Leading a receipt's line under its message, the icon's 2px of padding reach out, so the icon starts on the text's
+   edge, as the words do. */
+.ac-msg__foot .ac-receipt > :is(.ac-receipt__check, .ac-receipt__clock):first-child {
+  margin-inline-start: -2px;
+}
+/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
+.who-by {
+  margin-top: 4px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
 }

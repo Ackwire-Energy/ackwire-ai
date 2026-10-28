@@ -34,6 +34,8 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   over?: ReactNode;
   /** Line 2 (a string is drawn in the readable secondary color, up to two lines). */
   sub?: ReactNode;
+  /** Lines of a string `sub` (default 2, 0: all of it). */
+  subLines?: number;
   /** On the right of line 2 (a count badge, a state). */
   trailing?: ReactNode;
   /** A hairline above, inset to the text column (every row but the first). */
@@ -59,6 +61,7 @@ export function ListRow({
   time,
   over,
   sub,
+  subLines = 2,
   trailing,
   divider = false,
   dot = false,
@@ -103,7 +106,7 @@ export function ListRow({
           <View style={styles.l2}>
             <View style={styles.grow}>
               {typeof sub === "string" ? (
-                <Text variant="small" tone={unread ? "ink2" : "muted"} numberOfLines={2} style={LIST_PREVIEW}>
+                <Text variant="small" tone={unread ? "ink2" : "muted"} numberOfLines={subLines} style={LIST_PREVIEW}>
                   {sub}
                 </Text>
               ) : (

@@ -102,9 +102,9 @@ describe("invitations", () => {
     expect(JSON.stringify(row)).not.toContain(token);
     const preview = await previewInvitation(f.db, token);
     expect(preview).toMatchObject({ orgName: "Acme", email: "bia@example.com", role: "member", kind: "email" });
-    // Who invited and a few of the org's agents (name and look), for the phone's invitation screen.
+    // Who invited and the org's first agents (name and look), for the phone's invitation screen.
     expect(typeof preview?.invitedBy).toBe("string");
-    expect(preview?.agents.length).toBeLessThanOrEqual(3);
+    expect(preview?.agents.length).toBeLessThanOrEqual(4);
     for (const a of preview?.agents ?? []) expect(Object.keys(a).sort()).toEqual(["appearance", "id", "name"]);
 
     const wrong = await addUser(f.db, "carl");
@@ -114,6 +114,28 @@ describe("invitations", () => {
     await expect(acceptInvitation(f.db, bia, token)).rejects.toBeInstanceOf(ConflictError);
     const general = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.userId, bia.id));
     expect(general.map((g) => g.channelId)).toEqual([f.general.id]);
+  });
+
+  test("an invitation names the first four agents, oldest first, and counts the others", async () => {
+    const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "bia@example.com", role: "member" });
+    const names = async () => {
+      const preview = await previewInvitation(f.db, token);
+      return [preview?.agents.map((a) => a.name), preview && "moreAgents" in preview ? preview.moreAgents : undefined];
+    };
+    const start = Date.now();
+    const hire = (name: string, i: number) =>
+      f.db.insert(schema.agents).values({
+        orgId: f.org.id,
+        name,
+        handle: name.toLowerCase(),
+        model: "claude-sonnet-5-5",
+        createdAt: new Date(start + (i + 1) * 1000),
+      });
+    for (const [i, name] of ["Ada", "Lia", "Atlas"].entries()) await hire(name, i);
+    // Four: every one by name, nothing more to count.
+    expect(await names()).toEqual([["Dev", "Ada", "Lia", "Atlas"], undefined]);
+    for (const [i, name] of ["Theo", "Bia"].entries()) await hire(name, i + 3);
+    expect(await names()).toEqual([["Dev", "Ada", "Lia", "Atlas"], 2]);
   });
 
   test("expired invitations don't work", async () => {

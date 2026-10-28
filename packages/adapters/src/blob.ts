@@ -17,6 +17,8 @@ export interface BlobStore {
   delete(key: string): Promise<void>;
   /** Keys under `prefix`, at most `limit` (default 1000). */
   list(prefix: string, limit?: number): Promise<string[]>;
+  /** Everything under the folder `prefix` (ends with `/`) at once, folders included, where the store can. */
+  deletePrefix?(prefix: string): Promise<void>;
   /**
    * A short-lived URL that downloads the object, or null when this store
    * can't sign (the server streams it instead).

@@ -11,7 +11,7 @@ import {
   undoableNow,
 } from "@agenteschat/client/lib/actions";
 import { relativeTime, toYmd } from "@agenteschat/client/lib/format";
-import { cx, Icon, type IconName } from "@agenteschat/ui";
+import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
@@ -68,7 +68,7 @@ function useVisibleNow(ref: RefObject<HTMLElement | null>, live: boolean) {
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)));
+    const io = new IntersectionObserver((entries) => setVisible(onScreenNow(entries) === true));
     io.observe(el);
     return () => io.disconnect();
   }, [ref]);

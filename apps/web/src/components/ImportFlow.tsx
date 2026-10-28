@@ -12,7 +12,6 @@ import {
   Alert,
   Button,
   Card,
-  CardFooter,
   CardHeader,
   Checkbox,
   Chip,
@@ -21,6 +20,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   normalizeAppearance,
   OptionCard,
@@ -37,6 +37,7 @@ import { useApi } from "@/api/context";
 import { failedOffline } from "@/chat/outbox";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { fileSaver } from "@/components/artifacts/fileSaver";
+import { HelpLink } from "@/components/HelpLink";
 import { useOrg } from "@/components/org-context";
 import {
   EXPORT_PROMPT,
@@ -48,7 +49,6 @@ import {
   type PickedFile,
   parseImport,
   readImportFiles,
-  SOURCE_MARK,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
@@ -56,6 +56,7 @@ import {
   applyInChunks,
   blockedItems,
   bundleOrigin,
+  CARD_MARK,
   choosable,
   droppedFiles,
   EXPORT_PROMPT_APPS,
@@ -67,9 +68,11 @@ import {
   itemId,
   NOT_GITHUB,
   picksOf,
+  type RequestCard,
   retryable,
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
+import { useTheme } from "@/lib/theme";
 import "./import-flow.css";
 
 const KINDS: ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
@@ -336,6 +339,8 @@ function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">
 }
 
 function SourceMark({ card }: { card: ImportCard }) {
+  // The app's own theme, which can differ from the system's: so not a `<picture>` with a media query.
+  const dark = useTheme().resolved === "dark";
   if (card === "other") {
     return (
       <span className="imp-mark" aria-hidden="true">
@@ -343,10 +348,10 @@ function SourceMark({ card }: { card: ImportCard }) {
       </span>
     );
   }
-  const mark = SOURCE_MARK[card];
+  const mark = CARD_MARK[card];
   return (
     <span className="imp-mark" aria-hidden="true">
-      {"icon" in mark ? <img src={mark.icon} alt="" className="imp-mark__img" /> : mark.letters}
+      <img src={dark && mark.dark ? mark.dark : mark.icon} alt="" className="imp-mark__img" />
     </span>
   );
 }
@@ -369,12 +374,12 @@ function Picker({ flow }: { flow: ImportFlowState }) {
     const files = Array.from(list ?? []);
     if (files.length) void flow.read({ files });
   };
-  const cardName = (c: ImportCard) =>
-    c === "other"
-      ? t("onboarding.import.otherName")
-      : c === "agenteschat"
-        ? t("onboarding.import.agenteschatName")
-        : SOURCE_NAME[c];
+  const cardName = (c: ImportCard) => {
+    if (c === "other") return t("onboarding.import.otherName");
+    if (c === "agenteschat") return t("onboarding.import.agenteschatName");
+    if (c === "grok-bot" || c === "chatgpt-dots") return EXPORT_PROMPT_APPS.find((a) => a.app === c)?.name;
+    return SOURCE_NAME[c];
+  };
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the drop zone button and the pickers are the keyboard way
@@ -411,16 +416,15 @@ function Picker({ flow }: { flow: ImportFlowState }) {
           >
             <SourceMark card={c} />
             <span className="ac-option__title">{cardName(c)}</span>
-            <span className="ac-option__desc">{t(`onboarding.import.${c}Desc`)}</span>
           </OptionCard>
         ))}
       </div>
 
-      {flow.card === "other" ? (
-        <OtherApp />
+      {flow.card === "grok-bot" || flow.card === "chatgpt-dots" || flow.card === "other" ? (
+        <OtherApp key={flow.card} card={flow.card} />
       ) : (
         flow.card && (
-          <p className="imp-tip">
+          <p className="imp-tip ac-iconline">
             <Icon name="info" size={16} />
             <span>{t(`onboarding.import.where.${flow.card}`)}</span>
           </p>
@@ -514,16 +518,25 @@ function Picker({ flow }: { flow: ImportFlowState }) {
           )}
         </div>
       )}
-      <p className="imp-note">
+      {/* What a person needs before dropping a folder that holds keys: said on the line, the rest in its ⓘ. */}
+      <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
-        <span>{t("onboarding.import.privacy")}</span>
+        <span className="ac-hintline">
+          <span>{t("onboarding.import.privacy")}</span>
+          <InfoHint name={t("common.about", { label: t("onboarding.import.privacyLabel") })}>
+            {t("onboarding.import.privacyMore")}
+          </InfoHint>
+        </span>
       </p>
     </div>
   );
 }
 
-/** "Outro app": the request to paste there, and where each app gives the file back. */
-function OtherApp() {
+/**
+ * The request to paste in the app, in Grok Bot's or ChatGPT dots' own words on their cards. For any other
+ * app, where each one gives the file back is on the help page.
+ */
+function OtherApp({ card }: { card: RequestCard }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
   const copy = async () => {
@@ -537,43 +550,40 @@ function OtherApp() {
   return (
     <section className="imp-other" aria-labelledby="imp-other-title">
       <h3 id="imp-other-title" className="imp-other__title">
-        {t("onboarding.import.other.title")}
+        {t(`onboarding.import.request.${card}.title`)}
       </h3>
       <ol className="imp-other__steps">
-        <li>{t("onboarding.import.other.steps.copy")}</li>
-        <li>{t("onboarding.import.other.steps.paste")}</li>
-        <li>{t("onboarding.import.other.steps.back")}</li>
+        <li>{t("onboarding.import.request.copyStep")}</li>
+        <li>{t(`onboarding.import.request.${card}.paste`)}</li>
+        <li>{t(`onboarding.import.request.${card}.back`)}</li>
       </ol>
       <Textarea
         readOnly
         rows={6}
         value={EXPORT_PROMPT}
-        aria-label={t("onboarding.import.other.prompt")}
+        aria-label={t("onboarding.import.request.prompt")}
         className="imp-other__prompt"
         onFocus={(e) => e.currentTarget.select()}
       />
       <div className="imp-other__copy">
         <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-          {copied === "ok" ? t("common.copied") : t("onboarding.import.other.copy")}
+          {copied === "ok" ? t("common.copied") : t("onboarding.import.request.copy")}
         </Button>
         <span role="status" className="small muted">
           {copied === "ok"
-            ? t("onboarding.import.other.copied")
+            ? t(`onboarding.import.request.${card}.copied`)
             : copied === "failed"
-              ? t("onboarding.import.other.copyFailed")
+              ? t("onboarding.import.request.copyFailed")
               : ""}
         </span>
       </div>
-      <p className="imp-other__apps-title">{t("onboarding.import.other.appsTitle")}</p>
-      <dl className="imp-other__apps">
-        {EXPORT_PROMPT_APPS.map((a) => (
-          <div key={a.step}>
-            <dt>{a.name}</dt>
-            <dd>{t(`onboarding.import.other.apps.${a.step}`)}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="small muted">{t("onboarding.import.other.noFile")}</p>
+      {card === "other" && (
+        <p className="imp-help">
+          <HelpLink slug="import" section="other-apps">
+            {t("onboarding.import.request.where")}
+          </HelpLink>
+        </p>
+      )}
     </section>
   );
 }
@@ -679,7 +689,6 @@ function Preview({
           <Heading level={sub} id="imp-left-title" className="imp-block__title">
             {t("onboarding.import.leftOutTitle")}
           </Heading>
-          <p className="imp-block__help">{t("onboarding.import.leftOutHelp")}</p>
           <ul className="imp-left">
             {left.map((g) => (
               <li key={g.kind}>
@@ -698,7 +707,7 @@ function Preview({
           </ul>
         </section>
       )}
-      <p className="imp-note">
+      <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
         <span>{t("onboarding.import.never")}</span>
       </p>
@@ -706,7 +715,7 @@ function Preview({
       {standalone ? (
         <ApplyBar flow={flow} count={picks.length} />
       ) : (
-        <p className="imp-note">
+        <p className="imp-note ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("onboarding.import.withTeam")}</span>
         </p>
@@ -739,7 +748,7 @@ function ApplyBar({ flow, count }: { flow: ImportFlowState; count: number }) {
           {t("onboarding.import.go", { count })}
         </Button>
       ) : (
-        <p className="imp-apply__none">
+        <p className="imp-apply__none ac-iconline">
           <Icon name={here ? "check" : "info"} size={16} />
           {here ? t("onboarding.import.nothingNew") : t("onboarding.import.nothingToBring")}
         </p>
@@ -788,7 +797,10 @@ function Group({
           {title}
         </Heading>
         <CountChip size="sm">{rows.length}</CountChip>
-        <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
+        {/* Only what changes what happens after the import: skills arrive off, routines paused. */}
+        {(kind === "skill" || kind === "routine") && (
+          <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
+        )}
       </div>
       <ul className="imp-rows">
         {(open ? rows : rows.slice(0, SHOWN)).map((item, i) => (
@@ -1037,10 +1049,9 @@ function Todos({
       <Heading level={level} id="imp-todo-title" className="imp-block__title">
         {t("onboarding.import.todoTitle")}
       </Heading>
-      <p className="imp-block__help">{t("onboarding.import.todoHelp")}</p>
       <ul className="imp-todo">
         {todo.map((x) => (
-          <li key={`${x.kind}:${x.label}`}>
+          <li key={`${x.kind}:${x.label}`} className="ac-iconline">
             <Icon name={TODO_ICON[x.kind]} size={16} />
             <span className="imp-todo__text">
               <span>{t(`onboarding.import.todo.${x.kind}`, { label: x.label })}</span>
@@ -1200,7 +1211,7 @@ export function ImportReport({
           </Heading>
           <ul className="imp-missed">
             {missed.map((i) => (
-              <li key={itemId(i)}>
+              <li key={itemId(i)} className="ac-iconline">
                 <Icon name={KIND_ICON[i.kind]} size={16} />
                 <span>
                   {i.label}
@@ -1232,8 +1243,8 @@ export function ImportReport({
 }
 
 /**
- * Configurações → Importar e exportar (admins): the import flow, and this
- * workspace as a file, with what it carries and what it never does.
+ * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
+ * carries (whoever shares the file needs that); the full list is on the help page.
  */
 export function ImportExportSection() {
   const { t } = useTranslation();
@@ -1246,12 +1257,7 @@ export function ImportExportSection() {
   return (
     <>
       <Card aria-labelledby="imp-import-title">
-        <CardHeader
-          icon="upload"
-          id="imp-import-title"
-          title={t("settings.import.title")}
-          subtitle={t("settings.import.sub")}
-        />
+        <CardHeader icon="upload" id="imp-import-title" title={t("settings.import.title")} />
         <ImportFlow flow={flow} orgId={org.id} standalone level={3} />
       </Card>
       <Card aria-labelledby="imp-export-title">
@@ -1259,42 +1265,21 @@ export function ImportExportSection() {
           icon="download"
           id="imp-export-title"
           title={t("settings.import.exportTitle")}
-          subtitle={t("settings.import.exportSub")}
           action={
             <Button icon="download" onClick={download}>
               {t("settings.import.download")}
             </Button>
           }
         />
-        <div className="imp-export">
-          <section aria-labelledby="imp-carries">
-            <h3 id="imp-carries" className="imp-block__title">
-              {t("settings.import.carries")}
-            </h3>
-            <ul>
-              {(["agents", "skills", "channels", "routines", "memory"] as const).map((k) => (
-                <li key={k}>
-                  <Icon name="check" size={14} />
-                  {t(`settings.import.carry.${k}`)}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section aria-labelledby="imp-never">
-            <h3 id="imp-never" className="imp-block__title">
-              {t("settings.import.never")}
-            </h3>
-            <ul>
-              {(["keys", "connections", "computers", "messages", "usage"] as const).map((k) => (
-                <li key={k}>
-                  <Icon name="lock" size={14} />
-                  {t(`settings.import.neverList.${k}`)}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-        <CardFooter>{t("settings.import.back")}</CardFooter>
+        <p className="imp-note ac-iconline">
+          <Icon name="lock" size={16} />
+          <span>{t("settings.import.neverLine")}</span>
+        </p>
+        <p className="imp-help">
+          <HelpLink slug="import" section="export">
+            {t("settings.import.whatsIn")}
+          </HelpLink>
+        </p>
       </Card>
     </>
   );

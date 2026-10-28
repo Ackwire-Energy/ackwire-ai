@@ -1,49 +1,28 @@
 import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
-import { activitySentence, activityVerb, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
+import { activitySentence, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
-import { formatDuration, toolLabel } from "@agenteschat/client/lib/work";
+import { formatDuration } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, type LayoutChangeEvent, Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-  ZoomIn,
-} from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import { ActivityIndicator, Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
-import {
-  CHROME_MAX_SCALE,
-  haptics,
-  Icon,
-  PixelDone,
-  PixelOrbit,
-  PixelStop,
-  Text,
-  useReducedMotion,
-  useTheme,
-} from "@/ui";
+import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { markedParts, markName, stoppableInLine, workingEntries } from "./logic";
 import { MessageText } from "./MessageText";
+import { TurnTools } from "./ToolCalls";
 import {
   fadeTail,
   openerDelayMs,
   pruneMarks,
   type RevealMark,
-  recentTurn,
   rememberTurn,
-  type TurnItem,
   turnItems,
   turnOpener,
   turnPhase,
@@ -54,10 +33,10 @@ import {
 /**
  * An agent's turn, live: one block from "pensando" to the last word, in
  * the same place, the last thing in the conversation while it works. The header says what it is doing
- * (its pixel orbit and a breathing word, and for how long); above the words, its steps (the orbit while
- * one runs, one green pixel when done), what it said between them and the wells of the messages it read;
+ * (its pixel orbit and a breathing word, and for how long); above the words, its tools in one line that
+ * opens into every call (`TurnTools`) and, under it, the wells of the messages it read;
  * then the words, revealed at a steady pace and fading in, with the thin caret. When it is done, its saved
- * reply takes the same row and folds the work into "N passos" (`recentTurn`).
+ * reply takes the same row and keeps the same block, closed on "Usou N ferramentas" (`recentTurn`).
  */
 export const TurnRow = memo(function TurnRow({
   run,
@@ -82,11 +61,11 @@ export const TurnRow = memo(function TurnRow({
   const word = t(`mobile.chat.turn.${phase}`);
   const took = secs >= 2000 ? ` · ${formatDuration(t, secs)}` : "";
 
-  // Its work, for the saved reply to fold in place.
+  // Its work, for the saved reply to keep in place.
   const quotes = Object.fromEntries(
-    items.flatMap((x) => (x.kind === "read" ? [[x.messageId, bodyOf(x.messageId) ?? ""]] : [])),
+    items.flatMap((x) => (x.kind === "steer" ? [[x.messageId, bodyOf(x.messageId) ?? ""]] : [])),
   );
-  const signature = items.map((x) => `${x.key}:${x.kind === "step" ? x.running : ""}`).join("|");
+  const signature = items.map((x) => `${x.key}:${x.kind === "call" ? `${x.line.state}${x.line.count}` : ""}`).join("|");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `signature` stands for the items and their quotes
   useEffect(() => {
     rememberTurn(run.runId, { items, quotes, at: Date.now() });
@@ -130,137 +109,12 @@ export const TurnRow = memo(function TurnRow({
             <MessageText body={said ?? t(`mobile.chat.turn.opener${opener}`)} selectable={false} />
           </View>
         ) : null}
-        <TurnLines items={lines} quoteOf={bodyOf} color={color} />
+        <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
         {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
       </View>
     </View>
   );
 });
-
-/** The work above the words: steps, what it said between them, the messages it read. */
-export function TurnLines({
-  items,
-  quoteOf,
-  color,
-  settled = false,
-}: {
-  items: readonly TurnItem[];
-  quoteOf: (messageId: string) => string | undefined;
-  color: ReturnType<typeof agentLook>["color"];
-  /** Drawn by the saved reply as it folds (every message read, nothing running). */
-  settled?: boolean;
-}) {
-  const { t } = useTranslation();
-  const reduced = useReducedMotion();
-  if (items.length === 0) return null;
-  return (
-    <View style={styles.lines}>
-      {items.map((x) => {
-        switch (x.kind) {
-          case "say":
-            return (
-              <View key={x.key} style={styles.say}>
-                <MessageText body={x.text} selectable={false} />
-              </View>
-            );
-          case "read":
-            return <ReadWell key={x.key} now={x.now} quote={quoteOf(x.messageId) ?? ""} settled={settled} />;
-          case "step": {
-            const label = x.running
-              ? capitalize(activityVerb(t, x.activity))
-              : t(`chat.work.step.${x.activity.kind}`, {
-                  app: x.activity.app ?? "",
-                  tool: toolLabel(x.tool),
-                  defaultValue: toolLabel(x.tool),
-                });
-            return (
-              <Animated.View
-                key={x.key}
-                entering={reduced || settled ? undefined : FadeIn.duration(220)}
-                style={styles.step}
-              >
-                <View style={styles.stepIcon}>
-                  {x.running ? <PixelOrbit color={color} size={14} /> : <PixelDone />}
-                </View>
-                <Text variant="small" tone={x.running ? "ink2" : "muted"} numberOfLines={1} style={styles.grow}>
-                  {label}
-                </Text>
-              </Animated.View>
-            );
-          }
-        }
-        return null;
-      })}
-    </View>
-  );
-}
-
-/**
- * The saved reply that just took over a block: the work the block showed folds away (~450 ms) above the
- * "N passos" line, instead of vanishing in one frame. Nothing when the reply wasn't live here.
- */
-export function FoldingWork({ runId, agentId }: { runId: string; agentId: string }) {
-  const reduced = useReducedMotion();
-  const dir = useDirectory();
-  const [snap] = useState(() => recentTurn(runId, Date.now()));
-  const [gone, setGone] = useState(() => !snap || reduced);
-  const height = useSharedValue(-1);
-  const opacity = useSharedValue(1);
-  const style = useAnimatedStyle(() =>
-    height.value < 0 ? { opacity: opacity.value } : { height: height.value, opacity: opacity.value },
-  );
-  const onLayout = (e: LayoutChangeEvent) => {
-    if (height.value >= 0) return;
-    const h = e.nativeEvent.layout.height;
-    height.value = withSequence(
-      withTiming(h, { duration: 0 }),
-      withTiming(0, { duration: 450, easing: Easing.bezier(0.2, 0.8, 0.2, 1) }, (done) => {
-        if (done) scheduleOnRN(setGone, true);
-      }),
-    );
-    opacity.value = withTiming(0, { duration: 300 });
-  };
-  if (gone || !snap) return null;
-  return (
-    <Animated.View style={[styles.fold, style]} onLayout={onLayout} pointerEvents="none">
-      <TurnLines
-        items={snap.items}
-        quoteOf={(id) => snap.quotes[id]}
-        color={agentLook(dir.agentById.get(agentId)).color}
-        settled
-      />
-    </Animated.View>
-  );
-}
-
-const capitalize = (s: string) => (s ? s[0]?.toUpperCase() + s.slice(1) : s);
-
-/**
- * A message it read while working, inside its work: "Leu seu recado · …", or
- * "Parou para ler seu recado · …" when it was asked to stop and read (until then the message itself says
- * "lê na próxima pausa").
- */
-function ReadWell({ now, quote, settled }: { now: boolean; quote: string; settled: boolean }) {
-  const { t } = useTranslation();
-  const c = useTheme().colors;
-  const reduced = useReducedMotion();
-  return (
-    <Animated.View
-      entering={reduced || settled ? undefined : FadeIn.duration(260)}
-      style={[styles.well, { backgroundColor: c.sunken }]}
-    >
-      <Icon name={now ? "bolt" : "eye"} size={13} color={c.muted} />
-      <Text variant="small" tone="ink2" style={styles.wellTitle} numberOfLines={1}>
-        {t(now ? "mobile.chat.steer.wellNow" : "mobile.chat.steer.well")}
-      </Text>
-      {quote ? (
-        <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-          {quote}
-        </Text>
-      ) : null}
-    </Animated.View>
-  );
-}
 
 /**
  * The words as they arrive: revealed word by word at a steady reading pace (a backlog drains faster, never
@@ -502,31 +356,8 @@ const styles = StyleSheet.create({
   body: { flex: 1, minWidth: 0 },
   who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3, minHeight: 19 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
-  shrink: { flexShrink: 1 },
-  grow: { flex: 1, minWidth: 0 },
   state: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },
-  lines: { marginTop: 2, marginBottom: 4, gap: 2 },
   say: { marginVertical: 2 },
-  step: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 26 },
-  stepIcon: { width: 16, height: 16, alignItems: "center", justifyContent: "center" },
-  // "Leu seu recado": a sunken well with the "tato com canto" corner.
-  well: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    marginVertical: 6,
-    paddingVertical: 6,
-    paddingLeft: 8,
-    paddingRight: 10,
-    borderTopLeftRadius: 11,
-    borderTopRightRadius: 11,
-    borderBottomRightRadius: 11,
-    borderBottomLeftRadius: 3,
-  },
-  wellTitle: { fontWeight: "600", flexShrink: 0 },
-  fold: { overflow: "hidden" },
   dock: { paddingHorizontal: 4, paddingBottom: 6, alignItems: "flex-start" },
   pill: {
     flexDirection: "row",

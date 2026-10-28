@@ -33,6 +33,7 @@ const Provisioning = z
   .object({
     state: z.enum(PROVISIONING_STATES),
     step: z.enum(PROVISIONING_STEPS).nullable(),
+    stage: z.string().nullable().openapi({ description: "With `preparing`: the stage you gave." }),
     reason: z.enum(PROVISIONING_REASONS).nullable(),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
     requestedAt: z.string().openapi({
@@ -41,7 +42,7 @@ const Provisioning = z
     expectedReadyAt: z
       .string()
       .nullable()
-      .openapi({ description: "With `preparing`: the ready time you gave, kept while it is past (any moment now)." }),
+      .openapi({ description: "With `preparing`: the earliest ready time you gave in this wait." }),
     specs: Specs.nullable(),
   })
   .openapi("OperatorProvisioning");
@@ -71,6 +72,10 @@ const ProvisioningInput = z.object({
     .enum(PROVISIONING_STEPS)
     .optional()
     .openapi({ description: "With `preparing`: reserving, starting, installing or connecting; ignored otherwise." }),
+  stage: z.string().max(64).optional().openapi({
+    description:
+      "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step.",
+  }),
   reason: z
     .enum([...PROVISIONING_REASONS, "approval"])
     .optional()
@@ -83,7 +88,7 @@ const ProvisioningInput = z.object({
     .optional()
     .openapi({
       description:
-        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A time already past means any moment now, and while the stored one is past too it stays, so people see the wait run over.",
+        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one, or a report without one, leaves it as it is, so people see the wait run over.",
     }),
   etaSeconds: z
     .number()
@@ -156,9 +161,14 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live, with the time left. The time `since` restarts only when the state, step or reason change. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
-      responses: { 204: noContent[204], ...errors, 409: errorResponse("The computer is ready") },
+      responses: {
+        204: noContent[204],
+        ...errors,
+        403: errorResponse("The workspace isn't active"),
+        409: errorResponse("The computer is ready"),
+      },
     }),
     async (c) => {
       const { expectedReadyAt, ...input } = c.req.valid("json");
@@ -212,7 +222,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Take the workspace's computer away",
       description:
-        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now (one held or suspended waits for none). 404 when the workspace has no such managed computer (also when it was already removed).",
       request: { params: MachineParams },
       responses: { 204: noContent[204], ...errors },
     }),

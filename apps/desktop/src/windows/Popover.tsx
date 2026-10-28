@@ -32,7 +32,7 @@ import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { agentOf, readPref, useLocalServer, useOnShown, useUpdateCheck, writePref } from "../hooks";
 import type { BadgeCounts } from "../host/types";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
-import { CopyDiagnostics } from "../ui/here";
+import { CopyDetails } from "../ui/here";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
 
@@ -203,7 +203,9 @@ export function Popover() {
         await host.showWindow("prefs");
       };
       const showRequests = () => host.showWindow("popover");
-      answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
+      const localDir = () => host.localServer().then((s) => s.dir);
+      const revealFolder = (path: string) => host.revealFolder(path);
+      answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder }, request)
         .then(
           (data) => host.thisMacReply(id, true, data ?? null),
           (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
@@ -448,9 +450,7 @@ export function Popover() {
                     {t("desktop.tray.updateSee")}
                   </Button>
                 }
-              >
-                {t("desktop.tray.updateBody")}
-              </Banner>
+              />
             )}
             <span className="dk-pop__end" ref={bodyEnd} />
           </div>
@@ -567,9 +567,7 @@ export function Popover() {
                   {t("desktop.tray.updateSee")}
                 </Button>
               }
-            >
-              {t("desktop.tray.updateBody")}
-            </Banner>
+            />
           )}
 
           {requests.length > 0 && (
@@ -588,7 +586,7 @@ export function Popover() {
               {t("desktop.tray.now")} <Count n={jobs.length} />
               {jobs.length > 0 && (
                 <span className="dk-pcap__end">
-                  <button type="button" className="dk-link" onClick={openMain}>
+                  <button type="button" className="ac-link dk-link" onClick={openMain}>
                     {t("desktop.tray.seeAll")} <Icon name="external" size={14} />
                   </button>
                 </span>
@@ -650,7 +648,7 @@ export function Popover() {
 /**
  * The server here, on top: its state in a few words, `···` with Restart, Stop and Preferences (inline, as the
  * pause menu: the popover is a window of its own size), and its banners: stopped (Start it), not starting
- * (Copy diagnostics, Try again), an update that went back.
+ * (Copy details, Try again), an update that went back.
  */
 function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () => void }) {
   const { t } = useTranslation();
@@ -733,7 +731,7 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
           title={t("desktop.server.failingBanner")}
           actions={
             <>
-              <CopyDiagnostics />
+              <CopyDetails />
               <Button
                 size="sm"
                 variant="primary"
@@ -745,15 +743,13 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
               </Button>
             </>
           }
-        >
-          {t("desktop.server.failingBody")}
-        </Banner>
+        />
       )}
       {banner === "back" && (
         <Banner
           icon="alert"
           title={t("desktop.server.updateBack", { version: local.backTo })}
-          actions={<CopyDiagnostics />}
+          actions={<CopyDetails />}
         />
       )}
     </>

@@ -11,8 +11,8 @@ own machine). The setup writes it for you. Sign-in cookies, the only browser ori
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
 "Invalid origin" and saving fails with `bad_origin`.
 
-The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
-DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
+Gemini, DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -67,18 +67,19 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
    more. Done when it prints:
 
    ```
-   ✓ On your tailnet as agentes.tail1234.ts.net
-   ✓ .env: PUBLIC_URL=https://agentes.tail1234.ts.net
-   ✓ HTTPS certificate ready
-   ✓ agentes.chat <version> is up
-   ✓ Agents' computer: this machine
-
-     https://agentes.tail1234.ts.net
-
-       App:  agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net
+   ◇  On your tailnet as agentes.tail1234.ts.net
+   ◇  .env: PUBLIC_URL=https://agentes.tail1234.ts.net
+   ◇  HTTPS certificate ready
+   ◇  agentes.chat <version> is up
+   ◇  Agents' computer: this machine
+   │
+   ●  agentes.chat is up
+   │    https://agentes.tail1234.ts.net
+   │
+   │    App:  agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net
    ```
 
-   then that link's QR code for your phone, and what to do next.
+   then that link's QR code for your phone, what to do next, and `└  Done`.
 5. **Your account.** On a computer in your tailnet, open that address and sign up. The first account
    is always allowed and becomes the owner; after it, sign-up is closed and people join by
    invitation. Onboarding then creates your organization and asks for its model key.
@@ -495,7 +496,7 @@ computer and opens agentes.chat, signed in.
   (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
   and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
   brings both back.
-- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+- **Something went wrong?** **Copy details** copies what the app knows, the setup's steps and the end of
   `~/.agentes/logs/server.log`.
 - A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
   offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
@@ -650,23 +651,29 @@ ones a self-hosted instance usually touches:
 | `LANDING_PAGE` | `false` | The agentes.chat marketing page at `/`, with its waiting list and analytics. Leave it off. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
-| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
+| `EMAIL_ART` | `auto` | Where emails get their pictures (the logo, agents' faces): from this server's `/email/` when its address is public, else attached to each message. `attach` always attaches them, for a public address people outside still can't open (an access proxy, a VPN, an IP allowlist). |
 | `FILES_DIR` | `/data/files`, set by the compose file | Folder for uploaded files, on the `files` volume. |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
+| `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev (AI: plans and keys). Wins over the key added in Settings → AI accounts. |
 
-**Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
+**Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
 it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
-email from **Settings → Members and invitations**, or through an invite link, which works without
-email. Keep sign-up closed on an instance reachable from the internet. To keep the first account for
-its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex) of a one-time token (the setup doesn't make
-one yet); then only `<PUBLIC_URL>/owner#claim=<token>` creates it, with a password, and every other
-sign-up waits until it has. In the folder with `.env`:
+email from **Settings → Members and invitations**. A workspace's invitation link lets nobody in by
+itself, nor opens sign-up: whoever opens it asks to join, and an owner or admin approves each person.
+With email set up, whoever asks first proves the address with a 6-digit code sent to it, unless
+they're signed in with that address confirmed. Approving lets in at once a confirmed account with
+that address when the code proved it or that account asked. Anyone else gets an email invitation
+(without email, the admin gets its link to send). Keep sign-up closed on an instance reachable from
+the internet. To keep the first account for its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex)
+of a one-time token (the setup doesn't make one yet); then only `<PUBLIC_URL>/owner#claim=<token>`
+creates it, with a password, and every other sign-up waits until it has. In the folder with `.env`:
 
 ```sh
 token=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')
@@ -681,8 +688,8 @@ same for the desktop app that runs the server on its own computer.
 **Email.** Without `SMTP_URL` or `MILLIONSEND_API_KEY`, the app writes each email to its log instead
 of sending it (`docker compose logs agentes | grep 'email (not sent'`), so an invitation link can
 still be copied from there; email verification and password reset stay off. With either set, it
-sends invitations, email verification, password reset links, and budget and approval alerts.
-`MILLIONSEND_API_KEY` wins when both are set.
+sends invitations, codes for asking to join through a link, email verification, password reset
+links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are set.
 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
@@ -718,11 +725,12 @@ which removes the file as soon as it is read. Leave it `off` and people connect 
 <summary><b>Optional services and what they receive</b></summary>
 
 **The usage report.** The instance sends agentes.chat anonymous usage statistics: counts such as people,
-agents, machine sizes and AI tokens used, never messages, files or names. The first goes about an hour
-after the server first starts, then one a day at that time, restarts or not (one that came due while
-the server was off goes about 10 minutes after it starts again), as JSON in a POST to `TELEMETRY_URL`
-(`https://telemetry.agentes.chat/v1/report`). A send that fails is tried again three times within
-about 2.5 hours, then dropped: the next day's report replaces it. These are all its fields:
+agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive, never
+messages, files, names or sites. The first goes about an hour after the server first starts, then one a
+day at that time, restarts or not (one that came due while the server was off goes about 10 minutes
+after it starts again), as JSON in a POST to `TELEMETRY_URL` (`https://telemetry.agentes.chat/v1/report`).
+A send that fails is tried again three times within about 2.5 hours, then dropped: the next day's
+report replaces it. These are all its fields:
 
 | Field | What it is |
 | --- | --- |
@@ -736,16 +744,17 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 | `organizations` | How many workspaces. |
 | `people` | How many accounts (`total`), and how many used the server in the last 1, 7 and 30 days (`active1d`, `active7d`, `active30d`). |
 | `agents` | How many agents, archived ones aside. |
-| `computers` | The computers connected to the server and seen in the last 30 days, with agents or not (this server's own, once for all the workspaces it serves; the ones people connected; one given by a provisioner), one line for each `kind` (`host`, `connected`, `managed`), `os`, `arch` and `size` (as above; `null` when their runner is too old to say), with how many computers are alike (`count`), how many `agents` use them, and their last day's `load` (as above, their averages averaged and the highest peaks; `null` when none said how busy it got in the last day). The 50 lines with the most computers. |
+| `computers` | The computers connected to the server and seen in the last 30 days, with agents or not (this server's own, once for all the workspaces it serves, plus the ones people connected and one given by a provisioner), one line for each `kind` (`host`, `connected`, `managed`), `os`, `arch` and `size` (as above, or `null` when their runner is too old to say), with how many computers are alike (`count`), how many `agents` use them, their last day's `load` (as above, their averages averaged and the highest peaks, or `null` when none said how busy it got in the last day), and `browserTraffic`: what the agents' browsers on them sent and received over the last day, as their Chrome counts each request's headers and body (`upMb`, `downMb`, in MB), the `hours` counted and how many of the line's computers said (`computers`), `null` when none did. Only the agents' browsers are counted, never the rest of the computer. The 50 lines with the most computers. |
 | `lastDay.runs`, `lastDay.toolCalls` | Agent runs started, and tool calls they made, in the last 24 hours. |
 | `lastDay.desktopMinutes`, `lastDay.terminalMinutes` | Minutes people watched or controlled agents' desktops, and had terminals open, in the last 24 hours. |
 | `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model that isn't in agentes.chat's model list (a name someone typed, a deployment, a fine-tune) goes as `other`. |
 
-It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
-workspaces, people or computers (the request itself comes from your server's address, as any request
-does). `docker compose run --rm agentes telemetry` (without Docker, `agentes-server telemetry`) prints
-exactly the next report, whether it is on or off, and sends nothing; in the app, **Settings → General →
-Usage statistics → See what is sent** shows the same. Turn it off either way:
+It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, the sites agents'
+browsers visit, or ids of workspaces, people or computers (the request itself comes from your server's
+address, as any request does). `docker compose run --rm agentes telemetry` (without Docker,
+`agentes-server telemetry`) prints exactly the next report, whether it is on or off, and sends nothing.
+In the app, **Settings → General → Usage statistics → See what is sent** shows the same. Turn it off
+either way:
 
 - `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts); without
   Docker, in `~/.agentes/.env`, then start it again. This wins over the switch below.
@@ -772,14 +781,17 @@ party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
-| TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
+| Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
+| Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
 | Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+
+A Gemini key without billing lets Google use what it receives.
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.
@@ -887,8 +899,9 @@ What a person changes on a desktop (its theme, its panel) stays until the runner
 for a new version of the look, once Orchis, the SVG loader or the dock's plugin is installed or removed
 (running the installer again with `--desktop` installs them), when the agent is renamed, or when the
 agent's folder moves (without `--system`, it is renamed with the agent's handle). The runner writes it
-as a desktop starts, so a desktop that is running keeps its look until its next start (after a reboot,
-say): desktops stay on, and a new look doesn't close what is open on them.
+as a desktop starts, and into a desktop that is running once nobody watches it and its agent isn't using
+it: its settings change in place and its dock starts over, so nothing open on it closes. A desktop whose
+agent's folder moved keeps its look until its next start (after a reboot, say).
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every
@@ -930,14 +943,14 @@ agents can use their desktops there and, if not, what is missing and the command
 `agentes-runner desktop-check --agent <handle>` (with the runner stopped) times a look, an action, a
 screenshot and a close-up on that agent's desktop.
 
-With `TYPESAFE_API_KEY` (Jev), agents name targets in words, small ones are looked at again up close on
-the screenshot, and checks can look at the screen's image. Without it they act by the numbers on the
-screen and exact names, checks use the organization's cheap model on the screen's text, and nothing is
-found on images. Each step an agent takes shows on its message, and every app or file it opens is in
-the organization's audit log. Programs on one desktop aren't isolated from each other: code the agent
-runs there can see its screen and keys, so agents never type passwords into desktop apps; a person signs
-in with take control, and the sign-in stays in the agent's home. Mac and Windows computers have no
-desktop use.
+With Jev (**Settings → AI accounts**, or `TYPESAFE_API_KEY`), agents name targets in words, small ones
+are looked at again up close on the screenshot, and checks can look at the screen's image. Without it
+they act by the numbers on the screen and exact names, checks use the organization's small model on the
+screen's text when it has an API key, and nothing is found on images. Each step an agent takes shows on
+its message, and every app or file it opens is in the organization's audit log. Programs on one desktop
+aren't isolated from each other: code the agent runs there can see its screen and keys, so agents never
+type passwords into desktop apps; a person signs in with take control, and the sign-in stays in the
+agent's home. Mac and Windows computers have no desktop use.
 
 **This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
 the organizations the installation's first account made and is an owner or an admin of. The setup
@@ -982,6 +995,15 @@ restarts.
 stored encrypted with a key derived from `AGENTES_SECRET`, never sent back to a browser, and every
 model call goes through the server, which records its usage and cost per agent.
 
+**Jev (optional).** Jev is a fast model by TypeSafe that agentes.chat asks small questions: who should
+answer a message nobody @mentioned, how a new memory relates to the old ones, where a button is on an
+agent's screen. With it, unmentioned messages are routed even when agents think only with plans,
+memory spots repeats said in other words, and agents find buttons from a description and on
+screenshots. The person who set up the server adds the key in **Settings → AI accounts** (the setup
+asks once), or puts it in `.env` as `TYPESAFE_API_KEY`, which wins. It is stored encrypted like
+provider keys and never sent back to a browser. TypeSafe bills your account: US$ 0.042 per million
+tokens read, about US$ 0.0001 per routed message. Without it, see https://agentes.chat/help/jev#without.
+
 **Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
 on that computer, `<runner home>/accounts/<kind>/<id>` (`~/.agentes-runner/accounts/…` for a runner
@@ -990,6 +1012,11 @@ name, email, plan, status and usage (how much of each limit is used, and when it
 there says it). The code pasted when signing in from a browser is encrypted there to a
 key made on the computer and relayed without being stored, so the server can't read it. A personal
 plan is meant for its owner: answering other people with it may go against the provider's terms.
+With no Jev and no API key that has a small model, a plan also picks who answers its owner's own
+messages that mention nobody: Claude Code or Codex reads the message and the few before it on that
+computer, with every tool off, in a few seconds, and only while nothing else runs on that sign-in. It
+never picks for other people's messages, a sign-in made with an API key never picks, and a Windows
+computer doesn't pick yet.
 
 **Coding plans.** A GLM Coding Plan, Kimi Code, MiniMax or OpenCode Go key thinks through Claude Code
 on that computer, in its own account folder: the key is encrypted in the browser to the computer and

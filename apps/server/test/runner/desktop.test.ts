@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type AgentScope,
+  DESKTOP_TEXT_PROTOCOL,
   DESKTOP_USE_PROTOCOL,
   MACHINE_OPS,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
   parseRunnerFrame,
   parseServerFrame,
+  type RunnerFrame,
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -21,7 +23,7 @@ import {
 } from "../../runner/desktop";
 import type { HelperSnapshot, HelperWindow } from "../../runner/desktop-helper";
 import { RunnerError } from "../../runner/errors";
-import { handleRequest } from "../../runner/handlers";
+import { handleRequest, NEW_WORK_OPS, OP_ROUTES, RequestRunner } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const FAKE = path.join(import.meta.dir, "fake-desktop-helper.mjs");
@@ -570,6 +572,105 @@ describe("desktop use", () => {
     await Promise.all([t.manager.look(AGENT), t.manager.look(AGENT), t.manager.capture(AGENT, null)]);
     expect(t.requests().map((r) => r.op)).toEqual(["hello", "snapshot", "snapshot", "capture"]);
     expect(t.starts()).toBe(1);
+  });
+});
+
+describe("protocol 25: the screen's text", () => {
+  /** A tesseract that keeps its niceness and arguments and what it was given, and answers `ocr-text`. */
+  function withTesseract(text: string) {
+    const dir = tempDir("tesseract-");
+    dirs.push(dir);
+    const file = (name: string) => path.join(dir, name);
+    writeFileSync(file("ocr-text"), text);
+    writeFileSync(
+      file("tesseract"),
+      `#!/bin/sh\necho "$(ps -o nice= -p $$ | tr -d ' ') $*" >> '${file("ocr-args")}'\ncat > '${file("ocr-input")}'\ncat '${file("ocr-text")}'\n`,
+      { mode: 0o755 },
+    );
+    const which = (c: string) => (c === "tesseract" ? file("tesseract") : `/usr/bin/${c}`);
+    const t = setup({ system: { ...linux, which } });
+    return {
+      ...t,
+      say: (next: string) => writeFileSync(file("ocr-text"), next),
+      runs: () => (existsSync(file("ocr-args")) ? readFileSync(file("ocr-args"), "utf8").trim().split("\n") : []),
+      input: () => readFileSync(file("ocr-input"), "utf8"),
+    };
+  }
+
+  test("an op the runner takes, in the agent's worker, never refused as busy nor as new work", async () => {
+    expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(DESKTOP_TEXT_PROTOCOL);
+    expect(MACHINE_OPS).toContain("desktop.text");
+    expect(
+      parseServerFrame(JSON.stringify({ type: "request", id: "r1", op: "desktop.text", agent: AGENT })),
+    ).toMatchObject({ op: "desktop.text" });
+    expect(OP_ROUTES["desktop.text"]).toBe("agent");
+    expect(NEW_WORK_OPS.has("desktop.text")).toBe(false);
+    // A computer full of the agents' work still reads the screen of a person in control.
+    const sent: RunnerFrame[] = [];
+    const full = new RequestRunner(
+      { workspaceReal: "/", exec: true, token: "" },
+      (frame) => sent.push(frame),
+      () => {},
+      async (_ctx, req) => ({ op: req.op }),
+      0,
+    );
+    await full.start("look", { op: "desktop.look", agent: AGENT });
+    await full.start("text", { op: "desktop.text", agent: AGENT });
+    expect(sent).toEqual([
+      { type: "result", id: "look", ok: false, error: { code: "internal", message: "busy" } },
+      { type: "result", id: "text", ok: true, data: { op: "desktop.text" } },
+    ]);
+  });
+
+  test("tesseract reads the capture as the agent's user, at the lowest priority; only the text comes back", async () => {
+    const t = withTesseract("  Banco Exemplo\nSenha: ******  \n");
+    const reply = await t.manager.text(AGENT);
+    expect(reply).toEqual({ text: "Banco Exemplo\nSenha: ******" });
+    expect(t.runs()).toEqual(["19 stdin stdout -l eng+por"]);
+    expect(t.input()).toBe("not really a jpeg");
+    // A capture, never a look: the agent's refs and last look stay as they were.
+    expect(t.requests().map((r) => r.op)).toEqual(["hello", "capture"]);
+  });
+
+  test("an unchanged screen is read once; a new one is read again", async () => {
+    const t = withTesseract("first screen");
+    expect(await t.manager.text(AGENT)).toEqual({ text: "first screen" });
+    expect(await t.manager.text(AGENT)).toEqual({ same: true });
+    expect(t.runs()).toHaveLength(1);
+    t.set({ jpeg: "another screen" });
+    t.say("second screen");
+    expect(await t.manager.text(AGENT)).toEqual({ text: "second screen" });
+    expect(t.runs()).toHaveLength(2);
+  });
+
+  test("without tesseract: unavailable, and the desktop isn't touched", async () => {
+    const t = setup({ system: { ...linux, which: (c: string) => (c === "tesseract" ? null : `/usr/bin/${c}`) } });
+    expect(await failure(() => t.manager.text(AGENT))).toEqual({
+      code: "desktop_unavailable",
+      message: expect.stringContaining("tesseract-ocr tesseract-ocr-por"),
+    });
+    expect([t.ensured, t.starts()]).toEqual([[], 0]);
+  });
+
+  test("behind desktop use's switches, like the other desktop ops", async () => {
+    const t = withTesseract("hello");
+    const ws = tempDir("desktop-ws-");
+    dirs.push(ws);
+    let tools: RunnerTools = { claude: false, codex: false, commands: true, desktop: false };
+    const ctx = {
+      workspaceReal: ws,
+      exec: true,
+      token: "agm_x",
+      access: () => ({ folders: [], tools }),
+      desktopUse: t.manager,
+    };
+    const scope = { signal: new AbortController().signal, output: () => {} };
+    const text = { op: "desktop.text", agent: AGENT } as MachineRequest;
+    expect(await errorCode(() => handleRequest(ctx, text, scope))).toBe("not_allowed");
+    tools = { ...tools, desktop: true, commands: false };
+    expect(await errorCode(() => handleRequest(ctx, text, scope))).toBe("exec_disabled");
+    tools = { ...tools, commands: true };
+    expect(await handleRequest(ctx, text, scope)).toEqual({ text: "hello" });
   });
 });
 

@@ -28,6 +28,10 @@ export const Organization = z
       .object({
         state: z.enum(STANDING_STATES),
         reason: z.string().nullable().openapi({ description: "Only when the workspace is told why; else null." }),
+        cloud: z.literal(true).optional().openapi({
+          description:
+            "agentes.chat Cloud: the apps read `review` as the automatic review hold's line, and add how to contest a reason.",
+        }),
       })
       .optional()
       .openapi({ description: "In `GET /me` (ADR 0056 §8). Changes come as `org.standing` org events." }),
@@ -275,6 +279,22 @@ const MessageBase = z.object({
         .literal(true)
         .optional()
         .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
+      decidedBy: z
+        .union([
+          z.object({ step: z.literal("jev") }),
+          z.object({ step: z.literal("model"), model: z.string(), provider: z.string() }),
+          z.object({ step: z.literal("plan"), brand: z.enum(["claude", "chatgpt"]), ownerId: z.string() }),
+          z.object({ step: z.literal("rule"), rule: z.enum(["reply", "only_agent", "follow_up"]) }),
+        ])
+        .optional()
+        .openapi({
+          description:
+            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule. Absent before the chain.",
+        }),
+      reason: z
+        .literal("mention_needed")
+        .optional()
+        .openapi({ description: "No step could read it and no rule fit: only a mention reaches an agent." }),
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),

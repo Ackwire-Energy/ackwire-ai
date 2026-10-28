@@ -5,19 +5,21 @@ import {
   computerEdition,
   computerName,
   etaLine,
-  etaTickMs,
   promisesEmail,
   SETUP_STEPS,
   type SetupView,
   setupEta,
   setupNoticeKey,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
+  useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
@@ -26,16 +28,15 @@ import {
   ComputerPortrait,
   Icon,
   type IconName,
-  ProviderLogo,
+  InfoHint,
   Spinner,
   Steps,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useMatchRoute } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { useNow } from "@/hooks/useNow";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
@@ -69,24 +70,32 @@ export function useWaitReader(): WaitReader {
 }
 
 /**
- * The time left now, repainted every 15 s (every 5 s under a minute), and whether "we'll email you" holds.
- * A workspace on hold shows neither: its hold banner speaks, and its provisioner waits too.
+ * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds; `now`:
+ * that clock's time, while it waits. A workspace on hold shows neither: its hold banner speaks, and its provisioner
+ * waits too.
  */
 export function useSetupWait(view: SetupView | null, held: boolean) {
   const live = view && setupPending(view) && !held ? view : null;
-  const now = useNow((at) => (live ? etaTickMs(setupEta(live, at)) : false));
-  return live ? { eta: setupEta(live, now), email: promisesEmail(live, now), now } : { eta: null, email: false, now };
+  const now = useEtaNow(live !== null);
+  return live
+    ? { eta: setupEta(live, now), email: promisesEmail(live, now), now }
+    : { eta: null, email: false, now: null };
 }
 
+/** Every wait leads with the orbit, as work under way does: the clock is for the "as soon as it's ready" lines. */
 const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   preparing: "spinner",
-  waiting: "waiting",
+  waiting: "spinner",
   problem: "alert",
   ready: "check",
+  paused: "pause",
 };
 
-/** While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. */
-export function SetupProgress({ view }: { view: SetupView }) {
+/**
+ * While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. `said`: a
+ * chip or the window's head beside it says where it is, so a line that would only say it again stays out.
+ */
+export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
     return (
@@ -99,9 +108,11 @@ export function SetupProgress({ view }: { view: SetupView }) {
       </div>
     );
   }
+  if (said && statusRestatesChip(view)) return null;
+  // The lines under it lead with 14px too, so every line's words start in one column.
   return (
-    <p className="setup-progress setup-progress--line" role="status">
-      {view.phase === "preparing" ? <Spinner /> : <Icon name={PHASE_ICON[view.phase]} size={16} />}
+    <p className="setup-progress setup-progress--line ac-iconline" role="status">
+      {PHASE_ICON[view.phase] === "spinner" ? <Spinner size={14} /> : <Icon name={PHASE_ICON[view.phase]} size={14} />}
       <span>{t(view.textKey)}</span>
     </p>
   );
@@ -123,7 +134,7 @@ export function SetupWaitLines({ view, reader }: { view: SetupView; reader: Wait
           {etaLine(t, eta)}
         </p>
       )}
-      <p className="setup-line">
+      <p className="setup-line ac-iconline">
         <Icon name={emailed ? "mail" : "bell"} size={14} />
         <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
       </p>
@@ -131,53 +142,41 @@ export function SetupWaitLines({ view, reader }: { view: SetupView; reader: Wait
   );
 }
 
-/** "4 CPUs · 8 GB de memória · 100 GB de disco" (once the provisioner said) and "Um usuário para cada agente". */
+/** "4 CPUs · 8 GB de memória · 100 GB de disco", once the provisioner said. */
 export function SetupFacts({ view }: { view: SetupView }) {
   const { t } = useTranslation();
+  if (!view.specs) return null;
   return (
-    <ul className="setup-facts">
-      {view.specs && (
-        <li>
-          <Icon name="computer" size={14} />
-          {t("computerSetup.specs", view.specs)}
-        </li>
-      )}
-      <li>
-        <Icon name="members" size={14} />
-        {t("computerSetup.users")}
-      </li>
-    </ul>
-  );
-}
-
-/** Claude Code and Codex come ready on it: each agent signs in there with a plan. */
-export function SetupPlans() {
-  const { t } = useTranslation();
-  return (
-    <p className="setup-line">
-      <ProviderLogo id="claude_code" size="xs" />
-      <span>{t("computerSetup.plans")}</span>
+    <p className="setup-line ac-iconline">
+      <Icon name="computer" size={14} />
+      <span>{t("computerSetup.specs", view.specs)}</span>
     </p>
   );
 }
 
 /**
- * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left,
- * who hears when it's ready, the agent that waits for it (in its dialog), the plans and the size.
+ * The workspace computer's name with its ⓘ (one user per agent, each with its own folder), wherever the name
+ * shows: the setup's card, Settings › Computers and the computer's own page.
  */
-export function SetupWait({ view, reader, agentName }: { view: SetupView; reader: WaitReader; agentName?: string }) {
+export function ComputerTitle({ children, name }: { children: ReactNode; name: string }) {
   const { t } = useTranslation();
   return (
+    <span className="ac-hintline">
+      {children}
+      <InfoHint name={t("common.about", { label: name })}>{t("computerSetup.users")}</InfoHint>
+    </span>
+  );
+}
+
+/**
+ * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left, who
+ * hears when it's ready, then the size. `said` as `SetupProgress`'s.
+ */
+export function SetupWait({ view, reader, said }: { view: SetupView; reader: WaitReader; said?: boolean }) {
+  return (
     <div className="setup-wait">
-      <SetupProgress view={view} />
+      <SetupProgress view={view} said={said} />
       <SetupWaitLines view={view} reader={reader} />
-      {agentName && view.phase !== "ready" && (
-        <p className="setup-line">
-          <Icon name="clock" size={14} />
-          <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
-        </p>
-      )}
-      <SetupPlans />
       <SetupFacts view={view} />
     </div>
   );
@@ -201,7 +200,7 @@ export const managedOf = (machines: Machine[] | undefined) => machines?.find((m)
 /**
  * Configurações → Computadores where the workspace gets its own computer: its card, with no hostname, system or
  * address, and no Remove. On its way: the steps, the time left, or why it waits; ready: online or not. Always
- * its size and one user per agent, and the agents on it.
+ * its size, one user per agent behind its name's ⓘ, and the agents on it.
  */
 export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { t } = useTranslation();
@@ -218,25 +217,28 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           size={96}
         />
         <span className="computers-card__title">
-          <h2 id="sec-workspace-computer" className="ac-card__title">
-            {machine ? (
-              <Link
-                to="/org/$orgId/settings/computers/$machineId"
-                params={{ orgId: org.id, machineId: machine.id }}
-                className="machine-row__name"
-              >
-                {title}
-              </Link>
-            ) : (
-              title
-            )}
-          </h2>
-          <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <ComputerTitle name={title}>
+            <h2 id="sec-workspace-computer" className="ac-card__title">
+              {machine ? (
+                <Link
+                  to="/org/$orgId/settings/computers/$machineId"
+                  params={{ orgId: org.id, machineId: machine.id }}
+                  className="machine-row__name"
+                >
+                  {title}
+                </Link>
+              ) : (
+                title
+              )}
+            </h2>
+          </ComputerTitle>
+          {/* The card says where it is only here, so here a screen reader hears it change. */}
+          <span className="row" role="status" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <SetupChip view={view} machine={machine} />
           </span>
         </span>
       </div>
-      {view.phase !== "ready" && <SetupProgress view={view} />}
+      {view.phase !== "ready" && <SetupProgress view={view} said />}
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (
@@ -261,47 +263,46 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 }
 
 /**
- * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way: the step, the time left and the agents that wait for it ("Passo 3 de 4 · Instalando os
- * programas · faltam uns 6 min · Ada e Theo esperam por ele"). Everyone sees it; closed, it stays closed until
- * the state (or the step) changes.
+ * "Preparando o computador da Acme" (in line, its name alone): the notice at the top of the work area while the
+ * workspace's own computer is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam
+ * uns 6 min"), or the wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents
+ * that wait for it, each named by its label. Everyone sees it, except on Settings › Computers, where its See leads and
+ * the card says it; closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const there = useMatchRoute()({
+    to: "/org/$orgId/settings/$section",
+    params: { orgId: org.id, section: "computers" },
+  });
+  const reader = useWaitReader();
   const view = useSetupView(org.id);
   const pending = setupPending(view);
   const agents = useAgents(org.id);
   const machines = useMachines(org.id, pending);
-  const { eta } = useSetupWait(view, org.standing?.state === "hold");
+  const { eta, email } = useSetupWait(view, reader.held);
   const [hidden, setHidden] = useState(() => storage.get(STORAGE_KEYS.setupNoticeHidden));
-  if (!pending) return null;
+  if (!pending || there) return null;
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
-  const line = [
+  const data = [
     view.step
       ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
       : t(view.textKey),
     eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
-    waiting.length > 0
-      ? t("computerSetup.notice.waits", {
-          count: waiting.length,
-          names: joinNames(
-            waiting.map((a) => a.name),
-            t("newAgent.and"),
-          ),
-        })
-      : null,
   ]
     .filter(Boolean)
     .join(" · ");
+  const line =
+    view.phase === "waiting" && email && reader.owner ? `${endSentence(data)} ${t("computerSetup.email.short")}` : data;
   return (
     <section className="outages" aria-label={t("computerSetup.notice.label")}>
       <div className="outage setup-notice" role="status" data-phase={view.phase}>
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
-          <b>{t("computerSetup.notice.title", { org: org.name })}</b>
+          <b>{t(setupNoticeTitleKey(view), { org: org.name })}</b>
           <span>{line}</span>
         </span>
         <span className="outage__crew">

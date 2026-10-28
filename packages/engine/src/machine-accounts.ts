@@ -20,7 +20,7 @@ import {
   type RunnerAccountInfo,
 } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
-import { isPlanId, type PlanId, planOf } from "@agenteschat/providers/plans";
+import { isPlanId, loginPerAgent, type PlanId, planOf } from "@agenteschat/providers/plans";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -61,6 +61,11 @@ const { machineAccounts, agents, machines, users } = schema;
  * Key accounts (protocol 20): a coding plan on Claude Code (`provider`, a plan
  * of `@agenteschat/providers/plans`). The key goes sealed from the browser to
  * the computer and stays there; we keep its last 4 as the runner says them.
+ *
+ * Logins per agent: a login thinks for one agent, and an account whose plan
+ * allows it (`LOGIN_PER_AGENT`) has one login per agent, the same account
+ * signed in again. Its logins share one name, told apart by the account's
+ * email or key's last 4 (`sameAccountWhere`), and a rename renames them all.
  */
 
 export type MachineAccountRow = typeof machineAccounts.$inferSelect;
@@ -257,6 +262,8 @@ export async function releaseAgents(db: Executor, orgId: string, accountIds: str
 
 export const forgetAgents = (orgId: string, ids: string[]) => {
   for (const id of ids) caches.agents.delete(`${orgId}:${id}`);
+  // The team's cached rows carry each agent's brain, which the audience gate reads.
+  if (ids.length > 0) caches.agents.delete(`${orgId}:team`);
 };
 
 /** The page that shows a machine's accounts refetches them (no emails in the event). */
@@ -314,15 +321,15 @@ async function removeOnComputer(
   }
 }
 
+type AccountKey = Pick<MachineAccountRow, "orgId" | "machineId" | "kind" | "createdBy" | "provider">;
+type AccountIdentity = { email?: string | null; keyHint?: string | null };
+
 /**
- * The account another of its owner's on this computer already is: the same CLI, plan and email, or for a
- * key account the same key's last 4 (the key never leaves the computer).
+ * The logins of one account on this computer, its owner's: the same CLI, plan and email, or for a key account
+ * the same key's last 4 (the key never leaves the computer). Never the label, which any rename can repeat.
+ * Undefined while neither is known.
  */
-async function duplicateOf(
-  db: Executor,
-  row: Pick<MachineAccountRow, "orgId" | "machineId" | "id" | "kind" | "createdBy" | "provider">,
-  same: { email?: string | null; keyHint?: string | null },
-) {
+function sameAccountWhere(row: AccountKey, same: AccountIdentity) {
   // ponytail: a key account is told apart by its last 4 only; a fingerprint from the runner if two keys ever share them.
   const match = row.provider
     ? same.keyHint
@@ -331,25 +338,37 @@ async function duplicateOf(
     : same.email
       ? sql`lower(${machineAccounts.email}) = ${same.email.toLowerCase()}`
       : null;
-  if (!match) return null;
+  if (!match) return undefined;
+  return and(
+    eq(machineAccounts.orgId, row.orgId),
+    eq(machineAccounts.machineId, row.machineId),
+    eq(machineAccounts.kind, row.kind),
+    row.createdBy ? eq(machineAccounts.createdBy, row.createdBy) : isNull(machineAccounts.createdBy),
+    row.provider ? eq(machineAccounts.provider, row.provider) : isNull(machineAccounts.provider),
+    inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
+    match,
+  );
+}
+
+/** Another login of the same account (`sameAccountWhere`), the oldest. */
+async function sameAccount(db: Executor, row: AccountKey & Pick<MachineAccountRow, "id">, same: AccountIdentity) {
+  const where = sameAccountWhere(row, same);
+  if (!where) return null;
   const [other] = await db
     .select()
     .from(machineAccounts)
-    .where(
-      and(
-        eq(machineAccounts.orgId, row.orgId),
-        eq(machineAccounts.machineId, row.machineId),
-        ne(machineAccounts.id, row.id),
-        eq(machineAccounts.kind, row.kind),
-        row.createdBy ? eq(machineAccounts.createdBy, row.createdBy) : isNull(machineAccounts.createdBy),
-        row.provider ? eq(machineAccounts.provider, row.provider) : isNull(machineAccounts.provider),
-        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
-        match,
-      ),
-    )
+    .where(and(where, ne(machineAccounts.id, row.id)))
+    .orderBy(machineAccounts.createdAt, machineAccounts.id)
     .limit(1);
   return other ?? null;
 }
+
+/**
+ * The login of this account its owner already has here, which makes this one a duplicate. None where the
+ * account may have one login per agent (`LOGIN_PER_AGENT`).
+ */
+const duplicateOf = async (db: Executor, row: AccountKey & Pick<MachineAccountRow, "id">, same: AccountIdentity) =>
+  loginPerAgent(row.kind, row.provider) ? null : sameAccount(db, row, same);
 
 interface Settled {
   /** The account as stored now; null: it isn't this computer's. */
@@ -406,8 +425,10 @@ async function settleAccount(
   // The runner says it when it knows it; one that just started doesn't yet (the last stays).
   const usage = info.usage ? { usage: info.usage } : {};
   if (signingIn) {
-    const taken = await takenLabels(db, orgId, row.createdBy, row.id);
-    const label = defaultAccountLabel(kindOf(row), plan, taken, row.provider);
+    // A login of an account its owner already has here (one per agent) takes that account's name.
+    const label =
+      (await sameAccount(db, row, { email, keyHint }))?.label ??
+      defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)
       .set({ email, plan, keyHint, status, label, ...usage, updatedAt: now })
@@ -511,7 +532,8 @@ export async function syncMachineAccounts(
         const owner = machine.pairedByUserId;
         const provider = isPlanId(a.provider) ? a.provider : null;
         const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
-        if (await duplicateOf(tx, candidate, a)) {
+        const same = await sameAccount(tx, candidate, a);
+        if (same && !loginPerAgent(a.kind, provider)) {
           remove.push({ kind: a.kind, id: a.id });
           continue;
         }
@@ -519,7 +541,8 @@ export async function syncMachineAccounts(
           .insert(machineAccounts)
           .values({
             ...candidate,
-            label: defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id), provider),
+            label:
+              same?.label ?? defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id), provider),
             email: a.email ?? null,
             plan: a.plan ?? null,
             keyHint: a.keyHint ?? null,
@@ -675,7 +698,7 @@ async function memberMachine(db: Database, userId: string, orgId: string, machin
 }
 
 const runnerOld = (machine: Pick<MachineRow, "name">) =>
-  new ConflictError(`The runner on ${machine.name} is too old for accounts; update it`, "account.runner_old", {
+  new ConflictError(`The runner on ${machine.name} is too old for accounts. Update it.`, "account.runner_old", {
     name: machine.name,
   });
 
@@ -971,7 +994,10 @@ export const cleanAccountLabel = (label: unknown) =>
         .trim()
     : "";
 
-/** What people call it (1 to 40 characters): its owner only. Works with the computer offline. Audited. */
+/**
+ * What people call it (1 to 40 characters): its owner only, for every login of the account on that computer
+ * (one per agent, `sameAccountWhere`). Works with the computer offline. Audited per login.
+ */
 export async function renameMachineAccount(
   deps: MachineAccountDeps,
   userId: string,
@@ -990,21 +1016,38 @@ export async function renameMachineAccount(
   if (account.createdBy !== userId) {
     throw new ForbiddenError("Only the account's owner can rename it", "account.not_owner");
   }
-  if (label === account.label) return accountViewOf(deps.db, orgId, account, userId);
-  const [row] = await deps.db
+  const logins = await deps.db
+    .select()
+    .from(machineAccounts)
+    .where(
+      sameAccountWhere(account, account) ?? and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, account.id)),
+    )
+    .orderBy(machineAccounts.createdAt, machineAccounts.id);
+  const renamed = logins.filter((r) => r.label !== label);
+  if (renamed.length === 0) return accountViewOf(deps.db, orgId, account, userId);
+  await deps.db
     .update(machineAccounts)
     .set({ label, updatedAt: new Date() })
-    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, account.id)))
-    .returning();
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: userId },
-    action: "account.renamed",
-    target: { type: "machine_account", id: account.id },
-    details: { machineId: machine.id, from: account.label, to: label },
-  });
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        inArray(
+          machineAccounts.id,
+          renamed.map((r) => r.id),
+        ),
+      ),
+    );
+  for (const r of renamed) {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "account.renamed",
+      target: { type: "machine_account", id: r.id },
+      details: { machineId: machine.id, from: r.label, to: label },
+    });
+  }
   await publishAccountsChanged(deps.pubsub, orgId, machine.id);
-  return accountViewOf(deps.db, orgId, row ?? { ...account, label }, userId);
+  return accountViewOf(deps.db, orgId, { ...account, label }, userId);
 }
 
 /**

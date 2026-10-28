@@ -23,11 +23,13 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import { countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside } from "./paths";
+import type { Spawn } from "./scope-gate";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -80,7 +82,8 @@ import { agentFolderName, isInside } from "./paths";
  *   In system mode this runs in the agent's worker, as the agent's own user,
  *   on the desktop root starts for it (`WorkerLink.desktop`).
  * - Browser on the agent's desktop (`desktop-browser.ts`, `show`): a person's
- *   click brings that same Chrome there, started, moved or in front.
+ *   click brings that same Chrome there, started, moved or in front, and is
+ *   answered once its window shows there.
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -89,6 +92,13 @@ export const BROWSER_IDLE_MS = 15 * 60_000;
 const SWEEP_MS = 60_000;
 /** A Chrome that hasn't opened its debugging port by then is given up. */
 const CHROME_START_MS = 20_000;
+/** A Chrome started for Browser on its desktop whose window hasn't shown by then, once its port opened, is given up. */
+const WINDOW_MS = 20_000;
+/**
+ * How long Chrome takes to draw a window it just showed, at most, on a small computer: Browser's click is answered
+ * after it, so the note the launcher shows meanwhile closes under Chrome's window rather than before it.
+ */
+const WINDOW_DRAW_MS = 500;
 /** A Chrome asked to quit that is still there after this is killed. */
 const CHROME_KILL_MS = 3000;
 /** Memory one live browser takes, roughly (the per-machine cap). */
@@ -115,6 +125,8 @@ const ALIVE_MARGIN_MS = 60_000;
 const CAPTURE_LEFTOVER_MS = 60_000;
 /** After the agent's desktop failed to start, its browser stays headless this long before trying again. */
 const DESKTOP_RETRY_MS = 5 * 60_000;
+/** A new Chrome's first command waits this long at most for its traffic counter to attach. */
+const TRAFFIC_ATTACH_MS = 1000;
 
 /** What the server may ask for: everything else (vault, plugins, chat, dashboard, sessions, installs) is refused. */
 const COMMANDS = new Set([
@@ -346,13 +358,20 @@ export function findChrome(home: string = os.homedir(), platform: string = proce
 /**
  * Chrome flags on every launch: no first-run screens, nothing updating
  * Chrome's files in the background, and none of the automation markers a
- * launched-for-automation Chrome carries (no `--enable-automation`).
+ * launched-for-automation Chrome carries (no `--enable-automation`). Pages
+ * see `prefers-reduced-motion: reduce`, so an animated page holds still: one
+ * kept two of a 4-core computer's cores busy whether anyone watched or not,
+ * and sent its desktop's viewers a stream of changes. The chip asking to sign
+ * in to the browser, a feature of Chrome 147 (at least) to 155, stays off;
+ * later versions read the profile's own switch (`prepareProfile`).
  */
 export const CHROME_ARGS = [
   "--no-first-run",
   "--no-default-browser-check",
   "--disable-blink-features=AutomationControlled",
   "--disable-component-update",
+  "--force-prefers-reduced-motion",
+  "--disable-features=SigninPromoOnAvatarPill",
 ];
 const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800"];
 /**
@@ -449,23 +468,34 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
 }
 
 /**
- * Before a headed start: Chrome draws its own frame. By itself it does only
- * when a window manager already runs as it starts, and a desktop that just
- * started gets its window manager a moment later: Chrome would then take that
- * one's title bar, and a shorter page. A Preferences file that isn't JSON is
- * Chrome's to deal with, and the frame isn't worth failing a start for.
+ * Before a headed start, in the agent's profile:
+ * - Chrome draws its own frame. By itself it does only when a window manager
+ *   already runs as it starts, and a desktop that just started gets its window
+ *   manager a moment later: Chrome would then take that one's title bar, and a
+ *   shorter page.
+ * - Signing in to Chrome itself is off (its "Allow Chrome sign-in", which it
+ *   reads as it starts): no chip or bubble asks a person to sign in to the
+ *   browser. Signing in to sites stays as it is: people sign the agent in to
+ *   them on purpose.
+ * A Preferences file that isn't JSON is Chrome's to deal with, and neither is
+ * worth failing a start for.
  */
-export function useOwnFrame(profile: string) {
+export function prepareProfile(profile: string) {
   const file = path.join(profile, "Default", "Preferences");
   try {
     const prefs = existsSync(file) ? readJson<unknown>(file) : {};
     if (!isRecord(prefs)) return;
     const browser = isRecord(prefs.browser) ? prefs.browser : {};
-    if (browser.custom_chrome_frame === true) return;
+    const signin = isRecord(prefs.signin) ? prefs.signin : {};
+    if (browser.custom_chrome_frame === true && signin.allowed_on_next_startup === false) return;
     mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    writeJson(file, { ...prefs, browser: { ...browser, custom_chrome_frame: true } });
+    writeJson(file, {
+      ...prefs,
+      browser: { ...browser, custom_chrome_frame: true },
+      signin: { ...signin, allowed_on_next_startup: false },
+    });
   } catch {
-    // Chrome starts with whatever frame it picks.
+    // Chrome starts with the settings it has.
   }
 }
 
@@ -474,6 +504,8 @@ export interface OwnChrome {
   pid: number;
   /** Its debugging port (`agent-browser --cdp`). */
   port: number;
+  /** Its browser endpoint on that port (`/devtools/browser/<id>`), which its traffic is counted on. */
+  wsPath?: string;
   /** Asks it to quit, then kills it if it lingers. */
   kill(): void;
   /** Settles when the process is gone. */
@@ -512,25 +544,27 @@ function missingLibraries(exe: string, output: string): string[] {
 }
 
 /** For people: the missing libraries, the first few by name when there are many. */
-function missingLibrariesText(missing: string[]): string {
+export function missingLibrariesText(missing: string[]): string {
   const names =
     missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
-  return `the agent's computer is missing system libraries Chrome needs (${names}); install them on it, then try again`;
+  return `the agent's computer is missing system libraries Chrome needs (${names}). Install them on it, then try again.`;
 }
 
 /**
  * Starts Chrome and waits for its debugging port (Chrome writes it to
- * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`).
+ * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`, its
+ * browser endpoint on the next line).
  */
 export async function launchChrome(
   exe: string,
   args: string[],
   profile: string,
   env?: Record<string, string>,
+  start: Spawn = spawn,
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
+  const child = start(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
   let output = "";
   let started = false;
   // Read for as long as Chrome runs, since a full pipe would stall it; only what it says while starting is kept.
@@ -588,11 +622,19 @@ export async function launchChrome(
       );
     }
     const text = await readFile(portFile, "utf8").catch(() => "");
-    const port = Number(text.split("\n")[0]);
+    const [first = "", second = ""] = text.split("\n");
+    const port = Number(first);
     if (Number.isInteger(port) && port > 0 && port < 65536) {
       if (!child.pid) break;
       started = true;
-      return { pid: child.pid, port, kill, exited };
+      const wsPath = second.trim();
+      return {
+        pid: child.pid,
+        port,
+        kill,
+        exited,
+        ...(/^\/devtools\/browser\/[\w-]+$/.test(wsPath) ? { wsPath } : {}),
+      };
     }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -752,6 +794,9 @@ export interface BrowserManagerOptions {
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
+  /** Tests: how long a Chrome started for Browser may take to show its window (`WINDOW_MS`), and to draw it. */
+  windowMs?: number;
+  windowDrawMs?: number;
   /** The agents' desktops (ADR 0058 §7; a worker's are root's): without them every Chrome is headless. */
   desktops?: Pick<DesktopSessions, "ensure" | "status"> & { session(agentId: string): ChromeDisplay | null };
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
@@ -968,6 +1013,10 @@ export class BrowserManager {
   private closing: Promise<void> = Promise.resolve();
   /** `<runner home>/browser/chromes.json`: the Chromes this runner home started (pid and profile). */
   private readonly pidFile: string;
+  /** What each running Chrome sends and receives (protocol 23). */
+  private readonly counters = new Map<OwnChrome, TrafficCounter>();
+  /** What the counters of Chromes that are gone counted, not taken yet. */
+  private trafficLeft = { up: 0, down: 0 };
   /** Writes to the pid file, one at a time. */
   private pidWrites: Promise<unknown> = Promise.resolve();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -1081,7 +1130,7 @@ export class BrowserManager {
       );
     }
     const got = createHash("sha256").update(bytes).digest("hex");
-    if (got !== want) throw this.fail("The agent browser download didn't match its checksum; it was not used");
+    if (got !== want) throw this.fail("The agent browser download didn't match its checksum, so it was not used");
     await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
     const tmp = `${file}.${process.pid}.tmp`;
     await writeFile(tmp, bytes, { mode: 0o755 });
@@ -1109,11 +1158,12 @@ export class BrowserManager {
     const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
     this.chromePath = find();
     if (this.chromePath) return;
+    const why = firstLine(out.stderr || out.stdout);
     const hint =
       process.platform === "linux"
-        ? `; Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps`
+        ? ` Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps.`
         : "";
-    throw this.fail(`Couldn't install a browser for the agent${hint} (${firstLine(out.stderr || out.stdout)})`);
+    throw this.fail(`Couldn't install a browser for the agent${why ? ` (${why})` : ""}.${hint}`);
   }
 
   private fail(reason: string) {
@@ -1397,7 +1447,7 @@ export class BrowserManager {
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
         "browser_unavailable",
-        `This computer already has ${live.length} agent browsers open (its limit); try again in a few minutes`,
+        `This computer already has ${live.length} agent browsers open (its limit). Try again in a few minutes.`,
       );
     }
     for (const [id, s] of this.sessions) {
@@ -1462,7 +1512,7 @@ export class BrowserManager {
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
       const launch = async (on: ChromeDisplay | null) => {
-        if (on) useOwnFrame(profile);
+        if (on) prepareProfile(profile);
         const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
         try {
           const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
@@ -1505,6 +1555,7 @@ export class BrowserManager {
         session.aliveAt = null;
         this.changed();
       });
+      await this.countTraffic(chrome);
       return chrome;
     })();
     session.chromeStarting = starting;
@@ -1513,6 +1564,35 @@ export class BrowserManager {
     } finally {
       if (session.chromeStarting === starting) session.chromeStarting = undefined;
     }
+  }
+
+  /** A new Chrome's traffic is counted from its first command on: the counter attaches first (1 s at most). */
+  private async countTraffic(chrome: OwnChrome) {
+    if (!chrome.wsPath) return;
+    const counter = countChromeTraffic(`ws://127.0.0.1:${chrome.port}${chrome.wsPath}`);
+    this.counters.set(chrome, counter);
+    void chrome.exited.then(() => {
+      const last = counter.take();
+      this.trafficLeft.up += last.up;
+      this.trafficLeft.down += last.down;
+      counter.close();
+      this.counters.delete(chrome);
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([counter.attached, new Promise((r) => (timer = setTimeout(r, TRAFFIC_ATTACH_MS)))]);
+    clearTimeout(timer);
+  }
+
+  /** What the agents' Chromes sent and received since the last call, those that are gone included (protocol 23). */
+  takeTraffic(): { up: number; down: number } {
+    const total = this.trafficLeft;
+    this.trafficLeft = { up: 0, down: 0 };
+    for (const counter of this.counters.values()) {
+      const t = counter.take();
+      total.up += t.up;
+      total.down += t.down;
+    }
+    return total;
   }
 
   /** The agent's Chrome stops (the profile, and so its logins, stay). */
@@ -1864,29 +1944,73 @@ export class BrowserManager {
 
   /**
    * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, in front, for the person who
-   * clicked it. Chrome for Testing is installed first when it isn't here yet (`installing` says so). A Chrome
-   * running headless moves there even while someone watches it or a person's turn is open: a person asked, from
-   * that desktop. A desktop that can't take it fails the click with its own reason: a click never starts one
-   * headless. The click carries no address and no flag, so the browser reaches nothing new.
+   * clicked it, answered once its window is on the desktop (`windowShown`). Chrome for Testing is installed first
+   * when it isn't here yet (`installing` says so). A Chrome running headless moves there even while someone
+   * watches it or a person's turn is open: a person asked, from that desktop. A desktop that can't take it fails
+   * the click with its own reason: a click never starts one headless. The click carries no address and no flag, so
+   * the browser reaches nothing new. Each click's outcome goes in the log (a failure in the caller's).
+   *
+   * A Chrome already there comes to the front only for a click that reaches the runner: the apps menu's Browser, a
+   * middle or Shift click on docklike's, or the panel's own launcher where docklike isn't installed. A plain click
+   * on docklike's Browser while Chrome has a window there never comes here: docklike raises that window itself (or
+   * hides it, when it is the active one), and nothing is logged.
    */
   async show(agent: AgentScope, folder: string, installing: () => void): Promise<void> {
+    const clickedAt = this.now();
     const chrome = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
     if (!this.recentFailure() && (!this.presentCommand() || !chrome)) installing();
     const session = await this.session(agent, folder);
-    await this.enqueue(session, async () => {
+    const outcome = await this.enqueue(session, async () => {
       const before = session.chrome;
       const shown = await this.ensureOwnChrome(agent, session, true, [], true);
       session.lastUsed = this.now();
-      if (shown === before) await this.activate(shown);
+      if (shown === before) {
+        return (await this.activate(shown))
+          ? "already open: brought to the front"
+          : "already open; it didn't come to the front";
+      }
+      await this.windowShown(session, shown);
+      return `opened in ${((this.now() - clickedAt) / 1000).toFixed(1)} s`;
     });
+    this.opts.log(`Browser on the desktop of ${agent.handle}: ${outcome}`);
     this.changed();
   }
 
   /**
-   * Chrome's window in front, on its most recent tab, through Chrome's own debugging endpoint; a Chrome with no
-   * tab left gets a blank one, in a window of its own.
+   * Waits for the window of a Chrome just started for Browser: Chrome answers its debugging endpoint's list only
+   * once it is done starting, which shows its first window, and lists that window's page; then the time it takes
+   * to draw it. One that shows none in time is stopped, and one that closes meanwhile is gone: the click failed.
    */
-  private async activate(chrome: OwnChrome) {
+  private async windowShown(session: Session, chrome: OwnChrome) {
+    const until = Date.now() + (this.opts.windowMs ?? WINDOW_MS);
+    let gone = false;
+    void chrome.exited.then(() => {
+      gone = true;
+    });
+    while (!gone && Date.now() < until) {
+      const listed = await (this.opts.fetch ?? fetch)(`http://127.0.0.1:${chrome.port}/json/list`, {
+        redirect: "error",
+        signal: AbortSignal.timeout(Math.max(1, until - Date.now())),
+      })
+        .then((res) => res.json() as Promise<unknown>)
+        .then((targets) => Array.isArray(targets) && targets.some((t) => isRecord(t) && t.type === "page"))
+        .catch(() => false);
+      if (listed) {
+        await new Promise((r) => setTimeout(r, this.opts.windowDrawMs ?? WINDOW_DRAW_MS));
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (gone) throw new RunnerError("internal", "Chrome closed before its window showed");
+    await this.stopChrome(session);
+    throw new RunnerError("internal", "Chrome's window didn't show in time");
+  }
+
+  /**
+   * Chrome's window in front, on its most recent tab, through Chrome's own debugging endpoint; a Chrome with no
+   * tab left gets a blank one, in a window of its own. False when Chrome didn't take it.
+   */
+  private async activate(chrome: OwnChrome): Promise<boolean> {
     const at = `http://127.0.0.1:${chrome.port}/json`;
     const call = (p: string, method = "GET") =>
       (this.opts.fetch ?? fetch)(`${at}/${p}`, {
@@ -1900,9 +2024,10 @@ export class BrowserManager {
         ? targets.find((t): t is { id: string } => isRecord(t) && t.type === "page" && typeof t.id === "string")
         : undefined;
       // Chrome takes a new tab only by PUT.
-      await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"));
+      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"))).ok;
     } catch {
       // It stays where it is: on the desktop, behind whatever is in front.
+      return false;
     }
   }
 

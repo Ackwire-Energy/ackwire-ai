@@ -47,6 +47,7 @@ import {
 } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { EmailLetter } from "@/components/EmailLetter";
+import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import {
   MissionCommandsPending,
@@ -268,12 +269,6 @@ export function ApprovalsPage() {
                 t("approvals.nothing")
               )}
             </p>
-            <p className="ap-head__guard">
-              <span aria-hidden="true" className="ap-head__guard-icon">
-                <Icon name="shield" size={14} />
-              </span>
-              {t("approvals.guard")}
-            </p>
           </div>
         </header>
         <Toolbar
@@ -330,7 +325,7 @@ export function ApprovalsPage() {
           commands === 0 &&
           !missionWaiting && (
             <EmptyState sky title={t("approvals.emptyTitle")}>
-              {t("approvals.empty")}
+              <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
           )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
@@ -432,6 +427,8 @@ type ApprovalVia = {
   name: string;
   account: string | null;
   def: ConnectorDef | null;
+  /** A server connected by address: its own icon. */
+  image?: string | null;
 };
 
 /** What an approval goes through: a mailbox, a server connected by address, a catalog connector, or the app itself. */
@@ -454,11 +451,11 @@ function useApprovalVia(approval: Approval): ApprovalVia {
     : customId
       ? t("approvals.panel.orgConnector")
       : connectorName(t, def ?? { id: approval.connector, label: approval.connector });
-  return { kind: "connector", name, account: approval.connectorAccount ?? null, def };
+  return { kind: "connector", name, account: approval.connectorAccount ?? null, def, image: custom?.image };
 }
 
 function ViaGlyph({ via }: { via: ApprovalVia }) {
-  if (via.kind === "connector") return <ConnectorIcon def={via.def} label={via.name} />;
+  if (via.kind === "connector") return <ConnectorIcon def={via.def} image={via.image} label={via.name} />;
   return (
     <span className="ap-conn__own" aria-hidden="true">
       <Icon name={via.kind === "mail" ? "mail" : "shield"} size={14} />
@@ -542,7 +539,7 @@ function ApprovalOrigin({ approval }: { approval: Approval }) {
   if (!origin) return null;
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <p className="ap-origin">
+    <p className="ap-origin ac-iconline">
       <Icon name="routines" size={14} />
       <span>{tt(origin.key, origin.values)}</span>
     </p>
@@ -569,7 +566,7 @@ function Traits({ approval }: { approval: Approval }) {
   );
 }
 
-function expiryText(t: TFunction, a: Approval) {
+export function expiryText(t: TFunction, a: Approval) {
   const left = timeLeft(t, a.expiresAt);
   if (!left) return t("approval.expired");
   return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS
@@ -685,7 +682,7 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
     );
   return (
     <div className="ap-refuse">
-      <label htmlFor={id}>{t("approvals.refuseLabel", { The: g.The, name: g.name })}</label>
+      <label htmlFor={id}>{t("approvals.refuseLabel")}</label>
       <textarea
         id={id}
         ref={ref}
@@ -808,7 +805,7 @@ function RequestCard({
       <div className="ap-card__body">
         <ExactAction approval={a} max={4} />
         {why && (
-          <p className="ap-said">
+          <p className="ap-said ac-iconline">
             <AgentAvatar agentId={a.agentId} name={name} size="xs" />
             <span>
               <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />
@@ -1090,7 +1087,7 @@ function ApprovalDetails({
       <DetailsSection title={t("approvals.panel.exact")}>
         {/* Values in words; nested values and the tool's own name behind "Detalhes técnicos". */}
         <ExactAction approval={a} />
-        <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
+        <p className="ap-bound">{t("approvals.panel.bound")}</p>
         {pr && (
           <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
             {t("approvals.panel.openPr")}
@@ -1102,13 +1099,13 @@ function ApprovalDetails({
         <DetailsSection title={t("approvals.panel.trail")}>
           <ol className="ap-trail">
             {a.trail?.map((s) => (
-              <li key={s.at + s.text.slice(0, 12)}>
+              <li key={s.at + s.text.slice(0, 12)} className="ac-iconline">
                 <span className="ap-trail__dot" aria-hidden="true" />
                 <span className="ap-trail__text">{s.text}</span>
                 <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
               </li>
             ))}
-            <li className="is-current">
+            <li className="is-current ac-iconline">
               <span className="ap-trail__dot" aria-hidden="true" />
               <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
               <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>

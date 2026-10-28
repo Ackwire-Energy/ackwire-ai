@@ -12,7 +12,7 @@ const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools ena
  * Apps on the agents' desktops, on a computer's page (ADR 0062): whether agents can use apps on their own
  * desktops there; when not, on Linux the computer's own words on what is missing (each agent its own user,
  * packages) with the command in them, elsewhere that it takes a Linux computer; or the two switches to turn on.
- * Not on the workspace's own computer, whose page says what is on it instead.
+ * What the card is for is its title's ⓘ. Not on the workspace's own computer.
  */
 export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
         id="sec-machine-desktop-use"
         icon="computer"
         title={t("desktop.use.title")}
-        subtitle={t("desktop.use.description")}
+        hint={{ name: t("common.about", { label: t("desktop.use.title") }), text: t("desktop.use.description") }}
       />
       <div className="brw-status">
         {!use.available ? (
@@ -43,7 +43,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
         )}
       </div>
       {off && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="computer" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {t("desktop.use.offHelp")}
@@ -52,7 +52,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
         </div>
       )}
       {reason && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {reason}

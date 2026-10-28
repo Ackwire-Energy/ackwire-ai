@@ -94,7 +94,7 @@ export function AgentAsksLine({
   const shown = groups.filter((g) => g.tools.length > 0);
   return (
     <>
-      <p className="small muted agp-asks">
+      <p className="small muted agp-asks ac-iconline">
         <Icon name="lock" size={14} />
         <span className="agp-asks__t">
           {t("toolReview.asks", { count: total })}{" "}

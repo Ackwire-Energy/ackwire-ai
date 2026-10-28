@@ -24,6 +24,7 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { Markdown } from "@/lib/markdown";
@@ -57,9 +58,21 @@ export async function fileToBase64(file: Blob): Promise<string> {
   return btoa(binary);
 }
 
+/** GitHub's own mark, as the connector catalog draws it (in ink), for a skill installed from github.com. */
+const GITHUB_MARK = { iconUrl: "/connectors/github.svg", brandColor: null };
+
 function SourceChip({ skill }: { skill: Skill }) {
   const { t } = useTranslation();
-  return <Chip icon={SOURCE_ICON[skill.source] ?? "document"}>{t(`skills.source.${sourceKey(skill)}`)}</Chip>;
+  const key = sourceKey(skill);
+  const name = t(`skills.source.${key}`);
+  return (
+    <Chip
+      icon={SOURCE_ICON[skill.source] ?? "document"}
+      lead={key === "github" ? <ConnectorIcon def={GITHUB_MARK} label={name} /> : undefined}
+    >
+      {name}
+    </Chip>
+  );
 }
 
 function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null; onOpen: () => void }) {
@@ -98,13 +111,10 @@ export function SkillsSection() {
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   return (
     <Card aria-labelledby="sec-skills">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-skills" className="ac-card__title">
-            {t("skills.title")}
-          </h2>
-          <span className="small muted">{t("skills.subtitle")}</span>
-        </div>
+      <div className="row" style={{ gap: 12 }}>
+        <h2 id="sec-skills" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+          {t("skills.title")}
+        </h2>
         {!unavailable && (
           <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
             {t("skills.install")}

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { QueryClient } from "@tanstack/react-query";
-import type { Message } from "../src/index";
-import { cacheMessage, keys } from "../src/index";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import type { ApiClient, Message } from "../src/index";
+import { cacheMessage, cacheReceipts, catchUpChannel, keys } from "../src/index";
 
 const msg = (over: Partial<Message>): Message => ({
   id: "m",
@@ -26,4 +26,58 @@ test("a reply that starts a thread replaces its 'sending…' copy (which waits i
 
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.map((m) => m.id)).toEqual(["root"]);
   expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"))?.map((m) => m.id)).toEqual(["real"]);
+});
+
+test("catching up a channel adds what its open lists lack and keeps what they hold; a read's receipts go on their copies", async () => {
+  const qc = new QueryClient();
+  const asked = msg({ id: "asked", body: "@ada e o login?", createdAt: "2026-10-16T04:20:00.000Z" });
+  const agent = (id: string, body: string, createdAt: string, threadId: string | null = null) =>
+    msg({ id, threadId, author: { type: "agent", id: "ada" }, body, createdAt });
+  const live = agent("live", "Olhando agora.", "2026-10-16T04:30:00.000Z");
+  const receipts = {
+    seenBy: ["ada"],
+    pickedBy: ["ada"],
+    handled: [{ agentId: "ada", runId: "r1", status: "done" as const }],
+    blocked: [],
+  };
+  // What the server has: what was written before the channel's events reached us, never `live` (its read was
+  // made before it). Each read is new copies, as over HTTP.
+  const server = [
+    { ...asked, receipts },
+    agent("missed", "Deploy revertido.", "2026-10-16T04:21:00.000Z"),
+    agent("reply", "Corrigido.", "2026-10-16T04:22:00.000Z", "asked"),
+  ];
+  const api = {
+    chat: {
+      messages: async (_orgId: string, _channelId: string, options: { threadId?: string }) =>
+        structuredClone(
+          server.filter((m) =>
+            options.threadId ? m.id === options.threadId || m.threadId === options.threadId : !m.threadId,
+          ),
+        ),
+    },
+  } as unknown as ApiClient;
+  // The page's open lists: the latest page, with a message heard live since, and the thread under `asked`.
+  qc.setQueryData(keys.messages("o1", "c1"), [asked, live]);
+  qc.setQueryData(keys.thread("o1", "c1", "asked"), [asked]);
+  const open = [keys.messages("o1", "c1"), keys.thread("o1", "c1", "asked")].map((queryKey) =>
+    new QueryObserver(qc, { queryKey, queryFn: async () => [], staleTime: Number.POSITIVE_INFINITY }).subscribe(
+      () => {},
+    ),
+  );
+  const ids = (key: readonly unknown[]) => qc.getQueryData<Message[]>(key)?.map((m) => m.id);
+
+  const read = await catchUpChannel(api, qc, "o1", "c1");
+  expect(ids(keys.messages("o1", "c1"))).toEqual(["asked", "missed", "live"]);
+  expect(ids(keys.thread("o1", "c1", "asked"))).toEqual(["asked", "reply"]);
+  expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.[0]?.receipts).toBeUndefined();
+
+  cacheReceipts(qc, "o1", "c1", read);
+  for (const key of [keys.messages("o1", "c1"), keys.thread("o1", "c1", "asked")]) {
+    const copy = qc.getQueryData<Message[]>(key)?.[0];
+    expect(copy?.receipts).toEqual(receipts);
+    expect(copy?.body).toBe("@ada e o login?");
+  }
+  expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.at(-1)).toBe(live);
+  for (const off of open) off();
 });

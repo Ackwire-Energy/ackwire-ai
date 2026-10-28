@@ -6,7 +6,8 @@ import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-nativ
 import { Button, EmptyState, Filters, IconButton, SectionHeader, Text } from "@/ui";
 import { WaitingStrip } from "../chats/WaitingStrip";
 import type { WaitingItem } from "../chats/waiting";
-import { useColors, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { filterCounts, ISSUE_FILTERS, type IssueFilter, issueSections, waitsOnYou } from "./logic";
 import { ColumnHeader, IssueRow, useColumnLabel } from "./parts";
@@ -41,6 +42,7 @@ export function IssuesScreen() {
   const c = useColors();
   const orgId = useOrgId();
   const meId = useMeId();
+  const dir = useDirectory();
   const issues = useIssues(orgId);
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
@@ -95,6 +97,8 @@ export function IssuesScreen() {
         </View>
       ) : sections.length === 0 ? (
         <EmptyState
+          sky
+          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
           title={t("mobile.issues.empty")}
           {...(filter === "open" && all.length === 0 ? { subtitle: t("mobile.issues.emptyOpen") } : {})}
           action={

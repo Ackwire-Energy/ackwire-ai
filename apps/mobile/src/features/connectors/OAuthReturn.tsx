@@ -5,12 +5,14 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { isFinishing } from "./logic";
+import { returnHref } from "./review";
 
 /**
  * A connector's sign-in that came back to the app through its link (Android opens the app with it; iOS hands
  * it to the open sheet). When the sheet that started it is still finishing, this screen just steps aside;
- * otherwise (the app was closed meanwhile) it finishes here and lands on Conectores.
+ * otherwise (the app was closed meanwhile) it finishes here and lands on Conectores, on that connection's tools.
  */
 export function ConnectorOAuthReturn() {
   const { t } = useTranslation();
@@ -26,15 +28,23 @@ export function ConnectorOAuthReturn() {
     const leave = () => (router.canGoBack() ? router.back() : router.replace("/connectors"));
     if (state && isFinishing(state)) return leave();
     if (error || !state || !code) {
+      errorHaptic();
       toast({ title: t("mobile.connectors.failed"), icon: "x" });
       return void router.replace("/connectors");
     }
     complete.mutate(
       { state, code },
       {
-        onSettled: (_data, failed) => {
-          if (failed) toast({ title: t("mobile.connectors.failed"), icon: "x" });
-          router.replace("/connectors");
+        onSettled: (done, failed) => {
+          if (failed || !done) {
+            errorHaptic();
+            toast({ title: t("mobile.connectors.failed"), icon: "x" });
+            return void router.replace("/connectors");
+          }
+          successHaptic();
+          toast({ title: t("mobile.connectors.connectedDone") });
+          // On its tools, as the web lands on "O que faz" for the connection that came in.
+          router.replace(returnHref(done.connectionId));
         },
       },
     );

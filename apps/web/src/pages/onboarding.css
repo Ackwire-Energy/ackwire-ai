@@ -36,17 +36,27 @@
   justify-content: center;
   min-width: 0;
 }
-/* One calm column per step, centered where it opens: the host asks, the answer, one big action. */
+/*
+ * One calm column per step: the host asks, the answer, one big action. It is as tall as the screen at least, so the
+ * step's actions rest at the screen's bottom however short the step is. On a desktop the step centres in the room
+ * above them.
+ */
 .onb__body {
+  --onb-gutter: clamp(16px, 4vw, 32px);
   display: flex;
   flex-direction: column;
   gap: 24px;
   width: 100%;
   max-width: 600px;
-  margin: auto 0;
-  padding: 48px clamp(16px, 4vw, 32px) 64px;
+  padding: 48px var(--onb-gutter) 0;
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
+}
+/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. The page pins
+   that room as the step opens (`--onb-lead`), so what changes in the step grows or shrinks it downward. */
+.onb__body::before {
+  content: "";
+  margin-block: var(--onb-lead, auto) -24px;
 }
 @keyframes onb-in {
   from {
@@ -73,6 +83,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .onb__back:hover:not(:disabled) {
@@ -83,9 +94,10 @@
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */
 .onb__ask {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 14px;
 }
 .onb__host {
@@ -94,7 +106,6 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding-bottom: 2px;
 }
 /* A host agent that just arrived pops in. */
 .onb__host[data-fresh] .ac-avatar {
@@ -120,7 +131,7 @@
   flex: 1;
   min-width: 0;
   padding: 16px 20px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
+  border-radius: 6px var(--radius-section) var(--radius-section) var(--radius-section);
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
   animation: onb-in 0.3s var(--out) 0.08s both;
@@ -140,6 +151,26 @@
 .onb__ask .onb__lead {
   margin-top: 4px;
   font-size: 14px;
+}
+/*
+ * "optional" after a step's title, on the line where the title ends: its middle on the title's capitals, as an
+ * icon's. The chip has a smaller type of its own, so the title hands it where its capitals sit, as a length.
+ */
+@property --onb-title-caps {
+  syntax: "<length>";
+  inherits: true;
+  /* Browsers without the lh unit: the 21px title's line. */
+  initial-value: 14px;
+}
+@supports (top: 1lh) {
+  .onb__ask .onb__title {
+    --onb-title-caps: calc(0.5lh - var(--cap-mid));
+  }
+}
+.onb__titletag {
+  margin-left: 8px;
+  vertical-align: top;
+  translate: 0 calc(var(--onb-title-caps) - 50%);
 }
 .onb__answer {
   display: flex;
@@ -167,38 +198,16 @@ textarea.onb__big.ac-input {
   font-size: 13px;
   color: var(--faint);
 }
-/* The one link look here, a field's help links too ("Create the key at…"). */
-.onb__link,
-.onb__body .ac-field__help a {
-  padding: 0;
-  border: 0;
-  background: none;
+/* An `.ac-link` in the host's sentence ("Change", "skip"): muted until hovered. */
+.onb__link {
   color: var(--muted);
-  font: inherit;
-  font-weight: 600;
-  text-align: start;
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
-.onb__link:hover:not(:disabled),
-.onb__body .ac-field__help a:hover {
+.onb__link:hover:not(:disabled) {
   color: var(--ink);
-  text-decoration-color: currentColor;
 }
 .onb__link:disabled {
   cursor: default;
-}
-/* A quiet line with its icon ("We sent a confirmation link to…"). */
-.onb__note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.onb__note > .ac-icon {
-  flex: none;
-  margin-top: 2px;
+  text-decoration-color: var(--line2);
 }
 .onb__starters {
   display: flex;
@@ -235,19 +244,47 @@ textarea.onb__big.ac-input {
   font: inherit;
   font-size: 16px;
   font-weight: 650;
+  line-height: normal;
   text-align: right;
   outline: none;
 }
-/* The step's action: one big button; "Pular esta etapa" right under it. */
+/*
+ * The step's actions, in one place on every step: a bar at the bottom of the screen, clear of the home bar, on the
+ * page's ground with a 16px fade above it, so a longer step slides under it. The ground spans the column's gutters
+ * too: a card's ring passing under the bar never shows beside it. At the end of the scroll the bar sits under the
+ * content's last line, as far below it as the column's gap. Continue first, the step's text button beside it (Skip,
+ * I'll do it later, Open #general without sending), centred above it when both don't fit, so Continue keeps its place.
+ */
 .onb__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
+  flex-wrap: wrap-reverse;
+  align-items: center;
+  gap: 8px 12px;
+  margin: auto calc(-1 * var(--onb-gutter)) 0;
+  padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background: var(--pane);
   animation: onb-in 0.36s var(--out) 0.16s both;
 }
+.onb__actions::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 100%;
+  height: 16px;
+  background: linear-gradient(to bottom, transparent, var(--pane));
+  pointer-events: none;
+}
+.onb__actions > .ac-btn--primary {
+  flex: 1 1 160px;
+}
 .onb__actions > .ac-btn--ghost {
-  align-self: center;
+  margin-inline: auto;
+}
+/* A field being typed in stays clear of the bar: the page scrolls it above the bar's tallest (two rows). */
+html:has(.onb) {
+  scroll-padding-bottom: 104px;
 }
 .onb__label {
   font-size: 13px;
@@ -327,14 +364,14 @@ textarea.onb__big.ac-input {
   display: block;
   margin-bottom: 4px;
 }
+/* The computer chosen or connected: a well sunk into what holds it in both themes, as the computer's wait is. */
 .onb__status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 .onb__emails {
@@ -423,36 +460,43 @@ textarea.onb__big.ac-input {
 .onb__crew {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-top: 16px;
 }
-.onb__summary {
+/* Their computer after the faces: its portrait on a plate of the sky's glass, shaped like a face's tile. Spaced by
+   the row's gap alone, so a plate wrapped onto a line of its own starts under the first face. */
+.onb__crew-computer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 30%;
+  background: var(--sky-glass);
+  box-shadow: var(--e1);
+}
+/* Done's first message: the agent's offer in the bubble, the message in a box as tall as its text, and a line on
+   whether the agent can start on it now. */
+.onb__say {
   margin: 0;
-}
-.onb__summary dd {
-  margin: 0;
-}
-.onb__stat {
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 22px;
-  overflow-wrap: anywhere;
-}
-/* A name, not a number: in words of its own size (a connected computer's). */
-.onb__stat--name {
-  font-family: inherit;
-  font-weight: 600;
   font-size: 15px;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.45;
 }
-/* Under the big word, whose it is ("Ready" · Acme's computer). */
-.onb__stat-of {
-  font-size: 13px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
+/* One line is the big button's height: 1 + 11 + 24 + 11 + 1. */
+.onb__first-text.ac-input {
+  min-height: var(--control-h-lg);
+  padding: 11px 12px;
+  font-size: 16px;
+  line-height: 24px;
+  resize: none;
+}
+.onb__first-line[data-state="ready"] > .ac-icon {
+  color: var(--ok);
+}
+.onb__first-line[data-state="no_ai"] > .ac-icon {
+  color: var(--attention);
 }
 /* Phone. */
 @media (max-width: 760px) {
@@ -460,17 +504,32 @@ textarea.onb__big.ac-input {
     display: none;
   }
   .onb__body {
-    margin: 0;
     padding-top: 24px;
+  }
+  /* The step starts under the step bar, and the spare room all goes above the actions. */
+  .onb__body::before {
+    display: none;
   }
   .onb__ask .onb__title {
     font-size: 18px;
   }
+  /* Four faces and the computer on one line from 360 px wide; the portrait keeps its 48 px, whole pixels. */
+  .onb__crew {
+    gap: 8px;
+  }
+  .onb__crew .ac-avatar--lg,
+  .onb__crew-computer {
+    width: 48px;
+    height: 48px;
+  }
 }
 /* Clear the home bar; the e-mail chips field stays at 16px (no zoom on focus). */
 @media (max-width: 760px) {
-  .onb__body {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  .onb__actions {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+  html:has(.onb) {
+    scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px);
   }
 }
 @media (max-width: 760px), (pointer: coarse) {

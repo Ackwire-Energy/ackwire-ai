@@ -1,6 +1,9 @@
 import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
+import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -13,9 +16,10 @@ export type ActivityFilter = "all" | "waiting";
 
 /**
  * Waiting ones in this order: an agent stuck in its browser (it expires in minutes), an agent's question, my
- * turn at the table, an approval; newest first within a kind.
+ * turn at the table, an approval, then someone asking to join (nobody's work waits on it); newest first within a
+ * kind.
  */
-const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval"];
+const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval", "join_request"];
 
 export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, now = Date.now()) =>
   !n.doneAt && !(n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now);
@@ -99,12 +103,15 @@ export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.late
 
 // ── Esperando você as cards, and what comes next ─────────────────────────────────────────────────
 
-/** What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser. */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser";
+/**
+ * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, or let
+ * someone in.
+ */
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "join";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic, what to do in the browser. */
+  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
@@ -113,7 +120,7 @@ export interface WaitingCard {
 }
 
 /** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
-export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): WaitingCard {
+export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "latest">): WaitingCard {
   const l = n.latest;
   if (n.kind === "browser_handoff")
     return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };
@@ -121,7 +128,33 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): Wait
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
   if (n.kind === "forum_turn")
     return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
+  // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
+  if (n.kind === "join_request")
+    return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
+}
+
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people (the web's inbox). */
+export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
+  const shown = names.slice(0, max);
+  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
+  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
+}
+
+/**
+ * Who asks to join, as the card's line: "Ana asks to join", "Ana and Bruno ask to join", "Ana, Bruno and 2 more ask
+ * to join"; and the faces to lead it (the names shown, as they aren't members yet: their initials).
+ */
+export function joinRequestLine(
+  t: TFunction,
+  n: Pick<AppNotification, "count" | "latest">,
+): { text: string; faces: string[] } {
+  const asked = askersOf(n);
+  const text =
+    asked.total > 1
+      ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
+      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+  return { text, faces: asked.names.slice(0, 2) };
 }
 
 /** The next real thing coming: the soonest run of an active routine, still ahead. */

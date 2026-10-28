@@ -3,10 +3,37 @@
 Expo + React Native app for agentes.chat (ADR 0035).
 
 Code is checked in CI (`.github/workflows/ci.yml`: lint, typecheck,
-unit tests of the pure logic in `apps/mobile/test`). Builds and installs go through EAS
-(`.github/workflows/mobile.yml`).
+unit tests of the pure logic in `apps/mobile/test`). Android builds on the **Android build** workflow
+(`.github/workflows/android.yml`); EAS (`.github/workflows/mobile.yml`) still works for either platform.
+The native projects (`ios/`, `android/`) are made from `app.config.ts` and `plugins/` by `expo prebuild` and never
+committed. **Credentials never go in the repo** (it is public): the upload key, Firebase's files and store accounts
+live in GitHub's secrets or the stores.
 
-## Get a build on a phone (EAS only)
+## Android on GitHub Actions
+
+Run **Android build** (Actions → Run workflow) with `preview` (an arm64 APK to install directly, kept as the run's
+artifact) or `production` (an app bundle with every architecture; with `PLAY_SERVICE_ACCOUNT_JSON` set it also goes
+to the Play Store's internal track as a draft). It runs `expo prebuild --platform android --clean` and Gradle on a
+Blacksmith runner; `plugins/with-android-release-signing.js` signs the release with the upload key from the
+environment. Nothing goes through EAS.
+
+One time, in GitHub → Settings → Secrets and variables → Actions:
+1. The upload key: make one once (`keytool -genkeypair -v -storetype PKCS12 -keystore upload.keystore -alias upload
+   -keyalg RSA -keysize 2048 -validity 10000`) and keep it and its password somewhere safe; every update on the Play
+   Store is signed with it (Play App Signing lets Google reset a lost one). Add `ANDROID_KEYSTORE_BASE64`
+   (`base64 -i upload.keystore`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`upload`) and
+   `ANDROID_KEY_PASSWORD` (a PKCS12 keystore uses the same password for both). Without them the workflow stops at
+   its first step.
+2. Optional: `GOOGLE_SERVICES_JSON_BASE64`, Firebase's `google-services.json` in base64, for push on Android. The
+   file must list the variant's package (`chat.agentes.app`, `chat.agentes.app.preview`); otherwise that build is
+   made without push and the run says so.
+3. Optional: `PLAY_SERVICE_ACCOUNT_JSON` (a Play Console service account allowed to release; Play takes API uploads
+   only after the app's first bundle was uploaded by hand), and the variable `ANDROID_VERSION_CODE_BASE` (added to
+   the run number) above the last version code on Play, if any.
+
+A preview APK installs over an earlier one only when both were signed with the same key.
+
+## Get a build on a phone with EAS
 
 1. One time, on expo.dev: create an access token (Account settings → Access tokens). The EAS project
    already exists; its ID is in `app.config.ts` (`EAS_PROJECT_ID` overrides it).
@@ -22,12 +49,15 @@ unit tests of the pure logic in `apps/mobile/test`). Builds and installs go thro
 
 ## Environment
 
-Set per profile in `eas.json` (`build.<profile>.env`) or on expo.dev (EAS environment variables):
+Set in the build's environment: the Android workflow, or per profile in `eas.json` (`build.<profile>.env`) /
+on expo.dev (EAS environment variables) for EAS:
 
 | Variable | What | Default |
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_URL` | The default server. **Must be the server's `PUBLIC_URL` host** (see below). | `https://agentes.chat` |
 | `EAS_PROJECT_ID` | EAS project, for push tokens. | ours (`8514d5b3-…`) |
+| `GOOGLE_SERVICES_JSON` | Path to Firebase's `google-services.json` (the Android workflow writes it from a secret): push on Android (FCM). | none |
+| `ANDROID_VERSION_CODE` | The build's version code (the Android workflow's run). | from the config |
 | `APP_VARIANT` | `development` / `preview` / `production`: name and bundle id suffix, so all three install side by side. | `production` |
 
 Why the API URL must equal the public URL: React Native's WebSocket adds an `Origin` derived from the URL

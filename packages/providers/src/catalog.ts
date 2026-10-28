@@ -19,7 +19,7 @@ export interface TokenPrices {
 export interface ProviderInfo {
   label: string;
   /** The API it speaks, which picks its adapter (`createModelProviders`). */
-  protocol: "anthropic" | "openai";
+  protocol: "anthropic" | "openai" | "gemini";
   /** Replaces the SDK's default host. */
   baseURL?: string;
   /**
@@ -36,8 +36,9 @@ export interface ProviderInfo {
  * stores the provider id as text, so no migration is needed.
  */
 export const PROVIDERS = {
-  anthropic: { label: "Anthropic", protocol: "anthropic" },
+  anthropic: { label: "Claude", protocol: "anthropic" },
   openai: { label: "OpenAI", protocol: "openai" },
+  gemini: { label: "Gemini", protocol: "gemini" },
   deepseek: {
     label: "DeepSeek",
     protocol: "anthropic",
@@ -50,7 +51,7 @@ export const PROVIDERS = {
     baseURL: "https://api.moonshot.ai/anthropic",
     compat: { toolChoiceAny: true },
   },
-  // Z.ai and MiniMax document only `tool_choice: auto`.
+  // Z.ai documents only `tool_choice: auto`. MiniMax documents `any` too, untried here, so its tool isn't forced yet.
   zai: {
     label: "Z.ai",
     protocol: "anthropic",
@@ -74,14 +75,26 @@ export interface ModelInfo {
   provider: ProviderId;
   label: string;
   prices: TokenPrices;
+  /** Lower prices the provider charges until a day (UTC, exclusive): `prices` apply from then on. */
+  intro?: { until: string; prices: TokenPrices };
   /** Prices for the whole request when its prompt exceeds `aboveInputTokens`. */
   longContext?: { aboveInputTokens: number; prices: TokenPrices };
   /** Ask the API to retry a refused request on a fallback model (Anthropic `fallbacks: "default"`). */
   serverSideFallback: boolean;
   /** Takes a reasoning `effort` (OpenAI reasoning models). */
   reasoning?: boolean;
-  /** The provider's small, cheap model (router fallback, summaries, reflection). */
+  /** The provider's small, cheap model (summaries, reflection). */
   cheap?: boolean;
+  /**
+   * The provider's pick for routing and the judge (`routerModelOf`): its fastest model with the least thinking,
+   * at about US$ 0.0006 a call or less. Not always its `cheap` one: one that always thinks is slower for the same cost.
+   */
+  router?: boolean;
+  /**
+   * The least thinking the model allows, which `effort: "none"` asks for: `off` turns it off, `minimal` keeps
+   * a little (it can't be turned off). Absent: `none` goes as `low`.
+   */
+  leastThinking?: "off" | "minimal";
   /** Suggested for new agents of that provider. */
   recommended?: boolean;
   /** Its size in the provider's line, for "Automático": each run picks a tier, mapped back to a model. */
@@ -130,11 +143,13 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     contextWindow: 1_000_000,
     serverSideFallback: false,
     cheap: true,
+    router: true,
+    leastThinking: "off",
     tier: "small",
   },
   // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-20); cache writes
   // at the 30-minute rate. Above 272K prompt tokens, input, cached input and cache writes cost 2×, output 1.5×.
-  // TODO: `contextWindow` not checked yet; they use `DEFAULT_CONTEXT_WINDOW` until then.
+  // Context windows from each model's page (2026-10-26).
   "gpt-6.1-sol": {
     provider: "openai",
     label: "GPT-6.1 Sol",
@@ -143,6 +158,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
       aboveInputTokens: 272_000,
       prices: { input: 4000, output: 15000, cacheRead: 200, cacheWrite: 5000 },
     },
+    contextWindow: 1_050_000,
     serverSideFallback: false,
     reasoning: true,
     recommended: true,
@@ -156,6 +172,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
       aboveInputTokens: 272_000,
       prices: { input: 4000, output: 15000, cacheRead: 400, cacheWrite: 5000 },
     },
+    contextWindow: 1_050_000,
     serverSideFallback: false,
     reasoning: true,
   },
@@ -164,13 +181,51 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     label: "GPT-6 Luna",
     prices: { input: 100, output: 500, cacheRead: 10, cacheWrite: 125 },
     longContext: { aboveInputTokens: 272_000, prices: { input: 200, output: 750, cacheRead: 20, cacheWrite: 250 } },
+    contextWindow: 1_050_000,
     serverSideFallback: false,
     reasoning: true,
     cheap: true,
+    router: true,
+    leastThinking: "off",
+    tier: "small",
+  },
+  // Gemini (Interactions API), Standard tier, from ai.google.dev/gemini-api/docs/pricing (2026-10-27). Thinking is
+  // billed as output. Caching is implicit, with no write charge, so a cache write costs the input rate (none is ever
+  // reported). Argon and 3.8 Flash cost half until the day in `intro`.
+  "gemini-4-argon": {
+    provider: "gemini",
+    label: "Gemini 4 Argon",
+    prices: { input: 4000, output: 20000, cacheRead: 200, cacheWrite: 4000 },
+    intro: { until: "2026-12-01", prices: { input: 2000, output: 10000, cacheRead: 100, cacheWrite: 2000 } },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    tier: "large",
+  },
+  "gemini-3.8-flash": {
+    provider: "gemini",
+    label: "Gemini 3.8 Flash",
+    prices: { input: 1500, output: 7500, cacheRead: 150, cacheWrite: 1500 },
+    intro: { until: "2027-01-01", prices: { input: 750, output: 3750, cacheRead: 75, cacheWrite: 750 } },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    recommended: true,
+    tier: "medium",
+  },
+  // It can't stop thinking: `minimal` is the least.
+  "gemini-3.5-flash-lite": {
+    provider: "gemini",
+    label: "Gemini 3.5 Flash-Lite",
+    prices: { input: 300, output: 2500, cacheRead: 30, cacheWrite: 300 },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    cheap: true,
+    router: true,
+    leastThinking: "minimal",
     tier: "small",
   },
   // Anthropic-compatible providers, from each one's pricing page (2026-10-24). A cache write costs the
-  // input rate. DeepSeek stores its peak rates (off-peak is half), so budgets err high.
+  // input rate. DeepSeek stores its peak rates (off-peak is half), so budgets err high. `deepseek-flash` is
+  // served by DeepSeek-V4.1-Flash-1017.
   "deepseek-flash": {
     provider: "deepseek",
     label: "DeepSeek Flash",
@@ -178,6 +233,8 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     contextWindow: 1_000_000,
     serverSideFallback: false,
     cheap: true,
+    router: true,
+    leastThinking: "off",
     recommended: true,
     tier: "small",
   },
@@ -215,6 +272,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     recommended: true,
     tier: "medium",
   },
+  // Always thinks (Z.ai: it "cannot be disabled"), still the line's fastest for routing.
   "glm-5.3-flash": {
     provider: "zai",
     label: "GLM-5.3 Flash",
@@ -222,8 +280,11 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     contextWindow: 1_000_000,
     serverSideFallback: false,
     cheap: true,
+    router: true,
     tier: "small",
   },
+  // Routes for MiniMax: thinking off by default, while M3.1 Flash always thinks (at `max` unless told) for the
+  // same cost a call.
   "MiniMax-M3": {
     provider: "minimax",
     label: "MiniMax M3",
@@ -231,6 +292,8 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     longContext: { aboveInputTokens: 512_000, prices: { input: 600, output: 2400, cacheRead: 120, cacheWrite: 600 } },
     contextWindow: 1_000_000,
     serverSideFallback: false,
+    router: true,
+    leastThinking: "off",
     recommended: true,
     tier: "medium",
   },
@@ -246,12 +309,17 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
 };
 
 /**
- * The model a provider's system tasks use (router fallback, summaries): its
- * cheap one, else its recommended one (a line with no small model, like Kimi's).
+ * The model a provider's system tasks use (summaries, reflection): its cheap
+ * one, else its recommended one (a line with no small model, like Kimi's).
  */
 export function cheapModelOf(provider: string): string | null {
   const own = Object.entries(MODEL_CATALOG).filter(([, m]) => m.provider === provider);
   return (own.find(([, m]) => m.cheap) ?? own.find(([, m]) => m.recommended))?.[0] ?? null;
+}
+
+/** The provider's model for routing and the judge, never a large one: null for a line with none (Kimi). */
+export function routerModelOf(provider: string): string | null {
+  return Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.router)?.[0] ?? null;
 }
 
 /**
@@ -287,13 +355,24 @@ const tokensCost = (p: TokenPrices, u: ModelUsage) =>
   u.cacheReadTokens * p.cacheRead +
   u.cacheWriteTokens * p.cacheWrite;
 
-/** Cost of one call in nano-USD. Throws for models outside the catalog (we never make a call we can't price). */
-export function costNanoUsd(model: string, usage: ModelUsage): number {
+/**
+ * What a call made at `at` pays per token: the introductory prices before their day. Budget reservations
+ * (`maxCostNanoUsd`, `outputTokensWithin`) keep the list prices on purpose, so they err high while a lower price
+ * lasts; give them `at` too if that ever stops agents early.
+ */
+export const pricesAt = (info: ModelInfo, at = new Date()) =>
+  info.intro && at.getTime() < Date.parse(info.intro.until) ? info.intro.prices : info.prices;
+
+/**
+ * Cost in nano-USD of one call made at `at`. Throws for models outside the catalog (we never make a call we
+ * can't price).
+ */
+export function costNanoUsd(model: string, usage: ModelUsage, at = new Date()): number {
   const info = MODEL_CATALOG[model];
   if (!info) throw new Error(`unknown model ${model}`);
   const prompt = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
   return tokensCost(
-    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices,
+    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : pricesAt(info, at),
     usage,
   );
 }

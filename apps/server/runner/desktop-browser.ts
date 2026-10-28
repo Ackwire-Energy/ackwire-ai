@@ -4,7 +4,7 @@ import { chmodSync, chownSync, rmSync, statSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import type { MachineErrorCode } from "@agenteschat/adapters/machine-protocol";
-import { BROWSER_ICON, BROWSER_WM_CLASS, NOTE_ICON, NOTE_WM_CLASS } from "./desktop-look";
+import { BROWSER_ICON, NOTE_ICON, NOTE_WM_CLASS, WAIT_WM_CLASS } from "./desktop-look";
 import { toMachineError } from "./errors";
 
 /**
@@ -19,8 +19,9 @@ import { toMachineError } from "./errors";
  *   only the agent's group may enter, so only the agent's own user reaches it (and it may already run anything as
  *   itself). It takes one word, `open`: no address, no flag, nothing that widens what the browser reaches. The
  *   agent's own code can connect too: it answers one click at a time and holds a few connections at most.
- * - When the answer takes more than a moment, a small window on the desktop says the browser is opening (or, before
- *   the agent's first browser, that Chrome for Testing installs); when the browser can't open, one says why.
+ * - The runner answers once Chrome's window is on the desktop. When that takes more than a moment, a small window
+ *   on the desktop says the browser is opening (or, before the agent's first browser, that Chrome for Testing
+ *   installs) until then; when the browser can't open, one says why.
  */
 
 /** The socket's name, in the folder of the desktop's password file. */
@@ -33,14 +34,18 @@ const ASK_MS = 5000;
 const CONNECTIONS_MAX = 4;
 /** Chrome for Testing's download and install, then Chrome's start: a click is given up after this. */
 export const SHOW_MS = 16 * 60_000;
-/** A click answered sooner shows no window of its own: Chrome's is the answer. */
-const QUIET_MS = 1000;
+/**
+ * A click answered sooner (Chrome already open, brought to the front: from the apps menu, say, since docklike handles
+ * a plain click on Browser while Chrome has a window itself) shows no window of its own: Chrome's is the answer. A
+ * Chrome that starts takes seconds, and the note itself most of a second to show on a small computer.
+ */
+const QUIET_MS = 300;
 
 /**
  * Answers the Browser of one agent's desktop on `socket`: `open` in; `installing` while Chrome for Testing
- * installs first, then `ok` or `error <code>`. One click at a time: one that comes meanwhile is told `busy`, and
- * the first one's launcher shows what happens. The socket takes its folder's group (the agent's, in system mode),
- * and only that group may write to it.
+ * installs first, then `ok` (its window is on the desktop) or `error <code>`. One click at a time, until its
+ * answer: one that comes meanwhile is told `busy` and starts nothing, and the first one's launcher shows what
+ * happens. The socket takes its folder's group (the agent's, in system mode), and only that group may write to it.
  */
 export async function serveBrowser(socket: string, open: (installing: () => void) => Promise<void>): Promise<Server> {
   let busy = false;
@@ -130,8 +135,8 @@ const NOTE_COLUMNS = 56;
 /**
  * The note as an xfce4-terminal of its own (every desktop has one), small, with no menu or bars: the text
  * wrapped and indented, the cursor hidden, a row free above and below. The wait stays until closed, with Browser's
- * window class, so the dock shows it on Browser; the reason stays until Enter, with a class of its own, so a click
- * on Browser tries again rather than bringing that window up.
+ * icon; the reason until Enter. Each has a window class of its own (`desktop-look.ts`), so a click on Browser
+ * always reaches the runner: told `busy` during the wait, trying again after the reason.
  */
 export function noteArgs(kind: "wait" | "error", text: string): string[] {
   const error = kind === "error";
@@ -139,7 +144,7 @@ export function noteArgs(kind: "wait" | "error", text: string): string[] {
   const end = error ? "printf '\\n  %s' 'Press Enter to close.'; read -r _" : `exec sleep ${SHOW_MS / 1000}`;
   return [
     "--disable-server",
-    `--class=${error ? NOTE_WM_CLASS : BROWSER_WM_CLASS}`,
+    `--class=${error ? NOTE_WM_CLASS : WAIT_WM_CLASS}`,
     "--title=Browser",
     `--icon=${error ? NOTE_ICON : BROWSER_ICON}`,
     "--hide-menubar",

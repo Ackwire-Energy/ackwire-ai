@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
-import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED } from "./edition-words";
+import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { leaves } from "./leaves";
 
 /**
@@ -21,19 +21,24 @@ const NAMESPACES = [
   "support.",
 ];
 
-/** What the workspace computer's screens say in each state (`setupView`, `etaView` in packages/client/src/lib/computer.ts). */
+/**
+ * What the workspace computer's screens say in each state (`setupView`, `SETUP_STAGES`, `etaView` in
+ * packages/client/src/lib/computer.ts).
+ */
 const SETUP_KEYS = [
   ...["reserving", "starting", "installing", "connecting"].map((s) => `computerSetup.step.${s}`),
-  ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
+  ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall"].map(
+    (s) => `computerSetup.stage.${s}`,
+  ),
+  ...["preparing", "capacity", "problem", "ready", "paused"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,
   ]),
   ...["minutes_one", "minutes_other", "underMinute", "almost", "late"].map((s) => `computerSetup.eta.${s}`),
   "computerSetup.email.you",
   "computerSetup.email.here",
-  "computerSetup.plans",
+  "computerSetup.email.short",
   "computerSetup.title",
-  "computerSetup.lead",
   "computerSetup.specs",
   "computerSetup.users",
   "computerSetup.notice.title",
@@ -54,13 +59,12 @@ const SELFHOST_ONLY = [
   "agentComputer.status.paused",
   "agentComputer.status.pausedPlain",
   "agentComputer.status.noComputer",
+  "agentComputer.status.noBrowser",
   "agentComputer.status.outdated",
-  "agentComputer.sub.paused",
   "agentComputer.sub.offline",
   "agentComputer.state.paused",
   "agentComputer.state.pausedPlain",
   "agentComputer.state.offline",
-  "agentComputer.state.offlineHelp",
   "agentComputer.state.offlineHelpPlain",
   "agentComputer.state.screensOff",
   "agentComputer.state.screensMissing",
@@ -84,28 +88,38 @@ const CLOUD_EXTRA = [
   "desktop.state.retrying",
   "desktop.retry",
   "browser.now.handedBack",
+  "desktop.control.keys",
   "desktop.control.notice",
-  "desktop.paste.placeholder",
-  "desktop.paste.label",
-  "desktop.clipboard.got",
+  "desktop.session.check",
+  "desktop.session.screening",
+  "desktop.keyboard.field",
   "desktop.keyboard.label",
+  ...["got", "copied", "tooLong", "textOnly"].map((k) => `desktop.clipboard.${k}`),
   "computers.leadCloud",
-  ...["title", "screens", "plans", "coding"].map((k) => `computers.onIt.${k}`),
+  "computers.about",
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
   "agentPage.work.brain.fallbackTitle",
+  "agentPage.work.brain.fallbackHint",
+  "agentPage.work.brain.add.stepOneHint",
+  "aiAccounts.page.hint",
   "agentPage.work.brain.offCloud",
   "missions.settings.more.sub",
   "missions.settings.recovery.title",
   "onboarding.budget.noteKey",
   "onboarding.computer.leadCloud",
-  "onboarding.computer.leadCloudReady",
+  "onboarding.computer.leadCloudPaused",
   "onboarding.keyStep.lead",
-  "onboarding.keyStep.planLater",
-  "onboarding.keyStep.planLaterReady",
+  ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
+  ...["signIn", "key", "email", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
+  "connectAi.foot.signIn",
+  "connectAi.each",
+  "connectAi.eachHint",
+  "aiAccounts.share.fixedHint",
+  "connectAi.titleFor",
+  "agentPage.work.brain.add.startFailed",
   "outage.titleCloud",
   "outage.cloudSub",
-  "aiAccounts.connect.preparing",
   "aiAccounts.connect.needsCloud.claude_code",
   "aiAccounts.connect.needsCloud.codex",
   "aiAccounts.connect.needsCloud.online",
@@ -114,7 +128,6 @@ const CLOUD_EXTRA = [
   "scopes.browser_use.description",
   "access.areaText.browser.write",
   "missions.subtitle",
-  "missions.empty.text",
   "threads.empty.missions",
   "missions.share.lendText",
   "missions.waitingCloud",
@@ -126,11 +139,11 @@ const SELFHOST_EXTRA = [
   "browser.inCard.offline",
   "browser.inCard.noComputer",
   "computers.hostMissing",
-  ...["title", "text", "emptyTitle", "emptyText"].map((k) => `computers.other.${k}`),
+  ...["title", "text", "emptyTitle"].map((k) => `computers.other.${k}`),
+  "computers.how",
   "computers.daytona.cardTitle",
   "computers.cloud.note",
   "computers.agents.title",
-  "computers.agents.text",
   "machines.host.label",
   "machines.host.desc",
   "machines.host.descUsers",
@@ -158,17 +171,14 @@ const SELFHOST_EXTRA = [
   "agentPage.work.computer.useDaytona",
   "agentPage.computer.ownerPicks",
   ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
-  "onboarding.brain.help",
-  "onboarding.brain.claudeCodeDesc",
-  "onboarding.keyStep.useComputer",
-  ...["claude_code", "codex", "keys", "online"].map((k) => `aiAccounts.connect.needs.${k}`),
+  "onboarding.keyStep.leadNoComputer",
+  "onboarding.brain.failed",
+  "connectAi.wait.connecting",
+  ...["this", "thisText", "other", "note"].map((k) => `connectAi.own.${k}`),
+  "aiAccounts.connect.needs.keys",
   "aiAccounts.connect.noComputer",
   "aiAccounts.connect.addComputer",
 ];
-
-/** Case-insensitive, so the Go language is left out: it would match English "Go to…". */
-const TECHNICAL =
-  /\bLinux\b|\bIP(v[46])?\b|\bvCPU|Chrome|\bgit\b|\bNode\b|Python|\bRust\b|Debian|Ubuntu|Docker|kernel/i;
 
 const LOCALES = [
   ["pt-BR", ptBR],
@@ -207,6 +217,14 @@ describe("computer copy", () => {
       const { cloud } = editionKeys(strings);
       expect(cloud.filter((k) => !values.has(k))).toEqual([]);
       expect(hitsOf(values, cloud, () => CLOUD_BANNED[locale])).toEqual([]);
+    });
+
+    test(`${locale}: no stage opens with a step's word, so the computer never reads as starting twice`, () => {
+      const values = valuesOf(strings);
+      const first = (k: string) => values.get(k)?.split(" ")[0];
+      const of = (prefix: string) => [...values.keys()].filter((k) => k.startsWith(prefix));
+      const steps = of("computerSetup.step.").map(first);
+      expect(of("computerSetup.stage.").filter((k) => steps.includes(first(k)))).toEqual([]);
     });
 
     test(`${locale}: self-host never says the cloud, and its computer's dialog never says terminal`, () => {

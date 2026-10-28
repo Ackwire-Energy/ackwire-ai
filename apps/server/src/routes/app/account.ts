@@ -1,9 +1,11 @@
 import {
   acceptInvitation,
   addHostComputer,
+  announceMembers,
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
+  cloudNotice,
   countUsers,
   createInvitation,
   createOrganization,
@@ -12,6 +14,7 @@ import {
   hasPassword,
   isEmailVerified,
   isValidTimeZone,
+  joinStatus,
   listInvitations,
   listMembers,
   listMemberships,
@@ -26,6 +29,7 @@ import {
   setAvatar,
   setMyLocale,
   setOrgLogo,
+  settleJoinRequests,
   signInOptions,
   toldReason,
   USER_LOCALES,
@@ -33,9 +37,10 @@ import {
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, signupPolicy } from "../../auth";
-import { clientIp } from "../../http/client-ip";
+import { authUiConfig, mintPhoneSignIn, sessionUser, signupPolicy } from "../../auth";
+import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
+import { humanCheckRefusal } from "../../http/human-check";
 import {
   type AppDeps,
   body,
@@ -111,6 +116,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
             }),
+            turnstileSiteKey: z.string().nullable().openapi({
+              description:
+                "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
+            }),
           }),
         ),
       },
@@ -127,6 +136,7 @@ export function accountRoutes(deps: AppDeps) {
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
+          turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
         },
         200,
       );
@@ -139,14 +149,10 @@ export function accountRoutes(deps: AppDeps) {
       path: "/sign-in-options",
       tags,
       summary: "How an e-mail signs in (the login screen asks for the e-mail first)",
-      description: "Tells whether the e-mail has an account, so it is rate limited per IP.",
+      description:
+        "Tells whether the e-mail has an account, so it is rate limited per IP, and guarded by the bot check when this server has one (`human_check`, `human_check_blocked`).",
       request: {
-        body: body(
-          z.object({
-            email: z.email().max(254),
-            inviteToken: z.string().min(1).max(200).optional().openapi({ description: "From an org invite link." }),
-          }),
-        ),
+        body: body(z.object({ email: z.email().max(254) })),
       },
       responses: {
         200: json(
@@ -164,11 +170,17 @@ export function accountRoutes(deps: AppDeps) {
       },
     }),
     async (c) => {
-      const ip = clientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await deps.adapters.rateLimiter.consume(`sign-in-options:${ip}`, SIGN_IN_OPTIONS_PER_IP);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
-      const { email, inviteToken } = c.req.valid("json");
-      return c.json(await signInOptions(db, email, signupPolicy(config), inviteToken), 200);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
+      const refused = await humanCheckRefusal(
+        deps.adapters.humanCheck,
+        c.req.raw.headers,
+        "email-lookup",
+        config.TRUSTED_PROXIES,
+      );
+      if (refused) return apiError(c, 403, refused.code, refused.message);
+      return c.json(await signInOptions(db, c.req.valid("json").email, signupPolicy(config)), 200);
     },
   );
 
@@ -178,6 +190,8 @@ export function accountRoutes(deps: AppDeps) {
       path: "/invitations/{token}",
       tags,
       summary: "Preview an invitation",
+      description:
+        "Public. For an invitation link (ADR 0068), also what the signed-in person's request stands at (`you`).",
       request: { params: z.object({ token: z.string() }) },
       responses: {
         200: json(
@@ -195,15 +209,50 @@ export function accountRoutes(deps: AppDeps) {
                   appearance: z.object({ color: z.string(), eyes: z.string(), accessory: z.string() }).nullable(),
                 }),
               )
-              .openapi({ description: "A few of the organization's agents (name and look)." }),
+              .openapi({ description: "The organization's first agents (name and look)." }),
+            moreAgents: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .openapi({ description: "How many more agents work there than `agents` names." }),
+            closed: z
+              .literal(true)
+              .optional()
+              .openapi({ description: "A link turned off, expired, or whose workspace is paused: nobody can ask." }),
+            you: z
+              .object({
+                member: z.boolean(),
+                orgId: z.uuid().optional().openapi({ description: "Only when a member." }),
+                email: z.string(),
+                request: z
+                  .object({ status: z.enum(["pending", "approved", "denied"]), reason: z.string().nullable() })
+                  .nullable()
+                  .openapi({
+                    description:
+                      "The latest request for their address through a link, with its answer; always null while " +
+                      "the address isn't confirmed.",
+                  }),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "A link opened signed in: where they stand. On a link that no longer works, only a member's.",
+              }),
           }),
         ),
         404: errors[404],
       },
     }),
     async (c) => {
-      const invitation = await previewInvitation(db, c.req.valid("param").token);
-      return invitation ? c.json(invitation, 200) : apiError(c, 404, "not_found", "Invitation not found or expired");
+      const token = c.req.valid("param").token;
+      const invitation = await previewInvitation(db, token);
+      if (!invitation) return apiError(c, 404, "not_found", "Invitation not found or expired");
+      const user = invitation.kind === "link" ? await sessionUser(deps.auth, c.req.raw.headers) : null;
+      const status = user ? await joinStatus(db, user, token) : null;
+      // A link that no longer works still tells a member they're in; anyone else hears only that it doesn't work.
+      const you = "closed" in invitation && !status?.member ? null : status;
+      return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
     },
   );
 
@@ -259,7 +308,9 @@ export function accountRoutes(deps: AppDeps) {
             name: m.orgName,
             role: m.role,
             logo: m.orgLogo ?? null,
-            ...(m.standing ? { standing: { state: m.standing.state, reason: toldReason(m.standing) } } : {}),
+            ...(m.standing
+              ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
+              : {}),
           })),
         },
         200,
@@ -340,7 +391,7 @@ export function accountRoutes(deps: AppDeps) {
         limit: 30,
         windowMs: 3600_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many codes; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many codes. Try again later.");
       const { token, expiresIn } = await mintPhoneSignIn(deps.auth, current.session.token);
       return c.json({ token, server: new URL(config.PUBLIC_URL).origin, expiresIn }, 201);
     },
@@ -408,7 +459,7 @@ export function accountRoutes(deps: AppDeps) {
       const user = c.get("user");
       await requirePermission(db, user.id, c.req.valid("param").orgId, "read");
       const limit = await deps.adapters.rateLimiter.consume(`avatar:${user.id}`, { limit: 10, windowMs: 3600_000 });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photo changes; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photo changes. Try again later.");
       return c.json(await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json")), 200);
     },
   );
@@ -462,7 +513,7 @@ export function accountRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       await requirePermission(db, user.id, orgId, "configure");
       const limit = await deps.adapters.rateLimiter.consume(`org-logo:${orgId}`, { limit: 20, windowMs: 3600_000 });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many logo changes; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many logo changes. Try again later.");
       return c.json(
         await setOrgLogo({ db, blobs: deps.adapters.platformBlobs }, user.id, orgId, c.req.valid("json")),
         200,
@@ -646,7 +697,9 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
-      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role);
+      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role, {
+        pubsub: deps.adapters.pubsub,
+      });
       return c.body(null, 204);
     },
   );
@@ -766,7 +819,13 @@ export function accountRoutes(deps: AppDeps) {
       request: { params: z.object({ token: z.string() }) },
       responses: { 200: json(z.object({ orgId: z.uuid() })), ...errors },
     }),
-    async (c) => c.json(await acceptInvitation(db, c.get("user"), c.req.valid("param").token), 200),
+    async (c) => {
+      const joined = await acceptInvitation(db, c.get("user"), c.req.valid("param").token);
+      await announceMembers(deps.adapters.pubsub, joined.orgId);
+      // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
+      await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);
+      return c.json(joined, 200);
+    },
   );
 
   return app;

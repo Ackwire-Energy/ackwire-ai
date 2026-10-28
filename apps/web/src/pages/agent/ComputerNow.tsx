@@ -45,9 +45,9 @@ export function ComputerNow() {
   const reader = useWaitReader();
   const setupWait = useSetupWait(view.setup, reader.held);
   const waiting = Boolean(f?.handoff && isWaitingHandoff(f.handoff));
-  // A request's minutes left move on too.
+  // A request's minutes left move on too. While the computer is on its way, the time every other line reads.
   const requestNow = useNow(waiting ? 15_000 : false);
-  const now = Math.max(requestNow, setupWait.now);
+  const now = setupWait.now ?? requestNow;
   // Only for whoever may watch it; nothing while that loads, never one edition's words before the other's.
   if (view.forbidden || !view.ready || !f) return null;
   const state = entryState(f, now);
@@ -78,10 +78,10 @@ export function ComputerNow() {
   return (
     <section className="cmp-entry" data-tone={tone} aria-label={t("agentComputer.title", g)}>
       <SkyStrip color={colorOf(agent)} moving={state.kind === "working"} />
-      <div className="cmp-entry__row">
+      <div className="cmp-entry__row ac-faceline">
         <ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />
         <span className="cmp-entry__t">
-          <b>{t("agentComputer.title", g)}</b>
+          <b className="ac-captop">{t("agentComputer.title", g)}</b>
           <span className="cmp-entry__line">
             {state.kind === "held" && <Icon name="pause" size={14} />}
             {state.kind === "problem" && <Icon name="alert" size={14} />}

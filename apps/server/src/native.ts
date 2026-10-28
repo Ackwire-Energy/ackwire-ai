@@ -31,6 +31,7 @@ import {
   PG_MAJOR,
   PGLITE_VERSION,
   PgMajorMismatchError,
+  pgliteUrl,
   restorePglite,
 } from "@agenteschat/db";
 import { envEntries, upsertEnv } from "@agenteschat/setup/src/lib";
@@ -65,9 +66,10 @@ const PACKAGE = resolve(import.meta.dir, "..", "..");
 const USAGE = `agentes-server ${version}: agentes.chat on this computer, with its database built in.
 
 Usage:
-  agentes-server [--data <folder>]
-      Runs agentes.chat until it's stopped (Ctrl-C). The folder (default ~/.agentes) keeps
-      everything; a new one gets its settings, in .env, the first time.
+  agentes-server [--data <folder>] [--until-stdin-ends]
+      Runs agentes.chat until it's stopped (Ctrl-C, or the end of stdin with --until-stdin-ends).
+      The folder (default ~/.agentes) keeps everything. A new one gets its settings, in .env, the
+      first time.
   agentes-server migrate [--data <folder>]
       Updates the database to this version, then exits.
   agentes-server db dump [--data <folder>] [--out <file>]
@@ -145,7 +147,7 @@ async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
   env.PUBLIC_URL ??= `http://127.0.0.1:${env.PORT}`;
   env.INSTALL_MODE ??= "native";
   env.WEB_DIR ??= join(PACKAGE, "web");
-  env.DATABASE_URL = `pglite://${files.db}`;
+  env.DATABASE_URL = pgliteUrl(files.db);
   env.FILES_DIR = files.files;
   env.HOST = "127.0.0.1";
   env.NODE_ENV = "production";
@@ -196,8 +198,32 @@ function lockFolder(dir: string): LockResult {
 const lockedMessage = (dir: string, pid: number) =>
   `Another agentes-server is using ${dir} (pid ${pid}). Stop it first, or use another folder (--data).`;
 
+/**
+ * `--until-stdin-ends` (the desktop app on Windows, which has no SIGTERM): the end of stdin stops the server the
+ * way SIGTERM does. The app closes it to stop the server, and it closes by itself when the app ends any other
+ * way, so the server never outlives it. An end before the server is up stops it once it is.
+ */
+function stopWhenStdinEnds(): { up: () => void } {
+  let ended = false;
+  let up = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    if (up) process.emit("SIGTERM");
+  };
+  process.stdin.on("end", end).on("close", end).on("error", end);
+  process.stdin.resume();
+  return {
+    up: () => {
+      up = true;
+      if (ended) process.emit("SIGTERM");
+    },
+  };
+}
+
 /** `agentes-server [--data <dir>]`: runs until SIGTERM or SIGINT (`startServer` drains and exits). */
-async function run(dir: string): Promise<number> {
+async function run(dir: string, untilStdinEnds = false): Promise<number> {
+  const stdin = untilStdinEnds ? stopWhenStdinEnds() : null;
   const files = nativeFiles(dir);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   // From the start: a service's own output may go nowhere (launchd), and this says why it stopped.
@@ -229,6 +255,7 @@ async function run(dir: string): Promise<number> {
       pgMajor: PG_MAJOR,
     })}\n`,
   );
+  stdin?.up();
   // Until a signal: startServer stops the server and exits.
   return new Promise<number>(() => {});
 }
@@ -414,7 +441,7 @@ async function runCommand(argv: string[]): Promise<number> {
   try {
     switch (command.join(" ")) {
       case "":
-        return await run(dir);
+        return await run(dir, values["until-stdin-ends"] === true);
       case "migrate":
         return await migrate(dir);
       case "db dump":
@@ -451,6 +478,7 @@ function parseCommand(argv: string[]) {
       out: { type: "string" },
       in: { type: "string" },
       help: { type: "boolean", short: "h" },
+      "until-stdin-ends": { type: "boolean" },
     },
   });
   return { command: values.help ? ["help"] : positionals, values };

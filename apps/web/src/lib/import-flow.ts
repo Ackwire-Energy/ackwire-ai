@@ -13,21 +13,53 @@ import { filesFromDrop } from "@/lib/obsidian";
 /** Items one apply may create or update (`IMPORT_LIMITS.perApply` in packages/engine/src/imports.ts). */
 export const PER_APPLY = 200;
 
-/** The source cards: every app the parsers read, then any other app (it exports with `EXPORT_PROMPT`). */
-export type ImportCard = ImportSource | "other";
-export const IMPORT_CARDS: ImportCard[] = [...IMPORT_SOURCES, "other"];
+/** Apps that answer `EXPORT_PROMPT`: the brand, and the `source.app` the prompt suggests it writes. */
+export const EXPORT_PROMPT_APPS = [
+  { name: "Grok Bot", app: "grok-bot" },
+  { name: "ChatGPT dots", app: "chatgpt-dots" },
+  { name: "Claude", app: "claude" },
+  { name: "Manus", app: "manus" },
+  { name: "Rakazo", app: "rakazo" },
+] as const;
+type PromptApp = (typeof EXPORT_PROMPT_APPS)[number]["app"];
 
 /**
- * Apps that answer `EXPORT_PROMPT`: the brand, the key of its step, and the
- * `source.app` the prompt suggests it writes.
+ * The source cards, the most used apps first, then our own export and any other app. Grok Bot and
+ * ChatGPT dots answer `EXPORT_PROMPT` on cards of their own. OpenBot has no card: its files are still
+ * read, and land on any other app's.
  */
-export const EXPORT_PROMPT_APPS = [
-  { name: "Grok Bot", step: "grokBot", app: "grok-bot" },
-  { name: "ChatGPT dots", step: "chatgptDots", app: "chatgpt-dots" },
-  { name: "Claude", step: "claude", app: "claude" },
-  { name: "Manus", step: "manus", app: "manus" },
-  { name: "Rakazo", step: "rakazo", app: "rakazo" },
-] as const;
+export const IMPORT_CARDS = [
+  "grok-bot",
+  "chatgpt-dots",
+  "openbotrun",
+  "openmausbot",
+  "hermes",
+  "openclaw",
+  "paperclip",
+  "agenteschat",
+  "other",
+] as const satisfies readonly (PromptApp | ImportSource | "other")[];
+export type ImportCard = (typeof IMPORT_CARDS)[number];
+/** The cards that show the export request to copy. */
+export type RequestCard = Extract<ImportCard, PromptApp | "other">;
+
+/** An app's own card, else any other app's. */
+const cardOf = (app: string): ImportCard => IMPORT_CARDS.find((c) => c === app) ?? "other";
+
+/**
+ * Each card's tile: the app's official mark (apps/web/public/brands/README.md), and the maker's own dark
+ * coloring where the mark would vanish on a dark theme.
+ */
+export const CARD_MARK: Record<Exclude<ImportCard, "other">, { icon: string; dark?: string }> = {
+  "grok-bot": { icon: "/brands/grok-bot.svg", dark: "/brands/grok-bot-dark.svg" },
+  "chatgpt-dots": { icon: "/brands/chatgpt-dots.svg" },
+  openbotrun: { icon: "/brands/openbotrun.svg" },
+  openmausbot: { icon: "/brands/openmausbot.svg" },
+  hermes: { icon: "/brands/hermes.svg", dark: "/brands/hermes-dark.svg" },
+  openclaw: { icon: "/brands/openclaw.svg" },
+  paperclip: { icon: "/brands/paperclip.svg", dark: "/brands/paperclip-dark.svg" },
+  agenteschat: { icon: "/favicon.svg" },
+};
 
 /**
  * The card and app name of a bundle. One in our format names its app in
@@ -38,10 +70,10 @@ export function bundleOrigin(bundle: MigrationBundle): { card: ImportCard; app: 
   const source = IMPORT_SOURCES.find((s) => s === bundle.source.app);
   if (!source) return { card: "other", app: null };
   if (source !== "agenteschat" || bundle.source.ref.startsWith("agenteschat:")) {
-    return { card: source, app: SOURCE_NAME[source] };
+    return { card: cardOf(source), app: SOURCE_NAME[source] };
   }
-  const declared = bundle.source.ref.split(":")[0];
-  return { card: "other", app: EXPORT_PROMPT_APPS.find((a) => a.app === declared)?.name ?? null };
+  const declared = EXPORT_PROMPT_APPS.find((a) => a.app === bundle.source.ref.split(":")[0]);
+  return { card: declared ? cardOf(declared.app) : "other", app: declared?.name ?? null };
 }
 
 /** A link the server reads (the route's rule): https on github.com or raw.githubusercontent.com. */

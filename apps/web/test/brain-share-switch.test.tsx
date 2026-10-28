@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AudienceMode, MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /*
@@ -23,14 +24,26 @@ const click = async (el: Element) => {
 const brainCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args[2]);
 
-/** Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does). */
-async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "" } = {}) {
+/**
+ * Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does).
+ * `stored`: whom she answers as stored, where the gate reads otherwise (on the Cloud, a plan answers only its owner).
+ */
+async function ada(
+  patch: Partial<AgentBrain>,
+  {
+    mine = true,
+    tab = "",
+    provider = "",
+    stored,
+  }: { mine?: boolean; tab?: string; provider?: string; stored?: AudienceMode } = {},
+) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
     agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
     agent.audience = { mode: patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
+    agent.audienceMode = stored ?? agent.audience.mode;
   }
   const api = createFakeApi(state);
   fakeMachinesOf.get(api)?.pair({
@@ -61,17 +74,23 @@ const brainDialog = async () => {
 const shareSwitch = (d: HTMLElement, name = /^Só responde a você/) => within(d).getByRole("switch", { name });
 
 describe("Só responde a você (Quem pensa)", () => {
-  test("on by default; off shows Anthropic's words, Manter keeps it, Responder a todos saves it with the terms", async () => {
+  test("on by default; off shows Claude's terms, Manter keeps it, Responder a todos saves it with the terms", async () => {
     const state = await ada({});
     const d = await brainDialog();
     const on = shareSwitch(d);
     expect(on.getAttribute("aria-checked")).toBe("true");
-    expect(d.textContent).toContain("Usa o seu plano. Os outros veem que a Ada só responde a você.");
+    // One line, its label and its ⓘ: what it means, the same on or off, describes the switch.
+    const meaning =
+      "Os outros veem que a Ada só responde a você. Sem isso, a Ada responde também a outras pessoas, com o seu plano.";
+    const hint = hintOf("Só responde a você", d);
+    expect(hint.text).toBe(meaning);
+    expect(on.getAttribute("aria-describedby")).toBe(hint.button.getAttribute("aria-describedby"));
+    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
 
     await click(on);
     let share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
     expect(share.textContent).toContain(
-      "A Anthropic diz que as assinaturas pessoais do Claude são para uso pessoal. Usar a sua para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+      "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
     );
     await click(within(share).getByRole("button", { name: "Manter só comigo" }));
     expect(screen().queryByRole("dialog", { name: "Agora a Ada responde a todos" })).toBeNull();
@@ -82,7 +101,8 @@ describe("Só responde a você (Quem pensa)", () => {
     share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
     await click(within(share).getByRole("button", { name: "Responder a todos" }));
     expect(shareSwitch(d).getAttribute("aria-checked")).toBe("false");
-    expect(d.textContent).toContain("Responde a outras pessoas com o seu plano.");
+    expect(hintOf("Só responde a você", d).text).toBe(meaning);
+    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([
@@ -118,7 +138,7 @@ describe("Só responde a você (Quem pensa)", () => {
     d = await brainDialog();
     await click(shareSwitch(d));
     expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "A Anthropic diz que cada assento do plano é de uma pessoa.",
+      "Os termos do Claude dizem que cada assento é de uma pessoa.",
     );
     cleanup();
     const glm: MachineAccount = {
@@ -155,7 +175,8 @@ describe("Só responde a você (Quem pensa)", () => {
     let d = await brainDialog();
     const locked = shareSwitch(d, /^Só responde a João/);
     expect(locked.hasAttribute("disabled")).toBe(true);
-    expect(d.textContent).toContain("Usa o plano de João: só João libera para outras pessoas.");
+    expect(hintOf("Só responde a João", d).text).toBe("Usa o plano de João: só João libera para outras pessoas.");
+    expect(shownText(d)).not.toContain("só João libera");
     cleanup();
     const state = await ada({ onlyOwner: false }, { mine: false });
     d = await brainDialog();
@@ -181,6 +202,21 @@ describe("Só responde a você (Quem pensa)", () => {
     await click(screen().getByRole("button", { name: "Liberar para todos" }));
     await settle(4);
     expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }, { onlyOwner: false }]);
+  });
+
+  test("on the Cloud, one shared before plans were personal answers everyone again on the API: no such notice", async () => {
+    const state = await ada({}, { stored: "everyone" });
+    const d = await brainDialog();
+    await click(
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
+        name: /^Modelo da organização/,
+      }),
+    );
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(document.body.textContent).not.toContain("ainda só responde a você");
+    expect(screen().queryByRole("button", { name: "Liberar para todos" })).toBeNull();
+    expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }]);
   });
 });
 

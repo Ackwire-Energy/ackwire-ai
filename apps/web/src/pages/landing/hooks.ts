@@ -1,5 +1,6 @@
 import { cx } from "@agenteschat/ui";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "@/lib/theme";
 import { useLanding } from "./context";
 
 /** `prefers-reduced-motion: reduce` (false where `matchMedia` is missing). */
@@ -13,16 +14,50 @@ export function readReducedMotion(): boolean {
   }
 }
 
+/**
+ * The landing's theme, also the help pages': dark unless the person picked light, and a toggle that keeps the pick.
+ * The page behind (`<html>`, the phone's status bar) takes `root`'s background, so no app-theme strip shows at the
+ * edges or in the scroll bounce; it gets the app's colors back on the way out.
+ */
+export function useLandingTheme(root: RefObject<HTMLElement | null>) {
+  const { preference, setPreference } = useTheme();
+  const [theme, setTheme] = useState<"light" | "dark">(preference === "light" ? "light" : "dark");
+  useEffect(() => {
+    const html = document.documentElement;
+    const bg = root.current ? getComputedStyle(root.current).backgroundColor : "";
+    const before = { bg: html.style.backgroundColor, scheme: html.style.colorScheme };
+    html.style.backgroundColor = bg;
+    html.style.colorScheme = theme;
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+    const colors = metas.map((m) => m.content);
+    for (const m of metas) if (bg) m.content = bg;
+    return () => {
+      html.style.backgroundColor = before.bg;
+      html.style.colorScheme = before.scheme;
+      metas.forEach((m, i) => {
+        m.content = colors[i] ?? m.content;
+      });
+    };
+  }, [root, theme]);
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    setPreference(next);
+  };
+  return { theme, toggleTheme };
+}
+
 export interface Run {
   /** False once a newer run started or the component unmounted. */
   alive(): boolean;
-  /** Waits (at most 60 ms with reduced motion). */
+  /** Waits; with reduced motion only until the browser's next task, so a script shows how it ends at once. */
   sleep(ms: number): Promise<void>;
 }
 
 /**
  * Cancellable async scripts (typing, work steps, the demo scenarios): `start`
- * cancels the previous one; `join` continues the current one.
+ * cancels the previous one; `join` continues the current one. A script that
+ * loops checks `reduced` itself: with reduced motion it holds still.
  */
 export function useRunner() {
   const { reduced } = useLanding();
@@ -34,7 +69,7 @@ export function useRunner() {
     };
   }, []);
   return useMemo(() => {
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, reduced ? Math.min(ms, 60) : ms));
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, reduced ? 0 : ms));
     const bind = (id: number): Run => ({ alive: () => gen.current === id, sleep });
     return {
       start(fn: (run: Run) => Promise<void> | void) {

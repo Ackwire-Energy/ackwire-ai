@@ -14,7 +14,7 @@ import {
   postPersonMessage,
   type RouterStrategy,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
@@ -88,12 +88,26 @@ test("Jev's recorded answers: the step and provider above 0.6, auto-open only at
   }
 });
 
+test("a key of a provider the catalog lists goes along with the step: Gemini", async () => {
+  const judge = createFakeJudge(
+    (_kind, id): JudgeAnswer =>
+      id === "intent"
+        ? { choice: "api_key", probabilities: { api_key: 0.95 } }
+        : { choice: "gemini", probabilities: { gemini: 0.93 } },
+  );
+  expect(await aiConnectIntent(judge, { orgId: "o", text: "vamos de gemini" })).toEqual({
+    intent: "api_key",
+    provider: "gemini",
+    autoOpen: true,
+  });
+});
+
 test("one calibrated request: the message, the five steps, the catalog's providers; usage as the router's", async () => {
   const bodies: { state: Record<string, unknown>; questions: Record<string, { criteria: Record<string, string> }> }[] =
     [];
   const usage: unknown[] = [];
   const judge = createJevJudge({
-    apiKey: "tk",
+    key: "tk",
     gateway: {
       recordExternalUsage: async (u) => {
         usage.push(u);
@@ -230,6 +244,9 @@ test("the organization has AI: the strategy decides, and nobody asks Jev about c
 test("only a plan on a computer and the LLM router: mention an agent (mention_needed), not no_ai", async () => {
   const fx = await setup({ judge: intentJudge });
   f = fx;
+  // Someone else in #general: a person alone with one agent would reach it by the rule.
+  const bruna = await addMember(fx.db, fx.org.id, "member", "Bruna");
+  await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, userId: bruna.id });
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, { name: "MacBook" });
   await fx.db
     .update(schema.agents)

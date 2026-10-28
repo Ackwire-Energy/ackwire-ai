@@ -23,7 +23,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { AccountKind, MachineAccount } from "./schemas";
+import { AccountKind, MachineAccount, PlanUsage } from "./schemas";
 import { SecretBox } from "./secrets";
 
 const tags = ["Connected computers"];
@@ -92,7 +92,7 @@ export function machineAccountRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "The computer's Claude Code and Codex accounts (the person who connected it, an admin, or anyone where nobody did)",
+        "The computer's Claude, ChatGPT and coding plan accounts (the person who connected it, an admin, or anyone where nobody did)",
       description:
         "Emails only of the caller's own accounts. Changes come as `machine.updated` org events with `accounts: true`.",
       request: { params: MachineParams },
@@ -162,7 +162,7 @@ export function machineAccountRoutes(deps: AppDeps) {
         limit: 10,
         windowMs: 15 * 60_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many sign-ins started; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many sign-ins started. Try again later.");
       const login = await beginAccountLogin(withHub(), userId, orgId, machineId, kind, accountId, email, provider);
       return c.json(login, 201);
     },
@@ -251,6 +251,15 @@ export function machineAccountRoutes(deps: AppDeps) {
                     description:
                       "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
                   }),
+                  own: z
+                    .object({
+                      claude_code: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
+                      codex: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
+                    })
+                    .openapi({
+                      description:
+                        "Each CLI's own sign-in there (\"this computer's account\"), on a computer the caller connected: its plan and usage when known.",
+                    }),
                 }),
               ),
             })

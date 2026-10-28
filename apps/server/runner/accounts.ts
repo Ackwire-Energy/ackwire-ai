@@ -106,7 +106,7 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
   claude_code:
     "The Claude account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   codex:
-    "The Codex account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+    "The ChatGPT account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
@@ -119,6 +119,22 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
   for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
   env[ENV_VAR[kind]] = dir;
   return env;
+}
+
+/**
+ * Routes (`brain-route.ts`) running in this process, by sign-in (`signInKey`). A turn or a task about to start a
+ * CLI on a sign-in stops the route there first (`yieldRoute`): two processes on one sign-in race on its refresh token.
+ */
+export const routesRunning = new Map<string, { stop: AbortController; done: Promise<unknown> }>();
+
+/** A sign-in: its account folder, or the computer's own (`home` absent). */
+export const signInKey = (kind: AccountKind, home?: string | null) => `${kind}:${home ?? "own"}`;
+
+/** Stops the route running on that sign-in, if any, and resolves once its CLI has exited. */
+export async function yieldRoute(kind: AccountKind, home?: string | null): Promise<void> {
+  const route = routesRunning.get(signInKey(kind, home));
+  route?.stop.abort();
+  await route?.done.catch(() => {});
 }
 
 /** A key account's plan and key, in its folder (mode 600). */
@@ -500,7 +516,7 @@ export class AccountManager {
     if (!provider && running >= SIGN_INS_AT_ONCE) {
       throw new RunnerError(
         "bad_request",
-        "Too many sign-ins are in progress on this computer; try again in a few minutes",
+        "Too many sign-ins are in progress on this computer. Try again in a few minutes.",
       );
     }
     const dir = this.dirOf(kind, loginId);
@@ -515,7 +531,7 @@ export class AccountManager {
         throw new RunnerError("bad_request", "This sign-in already exists");
       }
       if ((await this.list().catch(() => [])).length >= MAX_MACHINE_ACCOUNTS) {
-        throw new RunnerError("bad_request", "This computer already has too many accounts; remove one first");
+        throw new RunnerError("bad_request", "This computer already has too many accounts. Remove one first.");
       }
     }
     // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
@@ -708,7 +724,10 @@ export class AccountManager {
   private async keepKey(login: Login, provider: PlanId, key: string) {
     const plan = planOf(provider);
     if (!plan || !key || key.length > MAX_KEY_CHARS || !planKeyFits(plan, key)) {
-      throw new RunnerError("bad_request", `That doesn't look like a ${plan?.label ?? "plan"} key; copy the whole key`);
+      throw new RunnerError(
+        "bad_request",
+        `That doesn't look like a ${plan?.label ?? "plan"} key. Copy the whole key.`,
+      );
     }
     const file = path.join(login.dir, PROVIDER_FILE);
     const tmp = `${file}.${process.pid}.tmp`;
@@ -763,7 +782,7 @@ export class AccountManager {
 
   private expire(login: Login) {
     if (login.state !== "waiting") return;
-    this.settle(login, "expired", "The sign-in took too long; start again");
+    this.settle(login, "expired", "The sign-in took too long. Start again.");
     void this.drop(login);
     this.log(`account sign-in ${login.id.slice(0, 8)} expired`);
   }

@@ -1,25 +1,25 @@
 import { useComputerSetup, useMachines, useMe } from "@agenteschat/client";
 import {
   etaLine,
-  etaTickMs,
   promisesEmail,
   SETUP_STEPS,
   type SetupView,
   setupEta,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
+  useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
-import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, ProviderLogo, SheetScreen, Text } from "@/ui";
-import { useColors, useNow, useOrgId } from "../shared/hooks";
+import { useOrg, useOrgMaybe } from "@/providers/org";
+import { Button, Icon, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
+import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
 
@@ -30,21 +30,34 @@ export function useSetupView(): SetupView | null {
 }
 
 /**
- * The time left now, repainted every 15 s (every 5 s under a minute), and whether "we'll email you" holds for
- * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too.
+ * The workspace a wait is read about: `orgId` (the first run's, made before one is chosen in the app), else the
+ * one chosen. `name` stands in until `me` lists it.
  */
-export function useSetupWait(view: SetupView | null) {
-  const { org } = useOrg();
-  const email = useMe().data?.user.email ?? "";
+export interface WaitWorkspace {
+  orgId: string;
+  name: string;
+}
+
+/**
+ * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds for
+ * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too. `now`:
+ * that clock's time, while it waits. `org`: the workspace's name.
+ */
+export function useSetupWait(view: SetupView | null, workspace?: WaitWorkspace) {
+  const chosen = useOrgMaybe();
+  const me = useMe().data;
+  const orgId = workspace?.orgId ?? chosen?.orgId;
+  const org = me?.organizations.find((o) => o.id === orgId) ?? (orgId === chosen?.orgId ? chosen?.org : null);
   const live = view && setupPending(view) && org?.standing?.state !== "hold" ? view : null;
-  const now = useNow(live ? etaTickMs(setupEta(live, Date.now())) : 60_000);
+  const now = useEtaNow(live !== null);
   return {
-    now,
+    now: live ? now : null,
     /** Lines about the wait show (not ready, not on hold). */
     live: live !== null,
     eta: live ? setupEta(live, now) : null,
     emailed: live !== null && org?.role === "owner" && promisesEmail(live, now),
-    email,
+    email: me?.user.email ?? "",
+    org: org?.name ?? workspace?.name ?? "",
   };
 }
 
@@ -64,11 +77,11 @@ function Steps({ n, total }: { n: number; total: number }) {
   );
 }
 
-function Line({ icon, leading, text }: { icon?: IconName; leading?: ReactNode; text: string }) {
+function Line({ icon, text }: { icon: IconName; text: string }) {
   const c = useColors();
   return (
     <View style={styles.line}>
-      {leading ?? (icon ? <Icon name={icon} size={16} color={c.muted} /> : null)}
+      <LineIcon variant="small" name={icon} size={16} color={c.muted} />
       <Text variant="small" tone="muted" style={styles.grow}>
         {text}
       </Text>
@@ -77,32 +90,37 @@ function Line({ icon, leading, text }: { icon?: IconName; leading?: ReactNode; t
 }
 
 /**
- * The workspace's computer on its way, as the web's preparing screen: the server's portrait, "Preparando o
- * computador da Acme", the steps ("Passo 3 de 4 · Instalando os programas") or why it waits, the time left, who
- * hears when it's ready (owners, by email), the agent that waits for it, the plans and the size. Ready: its
- * name and that the agents work on it.
+ * The workspace's computer on its way, as the web's preparing screen: the server's portrait, "Computador da Acme"
+ * with its ⓘ (one user per agent), the steps ("Passo 3 de 4 · Instalando os programas") or why it waits, the time
+ * left, who hears when it's ready (owners, by email) and the size. `said`: the screen's header names the computer
+ * and says where it is, so the name and a line that would only say it again stay out.
  */
 export function SetupWait({
   view,
-  agentName,
   online = false,
+  workspace,
+  said = false,
 }: {
   view: SetupView;
-  agentName?: string;
   online?: boolean;
+  /** The first run's workspace (no workspace is chosen in the app yet). */
+  workspace?: WaitWorkspace;
+  said?: boolean;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const wait = useSetupWait(view);
-  const orgName = org?.name ?? "";
-  const pending = setupPending(view);
+  const wait = useSetupWait(view, workspace);
+  const name = t("computerSetup.title", { org: wait.org });
   return (
     <View style={styles.wait}>
       <View style={styles.head}>
         <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, online)} size={96} />
-        <Text variant="title" style={styles.center}>
-          {pending ? t("computerSetup.notice.title", { org: orgName }) : t("computerSetup.title", { org: orgName })}
-        </Text>
+        {said ? null : (
+          <InfoHint name={t("common.about", { label: name })} text={t("computerSetup.users")} variant="title" center>
+            <Text variant="title" style={styles.center}>
+              {name}
+            </Text>
+          </InfoHint>
+        )}
         {view.step ? (
           <>
             <Steps n={view.stepNumber} total={SETUP_STEPS.length} />
@@ -110,7 +128,7 @@ export function SetupWait({
               {t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
             </Text>
           </>
-        ) : (
+        ) : said && statusRestatesChip(view) ? null : (
           <Text variant="small" tone="muted" style={styles.center}>
             {t(view.textKey)}
           </Text>
@@ -127,12 +145,7 @@ export function SetupWait({
           text={wait.emailed ? t("computerSetup.email.you", { email: wait.email }) : t("computerSetup.email.here")}
         />
       ) : null}
-      {agentName && pending ? (
-        <Line icon="clock" text={t("computerSetup.agentWaiting", agentGrammar(t, agentName))} />
-      ) : null}
-      <Line leading={<ProviderLogo id="claude_code" size="xs" />} text={t("computerSetup.plans")} />
       {view.specs ? <Line icon="server" text={t("computerSetup.specs", view.specs)} /> : null}
-      <Line icon="agent" text={t("computerSetup.users")} />
     </View>
   );
 }
@@ -152,8 +165,9 @@ export function ComputerSetupSheet({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * On Conversas while the workspace's own computer is being prepared, in the outage notices' style: "Preparando
- * o computador da Acme" and the time left (or where it is). It opens the whole wait in a sheet. Everyone sees it.
+ * On Conversas while the workspace's own computer is on its way, in the outage notices' style: "Preparando o
+ * computador da Acme" (in line, its name alone) and the time left (or where it is). It opens the whole wait in a
+ * sheet. Everyone sees it.
  */
 export function SetupNotice() {
   const { t } = useTranslation();
@@ -163,8 +177,8 @@ export function SetupNotice() {
   const view = useSetupView();
   const wait = useSetupWait(view);
   if (!setupPending(view)) return null;
-  const title = t("computerSetup.notice.title", { org: org?.name ?? "" });
-  const line = setupNoticeLine(t, view, wait.eta);
+  const title = t(setupNoticeTitleKey(view), { org: org?.name ?? "" });
+  const line = setupNoticeLine(t, view, wait.eta, wait.emailed);
   return (
     <View style={styles.list}>
       <Pressable

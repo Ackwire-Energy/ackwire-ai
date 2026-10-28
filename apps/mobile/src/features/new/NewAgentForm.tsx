@@ -3,7 +3,7 @@ import { handleFrom } from "@agenteschat/client/lib/text";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { AgentAvatar, Button, Icon, SheetScreen, Sky, systemText, Text, useToast } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, SheetScreen, Sky, Text, useToast } from "@/ui";
 import { FIRST_AGENT_EXAMPLES } from "../chats/examples";
 import { NEWBORN } from "../chats/Greeting";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -50,7 +50,8 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
     <SheetScreen>
       <SheetHeader title={t("mobile.agents.new")} />
       <View style={styles.sky}>
-        <Sky color={NEWBORN.color} depth={0.9} style={StyleSheet.absoluteFill} />
+        {/* Blends into the sheet's grouped gray: on the default (white) it drew a box under the header. */}
+        <Sky color={NEWBORN.color} depth={0.9} surface="grouped" style={StyleSheet.absoluteFill} />
         <AgentAvatar agent={NEWBORN} size={72} />
       </View>
       <Text variant="display2" style={styles.question} accessibilityRole="header">
@@ -80,7 +81,8 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
         ))}
       </View>
       <View style={[styles.field, surface]}>
-        <Text variant="subhead" tone="faint" style={styles.bold}>
+        {/* The field's size: a smaller label centered beside it sat higher than the name typed. */}
+        <Text variant="body" tone="faint" style={styles.bold}>
           {t("mobile.new.name")}
         </Text>
         <TextInput
@@ -95,9 +97,6 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
           style={[styles.input, { color: c.ink }]}
         />
       </View>
-      <Text variant="footnote" tone="faint" style={styles.fine}>
-        {t("mobile.new.agent.fine")}
-      </Text>
       <Button
         variant="primary"
         wide
@@ -140,6 +139,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 4,
   },
-  input: { flex: 1, paddingVertical: 12, ...systemText("body") },
-  fine: { marginHorizontal: 6 },
+  input: { flex: 1, paddingVertical: 12, ...fieldText("body") },
 });

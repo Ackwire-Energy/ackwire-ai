@@ -11,8 +11,10 @@ import {
   type ThreadFollowEvent,
   type ThreadInfo,
 } from "@agenteschat/client";
+import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { AppState } from "react-native";
 import { useConnection, useOrgId } from "./hooks";
 
 /**
@@ -38,6 +40,9 @@ export function useUserEvents() {
         if (event.type === "notification.upserted") {
           void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
           void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+          // Its sound (ADR 0070); the push covers the app in the background.
+          const sound = soundForNotification(event.notification, AppState.currentState !== "active");
+          if (sound) playSound(sound);
         }
       }
       // "Seguir" changed on one of your devices.

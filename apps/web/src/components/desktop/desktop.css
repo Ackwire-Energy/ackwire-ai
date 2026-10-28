@@ -4,7 +4,6 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  --screen-bg: #1f2128;
 }
 /* The desktop's own shape (1280×900, `DESKTOP_SIZE`): noVNC scales it inside, the panel never jumps. */
 .dsk-screen {
@@ -24,30 +23,72 @@
 .dsk-screen.is-control canvas {
   cursor: auto;
 }
-.dsk-foot .brw-ac__row {
-  flex-wrap: nowrap;
+/* The last picture, held over the watching connection while a hand back opens it (`holdPicture`): only a picture. */
+.dsk-screen > .dsk-still {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
-.dsk-notice {
-  flex: 1;
+/*
+ * In control the person's keys and pastes go here, a text field nobody sees, not to noVNC's canvas
+ * (`useScreenKeys`). 16px: iOS zooms into a smaller field when it takes focus.
+ */
+.dsk-keys {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 16px;
+}
+/*
+ * In control, in the steps' line's place under the screen and as tall (13px text on a 22px line): the keys, and
+ * what programs there can see. A phone's Keyboard button leads it with no baseline to share (a button's is its
+ * icon's bottom edge, about 4 px under its label's), so the words' first line is centred on the button, a touch
+ * control as tall as `--control-h-md`.
+ */
+.dsk-line {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 13px;
+  line-height: 22px;
+}
+.dsk-line > .ac-btn ~ * {
+  margin-top: calc((var(--control-h-md) - 22px) / 2);
+}
+/* What the clipboard just did, for a moment in the line's words' place, as a toast would say it. */
+.dsk-said {
+  color: var(--ink);
+}
+.dsk-said.is-error > .ac-icon {
+  color: var(--danger);
+}
+/* What the computer copied when the browser kept it out of the person's clipboard, with Copy: one line, cut to fit. */
+.dsk-got {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
 }
-.dsk-copied {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--control-r-md);
-  background: var(--sunken);
+.dsk-got > * {
+  flex: none;
 }
-.dsk-copied .small {
-  flex: 1;
+.dsk-got > q {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-}
-@media (max-width: 640px) {
-  .dsk-foot .brw-ac__row {
-    flex-wrap: wrap;
-  }
+  text-overflow: ellipsis;
 }

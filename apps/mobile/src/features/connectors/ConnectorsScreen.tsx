@@ -1,8 +1,9 @@
 import { type ConnectorDef, useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
-import { connectedItems } from "@agenteschat/client/lib/connected";
+import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
-import { useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -12,15 +13,17 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { openConnection } from "./ConnectionScreen";
 import { ConnectorIcon } from "./ConnectorIcon";
-import { AddressSheet, ConnectSheet } from "./ConnectSheet";
+import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
 import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, suggestionsOf } from "./logic";
 
 /**
  * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
- * brand's tone, then every service as even tiles in two columns, filtered by category. A tile opens a sheet
- * over the gallery with the whole flow in three steps: what agents could do → connect → who uses it.
+ * brand's tone, then every service as even tiles in two columns, filtered by category. A service not connected
+ * opens a sheet over the gallery with the flow in four steps: what agents could do → connect → its tools → who
+ * uses it; a connection opens its own screen (who uses it, its tools, disconnecting).
  */
 export function ConnectorsScreen() {
   return (
@@ -53,7 +56,6 @@ function Gallery() {
     [connections.data, servers.data, catalog.data],
   );
   const name = (d: ConnectorDef) => connectorName(t, d);
-  const connected = useMemo(() => list.filter((d) => connectionOf(d, items)), [list, items]);
   const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
   const searching = q.trim().length > 0;
   const rest = useMemo(() => {
@@ -62,7 +64,30 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
-  const open = (def: ConnectorDef) => sheet.open(<ConnectSheet def={def} />);
+  const open = (def: ConnectorDef) => {
+    const existing = connectionOf(def, items);
+    if (existing) openConnection(existing.id);
+    else sheet.open(<ConnectSheet def={def} />);
+  };
+  // A connection opens its own screen (a server connected by an address we don't know included).
+  const openItem = (item: ConnectedItem) => openConnection(item.id);
+  // Back from a sign-in that finished on the link route (`?connected=<id>`): its tools, as the web opens
+  // "O que faz" for the connection that just came in (admins; anyone else had the toast).
+  const { connected } = useLocalSearchParams<{ connected?: string }>();
+  const returned = useRef<string | null>(null);
+  useEffect(() => {
+    if (!connected || returned.current === connected || !connections.data || !servers.data || !catalog.data) return;
+    returned.current = connected;
+    const item = items.find((i) => i.id === connected);
+    if (!item || !admin) return;
+    sheet.open(
+      item.def ? (
+        <ConnectSheet def={item.def} item={item} start="review" fresh />
+      ) : (
+        <ServerSheet item={item} start="review" fresh />
+      ),
+    );
+  }, [connected, connections.data, servers.data, catalog.data, items, admin, sheet]);
 
   return (
     <PushedLargeTitle
@@ -96,21 +121,22 @@ function Gallery() {
         </View>
       ) : (
         <>
-          {searching ? null : connected.length > 0 ? (
+          {searching ? null : items.length > 0 ? (
             <>
               <SectionHeader title={t("mobile.connectors.connected")} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-                {connected.map((d) => (
+                {/* Every connection, servers connected by their address included (oldest first, as on the web). */}
+                {items.map((item) => (
                   <Pressable
-                    key={d.id}
-                    onPress={() => open(d)}
+                    key={item.id}
+                    onPress={() => openItem(item)}
                     accessibilityRole="button"
-                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: name(d) })}
+                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
                     style={styles.mini}
                   >
-                    <ConnectorIcon def={d} label={name(d)} size={48} check />
+                    <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size={48} check />
                     <Text variant="caption" tone="muted" numberOfLines={1}>
-                      {name(d)}
+                      {itemName(t, item)}
                     </Text>
                   </Pressable>
                 ))}
@@ -144,7 +170,7 @@ function Gallery() {
             </View>
           ) : null}
           {rest.length === 0 ? (
-            <EmptyState title={t("mobile.connectors.noResults")} />
+            <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
               {rest.map((d) => (
@@ -176,23 +202,34 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
       <View style={styles.faces}>
         {faces.map((a, i) => (
           <View key={a.id} style={i > 0 ? styles.overlap : undefined}>
-            <AgentFace agentId={a.id} size={30} live={false} />
+            <AgentFace agentId={a.id} size={34} live={false} />
           </View>
         ))}
       </View>
-      <View style={styles.grow}>
+      <View style={styles.hintText}>
         <Text variant="body" style={styles.bold}>
           {t("mobile.connectors.empty")}
         </Text>
         <Text variant="small" tone="muted">
           {t("mobile.connectors.emptySub")}
         </Text>
+        {admin ? (
+          // Under the text, spelled out: beside it, it squeezed the text into a narrow column; a globe alone
+          // didn't say it connects a service by its MCP address.
+          <Pressable
+            onPress={onAddress}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.connectors.addressTitle")}
+            hitSlop={6}
+            style={styles.byAddress}
+          >
+            <Icon name="globe" size={15} color={c.muted} />
+            <Text variant="small" style={styles.bold}>
+              {t("mobile.connectors.byAddress")}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
-      {admin ? (
-        <Pressable onPress={onAddress} accessibilityRole="button" accessibilityLabel={t("mobile.connectors.address")}>
-          <Icon name="globe" size={20} color={c.muted} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -307,13 +344,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // A column: the team's faces on top, then the line, its text and "Pelo endereço" (in a row the faces
+  // took a third of the width and the text wrapped into a narrow block).
   empty: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    gap: 10,
     marginHorizontal: 16,
     marginTop: 8,
-    padding: 14,
+    padding: 16,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -321,6 +358,8 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  hintText: { gap: 2 },
+  byAddress: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 8 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {

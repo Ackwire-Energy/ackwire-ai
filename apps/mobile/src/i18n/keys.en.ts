@@ -34,20 +34,29 @@ export const mobileEn: MobileTranslations = {
       backTo: "Back to {{host}}",
       now: "Now on {{host}}",
       invalid: "Check the address, something like agentes.yourteam.ts.net.",
-      unreachable: "We can't reach {{host}}. If it's on Tailscale, open the Tailscale app, connect and try again.",
+      unreachable: "We can't reach {{host}}. Check the address and your connection, and try again.",
+      unreachableTailscale:
+        "We can't reach {{host}}. It's on Tailscale: open the Tailscale app, connect and try again.",
       certificate: "The certificate of {{host}} isn't valid. Talk to whoever runs the server.",
       notAgentes: "{{host}} isn't an agentes.chat server. Check the address.",
       serverTooOld: "{{host}} needs an update to work with this app.",
       appTooOld: "Update the agentes app to use {{host}}.",
+      down: {
+        line: "{{host}} didn't answer.",
+        text: "It may be down or outside your network. The app opens on its own once it's back.",
+      },
     },
     connect: {
-      question: "Connect the app to this server?",
-      questionSignIn: "Sign in to this server with your account from the computer?",
+      title: "Connect to this server?",
+      titleSignIn: "Sign in with the computer's account?",
+      on: "Server: {{host}}",
       leave: "You'll be signed out of the current account on this phone.",
       confirm: "Connect",
       checking: "Checking the server…",
       notALink: "This link isn't from an agentes.chat server.",
       tokenFailed: "The code expired or was already used. Sign in with your email, or show a new code on the computer.",
+      signInSlow:
+        "Signing in is taking longer than it should. Sign in with your email, or show a new code on the computer.",
     },
     scan: {
       hint: "Point at the QR code on the computer.",
@@ -66,7 +75,7 @@ export const mobileEn: MobileTranslations = {
   },
   account: {
     deleteSoleOwner:
-      "You're the only owner of an organization with other members. Hand the organization to someone before deleting your account.",
+      "You're the only owner of an organization with other members. On the website, in People, make someone else an owner, then come back.",
     deleteFailed: "Couldn't delete your account right now. Try again.",
     deleted: "Your account was deleted.",
     signedOut: "You signed out.",
@@ -79,6 +88,21 @@ export const mobileEn: MobileTranslations = {
   push: {
     channel: "Alerts",
     channelDescription: "What's waiting for you, mentions and conversations.",
+    ask: {
+      title: "Know when an agent needs you",
+      text: "They work while you do something else. We'll tell you when they need your ok, finish what you asked or call you.",
+      on: "Turn on notifications",
+      later: "Not now",
+      done: "Notifications on",
+      failed: "Couldn't turn on notifications. Try again in You › Notifications.",
+      someone: "An agent",
+      examples: "Examples of notifications",
+      now: "now",
+      minutes: "{{n}} min",
+      approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
+      finished: { title: "{{name}} is done", body: "What you asked for is ready." },
+      mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
+    },
   },
   a11y: {
     agent: "{{name}}, agent",

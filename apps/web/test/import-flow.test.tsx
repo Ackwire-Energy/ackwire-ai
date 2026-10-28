@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -99,6 +99,40 @@ const row = (title: string) => {
   return found as HTMLElement;
 };
 const chipOf = (title: string) => row(title).querySelector(".imp-row__chip")?.textContent;
+/** A line led by an icon that `.ac-iconline` puts on the line's first row. */
+const iconLine = (line: Element | null) =>
+  !!line?.classList.contains("ac-iconline") && !!line.firstElementChild?.matches("svg.ac-icon");
+/** What an app given `EXPORT_PROMPT` writes, naming itself `app`. */
+const exportReply = (app: string, name: string) => ({
+  format: "agenteschat.bundle",
+  version: 1,
+  source: { app, ref: "my-bots", name, files: [] },
+  agents: [
+    {
+      key: "news",
+      name: "Newsy",
+      handle: "news",
+      role: "Notícias do dia",
+      instructions: "Resume as notícias do dia em cinco tópicos.",
+      model: null,
+      appearance: {},
+      skills: [],
+    },
+  ],
+  skills: [],
+  channels: [],
+  routines: [],
+  notes: [],
+  todo: [],
+  leftOut: [],
+});
+/** A reply pasted in the link field as an app answers in its chat: some words, then the JSON in a code block. */
+const pasteReply = async (reply: object) => {
+  const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
+  const pasted = `Aqui está:\n\`\`\`json\n${JSON.stringify(reply, null, 2)}\n\`\`\``;
+  await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
+  await settle(10);
+};
 /** `imports.apply` answering with `plan` for the dry run (and the default fake otherwise). */
 const withPlan = (api: ApiClient, state: State, plan: (input: ImportInput) => ImportItemResult[]) => {
   const fake = api.imports.apply;
@@ -113,7 +147,7 @@ const withPlan = (api: ApiClient, state: State, plan: (input: ImportInput) => Im
 };
 
 describe("Configurações → Importar e exportar", () => {
-  test("admins find it in the nav; the export downloads the bundle and says what it carries and never carries", async () => {
+  test("admins find it in the nav; the export downloads the bundle, says in one line what never goes, and links the rest", async () => {
     const saved: [string, string][] = [];
     fileSaver.save = (url, name) => saved.push([url, name]);
     await go();
@@ -121,15 +155,18 @@ describe("Configurações → Importar e exportar", () => {
     expect(within(nav).getByRole("link", { name: "Importar e exportar" }).getAttribute("aria-current")).toBe("page");
     expect(screen().getByRole("heading", { level: 2, name: "Importar e exportar" })).toBeTruthy();
 
+    // The import card's title alone: the page's subtitle says what importing is for.
+    const imports = screen().getByRole("region", { name: "Importar" });
+    expect(imports.querySelector(".ac-card__sub")).toBeNull();
+
     const card = screen().getByRole("region", { name: "Exportar este workspace" });
-    const carries = within(card).getByRole("region", { name: "Vai no arquivo" }).textContent ?? "";
-    for (const what of ["Agentes", "Skills", "Canais públicos", "Rotinas agendadas", "memória"]) {
-      expect(carries).toContain(what);
-    }
-    const never = within(card).getByRole("region", { name: "Nunca vai" }).textContent ?? "";
-    for (const what of ["Chaves de API e senhas", "Conectores e logins", "Computadores", "canais privados"]) {
-      expect(never).toContain(what);
-    }
+    expect(card.querySelector(".ac-card__sub, ul, .ac-card__foot")).toBeNull();
+    // Whoever shares the file needs to know what never goes in it: one line. The full list is on the help page.
+    expect(card.querySelector(".imp-note")?.textContent).toBe("Nunca leva chaves, senhas, logins nem conversas.");
+    const whatsIn = within(card).getByRole("link", { name: "O que vai no arquivo" });
+    expect(whatsIn.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#export");
+    expect(whatsIn.className).toBe("ac-link ac-link--muted");
+    expect([whatsIn.getAttribute("target"), whatsIn.getAttribute("rel")]).toEqual(["_blank", "noopener noreferrer"]);
     await click(within(card).getByRole("button", { name: "Baixar o arquivo" }));
     expect(saved).toHaveLength(1);
     expect(saved[0]?.[0]).toBe(`/api/app/organizations/${ORG_ID}/export`);
@@ -145,12 +182,130 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().queryByRole("region", { name: "Exportar este workspace" })).toBeNull();
   });
 
+  test("the most used apps first, each by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
+    const device = domWindow().happyDOM.settings.device;
+    const logos = () =>
+      [...document.querySelectorAll(".imp-source")].map((card) => [
+        card.querySelector(".ac-option__title")?.textContent,
+        card.querySelector(".imp-mark img")?.getAttribute("src") ?? null,
+      ]);
+    try {
+      // The system is dark, but the app is set to light: the light files.
+      device.prefersColorScheme = "dark";
+      localStorage.setItem("agentes.theme", "light");
+      await go();
+      expect(logos()).toEqual([
+        ["Grok Bot", "/brands/grok-bot.svg"],
+        ["ChatGPT dots", "/brands/chatgpt-dots.svg"],
+        ["OpenBot.run", "/brands/openbotrun.svg"],
+        ["OpenMausBot", "/brands/openmausbot.svg"],
+        ["Hermes Agent", "/brands/hermes.svg"],
+        ["OpenClaw", "/brands/openclaw.svg"],
+        ["Paperclip", "/brands/paperclip.svg"],
+        ["Exportação do agentes.chat", "/favicon.svg"],
+        // It names many apps: no one maker's logo fits.
+        ["Outro app", null],
+      ]);
+      cleanup();
+      // The app set to dark: Grok Bot, Hermes and Paperclip by their dark files, the others read on both.
+      localStorage.setItem("agentes.theme", "dark");
+      await go();
+      expect(logos()).toEqual([
+        ["Grok Bot", "/brands/grok-bot-dark.svg"],
+        ["ChatGPT dots", "/brands/chatgpt-dots.svg"],
+        ["OpenBot.run", "/brands/openbotrun.svg"],
+        ["OpenMausBot", "/brands/openmausbot.svg"],
+        ["Hermes Agent", "/brands/hermes-dark.svg"],
+        ["OpenClaw", "/brands/openclaw.svg"],
+        ["Paperclip", "/brands/paperclip-dark.svg"],
+        ["Exportação do agentes.chat", "/favicon.svg"],
+        ["Outro app", null],
+      ]);
+    } finally {
+      device.prefersColorScheme = "light";
+      localStorage.removeItem("agentes.theme");
+    }
+  });
+
+  test("the picker: each app by its mark and name alone; the lock line keeps what matters, the rest in its ⓘ", async () => {
+    await go();
+    expect(document.querySelector(".imp-source .ac-option__desc")).toBeNull();
+    expect(button("OpenClaw").textContent).toBe("OpenClaw");
+    expect(document.querySelector(".imp-drop__area")?.textContent).toBe(
+      "Solte aqui a pasta, o arquivo ou o .zipou clique para escolher",
+    );
+    // Read before anything is dropped, by whoever is about to drop a folder that holds keys.
+    const lock = document.querySelector(".imp-pick > .imp-note") as HTMLElement;
+    expect(iconLine(lock)).toBe(true);
+    expect(lock.querySelector(".ac-hintline > span")?.textContent).toBe(
+      "Lido no seu navegador. Arquivos de chaves e de login nunca são abertos.",
+    );
+    // Named by its subject, so a screen reader doesn't read the line's sentence a second time.
+    const about = within(lock).getByRole("button", { name: "Sobre Privacidade" });
+    const more = "Um link do GitHub passa pelo servidor do workspace. Nada muda aqui até você confirmar.";
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(more);
+    await click(about, 2);
+    expect(screen().getByRole("tooltip").textContent).toBe(more);
+  });
+
+  test("its notes and lists lead each line with an icon on the line's first row", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // The import leaves the routine out, so the report lists what didn't come.
+    const fake = api.imports.apply;
+    api.imports = {
+      ...api.imports,
+      apply: async (orgId, input) => {
+        const { items } = await fake(orgId, input);
+        if (input.dryRun) return { items };
+        const left = (i: ImportItemResult): ImportItemResult => ({
+          ...i,
+          action: "skip",
+          reason: "schedule_unsupported",
+        });
+        return { items: items.map((i) => (i.kind === "routine" ? left(i) : i)) };
+      },
+    };
+    await go(state, api);
+    const seen: [string, Element[]][] = [];
+    const take = (...selectors: string[]) => {
+      for (const s of selectors) seen.push([s, [...document.querySelectorAll(s)]]);
+    };
+    take(".imp-note");
+    await click(button(/^OpenClaw$/), 1);
+    take(".imp-tip");
+    await pick("Pasta para importar", folder("paperclip-company"));
+    take(".imp-note", ".imp-todo li");
+    await click(button(/^Importar \d+ itens/), 8);
+    take(".imp-missed li");
+    for (const [selector, lines] of seen) {
+      expect([selector, lines.length > 0]).toEqual([selector, true]);
+      for (const line of lines) expect([selector, iconLine(line)]).toEqual([selector, true]);
+    }
+  });
+
+  test("on a phone the link field stacks over Read and keeps its own height, as tall as Read", async () => {
+    const css = (await Bun.file(new URL("../src/components/import-flow.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("@media (max-width: 640px) {")[1]?.split("\n}")[0] ?? "";
+    expect(phone).toMatch(/\.imp-paste \{\s*flex-direction: column;/);
+    // A column's flex: 1 would size the field's height from nothing (27px of text under a 40px Read).
+    expect(css).toMatch(/\n\.imp-paste \.ac-input \{[^}]*flex: 1;/);
+    expect(phone).toMatch(/\.imp-paste \.ac-input \{\s*flex: none;/);
+  });
+
   test("a folder is recognized and planned on the server; unchecking an agent holds back what needs it; Importar applies and reports", async () => {
     const { state } = await go();
-    // Every source has a card with where its file is; the drop zone reads any of them.
-    for (const name of ["OpenClaw", "Hermes Agent", "OpenBot.Run", "Paperclip", "OpenMausBot", "OpenBot"]) {
-      expect(button(new RegExp(`^${name.replace(".", "\\.")} `))).toBeTruthy();
+    // Each app the parsers read has a card with where its file is, but OpenBot, which few use: the drop zone reads
+    // any of them, and the help behind Outro app says where OpenBot's files are.
+    for (const name of ["OpenBot.run", "OpenMausBot", "Hermes Agent", "OpenClaw", "Paperclip"]) {
+      expect(button(new RegExp(`^${name.replace(".", "\\.")}$`))).toBeTruthy();
     }
+    expect(screen().queryByRole("button", { name: /^OpenBot$/ })).toBeNull();
+    await click(button(/^OpenBot\.run$/), 1);
+    expect(text()).toContain("Solte o openbot-import.json");
     await click(button(/^Exportação do agentes\.chat/), 1);
     expect(text()).toContain("Configurações → Importar e exportar → Baixar o arquivo");
 
@@ -298,6 +453,7 @@ describe("Configurações → Importar e exportar", () => {
     await go(state, api);
     await pick("Arquivos para importar", [fixture("sales-desk.openmaus.json")]);
     expect(text()).toContain("Tudo isso já está aqui.");
+    expect(iconLine(document.querySelector(".imp-apply__none"))).toBe(true);
     expect(screen().queryByRole("button", { name: /^Importar \d/ })).toBeNull();
 
     action = "skip";
@@ -307,7 +463,7 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().queryByRole("button", { name: /^Importar \d/ })).toBeNull();
   });
 
-  test("Outro app: the export request to copy, where each app answers, and a pasted reply read at once", async () => {
+  test("Outro app: the export request to copy, a link to where each app answers, and a pasted reply read at once", async () => {
     const writes: string[] = [];
     let copyWorks = false;
     Object.defineProperty(navigator, "clipboard", {
@@ -323,46 +479,64 @@ describe("Configurações → Importar e exportar", () => {
     await click(button(/^Outro app/), 2);
     const other = screen().getByRole("region", { name: "Peça para o outro app exportar" });
     expect((within(other).getByLabelText("Pedido de exportação") as HTMLTextAreaElement).value).toBe(EXPORT_PROMPT);
-    for (const app of ["Grok Bot", "ChatGPT dots", "Claude", "Manus", "Rakazo"])
-      expect(other.textContent).toContain(app);
+    // Where each app puts its file is on the help page, one link under the request.
+    expect(other.querySelector("dl")).toBeNull();
+    const where = within(other).getByRole("link", { name: "Onde cada app entrega" });
+    expect(where.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#other-apps");
+    expect(where.className).toBe("ac-link ac-link--muted");
 
     await click(within(other).getByRole("button", { name: "Copiar o pedido" }), 2);
     expect(within(other).getByRole("status").textContent).toContain("Não deu para copiar.");
     copyWorks = true;
     await click(within(other).getByRole("button", { name: "Copiar o pedido" }), 2);
     expect(writes).toEqual([EXPORT_PROMPT]);
-    expect(within(other).getByRole("status").textContent).toBe("Copiado. Agora é só colar no outro app.");
+    expect(within(other).getByRole("button", { name: "Copiado" })).toBeTruthy();
+    expect(within(other).getByRole("status").textContent).toBe("Agora é só colar no outro app.");
 
-    const reply = {
-      format: "agenteschat.bundle",
-      version: 1,
-      source: { app: "grok-bot", ref: "my-bots", name: "Minhas automações", files: [] },
-      agents: [
-        {
-          key: "news",
-          name: "Newsy",
-          handle: "news",
-          role: "Notícias do dia",
-          instructions: "Resume as notícias do dia em cinco tópicos.",
-          model: null,
-          appearance: {},
-          skills: [],
-        },
-      ],
-      skills: [],
-      channels: [],
-      routines: [],
-      notes: [],
-      todo: [],
-      leftOut: [],
-    };
-    const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
-    const pasted = `Aqui está:\n\`\`\`json\n${JSON.stringify(reply, null, 2)}\n\`\`\``;
-    await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
-    await settle(10);
+    await pasteReply(exportReply("claude", "Minhas automações"));
     expect(screen().getByRole("heading", { name: "Minhas automações" })).toBeTruthy();
-    expect(text()).toContain("Veio do Grok Bot");
+    expect(text()).toContain("Veio do Claude");
+    expect(document.querySelector(".imp-head .imp-mark img")).toBeNull();
     expect(screen().getByRole("checkbox", { name: "Trazer Newsy" }).getAttribute("aria-checked")).toBe("true");
+    await click(button("Trocar arquivo"), 2);
+    expect(button(/^Outro app/).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("Grok Bot and ChatGPT dots: the same request in each app's own words, and a reply lands on its own card", async () => {
+    await go();
+    await click(button("Grok Bot"), 2);
+    const grok = screen().getByRole("region", { name: "Peça para o seu bot exportar" });
+    expect([...grok.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Copie o pedido abaixo.",
+      "Cole na conversa com o seu bot.",
+      "Ele responde com o JSON: copie a resposta inteira e cole no campo de baixo.",
+    ]);
+    expect((within(grok).getByLabelText("Pedido de exportação") as HTMLTextAreaElement).value).toBe(EXPORT_PROMPT);
+    // Its steps say where: the help page's list is for any other app.
+    expect(within(grok).queryByRole("link")).toBeNull();
+
+    await click(button("ChatGPT dots"), 2);
+    const dots = screen().getByRole("region", { name: "Peça para o seu dot exportar" });
+    expect([...dots.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Copie o pedido abaixo.",
+      "Cole num chat novo.",
+      "Baixe o arquivo que ele criar e solte aqui.",
+    ]);
+    expect((within(dots).getByLabelText("Pedido de exportação") as HTMLTextAreaElement).value).toBe(EXPORT_PROMPT);
+
+    // A Grok Bot reply pasted with any card picked: from Grok Bot, by its logo, and its card picked after.
+    await click(button(/^Outro app/), 2);
+    await pasteReply(exportReply("grok-bot", "Minhas automações"));
+    expect(text()).toContain("Veio do Grok Bot");
+    expect(document.querySelector(".imp-head .imp-mark img")?.getAttribute("src")).toBe("/brands/grok-bot.svg");
+    await click(button("Trocar arquivo"), 2);
+    expect(button("Grok Bot").getAttribute("aria-pressed")).toBe("true");
+
+    // The file a dot makes, dropped.
+    const file = new File([JSON.stringify(exportReply("chatgpt-dots", "Meu dot"))], "agentes-chat-export.json");
+    await drop({ files: [file], items: [] });
+    expect(text()).toContain("Veio do ChatGPT dots");
+    expect(document.querySelector(".imp-head .imp-mark img")?.getAttribute("src")).toBe("/brands/chatgpt-dots.svg");
   });
 
   test("what went wrong says what to do next, with Tentar de novo only where trying again helps", async () => {
@@ -395,7 +569,10 @@ describe("Configurações → Importar e exportar", () => {
 
     await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => "oi, tudo bem?" } }));
     await settle(6);
-    expect(alert()).toContain("Não reconhecemos esse texto. Cole a resposta inteira do outro app");
+    // No card named: Grok Bot, ChatGPT dots and Outro app each show the request.
+    expect(alert()).toContain(
+      "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou copie o pedido de novo e peça outra vez.",
+    );
 
     fail = new ApiError(500, "internal", "boom");
     await pick("Arquivos para importar", [fixture("sales-desk.openmaus.json")]);

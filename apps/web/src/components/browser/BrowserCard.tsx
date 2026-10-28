@@ -30,7 +30,17 @@ import {
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
-import { Button, FilterToggle, Icon, type IconName, Input, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  FilterToggle,
+  Icon,
+  type IconName,
+  onScreenKeyboard,
+  onScreenNow,
+  PixelSpinner,
+  SkyStrip,
+  Textarea,
+} from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import {
   type KeyboardEvent,
@@ -45,7 +55,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useStreams } from "@/realtime/context";
-import { DialogHead, FullButton, useDialogHead } from "../computer/head";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
@@ -261,10 +271,11 @@ export function Cover({
   help?: ReactNode;
   action?: ReactNode;
 }) {
+  const box = useRef<HTMLSpanElement>(null);
   return (
     <div className={sky ? "brw-dim brw-dim--sky" : "brw-dim"}>
-      {sky && <ComputerSky color={color} />}
-      <span className="brw-dim__box" role="status">
+      {sky && <ComputerSky color={color} clear={() => [box.current]} />}
+      <span className="brw-dim__box" role="status" ref={box}>
         {art}
         <span className="brw-dim__row">
           {spinner ? <PixelSpinner size={16} color={color} /> : icon && <Icon name={icon} size={16} />}
@@ -327,6 +338,7 @@ export function BrowserCard({
   const dir = useDirectory(org.id);
   const toast = useToast();
   const head = useDialogHead();
+  const sayFailed = useSayFailed();
   const openComputer = useOpenComputer();
   // The workspace's own computer is never off and nobody connects one: its words say so.
   const cloud = useComputerEdition(org.id) === "cloud";
@@ -361,7 +373,7 @@ export function BrowserCard({
   useEffect(() => {
     const el = root.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)));
+    const io = new IntersectionObserver((entries) => setVisible(onScreenNow(entries) === true));
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -405,7 +417,7 @@ export function BrowserCard({
   const [note, setNote] = useState("");
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
-  const backRef = useRef<HTMLInputElement>(null);
+  const backRef = useRef<HTMLTextAreaElement>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
@@ -547,7 +559,7 @@ export function BrowserCard({
     setText("");
   };
 
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
+  const didntWork = () => sayFailed(t("browser.live.actionFailed"));
 
   /** Pronto (a request) or Devolver (a take over), with what the person wants the agent to know. */
   const finish = () => {
@@ -560,7 +572,7 @@ export function BrowserCard({
         fold();
         onSettled?.();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
   };
 
@@ -575,7 +587,7 @@ export function BrowserCard({
           fold();
           onSettled?.();
         },
-        onError: failedToast,
+        onError: didntWork,
       },
     );
   };
@@ -590,9 +602,8 @@ export function BrowserCard({
         else if (h.runId && place) rememberHeldPlace({ runId: h.runId, agentId, ...place });
       },
       onError: (err) =>
-        toast.show(
+        sayFailed(
           (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
-          "error",
         ),
     });
   };
@@ -606,7 +617,7 @@ export function BrowserCard({
         if (onFold) toast.show(t("browser.machine.stopped", g));
         fold();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
 
   /** A site typed in the address bar: the card waits for its first frame. */
@@ -731,19 +742,20 @@ export function BrowserCard({
               ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
               : t("browser.live.watchOnly");
   const live_ = working && !blocker && !closed;
-  // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold).
-  const surfaceSub =
-    inControl || otherInControl || reconnecting
-      ? sub
-      : blocker
+  // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold). Over a cover
+  // it says nothing the cover says (opening, reconnecting): only who holds the page.
+  const surfaceSub = inControl
+    ? sub
+    : otherInControl
+      ? hidden
+        ? t("desktop.sub.hidden", { person: controllerName })
+        : sub
+      : blocker || reconnecting || (open && starting) || opening
         ? ""
-        : (open && starting) || opening
-          ? t("agentComputer.sub.opening")
-          : closed
-            ? t("browser.watch.live")
-            : (head?.watching ?? sub);
+        : closed
+          ? t("browser.watch.live")
+          : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
-  const fullLabel = full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
   const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
 
   // Watching: Assumir (a labelled, tactile button) and Parar (quiet, with a confirmation), never a lone red square.
@@ -754,7 +766,7 @@ export function BrowserCard({
     !blocker &&
     canTakeOver && (
       <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
-        {t("desktop.takeover")}
+        <span className="cmp-act-label">{t("desktop.takeover")}</span>
       </Button>
     )
   ) : confirmStop ? (
@@ -797,13 +809,14 @@ export function BrowserCard({
         <Button
           size="sm"
           variant="ghost"
+          {...(surface ? { icon: "block" as const, className: "cmp-couldnt ac-btn--glyph" } : {})}
           onClick={() => {
             setOpen(true);
             setHandingBack(false);
             setFailing(true);
           }}
         >
-          {surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}
+          <span className="cmp-act-label">{surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}</span>
         </Button>
       )}
       {!handingBack && (
@@ -817,7 +830,7 @@ export function BrowserCard({
             setHandingBack(true);
           }}
         >
-          {handBackLabel}
+          <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
     </>
@@ -837,15 +850,12 @@ export function BrowserCard({
   const cover = blocker ? (
     <Cover color={color} text={blocker} />
   ) : hidden ? (
-    <Cover
-      color={color}
-      icon="eyeOff"
-      text={t("browser.live.otherInControl", { name: controllerName })}
-      help={t("browser.inCard.hiddenHelp", g)}
-    />
+    // Its head says who is in control.
+    <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
   ) : closed ? (
     <Cover
       color={color}
+      sky
       icon="globe"
       text={t("browser.inCard.closed", g)}
       help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
@@ -939,17 +949,7 @@ export function BrowserCard({
                 {t("desktop.seeWhole")}
               </Button>
             )}
-            {!blocker && (
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon={full ? "close" : "external"}
-                aria-label={fullLabel}
-                title={fullLabel}
-                onClick={() => setFull((v) => !v)}
-              />
-            )}
+            {!blocker && <FullScreenButton full={full} onToggle={() => setFull((v) => !v)} />}
             {!full && (
               <Button
                 size="sm"
@@ -1018,7 +1018,7 @@ export function BrowserCard({
                 {steps.slice(-5).map((s, i, all) => {
                   const now = i === all.length - 1 && s.running;
                   return (
-                    <li key={s.id} className={now ? "is-now" : undefined}>
+                    <li key={s.id} className={now ? "ac-iconline is-now" : "ac-iconline"}>
                       {now ? <PixelSpinner size={14} color={color} /> : <Icon name={iconOf(s.tool)} size={14} />}
                       <span>{stepText(t, s)}</span>
                       {s.since && <small>{formatTime(i18n.language, new Date(s.since).toISOString())}</small>}
@@ -1041,10 +1041,12 @@ export function BrowserCard({
                   ))}
                 </div>
                 <Textarea
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={t("browser.live.failPlaceholder")}
-                  rows={2}
                   maxLength={900}
                 />
                 <div className="brw-ac__row">
@@ -1058,10 +1060,15 @@ export function BrowserCard({
                 </div>
               </div>
             ) : handingBack ? (
-              // Pronto or Devolver: an optional word to the agent, which it reads as the person's own.
+              // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on one line that
+              // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
+              // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
               <div className="brw-ac__foot brw-ac__fail">
                 <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
-                <Input
+                <Textarea
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
                   ref={backRef}
                   value={backNote}
                   onChange={(e) => setBackNote(e.target.value)}
@@ -1069,10 +1076,10 @@ export function BrowserCard({
                   aria-label={t("browser.inCard.backLabel", g)}
                   maxLength={1000}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      finish();
-                    } else if (e.key === "Escape") setHandingBack(false);
+                    if (e.key === "Escape") setHandingBack(false);
+                    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                    e.preventDefault();
+                    finish();
                   }}
                 />
                 <div className="brw-ac__row">

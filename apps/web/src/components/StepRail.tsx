@@ -1,4 +1,5 @@
 import { Icon } from "@agenteschat/ui";
+import { useLayoutEffect, useRef } from "react";
 
 export interface RailStep {
   id: string;
@@ -36,9 +37,28 @@ export function StepRail({
   doneLabel: string;
   optionalLabel?: string;
 }) {
+  // A step bar wider than its screen (a phone's) scrolls sideways to keep the current step in sight, as the step
+  // changes and as the window narrows; the page itself never scrolls for it.
+  const strip = useRef<HTMLOListElement>(null);
+  useLayoutEffect(() => {
+    const ol = strip.current;
+    if (!ol) return;
+    const reveal = () => {
+      const step = ol.children[current]?.getBoundingClientRect();
+      const box = ol.getBoundingClientRect();
+      if (!step) return;
+      if (step.right > box.right) ol.scrollLeft += step.right - box.right;
+      else if (step.left < box.left) ol.scrollLeft -= box.left - step.left;
+    };
+    reveal();
+    if (typeof ResizeObserver === "undefined") return;
+    const resized = new ResizeObserver(reveal);
+    resized.observe(ol);
+    return () => resized.disconnect();
+  }, [current]);
   return (
     <nav aria-label={label}>
-      <ol className="onb__steps">
+      <ol className="onb__steps" ref={strip}>
         {steps.map((s, i) => {
           const done = s.done && i !== current;
           const sub =

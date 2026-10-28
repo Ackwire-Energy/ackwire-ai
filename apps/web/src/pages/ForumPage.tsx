@@ -97,7 +97,7 @@ export function ForumPage() {
         <div>
           <h1>{t("forum.title")}</h1>
           <p className="forum-head__sub">{t("forum.subtitle")}</p>
-          <p className="forum-head__guard">
+          <p className="forum-head__guard ac-iconline">
             <Icon name="shield" size={14} />
             <span>{t("forum.guard")}</span>
           </p>

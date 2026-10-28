@@ -1,6 +1,7 @@
 import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { InfoHint } from "./InfoHint";
 import { SkyGlow } from "./PixelSky";
 
 /** Neutral card (`surface-raised` + `line`). State never tints it: use a Chip. */
@@ -13,29 +14,44 @@ export function Card({
   return <Tag className={cx("ac-card", padded && "ac-card--padded", className)} {...rest} />;
 }
 
-/** A card's head: the icon on a key, the title (an `h2`, with `id` for `aria-labelledby`), a quiet line and an action. */
+/**
+ * A card's head: the icon on a key, the title (an `h2`, with `id` for `aria-labelledby`), an ⓘ hint after it, a
+ * quiet line and an action.
+ */
 export function CardHeader({
   icon,
   title,
   subtitle,
   action,
   id,
+  hint,
 }: {
   icon?: IconName;
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
   id?: string;
+  /** What the card is for (plain sentences), behind an ⓘ after the title. */
+  hint?: { name: string; text: ReactNode };
 }) {
+  const heading = <h2 id={id}>{title}</h2>;
   return (
-    <div className="ac-card__head">
+    <div className={cx("ac-card__head", icon && "ac-iconline")}>
       {icon && (
         <span className="ac-card__key" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
       )}
       <div className="ac-card__heading">
-        <h2 id={id}>{title}</h2>
+        {/* Beside the h2, never in it: the heading's name stays the title alone. */}
+        {hint ? (
+          <span className="ac-hintline">
+            {heading}
+            <InfoHint name={hint.name}>{hint.text}</InfoHint>
+          </span>
+        ) : (
+          heading
+        )}
         {subtitle && <p className="ac-card__sub">{subtitle}</p>}
       </div>
       {action && <span className="ac-card__action">{action}</span>}
@@ -46,7 +62,7 @@ export function CardHeader({
 /** Help text at the bottom of a card, in a well ("O contexto da org entra antes destas instruções"). */
 export function CardFooter({ children, icon = "info" }: { children: ReactNode; icon?: IconName | null }) {
   return (
-    <p className="ac-card__foot">
+    <p className={cx("ac-card__foot", icon && "ac-iconline")}>
       {icon && <Icon name={icon} size={14} />}
       <span>{children}</span>
     </p>
@@ -135,7 +151,7 @@ export function Alert({
   return (
     <p
       role={tone === "danger" ? "alert" : "status"}
-      className={cx("ac-alert", tone === "neutral" && "ac-alert--neutral", className)}
+      className={cx("ac-alert ac-iconline", tone === "neutral" && "ac-alert--neutral", className)}
     >
       <Icon name="alert" />
       <span>{children}</span>

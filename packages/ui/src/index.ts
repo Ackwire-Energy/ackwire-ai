@@ -64,7 +64,6 @@ export {
   type AvatarKind,
   type AvatarProps,
   AvatarStack,
-  initialsOf,
 } from "./components/Avatar";
 export {
   BRAIN_ICONS,
@@ -151,7 +150,8 @@ export {
   type TrackSize,
   trackItemAt,
 } from "./components/ForumPixels";
-export { Kbd, modKey } from "./components/Kbd";
+export { InfoHint, type InfoHintProps } from "./components/InfoHint";
+export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
@@ -178,6 +178,7 @@ export { OptionList, type OptionListItem, type OptionListProps } from "./compone
 export {
   PixelDone,
   type PixelDoneProps,
+  PixelFail,
   PixelStop,
   type PixelStopProps,
   pixelCell,
@@ -192,6 +193,8 @@ export {
   type PixelSpinnerSize,
 } from "./components/PixelSpinner";
 export {
+  limitOffers,
+  type OfferAccount,
   PLAN_ALMOST,
   PlanMeter,
   type PlanMeterText,
@@ -202,7 +205,12 @@ export {
   planWindows,
 } from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
-export { ProviderLogo, type ProviderLogoProps } from "./components/ProviderLogo";
+export {
+  ProviderLogo,
+  type ProviderLogoProps,
+  ProviderStack,
+  type ProviderStackProps,
+} from "./components/ProviderLogo";
 export {
   modeOf,
   monthlyKindOf,
@@ -270,6 +278,13 @@ export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Token, TokenList } from "./components/Token";
 export {
+  ToolBlock,
+  type ToolBlockHead,
+  type ToolBlockItem,
+  type ToolBlockLine,
+  type ToolBlockState,
+} from "./components/ToolBlock";
+export {
   FilterToggle,
   type FilterToggleProps,
   SearchField,
@@ -291,6 +306,7 @@ export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./comp
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
+export { hoverPointer, onScreenKeyboard, onScreenNow } from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,
@@ -312,7 +328,9 @@ export {
   type TextEdit,
   wrapSelection,
 } from "./format";
+export { useNow } from "./hooks/useNow";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
+export { initialsOf } from "./names";
 export {
   BUSINESS_DAYS,
   nextOccurrences,
@@ -341,10 +359,21 @@ export {
 export { selectionSkyUrl } from "./sky/selection";
 export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./sky/tones";
 export {
+  cloudAt,
+  HEADER_AREA,
+  headerField,
+  type SkyHour,
+  skyHourOf,
+  starAt,
+  workspaceInk,
+  workspaceTones,
+} from "./sky/workspace";
+export {
   allZones,
   cityOf,
   FALLBACK_ZONES,
   filterZones,
+  isEuropeanTimeZone,
   offsetLabel,
   offsetMinutes,
   parseOffsetQuery,

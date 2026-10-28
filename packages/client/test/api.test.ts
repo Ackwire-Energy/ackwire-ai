@@ -55,6 +55,23 @@ describe("requester", () => {
     await request("/x", { query: { a: 1, b: undefined, c: null, d: "z" } }).catch(() => {});
     expect(calls[0]?.url).toBe("/x?a=1&d=z");
   });
+
+  test("the bot check's token rides only on the calls that carry one", async () => {
+    const { fetch, calls } = fakeFetch({
+      "POST /api/app/sign-in-options": { status: 200, body: { account: false } },
+      "POST /api/app/invitations/tok/code": { status: 202, body: { email: "a@x.com", resendIn: 60 } },
+      "POST /api/waitlist": { status: 202, body: { ok: true } },
+    });
+    const api = createHttpApi({ fetch });
+    await api.account.signInOptions({ email: "a@x.com" }, "tok-1");
+    await api.invites.sendCode("tok", { email: "a@x.com" }, "tok-2");
+    await api.waitlist.join({ email: "a@x.com", locale: "en" }, "tok-3");
+    await api.account.signInOptions({ email: "a@x.com" });
+    const header = (c: Call) => (c.init.headers as Record<string, string>)["x-captcha-response"];
+    expect(calls.map(header)).toEqual(["tok-1", "tok-2", "tok-3", undefined]);
+    // Never in the body.
+    expect(calls.every((c) => !String(c.init.body).includes("tok-"))).toBe(true);
+  });
 });
 
 describe("transport options (the phone app)", () => {
@@ -532,8 +549,16 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
       [`${org}/connectors/custom`]: { status: 200, body: { servers: [] } },
       [`POST ${org}/connectors/custom`]: { status: 200, body: { status: "needs_key" } },
       [`PUT ${org}/connectors/custom/s1/tools`]: { status: 200, body: { id: "s1" } },
-      [`POST ${org}/invite-links`]: { status: 201, body: { url: "https://x/invite/t", expiresAt: "t" } },
+      [`POST ${org}/invite-links`]: { status: 201, body: { id: "l1", url: "https://x/invite/t", expiresAt: "t" } },
+      [`GET ${org}/invite-links`]: { status: 200, body: { links: [{ id: "l1", url: null }] } },
+      [`DELETE ${org}/invite-links/l1`]: { status: 204 },
+      "POST /api/app/invitations/tok/requests": { status: 201, body: { status: "pending", email: "a@x.com" } },
+      "POST /api/app/invitations/tok/code": { status: 202, body: { email: "a@x.com", resendIn: 60 } },
+      "POST /api/app/invitations/tok/code/check": { status: 200, body: { verified: true } },
       "POST /api/app/invitations/tok/request-new": { status: 204 },
+      [`GET ${org}/join-requests`]: { status: 200, body: { requests: [{ id: "r1" }] } },
+      [`POST ${org}/join-requests/r1/approve`]: { status: 200, body: { outcome: "joined" } },
+      [`POST ${org}/join-requests/r1/deny`]: { status: 204 },
     });
     const api = createHttpApi({ fetch });
     expect((await api.calendar.range("o1", "2026-10-12", "2026-10-19")).events).toEqual([]);
@@ -546,8 +571,24 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     });
     await api.customConnectors.saveTools("o1", "s1", { label: "x", tools: [] });
     expect((await api.invites.createLink("o1")).url).toBe("https://x/invite/t");
+    expect(await api.invites.links("o1")).toEqual([expect.objectContaining({ id: "l1", url: null })]);
+    await api.invites.turnOff("o1", "l1");
+    expect(await api.invites.sendCode("tok", { email: "a@x.com" })).toEqual({ email: "a@x.com", resendIn: 60 });
+    expect(await api.invites.checkCode("tok", { email: "a@x.com", code: "123456" })).toEqual({ verified: true });
+    expect((await api.invites.ask("tok", { name: "Ana", email: "a@x.com", code: "123456" })).status).toBe("pending");
     await api.invites.requestNew("tok");
-    expect(calls.every((c) => c.init.method === "GET" || c.init.body !== undefined)).toBe(true);
+    expect(await api.joinRequests.list("o1")).toEqual([expect.objectContaining({ id: "r1" })]);
+    expect(await api.joinRequests.approve("o1", "r1", "admin")).toEqual({ outcome: "joined" });
+    await api.joinRequests.deny("o1", "r1", "Not now");
+    const sent = (path: string) => calls.find((c) => c.url === path && c.init.method === "POST")?.init.body;
+    expect(sent(`${org}/join-requests/r1/approve`)).toBe('{"role":"admin"}');
+    expect(sent(`${org}/join-requests/r1/deny`)).toBe('{"reason":"Not now"}');
+    expect(sent("/api/app/invitations/tok/requests")).toBe('{"name":"Ana","email":"a@x.com","code":"123456"}');
+    expect(sent("/api/app/invitations/tok/code/check")).toBe('{"email":"a@x.com","code":"123456"}');
+    // Writes carry JSON (the server's CSRF rule); a DELETE needs no body.
+    expect(calls.every((c) => ["GET", "DELETE"].includes(String(c.init.method)) || c.init.body !== undefined)).toBe(
+      true,
+    );
   });
 });
 
@@ -593,5 +634,51 @@ describe("phone app endpoints", () => {
       "GET",
       "DELETE",
     ]);
+  });
+});
+
+describe("push devices (ADR 0035, ADR 0071)", () => {
+  test("a browser's subscription and a phone's token share the route; the key is null when Web Push is off", async () => {
+    const endpoint = "https://push.example/send/abc?x=1";
+    const { fetch, calls } = fakeFetch({
+      "GET /api/app/push/web": { status: 200, body: { publicKey: "BPk" } },
+      "POST /api/app/push/devices": { status: 204 },
+      "POST /api/app/push/devices/forget": { status: 204 },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.push.webKey()).toBe("BPk");
+    await api.push.register({ platform: "web", endpoint, keys: { p256dh: "p", auth: "a" }, locale: "pt-BR" });
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({
+      platform: "web",
+      endpoint,
+      keys: { p256dh: "p", auth: "a" },
+      locale: "pt-BR",
+    });
+    await api.push.register({ platform: "ios", token: "ExponentPushToken[abcdefgh12345]", locale: "en" });
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({
+      platform: "ios",
+      token: "ExponentPushToken[abcdefgh12345]",
+      locale: "en",
+    });
+    // Forgotten by a body, not a path: an endpoint's encoded slashes don't survive every proxy.
+    await api.push.unregister(endpoint);
+    expect(calls.at(-1)?.url).toBe("/api/app/push/devices/forget");
+    expect(calls.at(-1)?.init.method).toBe("POST");
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({ token: endpoint });
+
+    const off = fakeFetch({
+      "GET /api/app/push/web": { status: 404, body: { error: { code: "web_push_off", message: "Off" } } },
+    });
+    expect(await createHttpApi({ fetch: off.fetch }).push.webKey()).toBeNull();
+  });
+
+  test("stale: the ids go in, the server's stale ones come back (clear on read)", async () => {
+    const { fetch, calls } = fakeFetch({
+      "POST /api/app/push/stale": { status: 200, body: { stale: ["n2"] } },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.push.stale(["n1", "n2"])).toEqual(["n2"]);
+    expect(calls.at(-1)?.init.method).toBe("POST");
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({ ids: ["n1", "n2"] });
   });
 });

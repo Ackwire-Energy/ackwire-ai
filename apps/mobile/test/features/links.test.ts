@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { agentDmOf, chatHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
+import {
+  chatHref,
+  computerReadyHref,
+  hrefForPush,
+  hrefFromUrl,
+  notificationHref,
+  routineHref,
+} from "../../src/features/links/logic";
 import { notification } from "./fixtures";
 
 describe("deep links", () => {
@@ -21,6 +28,19 @@ describe("deep links", () => {
     expect(hrefFromUrl("agenteschat://chat")).toBeNull();
     expect(hrefFromUrl("agenteschat://settings/x")).toBeNull();
     expect(hrefFromUrl("agenteschat://chat/abc?thread=<script>")).toBe("/chat/abc");
+    expect(hrefFromUrl("agenteschat://join-requests")).toBe("/join-requests");
+    expect(hrefFromUrl("/join-requests/")).toBe("/join-requests");
+    expect(hrefFromUrl("agenteschat://join")).toBeNull();
+  });
+
+  test("Rotinas and a routine", () => {
+    expect(hrefFromUrl("agenteschat://routines")).toBe("/routines");
+    expect(hrefFromUrl("agenteschat://routines/r-1")).toBe("/routines/r-1");
+    expect(hrefFromUrl("/routines/r1/")).toBe("/routines/r1");
+    expect(hrefFromUrl("agenteschat://routines/<script>")).toBeNull();
+    expect(routineHref("r1")).toBe("/routines/r1");
+    expect(routineHref(undefined)).toBe("/routines");
+    expect(routineHref("../x")).toBe("/routines");
   });
 });
 
@@ -34,6 +54,9 @@ describe("push payloads", () => {
   test("messages open their conversation and thread", () => {
     expect(hrefForPush({ kind: "mention", channelId: "c1", threadId: "t1" })).toBe("/chat/c1?thread=t1");
     expect(hrefForPush({ kind: "dm", channelId: "d1" })).toBe("/chat/d1");
+  });
+  test("someone asking to join opens the requests (never answered from the push)", () => {
+    expect(hrefForPush({ kind: "join_request", orgId: "o1", notificationId: "n1" })).toBe("/join-requests");
   });
   test("anything else opens Atividade", () => {
     expect(hrefForPush({ kind: "forum_turn" })).toBe("/activity");
@@ -54,6 +77,10 @@ describe("inbox items", () => {
     ).toBe("/chat/c1?thread=t1");
     expect(notificationHref(notification({ id: "n", kind: "dm", source: { dmId: "d1" } }))).toBe("/chat/d1");
   });
+  test("a request to join opens the requests, whoever asked", () => {
+    const n = notification({ id: "n", kind: "join_request", actors: [], count: 3, source: { label: "Alves Studio" } });
+    expect(notificationHref({ ...n, latest: { title: "Ana Souza" } })).toBe("/join-requests");
+  });
   test("issues and the forum have no screen in the app", () => {
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", channelId: "c1" } })),
@@ -61,30 +88,48 @@ describe("inbox items", () => {
     expect(notificationHref(notification({ id: "n", kind: "forum_turn", source: { topicId: "f1" } }))).toBeNull();
   });
 
-  test("routines: what one found opens the agent's message; its trouble opens the agent's DM", () => {
-    const atlas = [{ type: "agent" as const, id: "atlas" }];
+  test("routines: what one found opens the agent's message; its trouble opens the routine (as on the web)", () => {
+    const dev = [{ type: "agent" as const, id: "dev" }];
     const finished = notification({
       id: "n",
       kind: "routine_finished",
-      actors: atlas,
+      actors: dev,
       source: { routineId: "r1", channelId: "c1", messageId: "m1" },
     });
     expect(notificationHref(finished)).toBe("/chat/c1");
     expect(notificationHref({ ...finished, source: { ...finished.source, threadId: "t1" } })).toBe(
       "/chat/c1?thread=t1",
     );
-    const dms = [
-      { channelId: "d-ada", with: { type: "agent" as const, id: "ada", name: "Ada", handle: "ada" } },
-      { channelId: "d-atlas", with: { type: "agent" as const, id: "atlas", name: "Atlas", handle: "atlas" } },
-    ];
+    // What it found without a message to open: the routine.
+    expect(notificationHref({ ...finished, source: { routineId: "r1", channelId: "c1" } })).toBe("/routines/r1");
     for (const kind of ["routine_failed", "routine_paused", "routine_stalled"] as const) {
-      const n = notification({ id: "n", kind, actors: atlas, source: { routineId: "r1", channelId: "c1" } });
-      expect(notificationHref(n, agentDmOf(dms))).toBe("/chat/d-atlas");
-      // No DM with it yet: the agent, whose page opens the conversation.
-      expect(notificationHref(n)).toBe("/agent/atlas");
+      const n = notification({ id: "n", kind, actors: dev, source: { routineId: "r1", channelId: "c1" } });
+      expect(notificationHref(n)).toBe("/routines/r1");
+      // Without the routine's id, Rotinas itself.
+      expect(notificationHref({ ...n, source: { channelId: "c1" } })).toBe("/routines");
     }
-    expect(agentDmOf(undefined)("atlas")).toBeNull();
-    // Without an agent behind it, there is nowhere to go.
-    expect(notificationHref(notification({ id: "n", kind: "routine_paused", source: { routineId: "r1" } }))).toBeNull();
+  });
+});
+
+describe("the workspace's computer is ready", () => {
+  const noAi = { any: false, agents: [{ agentId: "a1", state: "no_ai" as const }] };
+  const someAi = { any: true, agents: [{ agentId: "a1", state: "ready" as const }] };
+
+  test("Connect an AI, saying it's ready, while no agent has an AI; else the computer's wait", () => {
+    expect(computerReadyHref(noAi)).toBe("/connect-ai?ready=1");
+    expect(computerReadyHref(someAi)).toBe("/computer-setup");
+    // No agents yet, or the status not known: nothing to connect for, the computer.
+    expect(computerReadyHref({ any: false, agents: [] })).toBe("/computer-setup");
+    expect(computerReadyHref(undefined)).toBe("/computer-setup");
+  });
+
+  test("its push and its row in Atividade open the same place", () => {
+    expect(hrefForPush({ kind: "computer_ready", orgId: "o1", notificationId: "n1" }, noAi)).toBe(
+      "/connect-ai?ready=1",
+    );
+    expect(hrefForPush({ kind: "computer_ready", orgId: "o1" })).toBe("/computer-setup");
+    const n = notification({ id: "n", kind: "computer_ready", actors: [], source: { machineId: "m1", label: "Acme" } });
+    expect(notificationHref(n, noAi)).toBe("/connect-ai?ready=1");
+    expect(notificationHref(n, someAi)).toBe("/computer-setup");
   });
 });

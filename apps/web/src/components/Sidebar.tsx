@@ -14,7 +14,7 @@ import {
   usePrefetchRecent,
   useSkills,
 } from "@agenteschat/client";
-import { audienceChip } from "@agenteschat/client/lib/audience";
+import { audienceChip, audienceNotice } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
@@ -29,6 +29,7 @@ import {
   Checkbox,
   CountBadge,
   CountChip,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -76,13 +77,13 @@ import {
 } from "@/lib/context-menu";
 import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
+import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
 import { AddPasswordDialog } from "./AddPassword";
-import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
@@ -90,8 +91,9 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
+import { BrowserNoticesRow } from "./WebPush";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
 const selectionSky = (color: AgentColor = "sky") =>
@@ -189,6 +191,7 @@ export function Sidebar() {
   // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
   const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
   const lastUnread = useRef(unreadNotifications);
+  const meRow = useRef<HTMLDivElement>(null);
   const [bumps, setBumps] = useState(0);
   useEffect(() => {
     if (unreadNotifications > lastUnread.current) setBumps((b) => b + 1);
@@ -275,6 +278,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
+        <WorkspaceSky part="side" rail={rail} />
         <div className="sidebar__org">
           <WorkspaceMenu
             summary={
@@ -480,7 +484,11 @@ export function Sidebar() {
       <NewChannelDialog open={creatingChannel} onOpenChange={setCreatingChannel} />
 
       <div className="sidebar__foot">
-        <SidebarHorizon working={working} total={dir.agents.length} />
+        <SidebarHorizon
+          working={working}
+          total={dir.agents.length}
+          clear={() => [meRow.current?.querySelector(".ac-avatar")]}
+        />
         {can(org.role, "manage_agents") && (
           <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
@@ -489,7 +497,7 @@ export function Sidebar() {
             </Link>
           </Button>
         )}
-        <div className="sidebar__me">
+        <div className="sidebar__me" ref={meRow}>
           <AccountMenu budgetUsed={budgetUsed} />
         </div>
       </div>
@@ -652,6 +660,7 @@ function AgentRow({
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
+  const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const live = useLiveStore();
   const runs = useStopRun();
@@ -730,9 +739,22 @@ function AgentRow({
       ) : busy ? (
         <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
       ) : (
-        (chip ?? a.role) && (
-          <span className="sidebar__item-meta">{chip ? <AudienceChip agent={a} compact /> : a.role}</span>
-        )
+        (chip ?? a.role) &&
+        (chip ? (
+          <span className="sidebar__item-meta sidebar__item-meta--audience">
+            {a.role && <span>{a.role}</span>}
+            <span
+              className="sidebar__lock"
+              role="img"
+              aria-label={chip}
+              title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
+            >
+              <Icon name="lock" size={14} />
+            </span>
+          </span>
+        ) : (
+          <span className="sidebar__item-meta">{a.role}</span>
+        ))
       )}
     </Link>
   );
@@ -751,7 +773,7 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, opening the phone app, theme, language, the budget and
+ * profile, time zone, opening the phone app, theme, language, sounds, the budget and
  * signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
@@ -760,6 +782,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const dir = useDirectory(org.id);
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
+  const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -796,7 +819,8 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <button
         ref={trigger}
         type="button"
-        className="sidebar__user"
+        // With the budget under the name the face stands beside two lines: the name's capitals at its top.
+        className={cx("sidebar__user", budgetUsed !== null && "ac-faceline")}
         aria-haspopup="dialog"
         aria-label={
           budgetUsed === null
@@ -808,7 +832,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       >
         <Avatar name={me.user.name} size="sm" imageUrl={photo} />
         <span className="sidebar__user-text">
-          <span className="sidebar__user-name">{me.user.name}</span>
+          <span className={cx("sidebar__user-name", budgetUsed !== null && "ac-captop")}>{me.user.name}</span>
           {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>
@@ -877,6 +901,21 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
               options={locales.map((l) => ({ value: l.code, label: l.label }))}
             />
           </MenuOverlayRow>
+          <MenuOverlayRow icon="sound" label={t("shell.sounds")}>
+            <Segmented
+              size="sm"
+              label={t("shell.sounds")}
+              value={sounds}
+              onValueChange={(v) => setSoundChoice(v as SoundChoice)}
+              options={[
+                { value: "tactile", label: t("shell.soundTactile") },
+                { value: "sky", label: t("shell.soundSky") },
+                { value: "pixel", label: t("shell.soundPixel") },
+                { value: "off", label: t("shell.soundOff") },
+              ]}
+            />
+          </MenuOverlayRow>
+          <BrowserNoticesRow />
           {inDesktopApp() && (
             <MenuOverlayRow icon="pointer" label={t("contextMenu.look")}>
               <Segmented
@@ -966,7 +1005,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
         anchor={trigger}
         closeLabel={t("common.close")}
         backdrop={<MenuHorizon />}
-        mark={<OrgMark logo={org.logo} size={64} />}
+        mark={<OrgMark logo={org.logo} size={82} />}
         title={org.name}
         meta={
           <>
@@ -1128,15 +1167,12 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
         <DialogBody>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
-            <div className="stack-4" style={{ gap: 2, flex: 1 }}>
-              <span style={{ fontWeight: 600 }}>{t("photo.label")}</span>
-              <span className="small muted">{t("photo.labelHelp")}</span>
-            </div>
+            <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
             <Button size="sm" type="button" onClick={() => setPhoto(true)}>
               {t("photo.change")}
             </Button>
           </div>
-          <Field label={t("shell.handle")} id="me-handle" help={t("shell.handleHelp")}>
+          <Field label={t("shell.handle")} id="me-handle">
             <AffixInput
               prefix="@"
               value={handle}
@@ -1147,7 +1183,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
           <Field
             label={t("shell.timezone")}
             id="me-zone"
-            help={t("shell.timezoneHelp")}
+            hint={{ name: t("common.about", { label: t("shell.timezone") }), text: t("shell.timezoneHelp") }}
             error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
           >
             <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />

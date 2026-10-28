@@ -14,6 +14,7 @@ import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
 import type { FetchLike } from "../../runner/push";
+import { RelayCount } from "../../runner/streams";
 import {
   BROWSER_LEASE_MS,
   Supervisor,
@@ -472,6 +473,225 @@ test("frames from a worker go up only when they are its agent's", async () => {
   ana.send(event);
   await sleep(20);
   expect(turn.emitted).toHaveLength(2);
+});
+
+test("the agents' browsers' traffic: each worker's count summed until taken, between sessions too; nonsense dropped", async () => {
+  const t = setup();
+  t.sup.boot();
+  t.sup.attach();
+  const runs = [handleRequest(t.ctx, exec(ANA), scope().scope), handleRequest(t.ctx, exec(BIA), scope().scope)];
+  await waitFor(() => t.workers.length === 2);
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  // Before its session's hello: its Chrome may have run meanwhile.
+  ana.send({ type: "browser.traffic", up: 100, down: 2000 });
+  ana.hello();
+  bia.hello();
+  bia.send({ type: "browser.traffic", up: 5, down: 70 });
+  for (const bad of [
+    { up: 1e12 + 1, down: 1 },
+    { up: 1, down: -1 },
+    { up: 1.5, down: 1 },
+    { up: "100", down: 1 },
+    { up: 1 },
+  ]) {
+    ana.send({ type: "browser.traffic", ...bad });
+  }
+  // Frames are read in order: once this one counts, the ones before it were seen.
+  ana.send({ type: "browser.traffic", up: 1e12, down: 0 });
+  const total = { up: 0, down: 0 };
+  await waitFor(() => {
+    const got = t.sup.takeTraffic();
+    total.up += got.up;
+    total.down += got.down;
+    return total.up >= 1e12;
+  });
+  expect(total).toEqual({ up: 1e12 + 105, down: 2070 });
+  expect(t.sup.takeTraffic()).toEqual({ up: 0, down: 0 });
+  // Nothing of it goes to the server: root says it on its own pong.
+  expect(t.up.filter((f) => f.type === "browser.traffic")).toEqual([]);
+  for (const w of [ana, bia]) {
+    const req = await requestOn(w);
+    w.send({ type: "result", id: req.id, ok: true, data: execDone });
+  }
+  await Promise.all(runs);
+});
+
+test("scope.enter: root moves only its agent's own process, into the agent's slice for its kind, and answers once it is there", async () => {
+  const proc = tempDir("proc-");
+  dirs.push(proc);
+  /** A process as /proc shows it: its uids (real, effective, saved, filesystem) and its cgroup. */
+  const pidAt = (pid: number, uids: number[], cgroup: string) => {
+    mkdirSync(path.join(proc, String(pid)), { recursive: true });
+    writeFileSync(
+      path.join(proc, String(pid), "status"),
+      `Name:\tchrome\nUid:\t${uids.join("\t")}\nGid:\t1\t1\t1\t1\n`,
+    );
+    writeFileSync(path.join(proc, String(pid), "cgroup"), `0::${cgroup}\n`);
+  };
+  const asked: string[][] = [];
+  let systemd: "moves" | "refuses" | "never" = "moves";
+  let clock = Date.UTC(2026, 9, 27, 12);
+  const t = setup({
+    proc,
+    now: () => clock,
+    busctl: async (args) => {
+      asked.push(args);
+      if (systemd === "refuses") return { code: 1, output: "Unit agentes-browser-21000-4242.scope already exists." };
+      const [pid, slice, unit] = [args[13], args[16], args[7]];
+      if (systemd === "moves") {
+        setTimeout(
+          () =>
+            writeFileSync(
+              path.join(proc, String(pid), "cgroup"),
+              `0::/agents.slice/agents-21000.slice/${slice}/${unit}\n`,
+            ),
+          60,
+        );
+      }
+      return { code: 0, output: 'o "/org/freedesktop/systemd1/job/1234"' };
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const answer = async (frame: Record<string, unknown>) => {
+    const before = ana.of("scope.entered").length;
+    ana.send({ type: "scope.enter", ...frame });
+    await waitFor(() => ana.of("scope.entered").length > before, 4000);
+    return ana.of("scope.entered").at(-1);
+  };
+
+  pidAt(4242, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/run-r1.scope");
+  expect(await answer({ enterId: "e1", pid: 4242, kind: "browser" })).toEqual({ type: "scope.entered", enterId: "e1" });
+  expect(asked).toEqual([
+    [
+      "call",
+      "--timeout=5",
+      "org.freedesktop.systemd1",
+      "/org/freedesktop/systemd1",
+      "org.freedesktop.systemd1.Manager",
+      "StartTransientUnit",
+      "ssa(sv)a(sa(sv))",
+      "agentes-browser-21000-4242.scope",
+      "fail",
+      "3",
+      "PIDs",
+      "au",
+      "1",
+      "4242",
+      "Slice",
+      "s",
+      "agents-21000-browser.slice",
+      "CollectMode",
+      "s",
+      "inactive-or-failed",
+      "0",
+    ],
+  ]);
+  expect(readFileSync(path.join(proc, "4242", "cgroup"), "utf8")).toBe(
+    "0::/agents.slice/agents-21000.slice/agents-21000-browser.slice/agentes-browser-21000-4242.scope\n",
+  );
+
+  // Never another agent's process, one outside the agent's slice, one that only seems the agent's, or a made-up kind.
+  pidAt(4243, [21001, 21001, 21001, 21001], "/agents.slice/agents-21001.slice/run-r2.scope");
+  pidAt(4244, [21000, 21000, 21000, 21000], "/agents.slice/agents-21001.slice/run-r3.scope");
+  pidAt(4245, [21000, 0, 21000, 21000], "/agents.slice/agents-21000.slice/run-r4.scope");
+  pidAt(4246, [21000, 21000, 21000, 21000], "/system.slice/agentes-runner.service");
+  for (const [frame, error] of [
+    [{ pid: 4243, kind: "cli" }, "That isn't this agent's process"],
+    [{ pid: 4245, kind: "cli" }, "That isn't this agent's process"],
+    [{ pid: 4244, kind: "cli" }, "That process isn't in this agent's slice"],
+    [{ pid: 4246, kind: "cli" }, "That process isn't in this agent's slice"],
+    [{ pid: 4999, kind: "cli" }, "That isn't this agent's process"],
+    [{ pid: 4242, kind: "desktop" }, "The kind is browser or cli"],
+    [{ pid: "4242", kind: "cli" }, "That isn't a process id"],
+    [{ pid: 1, kind: "cli" }, "That isn't a process id"],
+  ] as const) {
+    expect(await answer({ enterId: "e2", ...frame })).toEqual({ type: "scope.entered", enterId: "e2", error });
+  }
+  expect(asked).toHaveLength(1);
+
+  // systemd refusing, or a move that never shows: said so, and the process starts where it is.
+  pidAt(4250, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/run-r5.scope");
+  systemd = "refuses";
+  expect(await answer({ enterId: "e3", pid: 4250, kind: "cli" })).toEqual({
+    type: "scope.entered",
+    enterId: "e3",
+    error: "systemd didn't move it",
+  });
+  expect(t.logs.some((l) => l.includes("couldn't move a process into agents-21000-cli.slice"))).toBe(true);
+  systemd = "never";
+  expect(await answer({ enterId: "e4", pid: 4250, kind: "cli" })).toEqual({
+    type: "scope.entered",
+    enterId: "e4",
+    error: "It didn't show in its slice in time",
+  });
+
+  // 30 a minute: the 31st waits for the next minute. These already show in their slice.
+  const used = 8; // every ask above that named a process of a kind counted, refused or not
+  for (let i = used; i < 30; i++) {
+    pidAt(5000 + i, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/agents-21000-cli.slice/x.scope");
+    expect(await answer({ enterId: `r${i}`, pid: 5000 + i, kind: "cli" })).toEqual({
+      type: "scope.entered",
+      enterId: `r${i}`,
+    });
+  }
+  expect(await answer({ enterId: "over", pid: 5000 + used, kind: "cli" })).toEqual({
+    type: "scope.entered",
+    enterId: "over",
+    error: "Too many processes moved this minute",
+  });
+  clock += 61_000;
+  expect(await answer({ enterId: "again", pid: 5000 + used, kind: "cli" })).toEqual({
+    type: "scope.entered",
+    enterId: "again",
+  });
+
+  const req = await requestOn(ana);
+  ana.send({ type: "result", id: req.id, ok: true, data: execDone });
+  await run;
+});
+
+test("root counts the live view of its agents' browsers it relays: frames up, people's input down", async () => {
+  const relayed = new RelayCount();
+  const t = setup({ relayed });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const frame = {
+    type: "browser.frame",
+    agentId: ANA.id,
+    seq: 1,
+    data: "A".repeat(4000),
+    metadata: { deviceWidth: 1280, deviceHeight: 800 },
+  };
+  ana.send(frame);
+  // Another agent's frame never goes up, so it isn't counted either.
+  ana.send({ ...frame, agentId: BIA.id });
+  await waitFor(() => t.up.some((f) => f.type === "browser.frame"));
+  expect(relayed.browserView.up).toBe(Buffer.byteLength(JSON.stringify(frame)));
+  const input = handleRequest(
+    t.ctx,
+    { op: "browser.input", agent: ANA, events: [{ type: "text", text: "olá" }] } as unknown as MachineRequest,
+    scope().scope,
+  );
+  const sent = await requestOn(ana, 2);
+  expect(relayed.browserView.down).toBe(Buffer.byteLength(`${JSON.stringify(sent)}\n`));
+  expect([relayed.desktop, relayed.terminal]).toEqual([
+    { up: 0, down: 0 },
+    { up: 0, down: 0 },
+  ]);
+  ana.send({ type: "result", id: sent.id, ok: true, data: { ok: true } });
+  const req = await requestOn(ana, 1);
+  ana.send({ type: "result", id: req.id, ok: true, data: execDone });
+  await Promise.all([run, input]);
 });
 
 test("hello lists every worker's tasks until the server acknowledges them, across a restart of the supervisor", async () => {
@@ -1070,6 +1290,12 @@ test.if(posix)(
               };
               return { pid: 50_000 + chromes.length, port: 9400 + chromes.length, exited, kill };
             },
+            // Its debugging endpoint lists the page of its window: a click on Browser waits for that.
+            fetch: (async () =>
+              new Response(
+                JSON.stringify([{ id: "P1", type: "page", url: "about:blank" }]),
+              )) as unknown as typeof fetch,
+            windowDrawMs: 0,
           },
         });
         workerRuns.push(done);
@@ -1281,6 +1507,36 @@ test("a worker's ask for its desktop that root never answers gives up, and frees
   );
   expect([failed?.code, failed?.message]).toEqual(["internal", "The agent's desktop didn't start in time"]);
   expect(asked.map((l) => JSON.parse(l))).toEqual([{ type: "desktop.ensure", ensureId: "1", use: "browser" }]);
+});
+
+test("a worker's ask to move a process settles on root's answer, whatever it says, and its own traffic goes to root", async () => {
+  const fromRoot = new PassThrough();
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, toRoot);
+  const asked: Record<string, unknown>[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => asked.push(JSON.parse(line)),
+    () => {},
+  );
+  let settled = false;
+  const moved = link.enterScope(4242, "browser").then(() => {
+    settled = true;
+  });
+  await waitFor(() => asked.length === 1);
+  expect(asked[0]).toEqual({ type: "scope.enter", enterId: "1", pid: 4242, kind: "browser" });
+  // Another ask's answer settles nothing here.
+  fromRoot.write(`${JSON.stringify({ type: "scope.entered", enterId: "9" })}\n`);
+  await Bun.sleep(20);
+  expect(settled).toBe(false);
+  fromRoot.write(`${JSON.stringify({ type: "scope.entered", enterId: "1", error: "systemd didn't move it" })}\n`);
+  await moved;
+  // Nothing to say when nothing moved.
+  link.traffic({ up: 0, down: 0 });
+  link.traffic({ up: 120, down: 34_000 });
+  await waitFor(() => asked.length === 2);
+  expect(asked[1]).toEqual({ type: "browser.traffic", up: 120, down: 34_000 });
 });
 
 test.if(posix)(

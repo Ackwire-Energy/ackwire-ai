@@ -164,7 +164,7 @@ export function readConfig(home = runnerHome()): RunnerConfig | null {
 export function pairedConfig(stored: StoredConfig, file = "config.json"): RunnerConfig | null {
   if (!stored.token) return null;
   if (!stored.server || !stored.machineId || !stored.workspace) {
-    throw new Error(`${file} is incomplete; pair this computer again`);
+    throw new Error(`${file} is incomplete. Pair this computer again.`);
   }
   return {
     ...stored,

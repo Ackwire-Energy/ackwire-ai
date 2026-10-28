@@ -30,12 +30,13 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf, yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import { resetIso } from "./plan-usage";
+import type { Spawn } from "./scope-gate";
 import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
@@ -658,10 +659,10 @@ export class ClaudeProcess {
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
-  constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv) {
+  constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv, start: Spawn = spawn) {
     const [file, ...pre] = command;
     // A full path: the compiled runner would look the bare name up on the PATH it started with.
-    this.child = spawn(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
+    this.child = start(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
       cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -1062,6 +1063,8 @@ export interface BrainManagerOptions {
   mcp?: { socketPath: string; command: string[] };
   /** The runner's home (its accounts among it): turns never read it. */
   runnerHome?: string;
+  /** How Claude Code starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+  spawn?: Spawn;
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
@@ -1080,6 +1083,8 @@ interface Live {
   key: string;
   id: string;
   proc: ClaudeProcess;
+  /** The account folder it signs in with; null: the computer's own sign-in. */
+  account: string | null;
   /** Launch settings: a turn asking for others restarts the process (resumed). */
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
@@ -1198,6 +1203,12 @@ export class BrainManager {
     return this.live.get(`${agentId}:${session}`)?.proc;
   }
 
+  /** Whether a process of that sign-in is open: a turn, or the one kept after it (`null`: the computer's own). */
+  holds(account: string | null): boolean {
+    const open = (l: Live) => l.account === account && !l.proc.exited;
+    return [...this.live.values()].some(open) || [...this.running.values()].some(open);
+  }
+
   /**
    * For the MCP bridge: the token of a brain process's MCP server, the run it
    * works for now (its calls are relayed for that run) and whether a turn runs.
@@ -1305,6 +1316,9 @@ export class BrainManager {
     ctx: BrainTurnContext,
   ): Promise<WireBrainEvent> {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
+    // A route on this sign-in stops first: two processes on one sign-in race on its refresh token. Kept right
+    // before the process starts, since a route may begin during any await before it.
+    await yieldRoute("claude_code", ctx.accountHome);
     const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
     // A turn Claude Code runs by itself there (or one due): its output would read as this turn's. Wait for
@@ -1568,11 +1582,12 @@ export class BrainManager {
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });
-    const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
+    const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env, this.opts.spawn);
     const live: Live = {
       key,
       id,
       proc,
+      account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
       ranKey: ranKeyOf(req, session),
       busy: false,

@@ -196,6 +196,11 @@ export const extraIcons = {
       { d: "M4 4.5h4.5A2.5 2.5 0 0 1 10 6v10a2 2 0 0 0-2-2H4zM16 4.5h-4.5A2.5 2.5 0 0 0 10 6v10a2 2 0 0 1 2-2h4z" },
     ],
   ],
+  /** "Sons": a speaker and its waves. */
+  sound: [
+    ["path", { d: "M3.5 8v4h3l4 3.5v-11L6.5 8z" }],
+    ["path", { d: "M13.5 7.5a3.5 3.5 0 0 1 0 5M15.75 5.25a6.75 6.75 0 0 1 0 9.5" }],
+  ],
   /** "Lembrete" (a reminder routine). */
   bell: [["path", { d: "M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.2 1.5H4.3zM8.5 17h3" }]],
   /** Something is in progress (spins unless reduced motion). */
@@ -212,6 +217,8 @@ export const extraIcons = {
   ],
   /** "Tela cheia": two corners pulled apart. */
   expand: [["path", { d: "M12 3.5h4.5V8M8 16.5H3.5V12M16.5 3.5 11.25 8.75M3.5 16.5l5.25-5.25" }]],
+  /** "Sair da tela cheia": the same two corners pushed together. */
+  shrink: [["path", { d: "M11.5 4v4.5H16M8.5 16v-4.5H4M16.5 3.5l-5 5M3.5 16.5l5-5" }]],
   /** "Apagar". */
   trash: [
     [

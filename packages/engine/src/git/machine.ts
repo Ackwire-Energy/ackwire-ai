@@ -9,7 +9,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { activeConnections } from "../connectors/connections";
 import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machine-hub";
-import { MachineOfflineError, MachinePausedError } from "../machines";
+import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { grantedScopeKeys } from "../tools/scopes";
 import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
@@ -40,7 +40,7 @@ export const PRE_TURN_SYNC_SECONDS = 20;
 /** Why git can't run on the machine now (said to the agent), or null. */
 export function machineGitUnavailable(status: MachineStatus | null, orgId: string): Error | null {
   if (!status || status.orgId !== orgId) {
-    return new Error("Your connected computer was removed; ask an admin or your owner to choose another one.");
+    return new Error(REMOVED_COMPUTER_MESSAGE);
   }
   if (!status.online) return new MachineOfflineError(status.name);
   if (status.paused) return new MachinePausedError(status.name, status.paused.until, status.paused.timezone);

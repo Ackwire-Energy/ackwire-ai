@@ -1,25 +1,50 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { caches } from "./cache";
-import { randomToken, sha256 } from "./crypto";
+import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { deleteJevKey } from "./jev-key";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
-import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
+import { enqueue } from "./outbox";
+import {
+  assertCanWork,
+  cloudNotice,
+  isUserBlocked,
+  OrgPausedError,
+  STANDING_COLUMNS,
+  type WorkspaceStanding,
+} from "./standing";
 
 const {
   organizations,
   organizationMembers,
   organizationInvitations,
   organizationInviteLinks,
+  organizationJoinRequests,
   channels,
   channelMembers,
   users,
   accounts,
   agents,
+  instanceTelemetry,
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -129,14 +154,14 @@ export async function requirePermission(db: Database, userId: string, orgId: str
 }
 
 /** Invitations go out only from an active workspace (`standing.ts`). */
-function assertInviting(membership: Membership) {
+export function assertInviting(membership: Membership) {
   if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
 }
 
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
  * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
- * (`org.create_refused`, the same words whatever the cause).
+ * (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
  */
 export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
   const [paused] = await db
@@ -146,7 +171,7 @@ export async function createOrganization(db: Database, userId: string, input: { 
     .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
     .limit(1);
   if (paused || (await isUserBlocked(db, userId)))
-    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
@@ -202,6 +227,31 @@ export async function installOwner(db: Database): Promise<string | null> {
   return first?.id ?? null;
 }
 
+/**
+ * Who has the installation's own settings, the usage report's switch and the Jev key (ADR 0073): its first account,
+ * pinned the first time anyone asks. Unlike `installOwner`, it never passes to the next oldest account, who may be
+ * any member of any workspace: once the owner deletes their account, nobody has these settings here (the server's
+ * environment still does), until no account is left and the next first account is pinned.
+ */
+export async function pinnedOwner(db: Database): Promise<string | null> {
+  const [row] = await db
+    .select({ owner: instanceTelemetry.ownerUserId })
+    .from(instanceTelemetry)
+    .where(eq(instanceTelemetry.id, 1));
+  if (row?.owner) return row.owner;
+  const first = await installOwner(db);
+  if (!first) return null;
+  const [pinned] = await db
+    .insert(instanceTelemetry)
+    .values({ ownerUserId: first })
+    .onConflictDoUpdate({
+      target: instanceTelemetry.id,
+      set: { ownerUserId: sql`coalesce(${instanceTelemetry.ownerUserId}, excluded.owner_user_id)` },
+    })
+    .returning({ owner: instanceTelemetry.ownerUserId });
+  return pinned?.owner ?? first;
+}
+
 /** Who may create an account (ADR 0006): see `isSignupAllowed`. */
 export interface SignupPolicy {
   /** `ALLOW_SIGNUP`: anyone. */
@@ -214,24 +264,14 @@ export interface SignupPolicy {
  * Self-hosted sign-up policy: the first account may always register (there is
  * no other way in), unless the installation waits for its owner's link or key,
  * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
- * invitation for that email (or from a valid org invite link). Open sign-up on a reachable server would let
- * anyone create organizations (and spend model credits) on it.
+ * invitation for that email. An invitation link never opens it (ADR 0068): whoever holds one asks to join
+ * without an account. Open sign-up on a reachable server would let anyone create organizations (and spend
+ * model credits) on it.
  */
-export async function isSignupAllowed(
-  db: Database,
-  email: string,
-  policy: SignupPolicy,
-  now = new Date(),
-  /** The token of an org invite link the person is signing up from. */
-  inviteToken?: string | null,
-) {
+export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
   if (policy.allowSignup && !policy.ownerByLink) return true;
   if ((await countUsers(db)) === 0) return !policy.ownerByLink;
   if (policy.allowSignup) return true;
-  if (inviteToken) {
-    const link = await findInviteLink(db, inviteToken);
-    if (link && !link.link.revokedAt && link.link.expiresAt > now) return true;
-  }
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
@@ -255,7 +295,7 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
  * allowed for that e-mail). This tells whether the e-mail has an account, so
  * the route that serves it is rate limited.
  */
-export async function signInOptions(db: Database, email: string, policy: SignupPolicy, inviteToken?: string | null) {
+export async function signInOptions(db: Database, email: string, policy: SignupPolicy) {
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
@@ -266,7 +306,7 @@ export async function signInOptions(db: Database, email: string, policy: SignupP
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, policy, new Date(), inviteToken),
+      canSignUp: await isSignupAllowed(db, email, policy),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
@@ -476,6 +516,10 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   return row?.n ?? 0;
 }
 
+/** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
+export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
+
 /** Changes a member's role. Admins can't touch owners or make owners; nobody can demote the last owner. */
 export async function changeMemberRole(
   db: Database,
@@ -483,6 +527,7 @@ export async function changeMemberRole(
   orgId: string,
   targetUserId: string,
   role: MemberRole,
+  options: { pubsub?: PubSub } = {},
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
@@ -500,6 +545,7 @@ export async function changeMemberRole(
       .set({ role })
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
   });
+  await announceMembers(options.pubsub, orgId);
 }
 
 /** Removes a member (or lets a member leave). The last owner can't leave. */
@@ -538,19 +584,26 @@ export async function removeMember(
   await announceReleasedAccounts(options.pubsub, released);
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+  await announceMembers(options.pubsub, orgId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");
   await pauseRoutinesOfCreator({ db, pubsub: options.pubsub }, orgId, targetUserId).catch(() => 0);
 }
 
+/** A deleted workspace's files leave platform storage (`purgeOrgFiles`). */
+export const ORG_FILES_PURGE_JOB = "org.files.purge";
+/** The backoff tops out at 3 h: a purge keeps trying through a storage outage for about 30 days. */
+export const ORG_FILES_PURGE_ATTEMPTS = 240;
+
 /**
  * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
  * they are the only owner of an organization that has other members
  * (`sole_owner`, with the organizations' names: make someone else an owner
  * first). Organizations where they are the only member go with them, with
- * everything in them. Their AI accounts on computers are signed out and
- * removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
+ * everything in them (their files on platform storage through the job
+ * `org.files.purge`, ADR 0019). Their AI accounts on computers are signed
+ * out and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
  * sessions, sign-in methods, memberships, channel memberships, notifications
  * and phones are deleted; messages and records they authored stay without an
  * author (the same as any deleted user). Not for a blocked account: it can't
@@ -562,6 +615,8 @@ export async function deleteAccount(
   options: { pubsub?: PubSub } = {},
 ): Promise<{ deletedOrgIds: string[] }> {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
+  // Before any account goes: the first one stays the owner even once it is gone.
+  const owner = await pinnedOwner(db);
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
   const { left, deleted, released } = await db.transaction(async (tx) => {
     const mine = await tx
@@ -599,7 +654,25 @@ export async function deleteAccount(
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
+    // No org_id on the job: the outbox row would be deleted with the workspace (cascade). A second pass a day
+    // later takes files that work under way stored after the first (an agent's upload stores its file, then its
+    // row is refused).
+    for (const orgId of alone) {
+      const purge = {
+        orgId: null,
+        kind: ORG_FILES_PURGE_JOB,
+        payload: { orgId },
+        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+      };
+      await enqueue(tx, purge);
+      const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
+      await enqueue(tx, { ...purge, ...late });
+    }
     await tx.delete(users).where(eq(users.id, userId));
+    // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
+    if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
+    // With nobody left, the next first account owns the server again.
+    await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
     const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
     await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
     return { left: leaving, deleted: alone, released };
@@ -609,7 +682,10 @@ export async function deleteAccount(
     agents: released.agents.filter((a) => left.includes(a.orgId)),
   });
   // Their open WebSocket connections lose every subscription now.
-  for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+  for (const orgId of left) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+    await announceMembers(options.pubsub, orgId);
+  }
   return { deletedOrgIds: deleted };
 }
 
@@ -638,6 +714,88 @@ export async function appleSignInTokens(
 // ── Invitations ──────────────────────────────────────────────────────────────
 
 export const INVITATION_TTL_DAYS = 7;
+/** How long an invitation link works (ADR 0068): nobody gets in through it without an admin's approval. */
+export const INVITE_LINK_TTL_DAYS = 30;
+
+const ROLE_RANK: Record<MemberRole, number> = { member: 0, admin: 1, owner: 2 };
+
+/**
+ * Sends an invitation to an address with a role: the one named (`invitationId`), else the newest one for that
+ * address not accepted yet, gets a new token and 7 more days (its old link stops working); with none, a new one
+ * is made. One still working keeps the higher of its role and this one, so sending it again never demotes
+ * whoever it was meant for, and an owner's invitation goes out again only from an owner (`ownersOk`). Records
+ * `invitation.created`. The caller checks who may invite.
+ */
+export async function sendInvitation(
+  db: Executor,
+  input: {
+    orgId: string;
+    email: string;
+    role: MemberRole;
+    invitedBy: string;
+    /** The sender may invite owners (`manage_owners`). */
+    ownersOk: boolean;
+    now?: Date;
+    invitationId?: string;
+    /** Resent from the pending list. */
+    resent?: boolean;
+    /** An admin approved a request to join (`invite-requests.ts`). */
+    fromRequest?: boolean;
+  },
+) {
+  const now = input.now ?? new Date();
+  const email = input.email.trim().toLowerCase();
+  const [existing] = await db
+    .select({
+      id: organizationInvitations.id,
+      role: organizationInvitations.role,
+      expiresAt: organizationInvitations.expiresAt,
+    })
+    .from(organizationInvitations)
+    .where(
+      and(
+        eq(organizationInvitations.orgId, input.orgId),
+        input.invitationId
+          ? eq(organizationInvitations.id, input.invitationId)
+          : eq(organizationInvitations.email, email),
+        isNull(organizationInvitations.acceptedAt),
+      ),
+    )
+    .orderBy(desc(organizationInvitations.createdAt))
+    .limit(1);
+  const role =
+    existing && existing.expiresAt > now && ROLE_RANK[existing.role] > ROLE_RANK[input.role]
+      ? existing.role
+      : input.role;
+  if (role === "owner" && !input.ownersOk) throw new ForbiddenError("Only owners can invite owners");
+  const token = randomToken(32);
+  const fresh = {
+    role,
+    tokenHash: sha256(token),
+    invitedByUserId: input.invitedBy,
+    expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
+  };
+  const [invitation] = existing
+    ? await db.update(organizationInvitations).set(fresh).where(eq(organizationInvitations.id, existing.id)).returning()
+    : await db
+        .insert(organizationInvitations)
+        .values({ orgId: input.orgId, email, ...fresh })
+        .returning();
+  if (!invitation) throw new ConflictError("This invitation can't be sent");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId: input.orgId,
+    userId: input.invitedBy,
+    data: {
+      emailDomain: addressDomain(invitation.email),
+      role: invitation.role,
+      ...(input.resent ? { resent: true } : {}),
+      ...(input.fromRequest ? { fromRequest: true } : {}),
+    },
+  });
+  /** `token` goes in the link and is never stored. */
+  return { invitation, token };
+}
 
 export async function createInvitation(
   db: Database,
@@ -648,8 +806,6 @@ export async function createInvitation(
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
   assertInviting(actor);
-  if (input.role === "owner" && !can(actor.role, "manage_owners"))
-    throw new ForbiddenError("Only owners can invite owners");
   const email = input.email.trim().toLowerCase();
 
   const [alreadyMember] = await db
@@ -658,28 +814,8 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
-
-  const token = randomToken(32);
-  const [invitation] = await db
-    .insert(organizationInvitations)
-    .values({
-      orgId,
-      email,
-      role: input.role,
-      tokenHash: sha256(token),
-      invitedByUserId: actorId,
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-    })
-    .returning();
-  if (!invitation) throw new Error("invitation insert returned nothing");
-  await recordOperatorEvent(db, {
-    type: "invitation.created",
-    orgId,
-    userId: actorId,
-    data: { emailDomain: addressDomain(email), role: input.role },
-  });
-  /** `token` goes in the link and is never stored. */
-  return { invitation, token };
+  const ownersOk = can(actor.role, "manage_owners");
+  return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, ownersOk, now });
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -710,53 +846,91 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
 }
 
 /**
- * An organization-wide invite link (admins): whoever opens it signed in joins
- * as a member, for 7 days. Uses the same `/invite/{token}` page and accept
- * endpoint as email invitations.
+ * The workspace's invitation link (admins, ADR 0068): whoever opens it can only ask to join. One link per
+ * workspace, shown again whenever needed: the newest active link whose token is still derived from
+ * `secret` (`inviteLinkToken`), else a new one for 30 days (`made`). Uses the same `/invite/{token}` page as
+ * email invitations.
  */
-export async function createInviteLink(db: Database, actorId: string, orgId: string, now = new Date()) {
+export async function inviteLink(db: Database, secret: string, actorId: string, orgId: string, now = new Date()) {
   assertInviting(await requirePermission(db, actorId, orgId, "manage_members"));
-  const token = randomToken(32);
-  const [link] = await db
-    .insert(organizationInviteLinks)
-    .values({
-      orgId,
-      role: "member",
-      tokenHash: sha256(token),
-      createdByUserId: actorId,
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-    })
-    .returning();
-  if (!link) throw new Error("invite link insert returned nothing");
-  await recordOperatorEvent(db, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
-  return { link, token };
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invite-links:${orgId}`}))`);
+    const active = await tx
+      .select()
+      .from(organizationInviteLinks)
+      .where(
+        and(
+          eq(organizationInviteLinks.orgId, orgId),
+          isNull(organizationInviteLinks.revokedAt),
+          gt(organizationInviteLinks.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(organizationInviteLinks.createdAt));
+    for (const link of active) {
+      const token = inviteLinkToken(secret, link.id);
+      if (link.tokenHash === sha256(token)) return { link, token, made: false };
+    }
+    const id = crypto.randomUUID();
+    const token = inviteLinkToken(secret, id);
+    const [link] = await tx
+      .insert(organizationInviteLinks)
+      .values({
+        id,
+        orgId,
+        role: "member",
+        tokenHash: sha256(token),
+        createdByUserId: actorId,
+        expiresAt: new Date(now.getTime() + INVITE_LINK_TTL_DAYS * 86_400_000),
+      })
+      .returning();
+    if (!link) throw new Error("invite link insert returned nothing");
+    await recordOperatorEvent(tx, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
+    return { link, token, made: true };
+  });
 }
 
-async function findInviteLink(db: Database, token: string) {
+/** An invitation link by its token (or its id), with its workspace's name and standing; null when there is none. */
+export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
-    .select({ link: organizationInviteLinks, orgName: organizations.name })
+    .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
-    .where(eq(organizationInviteLinks.tokenHash, sha256(token)));
+    .where(
+      typeof by === "string"
+        ? eq(organizationInviteLinks.tokenHash, sha256(by))
+        : eq(organizationInviteLinks.id, by.id),
+    );
   return row ?? null;
 }
 
-/** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
-const INVITE_AGENTS = 3;
+/** A link people can still ask with: not turned off, not expired, and its workspace active. */
+export const inviteLinkOpen = (
+  found: { link: { revokedAt: Date | null; expiresAt: Date }; standing: WorkspaceStanding },
+  now = new Date(),
+) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
 
-/** The organization's first agents (not archived), for an invitation page: name and look only. */
+/** How many of the organization's agents an invitation names ("Theo, Ada, Lia e Atlas já trabalham lá"). */
+const INVITE_AGENTS = 4;
+
+/**
+ * The organization's first agents (not archived), for an invitation page: name and look only, and how many more
+ * work there (`moreAgents`, when some do), so the page never reads as if those were all of them.
+ */
 async function inviteAgents(db: Database, orgId: string) {
-  return db
-    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
+  const rows = await db
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance, total: sql<number>`count(*) over ()` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .orderBy(asc(agents.createdAt))
     .limit(INVITE_AGENTS);
+  const more = Number(rows[0]?.total ?? 0) - rows.length;
+  return { agents: rows.map(({ total: _, ...agent }) => agent), ...(more > 0 ? { moreAgents: more } : {}) };
 }
 
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
- * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ * invited (their name), the role and its first agents. Only for a valid token, which reached the person.
+ * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -775,7 +949,18 @@ export async function previewInvitation(db: Database, token: string, now = new D
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
   if (!row) {
     const link = await findInviteLink(db, token);
-    if (!link || link.link.revokedAt || link.link.expiresAt <= now) return null;
+    if (!link) return null;
+    if (!inviteLinkOpen(link, now)) {
+      return {
+        orgName: link.orgName,
+        email: "",
+        role: "member" as const,
+        kind: "link" as const,
+        invitedBy: null,
+        agents: [],
+        closed: true as const,
+      };
+    }
     const [creator] = link.link.createdByUserId
       ? await db.select({ name: users.name }).from(users).where(eq(users.id, link.link.createdByUserId))
       : [];
@@ -785,7 +970,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
-      agents: await inviteAgents(db, link.link.orgId),
+      ...(await inviteAgents(db, link.link.orgId)),
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
@@ -795,13 +980,14 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
-    agents: await inviteAgents(db, row.orgId),
+    ...(await inviteAgents(db, row.orgId)),
   };
 }
 
 /**
  * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
- * a blocked account, nor into a workspace on hold or suspended.
+ * a blocked account, nor into a workspace on hold or suspended. An invitation link only lets people ask
+ * (`invitation.ask_to_join`, ADR 0068).
  */
 export async function acceptInvitation(
   db: Database,
@@ -817,23 +1003,9 @@ export async function acceptInvitation(
       .where(eq(organizationInvitations.tokenHash, sha256(token)))
       .for("update");
     if (!invitation) {
-      // An org-wide link: any signed-in person joins as its role.
-      const [link] = await tx
-        .select()
-        .from(organizationInviteLinks)
-        .where(eq(organizationInviteLinks.tokenHash, sha256(token)))
-        .for("update");
-      if (!link || link.revokedAt || link.expiresAt <= now) {
-        throw new ConflictError("This invitation is invalid or has expired");
-      }
-      // Nobody joins a workspace on hold or suspended.
-      await assertCanWork(tx, link.orgId);
-      await joinOrganization(tx, link.orgId, user.id, link.role);
-      await tx
-        .update(organizationInviteLinks)
-        .set({ uses: sql`${organizationInviteLinks.uses} + 1` })
-        .where(eq(organizationInviteLinks.id, link.id));
-      return { orgId: link.orgId };
+      if (await findInviteLink(tx, token))
+        throw new ConflictError("This link asks an admin first", "invitation.ask_to_join");
+      throw new ConflictError("This invitation is invalid or has expired");
     }
     if (invitation.acceptedAt || invitation.expiresAt <= now) {
       throw new ConflictError("This invitation is invalid or has expired");
@@ -853,9 +1025,25 @@ export async function acceptInvitation(
   });
 }
 
-/** Adds a person to an organization (keeping an existing role) and to `general`. */
-async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+/**
+ * Adds a person to an organization (keeping an existing role) and to `general`. A request to join that they or
+ * their address had waiting closes: whoever answers it next finds it answered.
+ */
+export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  await tx
+    .update(organizationJoinRequests)
+    .set({ status: "closed", decidedAt: new Date() })
+    .where(
+      and(
+        eq(organizationJoinRequests.orgId, orgId),
+        eq(organizationJoinRequests.status, "pending"),
+        or(
+          eq(organizationJoinRequests.userId, userId),
+          eq(organizationJoinRequests.email, sql`(select ${users.email} from ${users} where ${users.id} = ${userId})`),
+        ),
+      ),
+    );
   await assignHandle(tx, orgId, userId);
   const [general] = await tx
     .select({ id: channels.id })
@@ -941,26 +1129,16 @@ export async function resendInvitation(
     .from(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
-  if (existing.role === "owner" && !can(actor.role, "manage_owners"))
-    throw new ForbiddenError("Only owners can invite owners");
-  const token = randomToken(32);
-  const [invitation] = await db
-    .update(organizationInvitations)
-    .set({
-      tokenHash: sha256(token),
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-      invitedByUserId: actorId,
-    })
-    .where(eq(organizationInvitations.id, invitationId))
-    .returning();
-  if (!invitation) throw new ConflictError("This invitation can't be resent");
-  await recordOperatorEvent(db, {
-    type: "invitation.created",
+  return sendInvitation(db, {
     orgId,
-    userId: actorId,
-    data: { emailDomain: addressDomain(invitation.email), role: invitation.role, resent: true },
+    email: existing.email,
+    role: existing.role,
+    invitedBy: actorId,
+    ownersOk: can(actor.role, "manage_owners"),
+    now,
+    invitationId,
+    resent: true,
   });
-  return { invitation, token };
 }
 
 /** Invitations not yet accepted, expired ones included, with their status. */

@@ -1,5 +1,7 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
+import { skyHourOf, workspaceInk, workspaceTones } from "@agenteschat/ui/sky/workspace";
 import type { StyleProp, ViewStyle } from "react-native";
+import { useServer } from "@/lib/server";
 import { useTheme } from "@/ui/theme";
 import { Dither } from "./Dither";
 import { fromSurface } from "./math";
@@ -22,4 +24,36 @@ export interface SkyProps {
 export function Sky({ color = "sky", depth = 0.9, fade = 0.55, surface = "bg", style }: SkyProps) {
   const { colors } = useTheme();
   return <Dither kind="sky" tones={fromSurface(colors[surface], depth, color)} pixel={4} fade={fade} style={style} />;
+}
+
+/** The host of a server's address ("" when it isn't one). */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The workspace's sky behind Conversas' title (as behind its header on the web): the Cloud's is day with pixel
+ * clouds drifting by, a server of one's own the same sky at dusk with a few stars (`@agenteschat/ui` sky/workspace,
+ * drawn by the `workspace` shader). Tones 0..3 are the field's, 6 and 7 what is drawn over it.
+ */
+export function WorkspaceSky({ fade = 0.55, style }: { fade?: number; style?: StyleProp<ViewStyle> }) {
+  const { colors } = useTheme();
+  const hour = skyHourOf(hostOf(useServer()));
+  const tones = workspaceTones(hour, colors.bg);
+  const ink = workspaceInk(hour, colors.bg);
+  const deepest = tones[tones.length - 1] ?? colors.bg;
+  return (
+    <Dither
+      kind="workspace"
+      tones={[...tones, deepest, deepest, ink.dim, ink.bright]}
+      pixel={4}
+      fade={fade}
+      extra={{ hour: hour === "day" ? 0 : 1, top: tones.length - 1 }}
+      style={style}
+    />
+  );
 }

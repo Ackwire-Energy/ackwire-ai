@@ -1,3 +1,4 @@
+import { humanCheckHeaders } from "../lib/human-check";
 import { CLOUD_SERVER } from "../lib/server";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
@@ -30,6 +31,7 @@ import type {
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
+  AskToJoinResult,
   AuditPage,
   AuthConfig,
   BatchInviteResult,
@@ -65,9 +67,14 @@ import type {
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
   Issue,
   IssueActivity,
   IssueColumn,
+  JevKey,
+  JoinApproval,
+  JoinCodeSent,
+  JoinRequest,
   Machine,
   MachineAccess,
   MachineAccount,
@@ -315,10 +322,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       },
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
+      saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
+      checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
+      removeJev: () => request<JevKey>("/api/app/jev", { method: "DELETE" }),
     },
     waitlist: {
-      join: async (input) => {
-        await request<{ ok: true }>("/api/waitlist", { json: input });
+      join: async (input, humanCheck) => {
+        await request<{ ok: true }>("/api/waitlist", { json: input, headers: humanCheckHeaders(humanCheck) });
       },
       confirm: async (input) => {
         await request<{ ok: true }>("/api/waitlist/confirm", { json: input });
@@ -326,11 +337,19 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
-      signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),
+      signInOptions: (input, humanCheck) =>
+        request<SignInOptions>("/api/app/sign-in-options", { json: input, headers: humanCheckHeaders(humanCheck) }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
+    },
+    push: {
+      webKey: async () =>
+        (await nullOn(404, () => request<{ publicKey: string }>("/api/app/push/web")))?.publicKey ?? null,
+      register: (input) => request<void>("/api/app/push/devices", { json: input }),
+      unregister: (token) => request<void>("/api/app/push/devices/forget", { json: { token } }),
+      stale: async (ids) => (await request<{ stale: string[] }>("/api/app/push/stale", { json: { ids } })).stale,
     },
     orgs: {
       create: (input) =>
@@ -522,9 +541,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           })
         ).authorizeUrl,
       completeOAuth: (orgId, input) =>
-        request<{ connectionId: string; connector: string }>(`${org(orgId)}/connectors/oauth/complete`, {
-          json: input,
-        }),
+        request<{ connectionId: string; connector: string; returnTo?: string }>(
+          `${org(orgId)}/connectors/oauth/complete`,
+          {
+            json: input,
+          },
+        ),
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
     },
@@ -668,8 +690,26 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`, { method: "PUT", json: input }),
     },
     invites: {
-      createLink: (orgId) => request<{ url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
+      createLink: (orgId) =>
+        request<{ id: string; url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
+      links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
+      turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
+      sendCode: (token, input, humanCheck) =>
+        request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, {
+          json: input,
+          headers: humanCheckHeaders(humanCheck),
+        }),
+      checkCode: (token, input) =>
+        request<{ verified: true }>(`/api/app/invitations/${enc(token)}/code/check`, { json: input }),
+      ask: (token, input) => request<AskToJoinResult>(`/api/app/invitations/${enc(token)}/requests`, { json: input }),
       requestNew: (token) => request<void>(`/api/app/invitations/${enc(token)}/request-new`, { json: {} }),
+    },
+    joinRequests: {
+      list: async (orgId) => (await request<{ requests: JoinRequest[] }>(`${org(orgId)}/join-requests`)).requests,
+      approve: (orgId, id, role) =>
+        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { role } }),
+      deny: (orgId, id, reason) =>
+        request<void>(`${org(orgId)}/join-requests/${enc(id)}/deny`, { json: reason ? { reason } : {} }),
     },
     storage: {
       get: (orgId) => request<StorageConfig>(`${org(orgId)}/storage`),

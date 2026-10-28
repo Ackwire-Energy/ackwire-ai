@@ -2,14 +2,17 @@ import { checkServer, normalizeServer, type ServerCheck, serverHost } from "@age
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { connectToServer, PROBLEM_TEXT } from "@/features/server";
+import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { useSession } from "@/providers/session";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Text } from "@/ui/Text";
+
+/** How long the token's session gets to arrive before the screen says so (never a screen that waits forever). */
+const SIGN_IN_WAIT_MS = 15_000;
 
 /**
  * A connect link, `agenteschat://connect?server=…[&token=…]` (the web app's QR code, the self-host setup):
@@ -27,6 +30,7 @@ export default function Connect() {
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [slow, setSlow] = useState(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` asks again (Tentar de novo)
   useEffect(() => {
@@ -44,6 +48,14 @@ export default function Connect() {
   // The token's session arrives a moment after the answer: into the app once it has.
   useEffect(() => {
     if (signingIn && session.signedIn) router.replace("/");
+  }, [signingIn, session.signedIn]);
+  useEffect(() => {
+    if (!signingIn || session.signedIn) return;
+    const timer = setTimeout(() => {
+      haptics.warning();
+      setSlow(true);
+    }, SIGN_IN_WAIT_MS);
+    return () => clearTimeout(timer);
   }, [signingIn, session.signedIn]);
 
   const leave = () => router.replace(session.signedIn ? "/" : "/sign-in");
@@ -71,24 +83,27 @@ export default function Connect() {
     router.replace(plan.move || !session.signedIn ? "/sign-in" : "/");
   };
 
-  const problem = check && !check.ok ? t(PROBLEM_TEXT[check.problem], { host: serverHost(target) }) : null;
+  const problem = check && !check.ok ? t(problemText(check.problem, target), { host: serverHost(target) }) : null;
+  // The token was refused, or its session never arrived: on to signing in with the email.
+  const stuck = refused || slow;
   return (
     <AuthScaffold
-      title={serverHost(target)}
-      subtitle={t(token ? "mobile.auth.connect.questionSignIn" : "mobile.auth.connect.question")}
+      // The question is the title; the address a line under it (a long host broke mid-word in large type).
+      title={t(token ? "mobile.auth.connect.titleSignIn" : "mobile.auth.connect.title")}
+      subtitle={t("mobile.auth.connect.on", { host: serverHost(target) })}
       onBack={leave}
     >
-      {plan.signOut && !refused ? (
-        <Text tone="muted" variant="small">
+      {plan.signOut && !stuck ? (
+        <Text tone="muted" variant="small" style={CENTER}>
           {t("mobile.auth.connect.leave")}
         </Text>
       ) : null}
-      {refused || problem ? (
-        <Text tone="danger" variant="small">
-          {refused ? t("mobile.auth.connect.tokenFailed") : problem}
+      {stuck || problem ? (
+        <Text tone="danger" variant="small" style={CENTER}>
+          {refused ? t("mobile.auth.connect.tokenFailed") : slow ? t("mobile.auth.connect.signInSlow") : problem}
         </Text>
       ) : null}
-      {refused ? (
+      {stuck ? (
         <Button variant="primary" wide label={t("mobile.common.continue")} onPress={() => router.replace("/sign-in")} />
       ) : problem ? (
         <Button variant="primary" wide label={t("mobile.common.retry")} onPress={() => setAttempt((a) => a + 1)} />
@@ -97,11 +112,11 @@ export default function Connect() {
           variant="primary"
           wide
           label={check ? t("mobile.auth.connect.confirm") : t("mobile.auth.connect.checking")}
-          disabled={!check || busy}
+          loading={!check || busy}
           onPress={() => void confirm()}
         />
       )}
-      {refused ? null : <Button variant="ghost" wide label={t("mobile.common.cancel")} onPress={leave} />}
+      {stuck ? null : <Button variant="ghost" wide label={t("mobile.common.cancel")} onPress={leave} />}
     </AuthScaffold>
   );
 }

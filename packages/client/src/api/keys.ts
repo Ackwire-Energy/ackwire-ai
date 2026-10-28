@@ -4,9 +4,12 @@ import type { ScreenKind } from "./types";
 export const keys = {
   health: ["health"] as const,
   telemetry: ["telemetry"] as const,
+  jev: ["jev"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   phoneSignIn: ["phone-sign-in"] as const,
+  /** The server's Web Push key (ADR 0071); `null` = Web Push off on this server. */
+  webPushKey: ["push", "web-key"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
@@ -21,6 +24,8 @@ export const keys = {
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
+  /** A channel's older pages loaded on scroll-up: outside the channel's key, which holds only message lists. */
+  olderPages: (orgId: string, channelId: string) => ["org", orgId, "older-pages", channelId] as const,
   thread: (orgId: string, channelId: string, rootId: string) =>
     ["org", orgId, "channel", channelId, "thread", rootId] as const,
   approvals: (orgId: string) => ["org", orgId, "approvals"] as const,
@@ -46,6 +51,9 @@ export const keys = {
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
+  /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
+  joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
+  inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
   audit: (orgId: string, query: object) => ["org", orgId, "audit", query] as const,
   /** The usage views; an agent's sits under it, so one invalidation refreshes both. */

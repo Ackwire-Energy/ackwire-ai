@@ -1,4 +1,5 @@
-/* Above the composer: no AI to think with (the organization's, or this DM's agent). */
+/* Above the composer: no AI to think with (the organization's, or this DM's agent). The words and their icon
+   (an `.ac-iconline`) sit in the middle of the button, the icon on the first line when they wrap. */
 .noai-banner {
   display: flex;
   align-items: center;
@@ -10,13 +11,13 @@
   font-size: 13px;
   color: var(--ink-muted);
 }
-.noai-banner > .ac-icon {
-  flex: none;
-  color: var(--attention);
-}
 .noai-banner__text {
   flex: 1;
   min-width: 0;
+  gap: 10px;
+}
+.noai-banner__text > .ac-icon {
+  color: var(--attention);
 }
 .noai-banner__text b {
   color: var(--ink);
@@ -34,21 +35,4 @@
   background: none;
   font: inherit;
   cursor: pointer;
-}
-
-/* The Connect dialog's first step: one card per way to connect. */
-.connect-ai__options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.connect-ai__key {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  color: var(--ink);
 }

@@ -5,18 +5,22 @@ import type { ModelRequest } from "@agenteschat/providers";
 import {
   AgentHeldError,
   acceptInvitation,
+  accountBlock,
+  accountBlockKind,
   addChannelMember,
+  agentHoldKind,
   assertCanWork,
   changeMemberRole,
+  cloudNotice,
   createAgent,
   createFakeJudge,
   createInvitation,
-  createInviteLink,
   createOrganization,
   deleteAccount,
   drainOutbox,
   ForbiddenError,
   getMembership,
+  inviteLink,
   isUserBlocked,
   listMemberships,
   type MachineHub,
@@ -31,10 +35,11 @@ import {
   runErrorDetail,
   setAgentHold,
   setOrgStanding,
+  setRestrictionNotices,
   setUserBlocked,
   standingJudge,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
@@ -210,7 +215,7 @@ describe("suspended", () => {
 
     for (const refused of [
       () => createInvitation(f.db, f.owner.id, f.org.id, { email: "carl@example.com", role: "member" }),
-      () => createInviteLink(f.db, f.owner.id, f.org.id),
+      () => inviteLink(f.db, SECRET, f.owner.id, f.org.id),
       () => resendInvitation(f.db, f.owner.id, f.org.id, sent.invitation.id),
       () => acceptInvitation(f.db, bia, sent.token),
     ]) {
@@ -413,7 +418,7 @@ describe("user block", () => {
     await f.db
       .insert(schema.pushDevices)
       .values({ userId: bia.id, token: "ExponentPushToken[bia]", platform: "ios", locale: "en" });
-    const link = await createInviteLink(f.db, f.owner.id, f.org.id);
+    const link = await inviteLink(f.db, SECRET, f.owner.id, f.org.id);
     const events: unknown[] = [];
     f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
 
@@ -520,6 +525,164 @@ describe("notice", () => {
     expect(
       await setOrgStanding({ db: f.db }, crypto.randomUUID(), { state: "hold", reason: REASON, notice: "silent" }),
     ).toBeNull();
+  });
+});
+
+describe("on agentes.chat Cloud: a restriction's kind and how to contest it, never its reason", () => {
+  afterEach(() => setRestrictionNotices("http://localhost:3000"));
+
+  test("the kinds come from the stored reasons", () => {
+    expect(["network.smtp", "network.scan", "operator", "Spam", null].map((r) => agentHoldKind(r))).toEqual([
+      "network",
+      "network",
+      "operator",
+      "operator",
+      "operator",
+    ]);
+    expect(["abuse.resignup", "legal_hold", "Phishing", null].map((r) => accountBlockKind(r))).toEqual([
+      "abuse",
+      "legal",
+      "other",
+      "other",
+    ]);
+  });
+
+  test("only on an agentes.chat address", () => {
+    for (const url of ["https://agentes.chat", "https://app.agentes.chat"]) {
+      setRestrictionNotices(url);
+      expect(cloudNotice()).toEqual({ cloud: true });
+    }
+    for (const url of ["https://chat.acme.com", "https://agentes.chat.example.com", "http://localhost:3000"]) {
+      setRestrictionNotices(url);
+      expect(cloudNotice()).toBeUndefined();
+    }
+  });
+
+  test("a held agent: its refusal and its runs say the kind, its people hear it, letting it go closes that", async () => {
+    setRestrictionNotices("https://agentes.chat");
+    f = await setup({ reply: () => ({ chunks: ["On it."] }) });
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const cid = await addMember(f.db, f.org.id, "member", "cid");
+    await addMember(f.db, f.org.id, "member", "dan");
+    // Cid answers for the agent.
+    await f.db.update(schema.agents).set({ ownerUserId: cid.id }).where(eq(schema.agents.id, f.agent.id));
+    const hold = (held: boolean, reason: string | null = null) =>
+      setAgentHold(f.db, f.org.id, f.agent.id, { held, reason }, f.pubsub);
+
+    expect(await hold(true, "network.smtp")).toEqual({ heldAt: expect.any(Date), reason: "network.smtp" });
+    await expect(assertCanWork(f.db, f.org.id, f.agent.id)).rejects.toMatchObject({
+      code: "agent.paused",
+      message: "This agent is paused: network",
+      params: { kind: "network", cloud: true },
+    });
+    await post("@dev check the build");
+    await drainOutbox(f.db, f.handlers);
+    const [refused] = await runs();
+    expect(refused).toMatchObject({ status: "failed", error: "This agent is paused: network" });
+    expect(runErrorDetail(refused?.error)).toEqual({
+      errorCode: "run.agent_paused",
+      errorParams: { kind: "network", cloud: "true" },
+    });
+
+    const told = await standingNotices();
+    expect(told.map((n) => n.userId).sort()).toEqual([f.owner.id, bia.id, cid.id].sort());
+    for (const n of told)
+      expect(n).toMatchObject({
+        source: { agentId: f.agent.id, label: "Dev" },
+        latest: { statusTo: "agent_hold", holdKind: "network" },
+        doneAt: null,
+      });
+    // Held again meanwhile for the same kind: nobody is told twice.
+    await hold(true, "network.scan");
+    expect(await standingNotices()).toHaveLength(3);
+    // For another kind, and back: the open notice says what its refusals say.
+    const open = async () => (await standingNotices()).filter((n) => n.doneAt === null);
+    const each = (holdKind: string) => [1, 2, 3].map(() => ({ latest: { statusTo: "agent_hold", holdKind } }));
+    await hold(true, "operator");
+    await expect(assertCanWork(f.db, f.org.id, f.agent.id)).rejects.toMatchObject({ params: { kind: "operator" } });
+    expect(await open()).toMatchObject(each("operator"));
+    await hold(true, "network.smtp");
+    expect(await open()).toMatchObject(each("network"));
+    expect(await standingNotices()).toHaveLength(9);
+    // The reasons never reach the workspace.
+    expect(JSON.stringify([await runs(), await standingNotices()])).not.toContain("smtp");
+
+    await hold(false);
+    expect(await open()).toEqual([]);
+    await Bun.sleep(5);
+    await hold(true, "operator");
+    expect(await open()).toMatchObject(each("operator"));
+  });
+
+  test("a blocked account's kind, a refused workspace, the workspace's standing and its runs say cloud", async () => {
+    setRestrictionNotices("https://agentes.chat");
+    f = await setup();
+    const bia = await addUser(f.db, "bia");
+    for (const [reason, kind] of [
+      ["abuse.resignup", "abuse"],
+      ["legal_hold", "legal"],
+      ["Phishing", "other"],
+    ] as const) {
+      await setUserBlocked({ db: f.db }, bia.id, { blocked: true, reason });
+      expect(await accountBlock(f.db, bia.id)).toEqual({ kind, cloud: true });
+    }
+    await expect(createOrganization(f.db, bia.id, { name: "Bia's" })).rejects.toMatchObject({
+      code: "org.create_refused",
+      params: { cloud: true },
+    });
+    await setUserBlocked({ db: f.db }, bia.id, { blocked: false, reason: null });
+    expect(await accountBlock(f.db, bia.id)).toBeNull();
+
+    const events: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
+    const set = (notice: "shown" | "silent") =>
+      setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state: "hold", reason: "review", notice });
+    await set("shown");
+    await expect(assertCanWork(f.db, f.org.id)).rejects.toMatchObject({
+      code: "org.paused",
+      params: { reason: "review", cloud: true },
+    });
+    // Its owners' notice reads as the hold does.
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review", cloud: true }]);
+    expect(events).toEqual([
+      {
+        type: "org.broadcast",
+        orgId: f.org.id,
+        event: { type: "org.standing", orgId: f.org.id, state: "hold", reason: "review", cloud: true },
+      },
+    ]);
+    expect(runErrorDetail("This workspace is on hold: review")).toEqual({
+      errorCode: "run.org_paused",
+      errorParams: { reason: "review", cloud: "true" },
+    });
+    // Silent: only that it is paused.
+    await set("silent");
+    const silent = await assertCanWork(f.db, f.org.id).catch((e: unknown) => e);
+    expect((silent as OrgPausedError).params).toEqual({ cloud: true });
+  });
+
+  test("a self-hosted server: no kind, no cloud, and nobody told of an agent hold", async () => {
+    setRestrictionNotices("https://chat.acme.com");
+    f = await setup();
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "network.smtp" }, f.pubsub);
+    await expect(assertCanWork(f.db, f.org.id, f.agent.id)).rejects.toMatchObject({
+      message: "This agent is paused for now.",
+      params: undefined,
+    });
+    expect(await standingNotices()).toHaveLength(0);
+    const bia = await addUser(f.db, "bia");
+    await setUserBlocked({ db: f.db }, bia.id, { blocked: true, reason: "abuse.resignup" });
+    expect(await accountBlock(f.db, bia.id)).toEqual({});
+    await expect(createOrganization(f.db, bia.id, { name: "Bia's" })).rejects.toMatchObject({
+      code: "org.create_refused",
+      params: undefined,
+    });
+    expect(runErrorDetail("This workspace is on hold: review")).toEqual({
+      errorCode: "run.org_paused",
+      errorParams: { reason: "review" },
+    });
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review" }]);
   });
 });
 

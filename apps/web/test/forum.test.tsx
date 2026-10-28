@@ -102,6 +102,22 @@ describe("a topic", () => {
     expect(document.body.textContent).toContain("Concluído");
   });
 
+  test("another person's turn: the round waits for them, their face leading the line", async () => {
+    const api = createFakeApi(seedState());
+    const get = api.forum.get;
+    api.forum.get = async (orgId, id) => ({
+      ...(await get(orgId, id)),
+      phase: "waiting_person",
+      waitingUserId: "u-joao",
+    });
+    await renderApp(`/org/${ORG_ID}/forum/topic-pricing`, { api });
+    await settle(8);
+    const live = document.getElementById("forum-live") as HTMLElement;
+    expect(live.textContent).toContain("A rodada espera João");
+    expect(live.classList.contains("ac-iconline")).toBe(true);
+    expect(live.firstElementChild?.matches(".ac-avatar")).toBe(true);
+  });
+
   test("the synthesis: the decision, suggested issues checked inline, create the chosen ones", async () => {
     const { state } = await go("forum/topic-onboarding");
     const synthesis = screen().getByRole("region", { name: "Síntese" });

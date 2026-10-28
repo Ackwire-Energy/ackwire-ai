@@ -59,21 +59,22 @@ describe("an agent's Connect card", () => {
     const ada = cardRow("Conectar o plano do Claude para Ada");
     expect(ada.textContent).toContain("Você pediu para a Ada usar o seu plano.");
     expect(ada.textContent).not.toContain("server text");
-    // One agent named: the dialog is for her alone, with no choice of agent.
+    // One agent named: the dialog is for her alone, on Claude's plan, with no choice of agent.
     await click(within(ada).getByRole("button", { name: "Conectar" }));
-    const plan = dialog("Conectar o seu plano do Claude") as HTMLElement;
-    expect(plan).not.toBeNull();
-    expect(within(plan).queryByRole("combobox", { name: "Para qual agente" })).toBeNull();
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(within(plan).getByRole("region", { name: "Seu plano do Claude" })).toBeTruthy();
+    expect(within(plan).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     await click(within(plan).getByRole("button", { name: "Fechar" }));
     // Two: a choice between them, the first one named chosen.
     await click(
       within(cardRow("Conectar o plano do Claude para Atlas e Ada")).getByRole("button", { name: "Conectar" }),
     );
-    const both = dialog("Conectar o seu plano do Claude") as HTMLElement;
-    expect(within(both).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Atlas");
+    const both = dialog("Conectar uma IA") as HTMLElement;
+    expect(within(both).getByRole("region", { name: "Seu plano do Claude" })).toBeTruthy();
+    expect(within(both).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toContain("Atlas");
   });
 
-  test("an organization's key: no agent named, the key dialog with its provider picked; it stays a button", async () => {
+  test("an organization's key: no agent named, the key panel with its maker picked; it stays a button", async () => {
     const state = seedState();
     state.messages.push(
       card("c-key", { what: "api_key", provider: "openai", agentIds: [], why: "Sua chave da OpenAI." }),
@@ -82,8 +83,9 @@ describe("an agent's Connect card", () => {
     const row = cardRow("Adicionar uma chave de API");
     expect(row.textContent).not.toContain("Conectado");
     await click(within(row).getByRole("button", { name: "Conectar" }));
-    const add = dialog("Adicionar uma chave de API") as HTMLElement;
-    expect(within(add).getByRole("combobox", { name: "Provedor" }).textContent).toContain("OpenAI");
+    const add = dialog("Conectar uma IA") as HTMLElement;
+    const makers = within(add).getByRole("group", { name: "Provedor" });
+    expect(within(makers).getByRole("button", { name: "OpenAI" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   test("done from live data: 'Conectado' once its agents think (with that plan, for a plan's card)", async () => {

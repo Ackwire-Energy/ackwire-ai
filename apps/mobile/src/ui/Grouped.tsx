@@ -1,6 +1,7 @@
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
+import { useInfoHint } from "./InfoHint";
 import { Text } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
@@ -20,7 +21,14 @@ export function GroupedList({ children }: { children?: ReactNode }) {
             <View
               style={[
                 styles.divider,
-                { backgroundColor: c.line2, marginLeft: (child.props as { icon?: unknown }).icon ? 54 : 14 },
+                {
+                  backgroundColor: c.line2,
+                  marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
+                    ? 54
+                    : (child.props as { leading?: unknown }).leading
+                      ? 58
+                      : 14,
+                },
               ]}
             />
           ) : null}
@@ -51,8 +59,14 @@ export function GroupedFooter({ children }: { children: ReactNode }) {
 
 export interface GroupedRowProps {
   label: string;
+  /** Lines the label may take (default 1): a setting's long name beside its switch. */
+  labelLines?: number;
   /** A small line under the label. */
   sub?: string;
+  /** Lines the small line may take (default 1). */
+  subLines?: number;
+  /** Under the small line, in the text column (a second line of facts). */
+  below?: ReactNode;
   /** A rounded tile with this icon on the left. */
   icon?: IconName;
   /** Anything else on the left (an organization's tile). */
@@ -73,7 +87,10 @@ export interface GroupedRowProps {
 /** One row of a group: icon tile, label, the value in faint, a chevron, a check or a switch. */
 export function GroupedRow({
   label,
+  labelLines = 1,
   sub,
+  subLines = 1,
+  below,
   icon,
   leading,
   value,
@@ -106,14 +123,15 @@ export function GroupedRow({
       ) : null}
       {leading}
       <View style={styles.grow}>
-        <Text variant="body" numberOfLines={1} style={{ color: tone }}>
+        <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
           {label}
         </Text>
         {sub ? (
-          <Text variant="footnote" tone="faint" numberOfLines={1}>
+          <Text variant="footnote" tone="faint" numberOfLines={subLines}>
             {sub}
           </Text>
         ) : null}
+        {below}
       </View>
       {value ? (
         <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>
@@ -127,20 +145,26 @@ export function GroupedRow({
   );
 }
 
+interface GroupedFieldProps {
+  label: string;
+  /** An ⓘ right after the label, with the field's explanation. */
+  hint?: { name: string; text: string };
+  children: ReactNode;
+  onPress?: () => void;
+}
+
 /**
  * A labeled field row ("Nome", "Seu @"): the label in a fixed column, the value or an input after it;
  * with `onPress`, the whole row opens a screen (a chevron on the right).
  */
-export function GroupedField({
-  label,
-  children,
-  onPress,
-}: {
-  label: string;
-  children: ReactNode;
-  onPress?: () => void;
-}) {
+export function GroupedField({ label, hint, children, onPress }: GroupedFieldProps) {
   const { colors: c } = useTheme();
+  if (hint)
+    return (
+      <HintedField label={label} hint={hint} onPress={onPress}>
+        {children}
+      </HintedField>
+    );
   const body = (
     <>
       <Text variant="callout" tone="muted" style={styles.key}>
@@ -163,6 +187,52 @@ export function GroupedField({
   );
 }
 
+/**
+ * A field whose label has an ⓘ. With `onPress` the row's button lies under the label and the value rather than
+ * around them: inside another button the ⓘ would be part of it to VoiceOver, never a button of its own.
+ */
+function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { hint: { name: string; text: string } }) {
+  const { colors: c } = useTheme();
+  const info = useInfoHint({ ...hint, variant: "callout" });
+  const passive = onPress ? "none" : "auto";
+  return (
+    <View>
+      <View style={styles.field}>
+        {onPress ? (
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            style={({ pressed }) => [StyleSheet.absoluteFill, pressed ? { backgroundColor: c.sunken } : null]}
+          />
+        ) : null}
+        <View style={[styles.key, styles.keyLine]} pointerEvents="box-none">
+          <View
+            pointerEvents={passive}
+            style={styles.shrink}
+            accessibilityElementsHidden={Boolean(onPress)}
+            importantForAccessibility={onPress ? "no-hide-descendants" : "auto"}
+          >
+            <Text variant="callout" tone="muted">
+              {label}
+            </Text>
+          </View>
+          {info.button}
+        </View>
+        <View style={styles.grow} pointerEvents={passive}>
+          {children}
+        </View>
+        {onPress ? (
+          <View pointerEvents="none">
+            <Icon name="right" size={15} color={c.faint} />
+          </View>
+        ) : null}
+      </View>
+      <View style={[styles.hint, info.open ? styles.hintOpen : null]}>{info.text}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
@@ -181,4 +251,8 @@ const styles = StyleSheet.create({
   value: { flexShrink: 1, maxWidth: "50%" },
   field: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 50, paddingHorizontal: 14 },
   key: { width: 96 },
+  keyLine: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  hint: { paddingHorizontal: 14 },
+  hintOpen: { paddingBottom: 12 },
 });

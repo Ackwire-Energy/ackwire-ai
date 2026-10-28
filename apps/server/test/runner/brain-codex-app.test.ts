@@ -193,6 +193,9 @@ test.skipIf(!posix)(
     expect(t.rpcs("thread/start")).toHaveLength(1);
     expect(t.rpcs("turn/start")[1]).toMatchObject({ model: "gpt-5.5", effort: "high" });
     expect(t.app.size).toBe(1);
+    // The computer's own sign-in has a process open: a plan's route there waits (`brain-route.ts`).
+    expect(t.app.holds(null)).toBe(true);
+    expect(t.app.holds("0193aaaa-bbbb-7ccc-8ddd-eeeeffff0001")).toBe(false);
   },
   20_000,
 );

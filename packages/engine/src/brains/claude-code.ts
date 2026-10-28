@@ -186,13 +186,13 @@ export function accountUnavailable(
   if (status?.protocol !== undefined && status.protocol < ACCOUNTS_PROTOCOL) {
     return {
       code: "runner_outdated",
-      message: `The runner${where} is too old for agents with their own ${name} account; update it (agentes-runner update).`,
+      message: `The runner${where} is too old for agents with their own ${name} account. Update it (agentes-runner update).`,
     };
   }
   if (account.status === "signed_out") {
     return {
       code: "not_logged_in",
-      message: `The ${name} account "${account.label}"${where} is signed out; its owner can sign in again in Settings, AI accounts.`,
+      message: `The ${name} account "${account.label}"${where} is signed out. Its owner can sign in again in Settings, AI accounts.`,
     };
   }
   return null;
@@ -224,7 +224,7 @@ export function claudeCodeAvailability(status: MachineStatus | null, account?: B
   if (status.protocol < BRAIN_PROTOCOL) {
     return err(
       "runner_outdated",
-      `The runner on ${status.name} is too old for agents that think with Claude Code; update it (agentes-runner update).`,
+      `The runner on ${status.name} is too old for agents that think with Claude Code. Update it (agentes-runner update).`,
       true,
     );
   }
@@ -361,7 +361,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
         if (permissions?.mode === "plan" && (status?.protocol ?? 0) < BRAIN_PROFILES_PROTOCOL) {
           yield err(
             "runner_outdated",
-            "The runner on the computer is too old to keep Claude Code within this agent's permissions; update it.",
+            "The runner on the computer is too old to keep Claude Code within this agent's permissions. Update it.",
             true,
           );
           return;
@@ -441,14 +441,16 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
  * Records a computer brain's plan usage (source "plan"): tokens with the
  * run, agent and org, cost zero, billed to the owner's plan. The engine calls
  * it for each `usage` event with `source: "plan"` (the Model Gateway records
- * API usage itself).
+ * API usage itself), and the router for a plan that picked who answers
+ * (kind `router`, no run).
  */
 export async function recordPlanUsage(
   db: Database,
   input: {
     orgId: string;
     agentId: string;
-    runId: string;
+    runId?: string;
+    kind?: "agent" | "router";
     /** `claude_code` or `codex`. */
     provider: string;
     /** The computer the turn ran on and the account it spent; `accountId` null: that computer's own sign-in. */
@@ -470,8 +472,8 @@ export async function recordPlanUsage(
     .values({
       orgId: input.orgId,
       agentId: input.agentId,
-      kind: "agent",
-      runId: input.runId,
+      kind: input.kind ?? "agent",
+      runId: input.runId ?? null,
       credentialId: null,
       provider: input.provider,
       model: input.model ?? input.provider,

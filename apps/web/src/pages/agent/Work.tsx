@@ -26,13 +26,24 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
+import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
+import {
+  allowsInApp,
+  commandInReason,
+  computerKind,
+  computerState,
+  toolOffReason,
+  toolOnCommand,
+} from "@agenteschat/client/lib/machines";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
   isPlanId,
+  loginPerAgent,
   planAliases,
   planModel as planModelOf,
   planModelOptions,
@@ -52,6 +63,7 @@ import {
   EffortPixels,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   LogoMark,
   OptionList,
@@ -125,8 +137,8 @@ function useWork() {
   return { brain, computer, browser, scopes, machines, granted, machineId, target, browserWord };
 }
 
-/** A cell of "Como trabalha": its icon, what it is, the value; a button for who may change it. */
-function Cell({
+/** A cell of "Como trabalha" (and the memory's counts): its icon, what it is, the value; a button for who may change it. */
+export function Cell({
   icon,
   label,
   value,
@@ -142,7 +154,7 @@ function Cell({
   more?: string | null;
   sub?: string | null;
   muted?: boolean;
-  openLabel: string;
+  openLabel?: string;
   onOpen?: () => void;
 }) {
   const body = (
@@ -234,13 +246,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const member = viewer === "member";
   const reason = work.browser.data?.reason;
   const machineRow = machine ? work.machines.data?.find((m) => m.id === machine.machineId) : undefined;
-  // The steps happen on the computer itself: never on the workspace's own, which nobody here reaches.
-  const steps =
-    !member &&
-    work.browserWord === "waiting" &&
-    machine &&
-    machineRow?.kind !== "managed" &&
-    (reason === "switched_off" || reason === "not_reported");
+  // Only a switch that is off has a step there: `not_reported` and `not_installed` are on, `outdated` has none.
+  const steps = !member && work.browserWord === "waiting" && machine && reason === "switched_off";
   const desktopGranted = (work.scopes.data ?? []).some(
     (s) => s.connectionId === null && s.scope === DESKTOP_TOOL_SCOPE,
   );
@@ -307,7 +314,6 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </div>
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
-      {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {edition === "cloud"
@@ -334,7 +340,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
   if (m.os !== "linux" || !use || use.available || !use.reason) return null;
   const command = commandInReason(use.reason);
   return (
-    <div className="brw-note">
+    <div className="brw-note ac-iconline">
       <Icon name="computer" size={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block" }}>{t("desktop.use.agent", { ...g, computer: m.name })}</span>
@@ -357,13 +363,17 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 }
 
 /**
- * The three clicks on the computer that turn its browser on, drawn small; the page notices by itself.
- * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (ADR 0036).
+ * What turns the computer's browser on, there; the page notices by itself. The app's three clicks, drawn small; on a
+ * Linux computer, which may be a server without the app, the command too. In agentes for Mac on this very Mac: one
+ * button to Preferences → Ferramentas instead (ADR 0036). Nothing once its switch is on, or on the workspace's own
+ * computer, which nobody here reaches.
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId ?? "");
+  const row = useMachines(org.id).data?.find((m) => m.id === machineId);
+  if (row?.kind === "managed" || row?.access?.tools.browser) return null;
   if (here) {
     return (
       <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
@@ -409,41 +419,49 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
         <b>{t("agentPage.work.steps.title", { computer })}</b>
         <span className="brw-steps__wait">{t("agentPage.work.steps.waiting")}</span>
       </div>
-      <div className="brw-steps__grid">
-        {step(1, bar(true), t("agentPage.work.steps.one"))}
-        {step(
-          2,
-          <>
-            {bar()}
-            <div className="brw-mmenu">
-              <span>{t("agentPage.work.steps.menuOpen")}</span>
-              <hr />
-              <span data-hl>{t("agentPage.work.steps.menuPrefs")}</span>
-              <span>{t("agentPage.work.steps.menuPause")}</span>
-              <hr />
-              <span>{t("agentPage.work.steps.menuQuit")}</span>
-            </div>
-          </>,
-          t("agentPage.work.steps.two"),
-        )}
-        {step(
-          3,
-          <div className="brw-mwin">
-            <div className="brw-mwin__bar">{t("agentPage.work.steps.tools")}</div>
-            <div className="brw-mwin__row">
-              Claude Code <i data-on />
-            </div>
-            <div className="brw-mwin__row">
-              {t("agentPage.work.steps.commands")} <i data-on />
-            </div>
-            <div className="brw-mwin__row" data-hl>
-              {t("agentPage.work.computer.browser")} <i data-flip />
-            </div>
-          </div>,
-          t("agentPage.work.steps.three"),
-        )}
-      </div>
-      <p className="brw-steps__done">
+      {row && !allowsInApp(row.os) ? (
+        <div className="stack-4" style={{ gap: 6 }}>
+          <span className="small">{t("browser.machine.offHelp")}</span>
+          <span className="small muted">{t("machines.access.grantTerminal")}</span>
+          <CommandBlock command={toolOnCommand(row, "browser")} />
+        </div>
+      ) : (
+        <div className="brw-steps__grid">
+          {step(1, bar(true), t("agentPage.work.steps.one"))}
+          {step(
+            2,
+            <>
+              {bar()}
+              <div className="brw-mmenu">
+                <span>{t("agentPage.work.steps.menuOpen")}</span>
+                <hr />
+                <span data-hl>{t("agentPage.work.steps.menuPrefs")}</span>
+                <span>{t("agentPage.work.steps.menuPause")}</span>
+                <hr />
+                <span>{t("agentPage.work.steps.menuQuit")}</span>
+              </div>
+            </>,
+            t("agentPage.work.steps.two"),
+          )}
+          {step(
+            3,
+            <div className="brw-mwin">
+              <div className="brw-mwin__bar">{t("agentPage.work.steps.tools")}</div>
+              <div className="brw-mwin__row">
+                Claude Code <i data-on />
+              </div>
+              <div className="brw-mwin__row">
+                {t("agentPage.work.steps.commands")} <i data-on />
+              </div>
+              <div className="brw-mwin__row" data-hl>
+                {t("agentPage.work.computer.browser")} <i data-flip />
+              </div>
+            </div>,
+            t("agentPage.work.steps.three"),
+          )}
+        </div>
+      )}
+      <p className="brw-steps__done ac-iconline">
         <Icon name="check" size={14} />
         {t("agentPage.work.steps.done")}
       </p>
@@ -534,9 +552,13 @@ function Footer({
  * through the API while the computer is off.
  */
 
-/** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
+/**
+ * Select values that aren't an account id: the computer's own sign-in, "Adicionar conta", and before a login's id
+ * a sign-in of this agent's own to that login's account ("Also used by Ada").
+ */
 const HERE = "__computer";
 const ADD = "__add";
+const ALSO = "__also:";
 /**
  * The effort's four levels. Automático is the model's choice, not a level: an automatic model picks the
  * effort too, and the ramp goes away.
@@ -552,6 +574,24 @@ function BrainDialog({ onClose }: { onClose: () => void }) {
   // The choices start from what is saved: the form mounts once it is loaded.
   if (!work.brain.data || !work.computer.data) return null;
   return <BrainForm view={work.brain.data} onClose={onClose} />;
+}
+
+/**
+ * A switch's label on one line, its ⓘ right after it: outside the label, so pressing the ⓘ never flips the switch,
+ * and the switch is described by it (`<id>-hint`). The hint reads the same whether the switch is on or off.
+ */
+function SwitchLabel({ htmlFor, label, hint }: { htmlFor: string; label: string; hint: string }) {
+  const { t } = useTranslation();
+  return (
+    <span className="agp-brainoff ac-hintline">
+      <label htmlFor={htmlFor}>
+        <b>{label}</b>
+      </label>
+      <InfoHint name={t("common.about", { label })} id={`${htmlFor}-hint`}>
+        {hint}
+      </InfoHint>
+    </span>
+  );
 }
 
 /** A setting of the opened brain: a small label above its control (the label is the control's name too). */
@@ -581,6 +621,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const credentials = useCredentials(org.id, canDo(org.role, "manage_credentials"));
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
+  // Answering through the API needs a key: the workspace's own, or the server's.
+  const apiKey = useAiStatus(org.id).data?.apiKey !== false;
   const update = useUpdateAgent(org.id, agent.id);
   const setTarget = useSetComputerTarget(org.id);
   const [kind, setKind] = useState<BrainKind>(view.brain);
@@ -590,7 +632,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
   const [effort, setEffort] = useState<ShownEffort>(shownEffort(view.effort));
-  const [adding, setAdding] = useState(false);
+  // Adding an account: any, or (an account) one more login of it for this agent.
+  const [adding, setAdding] = useState<boolean | MachineAccount>(false);
   // Accounts that arrived while the dialog was open (saved with the rest on "Usar").
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
@@ -712,7 +755,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
-      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
+      // On the API it answers its stored audience: `view.onlyOwner` is the gate's, which a personal plan narrows.
+      if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
           label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
@@ -775,6 +819,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
       return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
+    if (o.reason === "tool_off" && k !== "model") {
+      const off = toolOffReason(
+        work.machines.data?.find((m) => m.id === view.computer?.machineId),
+        k,
+      );
+      return t(off.key, { computer: view.computer?.name ?? "", command: off.command });
+    }
     return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "" });
   };
   const whereName = home?.name ?? "";
@@ -792,25 +843,38 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         : t("aiAccounts.share.hereNotYours", { computer: computerName }),
       leading: accountIcon,
     },
-    ...accounts.map((a) => {
-      // One account thinks for one agent.
+    // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
+    // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
+    ...groupPlans(accounts).flatMap(({ logins, usedBy }) => {
+      const own =
+        logins.find((l) => l.id === account) ??
+        logins.find((l) => l.id === view.account) ??
+        logins.find((l) => l.mine && l.usedBy.length === 0);
+      const a = own ?? logins[0];
+      if (!a) return [];
+      const also = !own && a.mine && loginPerAgent(a.kind, a.provider);
+      // One login thinks for one agent.
       const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
       const about = !a.mine
         ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-        : a.status === "signed_out"
-          ? t("agentPage.work.brain.accountSignedOut")
-          : others
-            ? t("agentPage.work.brain.accountMove", { agents: others })
-            : a.keyHint
-              ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-              : a.email;
-      return {
-        value: a.id,
-        label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-        disabled: !a.mine,
-        description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
-        leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
-      };
+        : also
+          ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
+          : a.status === "signed_out"
+            ? t("agentPage.work.brain.accountSignedOut")
+            : others
+              ? t("agentPage.work.brain.accountMove", { agents: others })
+              : a.keyHint
+                ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                : a.email;
+      return [
+        {
+          value: also ? `${ALSO}${a.id}` : a.id,
+          label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
+          disabled: !a.mine,
+          description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
+          leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
+        },
+      ];
     }),
     {
       value: ADD,
@@ -837,6 +901,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         disabled={!view.canUsePlans}
         onValueChange={(v) => {
           if (v === ADD) return setAdding(true);
+          const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
+          if (also) return setAdding(also);
           setArrived(null);
           setAccount(v === HERE ? null : v);
         }}
@@ -875,6 +941,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
     </BrainField>
   );
+  const shareLabel = view.canUsePlans
+    ? t("aiAccounts.share.switch")
+    : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" });
+  const also = typeof adding === "object" ? adding : undefined;
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
@@ -910,29 +980,36 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         />
       )}
       {accountField}
-      {agent.ownerUserId && (
-        <div className="agp-brainshare">
-          <label className="agp-brainoff" htmlFor={shareId}>
-            <b>
-              {view.canUsePlans
-                ? t("aiAccounts.share.switch")
-                : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" })}
-            </b>
-            <span>
-              {view.canUsePlans
-                ? t(onlyOwner ? "aiAccounts.share.on" : "aiAccounts.share.off", g)
-                : t(onlyOwner ? "aiAccounts.share.onOther" : "aiAccounts.share.offOther", { owner: ownerFirst ?? "" })}
+      {agent.ownerUserId &&
+        (edition === "cloud" ? (
+          // Where the server provisions the computers a plan is personal: nobody lets more people in (ADR 0059 §5).
+          <div className="agp-brainshare">
+            <span className="agp-brainoff ac-hintline">
+              <b>{shareLabel}</b>
+              <InfoHint name={t("common.about", { label: shareLabel })}>{t("aiAccounts.share.fixedHint")}</InfoHint>
             </span>
-          </label>
-          <Switch
-            id={shareId}
-            checked={onlyOwner}
-            // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
-            disabled={!view.canUsePlans && onlyOwner}
-            onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
-          />
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="agp-brainshare">
+            <SwitchLabel
+              htmlFor={shareId}
+              label={shareLabel}
+              hint={
+                view.canUsePlans
+                  ? t("aiAccounts.share.hint", g)
+                  : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
+              }
+            />
+            <Switch
+              id={shareId}
+              aria-describedby={`${shareId}-hint`}
+              checked={onlyOwner}
+              // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
+              disabled={!view.canUsePlans && onlyOwner}
+              onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
+            />
+          </div>
+        ))}
       {asking && accountKind && (
         <SharePlanDialog
           agentName={agent.name}
@@ -947,15 +1024,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onKeep={() => setAsking(false)}
         />
       )}
-      <div className="ac-optcard__foot">
-        <label className="agp-brainoff" htmlFor={offId}>
-          <b>{t("agentPage.work.brain.fallbackTitle", { computer: whereName })}</b>
-          <span>
-            {fallback ? t("agentPage.work.brain.fallbackOnNow", g) : t("agentPage.work.brain.fallbackOffNow", g)}
-          </span>
-        </label>
-        <Switch id={offId} checked={fallback} onCheckedChange={setFallback} />
-      </div>
+      {apiKey && (
+        <div className="ac-optcard__foot">
+          <SwitchLabel
+            htmlFor={offId}
+            label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
+            hint={t("agentPage.work.brain.fallbackHint", g)}
+          />
+          <Switch id={offId} aria-describedby={`${offId}-hint`} checked={fallback} onCheckedChange={setFallback} />
+        </div>
+      )}
     </>
   );
   const orgRows = can("model") ? (
@@ -988,7 +1066,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 leading: <ProviderLogo id={provider} size="sm" />,
                 description: available
                   ? modelDescription(t, i18n.language, m)
-                  : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
+                  : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
               })),
             ),
           ]}
@@ -1052,8 +1130,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={signedOut ? current?.id : undefined}
-                    {...(signedOut && isPlanId(current?.provider) ? { provider: current.provider } : {})}
-                    email={signedOut ? current?.email : undefined}
+                    {...(signedOut && isPlanId(current?.provider)
+                      ? { provider: current.provider }
+                      : isPlanId(also?.provider)
+                        ? { provider: also.provider }
+                        : {})}
+                    email={signedOut ? current?.email : also?.email}
+                    askEmail={!also && (view.ownSignIn || accounts.some((a) => a.mine))}
+                    local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
                       setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
@@ -1087,7 +1171,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             />
           </span>
         }
-        disabled={unchanged || adding || (kind !== "model" && !home)}
+        disabled={unchanged || adding !== false || (kind !== "model" && !home)}
         busy={busy}
         primary={planKind ? t(`agentPage.work.usePlan.${planKind}`) : t("agentPage.work.use")}
         onClose={onClose}
@@ -1214,15 +1298,19 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               ? [
                   {
                     value: CLOUD,
-                    leading:
-                      cloud === "none" ? (
-                        <Icon name="dash" size={20} />
-                      ) : (
-                        <ComputerPortrait
-                          kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
-                          state={workspace ? setupPortrait(workspace, false) : "online"}
-                        />
-                      ),
+                    // Portraits are as wide as their drawings: one column keeps the titles in line.
+                    leading: (
+                      <span className="machine-row__pic">
+                        {cloud === "none" ? (
+                          <Icon name="dash" size={20} />
+                        ) : (
+                          <ComputerPortrait
+                            kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                            state={workspace ? setupPortrait(workspace, false) : "online"}
+                          />
+                        )}
+                      </span>
+                    ),
                     title: noComputer.label(cloud),
                     description: workspace
                       ? t(workspace.textKey)
@@ -1235,7 +1323,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               : []),
             ...listed.map((m) => ({
               value: m.id,
-              leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
+              leading: (
+                <span className="machine-row__pic">
+                  <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
+                </span>
+              ),
               title: m.name,
               description: `${status(m)} · ${offers(m)}`,
               children: note(m.id),
@@ -1452,7 +1544,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
           {blocked && inDesktopApp() && (
             <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
           )}
-          {on && (moveTo ? !ready(moveTo) : !work.browser.data?.available && work.browser.data?.machine) && (
+          {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
             <BrowserSteps
               computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}

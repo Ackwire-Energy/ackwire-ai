@@ -65,6 +65,9 @@ export type ActivityKind =
   | "readingForum"
   | "creatingChannel"
   | "offeringConnectAi"
+  | "askingAgent"
+  | "tellingAgent"
+  | "findingTools"
   | "usingTool";
 
 export interface Activity {
@@ -142,6 +145,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Setting up the workspace.
   create_channel: "creatingChannel",
   offer_connect_ai: "offeringConnectAi",
+  // Another agent of the team (the consultation card says who and what it answered).
+  ask_agent: "askingAgent",
+  tell_agent: "tellingAgent",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -211,6 +217,8 @@ export function toolActivity(
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
+  // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
+  if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };
   // The agent's own browser (ADR 0040): not an app called "browser".
   if (name.startsWith("browser_")) return { kind: "browsing" };
   const label = connector?.trim();

@@ -26,12 +26,16 @@ export interface PlanModel {
 export interface CodingPlan {
   /** The account's first name ("GLM Coding"), numbered per owner. */
   label: string;
+  /** The plan as its maker sells it ("GLM Coding Plan"), for titles. */
+  name: string;
   /** Who sells it, for the logo's neighbors and the terms notice ("{{maker}} says…"). */
   maker: string;
   /** Where its owner makes the key. */
   site: string;
   /** What its keys look like (a `RegExp` source): loose, only to catch a paste that isn't a key. */
   keyPattern: string;
+  /** How its keys start, as the key field's example; none where the maker publishes no prefix. */
+  placeholder?: string;
   claudeCode: {
     /** Its Anthropic Messages endpoint (Claude Code adds `/v1/messages`). */
     baseUrl: string;
@@ -49,6 +53,7 @@ export interface CodingPlan {
 export const CODING_PLANS = {
   zai: {
     label: "GLM Coding",
+    name: "GLM Coding Plan",
     maker: "Z.ai",
     site: "https://z.ai/manage-apikey/apikey-list",
     keyPattern: "^[A-Za-z0-9._-]{16,256}$",
@@ -65,6 +70,7 @@ export const CODING_PLANS = {
   },
   kimi: {
     label: "Kimi Code",
+    name: "Kimi Code",
     maker: "Kimi",
     site: "https://www.kimi.com/code/console",
     keyPattern: "^[A-Za-z0-9._-]{16,256}$",
@@ -81,6 +87,7 @@ export const CODING_PLANS = {
   },
   minimax: {
     label: "MiniMax",
+    name: "MiniMax M Plan",
     maker: "MiniMax",
     site: "https://platform.minimax.io/console/plan",
     keyPattern: "^[A-Za-z0-9._-]{16,2048}$",
@@ -92,9 +99,11 @@ export const CODING_PLANS = {
   },
   opencode: {
     label: "OpenCode Go",
+    name: "OpenCode Go",
     maker: "OpenCode",
     site: "https://opencode.ai/console",
     keyPattern: "^oc_sk_[A-Za-z0-9._-]{8,256}$",
+    placeholder: "oc_sk_…",
     claudeCode: {
       baseUrl: "https://opencode.ai/inference/go/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
@@ -127,3 +136,19 @@ export const planAliases = (plan: CodingPlan): PlanAlias[] =>
 
 /** A pasted key that fits the plan: one line, the plan's shape. */
 export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.keyPattern).test(key);
+
+/**
+ * The accounts that may have one login per agent, the same account signed in again for each (on a computer where
+ * every agent is its own OS user, a sign-in folder belongs to one agent at a time). A coding plan's key has no
+ * refresh token, so its copies never sign each other out. Claude's and ChatGPT's sign-ins stay one agent per
+ * account until several sign-ins of one account are seen to hold.
+ */
+export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
+  claude_code: false,
+  codex: false,
+  key: true,
+};
+
+/** Whether an account (its CLI's kind, and a coding plan's `provider` for a key) may have one login per agent. */
+export const loginPerAgent = (kind: string, provider?: string | null) =>
+  isPlanId(provider) ? LOGIN_PER_AGENT.key : kind === "codex" ? LOGIN_PER_AGENT.codex : LOGIN_PER_AGENT.claude_code;

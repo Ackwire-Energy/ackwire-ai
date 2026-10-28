@@ -324,7 +324,7 @@ function WebScreen() {
             </Message>
             <Message agent avatar={adaAvatar} author={ada.name} time={fmt.time(9, 59)}>
               <MessageText>{t("landing.devices.web.forum")}</MessageText>
-              <div className="lp-dev-forum">
+              <div className="lp-dev-forum ac-iconline">
                 <Icon name="message" size={16} />
                 <div>
                   <b>{t("landing.devices.web.forumTitle")}</b>

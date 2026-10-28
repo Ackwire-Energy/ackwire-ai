@@ -1,12 +1,13 @@
 import { randomBytes, sign as signWithKey } from "node:crypto";
+import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import {
+  accountBlock,
   countUsers,
   deriveSecret,
   emailLocale,
   isSignupAllowed,
-  isUserBlocked,
   onUserCreated,
   queueEmail,
   recordSession,
@@ -22,6 +23,7 @@ import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware 
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import { desktopSignIn } from "./desktop-sign-in";
+import { humanCheckRefusal } from "./http/human-check";
 import type { Logger } from "./logger";
 import { ownerSignIn } from "./owner-claim";
 
@@ -40,21 +42,26 @@ import { ownerSignIn } from "./owner-claim";
  * The Mac app's window loads the site itself and signs in like the web; for
  * Google and Apple it borrows the browser (`desktop-sign-in.ts`, ADR 0036).
  */
-export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
-  const { db, config, log } = deps;
+export function createAuth(deps: {
+  db: Database;
+  config: Config;
+  log: Logger;
+  emailDelivers?: boolean;
+  /** Counts the reset and confirmation emails per address. */
+  rateLimiter: RateLimiter;
+  /** The bot check of the email forms (ADR 0075); absent: none. */
+  humanCheck?: HumanCheck | null;
+}) {
+  const { db, config, log, rateLimiter } = deps;
   const emailEnabled = deps.emailDelivers === true;
+  // Better Auth answers the same whether an email went out, so a flood from many addresses only stops quietly.
+  const emailAllowed = async (kind: "reset-email" | "verify-email", email: string) =>
+    (await rateLimiter.consume(`${kind}:${sha256(email.toLowerCase())}`, EMAILS_PER_ADDRESS)).allowed;
 
-  /**
-   * Emails cleared by an org invite link in the sign-up request (header
-   * `x-invite-token`), for the user-create hook of the same request.
-   */
-  const clearedByLink = new Map<string, number>();
   const policy = signupPolicy(config);
-  const assertSignupAllowed = async (email: string, inviteToken?: string | null) => {
-    const key = email.toLowerCase();
-    const cleared = clearedByLink.get(key);
-    if (cleared !== undefined && cleared > Date.now()) return;
-    if (!(await isSignupAllowed(db, email, policy, new Date(), inviteToken))) {
+  // An invitation link never opens sign-up (ADR 0068): only an email invitation to that address does.
+  const assertSignupAllowed = async (email: string) => {
+    if (!(await isSignupAllowed(db, email, policy))) {
       if (policy.ownerByLink && (await countUsers(db)) === 0) {
         throw new APIError("FORBIDDEN", {
           code: OWNER_CLAIM_REQUIRED,
@@ -62,7 +69,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         });
       }
       throw new APIError("FORBIDDEN", {
-        message: "Sign-up is closed on this agentes.chat instance. Ask an organization owner for an invitation.",
+        message: "Sign-up is closed on this server. If you were invited, open the link in the invitation email.",
       });
     }
   };
@@ -110,6 +117,8 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       minPasswordLength: 8,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
+      // The reset email says the link works for an hour.
+      resetPasswordTokenExpiresIn: 60 * 60,
       // Only when a real email sender is configured (MillionSend or SMTP); sent through the outbox.
       ...(emailEnabled
         ? {
@@ -124,6 +133,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
               },
               request?: Request,
             ) => {
+              if (!(await emailAllowed("reset-email", user.email))) return;
               // Straight to our page (not Better Auth's redirect): the same link opens the phone app when it is
               // installed (universal link / App Link, app-links.ts) and the website otherwise; both reset with it.
               const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
@@ -158,6 +168,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
               },
               request?: Request,
             ) => {
+              if (!(await emailAllowed("verify-email", user.email))) return;
               const locale = emailLocale(user.locale ?? requestLocale(request?.headers.get("accept-language")));
               await queueEmail(db, {
                 orgId: null,
@@ -192,34 +203,30 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       },
     },
     advanced: {
-      ipAddress: {
-        trustedProxies: config.TRUSTED_PROXIES?.split(",")
-          .map((p) => p.trim())
-          .filter(Boolean),
-      },
+      ipAddress: { trustedProxies: config.TRUSTED_PROXIES },
     },
     hooks: {
       // Checked before the endpoint runs so the person sees the real reason.
       // The database hook below also guards social sign-in.
       before: createAuthMiddleware(async (ctx) => {
+        const action = HUMAN_ACTIONS[ctx.path];
+        // Before the sign-up policy: a bot gets the cheap refusal first.
+        if (action && ctx.headers) {
+          const refused = await humanCheckRefusal(deps.humanCheck, ctx.headers, action, config.TRUSTED_PROXIES);
+          if (refused) throw new APIError("FORBIDDEN", refused);
+        }
         if (ctx.path !== "/sign-up/email") return;
         const email = (ctx.body as { email?: unknown } | undefined)?.email;
         if (typeof email !== "string") return;
-        const inviteToken = ctx.headers?.get("x-invite-token")?.trim() || null;
-        await assertSignupAllowed(email, inviteToken);
-        if (inviteToken) {
-          for (const [k, until] of clearedByLink) if (until <= Date.now()) clearedByLink.delete(k);
-          clearedByLink.set(email.toLowerCase(), Date.now() + 60_000);
-        }
+        await assertSignupAllowed(email);
       }),
     },
     databaseHooks: {
       user: {
         create: {
-          // Social sign-up too (the phone's Apple sign-in from an invitation): an org invite link's token in
-          // the request (`x-invite-token`) opens sign-up for it, as it does for e-mail sign-up.
+          // Social sign-up too (the phone's Apple sign-in from an invitation).
           before: async (user, context) => {
-            await assertSignupAllowed(user.email, context?.headers?.get("x-invite-token")?.trim() || null);
+            await assertSignupAllowed(user.email);
             // The sign-up's own language from the start: the confirmation email goes out before any other choice.
             const locale = requestLocale(context?.headers?.get("accept-language"));
             return { data: { ...user, email: user.email.toLowerCase(), ...(locale ? { locale } : {}) } };
@@ -247,10 +254,16 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       session: {
         create: {
           // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
-          // makes a social sign-in's callback send the person back to the sign-in page.
+          // makes a social sign-in's callback send the person back to the sign-in page. On agentes.chat Cloud the
+          // body adds the block's kind, never its reason.
           before: async (session) => {
-            if (await isUserBlocked(db, session.userId)) {
-              throw new APIError("FORBIDDEN", { code: "ACCOUNT_BLOCKED", message: "This account can't sign in." });
+            const block = await accountBlock(db, session.userId);
+            if (block) {
+              throw new APIError("FORBIDDEN", {
+                code: "ACCOUNT_BLOCKED",
+                message: "This account can't sign in.",
+                ...block,
+              });
             }
           },
           after: async (session) => {
@@ -273,6 +286,16 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
   const session = await auth.api.getSession({ headers });
   return session ? (session.user as SessionUser) : null;
 }
+
+/** Better Auth's paths that a bot check guards (ADR 0075), with the action their widget runs. */
+const HUMAN_ACTIONS: Record<string, HumanAction> = {
+  "/sign-in/email": "sign-in",
+  "/sign-up/email": "sign-up",
+  "/request-password-reset": "password-reset",
+};
+
+/** Reset and confirmation emails to one address in an hour. */
+const EMAILS_PER_ADDRESS = { limit: 3, windowMs: 3600_000 };
 
 /** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
 export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";

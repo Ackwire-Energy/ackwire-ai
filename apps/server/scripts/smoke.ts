@@ -16,7 +16,7 @@
  * With `--desktop-agent <handle>` (or the agent's id), through the server
  * running at PUBLIC_URL: the agent's desktop (started by watching it, if it
  * wasn't running) watched until one framebuffer update, and its terminal's
- * `id -un`, which must not be root
+ * `id -un`, which must not be root, or its refusal where sessions are screened
  * (`smoke-desktop.ts`). Without a model key, only that runs.
  */
 import { parseArgs } from "node:util";
@@ -200,7 +200,7 @@ async function modelSmoke(db: Database) {
 /** The agent's desktop and terminal through the server at PUBLIC_URL, as whoever may drive its computer. */
 async function desktopSmoke(db: Database, agent: string) {
   const origin = new URL(config.PUBLIC_URL).origin;
-  const auth = createAuth({ db, config, log: createLogger("error") });
+  const auth = createAuth({ db, config, log: createLogger("error"), rateLimiter: createMemoryRateLimiter() });
   const session = await signInForDesktop({ db, auth, base: origin, origin }, agent);
   step(`desktop: @${session.handle} through ${origin}, signed in as ${session.person}`);
   try {

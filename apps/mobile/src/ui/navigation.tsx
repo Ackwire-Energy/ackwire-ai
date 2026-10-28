@@ -3,11 +3,15 @@ import {
   DefaultTheme,
   type NativeStackNavigationOptions,
   type Theme as NavigationTheme,
+  router,
   Stack,
 } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
+import { IconButton } from "./IconButton";
+import { sheetColors } from "./palette";
 import { useTheme } from "./theme";
 
 /**
@@ -167,15 +171,21 @@ export function CoverTabStack({ title }: { title: string }) {
 /**
  * A pushed screen (conversation, mission, agent, delete account): native bar, back chevron only, the
  * edge swipe back, the platform's push animation. Opaque by default (lists and composers lay out below
- * it); `PushedHeader` switches a screen to a bar its content scrolls under.
+ * it); `PushedHeader` switches a screen to a bar its content scrolls under. On Android the back button is a
+ * round plate floating like iOS 26's glass one (the toolbar's own arrow sat bare on the bar).
  */
 export function usePushedOptions(): NativeStackNavigationOptions {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+  const backTitle = t("mobile.common.back");
   return useMemo<NativeStackNavigationOptions>(
     () => ({
       headerShown: true,
       title: "",
       headerBackButtonDisplayMode: "minimal",
+      // Hidden by the minimal button, but VoiceOver reads it: without it the back button was named after the
+      // route group under it, "(tabs)".
+      headerBackTitle: backTitle,
       headerTransparent: false,
       headerStyle: { backgroundColor: colors.bg },
       headerShadowVisible: false,
@@ -183,9 +193,25 @@ export function usePushedOptions(): NativeStackNavigationOptions {
       headerTintColor: colors.ink,
       gestureEnabled: true,
       contentStyle: { backgroundColor: colors.bg },
+      ...plateBack(backTitle),
     }),
-    [colors],
+    [colors, backTitle],
   );
+}
+
+/** Android's back button: a round plate (the toolbar's own arrow hidden); iOS keeps the system's. */
+function plateBack(label: string): NativeStackNavigationOptions {
+  if (Platform.OS !== "android") return {};
+  return {
+    headerBackVisible: false,
+    headerLeft: ({ canGoBack }) => (canGoBack ? <IconButton icon="back" label={label} plate onPress={back} /> : null),
+  };
+}
+
+/** Back, or home when the screen was opened by a link with nothing under it. */
+function back() {
+  if (router.canGoBack()) router.back();
+  else router.replace("/");
 }
 
 /** The bar of a pushed screen whose content scrolls under it (needs `contentInsetAdjustmentBehavior="automatic"`). */
@@ -210,13 +236,15 @@ export const coverBarOptions: NativeStackNavigationOptions = {
  * A native form sheet (Requests, Você): drag to dismiss, detents, the grabber, and on iOS the screen behind
  * scales back. `detents` are fractions of the screen height, ascending. On iOS 26 the system draws its
  * corners (floating, concentric with the screen's); a radius of ours would square them off at the bottom. Sheets sit on the grouped gray
- * (white cards on it, like iOS); `raised` for a sheet that is one white card.
+ * (white cards on it, like iOS), lifted above the screen in dark (`sheetColors`); `raised` for a sheet that is
+ * one white card. The content goes in `SheetSurface` (`SheetScreen` does it): its colors, and Android's grabber.
  */
 export function useFormSheetOptions(
   detents: number[],
   background: "raised" | "bg" = "bg",
 ): NativeStackNavigationOptions {
-  const { colors } = useTheme();
+  const { colors: screen, scheme } = useTheme();
+  const colors = useMemo(() => sheetColors(screen, scheme), [screen, scheme]);
   const key = detents.join(",");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the detents array
   return useMemo<NativeStackNavigationOptions>(
@@ -227,8 +255,9 @@ export function useFormSheetOptions(
       sheetGrabberVisible: true,
       ...(Platform.OS === "ios" && !legacyBlur ? null : { sheetCornerRadius: 28 }),
       sheetExpandsWhenScrolledToEdge: true,
-      contentStyle: { backgroundColor: background === "raised" ? colors.raised : colors.grouped },
+      // One white card in light; in dark the lifted sheet either way.
+      contentStyle: { backgroundColor: background === "raised" ? screen.raised : colors.grouped },
     }),
-    [key, background, colors],
+    [key, background, colors, screen],
   );
 }

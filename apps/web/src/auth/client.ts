@@ -3,18 +3,29 @@
  * session cookie: nothing auth-related is stored in JavaScript). Pages use
  * this interface; `better-auth.ts` implements it and tests pass a fake.
  */
-export type AuthResult = { ok: true } | { ok: false; status: number; message: string; code?: string };
+export type AuthResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      message: string;
+      code?: string;
+      /** A blocked account on agentes.chat Cloud: the block's kind, with `cloud` (`restrictionLine`). */
+      kind?: string;
+      cloud?: boolean;
+    };
 
+/** `humanCheck` on the email forms: the bot check's token, when the server has one (ADR 0075). */
 export interface AuthClient {
-  signIn(input: { email: string; password: string }): Promise<AuthResult>;
+  signIn(input: { email: string; password: string }, humanCheck?: string): Promise<AuthResult>;
   /** Creates the account, signed in; a server that sends e-mail sends the address a link that confirms it. */
-  signUp(input: { name: string; email: string; password: string }): Promise<AuthResult>;
+  signUp(input: { name: string; email: string; password: string }, humanCheck?: string): Promise<AuthResult>;
   /** A new link confirming the signed-in person's own address (`email`). */
   sendVerificationEmail(email: string): Promise<AuthResult>;
   /** Redirects the browser to the provider; comes back to `callbackURL`. */
   signInSocial(provider: "google" | "github" | "apple", callbackURL: string): Promise<AuthResult>;
   /** E-mails a link to `redirectTo?token=…` (only when the server can send e-mail: `passwordReset`). */
-  requestPasswordReset(input: { email: string; redirectTo: string }): Promise<AuthResult>;
+  requestPasswordReset(input: { email: string; redirectTo: string }, humanCheck?: string): Promise<AuthResult>;
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;

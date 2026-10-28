@@ -1,12 +1,24 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createFakePushSender } from "@agenteschat/adapters";
+import { createECDH } from "node:crypto";
+import {
+  createFakePushSender,
+  createFakeWebPushSender,
+  createMemoryPresence,
+  generateVapidKeys,
+  type KeyWrapper,
+  PushError,
+  type PushSender,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { unplainLeaves } from "../../i18n/test/plain-marks";
 import {
   addChannelMember,
   approvalIsHighRisk,
   checkPushReceipts,
   createJobHandlers,
+  createLocalKeyWrapper,
   deleteAccount,
+  deliverPush,
   drainOutbox,
   listMembers,
   listPushDevices,
@@ -14,13 +26,21 @@ import {
   notify,
   notifyApproval,
   openDm,
+  PUSH_ACTIVE_DELAY_MS,
   PUSH_RECEIPTS_DELAY_MS,
+  PUSH_STRINGS,
   postPersonMessage,
   pushLocale,
   pushTicketsOf,
   registerPushDevice,
   renderPush,
+  sealSecret,
   unregisterPushDevice,
+  VAPID_FALLBACK_SUBJECT,
+  VAPID_KEEP_NEW_MS,
+  VAPID_RECHECK_MS,
+  vapidKeys,
+  vapidSubject,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -47,6 +67,28 @@ async function withPhone(options: { unregistered?: string[]; goneLater?: string[
   return { bia, push, drain };
 }
 
+/** A session of this person, a week long unless said (a browser's pushes last as long as it does). */
+async function signIn(userId: string, expiresAt = new Date(Date.now() + 7 * 86_400_000)) {
+  const id = crypto.randomUUID();
+  await f.db.insert(schema.sessions).values({ id, token: `token-${id}`, userId, expiresAt });
+  return id;
+}
+
+/** A browser's Web Push subscription, turned on in that session. */
+function webSubscription(endpoint: string, sessionId: string, locale = "pt-BR") {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  return {
+    platform: "web" as const,
+    endpoint,
+    keys: { p256dh: ecdh.getPublicKey().toString("base64url"), auth: Buffer.alloc(16, 3).toString("base64url") },
+    locale,
+    sessionId,
+  };
+}
+const BROWSER = "https://fcm.googleapis.com/fcm/send/bia-laptop";
+const BROWSER_OLD = "https://updates.push.services.mozilla.com/wpush/v2/bia-old";
+
 const pushJobs = async () =>
   (await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "push.send"))).map((j) => j.payload);
 
@@ -56,6 +98,18 @@ describe("push text", () => {
     expect(pushLocale("pt_PT")).toBe("pt-BR");
     expect(pushLocale("en-US")).toBe("en");
     expect(pushLocale(null)).toBe("en");
+  });
+
+  test("no semicolon, no em dash in any push, as the phone shows it", () => {
+    const shown = Object.fromEntries(
+      Object.entries(PUSH_STRINGS).map(([locale, words]) => [
+        locale,
+        Object.fromEntries(
+          Object.entries(words).map(([key, w]) => [key, typeof w === "function" ? w("Ana", "Acme") : w]),
+        ),
+      ]),
+    );
+    expect(unplainLeaves(shown)).toEqual([]);
   });
 
   test("kinds render short friendly text; high-risk approvals only say to open the app", () => {
@@ -333,5 +387,346 @@ describe("account deletion", () => {
     f = await setup();
     expect(await deleteAccount(f.db, f.owner.id)).toEqual({ deletedOrgIds: [f.org.id] });
     expect(await f.db.select().from(schema.organizations).where(eq(schema.organizations.id, f.org.id))).toEqual([]);
+  });
+});
+
+describe("web push devices", () => {
+  test("a browser registers with its endpoint and keys; it counts toward the 10 per person", async () => {
+    f = await setup();
+    const session = await signIn(f.owner.id);
+    const sub = webSubscription(BROWSER, session);
+    expect(await registerPushDevice(f.db, f.owner.id, sub)).toBe(true);
+    const [row] = await listPushDevices(f.db, f.owner.id);
+    expect(row).toMatchObject({
+      token: BROWSER,
+      platform: "web",
+      webKeys: sub.keys,
+      sessionId: session,
+      locale: "pt-BR",
+    });
+    // A phone token that later shows up again as itself keeps no browser keys.
+    await registerPushDevice(f.db, f.owner.id, { token: TOKEN_BIA, platform: "android", locale: "en" });
+    const phone = (await listPushDevices(f.db, f.owner.id)).find((d) => d.token === TOKEN_BIA);
+    expect(phone?.webKeys).toBeNull();
+    expect(phone?.sessionId).toBeNull();
+
+    const base = Date.now() + 1000;
+    for (let i = 0; i < 10; i++) {
+      await registerPushDevice(
+        f.db,
+        f.owner.id,
+        webSubscription(`https://fcm.googleapis.com/fcm/send/device-${i}`, session),
+        new Date(base + i * 1000),
+      );
+    }
+    const tokens = (await listPushDevices(f.db, f.owner.id)).map((d) => d.token);
+    expect(tokens).toHaveLength(10);
+    expect(tokens).not.toContain(BROWSER);
+    expect(tokens).not.toContain(TOKEN_BIA);
+  });
+
+  test("a browser belongs to a live session of its person; signing out takes it away", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    // A session that ran out, or someone else's: nothing is registered.
+    const ended = await signIn(f.owner.id, new Date(Date.now() - 1000));
+    expect(await registerPushDevice(f.db, f.owner.id, webSubscription(BROWSER, ended))).toBe(false);
+    expect(await registerPushDevice(f.db, f.owner.id, webSubscription(BROWSER, await signIn(bia.id)))).toBe(false);
+    expect(await listPushDevices(f.db, f.owner.id)).toEqual([]);
+
+    // Signed in: on. Signing out (here, everywhere, or the session cleaned up) deletes it with the session.
+    const session = await signIn(f.owner.id);
+    expect(await registerPushDevice(f.db, f.owner.id, webSubscription(BROWSER, session))).toBe(true);
+    await registerPushDevice(f.db, f.owner.id, { token: TOKEN_BIA, platform: "ios", locale: "en" });
+    await f.db.delete(schema.sessions).where(eq(schema.sessions.id, session));
+    expect((await listPushDevices(f.db, f.owner.id)).map((d) => d.token)).toEqual([TOKEN_BIA]);
+  });
+});
+
+describe("web push delivery", () => {
+  async function withBrowser(
+    options: { gone?: string[]; failing?: string[]; refused?: string[]; unauthorized?: string[] } = {},
+  ) {
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await listMembers(f.db, f.org.id);
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    const session = await signIn(bia.id);
+    await registerPushDevice(f.db, bia.id, webSubscription(BROWSER, session));
+    const webPush = createFakeWebPushSender(options);
+    return { bia, webPush, session };
+  }
+
+  test("a mention goes to the browser encrypted to it: full text, the page to open, the tag", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser();
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia pode revisar?" });
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, webPush }));
+    const [n] = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
+    expect(webPush.sent).toHaveLength(1);
+    expect(webPush.sent[0]).toMatchObject({
+      endpoint: BROWSER,
+      urgency: "normal",
+      topic: n?.id.replace(/-/g, ""),
+      payload: {
+        title: "ana mencionou você",
+        body: "@bia pode revisar?",
+        tag: n?.id,
+        url: `/org/${f.org.id}/notifications`,
+        data: { orgId: f.org.id, kind: "mention", notificationId: n?.id, channelId: f.general.id },
+      },
+    });
+  });
+
+  test("a subscription its push service says is gone is deleted; the phone still gets it", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser({ gone: [BROWSER_OLD] });
+    await registerPushDevice(f.db, bia.id, webSubscription(BROWSER_OLD, await signIn(bia.id)));
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
+    const push = createFakePushSender();
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia oi" });
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, push, webPush }));
+    expect(webPush.sent.map((m) => m.endpoint)).toEqual([BROWSER]);
+    expect(push.sent).toHaveLength(1);
+    expect((await listPushDevices(f.db, bia.id)).map((d) => d.token).sort()).toEqual([TOKEN_BIA, BROWSER].sort());
+  });
+
+  test("a refused signature (401/403) keeps the subscription: our own key or contact may be what's wrong", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser({ unauthorized: [BROWSER] });
+    const [n] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: "mention:refused",
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "oi" },
+    });
+    // Not retried either: the same signature would be refused again.
+    expect(await deliverPush({ db: f.db, webPush }, n?.id ?? "")).toEqual({ sent: 0, removed: 0, failed: 1 });
+    expect((await listPushDevices(f.db, bia.id)).map((d) => d.token)).toEqual([BROWSER]);
+  });
+
+  test("a browser whose session ran out gets nothing and is forgotten; the phone still gets it", async () => {
+    f = await setup();
+    const { bia, webPush, session } = await withBrowser();
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
+    await f.db
+      .update(schema.sessions)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.sessions.id, session));
+    const push = createFakePushSender();
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia ainda aí?" });
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, push, webPush }));
+    expect(webPush.sent).toEqual([]);
+    expect(push.sent).toHaveLength(1);
+    expect((await listPushDevices(f.db, bia.id)).map((d) => d.token)).toEqual([TOKEN_BIA]);
+  });
+
+  test("nothing taken and every failure retryable: the job is tried again; something taken: no retry", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser({ failing: [BROWSER] });
+    const [n] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: "mention:retry",
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "oi" },
+    });
+    const id = n?.id ?? "";
+    await expect(deliverPush({ db: f.db, webPush }, id)).rejects.toMatchObject({ retryable: true });
+
+    // A phone took it: the browser's failure is left alone, so the phone is never pushed twice.
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
+    const push = createFakePushSender();
+    expect(await deliverPush({ db: f.db, push, webPush }, id)).toEqual({ sent: 1, removed: 0, failed: 1 });
+
+    // A refused message (400) isn't retried either.
+    webPush.failing.clear();
+    webPush.refused.add(BROWSER);
+    expect(await deliverPush({ db: f.db, webPush }, id)).toEqual({ sent: 0, removed: 0, failed: 1 });
+  });
+
+  test("a phone request that can't be retried fails the job, unless a browser took it", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser();
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
+    const [n] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "dm",
+      groupKey: "dm:x",
+      actor: { type: "user", id: f.owner.id },
+      source: { channelId: f.general.id },
+      latest: { text: "oi" },
+    });
+    const broken: PushSender = {
+      id: "broken",
+      send: async () => {
+        throw new PushError("refused", false, 400);
+      },
+    };
+    await expect(deliverPush({ db: f.db, push: broken }, n?.id ?? "")).rejects.toMatchObject({ retryable: false });
+    expect(await deliverPush({ db: f.db, push: broken, webPush }, n?.id ?? "")).toEqual({
+      sent: 1,
+      removed: 0,
+      failed: 1,
+    });
+  });
+
+  test("someone with the app open: a mention waits 45 s and goes only if still unread", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser();
+    const presence = createMemoryPresence();
+    await presence.connect(f.org.id, bia.id, "tab-1");
+    const handlers = createJobHandlers({ ...f.jobDeps, webPush, presence });
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia primeira" });
+    await drainOutbox(f.db, handlers);
+    expect(webPush.sent).toHaveLength(0);
+    const held = (await pushJobs()).filter((p) => p.held === true);
+    expect(held).toHaveLength(1);
+    const heldKey = `push.send:${held[0]?.notificationId}:held`;
+    const [job] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey, heldKey));
+    expect(job?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + PUSH_ACTIVE_DELAY_MS - 5_000);
+
+    // Still unread 45 s later: it goes, even though the app is still open.
+    await drainOutbox(f.db, handlers, { now: new Date(Date.now() + PUSH_ACTIVE_DELAY_MS + 1000) });
+    expect(webPush.sent).toHaveLength(1);
+  });
+
+  test("read in the app meanwhile: no push; waiting things go at once", async () => {
+    f = await setup();
+    const { bia, webPush } = await withBrowser();
+    const presence = createMemoryPresence();
+    await presence.connect(f.org.id, bia.id, "tab-1");
+    const handlers = createJobHandlers({ ...f.jobDeps, webPush, presence });
+    const [mention] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: "mention:seen",
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "olha" },
+    });
+    await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "agent_question",
+      groupKey: "agent_question:now",
+      waiting: true,
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "Qual branch?" },
+    });
+    await drainOutbox(f.db, handlers);
+    expect(webPush.sent.map((m) => (m.payload as { body: string }).body)).toEqual(["Qual branch?"]);
+    expect(webPush.sent[0]?.urgency).toBe("high");
+    await markNotificationRead(deps(), bia.id, f.org.id, mention?.id ?? "", true);
+    await drainOutbox(f.db, handlers, { now: new Date(Date.now() + PUSH_ACTIVE_DELAY_MS + 1000) });
+    expect(webPush.sent).toHaveLength(1);
+  });
+});
+
+describe("VAPID keys", () => {
+  const config = { PUBLIC_URL: "https://chat.example.com" };
+
+  test("made once, sealed, and the same pair on every call", async () => {
+    f = await setup();
+    const first = await vapidKeys(f.db, [f.keyWrapper], config);
+    expect(first.subject).toBe("https://chat.example.com");
+    expect(Buffer.from(first.publicKey, "base64url").length).toBe(65);
+    const [row] = await f.db.select().from(schema.instancePush);
+    expect(row?.vapidPublicKey).toBe(first.publicKey);
+    expect(row?.vapidPrivateKey).not.toContain(first.privateKey);
+    expect(await vapidKeys(f.db, [f.keyWrapper], config)).toEqual(first);
+  });
+
+  test("a stored key this server can never open (another secret) is replaced, unless it was just made", async () => {
+    f = await setup();
+    const old = generateVapidKeys();
+    const other = createLocalKeyWrapper("another-secret-".padEnd(48, "y"));
+    await f.db.insert(schema.instancePush).values({
+      id: 1,
+      vapidPublicKey: old.publicKey,
+      vapidPrivateKey: JSON.stringify(await sealSecret(other, old.privateKey, "instance_push:vapid")),
+    });
+    // Made a moment ago by a server with another AGENTES_SECRET: an error, so two servers never take turns.
+    await expect(vapidKeys(f.db, [f.keyWrapper], config)).rejects.toThrow("AGENTES_SECRET");
+    expect((await f.db.select().from(schema.instancePush))[0]?.vapidPublicKey).toBe(old.publicKey);
+
+    const later = new Date(Date.now() + VAPID_KEEP_NEW_MS + 1000);
+    const now = await vapidKeys(f.db, [f.keyWrapper], config, later);
+    expect(now.publicKey).not.toBe(old.publicKey);
+    const [stored] = await f.db.select().from(schema.instancePush);
+    expect(stored?.vapidPublicKey).toBe(now.publicKey);
+  });
+
+  test("a key service that doesn't answer is an error to retry, never a new pair", async () => {
+    f = await setup();
+    const local = f.keyWrapper;
+    let answering = false;
+    const kms: KeyWrapper = {
+      id: "kms:test",
+      wrap: (key, aad) => local.wrap(key, aad),
+      unwrap: async (wrapped, aad) => {
+        if (!answering) throw new Error("key service timed out");
+        return local.unwrap(wrapped, aad);
+      },
+    };
+    const old = generateVapidKeys();
+    await f.db.insert(schema.instancePush).values({
+      id: 1,
+      vapidPublicKey: old.publicKey,
+      vapidPrivateKey: JSON.stringify(await sealSecret(kms, old.privateKey, "instance_push:vapid")),
+      updatedAt: new Date(Date.now() - 86_400_000),
+    });
+    await expect(vapidKeys(f.db, [kms], config)).rejects.toThrow("timed out");
+    expect((await f.db.select().from(schema.instancePush))[0]?.vapidPublicKey).toBe(old.publicKey);
+    answering = true;
+    expect(await vapidKeys(f.db, [kms], config)).toEqual({ ...old, subject: config.PUBLIC_URL });
+  });
+
+  test("another server replaced the pair: this one signs with the new one within a minute", async () => {
+    f = await setup();
+    const first = await vapidKeys(f.db, [f.keyWrapper], config);
+    const next = generateVapidKeys();
+    await f.db.update(schema.instancePush).set({
+      vapidPublicKey: next.publicKey,
+      vapidPrivateKey: JSON.stringify(await sealSecret(f.keyWrapper, next.privateKey, "instance_push:vapid")),
+    });
+    expect((await vapidKeys(f.db, [f.keyWrapper], config)).publicKey).toBe(first.publicKey);
+    const later = new Date(Date.now() + VAPID_RECHECK_MS + 1000);
+    expect(await vapidKeys(f.db, [f.keyWrapper], config, later)).toEqual({ ...next, subject: config.PUBLIC_URL });
+  });
+
+  test("pinned keys win and aren't stored; the subject falls back to the sender's address", async () => {
+    f = await setup();
+    const pinned = await vapidKeys(f.db, [f.keyWrapper], {
+      PUBLIC_URL: "http://localhost:3000",
+      EMAIL_FROM: "agentes.chat <ops@example.com>",
+      WEB_PUSH_VAPID_PUBLIC_KEY: "pub",
+      WEB_PUSH_VAPID_PRIVATE_KEY: "priv",
+    });
+    expect(pinned).toEqual({ publicKey: "pub", privateKey: "priv", subject: "mailto:ops@example.com" });
+    expect(await f.db.select().from(schema.instancePush)).toEqual([]);
+    expect(vapidSubject({ PUBLIC_URL: "http://localhost:3000", EMAIL_FROM: "ops@example.com" })).toBe(
+      "mailto:ops@example.com",
+    );
+  });
+
+  test("the subject is always a contact push services take: https or mailto, never a local name", () => {
+    const subject = (PUBLIC_URL: string, EMAIL_FROM?: string) => vapidSubject({ PUBLIC_URL, EMAIL_FROM });
+    expect(subject("https://chat.acme.com/")).toBe("https://chat.acme.com");
+    expect(subject("https://agentes.tail1234.ts.net")).toBe("https://agentes.tail1234.ts.net");
+    // Tried on one computer or a LAN, with no sender of its own: the project's site.
+    for (const url of ["http://localhost:3000", "https://localhost", "https://agentes.local", "https://192.168.1.10"])
+      expect(subject(url)).toBe(VAPID_FALLBACK_SUBJECT);
+    expect(subject("http://chat.acme.com")).toBe(VAPID_FALLBACK_SUBJECT);
+    expect(subject("http://localhost:3000", "agentes.chat <ola@localhost>")).toBe(VAPID_FALLBACK_SUBJECT);
+    expect(subject("http://localhost:3000", "Ops <ops@acme.com>")).toBe("mailto:ops@acme.com");
+    expect(subject("http://localhost:3000", "not an address")).toBe(VAPID_FALLBACK_SUBJECT);
   });
 });

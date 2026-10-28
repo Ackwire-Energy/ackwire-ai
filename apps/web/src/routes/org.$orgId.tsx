@@ -15,10 +15,12 @@ import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
+import { PushOpens } from "@/components/NotificationOpen";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { HoldBanner, SuspendedScreen } from "@/components/Standing";
+import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -45,6 +47,10 @@ function OrgLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
   const focused = /\/agents\/new\/?$/.test(path) && can(membership?.role, "manage_agents");
+  // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
+  useWebPushRefresh(me.user.id);
+  // …and the ones it still shows for what was already read elsewhere close.
+  useWebPushClear();
   useEffect(() => {
     if (membership) storage.set(STORAGE_KEYS.lastOrg, membership.id);
   }, [membership]);
@@ -106,6 +112,7 @@ function OrgLayout() {
                 <div className="shell__pages">
                   <ConnectAiProvider>
                     <ComputerDialogProvider>
+                      <PushOpens />
                       <Outlet />
                     </ComputerDialogProvider>
                   </ConnectAiProvider>

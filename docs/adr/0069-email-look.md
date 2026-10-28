@@ -1,0 +1,39 @@
+# 0069. Emails: one look, in light and dark
+
+- Status: Accepted
+- Date: 2026-10-26. Revised 2026-10-27: every button is the app's primary button, in layers each client keeps or drops (§2). Revised 2026-10-28: a proven address is a mailto link (§5), and a face starts at its name's capitals (§2)
+- Code: `packages/engine/src/email/` (`layout.ts`, `words.ts`, `inert.ts`), `packages/engine/src/email.ts` (kinds, producers, where the pictures come from), `packages/adapters/src/email.ts` (pictures as inline parts), `apps/server/src/app.ts` (`/email/*`), `apps/web/public/email/` (the pictures and the font), `packages/engine/scripts/email-preview.ts`
+
+## Context
+
+Eight of the nine kinds of email went through a plain layout: the word "agentes" as text, system fonts, no dark design, no preheader, a footer that told invitees and new sign-ups they "use agentes.chat". The waiting list email had a renderer of its own, with its pictures taken from its link's origin. Subjects carried names people typed ("Ana invited you to Acme"), and some of these emails reach people outside the workspace. The computer-ready email's button opened #general instead of its first step.
+
+Mail clients go dark in different ways (caniemail, Litmus, the clients' own notes, checked in October 2026):
+
+- Apple Mail, the Outlook apps for Mac, iOS and Android, Samsung Email and Thunderbird apply an email's own `prefers-color-scheme: dark` rules.
+- Outlook.com and new Outlook recolour what reads under 4.5:1 against their dark background, and stamp `data-ogsc`/`data-ogsb` on what they changed.
+- The Gmail apps convert an email by themselves, and since September 2026 leave alone one that says `color-scheme: light only`, for Google accounts. Gmail with other accounts drops every `<style>`.
+- Classic Outlook on Windows inverts everything, with no hook.
+
+No single dark design reaches all of them, and Gmail's conversion of a light design is the worst-looking dark of all.
+
+## Decision
+
+1. **One layout for every kind.** `renderDoc` takes the content as data (paragraphs, steps, facts, notes, people, a button with an optional second link, a fallback address) and gives the HTML, the plain-text part from the same blocks, and the pictures to attach. `words.ts` holds every word in English and pt-BR, as plain text (the layout escapes everything); pt-BR's type is English's, so the two catalogs keep the same shape.
+2. **The app's look.** Colours from `@agenteschat/tokens` (hairlines as the solid colour they show over their surface, since classic Outlook has no `rgba`), Source Sans 3 where the client loads web fonts, the app's primary button at its large size, the house links, agents as their pixel faces and people as initials tiles, each starting where its name's capitals start, as the app's `.ac-captop` places a face. The logo is a picture in two versions, ink for light and bone for dark.
+   - **The button** is `.ac-btn--primary` at the large ruler (48 tall, 16 px sides, a 15 px label at 600, radius 14), built in layers a client keeps or drops one by one: a flat ink fill everywhere (`background-color` first), its gradient where the client draws gradients (in the `background` shorthand, never an inline `background-image`, which Gmail for Android breaks), and its highlight, bottom edge and shadow where it draws `box-shadow` (the only `rgba` in the email, and every client that draws `box-shadow` reads it). Whatever a client drops, it shows the flat button or better. In dark, the flat bone fill wherever our dark design applies, and the bone gradient in a `<style>` block of its own after Outlook.com's hooks. No icon.
+   - **A second action** (Deny) is the house link at the button's label size, 16 px after the button, as the app spaces its actions.
+   - **Classic Outlook** draws it square and flat, sized by em spacers at the 15 px label, with `mso-line-height-rule:at-least` on both links (an exact line height clips a link button there).
+3. **Dark.** The light design is complete in inline styles. Our dark design is written once and applied by the media query and again under Outlook.com's hooks, each kind of rule in its own `<style>` block so a client that rejects one keeps the rest. `<meta name="color-scheme" content="light only">` keeps the Gmail apps light (our design exactly, inside their dark UI), while `:root{color-scheme:light dark}` keeps Apple Mail applying ours. Classic Outlook inverts it, and the design survives that; its buttons are square (no VML).
+4. **Each server serves its own pictures** at `/email/*`: readable without a session and from any origin, cached for good, a 404 rather than the web app when missing. A changed picture gets a new file name, because Gmail's proxy caches by name. When `PUBLIC_URL` resolves to a private, loopback, link-local or CGNAT address (a Tailscale name), recipients can't fetch from it, so the pictures go attached to each message (`cid:`), with no web font. A name that doesn't resolve at boot is attached for the whole run, with a warning in the log. `EMAIL_ART=attach` does the same for a public address outsiders still can't open (an access proxy, a VPN, an IP allowlist). No data URIs: Gmail and classic Outlook don't show them. No self-hosted server fetches anything from agentes.chat.
+5. **Our words only** in the subject, preheader, headline and buttons. Names, addresses, titles and agents' words appear only in the body, made inert (`inertText`): no link, no number a phone dials, a break in any run of 30 characters, a cap on length. The paragraphs and cells that print them carry `word-break:break-word`, since a table cell grows to its longest word: a long one wraps instead of widening the card on a phone. An address that proved itself with a code (the person asking to join, ADR 0072) is a mailto link in the house link style instead, and plain in the text part: no client links a link again, and the hair spaces that keep typed text from linking would break a copied address.
+6. **Every button leads to the next step**, for a reader who is signed out too: the sign-in redirect keeps the link's query, and `/org/{id}` keeps it on its way to #general. The ready email picks its button from its first step (connect the AI, give a first task, or create an agent).
+7. **A footer for each kind** says why this address got it, how often that happens, and who sent it: agentes.chat, or a self-hosted server by its host.
+8. **Jobs render when they run**, so every payload field added later is optional and an email queued before a deploy still renders.
+
+## Consequences
+
+- The owner's choices are single values: the `light only` meta (drop it and the Gmail apps convert), the default sender's name ("agentes.chat", `defaultEmailFrom`), the font in the layout, square buttons in classic Outlook.
+- A snapshot per sample guards the HTML (`packages/engine/test/__snapshots__/email.test.ts.snap`), and `email-preview.ts` writes every sample to files, or mails them to one address for a check in real clients. Every kind has a sample (a test fails otherwise).
+- The email test reads the app's `.ac-btn--primary` and the control ruler: when the app's button changes, it fails until the email's button follows.
+- The pictures the waiting list emails already delivered point at stay in `apps/web/public/email/`.

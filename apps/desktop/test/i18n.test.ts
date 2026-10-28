@@ -1,4 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { join, relative } from "node:path";
+import { leaves as entries } from "../../../packages/i18n/test/leaves";
+import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
+import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
+import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
 import { createDesktopI18n, pickLocale, withDesktopKeys } from "../src/i18n";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
@@ -31,6 +36,33 @@ describe("desktop strings", () => {
     for (const s of [...values(desktopPtBR), ...values(desktopEn)]) {
       expect(s.trim().length).toBeGreaterThan(0);
       expect(s).not.toMatch(/\b(runner|MCP|protocol|protocolo|sidecar|Tauri|PGlite)\b/i);
+    }
+  });
+
+  test("no semicolon, no em dash", () => {
+    expect([desktopEn, desktopPtBR].flatMap((tree) => unplainLeaves(tree))).toEqual([]);
+  });
+
+  test("words true in every setup", () => {
+    const desktop = (tree: object) => entries(tree).map(([k, v]): [string, string] => [`desktop.${k}`, String(v)]);
+    const en = desktop(desktopEn);
+    const pt = desktop(desktopPtBR);
+    expect([...misplaced(en, "en"), ...misplaced(pt, "pt-BR")]).toEqual([]);
+    const keys = [...en, ...pt].map(([k]) => k);
+    expect(staleLines(keys, "desktop.")).toEqual([]);
+  });
+
+  test("Claude and ChatGPT, not their makers, in what the app shows", () => {
+    const app = join(import.meta.dir, "..");
+    expect(filesNamingMakers([join(app, "src")]).map((f) => relative(app, f))).toEqual([]);
+  });
+
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [desktopPtBR, desktopEn]) {
+      const paths = values(tree).filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(1);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
     }
   });
 
@@ -89,6 +121,7 @@ describe("desktop strings", () => {
       "tray.unreachable",
       "cover.offline",
       "cover.unreachable",
+      "cover.otherServer",
       "link.question",
       "link.questionSignIn",
       "link.questionClaim",
@@ -101,7 +134,6 @@ describe("desktop strings", () => {
       "prefs.nav.servers",
       "prefs.nav.updates",
       "prefs.general.title",
-      "prefs.general.lead",
       "prefs.general.behavior",
       "prefs.general.launchTitle",
       "prefs.general.notifySiteTitle",
@@ -109,7 +141,6 @@ describe("desktop strings", () => {
       "prefs.general.dockTitle",
       "prefs.general.dockDesc",
       "prefs.general.menuBarTitle",
-      "prefs.general.menuBarDesc",
       ...leaves(desktopEn.prefs.updates).map((k) => `prefs.updates.${k}`),
     ];
     for (const tree of [desktopEn, desktopPtBR]) {

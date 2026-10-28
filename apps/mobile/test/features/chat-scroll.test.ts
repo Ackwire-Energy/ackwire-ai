@@ -5,6 +5,8 @@ import {
   HOLD_FINISHED_RUN_MS,
   landsOnDivider,
   lastSeenKey,
+  type Place,
+  placeCorrection,
   runsToShow,
   type ScrollRow,
   type TurnKey,
@@ -181,5 +183,38 @@ describe("runsToShow", () => {
   test("held rows come before the ones still writing", () => {
     const first = runsToShow(none, [run("1"), run("2")], [run("2")], new Set(), 0);
     expect(first.shown.map((x) => x.runId)).toEqual(["1", "2"]);
+  });
+});
+
+describe("placeCorrection", () => {
+  const list = (scroll: number, distanceFromEnd = 500, positions: Record<string, number> = {}) => ({
+    scroll,
+    distanceFromEnd,
+    positionOf: (key: string) => positions[key],
+  });
+  const reading: Place = { end: false, scroll: 1200, key: "m7", position: 1100 };
+
+  test("a place still on screen needs nothing, a drift under the slack included", () => {
+    expect(placeCorrection(reading, list(1200, 500, { m7: 1100 }))).toBeNull();
+    expect(placeCorrection(reading, list(1230, 500, { m7: 1100 }))).toBeNull();
+  });
+  test("a jump toward older messages or toward the end is put back", () => {
+    expect(placeCorrection(reading, list(0, 2000, { m7: 1100 }))).toBe(1200);
+    expect(placeCorrection(reading, list(2400, 0, { m7: 1100 }))).toBe(1200);
+  });
+  test("rows above that grew move the place with its row", () => {
+    // An older page loaded above: the row is 600 lower, and the list moved with it.
+    expect(placeCorrection(reading, list(1800, 500, { m7: 1700 }))).toBeNull();
+    // It didn't: the row is put back where it was on screen.
+    expect(placeCorrection(reading, list(1200, 500, { m7: 1700 }))).toBe(1800);
+  });
+  test("without its row, the scroll it had", () => {
+    expect(placeCorrection(reading, list(300))).toBe(1200);
+    expect(placeCorrection({ end: false, scroll: 800, key: null, position: null }, list(300))).toBe(800);
+  });
+  test("at the end, it goes back to the end only when the list left it", () => {
+    expect(placeCorrection({ end: true }, list(900, 0))).toBeNull();
+    expect(placeCorrection({ end: true }, list(900, 30))).toBeNull();
+    expect(placeCorrection({ end: true }, list(0, 900))).toBe("end");
   });
 });

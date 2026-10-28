@@ -376,7 +376,7 @@ export function ContextBlock({ thread }: { thread: ThreadInfo }) {
               </Link>
             );
           })}
-          <p className="thread-context__note">
+          <p className="thread-context__note ac-iconline">
             <Icon name={ctx.moved ? "thread" : "link"} size={14} />
             <span>
               {ctx.moved
@@ -401,7 +401,7 @@ export function ThreadOrigin({ thread }: { thread: ThreadInfo }) {
     ? (dir.memberById.get(thread.createdBy)?.name ?? t("threads.someone"))
     : t("threads.someone");
   return (
-    <p className="thread-origin">
+    <p className="thread-origin ac-iconline">
       <Icon name="thread" size={14} />
       <span>
         {t("threads.view.origin", {
@@ -421,9 +421,11 @@ export function ArchivedNote({ thread }: { thread: ThreadInfo }) {
   const controls = useThreadControls();
   return (
     <div className="thread-archived" role="note">
-      <Icon name="lock" size={16} />
-      <span>
-        <b>{t("threads.view.archivedTitle")}</b> {t("threads.view.archivedText")}
+      <span className="ac-iconline">
+        <Icon name="lock" size={16} />
+        <span>
+          <b>{t("threads.view.archivedTitle")}</b> {t("threads.view.archivedText")}
+        </span>
       </span>
       {thread.canManage && (
         <Button size="sm" icon="unarchive" onClick={() => controls.request([thread], "unarchive")}>

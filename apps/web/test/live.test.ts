@@ -96,6 +96,76 @@ describe("receipts", () => {
     expect(receiptView(s.m1)).toMatchObject({ seen: ["ada", "atlas"], status: { kind: "nobody" } });
   });
 
+  test("who picked: kept from the decision and from the list; a decision from before says nothing", () => {
+    const plan = { step: "plan" as const, brand: "claude" as const, ownerId: "u" };
+    let s = seedReceipt({}, person());
+    s = step(s, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"], decidedBy: plan });
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "picked", agents: ["ada"] }, decidedBy: plan });
+    // The run's own events keep it.
+    s = step(s, { type: "agent.run", threadId: "m1", runId: "r", agentId: "ada", status: "running" });
+    expect(receiptView(s.m1).decidedBy).toEqual(plan);
+
+    const reply = { step: "rule" as const, rule: "reply" as const };
+    const listed = (receipts: NonNullable<Message["receipts"]>) => ({ ...person(), receipts }) as Message;
+    const seeded = seedReceipt({}, listed({ seenBy: ["ada"], pickedBy: ["ada"], handled: [], decidedBy: reply }));
+    expect(receiptView(seeded.m1).decidedBy).toEqual(reply);
+    const old = seedReceipt({}, listed({ seenBy: ["ada"], pickedBy: ["ada"], handled: [] }));
+    expect(receiptView(old.m1)).not.toHaveProperty("decidedBy");
+  });
+
+  test("nobody could read it: the reason, live and after a reload; another nobody has none", () => {
+    let s = seedReceipt({}, person());
+    s = step(s, {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: [],
+      strategy: "router",
+      reason: "mention_needed",
+    });
+    expect(receiptView(s.m1).status).toEqual({ kind: "nobody", mentionNeeded: true });
+    const reloaded = seedReceipt({}, {
+      ...person(),
+      receipts: { seenBy: ["ada"], pickedBy: [], handled: [], reason: "mention_needed" },
+    } as Message);
+    expect(receiptView(reloaded.m1).status).toEqual({ kind: "nobody", mentionNeeded: true });
+    const jev = step(seedReceipt({}, person()), {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: [],
+      decidedBy: { step: "jev" },
+    });
+    expect(receiptView(jev.m1)).toMatchObject({ status: { kind: "nobody" }, decidedBy: { step: "jev" } });
+    expect(receiptView(jev.m1).status).not.toHaveProperty("mentionNeeded");
+  });
+
+  test("'Picking who answers' while the author's plan reads it, until the decision", () => {
+    let s = seedReceipt({}, person());
+    expect(receiptView(s.m1).picking).toBeUndefined();
+    s = step(s, { type: "message.routing", messageId: "m1", step: "plan" });
+    expect(receiptView(s.m1)).toEqual({ seen: [], status: null, done: false, referenced: [], picking: true });
+    s = step(s, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: [], reason: "mention_needed" });
+    expect(receiptView(s.m1).picking).toBeUndefined();
+    expect(receiptView(s.m1).status).toEqual({ kind: "nobody", mentionNeeded: true });
+    // A late "routing" after the decision changes nothing.
+    expect(step(s, { type: "message.routing", messageId: "m1", step: "plan" })).toBe(s);
+  });
+
+  test("a list read before the decision keeps 'Picking who answers', whichever comes first", () => {
+    const undecided = { ...person(), receipts: { seenBy: [], pickedBy: [], handled: [], blocked: [] } } as Message;
+    const picking = { seen: [], status: null, done: false, referenced: [], picking: true as const };
+    let s = step(seedReceipt({}, person()), { type: "message.routing", messageId: "m1", step: "plan" });
+    s = seedReceipt(s, undecided);
+    expect(receiptView(s.m1)).toEqual(picking);
+    s = seedReceipt({}, undecided);
+    s = step(s, { type: "message.routing", messageId: "m1", step: "plan" });
+    expect(receiptView(s.m1)).toEqual(picking);
+    s = step(s, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "picked", agents: ["ada"] } });
+    expect(receiptView(s.m1).picking).toBeUndefined();
+  });
+
   test("claimed and failed; server receipts seed the row", () => {
     let s = step({}, { type: "message.claimed", messageId: "m1", agentId: "atlas" });
     expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["atlas"] });
@@ -123,6 +193,52 @@ describe("receipts", () => {
     expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
     s = step(s, { type: "question.answered", threadId: null, question } as never);
     expect(receiptView(s.m1).status?.kind).toBe("claimed");
+  });
+
+  /** A read of m1, as over HTTP: new objects each time. */
+  const read = (handled: NonNullable<Message["receipts"]>["handled"]) =>
+    ({ ...person(["ada"]), receipts: { seenBy: ["ada"], pickedBy: ["ada"], handled, blocked: [] } }) as Message;
+  const running = () => read([{ agentId: "ada", runId: "r1", status: "running" }]);
+
+  test("a later read shows how her run ended when its events were missed; an older one moves nothing, not even sideways", () => {
+    // Read as her run started; it ended for want of an AI before the channel's events reached us.
+    let s = seedReceipt({}, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = seedReceipt(s, read([{ agentId: "ada", runId: "r1", status: "failed", reason: "no_ai" }]));
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    s = seedReceipt(s, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    // She asks live; a read made before that lands after it.
+    s = seedReceipt({}, running());
+    s = step(s, {
+      type: "question.asked",
+      threadId: null,
+      question: { id: "q", agentId: "ada", runId: "r1" },
+    } as never);
+    s = seedReceipt(s, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
+  });
+
+  test("after 'Responder agora', a read of her old run's end never covers the new run", () => {
+    const noAi = read([{ agentId: "ada", runId: "r1", status: "failed", reason: "no_ai" }]);
+    let s = seedReceipt({}, noAi);
+    s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    s = step(s, { type: "agent.run", runId: "r2", agentId: "ada", status: "running" });
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    // The list seeding that read again, and a copy of it made before she started again (a refetch on its way).
+    s = seedReceipt(s, noAi);
+    s = seedReceipt(s, structuredClone(noAi));
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = step(s, { type: "message.handled", messageId: "m1", agentId: "ada", runId: "r2", status: "done" });
+    s = seedReceipt(s, structuredClone(noAi));
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "handled", agents: ["ada"] }, done: true });
+  });
+
+  test("a read nothing changed the receipt since it was asked for is taken as it is", () => {
+    let s = seedReceipt({}, running());
+    // She asked before the channel's events reached us.
+    s = seedReceipt(s, read([{ agentId: "ada", runId: "r1", status: "waiting_input" }]), true);
+    expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
   });
 });
 

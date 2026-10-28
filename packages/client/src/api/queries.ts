@@ -21,6 +21,7 @@ import {
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
+import { playSound } from "../lib/sounds";
 import { upsertMessage } from "../lib/timeline";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
@@ -33,6 +34,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -59,6 +61,7 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  JevKey,
   Machine,
   MachineAccessReduce,
   MailAccountUpdate,
@@ -112,6 +115,9 @@ export const authConfigQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.authConfig, queryFn: () => api.account.authConfig(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
   queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
+/** An invitation's preview (its page, and the sign-in that leads to it). */
+export const invitationQuery = (api: ApiClient, token: string) =>
+  queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
 
 // ── Account ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +142,39 @@ export function useSetServerTelemetry() {
     onSuccess: (telemetry) => qc.setQueryData(keys.telemetry, telemetry),
   });
 }
+
+/** The installation's Jev key: `null` for everyone but its owner on a self-hosted server. */
+export const useJevKey = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.jev, queryFn: () => api.system.jev() });
+};
+
+function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>, silent = false) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(api, input),
+    onSuccess: (jev) => {
+      qc.setQueryData(keys.jev, jev);
+      // The key is the server's: who picks the agents may change in every workspace.
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[3] === "ai-status" });
+    },
+    // A refused key is said under its field.
+    ...(silent ? { meta: { silent: true } } : {}),
+  });
+}
+export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey), true);
+export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
+export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
+
+/**
+ * The server's Web Push key (ADR 0071): `null` when this server has Web Push off. Asked only where this
+ * browser could take pushes (`enabled`); the key changes only when the server's does.
+ */
+export const useWebPushKey = (enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.webPushKey, queryFn: () => api.push.webKey(), enabled, staleTime: 60 * 60_000 });
+};
 
 export function useCreateOrganization() {
   const api = useApi();
@@ -226,6 +265,12 @@ export const useModels = () => {
   return useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
 };
 
+/** A catalog model's name ("Claude Haiku 5.5") once the list is in: its id for one the list doesn't have, null before. */
+export function useModelLabel() {
+  const models = useModels();
+  return (id: string) => (models.data ? (models.data.models.find((m) => m.id === id)?.label ?? id) : null);
+}
+
 export const useCredentials = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.credentials(orgId), queryFn: () => api.agents.credentials(orgId), enabled });
@@ -287,12 +332,15 @@ export const useChannelMembers = (orgId: string, channelId: string, enabled = tr
 
 /** Messages per page: the latest page, then older pages on scroll-up. */
 export const MESSAGES_PAGE = 100;
+/** A thread's root and replies, in one read. */
+export const THREAD_PAGE = 200;
 
 /**
  * The latest page of a conversation. Cached per channel and fresh for 30 s
- * (real-time events keep it current), so switching back is instant; then it
- * revalidates in the background. Kept 30 min after leaving it, so going back
- * later still shows it at once.
+ * (real-time events keep it current, and what they missed before the
+ * channel's subscription was confirmed is added then), so switching back is
+ * instant; then it revalidates in the background. Kept 30 min after leaving
+ * it, so going back later still shows it at once.
  */
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
@@ -389,6 +437,62 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
 }
 
+const isMessageList = (key: readonly unknown[]) => key[4] === "messages" || key[4] === "thread";
+
+/**
+ * Reads a channel's open lists again once its events reach us (`subscribed`: what happened there before was
+ * never sent to us) and adds what they lack, taking nothing away: a message heard live while this read was on
+ * its way stays. A read already on its way lands first, so it can't put an older list back over what this one
+ * adds. Returns what it read.
+ */
+export async function catchUpChannel(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+): Promise<Message[]> {
+  const prefix = ["org", orgId, "channel", channelId];
+  await qc.refetchQueries({ queryKey: prefix, fetchStatus: "fetching" }, { cancelRefetch: false });
+  const reads = qc
+    .getQueryCache()
+    .findAll({ queryKey: prefix, type: "active" })
+    .flatMap(({ queryKey: [, , , , list, rootId] }) =>
+      list === "messages"
+        ? [api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE })]
+        : list === "thread" && typeof rootId === "string"
+          ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
+          : [],
+    );
+  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const known = new Set(
+    qc
+      .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
+      .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
+  );
+  for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  return read;
+}
+
+/** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
+export function cacheReceipts(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  read: Message[],
+) {
+  const receipts = new Map(read.flatMap((m) => (m.receipts ? [[m.id, m.receipts] as const] : [])));
+  qc.setQueriesData<Message[]>(
+    { queryKey: ["org", orgId, "channel", channelId], predicate: (q) => isMessageList(q.queryKey) },
+    (list) =>
+      list?.some((m) => receipts.has(m.id) && m.receipts !== receipts.get(m.id))
+        ? list.map((m) => {
+            const r = receipts.get(m.id);
+            return r && m.receipts !== r ? { ...m, receipts: r } : m;
+          })
+        : list,
+  );
+}
+
 /**
  * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
  * the message's `meta.forumSuggestion` in every loaded list of that channel.
@@ -410,7 +514,8 @@ export function cacheForumSuggestion(
   });
 }
 
-const newClientId = () =>
+/** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */
+export const newClientId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -476,6 +581,7 @@ export function usePostMessage(
         ),
       );
       options.onOptimistic?.(local);
+      playSound("send");
       return { local };
     },
     onSuccess: (message, { clientId, threadId, meta }, ctx) => {
@@ -594,7 +700,8 @@ export function useDecideApproval(orgId: string) {
   return useMutation({
     mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
       decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
-    onSuccess: (approval) => {
+    onSuccess: (approval, { decision }) => {
+      playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
     },
@@ -634,7 +741,7 @@ export function useStartOAuth(orgId: string) {
 /** Where the phone app's OAuth lands: the callback hands `state` and `code` back to the app. */
 export const APP_OAUTH_RETURN = "app:connectors";
 
-/** The phone app finishes an authorization it started (see `APP_OAUTH_RETURN`). */
+/** The phone app (see `APP_OAUTH_RETURN`) or the desktop app's window finishes an authorization it started. */
 export function useCompleteOAuth(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -880,6 +987,78 @@ export function useResendInvitation(orgId: string) {
   });
 }
 
+/** The workspace's invitation links (admins, ADR 0068). */
+export const useInviteLinks = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.inviteLinks(orgId), queryFn: () => api.invites.links(orgId), enabled });
+};
+
+/** "Make a link": the active one, or a new one. */
+export function useMakeInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.invites.createLink(orgId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.inviteLinks(orgId) }),
+  });
+}
+
+/** Turning a link off closes its requests too: the links, the requests and the pending list refresh. */
+export function useTurnOffInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => api.invites.turnOff(orgId, linkId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/**
+ * Requests to join waiting for an answer (admins, ADR 0068). Refreshed on focus, after each answer and when a
+ * `join_request` notice arrives (`applyNotificationEvent`).
+ */
+export const useJoinRequests = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.joinRequests(orgId),
+    queryFn: () => api.joinRequests.list(orgId),
+    enabled,
+    refetchOnWindowFocus: true,
+  });
+};
+
+/**
+ * Whoever got in shows in the people and in the workspace's counts (the sidebar's "2 members"); an invitation, in
+ * the pending list. Refetched after a refusal too.
+ */
+function refreshAnswered(qc: QC, orgId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.people(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.overview(orgId) }),
+  ]);
+}
+
+export function useApproveJoinRequest(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; role: "member" | "admin" }) =>
+      api.joinRequests.approve(orgId, input.id, input.role),
+    onSettled: () => refreshAnswered(qc, orgId),
+  });
+}
+
+export function useDenyJoinRequest(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; reason?: string }) => api.joinRequests.deny(orgId, input.id, input.reason),
+    onSettled: () => refreshAnswered(qc, orgId),
+  });
+}
+
 export const useUsageReport = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
@@ -923,10 +1102,23 @@ export const usePlatformKey = (orgId: string) => {
   });
 };
 
-/** Whether each agent has an AI to think with (the no-AI banner, card and chip). */
-export const useAiStatus = (orgId: string) => {
+/**
+ * Whether each agent has an AI to think with (the no-AI banner, card and chip). `pollMs` where no socket is open
+ * (the onboarding), a time or one picked from the last answer.
+ */
+export const useAiStatus = (
+  orgId: string,
+  enabled = true,
+  pollMs: number | false | ((status: AiStatus | undefined) => number | false) = false,
+) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiStatus(orgId), queryFn: () => api.agents.aiStatus(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.aiStatus(orgId),
+    queryFn: () => api.agents.aiStatus(orgId),
+    staleTime: 30_000,
+    enabled: enabled && orgId.length > 0,
+    refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
+  });
 };
 
 export function useRotateCredential(orgId: string) {
@@ -1751,22 +1943,30 @@ export function useSaveSandboxSettings(orgId: string) {
   });
 }
 
-/** `pollMs`: refetch this often (while starting or stopping); `false` = no polling. */
-/** "Quem pensa" (its owner or an admin; members don't load it). */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true) => {
+/**
+ * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
+ * keeps it current (the onboarding opens no socket).
+ */
+export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.agentBrain(orgId, agentId),
     queryFn: () => api.agents.brain(orgId, agentId),
     enabled,
     retry: false,
+    refetchInterval: pollMs,
   });
 };
 
 /** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
-export const useAiAccounts = (orgId: string, enabled = true) => {
+export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiAccounts(orgId), queryFn: () => api.machines.aiAccounts(orgId), enabled });
+  return useQuery({
+    queryKey: keys.aiAccounts(orgId),
+    queryFn: () => api.machines.aiAccounts(orgId),
+    enabled,
+    refetchInterval: pollMs,
+  });
 };
 
 /** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
@@ -2252,7 +2452,7 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
   const api = useApi();
   return useQuery({
     queryKey: keys.thread(orgId, channelId ?? "", rootId),
-    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: 200 }),
+    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE }),
     enabled: Boolean(channelId),
     staleTime: 30_000,
   });
@@ -2423,6 +2623,8 @@ export function dropNotification(qc: QC, orgId: string, id: string) {
 
 /** `notification.upserted` / `removed` / `counts` (user scope). */
 export function applyNotificationEvent(qc: QC, orgId: string, event: NotificationEvent) {
+  if (event.type === "notification.upserted" && event.notification.kind === "join_request")
+    void qc.invalidateQueries({ queryKey: keys.joinRequests(orgId) });
   if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
   else if (event.type === "notification.removed") dropNotification(qc, orgId, event.id);
   else {

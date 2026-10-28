@@ -10,7 +10,7 @@ import {
   readAgentUsers,
   systemLauncher,
 } from "../../runner/agent-users";
-import type { RunCommand } from "../../runner/service";
+import { agentCategorySlice, agentSlice, type RunCommand } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -250,6 +250,12 @@ test("the launcher: the agent's slice and user, absolute paths, and a fixed envi
     env,
     home: "/home/ag-a1b2c3d4",
   });
+});
+
+test("inside the agent's slice, its Chrome and its AI CLIs each get one, named from its uid", () => {
+  expect(agentSlice(21003)).toBe("agents-21003.slice");
+  expect(agentCategorySlice(21003, "browser")).toBe("agents-21003-browser.slice");
+  expect(agentCategorySlice(21003, "cli")).toBe("agents-21003-cli.slice");
 });
 
 test("an agent user's group, as the computer says it (`id -g`): never root's, never a guess", async () => {

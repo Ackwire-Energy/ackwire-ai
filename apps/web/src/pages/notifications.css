@@ -83,6 +83,11 @@
   box-shadow: var(--e1), var(--top);
   margin-bottom: 4px;
 }
+/* A raised container: its buttons lift one step in dark (the kit's elevation context). */
+.nt-wait > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+}
 .nt-wh {
   display: flex;
   align-items: center;
@@ -235,11 +240,105 @@
   margin-top: 10px;
   min-width: 0;
 }
+/* A card's action line, an `.ac-acts` row. Remind me later and Done end it, in the rows' two columns. A nested
+   `.ac-acts` has no box, and a line that wraps would split the pair: here it keeps one, which the margin pushes. */
 .nt-wacts {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.nt-wacts > .nt-tail.ac-acts {
+  display: flex;
+  margin-left: auto;
+}
+/* On touch a ghost at the item's edge reaches to 2px from it (a phone's 14px padding, the 12px plate), and the item
+   clips: the ring goes inside, as the item's own does. */
+.nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+/* ── What only points somewhere: one row, opened by a click on it ─────────── */
+.nt-wr {
+  align-items: start;
+  padding: 12px 16px;
+}
+/* A flex box, not a line: an avatar left on a line of text gets the line's descent under it. */
+.nt-wr > .nt-face {
+  grid-row: auto;
+  padding-top: 0;
+  display: flex;
+}
+/* The words, then the actions, as far from the words as the actions are from each other. */
+.nt-wr__main {
+  display: flex;
+  align-items: flex-start;
+  column-gap: calc(2 * var(--ghost-plate));
+  min-width: 0;
+}
+.nt-wr__text {
+  flex: 1;
+  min-width: 0;
+}
+/* The headline, its chips and its time on one line, the chips' 22px. Only the headline shrinks. */
+.nt-wr__l1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--muted);
+}
+.nt-wr__l1 > .ac-chip,
+.nt-wr__tm {
+  flex: none;
+}
+.nt-wr__tm {
+  font-size: 12.5px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.nt-wr__sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Open, Remind me later and Done on the face's middle. */
+.nt-wr__acts {
+  flex: none;
+  height: 40px;
+}
+/* The whole row opens: Open answers its hover. */
+@media (hover: hover) {
+  .nt-wr:hover .nt-wr__open:not(:focus-visible) {
+    box-shadow: var(--e2), var(--top);
+  }
+}
+/* At every width a line alone centres on the face, (40 - 22) / 2, on the actions' middle. With a line under it, or
+   where the words wrap, the row gives the first line `.ac-captop`: its capitals start at the face's top. */
+.nt-wr__l1:not(.ac-captop) {
+  margin-block-start: 9px;
+}
+/* Under 1024px one line leaves the headline too little room beside the actions: the words wrap, three lines at most,
+   the time at their end and never alone on the last line. A name with no spaces (an email) breaks too. */
+@media (max-width: 1023px) {
+  .nt-wr__l1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+  .nt-wr .nt-what {
+    white-space: normal;
+  }
+  /* A chip is an inline box as tall as the line: on the baseline it makes the line 3px taller, on its top none. */
+  .nt-wr__l1 > .ac-chip {
+    vertical-align: top;
+  }
 }
 .nt-sug {
   display: flex;
@@ -255,6 +354,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
   transition:
@@ -374,6 +474,9 @@
 .nt-c {
   min-width: 0;
 }
+/* The headline's 22px line (its chips') and the 28px face beside it share a middle. A headline alone comes down
+   to the face's: the face's 1px, then (28 - 22) / 2. With lines under it (on a phone, where it wraps, always),
+   the face goes up to it instead, so the text keeps the row's padding above it as below it. */
 .nt-l1 {
   display: flex;
   align-items: center;
@@ -381,6 +484,12 @@
   min-width: 0;
   font-size: 13.5px;
   color: var(--muted);
+}
+.nt-l1:only-child {
+  margin-top: 4px;
+}
+.nt-item:has(> .nt-c > :nth-child(2)) > .nt-who {
+  margin-top: -4px;
 }
 .nt-what {
   min-width: 0;
@@ -393,7 +502,8 @@
   font-weight: 600;
 }
 /* Unread is the weight of the headline (no bar on the side, like Threads). */
-.nt-item:not(.is-unread) .nt-what b {
+.nt-item:not(.is-unread) .nt-what b,
+.nt-wr:not(.is-unread) .nt-what b {
   font-weight: 500;
 }
 /* A headline that names nobody (the workspace's computer, its standing) is all subject: it takes the weight whole. */
@@ -442,6 +552,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* A restriction's notice: its whole line, how to contest it included. */
+.nt-snip--whole {
+  -webkit-line-clamp: unset;
+}
 .nt-item:not(.is-unread) .nt-snip {
   color: var(--muted);
 }
@@ -451,7 +565,6 @@
 }
 .nt-replied {
   display: flex;
-  align-items: center;
   gap: 6px;
   margin-top: 9px;
   font-size: 12.5px;
@@ -460,7 +573,6 @@
 }
 .nt-replied .ac-icon {
   color: var(--ok);
-  flex: none;
 }
 .nt-replied span {
   min-width: 0;
@@ -514,6 +626,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
 }
@@ -669,6 +782,7 @@
   justify-content: center;
   gap: 6px;
   font: inherit;
+  line-height: normal;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -874,15 +988,6 @@
   justify-content: center;
   margin-bottom: 12px;
 }
-.nt-foot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--faint);
-  padding: 8px 0;
-}
 
 /* ── Phones ─────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
@@ -901,25 +1006,42 @@
     padding: 12px 14px;
   }
   .nt-wi {
-    grid-template-columns: 32px minmax(0, 1fr);
     gap: 2px 10px;
     padding: 14px 14px 16px;
-  }
-  .nt-av40 {
-    width: 32px;
-    height: 32px;
   }
   .nt-body {
     grid-column: 1 / -1;
   }
-  .nt-wacts {
-    gap: 6px;
+  .nt-wr {
+    padding: 12px 14px;
   }
-  .nt-wacts .nt-grow {
+  /* A tap on the row opens it, so the words take Open's room. Open stays for screen readers and the keyboard. */
+  .nt-wr__open:not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* Where it opens is the chip's job on wide screens. Here the words need the room. */
+  .nt-wr__src {
+    display: none;
+  }
+  /* An expiring request says the time that matters: its chip in the time's place. */
+  .nt-wr__l1:has(> .nt-wr__left) > .nt-wr__tm {
     display: none;
   }
   .nt-l1 {
     align-items: flex-start;
+  }
+  .nt-l1:only-child {
+    margin-top: 0;
+  }
+  .nt-who {
+    margin-top: -4px;
   }
   .nt-what {
     white-space: normal;

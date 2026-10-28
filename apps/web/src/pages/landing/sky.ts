@@ -3,9 +3,12 @@
  * with pixel-art agents drifting up and blinking, a light that follows the
  * pointer, and calm zones behind the text (the field settles on palette level
  * 6/7 there and the sprites pass behind). Every canvas call is guarded: without a 2D
- * context (tests, old browsers) nothing is drawn and the CSS background shows.
+ * context (tests, old browsers) nothing is drawn and the CSS background shows. A sky
+ * draws about 30 frames a second while on screen (none while the page is hidden: the
+ * browser holds its frames); with reduced motion, one frame (again when it resizes).
  */
-import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";
+import { type AgentColor, onScreenNow, SPRITE, spriteTone } from "@agenteschat/ui";
+import { lightToward, SKY_FRAME_MS } from "@agenteschat/ui/sky/math";
 import { GRAD } from "./data";
 
 /** "#rrggbb" → a little-endian RGBA pixel for a Uint32Array over ImageData. */
@@ -150,8 +153,8 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     const r = host.getBoundingClientRect();
     const tx = (pointer.x - r.left) / (r.width || 1);
     const ty = (pointer.y - r.top) / (r.height || 1);
-    light.x += (Math.min(1.3, Math.max(-0.3, tx)) - light.x) * 0.05;
-    light.y += (Math.min(1.3, Math.max(-0.3, ty)) - light.y) * 0.05;
+    light.x = lightToward(light.x, tx, dt);
+    light.y = lightToward(light.y, ty, dt);
     const blobs = opts.blobs(t);
     const nb = blobs.length;
     const inv = 1 / h;
@@ -262,7 +265,12 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
       }
     }
     ctx?.putImageData(img, 0, 0);
-    if (visible && !reduced && raf$) raf = raf$(frame);
+    if (visible && !reduced && raf$) raf = raf$(tick);
+  }
+  /** The browser's frames, drawn about 30 times a second. */
+  function tick(now: number) {
+    if (now - last >= SKY_FRAME_MS) frame(now);
+    else if (visible && raf$) raf = raf$(tick);
   }
 
   resize();
@@ -276,13 +284,13 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     observers.push(ro);
   }
   if (typeof IntersectionObserver !== "undefined") {
-    const io = new IntersectionObserver(([e]) => {
-      visible = e?.isIntersecting ?? true;
+    const io = new IntersectionObserver((entries) => {
+      visible = onScreenNow(entries) ?? true;
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       if (visible && !reduced && raf$) {
         last = performance.now();
-        raf = raf$(frame);
+        raf = raf$(tick);
       }
     });
     io.observe(host);

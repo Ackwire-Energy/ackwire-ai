@@ -18,17 +18,25 @@
 }
 
 /* ── Source cards ───────────────────────────────────────────────────────── */
+/*
+ * Never one card alone on the last row: a card is over a quarter of the row, so three columns at most, which
+ * the nine cards (IMPORT_CARDS) fill. Where only two fit (under three 168px cards and their gaps), an odd last
+ * card takes the whole row.
+ */
 .imp-sources {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(min(100%, 168px), 26%), 1fr));
   gap: 8px;
+  container-type: inline-size;
+}
+@container (width < 520px) {
+  .imp-source:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 .imp-source {
   padding: 12px;
   gap: 4px;
-}
-.imp-source .ac-option__desc {
-  font-size: 12.5px;
 }
 .imp-mark {
   flex: none;
@@ -41,25 +49,25 @@
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
-  /* A source's monogram, when it has no mark of its own: the connector catalog's letters. */
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1;
 }
+/* As the maker drew it: its own corners, never clipped to ours. */
 .imp-mark__img {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
   object-fit: contain;
 }
+/* `.ac-iconline` rows: the icon on the first line's capitals, on a whole-pixel line (a fractional one rounds the
+   text's baseline off by a pixel). */
 .imp-tip,
 .imp-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+/* A help page's link, on a line of its own under what it explains. */
+.imp-help {
+  margin: 0;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -68,11 +76,6 @@
   border-radius: 14px;
   background: var(--plate);
   color: var(--ink2);
-}
-.imp-tip .ac-icon,
-.imp-note .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 
 /* ── "Outro app": the request to paste there ────────────────────────────── */
@@ -107,30 +110,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-}
-.imp-other__apps-title {
-  margin: 4px 0 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.imp-other__apps {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  font-size: 13px;
-}
-.imp-other__apps > div {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 8px;
-}
-.imp-other__apps dt {
-  font-weight: 600;
-}
-.imp-other__apps dd {
-  margin: 0;
-  color: var(--muted);
 }
 .imp-other p {
   margin: 0;
@@ -368,11 +347,6 @@ label.imp-row__text {
   font-size: 13.5px;
   font-weight: 650;
 }
-.imp-block__help {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12.5px;
-}
 .imp-todo,
 .imp-left,
 .imp-missed,
@@ -384,18 +358,14 @@ label.imp-row__text {
   padding: 0;
   list-style: none;
 }
+/* `.ac-iconline` rows. */
 .imp-todo li,
 .imp-missed li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 13.5px;
   overflow-wrap: anywhere;
 }
-.imp-todo .ac-icon,
-.imp-missed .ac-icon {
-  flex: none;
-  margin-top: 2px;
+.imp-todo li > .ac-icon,
+.imp-missed li > .ac-icon {
   color: var(--ink2);
 }
 .imp-todo__text {
@@ -436,9 +406,6 @@ label.imp-row__text {
 }
 .imp-apply__progress,
 .imp-apply__none {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -499,32 +466,6 @@ label.imp-row__text {
   box-shadow: var(--focus-ring);
 }
 
-/* ── Export ─────────────────────────────────────────────────────────────── */
-.imp-export {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 16px;
-}
-.imp-export ul {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13.5px;
-}
-.imp-export li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.imp-export li .ac-icon {
-  flex: none;
-  margin-top: 3px;
-  color: var(--ink2);
-}
-
 @media (max-width: 640px) {
   .imp-row {
     flex-wrap: wrap;
@@ -534,12 +475,12 @@ label.imp-row__text {
     margin-left: 56px;
     max-width: none;
   }
-  .imp-other__apps > div {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
   .imp-paste {
     flex-direction: column;
+  }
+  /* In a column, `flex: 1` would size its height from nothing: the field keeps its own, Read's under it. */
+  .imp-paste .ac-input {
+    flex: none;
   }
   .imp-apply {
     align-items: stretch;

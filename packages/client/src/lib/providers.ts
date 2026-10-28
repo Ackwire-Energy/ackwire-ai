@@ -3,13 +3,18 @@ import type { Credential, Model } from "../api/types";
 interface ProviderEntry {
   id: string;
   label: string;
-  placeholder: string;
+  /** How its keys start, as the key field's example; none where the provider publishes no prefix. */
+  placeholder?: string;
   /** What its keys look like: only to catch paste mistakes (loose where the provider publishes no format). */
   pattern: RegExp;
   /** Where the provider hands out keys. */
   site: string;
   /** It also sells coding plans, whose keys only work in coding tools. */
   plans?: boolean;
+  /** Its name is masculine in Portuguese ("do Claude", "do Gemini"); the others are feminine ("da OpenAI"). */
+  masculine?: boolean;
+  /** Its free tier lets the provider use what is sent: billing should be on. */
+  billing?: boolean;
 }
 
 /**
@@ -19,10 +24,11 @@ interface ProviderEntry {
 export const PROVIDERS = [
   {
     id: "anthropic",
-    label: "Anthropic",
+    label: "Claude",
     placeholder: "sk-ant-…",
     pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
-    site: "console.anthropic.com/settings/keys",
+    site: "platform.claude.com/settings/keys",
+    masculine: true,
   },
   {
     id: "openai",
@@ -30,6 +36,16 @@ export const PROVIDERS = [
     placeholder: "sk-…",
     pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/,
     site: "platform.openai.com/api-keys",
+  },
+  {
+    id: "gemini",
+    label: "Gemini",
+    placeholder: "AQ.…",
+    // AI Studio's keys: "AQ." since 2026-05-28 (bound to a service account), "AIza" before.
+    pattern: /^(?:AQ\.[A-Za-z0-9._-]{20,}|AIza[A-Za-z0-9_-]{30,})$/,
+    site: "aistudio.google.com/api-keys",
+    masculine: true,
+    billing: true,
   },
   {
     id: "deepseek",
@@ -49,17 +65,15 @@ export const PROVIDERS = [
   {
     id: "zai",
     label: "Z.ai",
-    placeholder: "…",
-    pattern: /^(?!sk-)[A-Za-z0-9._-]{16,}$/,
+    pattern: /^(?!sk-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "z.ai/manage-apikey/apikey-list",
     plans: true,
   },
   {
     id: "minimax",
     label: "MiniMax",
-    placeholder: "…",
     // `sk-cp-` keys are its coding plan's.
-    pattern: /^(?!sk-ant-|sk-cp-)[A-Za-z0-9._-]{16,}$/,
+    pattern: /^(?!sk-ant-|sk-cp-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "platform.minimax.io/user-center/basic-information/interface-key",
     plans: true,
   },
@@ -67,8 +81,12 @@ export const PROVIDERS = [
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-/** A provider's entry; undefined for an id this client doesn't know (it then shows the id itself). */
-export const providerOf = (id: string): ProviderEntry | undefined => PROVIDERS.find((p) => p.id === id);
+/**
+ * A provider's entry by its id, or by its label (run errors name the provider by label); undefined for one
+ * this client doesn't know (it then shows what it was given).
+ */
+export const providerOf = (id: string): ProviderEntry | undefined =>
+  PROVIDERS.find((p) => p.id === id || p.label === id);
 export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
 export const isProviderId = (id: string): id is ProviderId => PROVIDERS.some((p) => p.id === id);
 export const keyLooksValid = (provider: ProviderId, key: string) =>
@@ -79,6 +97,20 @@ export const keyLooksValid = (provider: ProviderId, key: string) =>
  * Kimi's or MiniMax's), so the person says which instead of the app guessing.
  */
 export const providersForKey = (key: string) => PROVIDERS.filter((p) => p.pattern.test(key.trim()));
+
+/** Whose a pasted key is: the one provider whose keys look like it, else the one asked for, else the first that fits. */
+export function providerGuess(key: string | undefined, asked?: string): ProviderId {
+  const fits = key ? providersForKey(key) : [];
+  const guess = (fits.length === 1 ? fits[0]?.id : undefined) ?? asked ?? fits[0]?.id;
+  return guess && isProviderId(guess) ? guess : "anthropic";
+}
+
+/**
+ * The ⓘ on the key panel's first step, web and phone: for a maker that also sells coding plans, where a plan's key
+ * goes; for one whose free tier may use what is sent, to turn on billing.
+ */
+export const keyStepHint = (p: ProviderEntry) =>
+  p.plans ? "connectAi.key.notPlan" : p.billing ? "connectAi.key.billing" : undefined;
 
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {

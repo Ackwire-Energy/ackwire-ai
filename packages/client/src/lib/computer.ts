@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
+import { useSyncExternalStore } from "react";
 import type { AgentComputer, ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
-import { type ComputerState, computerKind } from "./machines";
+import { type ComputerState, computerKind, machineTitle } from "./machines";
 
 /** What a person asked the agent's PC to do. */
 export type ComputerAction = "start" | "stop" | "remove";
@@ -75,7 +76,24 @@ export function computerEdition(setup: ComputerSetup | null | undefined, workspa
 /** The provisioner's steps, in order (`computerSetup.step.*`). */
 export const SETUP_STEPS: readonly ComputerSetupStep[] = ["reserving", "starting", "installing", "connecting"];
 
-export type SetupPhase = "preparing" | "waiting" | "problem" | "ready";
+/**
+ * What the computer is doing within a step, where that has words of its own (`computerSetup.stage.*`), by the step
+ * it belongs to. A stage its step already says (`starting`, `apps`, `connecting`), one under another step, or one
+ * this app doesn't know yet reads as its step.
+ */
+export const SETUP_STAGES = {
+  ordering: "reserving",
+  wiping: "starting",
+  booting: "installing",
+  updating: "installing",
+  restarting: "installing",
+  network: "installing",
+  firewall: "installing",
+} as const satisfies Record<string, ComputerSetupStep>;
+type SetupStage = keyof typeof SETUP_STAGES;
+
+/** `paused`: the workspace is on hold, and waits for no computer until it is active again. */
+export type SetupPhase = "preparing" | "waiting" | "problem" | "ready" | "paused";
 /** What a line or a chip says: the phase, or why it waits. */
 type SetupStatus = Exclude<SetupPhase, "waiting"> | "capacity";
 
@@ -85,10 +103,13 @@ export interface SetupView {
   /** While preparing: the step, and its number from 1 (0 before the provisioner names one). */
   step: ComputerSetupStep | null;
   stepNumber: number;
-  /** While waiting: `capacity` (longer than usual). */
+  /** While waiting: `capacity` (no computer on its way yet). */
   reason: "capacity" | null;
-  /** The status line. */
-  textKey: `computerSetup.step.${ComputerSetupStep}` | `computerSetup.status.${SetupStatus}`;
+  /** The status line: the stage within the step when it has words, else the step, else the phase. */
+  textKey:
+    | `computerSetup.stage.${SetupStage}`
+    | `computerSetup.step.${ComputerSetupStep}`
+    | `computerSetup.status.${SetupStatus}`;
   /** The short word for a chip. */
   chipKey: `computerSetup.chip.${SetupStatus}`;
   /** `computerSetup.specs`'s values ("4 CPUs · 8 GB…"), once the provisioner said. */
@@ -110,8 +131,10 @@ export interface SetupView {
  */
 export function setupView(setup: ComputerSetup | null | undefined, receivedAt = Date.now()): SetupView | null {
   if (setup?.mode !== "external") return null;
-  const phase: SetupPhase = setup.state ?? "preparing";
+  // The server says no state only for a workspace that isn't active and has no ready computer.
+  const phase: SetupPhase = setup.state ?? "paused";
   const step = phase === "preparing" && setup.step && SETUP_STEPS.includes(setup.step) ? setup.step : null;
+  const stage = setup.stage as SetupStage | null | undefined;
   // Every wait reads as capacity: an older server's `approval` too.
   const status: SetupStatus = phase === "waiting" ? "capacity" : phase;
   const secondsLeft = typeof setup.secondsLeft === "number" ? setup.secondsLeft : null;
@@ -120,7 +143,12 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     step,
     stepNumber: step ? SETUP_STEPS.indexOf(step) + 1 : 0,
     reason: phase === "waiting" ? "capacity" : null,
-    textKey: step ? `computerSetup.step.${step}` : `computerSetup.status.${status}`,
+    textKey:
+      step && stage && SETUP_STAGES[stage] === step
+        ? `computerSetup.stage.${stage}`
+        : step
+          ? `computerSetup.step.${step}`
+          : `computerSetup.status.${status}`,
     chipKey: `computerSetup.chip.${status}`,
     specs: setup.specs,
     machineId: setup.machineId,
@@ -139,17 +167,17 @@ export type EtaView =
   | { kind: "late" };
 
 /**
- * The time left now: the server's `secondsLeft` less the seconds since its answer came. A minute or more:
- * whole minutes, rounded up; under 15 s, or up to a minute past the time: almost; past that: a little longer
- * than expected. Null without a time.
+ * The time left now: the server's `secondsLeft` less the seconds since its answer came. Run out, it says a little
+ * longer than expected until the computer is ready: the server never moves a wait's time later. Else almost ready
+ * in the last step (`last`), whole minutes rounded up from a minute, less than a minute under that. Null without
+ * a time.
  */
-export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number): EtaView | null {
+export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number, last = false): EtaView | null {
   if (secondsLeft === null) return null;
-  const left = secondsLeft - Math.max(0, nowMs - receivedAtMs) / 1000;
-  if (left >= 60) return { kind: "minutes", count: Math.ceil(left / 60) };
-  if (left >= 15) return { kind: "underMinute" };
-  if (left >= -60) return { kind: "almost" };
-  return { kind: "late" };
+  const left = secondsLeft - Math.max(0, (nowMs - receivedAtMs) / 1000);
+  if (left <= 0) return { kind: "late" };
+  if (last) return { kind: "almost" };
+  return left >= 60 ? { kind: "minutes", count: Math.ceil(left / 60) } : { kind: "underMinute" };
 }
 
 /** "About 6 min left", "Almost ready…" (`computerSetup.eta.*`). */
@@ -158,10 +186,43 @@ export const etaLine = (t: TFunction, eta: EtaView) =>
 
 /** Only while it is being prepared: a wait and a problem have no time. */
 export const setupEta = (view: SetupView, nowMs: number) =>
-  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs) : null;
+  view.phase === "preparing"
+    ? etaView(view.secondsLeft, view.receivedAt, nowMs, view.step === SETUP_STEPS.at(-1))
+    : null;
 
-/** How often the time line repaints: every 15 s, every 5 s under a minute. No ticking seconds. */
-export const etaTickMs = (eta: EtaView | null) => (eta?.kind === "minutes" ? 15_000 : 5_000);
+/** How often every time line repaints, all together. No ticking seconds. */
+const ETA_TICK_MS = 5_000;
+
+/**
+ * One clock for every time line on screen (the notice, the setup, the computer's window, the agent's page): one
+ * that shows up later reads the time the others read, and they all move on together, so two of them never say two
+ * different times. It runs only while one is shown.
+ */
+const etaClock = {
+  now: Date.now(),
+  shown: new Set<() => void>(),
+  timer: undefined as ReturnType<typeof setInterval> | undefined,
+};
+
+function showEta(repaint: () => void) {
+  if (etaClock.shown.size === 0) {
+    etaClock.now = Date.now();
+    etaClock.timer = setInterval(() => {
+      etaClock.now = Date.now();
+      for (const shown of etaClock.shown) shown();
+    }, ETA_TICK_MS);
+  }
+  etaClock.shown.add(repaint);
+  return () => {
+    etaClock.shown.delete(repaint);
+    if (etaClock.shown.size === 0) clearInterval(etaClock.timer);
+  };
+}
+
+const hidden = () => () => {};
+
+/** The time every time line reads now (`shown`: one is on screen, so the clock moves). */
+export const useEtaNow = (shown: boolean) => useSyncExternalStore(shown ? showEta : hidden, () => etaClock.now);
 
 /**
  * Whether "we'll email you" holds: the server sends email, and the wait is or will be over a minute, which
@@ -191,8 +252,20 @@ export function setupPortrait(view: SetupView, online: boolean): ComputerState {
   return view.phase === "problem" ? "offline" : "paused";
 }
 
-/** Not ready yet: the notice, the waiting agents and the onboarding's progress show. */
-export const setupPending = (view: SetupView | null): view is SetupView => view !== null && view.phase !== "ready";
+/**
+ * Its one-line status (no step yet) only restates its chip: in line, or being prepared before a step. A problem or a
+ * hold says more than its chip (what happens, why).
+ */
+export const statusRestatesChip = (view: SetupView) =>
+  view.step === null && (view.phase === "waiting" || view.phase === "preparing");
+
+/** The notice's title ("Preparando o computador da Acme"): in line nothing is prepared yet, so its name alone. */
+export const setupNoticeTitleKey = (view: SetupView) =>
+  view.phase === "waiting" ? "computerSetup.title" : "computerSetup.notice.title";
+
+/** On its way: the notice, the waiting agents and the onboarding's progress show. */
+export const setupPending = (view: SetupView | null): view is SetupView =>
+  view !== null && view.phase !== "ready" && view.phase !== "paused";
 
 /**
  * The agents waiting for the workspace's computer: those no computer lists. Its first hello gives it to every
@@ -219,7 +292,8 @@ export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 /**
  * The agent's computer as this reader calls it. The workspace's own keeps the name it got in its first owner's
  * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
- * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name.
+ * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name, and
+ * the server's own, until its runner names it, by what it is.
  */
 export function computerName(
   t: TFunction,
@@ -228,7 +302,7 @@ export function computerName(
 ): string {
   const ours = t("computerSetup.title", { org: orgName });
   if (!machine) return ours;
-  if (machine.kind !== "managed") return machine.name;
+  if (machine.kind !== "managed") return machineTitle(machine, t("machines.host.label"));
   return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
 }
 

@@ -61,10 +61,10 @@ import {
   useStanceText,
 } from "@/components/Forum";
 import { ErrorState, LoadingPage } from "@/components/Loading";
-import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
 import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
+import { SavedTools } from "@/components/ToolCalls";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
@@ -311,19 +311,19 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
                   />
                 ))}
                 {passed.map((e) => (
-                  <p key={`p-${e.seat.id}`} className="forum-bskip">
+                  <p key={`p-${e.seat.id}`} className="forum-bskip ac-iconline">
                     <SeatAvatar seat={e.seat} size="xs" />
                     <span>{t("forum.posts.passedTurn", { name: who.seatName(e.seat) })}</span>
                   </p>
                 ))}
                 {budget.map((e) => (
-                  <p key={`b-${e.seat.id}`} className="forum-bskip">
+                  <p key={`b-${e.seat.id}`} className="forum-bskip ac-iconline">
                     <SeatAvatar seat={e.seat} size="xs" mode="sleep" />
                     <span>{t("forum.posts.budgetSkip", { name: who.seatName(e.seat) })}</span>
                   </p>
                 ))}
                 {silent.length > 0 && said > 0 && (
-                  <p className="forum-quiet">
+                  <p className="forum-quiet ac-iconline">
                     <Icon name="dash" size={14} />
                     {t("forum.posts.didntSpeak", { count: silent.length, names: joinNames(silent, t("newAgent.and")) })}
                   </p>
@@ -682,7 +682,7 @@ function Post({
             <Markdown source={p.body} variant="message" wikiLink={wikiLink} />
           </div>
           {stopped && <p className="forum-post__stop">{t("forum.posts.stopped")}</p>}
-          {p.agentRunId && <MessageWork runId={p.agentRunId} meta={p.meta} agentName={name} />}
+          {p.agentRunId && <SavedTools runId={p.agentRunId} meta={p.meta} agentName={name} />}
         </div>
       </article>
     );
@@ -715,7 +715,7 @@ function Post({
           <Markdown source={p.body} variant="message" wikiLink={wikiLink} />
         </div>
         {leads !== null && (
-          <p className="forum-note">
+          <p className="forum-note ac-iconline">
             <Icon name="flag" size={14} />
             {leads > topic.rounds
               ? t("forum.posts.last")
@@ -796,7 +796,7 @@ function LiveTurn({ topic, active }: { topic: ForumTopicDetail; active: string[]
   if (now.kind === "person") {
     if (now.userId !== who.me)
       return (
-        <p className="forum-bskip" id="forum-live">
+        <p className="forum-bskip ac-iconline" id="forum-live">
           <SeatAvatar seat={{ type: "person", id: now.userId }} size="xs" />
           <span>{t("forum.liveTurn.waitsFor", { name: who.personName(now.userId) })}</span>
         </p>
@@ -858,7 +858,7 @@ function LiveTurn({ topic, active }: { topic: ForumTopicDetail; active: string[]
             </div>
           </div>
           {topic.deadline && (
-            <p className="forum-chint">
+            <p className="forum-chint ac-iconline">
               <Icon name="calendar" size={14} />
               {t("forum.liveTurn.deadline", { when: deadlineLabel(t, i18n.language, topic.deadline) })}
             </p>
@@ -942,7 +942,7 @@ function TopicComposer({
   const ownerName = who.agentName(owner);
   if (topic.status === "canceled")
     return (
-      <div className="forum-closed">
+      <div className="forum-closed ac-iconline">
         <Icon name="block" size={16} />
         <span>{t("forum.closed.canceled")}</span>
       </div>
@@ -980,7 +980,7 @@ function TopicComposer({
             </label>
           }
         />
-        <p className="forum-chint">
+        <p className="forum-chint ac-iconline">
           <Icon name="repeat" size={14} />
           {ask
             ? t("forum.composer.reroundHint", { name: ownerName, the: who.g(ownerName).article })
@@ -993,7 +993,7 @@ function TopicComposer({
   if (now?.kind === "person" && now.userId === who.me) return null;
   if (now?.kind === "synthesis")
     return (
-      <div className="forum-closed">
+      <div className={owner ? "forum-closed ac-iconline" : "forum-closed"}>
         {owner && <SeatAvatar seat={{ type: "agent", id: owner }} size="xs" mode="run" />}
         <span>{t("forum.closed.synthesizing", { name: ownerName, The: who.g(ownerName).The })}</span>
       </div>
@@ -1032,7 +1032,7 @@ function TopicComposer({
           ) : undefined
         }
       />
-      <p className="forum-chint">
+      <p className="forum-chint ac-iconline">
         <Icon name="flag" size={14} />
         {t(last && !more ? "forum.composer.hintLast" : "forum.composer.hint")}
       </p>
@@ -1326,7 +1326,7 @@ function Standing({
                   : null;
             })
             .filter(Boolean)
-            .join("; ");
+            .join(", ");
           return (
             <div key={s.agentId} className="forum-ag">
               <SeatAvatar seat={{ type: "agent", id: s.agentId }} size="sm" mode={agentMode(topic, s.agentId, next)} />

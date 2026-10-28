@@ -159,7 +159,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (agentCredentialId) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, agentCredentialId);
       if (!credential) {
-        throw new MissingCredentialError("This agent's API key was revoked; pick another one in the agent's settings");
+        throw new MissingCredentialError("This agent's API key was revoked. Pick another one in the agent's settings.");
       }
       if (credential.provider !== provider) {
         throw new MissingCredentialError(
@@ -261,7 +261,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   ) {
     // Price by the model that answered (a server-side fallback may differ), if we know it.
     const pricedModel = isKnownModel(input.model) ? input.model : input.requestedModel;
-    const cost = costNanoUsd(pricedModel, input.usage);
+    const cost = costNanoUsd(pricedModel, input.usage, now());
     const [record] = await tx
       .insert(usageRecords)
       .values({
@@ -446,7 +446,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   }) {
     const { agent, usage } = input;
     const pricedModel = isKnownModel(input.model) ? input.model : agent.model;
-    const cost = costNanoUsd(pricedModel, usage);
+    const cost = costNanoUsd(pricedModel, usage, now());
     const id = Bun.randomUUIDv7();
     const period = input.reservation?.periodStart ?? periodOf(now());
     const at = now().toISOString();
@@ -593,7 +593,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /**
      * Usage of a non-model service called for an org (e.g. the Jev router):
-     * recorded like every call, with its kind and provider, billed to the platform.
+     * recorded like every call, with its kind and provider, billed to the server's own key (`platform`).
      */
     async recordExternalUsage(input: {
       orgId: string;

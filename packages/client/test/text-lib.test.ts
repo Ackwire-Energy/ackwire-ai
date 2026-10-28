@@ -22,7 +22,7 @@ test("the webmail to open after sending an e-mail", () => {
 
 test("a text's start: whole sentences and lines while they fit, never a stop before the ellipsis", () => {
   const ada =
-    "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs; for big changes opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review.";
+    "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs. For big changes, opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review.";
   const start = excerpt(ada, 280);
   expect(start).toEndWith("explains the plan there.");
   expect(start.split("\n")).toHaveLength(2);

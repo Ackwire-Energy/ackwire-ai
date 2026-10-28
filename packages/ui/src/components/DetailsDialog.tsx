@@ -97,7 +97,7 @@ export function DetailsDialog({
           <div className="ac-details__head">
             <div className="ac-details__bar">
               <span className="ac-details__eyebrow">{eyebrow}</span>
-              <div className="ac-details__actions">
+              <div className="ac-details__actions ac-acts">
                 {actions}
                 {page &&
                   (page.render ? (

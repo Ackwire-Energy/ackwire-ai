@@ -176,6 +176,16 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(card("Avaliações").textContent).toContain("A cada 30 minutos");
     expect(card("Avaliações").textContent).not.toContain("Every");
   });
+
+  test("the strip's last runs read as sentences: each after the first starts with a capital", async () => {
+    const now = routineRun({ at: ago(0.5), status: "reported" });
+    const yesterday = routineRun({ at: ago(24 * 60), status: "silent" });
+    await open([routine({ id: "rt-runs", name: "Erros do Sentry", lastRun: now, recentRuns: [now, yesterday] })]);
+    const strip = within(card("Erros do Sentry")).getByRole("img", { name: /^Últimas execuções/ });
+    expect(strip.getAttribute("aria-label")).toMatch(
+      /^Últimas execuções: agora: respondeu\. Ontem \d{1,2}:\d{2}: nada novo, ficou em silêncio$/,
+    );
+  });
 });
 
 describe("Rotinas: a routine's details", () => {
@@ -253,9 +263,14 @@ describe("Rotinas: a routine's details", () => {
     expect(within(row).queryByRole("switch")).toBeNull();
     expect(within(row).queryByRole("button", { name: "Rodar agora" })).toBeNull();
     const panel = await details("Caixa do suporte");
-    expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem");
+    expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
+    // What it may do on its own: the answer, and its meaning behind the section's ⓘ; when it speaks: the answer alone.
+    const access = within(panel).getByRole("region", { name: "O que pode fazer sozinha" });
+    expect(within(access).getByRole("button", { name: "Sobre O que pode fazer sozinha" })).toBeTruthy();
+    expect(access.querySelector(".small.muted")).toBeNull();
+    expect(within(panel).getByRole("region", { name: "Quando falar" }).querySelectorAll("p")).toHaveLength(1);
   });
 });
 
@@ -320,6 +335,15 @@ describe("Rotinas: every code in the person's words", () => {
 });
 
 describe("Rotinas: the form's two plain questions", () => {
+  test("no routines: the title and Nova rotina, nothing else", async () => {
+    await open([]);
+    const empty = document.querySelector(".ac-empty") as HTMLElement;
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Nenhuma rotina ainda");
+    expect(empty.querySelector(".ac-empty__text")).toBeNull();
+    expect(within(empty).getByRole("button", { name: "Nova rotina" })).toBeTruthy();
+    expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
+  });
+
   test("Quando falar and O que pode fazer sozinha, sent with the routine", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/routines`, { api });
@@ -332,10 +356,15 @@ describe("Rotinas: the form's two plain questions", () => {
       "true",
     );
     expect(within(dialog).getByRole("radio", { name: "Só olhar e contar" }).getAttribute("aria-checked")).toBe("true");
-    expect(dialog.textContent).toContain("Ela lê e conta o que achou.");
+    // What each answer allows is one ⓘ beside "O que pode fazer sozinha"; no line under either question.
+    const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
+    const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+    expect(hint?.textContent).toBe(
+      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+    );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
     await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
-    expect(dialog.textContent).toContain("Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.");
+    expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
     );
@@ -350,7 +379,7 @@ describe("Rotinas: the form's two plain questions", () => {
 });
 
 describe("Approval cards: why, and asked while nobody watched", () => {
-  test("the card says the routine that asked on its first line, then the action, then the agent's why", async () => {
+  test("the request: the agent's why in its words, then the action, then the routine that asked", async () => {
     const state = seedState();
     const first = state.approvals[0];
     if (first) {
@@ -361,12 +390,12 @@ describe("Approval cards: why, and asked while nobody watched", () => {
     await settle(6);
     const group = screen().getByRole("group", { name: "Pedido de aprovação" });
     const text = group.textContent ?? "";
-    const origin = text.indexOf("rotina «Revisar PRs»");
-    const action = text.indexOf("Merge PR #42 into main");
     const why = text.indexOf("O PR #42 corrige o login");
-    expect(origin).toBeGreaterThan(-1);
-    expect(action).toBeGreaterThan(origin);
-    expect(why).toBeGreaterThan(action);
+    const action = text.indexOf("Merge PR #42 into main");
+    const origin = text.indexOf("rotina «Revisar PRs»");
+    expect(why).toBeGreaterThan(-1);
+    expect(action).toBeGreaterThan(why);
+    expect(origin).toBeGreaterThan(action);
   });
 });
 

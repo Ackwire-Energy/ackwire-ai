@@ -171,6 +171,52 @@ test("budget resets with the calendar month", async () => {
   expect(f.provider.calls).toHaveLength(2);
 });
 
+test("a call is priced as of its day: Gemini 4 Argon at half until December 2026, agent and org calls alike", async () => {
+  f = await setup({ reply: () => ({ chunks: ["x"], usage: { inputTokens: 1000, outputTokens: 100 } }) });
+  await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+    provider: "gemini",
+    label: "Gemini",
+    apiKey: "AQ.gemini-test-key-0000",
+  });
+  await f.db
+    .update(schema.agents)
+    .set({ model: "gemini-4-argon", credentialId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+  const on = (iso: string) =>
+    createModelGateway({
+      db: f.db,
+      keyWrappers: [f.keyWrapper],
+      providers: { gemini: f.provider },
+      platformCredentials: noPlatformCredentials,
+      now: () => new Date(iso),
+    });
+  const messages = [{ role: "user" as const, content: "hi" }];
+  const agentCall = (iso: string) =>
+    on(iso).stream({ orgId: f.org.id, agentId: f.agent.id, system: "s", messages, maxTokens: 100, onDelta: () => {} });
+  const orgCall = (iso: string) =>
+    on(iso).complete({
+      orgId: f.org.id,
+      kind: "summary",
+      model: "gemini-4-argon",
+      system: "s",
+      messages,
+      maxTokens: 100,
+    });
+  const half = 1000 * 2000 + 100 * 10000;
+  expect((await agentCall("2026-11-30T23:59:59Z")).costNanoUsd).toBe(half);
+  expect((await agentCall("2026-12-01T00:00:00Z")).costNanoUsd).toBe(2 * half);
+  expect((await orgCall("2026-11-30T23:59:59Z")).costNanoUsd).toBe(half);
+  expect((await orgCall("2026-12-01T00:00:00Z")).costNanoUsd).toBe(2 * half);
+  expect(f.provider.calls.every((c) => c.apiKey === "AQ.gemini-test-key-0000")).toBe(true);
+  const records = await f.db.select().from(schema.usageRecords);
+  expect(records.map((r) => `${r.kind} ${r.provider} ${r.costNanoUsd}`).sort()).toEqual([
+    `agent gemini ${half}`,
+    `agent gemini ${2 * half}`,
+    `summary gemini ${half}`,
+    `summary gemini ${2 * half}`,
+  ]);
+});
+
 test("a stream that fails midway records partial usage (provider's input count) and releases the reservation", async () => {
   f = await setup({
     budgetNanoUsd: 1_000_000_000,
@@ -262,7 +308,8 @@ test("no credential: core has no platform key; a module can provide one", async 
   await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id);
   await expect(call(f)).rejects.toBeInstanceOf(MissingCredentialError);
   await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: null });
-  await expect(call(f)).rejects.toBeInstanceOf(MissingCredentialError);
+  // `runErrorDetail` reads this text, and the app finds the provider by its label.
+  await expect(call(f)).rejects.toThrow("Add an API key for Claude in the workspace settings");
   await f.close();
 
   // Resolution order: agent key → org key for the provider → platform key.

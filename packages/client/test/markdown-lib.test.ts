@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { parseMarkdown, tableAt } from "../src/lib/markdown";
+import { firstMentioned, parseMarkdown, tableAt } from "../src/lib/markdown";
+
+describe("mentions", () => {
+  test("the first agent a text @mentions, as the backend reads it: any case, never an email", () => {
+    const team = [{ handle: "theo" }, { handle: "Lia" }];
+    expect(firstMentioned("oi @maria, e @LIA e @theo", team)).toBe(team[1]);
+    expect(firstMentioned("@theo!", team)).toBe(team[0]);
+    expect(firstMentioned("mande para lia@acme.com.br", team)).toBeUndefined();
+    expect(firstMentioned("bom dia, time", team)).toBeUndefined();
+  });
+});
 
 const TABLE = [
   "| Gatilho | Exibições | Compras | Taxa |",

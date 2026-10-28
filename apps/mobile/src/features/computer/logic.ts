@@ -6,6 +6,7 @@ import {
   surfaceOf,
 } from "@agenteschat/client/lib/agent-computer";
 import { type EtaView, etaLine, type SetupView } from "@agenteschat/client/lib/computer";
+import { endSentence } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
 
 /*
@@ -71,6 +72,16 @@ export const screenRequest = (h: BrowserHandoff | null, nowMs = Date.now()) =>
 export const offersSwitch = (f: Pick<AgentComputerFacts, "edition">, manages: boolean, hasOutage: boolean) =>
   f.edition === "selfhost" && manages && hasOutage;
 
-/** The wait notice's line under "Preparando o computador da Acme": the time left (`setupEta`), else where it is. */
-export const setupNoticeLine = (t: TFunction, view: SetupView, eta: EtaView | null): string =>
-  eta ? etaLine(t, eta) : t(view.textKey);
+/**
+ * The wait notice's line under "Preparando o computador da Acme": the time left (`setupEta`), else where it is; in
+ * the wait for a computer, "Avisamos por e-mail." after it for those who get the email (`emailed`).
+ */
+export function setupNoticeLine(t: TFunction, view: SetupView, eta: EtaView | null, emailed: boolean): string {
+  if (eta) return etaLine(t, eta);
+  return view.phase === "waiting" && emailed
+    ? `${endSentence(t(view.textKey))} ${t("computerSetup.email.short")}`
+    : t(view.textKey);
+}
+
+/** The full screen's header while the workspace's computer is on its way: the chip's word ("Na fila"). */
+export const setupSub = (t: TFunction, view: SetupView): string => t(view.chipKey);

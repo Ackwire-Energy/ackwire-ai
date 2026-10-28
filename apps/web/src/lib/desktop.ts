@@ -81,6 +81,17 @@ export function desktopNotice(
   };
 }
 
+/**
+ * A connector's OAuth started in the app's window: the provider opens in the browser, which isn't signed in, so
+ * the server hands what it sent back to the app (`agenteschat://desktop/connectors/oauth`), which opens
+ * `/desktop/connector` in its window to finish there (packages/engine oauth-return.ts). Apps from before say
+ * nothing and keep the web's return.
+ */
+export function oauthReturnPath(path: string) {
+  const desktop = (window as { __agentesDesktop?: { connectorReturn?: unknown } }).__agentesDesktop;
+  return desktop?.connectorReturn === true ? `desktop:${path}` : path;
+}
+
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";
 /** Loading this brings the window to the front (main_window.rs), then goes on to `to`. */
@@ -157,6 +168,26 @@ export function pageReady() {
   void tauri.invoke("page_ready", {}).catch(() => {});
 }
 
+/**
+ * Links that open a new window (`target="_blank"`) in the app: the window's `on_new_window` sends them on, a page
+ * of this server to the window and anything else to the browser (main_window.rs). The app's shell plugin adds
+ * a click listener of its own to every page (on `body`) that takes these links first and asks the app over IPC,
+ * which the site may not do, so a click did nothing. This one sits on the React root: after the page's own
+ * handlers (one that handled the click itself, a popup, keeps it) and before the plugin's.
+ */
+export function routeNewWindowLinks(root: HTMLElement): () => void {
+  const onClick = (e: MouseEvent) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
+    if (link?.target !== "_blank" || !/^(https?|mailto|tel):$/.test(link.protocol)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(link.href, "_blank", "noopener");
+  };
+  root.addEventListener("click", onClick);
+  return () => root.removeEventListener("click", onClick);
+}
+
 export const thisMac = {
   status: () => invoke<ThisMacStatus>({ kind: "status" }),
   /**
@@ -181,7 +212,19 @@ export const thisMac = {
    * this window trades at `/desktop/handover`; the key never reaches the page). The window moves there.
    */
   signIn: () => invoke<unknown>({ kind: "signIn" }),
+  /** The app's own window to pick another server (its first run), from the sign-in page. */
+  otherServer: () => invoke<unknown>({ kind: "servers" }),
+  /** The folder where the server the app runs here keeps its files, in Finder or the file manager. */
+  revealFiles: () => invoke<unknown>({ kind: "files" }),
 };
+
+/** The app takes `otherServer` (`servers` in `window.__agentesDesktop`); older apps refuse it. */
+export const desktopPicksServer = () =>
+  inDesktopApp() && (window as { __agentesDesktop?: { servers?: unknown } }).__agentesDesktop?.servers === true;
+
+/** The app takes `revealFiles` (`files` in `window.__agentesDesktop`); older apps refuse it. */
+export const desktopRevealsFiles = () =>
+  inDesktopApp() && (window as { __agentesDesktop?: { files?: unknown } }).__agentesDesktop?.files === true;
 
 /**
  * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"

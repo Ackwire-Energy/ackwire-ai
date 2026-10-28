@@ -21,7 +21,12 @@ import type {
   HttpApi,
   ImportItemKind,
   ImportItemResult,
+  InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
+  JevKey,
+  JoinApproval,
+  JoinRequest,
   Me,
   Member,
   Memory,
@@ -36,6 +41,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SignInOptions,
+  StoragePlatform,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -185,6 +191,35 @@ export interface FakeState {
   answerNowError?: ApiError;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
+  /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
+  jev?: JevKey;
+  /**
+   * What TypeSafe says of a key `system.saveJev` checks: refused (422, nothing kept) or out of credit; else it works.
+   * `rate_limited`: the server's limit answers the first try (429), and the next one goes through.
+   */
+  jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
+  /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
+  storagePlatform?: StoragePlatform;
+  /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
+  webPushKey?: string;
+  /** `push.stale`: the notification ids the server calls stale (read, done, snoozed, gone); unset = none. */
+  stalePushIds?: string[];
+  /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
+  previews?: Record<string, InvitationPreview>;
+  /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
+  askError?: ApiError;
+  /** The code `invites.checkCode` takes (default 123456); any other is `join.code_wrong`. */
+  joinCode?: string;
+  /** Make `invites.sendCode` fail with this error (`join.code_wait`, `join.code_limit`…). */
+  sendCodeError?: ApiError;
+  /** The workspace's invitation links (`invites.links`); `invites.createLink` makes one when none has a URL. */
+  inviteLinks?: InviteLink[];
+  /** Requests to join waiting (`joinRequests.list`). */
+  joinRequests?: JoinRequest[];
+  /** What `joinRequests.approve` answers; unset: in at once when confirmed, else an emailed invitation. */
+  approval?: JoinApproval;
+  /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
+  answerError?: ApiError;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -287,7 +322,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "cred-1",
         provider: "anthropic",
-        label: "Anthropic da Acme",
+        label: "Claude da Acme",
         keyHint: "7f2a",
         createdAt: minutesAgo(9999),
         revokedAt: null,
@@ -647,7 +682,11 @@ export const CATALOG: ConnectorCatalog = {
     remote("notion", "Notion", "docs", "Páginas e bancos de dados.", "https://mcp.notion.com/mcp", null),
     remote("stripe", "Stripe", "payments", "Clientes e cobranças.", "https://mcp.stripe.com", "#635BFF"),
     remote("zapier", "Zapier", "automation", "Ações do Zapier.", "https://oauth.zapier.example/mcp", "#FF4F00"),
-    remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null, false),
+    // A mark in its maker's colors, from the web app's brands folder.
+    {
+      ...remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null),
+      iconUrl: "/brands/canva.svg",
+    },
     {
       ...remote("slack", "Slack", "support", "Canais e mensagens.", "https://mcp.slack.example/mcp", null, false),
       kind: "catalog",
@@ -675,6 +714,7 @@ type FakedParts =
   | "skills"
   | "access"
   | "invites"
+  | "joinRequests"
   | "storage"
   | "artifacts"
   | "issues"
@@ -732,10 +772,34 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.telemetry = { ...state.telemetry, enabled };
         return state.telemetry;
       },
+      jev: async () => state.jev ?? null,
+      saveJev: async (apiKey) => {
+        log("system.saveJev", apiKey);
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        const verdict = state.jevVerdicts?.[apiKey];
+        if (verdict === "invalid") throw new ApiError(422, "jev_key_invalid", "TypeSafe didn't accept this key.");
+        if (verdict === "rate_limited") {
+          delete state.jevVerdicts?.[apiKey];
+          throw new ApiError(429, "rate_limited", "Too many tries. Wait a minute.");
+        }
+        state.jev = { ...state.jev, source: "settings", hint: apiKey.slice(-4), state: verdict ?? "ok" };
+        return state.jev;
+      },
+      checkJev: async () => {
+        log("system.checkJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        return state.jev;
+      },
+      removeJev: async () => {
+        log("system.removeJev");
+        if (!state.jev) throw new ApiError(404, "not_found", "Not found");
+        state.jev = { ...state.jev, source: null, hint: null, state: "off" };
+        return state.jev;
+      },
     },
     waitlist: {
-      join: async (input) => {
-        log("waitlist.join", input);
+      join: async (input, humanCheck) => {
+        state.calls.push({ method: "waitlist.join", args: humanCheck === undefined ? [input] : [input, humanCheck] });
         if (state.waitlistError) throw state.waitlistError;
       },
       confirm: async (input) => {
@@ -751,8 +815,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         landing: true,
         ...state.authConfig,
       }),
-      signInOptions: async () =>
-        state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true },
+      signInOptions: async (input, humanCheck) => {
+        if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
+        return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
+      },
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
@@ -768,6 +834,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           server: state.phoneServer ?? "https://agentes.chat",
           expiresIn: 180,
         };
+      },
+    },
+    push: {
+      webKey: async () => state.webPushKey ?? null,
+      register: async (input) => {
+        log("push.register", input);
+      },
+      unregister: async (token) => {
+        log("push.unregister", token);
+      },
+      stale: async (ids) => {
+        log("push.stale", ids);
+        return ids.filter((id) => state.stalePushIds?.includes(id));
       },
     },
     orgs: {
@@ -846,7 +925,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.invitations = state.invitations.filter((i) => i.id !== invitationId);
       },
       previewInvitation: async (token) =>
-        token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null,
+        state.previews?.[token] ??
+        (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null),
       acceptInvitation: async (token) => {
         log("orgs.acceptInvitation", token);
         return { orgId: ORG_ID };
@@ -1044,7 +1124,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             ...rest,
             ...(seesCost() ? { monthlyBudgetUsd } : {}),
             budgetUsedPercent: percentOf(a),
-            audienceMode: mode,
+            // As stored, which `audience` (the gate) may narrow: on the Cloud a plan answers only its owner.
+            audienceMode: a.audienceMode ?? mode,
             canTalk,
           };
         }),
@@ -1406,20 +1487,29 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.channelMembers[channelId] = list;
         list.push("agentId" in member ? { type: "agent", id: member.agentId } : { type: "person", id: member.userId });
       },
+      // Copies, as over HTTP: each read is new objects, never the ones an earlier read returned.
       messages: async (_orgId, channelId, options = {}) => {
         const inChannel = state.messages.filter((m) => m.channelId === channelId);
         if (options.threadId) {
           const root = inChannel.find((m) => m.id === options.threadId);
-          return [...(root ? [root] : []), ...inChannel.filter((m) => m.threadId === options.threadId)];
+          return structuredClone([
+            ...(root ? [root] : []),
+            ...inChannel.filter((m) => m.threadId === options.threadId),
+          ]);
         }
         // Like the server: the latest `limit` before `before`, oldest first.
         const top = inChannel.filter((m) => m.threadId === null && (!options.before || m.createdAt < options.before));
-        return options.limit ? top.slice(-options.limit) : top;
+        return structuredClone(options.limit ? top.slice(-options.limit) : top);
       },
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);
         if (state.holdPosts) await state.holdPosts;
         if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
+        // Like the server: a resend (the same person's `clientId`) gets the message already written.
+        const resent = input.clientId
+          ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))
+          : undefined;
+        if (resent) return resent;
         // Like the server: the quoted message must be in this channel; the meta is built here.
         const meta: Record<string, unknown> = {};
         if (input.replyTo) {
@@ -1850,18 +1940,91 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       (orgId) => customConnectors.list(orgId),
     ),
     invites: {
+      // The same link every time, like the server: a new one only when none can be shown.
       createLink: async (orgId) => {
         state.calls.push({ method: "invites.createLink", args: [orgId] });
-        return {
-          url: `http://localhost:3000/invite/link-${state.calls.length}`,
-          expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-        };
+        state.inviteLinks ??= [];
+        let link = state.inviteLinks.find((l) => l.url !== null);
+        if (!link) {
+          const id = `link-${state.inviteLinks.length + 1}`;
+          link = {
+            id,
+            url: `http://localhost:3000/invite/${id}`,
+            expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+            createdAt: new Date().toISOString(),
+            createdBy: "Walter",
+            waiting: 0,
+          };
+          state.inviteLinks.unshift(link);
+        }
+        return { id: link.id, url: link.url ?? "", expiresAt: link.expiresAt };
+      },
+      links: async (orgId) => {
+        state.calls.push({ method: "invites.links", args: [orgId] });
+        return structuredClone(state.inviteLinks ?? []);
+      },
+      turnOff: async (orgId, linkId) => {
+        state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
+        state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
+      },
+      sendCode: async (token, input, humanCheck) => {
+        state.calls.push({
+          method: "invites.sendCode",
+          args: humanCheck === undefined ? [token, input] : [token, input, humanCheck],
+        });
+        if (state.sendCodeError) throw state.sendCodeError;
+        return { email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), resendIn: 60 };
+      },
+      checkCode: async (token, input) => {
+        state.calls.push({ method: "invites.checkCode", args: [token, input] });
+        if (input.code !== (state.joinCode ?? "123456"))
+          throw new ApiError(400, "join.code_wrong", "That code isn't right.");
+        return { verified: true };
+      },
+      ask: async (token, input) => {
+        state.calls.push({ method: "invites.ask", args: [token, input] });
+        if (state.askError) throw state.askError;
+        return { status: "pending", email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), emailed: true };
       },
       requestNew: async (token) => {
         state.calls.push({ method: "invites.requestNew", args: [token] });
       },
     },
-    storage: createMockStorage(),
+    joinRequests: {
+      list: async (orgId) => {
+        state.calls.push({ method: "joinRequests.list", args: [orgId] });
+        return structuredClone(state.joinRequests ?? []);
+      },
+      approve: async (orgId, requestId, role) => {
+        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, role] });
+        if (state.answerError) throw state.answerError;
+        const request = state.joinRequests?.find((r) => r.id === requestId);
+        state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
+        if (request?.confirmed && !state.approval)
+          state.members.push({
+            userId: `u-${requestId}`,
+            name: request.name,
+            email: request.email,
+            image: null,
+            role,
+            joinedAt: new Date().toISOString(),
+            handle: requestId,
+            timezone: "America/Sao_Paulo",
+          });
+        return (
+          state.approval ??
+          (request?.confirmed
+            ? { outcome: "joined" }
+            : { outcome: "invited", url: `http://localhost:3000/invite/tok-${requestId}`, emailed: true })
+        );
+      },
+      deny: async (orgId, requestId, reason) => {
+        state.calls.push({ method: "joinRequests.deny", args: [orgId, requestId, reason] });
+        if (state.answerError) throw state.answerError;
+        state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
+      },
+    },
+    storage: createMockStorage(() => state.storagePlatform),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,

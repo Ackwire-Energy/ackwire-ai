@@ -9,14 +9,17 @@ import {
   computerName,
   newerSetup,
   noComputerChoice,
+  SETUP_STAGES,
   SETUP_STEPS,
   setupNoticeKey,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
   WORKSPACE_COMPUTER_KIND,
 } from "../src/lib/computer";
-import { errorText, holdText, standingRefusalText } from "../src/lib/errors";
+import { errorText, holdText, restrictionLine, supportLineOf } from "../src/lib/errors";
 import { canReduceAccess } from "../src/lib/machines";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 
@@ -58,18 +61,41 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
       chipKey: "computerSetup.chip.preparing",
       specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     });
-    // Nothing reported yet reads as preparing, with no step.
-    expect(setupView(external({ state: null }))).toMatchObject({
-      phase: "preparing",
-      step: null,
-      stepNumber: 0,
-      textKey: "computerSetup.status.preparing",
-    });
     // A step the app doesn't know (a newer provisioner) is no step.
     expect(setupView(external({ step: "polishing" as never }))?.step).toBeNull();
   });
 
-  test("a wait takes longer than usual, whatever reason it gives; problem and ready have their own words", () => {
+  test("no state: the workspace is on hold and waits for no computer, so nothing says one is on its way", () => {
+    const paused = setupView(external({ state: null, since: null, requestedAt: null, secondsWaited: null }));
+    expect(paused).toMatchObject({
+      phase: "paused",
+      step: null,
+      stepNumber: 0,
+      textKey: "computerSetup.status.paused",
+      chipKey: "computerSetup.chip.paused",
+    });
+    expect(setupPending(paused)).toBe(false);
+  });
+
+  test("what it is doing within its step: the stage's own words, still that step's number; else the step's", () => {
+    expect(setupView(external({ step: "installing", stage: "updating" }))).toMatchObject({
+      step: "installing",
+      stepNumber: 3,
+      textKey: "computerSetup.stage.updating",
+    });
+    expect(setupView(external({ step: "starting", stage: "wiping" }))?.textKey).toBe("computerSetup.stage.wiping");
+    // A stage its step already says, one under another step, one this app doesn't know yet (an older provisioner's
+    // last checks among them), or none: the step.
+    for (const stage of ["apps", "wiping", "defragmenting", "finishing", "toString", null, undefined])
+      expect(setupView(external({ step: "installing", stage }))?.textKey).toBe("computerSetup.step.installing");
+    // No step said, or not preparing: no stage either.
+    expect(setupView(external({ stage: "updating" }))?.textKey).toBe("computerSetup.status.preparing");
+    expect(setupView(external({ state: "waiting", step: "installing", stage: "updating" }))?.textKey).toBe(
+      "computerSetup.status.capacity",
+    );
+  });
+
+  test("a wait is for an available computer, whatever reason it gives; problem and ready have their own words", () => {
     expect(setupView(external({ state: "waiting", reason: "capacity", step: "starting" }))).toMatchObject({
       phase: "waiting",
       step: null,
@@ -92,18 +118,28 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
 
   test("every state names one of the keys packages/i18n words (plain-computer-copy.test.ts)", () => {
     const lines = new Set<string>();
-    for (const state of ["preparing", "waiting", "problem", "ready"] as const)
+    for (const state of ["preparing", "waiting", "problem", "ready", null] as const)
       for (const step of [null, ...SETUP_STEPS])
-        for (const reason of [null, "approval" as never, "capacity"] as const) {
-          const view = setupView(external({ state, step, reason }));
-          if (view) lines.add(view.textKey).add(view.chipKey);
-        }
+        for (const reason of [null, "approval" as never, "capacity"] as const)
+          for (const stage of [null, ...Object.keys(SETUP_STAGES)]) {
+            const view = setupView(external({ state, step, reason, stage }));
+            if (view) lines.add(view.textKey).add(view.chipKey);
+          }
     expect([...lines].sort()).toEqual([
       "computerSetup.chip.capacity",
+      "computerSetup.chip.paused",
       "computerSetup.chip.preparing",
       "computerSetup.chip.problem",
       "computerSetup.chip.ready",
+      "computerSetup.stage.booting",
+      "computerSetup.stage.firewall",
+      "computerSetup.stage.network",
+      "computerSetup.stage.ordering",
+      "computerSetup.stage.restarting",
+      "computerSetup.stage.updating",
+      "computerSetup.stage.wiping",
       "computerSetup.status.capacity",
+      "computerSetup.status.paused",
       "computerSetup.status.preparing",
       "computerSetup.status.problem",
       "computerSetup.status.ready",
@@ -122,9 +158,30 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupPortrait(at("problem"), false)).toBe("offline");
     expect(setupPortrait(at("ready"), true)).toBe("online");
     expect(setupPortrait(at("ready"), false)).toBe("offline");
+    expect(setupPortrait(at(null), false)).toBe("paused");
     expect(setupPending(at("waiting"))).toBe(true);
     expect(setupPending(at("ready"))).toBe(false);
     expect(setupPending(null)).toBe(false);
+  });
+
+  test("beside its chip, its one-line status says nothing more while in line or before a step", () => {
+    const at = (patch: Partial<ComputerSetup>) =>
+      setupView(external(patch)) as NonNullable<ReturnType<typeof setupView>>;
+    expect(statusRestatesChip(at({ state: "waiting", reason: "capacity" }))).toBe(true);
+    expect(statusRestatesChip(at({ state: "preparing" }))).toBe(true);
+    // The steps' bar, what went wrong and why it waits say more than the chip.
+    expect(statusRestatesChip(at({ state: "preparing", step: "installing" }))).toBe(false);
+    expect(statusRestatesChip(at({ state: "problem" }))).toBe(false);
+    expect(statusRestatesChip(at({ state: null }))).toBe(false);
+  });
+
+  test("the notice is titled by its name while in line, where nothing is being set up yet", () => {
+    const at = (patch: Partial<ComputerSetup>) =>
+      setupView(external(patch)) as NonNullable<ReturnType<typeof setupView>>;
+    expect(setupNoticeTitleKey(at({ state: "waiting", reason: "capacity" }))).toBe("computerSetup.title");
+    expect(setupNoticeTitleKey(at({ state: "preparing" }))).toBe("computerSetup.notice.title");
+    expect(setupNoticeTitleKey(at({ state: "preparing", step: "installing" }))).toBe("computerSetup.notice.title");
+    expect(setupNoticeTitleKey(at({ state: "problem" }))).toBe("computerSetup.notice.title");
   });
 
   test("who waits for it: the agents no computer lists", () => {
@@ -155,6 +212,9 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     // Renamed by an admin: theirs. Any other computer: its own.
     expect(computerName(t, "Oficina", managed("Servidor da loja"))).toBe("Servidor da loja");
     expect(computerName(t, "Oficina", { kind: "connected", name: "Oficina's computer" })).toBe("Oficina's computer");
+    // The server's own: its runner's name, and what it is until the runner names it.
+    expect(computerName(t, "Oficina", { kind: "host", name: "srv-1" })).toBe("srv-1");
+    expect(computerName(t, "Oficina", { kind: "host", name: "" })).toBe("machines.host.label");
   });
 
   test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {
@@ -171,10 +231,13 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     for (const state of ["preparing", "waiting", "problem"] as const) {
       expect(noComputerChoice(at(state), false, false)).toBe("workspace");
     }
-    // Ready, on a server with no cloud computer: never offered, only shown for an agent that has none.
-    expect(noComputerChoice(at("ready"), false, false)).toBeNull();
-    expect(noComputerChoice(at("ready"), false, true)).toBe("none");
-    expect(noComputerChoice(at("ready"), true, false)).toBe("cloud");
+    // Ready, or on hold with none on its way, on a server with no cloud computer: never offered, only shown for an
+    // agent that has none.
+    for (const state of ["ready", null] as const) {
+      expect(noComputerChoice(at(state), false, false)).toBeNull();
+      expect(noComputerChoice(at(state), false, true)).toBe("none");
+      expect(noComputerChoice(at(state), true, false)).toBe("cloud");
+    }
   });
 
   test("nobody turns a tool off or takes a folder away on the workspace's own computer", () => {
@@ -224,6 +287,7 @@ describe("live: machine.provisioning and org.standing", () => {
       mode: "external",
       state: "waiting",
       step: null,
+      stage: null,
       reason: "capacity",
       since: "2026-10-24T19:00:00.000Z",
       requestedAt: "2026-10-24T18:49:00.000Z",
@@ -236,6 +300,18 @@ describe("live: machine.provisioning and org.standing", () => {
       machineId: null,
     });
     expect(refetched).toBe(0);
+    // What it is doing within its step comes with it.
+    applyWorkspaceEvent(qc, "o1", {
+      type: "machine.provisioning",
+      state: "preparing",
+      step: "installing",
+      stage: "restarting",
+      secondsLeft: 257,
+    } as { type: string });
+    expect(qc.getQueryData<ComputerSetup>(keys.computerSetup("o1"))).toMatchObject({
+      stage: "restarting",
+      secondsLeft: 257,
+    });
     applyWorkspaceEvent(qc, "o1", { type: "machine.provisioning", state: "ready", machineId: "m1" } as {
       type: string;
     });
@@ -244,8 +320,9 @@ describe("live: machine.provisioning and org.standing", () => {
     expect(applyWorkspaceEvent(qc, "o1", { type: "machine.status" })).toBe(false);
   });
 
-  test("a standing event sets that workspace's standing in /me (the reason only when told)", () => {
+  test("a standing event sets that workspace's standing in /me (the reason only when told) and asks for its setup", () => {
     const qc = new QueryClient();
+    qc.setQueryData(keys.computerSetup("o1"), external({ state: "waiting", reason: "capacity" }));
     const me: Me = {
       user: { id: "u1", name: "Walt", email: "w@x.co", image: null },
       organizations: [
@@ -260,12 +337,29 @@ describe("live: machine.provisioning and org.standing", () => {
     const after = qc.getQueryData<Me>(keys.me);
     expect(after?.organizations[0]?.standing).toEqual({ state: "hold", reason: null });
     expect(after?.organizations[1]?.standing).toBeUndefined();
+    // On hold it waits for no computer, active again it waits for one: the server's answer follows the standing.
+    expect(qc.getQueryState(keys.computerSetup("o1"))?.isInvalidated).toBe(true);
     applyWorkspaceEvent(qc, "o1", { type: "org.standing", orgId: "o1", state: "suspended", reason: "Pagamento" } as {
       type: string;
     });
     expect(qc.getQueryData<Me>(keys.me)?.organizations[0]?.standing).toEqual({
       state: "suspended",
       reason: "Pagamento",
+    });
+    // agentes.chat Cloud says so, and the apps add how to contest it.
+    applyWorkspaceEvent(qc, "o1", {
+      type: "org.standing",
+      orgId: "o1",
+      state: "hold",
+      reason: "review",
+      cloud: true,
+    } as {
+      type: string;
+    });
+    expect(qc.getQueryData<Me>(keys.me)?.organizations[0]?.standing).toEqual({
+      state: "hold",
+      reason: "review",
+      cloud: true,
     });
   });
 });
@@ -282,18 +376,29 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
     expect(holdText(t, undefined)).toBeNull();
   });
 
+  test("where to ask: the server's address, else who runs it; on the Cloud without an address, nowhere", () => {
+    expect(supportLineOf({ supportEmail: "ti@acme.dev", workspaceComputer: false })).toEqual({ email: "ti@acme.dev" });
+    expect(supportLineOf({ supportEmail: "help@agentes.chat", workspaceComputer: true })).toEqual({
+      email: "help@agentes.chat",
+    });
+    expect(supportLineOf({ supportEmail: null, workspaceComputer: false })).toBe("ask");
+    // A server too old to say whether it is the Cloud is someone's own.
+    expect(supportLineOf({ supportEmail: null })).toBe("ask");
+    // Nobody else runs the Cloud: "ask the people who run this server" would point at no one.
+    expect(supportLineOf({ supportEmail: null, workspaceComputer: true })).toBeNull();
+    expect(supportLineOf(undefined)).toBeNull();
+  });
+
   test("refusals, from the API or a run, in the person's language with the reason told", () => {
-    expect(standingRefusalText(t, "run.org_paused", { reason: "payment check" })).toBe(
+    expect(restrictionLine(t, "run.org_paused", { reason: "payment check" })).toBe(
       'standing.onHold {"reason":"payment check"}',
     );
-    expect(standingRefusalText(t, "run.org_paused", { reason: "  " })).toBe("standing.paused");
-    expect(standingRefusalText(t, "run.org_suspended", undefined)).toBe("standing.suspended");
-    expect(standingRefusalText(t, "run.org_suspended", { reason: "spam" })).toBe(
-      'standing.suspendedFor {"reason":"spam"}',
-    );
-    expect(standingRefusalText(t, "run.agent_paused", null)).toBe("standing.agentPaused");
-    expect(standingRefusalText(t, "run.budget_exceeded", null)).toBeNull();
-    expect(standingRefusalText(t, undefined, null)).toBeNull();
+    expect(restrictionLine(t, "run.org_paused", { reason: "  " })).toBe("standing.paused");
+    expect(restrictionLine(t, "run.org_suspended", undefined)).toBe("standing.suspended");
+    expect(restrictionLine(t, "run.org_suspended", { reason: "spam" })).toBe('standing.suspendedFor {"reason":"spam"}');
+    expect(restrictionLine(t, "run.agent_paused", null)).toBe("standing.agentPaused");
+    expect(restrictionLine(t, "run.budget_exceeded", null)).toBeNull();
+    expect(restrictionLine(t, undefined, null)).toBeNull();
     // The API's own codes, through errorText.
     expect(errorText(t, new ApiError(403, "org.paused", "This workspace is on hold: x", { reason: "x" }))).toBe(
       'standing.onHold {"reason":"x"}',
@@ -304,5 +409,14 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
     expect(errorText(t, new ApiError(403, "agent.paused", "This agent is paused for now."))).toBe(
       "standing.agentPaused",
     );
+    // On agentes.chat Cloud, the hold's kind and how to contest it; a run's values say "true".
+    const email = '{"email":"legal@agentes.chat"}';
+    expect(restrictionLine(t, "run.agent_paused", { kind: "network", cloud: "true" })).toBe(
+      `standing.cloud.agentNetwork ${email}`,
+    );
+    const held = new ApiError(403, "agent.paused", "This agent is paused: operator", { kind: "operator", cloud: true });
+    expect(errorText(t, held)).toBe(`standing.cloud.agentOperator ${email}`);
+    // Without `cloud`, a kind changes nothing.
+    expect(restrictionLine(t, "agent.paused", { kind: "network" })).toBe("standing.agentPaused");
   });
 });

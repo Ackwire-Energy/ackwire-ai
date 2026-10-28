@@ -36,21 +36,29 @@ export const mobilePtBR = {
       backTo: "Voltar para {{host}}",
       now: "Agora em {{host}}",
       invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
-      unreachable:
-        "Não conseguimos falar com {{host}}. Se ele estiver no Tailscale, abra o app do Tailscale, conecte e tente de novo.",
+      unreachable: "Não conseguimos falar com {{host}}. Confira o endereço e a internet, e tente de novo.",
+      unreachableTailscale:
+        "Não conseguimos falar com {{host}}. Ele está no Tailscale: abra o app do Tailscale, conecte e tente de novo.",
       certificate: "O certificado de {{host}} não é válido. Fale com quem cuida do servidor.",
       notAgentes: "{{host}} não é um servidor agentes.chat. Confira o endereço.",
       serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",
       appTooOld: "Atualize o app agentes para usar {{host}}.",
+      down: {
+        line: "{{host}} não respondeu.",
+        text: "Ele pode estar fora do ar ou fora da sua rede. O app abre sozinho quando ele voltar.",
+      },
     },
     connect: {
-      question: "Conectar o app a este servidor?",
-      questionSignIn: "Entrar neste servidor com a sua conta do computador?",
+      title: "Conectar a este servidor?",
+      titleSignIn: "Entrar com a conta do computador?",
+      on: "Servidor: {{host}}",
       leave: "Você sai da conta atual neste celular.",
       confirm: "Conectar",
       checking: "Conferindo o servidor…",
       notALink: "Este link não é de um servidor agentes.chat.",
       tokenFailed: "O código expirou ou já foi usado. Entre com seu e-mail, ou mostre um código novo no computador.",
+      signInSlow:
+        "Entrar está demorando mais que o normal. Entre com seu e-mail, ou mostre um código novo no computador.",
     },
     scan: {
       hint: "Aponte para o QR code que aparece no computador.",
@@ -69,7 +77,7 @@ export const mobilePtBR = {
   },
   account: {
     deleteSoleOwner:
-      "Você é a única pessoa dona de uma organização com outros membros. Passe a organização para alguém antes de apagar sua conta.",
+      "Você é a única pessoa dona de uma organização com outros membros. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     deleteFailed: "Não deu para apagar sua conta agora. Tente de novo.",
     deleted: "Sua conta foi apagada.",
     signedOut: "Você saiu.",
@@ -82,6 +90,21 @@ export const mobilePtBR = {
   push: {
     channel: "Avisos",
     channelDescription: "O que espera você, menções e conversas.",
+    ask: {
+      title: "Saiba quando um agente precisar de você",
+      text: "Eles trabalham enquanto você faz outra coisa. Avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
+      on: "Ativar avisos",
+      later: "Agora não",
+      done: "Avisos ativados",
+      failed: "Não deu para ativar os avisos. Tente de novo em Você › Notificações.",
+      someone: "Um agente",
+      examples: "Exemplos de avisos",
+      now: "agora",
+      minutes: "{{n}} min",
+      approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
+      finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
+      mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+    },
   },
   a11y: {
     agent: "{{name}}, agente",

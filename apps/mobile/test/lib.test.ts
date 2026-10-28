@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
-import { chooseOrg } from "../src/lib/org-choice";
+import { chooseOrg, firstRunMounted, serverDownOf } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
@@ -97,9 +97,34 @@ test("organization choice: remembered if still a member, else the first", () => 
   expect(chooseOrg([], "a")).toBeNull();
 });
 
+test("the first run: kept, hidden, under an invitation's screen once mounted; never first mounted under one", () => {
+  // An invitation opened from the first run: its answers and its workspace stay.
+  expect(firstRunMounted(true, true, true)).toBe(true);
+  // An invitation opened first: the first run waits for it to close, then mounts.
+  expect(firstRunMounted(false, true, true)).toBe(false);
+  expect(firstRunMounted(false, true, false)).toBe(true);
+  // A workspace now (joined, or made): gone, and not kept for the next invitation.
+  expect(firstRunMounted(true, false, false)).toBe(false);
+  expect(firstRunMounted(false, false, true)).toBe(false);
+});
+
+test("a server that can't be opened gets its own screen, never the first run", () => {
+  // The account failed with nothing cached: down, with the server's own reason once its check says one.
+  expect(serverDownOf(true, false, null)).toBe("unreachable");
+  expect(serverDownOf(true, false, { ok: false, problem: "certificate" })).toBe("certificate");
+  // The server answers but the account didn't load: still can't open it.
+  expect(serverDownOf(true, false, { ok: true })).toBe("unreachable");
+  // Slow: only once the server is known to be out of reach.
+  expect(serverDownOf(false, true, null)).toBeNull();
+  expect(serverDownOf(false, true, { ok: true })).toBeNull();
+  expect(serverDownOf(false, true, { ok: false, problem: "unreachable" })).toBe("unreachable");
+  // Loaded: an old failed check doesn't matter.
+  expect(serverDownOf(false, false, { ok: false, problem: "unreachable" })).toBeNull();
+});
+
 test("every icon of the design is there", () => {
   const required =
-    "home chat agent bell search plus send back more check x clock shield wait hash chev right image file camera mic target list reply copy pin eyeoff moon sun globe out code server mail chart pen doc sparkle smile laptop archive circle pause flag".split(
+    "home chat agent bell search plus send back more check x clock shield wait hash chev right image file camera mic target list reply copy pin eyeoff moon sun globe out code server mail chart pen doc sparkle smile laptop archive circle pause flag info".split(
       " ",
     );
   for (const name of required) expect(ICON_NAMES).toContain(name as (typeof ICON_NAMES)[number]);

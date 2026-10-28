@@ -1,8 +1,8 @@
 import {
   buildTelemetryReport,
-  installOwner,
   isAgentesCloud,
   NotFoundError,
+  pinnedOwner,
   setTelemetryEnabled,
   telemetryState,
 } from "@agenteschat/engine";
@@ -30,6 +30,19 @@ const Load = z
     hours: z.number(),
   })
   .nullable();
+
+const BrowserTraffic = z
+  .object({
+    upMb: z.number().int(),
+    downMb: z.number().int(),
+    hours: z.number(),
+    computers: z.number().int(),
+  })
+  .nullable()
+  .openapi({
+    description:
+      "What the agents' browsers on these computers sent and received over the last day, in MB (10^6 bytes), as their Chrome counts each request's headers and body, with the `hours` counted on average and how many of them said. Null when none did.",
+  });
 
 const Report = z
   .object({
@@ -59,6 +72,7 @@ const Report = z
         count: z.number().int().openapi({ description: "How many computers are of this kind, system and size." }),
         agents: z.number().int(),
         load: Load,
+        browserTraffic: BrowserTraffic,
       }),
     ),
     lastDay: z.object({
@@ -89,14 +103,14 @@ const Telemetry = z
   })
   .openapi("ServerTelemetry");
 
-/** The usage report's switch (ADR 0060 §5): only the installation's owner, and not on agentes.chat's own servers. */
+/** The usage report's switch (ADR 0060 §5): only the installation's pinned owner, never on agentes.chat itself. */
 export function telemetryRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);
   app.use("/telemetry", requireSession(deps.auth));
 
   const requireOwner = async (userId: string) => {
-    if (isAgentesCloud(config.PUBLIC_URL) || (await installOwner(db)) !== userId) throw new NotFoundError("Not found");
+    if (isAgentesCloud(config.PUBLIC_URL) || (await pinnedOwner(db)) !== userId) throw new NotFoundError("Not found");
   };
   const view = async () => ({
     enabled: (await telemetryState(db)).enabled,
@@ -110,7 +124,8 @@ export function telemetryRoutes(deps: AppDeps) {
       path: "/telemetry",
       tags,
       summary: "The usage report's switch, and the next report",
-      description: "404 for everyone but the installation's owner (its first account), and on agentes.chat itself.",
+      description:
+        "404 for everyone but the installation's owner (its first account, kept once it is gone), and on agentes.chat itself.",
       security,
       responses: { 200: json(Telemetry), 401: errors[401], 404: errors[404] },
     }),

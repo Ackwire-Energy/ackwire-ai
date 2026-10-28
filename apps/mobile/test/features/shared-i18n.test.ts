@@ -98,6 +98,17 @@ describe("the screens' strings", () => {
     for (const group of Object.keys(mobilePtBR)) expect(mine).not.toContain(group);
   });
 
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [featureKeysPtBR, featureKeysEn]) {
+      const paths = leaves(tree)
+        .map((key) => get(tree, key) as string)
+        .filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(1);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
+    }
+  });
+
   test("plural keys come in pairs", () => {
     const keys = new Set(leaves(featureKeysPtBR));
     for (const key of keys) {

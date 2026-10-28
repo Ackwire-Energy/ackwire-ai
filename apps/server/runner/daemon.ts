@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { LoadWindow, machineSize, sampleLoad } from "@agenteschat/adapters/host-stats";
+import { LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
@@ -83,7 +83,7 @@ import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrg
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
-import { DataSockets } from "./streams";
+import { DataSockets, RELAYED_FILE, RelayCount } from "./streams";
 import {
   launchWorker,
   Supervisor,
@@ -288,6 +288,10 @@ export class RunnerDaemon implements RequestObserver {
   private readonly timers: ReturnType<typeof setInterval>[] = [];
   /** Protocol 22: how busy this computer got over the last day (rides on `pong`). */
   private readonly load = new LoadWindow();
+  /** The agents' browsers' last day of traffic (protocol 23). */
+  private readonly traffic = new TrafficWindow();
+  /** System mode: what this process relayed to the server, per stream (`relayed.json`). */
+  private readonly relayed = new RelayCount();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private stopping = false;
@@ -394,7 +398,7 @@ export class RunnerDaemon implements RequestObserver {
     }
     const started = await this.desktops.ensure(agent, { chrome: use === "browser" });
     const s = this.desktops.session(agent.id);
-    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again.");
     return { ...started, xauthority: s.xauthority, home: s.home };
   }
 
@@ -407,7 +411,7 @@ export class RunnerDaemon implements RequestObserver {
     if (!session) {
       throw new RunnerError(
         "internal",
-        "This computer isn't connected to agentes.chat right now; try again in a minute",
+        "This computer isn't connected to agentes.chat right now. Try again in a minute.",
       );
     }
     const { tools } = this.access();
@@ -415,7 +419,7 @@ export class RunnerDaemon implements RequestObserver {
       throw new RunnerError("not_allowed", "The browser is turned off on this computer");
     }
     if (this.pauseState().paused) {
-      throw new RunnerError("paused", "This computer is paused; open the browser again once it resumes");
+      throw new RunnerError("paused", "This computer is paused. Open the browser again once it resumes.");
     }
     if (session.supervisor) return session.supervisor.showBrowser(agent, installing);
     return session.browser.show(agent, await this.agentFolder(agent), installing);
@@ -469,14 +473,28 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
-    const sample = () =>
+    const sample = () => {
+      const s = this.session;
+      this.traffic.add((s?.supervisor ?? s?.browser)?.takeTraffic() ?? { up: 0, down: 0 });
       void sampleLoad()
-        .then((s) => this.load.add(s))
+        .then((l) => this.load.add(l))
         .catch(() => undefined);
+    };
     sample();
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();
     this.timers.push(load);
+    // System mode: for the Cloud's guard, at most once a minute.
+    const relayed = setInterval(() => {
+      if (!this.session?.supervisor) return;
+      try {
+        this.relayed.save(path.join(this.opts.home, RELAYED_FILE));
+      } catch (err) {
+        this.opts.log(`${RELAYED_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, 60_000);
+    relayed.unref?.();
+    this.timers.push(relayed);
     this.expireRequests();
   }
 
@@ -798,7 +816,11 @@ export class RunnerDaemon implements RequestObserver {
       numbered: this.desktopRefsGiven,
       log,
     });
-    const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
+    const streams = new DataSockets({
+      url: connectUrl(config.server, "stream"),
+      token: config.token,
+      relayed: this.relayed,
+    });
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
@@ -824,6 +846,7 @@ export class RunnerDaemon implements RequestObserver {
         server: config.server,
         send: (frame) => live?.send(frame) ?? false,
         state: () => this.workerState(),
+        relayed: this.relayed,
         log,
       });
     }
@@ -882,6 +905,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       executors: () => this.helloExecutors(),
       load: () => this.load.summary(),
+      browserTraffic: () => this.traffic.summary(),
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
@@ -1084,8 +1108,9 @@ export class RunnerDaemon implements RequestObserver {
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
     }
-    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good.
-    void this.desktops.stopAll(new Set(list.map((a) => a.id))).catch(() => undefined);
+    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good; the
+    // others take their agent's current name and handle.
+    void this.desktops.serve(list).catch(() => undefined);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
     this.agents = list;
     try {
@@ -1286,7 +1311,7 @@ export class RunnerDaemon implements RequestObserver {
    */
   pairStart(server: string, name?: string, tools?: { claude?: boolean; codex?: boolean }): { started: true } {
     if (this.config && this.connState !== "refused")
-      throw new ControlError("already_paired", "This computer is already connected; disconnect it first");
+      throw new ControlError("already_paired", "This computer is already connected. Disconnect it first.");
     let url: string;
     try {
       url = normalizeServerUrl(String(server ?? ""));

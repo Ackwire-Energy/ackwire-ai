@@ -4,6 +4,8 @@
  * banners, the cover's line, Preferences' words). Pure, so it is tested without the app.
  */
 
+import type { Platform } from "./platform";
+
 export type LocalPhase = "off" | "starting" | "updating" | "running" | "stopped" | "failing";
 
 export interface LocalServerStatus {
@@ -35,8 +37,37 @@ export interface LocalServerStatus {
   backTo: string | null;
 }
 
-export type Tailnet = { state: "missing" } | { state: "off" } | { state: "on"; device: string };
-export type ServeProblem = { reason: "https"; url: string | null } | { reason: "operator" } | { reason: "serve" };
+/** `app`: Tailscale's Mac app is there to open, not only its command-line tool (Homebrew's). */
+export type Tailnet = { state: "missing" } | { state: "off"; app: boolean } | { state: "on"; device: string };
+/**
+ * Where Tailscale gets connected on this system: its app, which the app opens (a Mac with that app), its icon by the
+ * clock (Windows: tailscale.com/kb/1022/install-windows), or `sudo tailscale up` in the terminal (Linux, and a Mac
+ * with only the command-line tool). `tailnet` not read yet: a Mac's app.
+ */
+export function tailscaleFrom(platform: Platform, tailnet: Tailnet | null): "app" | "tray" | "terminal" {
+  if (platform === "windows") return "tray";
+  if (platform === "linux") return "terminal";
+  return tailnet?.state === "off" && !tailnet.app ? "terminal" : "app";
+}
+const COVER_TAILNET = { app: "openTailscale", tray: "tailnetTray", terminal: "tailnetUp" } as const;
+/** After the cover's "Connect Tailscale on this {{device}}…": the Open Tailscale button, or how it connects. */
+export const coverTailnet = (platform: Platform, tailnet: Tailnet | null) =>
+  COVER_TAILNET[tailscaleFrom(platform, tailnet)];
+/**
+ * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale refused, the person
+ * stopped waiting for HTTPS, or the server didn't answer again at its new address.
+ */
+export type ServeProblem =
+  | { reason: "https"; url: string | null }
+  | { reason: "operator" }
+  | { reason: "serve" }
+  | { reason: "stopped" }
+  | { reason: "start" };
+/**
+ * What turning reach on or off is doing now (`local-server://reach`): Tailscale sharing it, Tailscale waiting for
+ * HTTPS to be allowed at `url`, the server starting again at its new address, the window signing in there.
+ */
+export type ReachStage = { stage: "sharing" | "restarting" | "signingIn" } | { stage: "approve"; url: string };
 export type ReachResult = { ok: true; url: string } | { ok: false; problem: ServeProblem };
 
 export interface LocalChoice {
@@ -89,6 +120,37 @@ export function stepStates(steps: readonly SetupStep[], changes: readonly StepCh
   return out;
 }
 
+/**
+ * A setup normally ends in under 30 s, so a step under way shows its time from 10 s, and from 30 s it is "taking a
+ * little longer than expected". The server here updating says "This can take a minute": it is slow only after two.
+ */
+export const STEP_TIME_MS = 10_000;
+export const STEP_SLOW_MS = 30_000;
+export const UPDATE_SLOW_MS = 120_000;
+export const stepClock = (ms: number, slowAfter = STEP_SLOW_MS) => ({
+  time: ms >= STEP_TIME_MS,
+  slow: ms >= slowAfter,
+});
+
+/** Where a setup that ended in an error stops: the failed step, else the one under way, else the first not done. */
+export function failedStep(steps: readonly SetupStep[], states: Record<SetupStep, StepState>): SetupStep {
+  return (
+    steps.find((s) => states[s] === "failed") ??
+    steps.find((s) => states[s] === "active") ??
+    steps.find((s) => states[s] !== "done" && states[s] !== "warn") ??
+    (steps[steps.length - 1] as SetupStep)
+  );
+}
+
+/** What a failed step says (`computer` and `reach` never fail on their own: the general line if they ever do). */
+export const FAIL_TEXT: Record<SetupStep, string> = {
+  database: "desktop.here.fail.database",
+  start: "desktop.here.fail.start",
+  account: "desktop.here.fail.account",
+  computer: "desktop.common.error",
+  reach: "desktop.common.error",
+};
+
 /** What "Run agentes.chat on this computer" shows. */
 export type HereView =
   /** The form; `ask`: the owner's name and email (no owner yet). */
@@ -119,6 +181,8 @@ export const REASON_TEXT: Record<ServeProblem["reason"], string> = {
   https: "desktop.here.reason.https",
   operator: "desktop.here.reason.operator",
   serve: "desktop.here.reason.serve",
+  stopped: "desktop.here.reason.stopped",
+  start: "desktop.here.reason.start",
 };
 
 /** The server here in a few words: "Running · only on this Mac", "Starting", … */
@@ -137,13 +201,19 @@ export function hereLine(status: LocalServerStatus): string {
   }
 }
 
-/** The popover's banner about the server here: stopped (Start it), not starting (diagnostics), or an update that went back. */
+/** The popover's banner about the server here: stopped (Start it), not starting (Copy details), or an update that went back. */
 export function hereBanner(status: LocalServerStatus): "stopped" | "failing" | "back" | null {
   if (!status.run) return null;
   if (status.phase === "failing") return "failing";
   if (status.phase === "stopped") return "stopped";
   return status.backTo ? "back" : null;
 }
+
+/**
+ * Where the server here keeps uploaded files: `files` in its folder (`FILES_DIR`, apps/server native.ts), written
+ * with the folder's own separator (`C:\Users\ana\.agentes` on Windows).
+ */
+export const filesFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}files`;
 
 /** Whether `server` is the server here, at either of its addresses. */
 export const isHereServer = (status: LocalServerStatus, server: string | null) =>

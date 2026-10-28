@@ -1,12 +1,14 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { chmodSync, chownSync, lstatSync, mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   HEARTBEAT_MS,
+  inRange,
   MAX_FRAME_BYTES,
   type MachineErrorCode,
   type MachineReplies,
@@ -27,6 +29,9 @@ import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
+import type { ScopeKind } from "./scope-gate";
+import { agentCategorySlice, agentSlice } from "./service";
+import type { RelayCount } from "./streams";
 
 /**
  * System mode (`install.sh --system`): this root process keeps the server's
@@ -72,6 +77,23 @@ const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
  * it three times as often while it is.
  */
 export const BROWSER_LEASE_MS = 90_000;
+/** What a request or a click still waiting on a worker hears once the runner stops. */
+export const STOPPING = "The runner is stopping. Try again in a minute.";
+/** A worker's `browser.traffic` larger than this (bytes, either way) isn't believed. */
+const TRAFFIC_DELTA_MAX = 1e12;
+/** How many of its processes a worker may have moved a minute (`scope.enter`). */
+const SCOPE_ENTERS_PER_MINUTE = 30;
+/** A moved process shows in its new slice within this, or the worker hears it didn't. */
+const SCOPE_SHOW_MS = 2000;
+const SCOPE_POLL_MS = 20;
+
+/** `busctl` and its answer, without holding the runner while systemd answers. */
+const busctl = (args: string[]) =>
+  new Promise<{ code: number; output: string }>((resolve) =>
+    execFile("/usr/bin/busctl", args, { timeout: 10_000 }, (err, stdout, stderr) =>
+      resolve({ code: err ? 1 : 0, output: `${stdout}${stderr}`.trim() }),
+    ),
+  );
 
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
@@ -122,7 +144,13 @@ export type WorkerLinkFrame =
   /** From the worker: Chrome for Testing installs first. */
   | { type: "browser.showing"; showId: string }
   /** From the worker: the agent's Chrome is on its desktop, or why not. */
-  | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } };
+  | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } }
+  /** From the worker: what its agent's Chrome sent and received since it last said (protocol 23). */
+  | { type: "browser.traffic"; up: number; down: number }
+  /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
+  | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
+  /** To the worker: it is there, or why not (it starts where it is either way). */
+  | { type: "scope.entered"; enterId: string; error?: string };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -164,6 +192,11 @@ export interface SupervisorOptions {
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
   showMs?: number;
+  /** What root relayed, `relayed.json` (the live view of the agents' browsers is counted here). */
+  relayed?: RelayCount;
+  /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
+  proc?: string;
+  busctl?: (args: string[]) => Promise<{ code: number; output: string }>;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -198,6 +231,8 @@ interface Worker {
   shows: Map<string, Show>;
   /** When it last said its agent's Chrome is in use on the agent's desktop. */
   browserLeaseAt: number;
+  /** When it asked for its processes to be moved, in the last minute (`scope.enter`). */
+  enters: number[];
 }
 
 interface Show {
@@ -217,6 +252,8 @@ export class Supervisor {
   private closed = false;
   private seq = 0;
   private pinger: ReturnType<typeof setInterval> | null = null;
+  /** What the workers said their agents' Chromes sent and received, not taken yet (protocol 23). */
+  private traffic = { up: 0, down: 0 };
 
   /** The connection's MCP side: answers go back to the worker that asked. */
   readonly mcp = {
@@ -256,10 +293,15 @@ export class Supervisor {
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
+    if (this.closed) throw new RunnerError("internal", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
-    if (req.op === "brain.turn" && typeof req.account === "string" && req.account && this.opts.lend) {
+    if (
+      (req.op === "brain.turn" || req.op === "brain.route") &&
+      typeof req.account === "string" &&
+      req.account &&
+      this.opts.lend
+    ) {
       await this.opts
         .lend(req.kind === "codex" ? "codex" : "claude_code", req.account, w.user.uid)
         .catch((err: unknown) =>
@@ -269,7 +311,7 @@ export class Supervisor {
         );
     }
     await this.ready(w, scope.signal);
-    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     if (req.op === "task.start") this.own(req.taskId, w);
     const id = String(++this.seq);
     return new Promise((resolve, reject) => {
@@ -360,10 +402,10 @@ export class Supervisor {
    * brings the agent's Chrome there, and gets the desktop from root meanwhile (`desktop.ensure`).
    */
   async showBrowser(agent: AgentScope, installing: () => void): Promise<void> {
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
+    if (this.closed) throw new RunnerError("internal", STOPPING);
     const w = this.entry(this.opts.user(agent));
     await this.ready(w, new AbortController().signal);
-    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     const showId = String(++this.seq);
     await new Promise<void>((resolve, reject) => {
       // The agent's own code can stop its worker (same user): past the launcher's own wait the click is over, and
@@ -386,6 +428,13 @@ export class Supervisor {
     });
   }
 
+  /** What the agents' Chromes sent and received since the last call, as their workers said (protocol 23). */
+  takeTraffic(): { up: number; down: number } {
+    const total = this.traffic;
+    this.traffic = { up: 0, down: 0 };
+    return total;
+  }
+
   /** The session is over: workers' stdin closes (they finish and exit), and the ones still there after `graceMs` are killed. */
   async close(graceMs = 5000) {
     this.closed = true;
@@ -395,11 +444,10 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      const stopping = "The runner is stopping; try again in a minute";
-      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", stopping));
+      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", STOPPING));
       w.ready = false;
-      this.endSession(w, stopping);
-      this.endShows(w, stopping);
+      this.endSession(w, STOPPING);
+      this.endShows(w, STOPPING);
       if (!w.proc) continue;
       w.proc.stdin.end();
       exits.push(w.proc.exited);
@@ -428,6 +476,7 @@ export class Supervisor {
         inflight: new Map(),
         shows: new Map(),
         browserLeaseAt: 0,
+        enters: [],
       };
       this.workers.set(user.id, w);
     }
@@ -525,8 +574,8 @@ export class Supervisor {
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
-    this.endSession(w, "The agent's worker stopped on this computer; try again");
-    this.endShows(w, "The agent's worker stopped on this computer; try again");
+    this.endSession(w, "The agent's worker stopped on this computer. Try again.");
+    this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
@@ -557,7 +606,11 @@ export class Supervisor {
       w.proc.kill();
       return;
     }
-    w.proc.stdin.write(`${JSON.stringify(frame)}\n`);
+    const line = `${JSON.stringify(frame)}\n`;
+    if (frame.type === "request" && frame.op === "browser.input" && this.opts.relayed) {
+      this.opts.relayed.browserView.down += Buffer.byteLength(line);
+    }
+    w.proc.stdin.write(line);
   }
 
   private welcome(w: Worker) {
@@ -590,14 +643,14 @@ export class Supervisor {
     if (w.proc !== proc) return;
     try {
       const frame = parseRunnerFrame(line);
-      if (frame) this.frame(w, frame);
+      if (frame) this.frame(w, frame, line);
       else this.linkFrame(w, line);
     } catch (err) {
       this.opts.log(`[${w.user.user}] a frame failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  private frame(w: Worker, f: RunnerFrame) {
+  private frame(w: Worker, f: RunnerFrame, line: string) {
     if (f.type === "hello") return this.hello(w);
     if (!w.ready) return;
     switch (f.type) {
@@ -644,7 +697,9 @@ export class Supervisor {
       }
       case "browser.frame":
       case "browser.stream.ended":
-        if (f.agentId === w.user.id) this.opts.send(f);
+        if (f.agentId === w.user.id && this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
+          this.opts.relayed.browserView.up += Buffer.byteLength(line);
+        }
         return;
       default:
         // `pong`, and the computer's own frames (pause, access, accounts): never a worker's.
@@ -654,7 +709,7 @@ export class Supervisor {
 
   /** A new session of the worker: whatever the last one ran is gone (the worker aborted it). */
   private hello(w: Worker) {
-    this.endSession(w, "The agent's worker started over; try again");
+    this.endSession(w, "The agent's worker started over. Try again.");
     w.ready = true;
     w.state = "";
     this.sendState(w);
@@ -723,6 +778,22 @@ export class Supervisor {
       const use = f.use === "browser" ? "browser" : "desktop";
       return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "", use);
     }
+    // Its processes start held until this is answered, between its sessions too.
+    if (f?.type === "scope.enter") {
+      const enterId = typeof f.enterId === "string" ? f.enterId.slice(0, 64) : "";
+      void this.enterScope(w, f.pid, f.kind).then((error) =>
+        this.write(w, { type: "scope.entered", enterId, ...(error ? { error } : {}) }),
+      );
+      return;
+    }
+    // Counted whenever it comes: the worker's Chrome ran between its sessions too.
+    if (f?.type === "browser.traffic") {
+      if (inRange(f.up, [0, TRAFFIC_DELTA_MAX]) && inRange(f.down, [0, TRAFFIC_DELTA_MAX])) {
+        this.traffic.up += f.up;
+        this.traffic.down += f.down;
+      }
+      return;
+    }
     if (!w.ready) return;
     if (f?.type === "browser.desktop") {
       w.browserLeaseAt = (this.opts.now ?? Date.now)();
@@ -787,6 +858,62 @@ export class Supervisor {
       (desktop) => reply({ desktop }),
       (err: unknown) => reply({ error: toMachineError(err) }),
     );
+  }
+
+  /**
+   * `scope.enter`: a process of the worker's agent, already in that agent's slice, goes into the agent's
+   * slice for its kind (`agentCategorySlice`), named from the worker's uid and never from the frame, where the
+   * Cloud's guard counts its traffic apart. The worst a worker can do here is mislabel its own agent's bytes.
+   * Answered once the process shows there; otherwise with why not.
+   */
+  private async enterScope(w: Worker, pid: unknown, kind: unknown): Promise<string | undefined> {
+    if (kind !== "browser" && kind !== "cli") return "The kind is browser or cli";
+    if (!inRange(pid, [2, 2 ** 22])) return "That isn't a process id";
+    const now = (this.opts.now ?? Date.now)();
+    w.enters = w.enters.filter((at) => at > now - 60_000);
+    if (w.enters.length >= SCOPE_ENTERS_PER_MINUTE) return "Too many processes moved this minute";
+    w.enters.push(now);
+    const { uid } = w.user;
+    const read = (file: string) =>
+      readFile(path.join(this.opts.proc ?? "/proc", String(pid), file), "utf8").catch(() => "");
+    const ids = /^Uid:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/m.exec(await read("status"));
+    if (!ids || ids.slice(1).some((id) => Number(id) !== uid)) return "That isn't this agent's process";
+    const agentDir = `/agents.slice/${agentSlice(uid)}/`;
+    const cgroup = async () => /^0::(\/.*)$/m.exec(await read("cgroup"))?.[1] ?? "";
+    if (!(await cgroup()).startsWith(agentDir)) return "That process isn't in this agent's slice";
+    const slice = agentCategorySlice(uid, kind);
+    const asked = await (this.opts.busctl ?? busctl)([
+      "call",
+      "--timeout=5",
+      "org.freedesktop.systemd1",
+      "/org/freedesktop/systemd1",
+      "org.freedesktop.systemd1.Manager",
+      "StartTransientUnit",
+      "ssa(sv)a(sa(sv))",
+      `agentes-${kind}-${uid}-${pid}.scope`,
+      "fail",
+      "3",
+      "PIDs",
+      "au",
+      "1",
+      String(pid),
+      "Slice",
+      "s",
+      slice,
+      "CollectMode",
+      "s",
+      "inactive-or-failed",
+      "0",
+    ]);
+    if (asked.code !== 0) {
+      this.opts.log(`[${w.user.user}] couldn't move a process into ${slice}: ${asked.output.slice(0, 300)}`);
+      return "systemd didn't move it";
+    }
+    for (let waited = 0; waited <= SCOPE_SHOW_MS; waited += SCOPE_POLL_MS) {
+      if ((await cgroup()).startsWith(`${agentDir}${slice}/`)) return undefined;
+      await new Promise((r) => setTimeout(r, SCOPE_POLL_MS));
+    }
+    return "It didn't show in its slice in time";
   }
 
   /** To the request's upload on the server this computer is paired with, with the machine token; from the worker only the file's name, type and hash. */

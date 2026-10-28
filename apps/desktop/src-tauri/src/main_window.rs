@@ -29,6 +29,12 @@ pub const LABEL: &str = "main";
 const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 /// The site comes here once the browser handed the session over: the window comes to the front.
 const SIGNED_IN: &str = "/desktop/signed-in";
+/// The help pages: background reading opens in the browser, never in place of the conversation.
+const HELP: &str = "/help/";
+/// Cloudflare Turnstile, the bot check of the site's sign-in pages: its frame loads inside the page. On macOS and
+/// Linux the web view asks about frames too, so sent outside it would open a tab on every sign-in page and never
+/// load in the window.
+const BOT_CHECK_HOST: &str = "challenges.cloudflare.com";
 
 /// The server the window loads: the one open now (`servers.json`); None before the first run chose one.
 pub fn site(app: &AppHandle) -> Option<Url> {
@@ -51,11 +57,11 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
 };
 
 /// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
-/// computer of its own), a server on this computer itself, the server here included at its Tailscale address
-/// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+/// computer of its own) or a server on this computer itself, the server here included at its Tailscale address
+/// (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
 pub fn agents_here(origin: &str, server_here: bool) -> bool {
-    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
+    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here
 }
 
 /// What a navigation in the window does.
@@ -74,8 +80,10 @@ fn route(url: &Url, site: &Url) -> Route {
         "http" | "https" if same_site(url, site) => match url.path() {
             BROWSER_SIGN_IN => Route::Outside,
             SIGNED_IN => Route::Front,
+            path if path.starts_with(HELP) => Route::Outside,
             _ => Route::Stay,
         },
+        "https" if url.host_str() == Some(BOT_CHECK_HOST) && url.port().is_none() => Route::Stay,
         "http" | "https" => Route::Outside,
         // The site's own previews (sandboxed HTML, PDFs) load from these.
         "blob" | "data" | "about" => Route::Stay,
@@ -201,12 +209,17 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .on_document_title_changed(move |_, title| {
             if let Some(window) = on_title.get_window(LABEL) {
                 let _ = window.set_title(window_title(&title));
+                // A new title lays the title bar out anew, the buttons back at its top.
+                keep_lights(&on_title);
             }
         })
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
-        // browser, the device's name in its words); nothing else.
+        // browser, the device's name in its words), that `this_mac` takes `servers` and `files` (older apps
+        // refuse them, so the sign-in's other server and Storage's "Show the folder" show only where this says
+        // so), and that a connector's sign-in comes back here (`deep_link.rs`, older apps don't take it);
+        // nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?} }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
@@ -267,10 +280,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
-        // Centred in the site's 40px title bar (apps/web desktop.css): `y` places the top of the buttons' row,
-        // not their middle (at 20 they sat ~3pt below the bar's icons).
-        .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0));
+        // The buttons are placed by `place_lights` (on every fit), not with `traffic_light_position`.
+        .hidden_title(true);
     let built = builder.build().map_err(|e| e.to_string())?;
     let window = built.as_ref().window();
     if saved.maximized {
@@ -280,6 +291,9 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    follow_lights(app);
+    fit_page(app);
     front(app)
 }
 
@@ -294,18 +308,299 @@ fn window_title(title: &str) -> &str {
 }
 
 /// Tells the page the zoom (`--app-zoom`: its title bar stays 40pt and level with the window's buttons) and
-/// whether the window is full screen (no room kept for the buttons then).
+/// whether the window is full screen (no room kept for the buttons then), and puts the buttons back in the
+/// bar's middle (a resize or full screen lays them out anew). AppKit is touched on the main thread.
 pub fn fit_page(app: &AppHandle) {
-    let Some(page) = app.get_webview(LABEL) else { return };
-    let zoom = crate::menus::current_zoom(app);
-    let full = app
-        .get_window(LABEL)
-        .and_then(|w| w.is_fullscreen().ok())
-        .unwrap_or(false);
-    let _ = page.eval(format!(
-        "document.documentElement.style.setProperty('--app-zoom','{zoom}');\
-         document.documentElement.toggleAttribute('data-fullscreen',{full});"
-    ));
+    keep_lights(app);
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let window = handle.get_window(LABEL);
+        let full = window.as_ref().and_then(|w| w.is_fullscreen().ok()).unwrap_or(false);
+        let Some(page) = handle.get_webview(LABEL) else { return };
+        let zoom = crate::menus::current_zoom(&handle);
+        let _ = page.eval(format!(
+            "document.documentElement.style.setProperty('--app-zoom','{zoom}');\
+             document.documentElement.toggleAttribute('data-fullscreen',{full});"
+        ));
+    });
+}
+
+/// The window's buttons back in the middle of the site's title bar after AppKit lays it out anew (a resize,
+/// a new title, focus, the cover going): now, on the next turn of the main loop, and once more a moment later
+/// (a new title's layout pass can come after both). Nothing in full screen (no buttons).
+pub fn keep_lights(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            place_now(&handle);
+            let again = handle.clone();
+            let _ = handle.run_on_main_thread(move || place_now(&again));
+        });
+        let later = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(LIGHTS_AGAIN);
+            let handle = later.clone();
+            let _ = later.run_on_main_thread(move || place_now(&handle));
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+/// How long after a layout the buttons are placed once more.
+#[cfg(target_os = "macos")]
+const LIGHTS_AGAIN: Duration = Duration::from_millis(300);
+
+#[cfg(target_os = "macos")]
+fn place_now(app: &AppHandle) {
+    // A move made while placing (AppKit moves the next button from inside our own notice) is answered by
+    // placing once more, not dropped. A few rounds at most.
+    if PLACING.with(|p| p.replace(true)) {
+        AGAIN.with(|a| a.set(true));
+        return;
+    }
+    for _ in 0..3 {
+        AGAIN.with(|a| a.set(false));
+        if let Some(window) = app.get_window(LABEL) {
+            if window.is_fullscreen().unwrap_or(false) {
+                LIGHTS_AT.with(|a| a.borrow_mut().clear());
+            } else {
+                place_lights(&window);
+            }
+        }
+        if !AGAIN.with(|a| a.get()) {
+            break;
+        }
+    }
+    PLACING.with(|p| p.set(false));
+}
+
+/// Keeps the buttons where `place_lights` puts them. A new title (every chat switched to) lays the title bar
+/// out on the next display pass, after `keep_lights` has already placed them, and they showed at the bar's top
+/// until the later pass (a visible jump). So: their frames are watched and placed again inside that same
+/// layout pass, and each button re-applies its place after its own layout (`follow_layout`), which puts its
+/// layer back where AppKit draws it natively without touching its frame. The gap between them is read here,
+/// once, from AppKit's own layout: read later it is whatever the last placement left.
+#[cfg(target_os = "macos")]
+fn follow_lights(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_window(LABEL) {
+            watch_lights(&handle, &window);
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn watch_lights(app: &AppHandle, window: &tauri::Window) {
+    use crate::notch::native::CGRect;
+    use block2::RcBlock;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use std::ptr::NonNull;
+
+    let Ok(ns) = window.ns_window() else { return };
+    let ns = ns as *mut AnyObject;
+    if ns.is_null() {
+        return;
+    }
+    // SAFETY: `ns` is this window's live NSWindow, on the main thread; the views watched are its own buttons,
+    // their row and its container, which live as long as the window.
+    unsafe {
+        let buttons: [*mut AnyObject; 3] = [
+            msg_send![ns, standardWindowButton: 0usize],
+            msg_send![ns, standardWindowButton: 1usize],
+            msg_send![ns, standardWindowButton: 2usize],
+        ];
+        if buttons.iter().any(|b| b.is_null()) {
+            return;
+        }
+        let first: CGRect = msg_send![buttons[0], frame];
+        let second: CGRect = msg_send![buttons[1], frame];
+        let step = second.origin.x - first.origin.x;
+        if step > first.size.width {
+            LIGHTS_STEP.with(|s| s.set(Some(step)));
+        }
+        for button in buttons {
+            follow_layout(button);
+        }
+        let row: *mut AnyObject = msg_send![buttons[0], superview];
+        let container: *mut AnyObject = if row.is_null() { row } else { msg_send![row, superview] };
+        let center: *mut AnyObject = msg_send![class!(NSNotificationCenter), defaultCenter];
+        let name: *mut AnyObject =
+            msg_send![class!(NSString), stringWithUTF8String: c"NSViewFrameDidChangeNotification".as_ptr()];
+        let handle = app.clone();
+        let block = RcBlock::new(move |_: NonNull<AnyObject>| place_now(&handle));
+        for view in buttons.into_iter().chain([row, container]).filter(|v| !v.is_null()) {
+            let _: () = msg_send![view, setPostsFrameChangedNotifications: true];
+            let nil: *mut AnyObject = std::ptr::null_mut();
+            let _: *mut AnyObject =
+                msg_send![center, addObserverForName: name, object: view, queue: nil, usingBlock: &*block];
+        }
+    }
+}
+
+/// Gives a window button a subclass of its own class that keeps it where it was placed. On a new title AppKit
+/// moves each button back to its own spot (`-[NSThemeFrame _updateButtonPositions]` calls
+/// `setFrameOrigin:ignoreRentry:`), the last one from inside our own frame notice, so it stayed there until the
+/// later placement: the subclass answers that call with the placed spot instead (outside full screen, where the
+/// buttons are AppKit's). Its `layout` also places it again afterwards (the layer laid out natively with the
+/// frame unchanged).
+///
+/// SAFETY: `button` is a live window button, on the main thread. The subclass adds no ivars and overrides
+/// `layout` and `setFrameOrigin:ignoreRentry:` (only if its class has it), calling its superclass's.
+#[cfg(target_os = "macos")]
+unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
+    use crate::notch::native::CGPoint;
+    use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
+    use objc2::{msg_send, sel};
+    use std::ffi::CString;
+
+    unsafe extern "C-unwind" fn layout(this: *mut AnyObject, _: Sel) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
+        let Some(superclass) = this.class().superclass() else { return };
+        let _: () = unsafe { msg_send![super(this, superclass), layout] };
+        if let Some(origin) = placed_at(this) {
+            let _: () = unsafe { msg_send![this, setFrameOrigin: origin] };
+        }
+    }
+
+    unsafe extern "C-unwind" fn set_origin(this: *mut AnyObject, _: Sel, origin: CGPoint, ignore: Bool) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
+        let Some(superclass) = this.class().superclass() else { return };
+        let origin = placed_at(this).filter(|_| !unsafe { full_screen(this) }).unwrap_or(origin);
+        let _: () = unsafe { msg_send![super(this, superclass), setFrameOrigin: origin, ignoreRentry: ignore] };
+    }
+
+    let class = unsafe { &*button }.class();
+    let class_name = class.name().to_string_lossy();
+    if class_name.starts_with(FOLLOWING) {
+        return;
+    }
+    let Ok(name) = CString::new(format!("{FOLLOWING}{class_name}")) else { return };
+    let sub = match AnyClass::get(&name) {
+        Some(sub) => sub,
+        None => {
+            let Some(mut builder) = ClassBuilder::new(&name, class) else { return };
+            unsafe {
+                builder.add_method(sel!(layout), layout as unsafe extern "C-unwind" fn(*mut AnyObject, Sel));
+                let moved = sel!(setFrameOrigin:ignoreRentry:);
+                if class.instance_method(moved).is_some() {
+                    builder.add_method(
+                        moved,
+                        set_origin as unsafe extern "C-unwind" fn(*mut AnyObject, Sel, CGPoint, Bool),
+                    );
+                }
+            }
+            builder.register()
+        }
+    };
+    unsafe { AnyObject::set_class(&*button, sub) };
+}
+
+/// Where `place_lights` last put this button, if anywhere.
+#[cfg(target_os = "macos")]
+fn placed_at(button: &objc2::runtime::AnyObject) -> Option<crate::notch::native::CGPoint> {
+    let key = button as *const objc2::runtime::AnyObject as usize;
+    LIGHTS_AT.with(|at| at.borrow().iter().find(|(b, _)| *b == key).map(|(_, o)| *o))
+}
+
+/// Whether the button's window is full screen (NSWindowStyleMaskFullScreen), or it has none.
+///
+/// SAFETY: `button` is a live view, on the main thread.
+#[cfg(target_os = "macos")]
+unsafe fn full_screen(button: &objc2::runtime::AnyObject) -> bool {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    let window: *mut AnyObject = unsafe { msg_send![button, window] };
+    if window.is_null() {
+        return true;
+    }
+    let mask: usize = unsafe { msg_send![window, styleMask] };
+    mask & (1 << 14) != 0
+}
+
+/// The prefix of the buttons' own subclasses (`follow_layout`).
+#[cfg(target_os = "macos")]
+const FOLLOWING: &str = "AgentesFollowing";
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    /// Placing the buttons moves them too: their own frame notices don't start another placement.
+    static PLACING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A button moved while placing: placed once more.
+    static AGAIN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// From one button's left edge to the next's, as AppKit lays them out.
+    static LIGHTS_STEP: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
+    /// Where each button was placed last (by its address), for `follow_layout`.
+    static LIGHTS_AT: std::cell::RefCell<Vec<(usize, crate::notch::native::CGPoint)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The site's title bar (apps/web desktop.css), in points.
+#[cfg(target_os = "macos")]
+const TITLE_BAR: f64 = 40.0;
+/// The close button's left edge, in points.
+#[cfg(target_os = "macos")]
+const LIGHTS_LEFT: f64 = 16.0;
+
+/// The window's close, minimize and zoom buttons in the middle of the site's title bar, as Electron places
+/// them (`WindowButtonsProxy`): the title bar's container as tall as the bar, each button centred in it.
+/// `traffic_light_position` only makes the container taller, and macOS 26 keeps the buttons at its top (their
+/// middle at ~15pt on macOS 27, under the bar's icons at 20pt).
+#[cfg(target_os = "macos")]
+fn place_lights(window: &tauri::Window) {
+    use crate::notch::native::{CGPoint, CGRect};
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let Ok(ns) = window.ns_window() else { return };
+    let ns = ns as *mut AnyObject;
+    if ns.is_null() {
+        return;
+    }
+    // SAFETY: `ns` is this window's live NSWindow, on the main thread; the buttons and their container are
+    // its own views (NSWindowCloseButton, MiniaturizeButton, ZoomButton = 0, 1, 2).
+    unsafe {
+        let buttons: [*mut AnyObject; 3] = [
+            msg_send![ns, standardWindowButton: 0usize],
+            msg_send![ns, standardWindowButton: 1usize],
+            msg_send![ns, standardWindowButton: 2usize],
+        ];
+        if buttons.iter().any(|b| b.is_null()) {
+            return;
+        }
+        let row: *mut AnyObject = msg_send![buttons[0], superview];
+        if row.is_null() {
+            return;
+        }
+        let container: *mut AnyObject = msg_send![row, superview];
+        if container.is_null() {
+            return;
+        }
+        let window_frame: CGRect = msg_send![ns, frame];
+        let first: CGRect = msg_send![buttons[0], frame];
+        let step = LIGHTS_STEP.with(|s| s.get()).unwrap_or_else(|| {
+            let second: CGRect = msg_send![buttons[1], frame];
+            second.origin.x - first.origin.x
+        });
+        let mut bar: CGRect = msg_send![container, frame];
+        bar.size.height = TITLE_BAR;
+        bar.origin.y = window_frame.size.height - TITLE_BAR;
+        let _: () = msg_send![container, setFrame: bar];
+        let mut at = Vec::with_capacity(3);
+        for (i, button) in buttons.into_iter().enumerate() {
+            let frame: CGRect = msg_send![button, frame];
+            let origin = CGPoint {
+                x: LIGHTS_LEFT + i as f64 * step,
+                y: (TITLE_BAR - frame.size.height) / 2.0,
+            };
+            at.push((button as usize, origin));
+            let _: () = msg_send![button, setFrameOrigin: origin];
+        }
+        LIGHTS_AT.with(|a| *a.borrow_mut() = at);
+    }
 }
 
 /// Downloads land in ~/Downloads under their own name, never over an existing file.
@@ -336,8 +631,10 @@ fn front(app: &AppHandle) -> Result<(), String> {
 /// pairing it with one (`connect`: the system's own dialog asks first, then the site confirms the runner's
 /// code with its own session), reconnecting it (`reconnect`), Preferences on a tab (`prefs`), the menu bar's
 /// access requests (`requests`), the Dock's badge (`badge`), the Go menu's organizations (`orgs`), a
-/// notification while the app is in the background (`notify`) and, on the server here, signing its owner in
-/// (`signIn`: the app spends its owner key on a one-time sign-in, which the window trades itself). Rust checks
+/// notification while the app is in the background (`notify`), the first run's window to pick another server
+/// (`servers`: the sign-in page's way out, the same window as Servers › Add a server…) and, on the server
+/// here, signing its owner in (`signIn`: the app spends its owner key on a one-time sign-in, which the window
+/// trades itself) and the folder of its files (`files`: Storage's "Show the folder"). Rust checks
 /// each request, rebuilds it from the keys it may have, adds the asking page's own `origin`, whether agents may
 /// work here for it and whether it is the server here (`local`), and relays it: the popover's code owns the
 /// runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The machine's token
@@ -391,6 +688,9 @@ fn checked(request: &Value) -> Result<Value, String> {
         Some("status") => Ok(json!({ "kind": "status" })),
         Some("requests") => Ok(json!({ "kind": "requests" })),
         Some("signIn") => Ok(json!({ "kind": "signIn" })),
+        Some("servers") => Ok(json!({ "kind": "servers" })),
+        // The folder is the app's to know: the page names none.
+        Some("files") => Ok(json!({ "kind": "files" })),
         Some("connect") => {
             let mut out = json!({ "kind": "connect", "orgId": org()? });
             if let Some(name) = display_name(request.get("orgName")) {
@@ -444,6 +744,18 @@ fn checked(request: &Value) -> Result<Value, String> {
         }
         _ => Err("unknown request".into()),
     }
+}
+
+/// `files` reaches the popover only from the server here's own page, marked `local`: the folder it shows is this
+/// computer's.
+fn files_gate(mut request: Value, server_here: bool) -> Result<Value, String> {
+    if request["kind"] == "files" {
+        if !server_here {
+            return Err("not_here".into());
+        }
+        request["local"] = json!(true);
+    }
+    Ok(request)
 }
 
 /// The site's notifications: at most one every 3 seconds and 60 an hour, only while the window isn't in
@@ -500,6 +812,7 @@ fn notify(app: &AppHandle, request: &Value, site: &Url) {
 
 /// The main window came to the front: within 30 seconds of a notification, its page.
 pub fn focused(app: &AppHandle) {
+    keep_lights(app);
     let pending = {
         let notices = app.state::<Notices>();
         let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
@@ -605,6 +918,11 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             }
             return Ok(json!({}));
         }
+        // Only a window of the app's own: the person picks and confirms the server there.
+        Some("servers") => {
+            crate::present(&app, "welcome")?;
+            return Ok(json!({}));
+        }
         _ => {}
     }
     let asks_here = matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect"));
@@ -625,6 +943,7 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             }
         }
     }
+    request = files_gate(request, server_here)?;
     if request["kind"] == "connect" {
         if !here {
             return Err("not_here".into());
@@ -751,6 +1070,23 @@ mod tests {
         assert_eq!(r("https://agentes.tail1234.ts.net.evil.com/", own), Route::Outside);
         assert_eq!(r("http://127.0.0.1:4311/", "http://127.0.0.1:4310"), Route::Outside);
         assert_eq!(r("mailto:a@b.c", own), Route::Outside);
+        let cloud = "https://agentes.chat";
+        assert_eq!(r("https://agentes.chat/help/memory?lang=en#learns", cloud), Route::Outside);
+        assert_eq!(r("https://agentes.chat/org/x", cloud), Route::Stay);
+    }
+
+    #[test]
+    fn the_bot_check_s_frame_stays_in_the_window_and_nothing_else_of_its_host() {
+        for site in ["https://agentes.chat", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
+            let frame = "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/av0/rcv/x";
+            assert_eq!(r(frame, site), Route::Stay);
+            assert_eq!(r("https://challenges.cloudflare.com:443/turnstile/v0/api.js", site), Route::Stay);
+            assert_eq!(r("http://challenges.cloudflare.com/turnstile/v0/api.js", site), Route::Outside);
+            assert_eq!(r("https://challenges.cloudflare.com:8443/x", site), Route::Outside);
+            assert_eq!(r("https://challenges.cloudflare.com.evil.example/x", site), Route::Outside);
+            assert_eq!(r("https://evil.example/challenges.cloudflare.com", site), Route::Outside);
+            assert_eq!(r("https://www.cloudflare.com/turnstile-privacy-policy/", site), Route::Outside);
+        }
     }
 
     #[test]
@@ -758,7 +1094,7 @@ mod tests {
         assert!(!agents_here("https://agentes.chat", false));
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
-        assert_eq!(agents_here("https://agentes.tail1234.ts.net", false), PLATFORM != "windows");
+        assert!(agents_here("https://agentes.tail1234.ts.net", false));
         assert!(!agents_here("https://ana-mac.tail1234.ts.net", true), "the server here, at its Tailscale address");
     }
 
@@ -786,7 +1122,24 @@ mod tests {
         assert!(checked(&json!({ "kind": "reconnect" })).is_err());
         assert_eq!(checked(&json!({ "kind": "requests", "x": 1 })), Ok(json!({ "kind": "requests" })));
         assert_eq!(checked(&json!({ "kind": "signIn", "key": "x" })), Ok(json!({ "kind": "signIn" })));
+        assert_eq!(
+            checked(&json!({ "kind": "servers", "url": "https://evil.example" })),
+            Ok(json!({ "kind": "servers" }))
+        );
+        // The page can't name a folder, or say it is the server here (Rust adds `local` itself).
+        assert_eq!(
+            checked(&json!({ "kind": "files", "path": "/etc", "local": true })),
+            Ok(json!({ "kind": "files" }))
+        );
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
+    }
+
+    #[test]
+    fn files_only_for_the_server_here() {
+        let files = checked(&json!({ "kind": "files", "local": true })).unwrap();
+        assert_eq!(files_gate(files.clone(), false), Err("not_here".to_string()));
+        assert_eq!(files_gate(files, true), Ok(json!({ "kind": "files", "local": true })));
+        assert_eq!(files_gate(json!({ "kind": "status" }), false), Ok(json!({ "kind": "status" })));
     }
 
     #[test]

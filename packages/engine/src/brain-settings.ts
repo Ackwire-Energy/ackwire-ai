@@ -1,16 +1,26 @@
 import {
   ACCOUNTS_PROTOCOL,
+  type AccountKind,
   BRAIN_PROTOCOL,
   type BrainEffort,
   isBrainEffort,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
+  type PlanUsage,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
-import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
+import {
+  type AgentAudience,
+  answersOthers,
+  audienceOf,
+  OWNER_ONLY,
+  planSharing,
+  refusePersonalPlan,
+  storedAudience,
+} from "./audience";
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -367,7 +377,8 @@ export interface AgentBrainInput {
    * "Só responde a você" (ADR 0059 §5): true, only its owner talks to it;
    * false, on a plan everyone does, and on the API whoever did before a plan
    * made it its owner's only. Omitted = keep it; a switch onto a plan makes
-   * it its owner's only.
+   * it its owner's only. Where plans are personal, false on a plan is refused
+   * (`refusePersonalPlan`).
    */
   onlyOwner?: unknown;
   /**
@@ -399,7 +410,7 @@ function nextAudience(
   onlyOwner: boolean | undefined,
 ): { base: AgentAudience; to: AgentAudience } {
   const plan = isComputerBrain(brain);
-  const base = changed && plan ? OWNER_ONLY : audienceOf(agent);
+  const base = changed && plan ? OWNER_ONLY : storedAudience(agent);
   if (onlyOwner === undefined) return { base, to: base };
   if (onlyOwner) return { base, to: OWNER_ONLY };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
@@ -460,6 +471,7 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.onlyOwner === false) refusePersonalPlan({ name: agent.name, brain });
   const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
   const accepted = planSharing({ ...agent, brain }, userId, base, to, input.acceptPlanTerms === true);
   const audience = to.mode === agent.audienceMode ? null : to;
@@ -510,7 +522,8 @@ export async function setAgentBrain(
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);
-  if (audience) caches.agents.delete(`${orgId}:team`);
+  // The team's cached rows carry the brain too, which the audience gate reads.
+  if (audience || changed) caches.agents.delete(`${orgId}:team`);
   forgetAgents(orgId, released);
   await recordAudit(deps.db, {
     orgId,
@@ -526,7 +539,7 @@ export async function setAgentBrain(
         effort: agent.brainEffort,
       },
       to: { brain, model, fallback, account, effort },
-      ...(audience ? { audience: { from: audienceOf(agent), to: audience } } : {}),
+      ...(audience ? { audience: { from: storedAudience(agent), to: audience } } : {}),
       ...(accepted ? { acceptedPlanTerms: true } : {}),
     },
   });
@@ -850,6 +863,19 @@ export interface AiComputer {
   keys: boolean;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
+  /**
+   * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
+   * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
+   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known.
+   */
+  own: Partial<Record<AccountKind, OwnSignIn>>;
+}
+
+/** A computer's own sign-in as the AI accounts page lists it. */
+export interface OwnSignIn {
+  /** The plan the CLI reported (`max`, `pro`…); absent when it didn't say. */
+  plan?: string;
+  usage?: PlanUsage;
 }
 
 export interface AiAccountsView {
@@ -886,7 +912,25 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
         canAdd: mayAddAccounts(m, userId) && m.protocol >= ACCOUNTS_PROTOCOL,
         keys: m.protocol >= PLAN_KEYS_PROTOCOL,
         brains: { claude_code: can("claude_code"), codex: can("codex") },
+        own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };
     }),
   };
+}
+
+/** The CLIs' own sign-ins a computer reported (see `AiComputer.own`). */
+function ownSignIns(
+  executors: schema.MachineExecutors | null | undefined,
+  can: (kind: BrainKind) => boolean,
+): Partial<Record<AccountKind, OwnSignIn>> {
+  const usage: OwnPlanUsage = executors?.ownUsage ?? {};
+  const out: Partial<Record<AccountKind, OwnSignIn>> = {};
+  const claude = executors?.claude;
+  if (can("claude_code") && (claude?.loggedIn === true || usage.claude_code))
+    out.claude_code = {
+      ...(claude?.plan ? { plan: claude.plan } : {}),
+      ...(usage.claude_code ? { usage: usage.claude_code } : {}),
+    };
+  if (can("codex") && usage.codex) out.codex = { usage: usage.codex };
+  return out;
 }

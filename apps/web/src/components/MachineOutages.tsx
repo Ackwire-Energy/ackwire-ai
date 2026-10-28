@@ -223,7 +223,8 @@ export function SwitchComputerDialog({
   const chosenAgents = o.agents.filter((a) => picked.includes(a.agentId));
   // A target must run every brain of the agents chosen (all of them while none is chosen).
   const brains = brainsOf(chosenAgents.length > 0 ? chosenAgents : o.agents);
-  const targets = targetsFor(data, o.machineId);
+  // Which rows show doesn't change with the checks: only whether each can take who is checked.
+  const targets = targetsFor(data, o.machineId, brainsOf(o.agents));
   const options = targets.map((x) => targetOption(t, x, brains));
   const firstOpen = options.find((x) => !x.disabled)?.value ?? "";
   const [target, setTarget] = useState(firstOpen);
@@ -317,7 +318,7 @@ export function SwitchComputerDialog({
             );
           })}
         </div>
-        <p className="outage-dialog__hint">
+        <p className="outage-dialog__hint ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("outage.dialog.hint", { name: o.name })}</span>
         </p>
@@ -370,7 +371,7 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   if (state !== "waiting") {
     return (
       <div className="waitcard" data-done="">
-        <span className="waitcard__top">
+        <span className="waitcard__top ac-iconline">
           <Icon name="check" size={16} />
           <span>{state === "back" ? t("outage.card.back", { name }) : t("outage.card.moved")}</span>
         </span>
@@ -379,11 +380,11 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   }
   return (
     <div className="waitcard">
-      <span className="waitcard__top">
+      <span className="waitcard__top ac-iconline">
         <Icon name="waiting" size={16} />
         <span>{t("outage.card.waiting", { name })}</span>
       </span>
-      <p>
+      <p className="ac-iconline">
         <ProviderLogo id={notice.brain} size="xs" />
         {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
       </p>

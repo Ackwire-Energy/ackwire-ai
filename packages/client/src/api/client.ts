@@ -33,6 +33,7 @@ import type {
   ArtifactDetail,
   ArtifactFilters,
   ArtifactVersion,
+  AskToJoinResult,
   AuditPage,
   AuditQuery,
   AuthConfig,
@@ -81,12 +82,17 @@ import type {
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
   Issue,
   IssueActivity,
   IssueColumn,
   IssueInput,
   IssuePatch,
   IssueStatus,
+  JevKey,
+  JoinApproval,
+  JoinCodeSent,
+  JoinRequest,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -137,6 +143,7 @@ import type {
   Person,
   PhoneSignIn,
   Proposal,
+  PushDeviceInput,
   ReactionCount,
   Reminder,
   ReminderInput,
@@ -205,11 +212,20 @@ export interface ApiClient {
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+    /** `null` unless I am the installation's owner on a self-hosted server. */
+    jev(): Promise<JevKey | null>;
+    /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */
+    saveJev(apiKey: string): Promise<JevKey>;
+    checkJev(): Promise<JevKey>;
+    removeJev(): Promise<JevKey>;
   };
   account: {
     authConfig(): Promise<AuthConfig>;
-    /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
-    signInOptions(input: { email: string; inviteToken?: string }): Promise<SignInOptions>;
+    /**
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
+     * bot check's token, when the server has one (`human_check` 403 without it).
+     */
+    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -218,6 +234,23 @@ export interface ApiClient {
     phoneSignIn(): Promise<PhoneSignIn>;
     /** A password for an account that has none (`password_set` 409 when it has one). */
     addPassword(password: string): Promise<void>;
+  };
+  /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
+  push: {
+    /** The server's Web Push public key (base64url); `null` when this server has Web Push off (`web_push_off` 404). */
+    webKey(): Promise<string | null>;
+    /** Registers (or refreshes, or moves to me) a phone's token or a browser's subscription. Rate limited (429). */
+    register(input: PushDeviceInput): Promise<void>;
+    /**
+     * Stops pushes to a phone's token or a browser's endpoint (only my own; anything else is a no-op). In the
+     * body, not the path: an endpoint's encoded slashes don't survive every proxy.
+     */
+    unregister(token: string): Promise<void>;
+    /**
+     * Of these notification ids (at most 100), the ones no longer open and unread for me (read, done, snoozed or
+     * gone): a browser closes the notifications it still shows for them (clear on read, ADR 0071).
+     */
+    stale(ids: string[]): Promise<string[]>;
   };
   orgs: {
     create(input: {
@@ -408,13 +441,14 @@ export interface ApiClient {
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
     startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
     /**
-     * The phone app finishes an authorization it started (`returnTo: APP_OAUTH_RETURN`) with the `state` and
-     * `code` the callback handed back to it.
+     * The phone app (`returnTo: APP_OAUTH_RETURN`) or the desktop app's window (`desktop:` + a path) finishes an
+     * authorization it started with the `state` and `code` the callback handed back to it. `returnTo`: the path
+     * a desktop authorization lands on.
      */
     completeOAuth(
       orgId: string,
       input: { state: string; code: string },
-    ): Promise<{ connectionId: string; connector: string }>;
+    ): Promise<{ connectionId: string; connector: string; returnTo?: string }>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
   };
   githubApp: {
@@ -933,10 +967,41 @@ export interface ApiClient {
     migration(orgId: string): Promise<StorageMigration | null>;
   };
   invites: {
-    /** Org-wide link: whoever joins with it becomes a member (7 days). */
-    createLink(orgId: string): Promise<{ url: string; expiresAt: string }>;
-    /** Expired invitation: ask the inviter for a new one. */
+    /**
+     * The workspace's invitation link (admins, ADR 0068): the active one, else a new one for 30 days. Whoever
+     * opens it can only ask to join.
+     */
+    createLink(orgId: string): Promise<{ id: string; url: string; expiresAt: string }>;
+    /** The links people can still ask with, earlier ones (no `url`) included. */
+    links(orgId: string): Promise<InviteLink[]>;
+    /** Nobody new can ask with it; the requests made through it close without emails. */
+    turnOff(orgId: string, linkId: string): Promise<void>;
+    /**
+     * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
+     * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
+     */
+    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<JoinCodeSent>;
+    /** Checks the code from the email: right, the address can ask for 30 minutes. */
+    checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
+    /**
+     * Asks to join through a link: signed out with a name and an email, signed in as the account. On a server that
+     * sends email, `code` proves an address that isn't a confirmed account's.
+     */
+    ask(
+      token: string,
+      input: { name?: string; email?: string; note?: string; code?: string },
+    ): Promise<AskToJoinResult>;
+    /** Expired email invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
+  };
+  /** Requests to join through the invitation link, for admins (ADR 0068). */
+  joinRequests: {
+    /** Waiting ones, oldest first. */
+    list(orgId: string): Promise<JoinRequest[]>;
+    /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
+    approve(orgId: string, requestId: string, role: "member" | "admin"): Promise<JoinApproval>;
+    /** `reason` is told to the person by email. */
+    deny(orgId: string, requestId: string, reason?: string): Promise<void>;
   };
   /**
    * Phone app additions. Optional so older fakes and clients still type-check;
@@ -1064,7 +1129,8 @@ export interface ApiClient {
   };
   /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
   waitlist: {
-    join(input: { email: string; locale: string }): Promise<void>;
+    /** `humanCheck`: the bot check's token, when the server has one. */
+    join(input: { email: string; locale: string }, humanCheck?: string): Promise<void>;
     /** The link in the confirmation email (`?confirm=`); `invalid_token` when unknown or expired. */
     confirm(input: { token: string }): Promise<void>;
   };

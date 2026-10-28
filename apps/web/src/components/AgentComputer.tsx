@@ -35,7 +35,13 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { computerKind, computerState, folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
+import {
+  computerKind,
+  computerState,
+  folderName,
+  foldersOfAgent,
+  machineTitle,
+} from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -50,6 +56,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   List,
   Menu,
@@ -211,8 +218,10 @@ function ComputerError({ life }: { life: Lifecycle }) {
   if (!error) return null;
   return (
     <p className="computer-error small" role="alert">
-      <Icon name="alert" size={16} />
-      <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+      <span className="ac-iconline">
+        <Icon name="alert" size={16} />
+        <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+      </span>
       <Button size="sm" variant="ghost" onClick={() => life.run(error.action)}>
         {t("computer.retry")}
       </Button>
@@ -287,7 +296,10 @@ function ComputerMenu({ agent, life }: { agent: Agent; life: Lifecycle }) {
 /** The computer an agent uses; older servers don't say: the cloud one. */
 export const targetOf = (pc: AgentComputer | undefined): ComputerTarget => pc?.target ?? { kind: "cloud" };
 
-/** "Na máquina Servidor do escritório · Online": a connected computer is turned on by its owner. */
+/**
+ * "Servidor do escritório · Online": a connected computer, turned on by whoever connected it, or the workspace's
+ * own; who runs it is its name's ⓘ, and only being offline says more.
+ */
 function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind: "machine" }> }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -298,18 +310,17 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   return (
     <span className="stack-4" style={{ gap: 4 }}>
       <span className="row" style={{ gap: 8, alignItems: "center" }}>
-        <span className="computer-machine__name">{target.name}</span>
+        <span className="ac-hintline">
+          <span className="computer-machine__name">{target.name}</span>
+          <InfoHint name={t("common.about", { label: target.name })}>
+            {managed ? t("computerSetup.managedHint") : t("computer.machineHint")}
+          </InfoHint>
+        </span>
         <MachineChip online={target.online} />
       </span>
-      <span className="small muted">
-        {managed
-          ? t("computerSetup.managedHint")
-          : target.online
-            ? t("computer.machineHint")
-            : here
-              ? t("machines.thisMac.offline")
-              : t("computer.machineOffline")}
-      </span>
+      {!managed && !target.online && (
+        <span className="small muted">{here ? t("machines.thisMac.offline") : t("computer.machineOffline")}</span>
+      )}
       {!target.online && here && (
         <span>
           <ReconnectThisMacButton orgId={org.id} />
@@ -477,13 +488,11 @@ function TargetPortrait({ target, display }: { target: ComputerTarget; display: 
 }
 
 /** The workspace's own computer on its way, for an agent that gets it once it's ready. */
-function WaitingForComputer({ view, title, agentName }: { view: SetupView; title: string; agentName: string }) {
-  const { t } = useTranslation();
+function WaitingForComputer({ view, title }: { view: SetupView; title: string }) {
   return (
     <span className="stack-4" style={{ gap: 6 }}>
       <span className="computer-machine__name">{title}</span>
       <SetupProgress view={view} />
-      <span className="small muted">{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
     </span>
   );
 }
@@ -519,6 +528,13 @@ export function AgentComputerPanel({
   const choice = target.kind === "cloud" ? noComputer.choice(true) : null;
   // No computer yet where the workspace's own is on its way: that one is the agent's (its first hello gives it).
   const waiting = choice === "workspace" ? noComputer.setup : null;
+  // The computer's name shows above for a connected computer, the workspace's on its way, or none at all.
+  const named = waiting !== null || choice === "none" || target.kind === "machine";
+  const pick = onMachine ? (
+    <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
+  ) : named ? null : (
+    <span className="agp-ro">{noComputer.label(choice ?? "cloud")}</span>
+  );
   return (
     <div className="agp-pc">
       <div className="agp-pc__now">
@@ -533,7 +549,7 @@ export function AgentComputerPanel({
         )}
         <span className="agp-pc__text">
           {waiting ? (
-            <WaitingForComputer view={waiting} title={noComputer.label("workspace")} agentName={agent.name} />
+            <WaitingForComputer view={waiting} title={noComputer.label("workspace")} />
           ) : choice === "none" ? (
             <span className="stack-4" style={{ gap: 4 }}>
               <span className="computer-machine__name">{t("computer.target.none")}</span>
@@ -569,22 +585,18 @@ export function AgentComputerPanel({
         )}
       </div>
       <ComputerError life={life} />
-      <div className="stack-4" style={{ gap: 6 }}>
-        <span className="newag__label">{t("computer.target.label")}</span>
-        {onMachine ? (
-          <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
-        ) : (
-          <span className="agp-ro">
-            {target.kind === "machine" ? target.name : noComputer.label(choice ?? "cloud")}
-          </span>
-        )}
-        {machineNote}
-        {onMachine && (
-          <span className="small muted">
-            {admin ? t("agentPage.computer.adminsPick") : t("agentPage.computer.ownerPicks")}
-          </span>
-        )}
-      </div>
+      {(pick || machineNote) && (
+        <div className="stack-4" style={{ gap: 6 }}>
+          {pick && <span className="newag__label">{t("computer.target.label")}</span>}
+          {pick}
+          {machineNote}
+          {onMachine && (
+            <span className="small muted">
+              {admin ? t("agentPage.computer.adminsPick") : t("agentPage.computer.ownerPicks")}
+            </span>
+          )}
+        </div>
+      )}
       {target.kind === "machine" && <AgentMachineFolders agentId={agent.id} machineId={target.machineId} />}
     </div>
   );
@@ -604,7 +616,15 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
   const folders = foldersOfAgent(m.access, agentId);
   return (
     <div className="stack-4" style={{ gap: 6 }} data-agent-folders>
-      <span className="newag__label">{t("agentPage.computer.folders")}</span>
+      <span className="ac-hintline">
+        <span className="newag__label">{t("agentPage.computer.folders")}</span>
+        {/* The workspace's own computer: nobody here allows more on it. */}
+        {m.kind !== "managed" && (
+          <InfoHint name={t("common.about", { label: t("agentPage.computer.folders") })}>
+            {t("agentPage.computer.foldersHint")}
+          </InfoHint>
+        )}
+      </span>
       {!m.access ? (
         <span className="small muted">
           {m.canManage
@@ -627,8 +647,6 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
           </ul>
         </>
       )}
-      {/* The workspace's own computer: nobody here allows more on it. */}
-      {m.kind !== "managed" && <span className="small muted">{t("agentPage.computer.foldersHint")}</span>}
     </div>
   );
 }
@@ -810,7 +828,7 @@ function CloudComputerDialog({
               ))}
             </RadioGroup>
             {draft.network === "open" && (
-              <p className="sandbox-warning small" role="note">
+              <p className="sandbox-warning small ac-iconline" role="note">
                 <Icon name="alert" size={16} />
                 {t("sandbox.openWarning")}
               </p>
@@ -912,7 +930,7 @@ function CloudComputerDialog({
             />
             <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
           </span>
-          <p className="computers-note small" role="note">
+          <p className="computers-note small ac-iconline" role="note">
             <Icon name="info" size={16} />
             <span>{t("computers.cloud.note")}</span>
           </p>
@@ -952,12 +970,9 @@ export function AgentComputersCard() {
   const list = agents.data ?? [];
   return (
     <Card aria-labelledby="sec-agent-computers">
-      <div className="stack-4" style={{ gap: 2 }}>
-        <h2 id="sec-agent-computers" className="ac-card__title">
-          {t("computers.agents.title")}
-        </h2>
-        <span className="small muted">{t("computers.agents.text")}</span>
-      </div>
+      <h2 id="sec-agent-computers" className="ac-card__title">
+        {t("computers.agents.title")}
+      </h2>
       {agents.isLoading || machines.isLoading ? (
         <LoadingLine width={240} />
       ) : list.length === 0 ? (
@@ -1006,8 +1021,11 @@ function AgentComputerRow({
     ) : (
       <ComputerIcon kind={computerKind(machines.find((m) => m.id === id)?.os)} size={16} />
     );
-  const nameOf = (id: string) =>
-    id === CLOUD ? noComputer.label(cloud ?? "cloud") : (machines.find((m) => m.id === id)?.name ?? id);
+  const host = t("machines.host.label");
+  const nameOf = (id: string) => {
+    const m = machines.find((x) => x.id === id);
+    return id === CLOUD ? noComputer.label(cloud ?? "cloud") : m ? machineTitle(m, host) : id;
+  };
   const options: SelectOption[] = [
     ...(cloud
       ? [
@@ -1025,7 +1043,7 @@ function AgentComputerRow({
       : []),
     ...choices.map((m) => ({
       value: m.id,
-      label: m.name,
+      label: machineTitle(m, host),
       description: t(`computers.agents.state.${computerState(m)}`),
     })),
   ].map((o) => ({ ...o, leading: iconOf(o.value) }));

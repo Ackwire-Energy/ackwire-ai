@@ -1,23 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { suspendedText } from "@agenteschat/client/lib/errors";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
-import { resources } from "@agenteschat/i18n";
-import i18next, { type TFunction } from "i18next";
-import { featureKeysEn } from "../../src/features/i18n/keys.en";
-import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
-import { withMobileKeys } from "../../src/i18n/merge";
 import { suspendedOf } from "../../src/lib/org-choice";
-
-async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
-  const i18n = i18next.createInstance();
-  await i18n.init({
-    lng,
-    fallbackLng: "pt-BR",
-    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
-    interpolation: { escapeValue: false },
-  });
-  return i18n.t;
-}
+import { translator } from "./fixtures";
 
 /** The workspace's own computer (ADR 0056 §10): the server names it ("Computador da Acme"), its system never said. */
 const managed: OutageTargetLike = {
@@ -67,9 +53,22 @@ describe("a suspended organization on the phone", () => {
   test("the chosen one suspended: why (when told) and where else to go", () => {
     expect(suspendedOf(orgs, "a")).toEqual({
       reason: "uso fora dos termos",
+      cloud: false,
       others: [orgs[1], orgs[2]],
     });
     expect(suspendedOf(orgs, "d")?.reason).toBeNull();
+  });
+
+  test("its line: why, and on agentes.chat Cloud how to contest it", async () => {
+    const t = await translator("pt-BR");
+    expect(suspendedText(t, suspendedOf(orgs, "a"))).toBe("Este workspace está suspenso: uso fora dos termos");
+    const cloud = [{ id: "e", name: "Eco", standing: { state: "suspended", reason: "Termos 5: spam", cloud: true } }];
+    expect(suspendedText(t, suspendedOf(cloud, "e"))).toBe(
+      "Este workspace está suspenso: Termos 5: spam. Para contestar, escreva para legal@agentes.chat.",
+    );
+    expect(suspendedText(t, suspendedOf(orgs, "d"))).toBe(
+      "As conversas e os agentes dele estão fechados por enquanto.",
+    );
   });
 
   test("active or on hold: no suspended screen", () => {

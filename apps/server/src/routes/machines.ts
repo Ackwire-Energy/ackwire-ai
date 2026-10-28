@@ -1,3 +1,4 @@
+import { limitIp } from "@agenteschat/adapters";
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
@@ -29,7 +30,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { installScript } from "../../runner/install-script";
-import { requestIp } from "../http/client-ip";
+import { requestIp, requestLimitIp } from "../http/client-ip";
 import { apiError, domainErrorResponse, errorResponse } from "../http/errors";
 import {
   type AppDeps,
@@ -166,23 +167,30 @@ const ComputerSetup = z
       description:
         "`pair`: people connect their own computers (the other fields are null). `external`: the workspace gets its own computer, being prepared until `state` is `ready`.",
     }),
-    state: z.enum(PROVISIONING_STATES).nullable(),
+    state: z.enum(PROVISIONING_STATES).nullable().openapi({
+      description:
+        "With `external`, null while the workspace is on hold and its computer isn't ready: it waits for none, so nothing of a wait is said either.",
+    }),
     step: z
       .enum(PROVISIONING_STEPS)
       .nullable()
       .openapi({ description: "While `preparing`: reserving, starting, installing or connecting." }),
+    stage: z.string().nullable().openapi({
+      description:
+        "While `preparing`, when the provisioner says: what it is doing within its step (`updating`, `restarting`, `apps`…). One the app has no words for reads as its step.",
+    }),
     reason: z
       .enum(PROVISIONING_REASONS)
       .nullable()
-      .openapi({ description: "While `waiting`: `capacity` (taking longer than usual)." }),
+      .openapi({ description: "While `waiting`: `capacity` (no computer on its way yet)." }),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
     requestedAt: z.string().nullable().openapi({
       description: "When its people started waiting: the computer's last removal, else the workspace's creation.",
     }),
-    expectedReadyAt: z
-      .string()
-      .nullable()
-      .openapi({ description: "While `preparing`, when known: when it should be ready (already past: any moment)." }),
+    expectedReadyAt: z.string().nullable().openapi({
+      description:
+        "While `preparing`, when known: the earliest time this wait was told it would be ready, never moved later (already past: it runs over).",
+    }),
     secondsLeft: z.number().int().nullable().openapi({
       description:
         "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter.",
@@ -346,7 +354,7 @@ export function machineAppRoutes(deps: AppDeps) {
         limit: 30,
         windowMs: 60_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       return c.json(await getDeviceCode({ db }, c.req.valid("param").userCode, c.get("user").id), 200);
     },
   );
@@ -692,9 +700,9 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     async (c) => {
       if (config.MACHINE_PROVISIONING === "external")
         return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.server);
-      const ip = requestIp(c.req.raw.headers);
-      const limit = await adapters.rateLimiter.consume(`machine-device:${ip}`, DEVICE_START_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      const ip = requestIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-device:${limitIp(ip)}`, DEVICE_START_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       try {
         const started = await startDeviceCode({ db, publicUrl: config.PUBLIC_URL }, c.req.valid("json"), { ip });
         return c.json(started, 200);
@@ -734,7 +742,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       },
     }),
     async (c) => {
-      const ip = requestIp(c.req.raw.headers);
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await adapters.rateLimiter.consume(`machine-device-poll:${ip}`, DEVICE_POLL_LIMIT);
       if (!limit.allowed) return c.json({ error: "slow_down" as const }, 400);
       const result = await pollDeviceToken({ db, pubsub: adapters.pubsub }, c.req.valid("json").deviceCode);
@@ -778,8 +786,9 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     async (c) => {
       const expected = config.HOST_COMPUTER_TOKEN;
       if (!expected) return apiError(c, 404, "machine.host_off", "This server has no computer of its own");
-      const limit = await adapters.rateLimiter.consume(`machine-host:${requestIp(c.req.raw.headers)}`, HOST_SYNC_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-host:${ip}`, HOST_SYNC_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       const auth = c.req.header("authorization") ?? "";
       if (!auth.startsWith("Bearer ") || !safeEqual(auth.slice(7).trim(), expected)) {
         return apiError(c, 401, "machine.unauthorized", "This server's computer token is not valid");

@@ -37,6 +37,23 @@ describe("buttons and kbd", () => {
     expect(b.querySelector(".ac-btn__kbd")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("a Button that toggles stays pushed in while on (aria-pressed), hovered or not; a ghost one keeps its plate", async () => {
+    render(<Button aria-pressed>Teclado</Button>);
+    expect(body().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("true");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) =>
+      new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+    const pressed = rule('.ac-btn[aria-pressed="true"]');
+    expect(pressed).toContain("background: var(--sunken)");
+    expect(pressed).toContain("color: var(--ink)");
+    expect(pressed).toContain("inset 0 0 0 1px var(--line)");
+    expect(rule('.ac-btn--ghost[aria-pressed="true"]')).toContain("background: var(--plate)");
+    // At the hover's weight, after it, so a pressed button stays pushed in under the pointer; before the focus ring.
+    const at = (selector: string) => css.lastIndexOf(`\n${selector} {`);
+    expect(at(".ac-btn:hover")).toBeLessThan(at('.ac-btn[aria-pressed="true"]'));
+    expect(at('.ac-btn[aria-pressed="true"]')).toBeLessThan(at(".ac-btn:focus-visible"));
+  });
+
   test("Kbd is a <kbd>", () => {
     const { container } = render(<Kbd>esc</Kbd>);
     expect(container.querySelector("kbd.ac-kbd")?.textContent).toBe("esc");
@@ -53,6 +70,19 @@ describe("buttons and kbd", () => {
     const b = body().getByRole("button", { name: "Cancelar" });
     b.focus();
     expect(document.activeElement).toBe(b);
+  });
+
+  test("off, a button is a faint plate over what it sits on, so its shape shows on the dark page too", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const off = css.split('\n.ac-btn[disabled],\n.ac-btn[aria-disabled="true"] {').at(-1)?.split("}")[0] ?? "";
+    expect(off).toContain("background: var(--plate)");
+    expect(off).not.toContain("var(--sunken)");
+  });
+
+  test("a chosen option never moves, so a row of options keeps its words on one line in both themes", async () => {
+    const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
+    const lifts = [...tokens.matchAll(/--chosen-lift: ([^;]+);/g)].map((m) => m[1]);
+    expect(lifts).toEqual(["none", "none"]);
   });
 });
 

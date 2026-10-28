@@ -74,8 +74,6 @@
   color: var(--muted);
 }
 .forum-head__guard {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 8px 0 0;
   font-size: 12.5px;
@@ -500,9 +498,6 @@
   gap: 12px 24px;
 }
 .forum-oline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   padding: 8px 12px;
   border-radius: 12px;
@@ -577,6 +572,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
   transition:
@@ -1051,7 +1047,6 @@ a.forum-facts__lnk:hover {
 }
 .forum-note {
   display: inline-flex;
-  align-items: center;
   gap: 6px;
   margin: 8px 0 0;
   font-size: 12px;
@@ -1065,9 +1060,6 @@ a.forum-facts__lnk:hover {
 }
 .forum-bskip,
 .forum-quiet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 6px 0;
   padding: 4px 0;
   font-size: 13px;
@@ -1159,10 +1151,8 @@ a.forum-facts__lnk:hover {
   flex-wrap: wrap;
 }
 .forum-closed {
-  display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
   margin-top: 22px;
   padding: 12px 14px;
   border-radius: 16px;
@@ -1175,8 +1165,6 @@ a.forum-facts__lnk:hover {
   scroll-margin-top: 24px;
 }
 .forum-chint {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 8px 4px 0;
   font-size: 12.5px;
@@ -1397,14 +1385,8 @@ a.forum-facts__lnk:hover {
   gap: 4px;
   color: var(--ink2);
 }
-.forum-pcr__col > span {
-  display: flex;
-  gap: 8px;
-}
 .forum-pcr__col .ac-icon {
-  margin-top: 2px;
   color: var(--faint);
-  flex: none;
 }
 .forum-twocol,
 .forum-went {
@@ -1657,17 +1639,8 @@ a.forum-facts__lnk:hover {
   font-weight: 500;
 }
 .forum-vlink {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
   font-size: 12.5px;
-  font-weight: 600;
   color: var(--muted);
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
 }
 .forum-vlink:hover {
   color: var(--ink);
@@ -1907,8 +1880,6 @@ a.forum-facts__lnk:hover {
   gap: 6px 8px;
 }
 .forum-sg-note {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 8px 0 0;
   font-size: 12.5px;

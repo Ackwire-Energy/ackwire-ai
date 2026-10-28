@@ -150,7 +150,12 @@ export const auditLog = pgTable(
     outcome: text().$type<AuditOutcome>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.orgId, t.createdAt), index().on(t.orgId, t.actorType, t.actorId, t.createdAt)],
+  // The reader pages newest first by id (UUIDv7, so in time order): one index for the whole log, one per actor.
+  (t) => [
+    index().on(t.orgId, t.createdAt),
+    index().on(t.orgId, t.id),
+    index().on(t.orgId, t.actorType, t.actorId, t.id),
+  ],
 );
 
 export type AuditOutcome = "done" | "failed" | "refused" | "pending";

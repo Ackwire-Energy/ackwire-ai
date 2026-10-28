@@ -38,9 +38,9 @@
   --e3: 0 2px 4px rgba(23, 23, 22, 0.04), 0 24px 56px -16px rgba(23, 23, 22, 0.3), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(10, 10, 10, 0.32);
-  /* Chosen, never a thick ring. Light: it sinks into the page in place, like a key
-     held down. Dark: it rises (brighter face, deeper shadow) and, in a single-choice group, the others step
-     back to a flat hairline (components.css). */
+  /* Chosen, never a thick ring, and never moved, so a row of options keeps its words on one line. Light: it
+     sinks into the page, like a key held down. Dark: it lights up (brighter face, deeper shadow) and, in a
+     single-choice group, the others step back to a flat hairline (components.css). */
   --chosen-bg: var(--sunken);
   --chosen-shadow:
     inset 0 2px 5px rgba(23, 23, 22, 0.16), inset 0 1px 1.5px rgba(23, 23, 22, 0.12), inset 0 0 0 1px var(--line),
@@ -85,7 +85,7 @@
   --chosen-bg: color-mix(in srgb, #fff 7%, var(--raised));
   --chosen-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.1), 0 14px 28px -8px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --chosen-lift: translateY(-2px);
+  --chosen-lift: none;
 }
 :root,
 [data-theme] {
@@ -141,6 +141,22 @@
   --control-icon-lg: 20px;
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+  /*
+   * Where a line's capitals sit, in x-heights (`ex` follows font-size-adjust): their middle --cap-mid above the line
+   * box's middle, their top --cap-top above it. Measured for Source Sans 3 (0.037ex, 0.716ex) and Onest (0.040ex,
+   * 0.711ex): a new font is measured again.
+   */
+  --cap-mid: 0.04ex;
+  --cap-top: 0.71ex;
+  /*
+   * What looks the same in both themes: a site is a light page, behind its frame and before it loads; our drawings
+   * of the Mac's own menus and switches keep its blue and white; an agent's screen keeps its dark ground.
+   */
+  --site-paper: #fff;
+  --site-blank: #fbfbfc;
+  --mac-accent: #2f7cf6;
+  --mac-accent-ink: #fff;
+  --screen-bg: #1f2128;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-md: 14.5px;

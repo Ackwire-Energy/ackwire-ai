@@ -6,6 +6,7 @@ setupDom();
 import type { ComputerSetup } from "@agenteschat/client";
 import { act, cleanup, fireEvent } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -58,7 +59,9 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
       "Sandboxes da Daytona",
     ])
       expect(region(name)).toBeNull();
-    expect(screen().queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
+    expect(screen().queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
+    // The page on how people's own computers work is self-host's alone.
+    expect(screen().queryByRole("link", { name: "Como os computadores funcionam" })).toBeNull();
     // Drawn as a server, never as the cloud.
     expect(document.querySelector(".setup-card canvas.ac-computer")?.getAttribute("data-kind")).toBe("linux");
     expect(body()).not.toMatch(/na nuvem|seu computador|desligad|parear|terminal/i);
@@ -144,13 +147,25 @@ describe("Configurações → Computadores on self-host", () => {
       "sec-agent-computers",
     ]);
     const host = region("Computador deste servidor") as HTMLElement;
-    expect(host.textContent).toContain(
-      "O computador onde o agentes.chat está instalado, com um usuário para cada agente.",
-    );
+    expect(host.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
     expect(host.textContent).toContain("Online");
-    // It's this server's: not among the other computers.
-    expect((region("Outros computadores") as HTMLElement).textContent).toContain("Nenhum outro computador ainda");
+    // It's this server's: not among the other computers. Their card is its title and ⓘ, and its empty state the
+    // title alone.
+    const others = region("Outros computadores") as HTMLElement;
+    expect(hintOf("Outros computadores", others).text).toBe(
+      "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
+    );
+    expect(shownText(others)).toBe("Outros computadoresNenhum outro computador ainda");
+    expect((region("Qual computador cada agente usa") as HTMLElement).textContent).not.toContain("Um por agente");
     expect(body()).not.toMatch(/na nuvem|computador na nuvem|in the cloud/i);
+    // What it all means (pausing, folders, the other ways to connect) is one help page, linked once at the end.
+    const how = screen().getByRole("link", { name: "Como os computadores funcionam" });
+    const url = new URL(how.getAttribute("href") ?? "");
+    expect(url.origin + url.pathname).toBe("https://agentes.chat/help/computers");
+    expect(url.searchParams.get("lang")).toBe("pt-BR");
+    expect(how.className).toBe("ac-link ac-link--muted");
+    expect(how.getAttribute("rel")).toBe("noopener noreferrer");
+    expect([...document.querySelectorAll(".settings__body a")].at(-1)).toBe(how);
   });
 
   test("with no computer of the server's own, admins read how to make it one, only while sign-up is closed", async () => {

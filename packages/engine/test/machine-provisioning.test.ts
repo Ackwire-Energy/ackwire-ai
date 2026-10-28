@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
   agentComputerInfo,
   computerSetup,
@@ -16,6 +17,7 @@ import {
   type MachineHub,
   type MachineHubDeps,
   OrgPausedError,
+  type ProvisioningStep,
   pollDeviceToken,
   reduceMachineAccess,
   renameMachine,
@@ -35,6 +37,7 @@ import { addMember, addUser, type Fixture, setup } from "./fixtures";
 let f: Fixture;
 let hub: MachineHub | null = null;
 afterEach(async () => {
+  setSystemTime();
   await hub?.stop();
   hub = null;
   const current = f;
@@ -51,6 +54,61 @@ const machineRow = async (id: string) => {
   if (!row) throw new Error("no machine");
   return row;
 };
+/** What the provisioner last said of the workspace's computer, as stored; null: nothing. */
+const waitState = async (orgId = f.org.id) => {
+  const [row] = await f.db
+    .select({ state: schema.machineProvisioning.state })
+    .from(schema.machineProvisioning)
+    .where(eq(schema.machineProvisioning.orgId, orgId));
+  return row?.state ?? null;
+};
+
+/**
+ * `db` whose first select, in a transaction or not, says its rows came (`read`) and hands them over once `gate`
+ * opens: a report that reads the workspace's standing that way writes after whatever happens meanwhile.
+ */
+function readThenWait(db: Database, read: () => void, gate: Promise<void>): Database {
+  let first = true;
+  const late = <T extends object>(query: T): T =>
+    new Proxy(query, {
+      get(target, key) {
+        const value = Reflect.get(target, key);
+        if (key === "then") {
+          return (ok: (rows: unknown) => unknown, ko: (error: unknown) => unknown) =>
+            (target as unknown as PromiseLike<unknown>)
+              .then(async (rows) => {
+                read();
+                await gate;
+                return rows;
+              })
+              .then(ok, ko);
+        }
+        if (typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          const next = value.apply(target, args);
+          return next && typeof next === "object" ? late(next) : next;
+        };
+      },
+    });
+  const watched = <T extends object>(handle: T): T =>
+    new Proxy(handle, {
+      get(target, key) {
+        const value = Reflect.get(target, key);
+        if (typeof value !== "function") return value;
+        if (key === "transaction") {
+          return (run: (tx: object) => unknown, ...rest: unknown[]) =>
+            value.call(target, (tx: object) => run(watched(tx)), ...rest);
+        }
+        if (key !== "select" || !first) return value.bind(target);
+        return (...args: unknown[]) => {
+          first = false;
+          return late(value.apply(target, args));
+        };
+      },
+    });
+  return watched(db);
+}
+
 const agentMachine = async (agentId: string) => {
   const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
   return row?.machineId ?? null;
@@ -134,6 +192,7 @@ describe("external provisioning", () => {
         provisioning: {
           state: "waiting",
           step: null,
+          stage: null,
           reason: "capacity",
           since: expect.any(String),
           requestedAt: later.organization.createdAt.toISOString(),
@@ -157,6 +216,7 @@ describe("external provisioning", () => {
       mode: "external",
       state: "preparing",
       step: null,
+      stage: null,
       reason: null,
       since: null,
       requestedAt: f.org.createdAt.toISOString(),
@@ -177,15 +237,14 @@ describe("external provisioning", () => {
     expect(await status()).toEqual({ ...reserving, secondsLeft: expect.any(Number) });
     expect(events).toHaveLength(1);
     await Bun.sleep(5);
-    // A reason only goes with `waiting`.
+    // A reason only goes with `waiting`; a new step with no time is the same wait, with its time.
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", reason: "capacity" });
     const installing = await status();
     expect(installing).toMatchObject({
       state: "preparing",
       step: "installing",
       reason: null,
-      expectedReadyAt: null,
-      secondsLeft: null,
+      expectedReadyAt: at.toISOString(),
       specs,
     });
     expect(installing.since).not.toBe(reserving.since);
@@ -224,7 +283,110 @@ describe("external provisioning", () => {
     expect((await status()).requestedAt).toBe(waiting.requestedAt);
   });
 
-  test("the ready time: past times keep the first, the seconds left come from the server, older words still read", async () => {
+  test("the stage within a step: kept with preparing only, any word, heard when it changes, since kept", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id);
+    const at = new Date(Date.now() + 600_000);
+    const report = (stage?: string) =>
+      setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", stage, expectedReadyAt: at });
+
+    await report("updating");
+    const updating = await status();
+    expect(updating).toMatchObject({ step: "installing", stage: "updating" });
+    expect(events.at(-1)).toMatchObject({ step: "installing", stage: "updating" });
+    const listed = (await page()).requests.find((r) => r.orgId === f.org.id);
+    expect(listed?.provisioning).toMatchObject({ step: "installing", stage: "updating" });
+    // The same report again says nothing new.
+    await report("updating");
+    expect(events).toHaveLength(1);
+    // The restart the update needs: its people hear it, and the step it is in began when it did.
+    await Bun.sleep(5);
+    await report("restarting");
+    expect(events).toHaveLength(2);
+    expect(events.at(-1)).toMatchObject({ step: "installing", stage: "restarting" });
+    expect((await status()).since).toBe(updating.since);
+    // A word this server has no use for is kept as said: the apps read it as its step.
+    await report("defragmenting");
+    expect((await status()).stage).toBe("defragmenting");
+    // A report without one has none, and only `preparing` has one.
+    await report();
+    expect((await status()).stage).toBeNull();
+    expect(events.at(-1)).toMatchObject({ stage: null });
+    await report("apps");
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity", stage: "apps" });
+    expect(await status()).toMatchObject({ state: "waiting", stage: null });
+
+    // Ready, then taken away: no stage left over.
+    await report("apps");
+    const { machineId, token } = await enrolled();
+    await hello(token);
+    expect(await status()).toMatchObject({ state: "ready", stage: null });
+    await revokeManagedMachine(deps(), f.org.id, machineId);
+    expect(await status()).toMatchObject({ state: "preparing", step: null, stage: null });
+  });
+
+  test("one wait counts down to the earliest time it was told: a later one is kept out, and it runs over", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id);
+    // A cold run as its provisioner reported it: planned again at each stage from the stage the computer was in, every
+    // time later than the first, as the app install ran 50 s past its estimate. Ready came at 16:11:34.614.
+    const first = Date.parse("2026-10-26T16:05:05.889Z");
+    const t0 = Date.now();
+    const at = (clock: string) => new Date(t0 + Date.parse(`2026-10-26T${clock}Z`) - first);
+    const report = (sent: string, step: ProvisioningStep, stage: string, readyAt: string) => {
+      setSystemTime(at(sent));
+      return setProvisioning(deps(), f.org.id, { state: "preparing", step, stage, expectedReadyAt: at(readyAt) });
+    };
+    const told = at("16:10:08.587").toISOString();
+    await report("16:05:05.889", "installing", "updating", "16:10:08.587");
+    await report("16:06:22.927", "installing", "restarting", "16:10:41.447");
+    await report("16:06:38.499", "installing", "network", "16:10:43.025");
+    await report("16:06:54.782", "installing", "firewall", "16:10:44.936");
+    await report("16:07:10.284", "installing", "apps", "16:10:51.961");
+    // Every stage is heard, with the first time.
+    expect(events.map((e) => [e.stage, e.expectedReadyAt])).toEqual(
+      ["updating", "restarting", "network", "firewall", "apps"].map((stage) => [stage, told]),
+    );
+    expect(events.at(-1)).toMatchObject({ secondsLeft: 178 });
+    setSystemTime(at("16:10:08.587"));
+    expect(await status()).toMatchObject({ expectedReadyAt: told, secondsLeft: 0 });
+    // Past it, the provisioner's time slides with the clock: no new time, nothing heard.
+    await report("16:11:07.677", "installing", "apps", "16:11:24.500");
+    expect(events).toHaveLength(5);
+    expect(await status()).toMatchObject({ expectedReadyAt: told, secondsLeft: -59 });
+    // The last step, still past the first time: it runs over until it is ready.
+    await report("16:11:30.630", "connecting", "connecting", "16:11:43.372");
+    expect(events.at(-1)).toMatchObject({ step: "connecting", expectedReadyAt: told, secondsLeft: -82 });
+    for (const answer of [...events, await status()]) expect(answer).not.toHaveProperty("secondsSteady");
+
+    // Waiting, then preparing again: a new wait, counted down to what it is told now. A part ending early brings the
+    // time forward at once; a later one is kept out again.
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    await report("16:12:00.000", "reserving", "ordering", "16:26:00.000");
+    expect(events.at(-1)).toMatchObject({ expectedReadyAt: at("16:26:00.000").toISOString(), secondsLeft: 840 });
+    await report("16:13:00.000", "reserving", "ordering", "16:25:00.000");
+    expect(events.at(-1)).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 720 });
+    const heardBefore = events.length;
+    await report("16:13:05.000", "reserving", "ordering", "16:25:30.000");
+    expect(events).toHaveLength(heardBefore);
+    expect((await status()).expectedReadyAt).toBe(at("16:25:00.000").toISOString());
+    // A report with no time is the same wait: its time stays, and a later one after it is still kept out.
+    setSystemTime(at("16:13:10.000"));
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", stage: "ordering" });
+    expect(await status()).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 710 });
+    await report("16:13:15.000", "reserving", "ordering", "16:26:00.000");
+    expect(events).toHaveLength(heardBefore);
+    expect(await status()).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 705 });
+    // Its computer taken away: a new wait too.
+    const { machineId } = await enrolled();
+    await revokeManagedMachine(deps(), f.org.id, machineId);
+    await report("16:14:00.000", "starting", "wiping", "16:29:00.000");
+    expect((await status()).expectedReadyAt).toBe(at("16:29:00.000").toISOString());
+  });
+
+  test("the ready time: the seconds left come from the server, a past one stays past, older words still read", async () => {
     f = await setup();
     const events = heard("machine.provisioning");
     const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id, true);
@@ -260,26 +422,14 @@ describe("external provisioning", () => {
     await report(new Date(Date.now() - 1000));
     expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect((await status()).secondsLeft).toBeLessThanOrEqual(-90);
-    // The provisioner's clock a little ahead of this one: its "now" arrives seconds in the future, and still is now.
+    // Nor does a time ahead start a countdown again: a provisioner's clock a little ahead of this one, or a new plan.
     await report(new Date(Date.now() + 10_000));
+    await report(new Date(Date.now() + 120_000));
     expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect(events.length).toBe(heardBefore);
-    // A time ahead replaces it.
-    const soon = new Date(Date.now() + 30_000);
-    await report(soon);
-    expect((await status()).expectedReadyAt).toBe(soon.toISOString());
-    const later = new Date(Date.now() + 120_000);
-    await report(later);
-    expect((await status()).expectedReadyAt).toBe(later.toISOString());
-
-    // An older provisioner's countdown is a time from now.
-    const sent = Date.now();
-    await report(undefined, 600);
-    const eta = Date.parse((await status()).expectedReadyAt ?? "");
-    expect(eta).toBeGreaterThanOrEqual(sent + 600_000);
-    expect(eta).toBeLessThanOrEqual(Date.now() + 600_000);
 
     // Only `preparing` has a time.
+    const later = new Date(Date.now() + 120_000);
     await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity", expectedReadyAt: later });
     expect(await status()).toMatchObject({
       state: "waiting",
@@ -297,6 +447,13 @@ describe("external provisioning", () => {
     expect((await status()).reason).toBe("capacity");
     await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
     expect((await status()).since).toBe(since);
+
+    // An older provisioner's countdown is a time from now, here the new wait's first.
+    const sent = Date.now();
+    await report(undefined, 600);
+    const eta = Date.parse((await status()).expectedReadyAt ?? "");
+    expect(eta).toBeGreaterThanOrEqual(sent + 600_000);
+    expect(eta).toBeLessThanOrEqual(Date.now() + 600_000);
   });
 
   test("the ready email is promised by a ready time over a minute ahead, waiting or a problem, until it is ready", async () => {
@@ -308,19 +465,24 @@ describe("external provisioning", () => {
         .where(eq(schema.machineProvisioning.orgId, orgId));
       return row?.emailWhenReady;
     };
-    const preparing = (seconds: number) =>
-      setProvisioning(deps(), f.org.id, {
+    const preparing = (seconds: number, orgId = f.org.id) =>
+      setProvisioning(deps(), orgId, {
         state: "preparing",
         step: "starting",
         expectedReadyAt: new Date(Date.now() + seconds * 1000),
       });
     await preparing(30);
     expect(await promised()).toBe(false);
+    // A later time within the same wait isn't what its people are told (they count down to the first), so it
+    // promises nothing either: the email still goes if the wait itself takes over a minute.
     await preparing(90);
-    expect(await promised()).toBe(true);
-    // Told once, kept: a later, shorter estimate doesn't take it back.
-    await preparing(10);
-    expect(await promised()).toBe(true);
+    expect(await promised()).toBe(false);
+    const later = (await createOrganization(f.db, (await addUser(f.db, "later")).id, { name: "later" })).organization;
+    await preparing(90, later.id);
+    expect(await promised(later.id)).toBe(true);
+    // Told once, kept: a shorter estimate doesn't take it back.
+    await preparing(10, later.id);
+    expect(await promised(later.id)).toBe(true);
     for (const state of ["waiting", "problem"] as const) {
       const other = await createOrganization(f.db, (await addUser(f.db, state)).id, { name: state });
       await setProvisioning(deps(), other.organization.id, { state });
@@ -421,6 +583,7 @@ describe("external provisioning", () => {
           type: "machine.provisioning",
           state: "ready",
           step: null,
+          stage: null,
           reason: null,
           since: expect.any(String),
           requestedAt: f.org.createdAt.toISOString(),
@@ -589,6 +752,143 @@ describe("external provisioning", () => {
     await hello(heldComputer.token);
     expect(await state(held.organization.id)).toBe("ready");
     expect(await queued(held.organization.id)).toEqual([]);
+  });
+
+  test("a workspace held, suspended or ended waits for no computer; active again, it is a request like any other", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const standings = heard("org.standing");
+    const nothing = {
+      mode: "external" as const,
+      state: null,
+      step: null,
+      stage: null,
+      reason: null,
+      since: null,
+      requestedAt: null,
+      expectedReadyAt: null,
+      specs: null,
+      secondsLeft: null,
+      secondsWaited: null,
+      notifyByEmail: true,
+      machineId: null,
+    };
+    // Waiting for capacity, then ended before any computer came: the wait goes, and its people are told of none
+    // (their apps ask again on `org.standing`).
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    expect(await waitState()).toBe("waiting");
+    const end = { state: "hold", reason: "ended", notice: "shown" } as const;
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(await waitState()).toBeNull();
+    expect(standings.at(-1)).toMatchObject({ type: "org.standing", state: "hold" });
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id, true)).toEqual(nothing);
+    // Nothing reported before it was held either: no wait to tell of.
+    const bia = await addUser(f.db, "bia");
+    const other = (await createOrganization(f.db, bia.id, { name: "Other" })).organization.id;
+    await setOrgStanding(deps(), other, end);
+    expect(await computerSetup(f.db, "external", bia.id, other, true)).toEqual(nothing);
+    // A report sent as it was held is refused, so nothing says a computer is on its way again.
+    const late = await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" }).catch((e) => e);
+    expect(late).toBeInstanceOf(OrgPausedError);
+    expect(late).toMatchObject({ code: "org.paused" });
+    expect(await waitState()).toBeNull();
+
+    // Active again: a request like any other, waiting again, and its reports count.
+    await setOrgStanding(deps(), f.org.id, { state: "active", reason: "reactivated", notice: "shown" });
+    expect(await requested()).toEqual(["Acme"]);
+    expect((await page()).requests[0]?.provisioning).toBeNull();
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({
+      state: "preparing",
+      since: null,
+    });
+    expect(await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" })).toBe(true);
+
+    // A ready computer stays ready while its workspace is held or suspended; taken away then, no wait starts.
+    const { machineId, token } = await enrolled();
+    await hello(token);
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({ state: "ready", machineId });
+    await setOrgStanding(deps(), f.org.id, { state: "suspended", reason: "Abuse", notice: "silent" });
+    expect(await waitState()).toBe("ready");
+    expect(await revokeManagedMachine(deps(), f.org.id, machineId)).toBe(true);
+    expect(await waitState()).toBeNull();
+    expect(events.at(-1)).toMatchObject({ type: "machine.provisioning", state: null, since: null, machineId: null });
+    expect(await requested()).toEqual([]);
+    await setOrgStanding(deps(), f.org.id, { state: "active", reason: "Reviewed", notice: "silent" });
+    expect(await requested()).toEqual(["Acme"]);
+  });
+
+  test("a report sent as the workspace is held never brings the wait back", async () => {
+    f = await setup();
+    const waiting = { state: "waiting", reason: "capacity" } as const;
+    await setProvisioning(deps(), f.org.id, waiting);
+    let read = () => {};
+    const readIt = new Promise<void>((resolve) => {
+      read = resolve;
+    });
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // The report has read the workspace active when the hold comes, and writes once the hold is done or after a
+    // moment it holds the hold up: either the hold drops what the report wrote, or it waits for the report to.
+    const report = setProvisioning({ ...deps(), db: readThenWait(f.db, read, gate) }, f.org.id, waiting).catch(
+      (e) => e,
+    );
+    await readIt;
+    const hold = setOrgStanding(deps(), f.org.id, { state: "hold", reason: "ended", notice: "shown" });
+    await Promise.race([hold, Bun.sleep(200)]);
+    release();
+    await Promise.all([report, hold]);
+    expect(await waitState()).toBeNull();
+  });
+
+  test("a hold that can't drop the wait isn't set: nothing is left half done for a retry to finish", async () => {
+    f = await setup();
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    // The drop fails as a full disk would make it.
+    await f.db.execute(
+      sql.raw("create function refuse_delete() returns trigger language plpgsql as $$ begin raise 'disk full'; end $$"),
+    );
+    await f.db.execute(
+      sql.raw(
+        "create trigger refuse before delete on machine_provisioning for each row execute function refuse_delete()",
+      ),
+    );
+    const suspend = { state: "suspended", reason: "Abuse", notice: "silent" } as const;
+    await expect(setOrgStanding(deps(), f.org.id, suspend)).rejects.toThrow();
+    const [org] = await f.db
+      .select({ standing: schema.organizations.standing })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, f.org.id));
+    expect(org?.standing).toBe("active");
+    expect(await waitState()).toBe("waiting");
+    await f.db.execute(sql.raw("drop trigger refuse on machine_provisioning"));
+    expect(await setOrgStanding(deps(), f.org.id, suspend)).toMatchObject({ state: "suspended" });
+    expect(await waitState()).toBeNull();
+  });
+
+  test("the migration drops the waits of workspaces that weren't active before the server did it itself", async () => {
+    f = await setup();
+    const org = async (name: string, standing: "active" | "hold" | "suspended", state: string) => {
+      const made = await createOrganization(f.db, (await addUser(f.db, name.toLowerCase())).id, { name });
+      const orgId = made.organization.id;
+      await f.db.update(schema.organizations).set({ standing }).where(eq(schema.organizations.id, orgId));
+      await f.db.insert(schema.machineProvisioning).values({ orgId, state });
+      return orgId;
+    };
+    const waiting = await org("Waiting", "active", "waiting");
+    const ended = await org("Ended", "hold", "waiting");
+    const retired = await org("Retired", "hold", "preparing");
+    const closed = await org("Closed", "suspended", "problem");
+    const kept = await org("Kept", "hold", "ready");
+    await runMigration(f.db, "idle_provisioning");
+    await runMigration(f.db, "idle_provisioning");
+    const rows = await f.db
+      .select({ orgId: schema.machineProvisioning.orgId, state: schema.machineProvisioning.state })
+      .from(schema.machineProvisioning);
+    expect(Object.fromEntries(rows.map((r) => [r.orgId, r.state]))).toEqual({ [waiting]: "waiting", [kept]: "ready" });
+    for (const gone of [ended, retired, closed]) expect(rows.some((r) => r.orgId === gone)).toBe(false);
   });
 
   test("people see it without its insides and can't remove it; the provisioner can", async () => {
