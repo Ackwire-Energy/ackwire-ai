@@ -10,6 +10,7 @@ import {
   type PushSender,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { unplainLeaves } from "../../i18n/test/plain-marks";
 import {
   addChannelMember,
   approvalIsHighRisk,
@@ -27,6 +28,7 @@ import {
   openDm,
   PUSH_ACTIVE_DELAY_MS,
   PUSH_RECEIPTS_DELAY_MS,
+  PUSH_STRINGS,
   postPersonMessage,
   pushLocale,
   pushTicketsOf,
@@ -96,6 +98,18 @@ describe("push text", () => {
     expect(pushLocale("pt_PT")).toBe("pt-BR");
     expect(pushLocale("en-US")).toBe("en");
     expect(pushLocale(null)).toBe("en");
+  });
+
+  test("no semicolon, no em dash in any push, as the phone shows it", () => {
+    const shown = Object.fromEntries(
+      Object.entries(PUSH_STRINGS).map(([locale, words]) => [
+        locale,
+        Object.fromEntries(
+          Object.entries(words).map(([key, w]) => [key, typeof w === "function" ? w("Ana", "Acme") : w]),
+        ),
+      ]),
+    );
+    expect(unplainLeaves(shown)).toEqual([]);
   });
 
   test("kinds render short friendly text; high-risk approvals only say to open the app", () => {

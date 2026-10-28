@@ -22,7 +22,7 @@ import {
   useRuleParse,
 } from "@agenteschat/client";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
-import { formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
+import { capitalize, formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -464,9 +464,12 @@ function useRunWords() {
     label: (r: Routine) => {
       const runs = runPixels(r.recentRuns).slice(0, RUN_SLOTS);
       if (runs.length === 0) return t("routines.stripNone");
-      return t("routines.stripLabel", {
-        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join("; "),
+      // A sentence per run. The first follows the label's colon, so only the others start with a capital.
+      const list = runs.map((x, i) => {
+        const when = whenAt(t, i18n.language, x.at);
+        return `${i > 0 ? capitalize(when, i18n.language) : when}: ${t(`routines.statusWord.${x.status}`)}`;
       });
+      return t("routines.stripLabel", { list: list.join(". ") });
     },
   };
 }

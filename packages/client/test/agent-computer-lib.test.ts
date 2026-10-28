@@ -331,7 +331,7 @@ describe("the entry's status line, first match wins", () => {
     // Waiting for a computer, in the words every screen says it; "we'll email you" only where it was promised (owners).
     expect(line({ kind: "waiting" })).toBe("computerSetup.status.capacity");
     expect(line({ kind: "waiting" }, { emailPromised: true })).toBe(
-      "computerSetup.status.capacity · computerSetup.email.short",
+      "computerSetup.status.capacity. computerSetup.email.short",
     );
     expect(line({ kind: "problem" })).toBe("agentComputer.status.problem");
     // The Cloud's computer isn't answering; a self-hoster's is offline since a time.

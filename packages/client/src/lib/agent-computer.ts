@@ -13,6 +13,7 @@ import {
 import { clockAt, lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
 import { type ComputerKind, type ComputerState, computerKind, isPaused } from "./machines";
+import { endSentence } from "./text";
 
 /*
  * The agent's computer as one entry and one dialog, on the web and the phone: what its status line says
@@ -161,7 +162,7 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
         : t("agentComputer.status.preparingPlain");
     case "waiting":
       return w.emailPromised
-        ? `${t("computerSetup.status.capacity")} · ${t("computerSetup.email.short")}`
+        ? `${endSentence(t("computerSetup.status.capacity"))} ${t("computerSetup.email.short")}`
         : t("computerSetup.status.capacity");
     case "problem":
       return t("agentComputer.status.problem");

@@ -135,15 +135,21 @@ export function refusalText(
   refusal: { status: number; code?: string | null } & Pick<RestrictionFacts, "kind" | "cloud">,
 ): string {
   if (refusal.code === HUMAN_CHECK_BLOCKED) return t("mobile.humanCheck.blocked");
+  // Better Auth's own limit, in the words the web's sign-in uses. The API's limits are `knownErrorText`'s.
+  if (refusal.status === 429 && !(refusal instanceof ApiError)) return t("auth.tooManyTries");
   const { kind, cloud } = refusal;
   const error =
     refusal instanceof ApiError ? refusal : new ApiError(refusal.status, refusal.code ?? "", "", { kind, cloud });
-  return knownErrorText(t, error) ?? t(refusal.status === 429 ? "auth.tooManyTries" : "mobile.auth.errors.generic");
+  return knownErrorText(t, error) ?? t("mobile.auth.errors.generic");
 }
 
 /** A failed call to the app's API in the phone's words: the server's refusal, else no connection. */
 export const failureText = (t: TFunction, error: unknown) =>
   error instanceof ApiError ? refusalText(t, error) : t("mobile.auth.errors.network");
+
+/** The sign-in's e-mail step: any limit in the sign-in's own words, as the web's sign-in says it. */
+export const lookUpFailureText = (t: TFunction, error: unknown) =>
+  error instanceof ApiError && error.status === 429 ? t("auth.tooManyTries") : failureText(t, error);
 
 /** Better Auth's answer as a refusal `withHumanCheck` reads (its status and code on top), or null when it passed. */
 export const refusalOf = ({ error }: { error: ({ status: number; code?: string } & RestrictionFacts) | null }) =>

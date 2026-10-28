@@ -17,6 +17,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
@@ -257,8 +258,8 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 /**
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
  * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), or the
- * wait for a computer, with "avisamos por e-mail" for owners, and the faces of the agents that wait for it, each
- * named by its label. Everyone sees it; closed, it stays closed until the state (or the step) changes.
+ * wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents that wait for it,
+ * each named by its label. Everyone sees it; closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
@@ -274,15 +275,16 @@ export function ComputerSetupNotice() {
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
-  const line = [
+  const data = [
     view.step
       ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
       : t(view.textKey),
     eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
-    view.phase === "waiting" && email && reader.owner ? t("computerSetup.email.short") : null,
   ]
     .filter(Boolean)
     .join(" · ");
+  const line =
+    view.phase === "waiting" && email && reader.owner ? `${endSentence(data)} ${t("computerSetup.email.short")}` : data;
   return (
     <section className="outages" aria-label={t("computerSetup.notice.label")}>
       <div className="outage setup-notice" role="status" data-phase={view.phase}>

@@ -1326,7 +1326,7 @@ function Standing({
                   : null;
             })
             .filter(Boolean)
-            .join("; ");
+            .join(", ");
           return (
             <div key={s.agentId} className="forum-ag">
               <SeatAvatar seat={{ type: "agent", id: s.agentId }} size="sm" mode={agentMode(topic, s.agentId, next)} />

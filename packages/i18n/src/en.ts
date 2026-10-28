@@ -43,6 +43,7 @@ export const en: Translations = {
     yesterday: "Yesterday",
     loadFailed: "Couldn't load this. Check your connection and try again.",
     notAllowed: "You don't have permission for this. Ask an organization admin.",
+    tooMany: "Too many tries. Try again later.",
   },
   roles: {
     owner: "Owner",
@@ -215,7 +216,7 @@ export const en: Translations = {
       approvedEmail: "To finish, open the invitation we sent to {{email}}.",
       approvedNoEmail: "An admin will send you a link to finish.",
       deniedTitle: "Your request wasn't approved",
-      deniedText: "If you think it's a mistake, ask someone at {{org}} to invite you by email.",
+      deniedText: "If you think it's a mistake, ask someone at {{org}} to invite you.",
       reason: "Their note: “{{reason}}”",
       reasonSaid: "<b>Their note:</b> “{{reason}}”",
       closedTitle: "This link no longer works",
@@ -509,7 +510,7 @@ export const en: Translations = {
         plan: "We read the files but couldn't compare them with the workspace. Try again.",
         offline: "No internet. Check your connection and try again.",
         tooBig: "That's too much for one import (up to 32 MB). Bring it in parts, one agent or one folder at a time.",
-        apply: "Couldn't finish the import. What arrived stays here; try again to bring the rest.",
+        apply: "Couldn't finish the import. What arrived stays here, and trying again brings the rest.",
         tooMany: "That's too many items at once. Uncheck some, import, then bring the rest.",
       },
     },
@@ -569,7 +570,7 @@ export const en: Translations = {
     keyFromOther: "Is it from another provider?",
     anthropicWorkspace: "Claude Console workspace ID",
     anthropicWorkspaceHelp: "Only for a key that works in more than one workspace. The ID starts with wrkspc_.",
-    platformKeyDesc: "No key of your own: agents use the agentes.chat key. You see each agent's cost.",
+    platformKeyDesc: "No key of your own: agents use this server's Claude key. You see each agent's cost.",
     computer: {
       title: "Where will we work?",
       lead: "Agents work on a computer, and sensitive actions still ask for your approval.",
@@ -577,14 +578,14 @@ export const en: Translations = {
       cloudDesc: "An isolated computer for each agent, on Daytona.",
       cloudReady: "Daytona sandboxes on: each agent gets its own.",
       mine: "Another computer",
-      mineDesc: "A Mac or another server, connected with a code.",
+      mineDesc: "A Mac, a PC or a server, connected with a code.",
       thisMac: "This {{device}}",
       thisMacDesc: "Only in the folders you allow.",
       thisMacConnecting: "Connecting this {{device}}…",
       thisMacConnected: "{{name}} connected. The chosen agents will work on this {{device}}.",
       thisMacFolders: "Choose folders",
       otherComputer: "Connect another computer",
-      connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
+      connected: "{{name}} ({{os}}) is connected. The chosen agents will use this computer.",
       hostReady: "The chosen agents will work on this server's computer.",
       hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
       leadCloud: "On a computer just for this workspace, always on.",
@@ -916,7 +917,6 @@ export const en: Translations = {
     detailsEmpty: "Nobody found for “{{q}}”.",
     topicLabel: "Channel description",
     topicPlaceholder: "What is this channel about?",
-    autoReply: "answers without a mention",
     noTopic: "No description",
     actions: "Actions for {{name}}'s message",
     helpful: "Helpful",
@@ -1052,7 +1052,7 @@ export const en: Translations = {
       saved: "Saved. Every agent without a plan thinks with it.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
-      platform: "agentes.chat",
+      platform: "This server",
     },
     wait: {
       signIn: "You sign in here as soon as the computer is ready.",
@@ -1344,7 +1344,7 @@ export const en: Translations = {
   },
   agentSecrets: {
     title: "Secrets",
-    help: "What people gave this computer. The value stays there; only the names show here.",
+    help: "What people gave this computer. Only the names show here. The values stay on the computer.",
     env: "environment variable",
     file: "file {{path}}",
     by: "{{person}} · {{time}}",
@@ -1611,7 +1611,7 @@ export const en: Translations = {
     },
     toast: {
       done: "Marked as done",
-      doneQuestion: "{{name}} is still waiting; the question stays in the conversation.",
+      doneQuestion: "{{name}} is still waiting. The question stays in the conversation.",
       doneApproval: "The request stays in Approvals.",
       undo: "Undo",
       readAll_one: "{{count}} marked as read",
@@ -1703,7 +1703,7 @@ export const en: Translations = {
       failed: "Failed",
       running: "Running",
     },
-    expiredLine: "Nobody decided within 24 h; nothing was done.",
+    expiredLine: "Nobody decided within 24 h, so nothing was done.",
     canceledLine: "The run stopped before a decision.",
     lesson: "{{name}} will keep it in mind: {{reason}}",
     again: "Ask again",
@@ -1770,7 +1770,6 @@ export const en: Translations = {
     subtitle: "{{role}} · answers to <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · no owner · {{model}} {{key}}",
     withOrgKey: "with the {{org}} key",
-    withPlatformKey: "with the agentes key",
     openIn: "Open in #{{channel}}",
     saveChanges: "Save changes",
     saved: "Saved",
@@ -1957,7 +1956,7 @@ export const en: Translations = {
         tools: "Tools",
         commands: "Commands",
       },
-      offlineCloud: "{{computer}} isn't answering. {{name}} answers again when it's back; we're on it.",
+      offlineCloud: "{{computer}} isn't answering. We're on it. {{name}} answers again when it's back.",
     },
     tabsLabel: "{{name}}'s sections",
     tabs: {
@@ -2196,12 +2195,11 @@ export const en: Translations = {
       channels: "Channels",
       computer: "Computer",
       danger: "Archive",
-      keySafe: "The key stays encrypted on the server; nobody sees it.",
+      keySafe: "The key stays encrypted on the server. Nobody sees it.",
       spentOf: "spent in {{month}}, of {{amount}}",
       spentOfDefault: "spent in {{month}}, of {{amount}} (workspace default)",
       used: "of the agent's budget used in {{month}}",
       usedDefault: "of the workspace default budget used in {{month}}",
-      budgetStats: "{{runs}} · {{tokens}} · {{who}} alerted at 80%.",
       budgetAlert: "{{who}} alerted at 80%",
       theAdmins: "admins",
       limit: "Monthly limit",
@@ -2301,7 +2299,7 @@ export const en: Translations = {
     waitingAdmin: "Waiting for an admin",
     stale: "Stale",
     staleError: "This proposal is stale: the text changed after it was made. The list was refreshed.",
-    staleNote: "The text changed after this proposal; it can no longer be accepted.",
+    staleNote: "The text changed after this proposal, so it can't be accepted anymore.",
     accepted: "Accepted",
     refused: "Refused",
     acceptedBy: "Accepted by {{name}} · {{when}}",
@@ -2379,7 +2377,7 @@ export const en: Translations = {
         agent: "Ada",
         desc: "Codes, reviews PRs and investigates bugs.",
         instructions:
-          "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs; for big changes opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review.",
+          "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs. For big changes, opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review.",
       },
       ops: {
         name: "Ops",
@@ -2393,7 +2391,7 @@ export const en: Translations = {
         agent: "Iris",
         desc: "Tests flows and reproduces reported bugs.",
         instructions:
-          "Reproduces every reported bug before opening a task. Writes clear steps and attaches evidence.\nIf it can't reproduce, first checks the errors, recent changes and related tasks; asks for the environment and version only if they aren't there.\nPrioritizes what blocks customers.",
+          "Reproduces every reported bug before opening a task. Writes clear steps and attaches evidence.\nIf it can't reproduce, first checks the errors, recent changes and related tasks. Asks for the environment and version only if they aren't there.\nPrioritizes what blocks customers.",
       },
       pm: {
         name: "PM",
@@ -2407,49 +2405,49 @@ export const en: Translations = {
         agent: "Nina",
         desc: "Answers customers and hands off what needs a person.",
         instructions:
-          "Before answering, looks up the customer's history, past conversations and the help center, and comes back with a ready reply and where it came from.\nIf it's a product problem, opens a task with the steps and tells the team; never promises a date or a fix that doesn't exist.\nMessages to customers, refunds and discounts only with approval.",
+          "Before answering, looks up the customer's history, past conversations and the help center, and comes back with a ready reply and where it came from.\nIf it's a product problem, opens a task with the steps and tells the team. Never promises a date or a fix that doesn't exist.\nMessages to customers, refunds and discounts only with approval.",
       },
       sales: {
         name: "Sales",
         agent: "Leo",
         desc: "Prepares proposals and follows up with leads.",
         instructions:
-          "Before talking to anyone, researches the company, the history with it and what was already agreed, and comes back with a summary and the next step.\nKeeps the list of leads up to date and reminds the team of what's stalled.\nNever makes up prices, discounts or terms: uses only what's in the price list; sending a proposal or email to a customer only with approval.",
+          "Before talking to anyone, researches the company, the history with it and what was already agreed, and comes back with a summary and the next step.\nKeeps the list of leads up to date and reminds the team of what's stalled.\nNever makes up prices, discounts or terms: uses only what's in the price list. Sends a proposal or email to a customer only with approval.",
       },
       marketing: {
         name: "Marketing",
         agent: "Mila",
         desc: "Plans campaigns, posts and website pages.",
         instructions:
-          "Starts by looking at what was already done, the results and the brand's voice before suggesting something new.\nWrites drafts of campaigns, posts and pages, with one main idea and who it's for.\nNever makes up numbers or testimonials; publishing on the website or social media only with approval.",
+          "Starts by looking at what was already done, the results and the brand's voice before suggesting something new.\nWrites drafts of campaigns, posts and pages, with one main idea and who it's for.\nNever makes up numbers or testimonials. Publishes on the website or social media only with approval.",
       },
       content: {
         name: "Content",
         agent: "Bento",
         desc: "Writes and edits texts, articles and newsletters.",
         instructions:
-          "Before writing, reads what already exists on the subject (wiki, documents, conversations) and confirms who the text is for.\nDelivers clear, short drafts with the sources at the end; when editing, explains what changed and why.\nNever makes up data or quotes; publishing or sending outside the team only with approval.",
+          "Before writing, reads what already exists on the subject (wiki, documents, conversations) and confirms who the text is for.\nDelivers clear, short drafts with the sources at the end. When editing, explains what changed and why.\nNever makes up data or quotes. Publishes or sends outside the team only with approval.",
       },
       data: {
         name: "Data",
         agent: "Dora",
         desc: "Answers questions with numbers and builds reports.",
         instructions:
-          "Gets the numbers from the source before answering and shows where they came from, the period and how it calculated them.\nIf the data isn't enough or looks wrong, says so instead of guessing; never makes up a number.\nEvery Monday, posts a summary of the week's main numbers.",
+          "Gets the numbers from the source before answering and shows where they came from, the period and how it calculated them.\nIf the data isn't enough or looks wrong, says so instead of guessing. Never makes up a number.\nEvery Monday, posts a summary of the week's main numbers.",
       },
       finance: {
         name: "Finance",
         agent: "Otto",
         desc: "Keeps track of payments, billing and spending.",
         instructions:
-          "Checks payments, billing and spending at the source before answering and shows amounts with the date and where they came from.\nFlags what's out of the ordinary: failing charges, spending above what's expected, invoices coming due.\nPayments, refunds and any money movement only with approval; never makes up amounts.",
+          "Checks payments, billing and spending at the source before answering and shows amounts with the date and where they came from.\nFlags what's out of the ordinary: failing charges, spending above what's expected, invoices coming due.\nPayments, refunds and any money movement only with approval. Never makes up amounts.",
       },
       people: {
         name: "People",
         agent: "Clara",
         desc: "Helps with hiring, onboarding and the team's questions.",
         instructions:
-          "Before answering, looks in the policies, the wiki and the team's documents, and says where it found the answer.\nOrganizes openings, interviews and new joiners' first days, with clear checklists.\nHandles personal data with care and shares it only with who needs it; messages to candidates only with approval.",
+          "Before answering, looks in the policies, the wiki and the team's documents, and says where it found the answer.\nOrganizes openings, interviews and new joiners' first days, with clear checklists.\nHandles personal data with care and shares it only with who needs it. Messages candidates only with approval.",
       },
       research: {
         name: "Research",
@@ -2478,7 +2476,7 @@ export const en: Translations = {
     handle: "In chat",
     handlePlaceholder: "iris",
     handleHelp: "Mention @{{handle}} to call it.",
-    handleEmpty: "Comes from the name; you can change it.",
+    handleEmpty: "Made from the name. You can change it.",
     look: "Look",
     shuffle: "Shuffle",
     optional: "optional",
@@ -2514,7 +2512,7 @@ export const en: Translations = {
     approverAdmins: "An admin approves.",
     skillsHelp: "Manuals {{name}} opens when needed.",
     channels: "Channels",
-    channelsHelp: "Joins now; you can call it in others later.",
+    channelsHelp: "Joins now. You can add it to other channels later.",
     noChannels: "You're not in any channel yet. You can add the agent to a channel later.",
     owner: "Owner",
     you: "{{name}} (you)",
@@ -2657,15 +2655,15 @@ export const en: Translations = {
     },
     link: {
       title: "Invitation link",
-      help: "Anyone with it can ask to join, and an admin approves each person · works until {{date}}",
+      help: "An admin approves each person who asks. Works until {{date}}.",
       make: "Make a link",
       turnOff: "Turn off",
       turnOffTitle: "Turn off the link?",
       turnOffText_zero: "Nobody new can ask with it.",
       turnOffText_one: "Nobody new can ask with it, and the request made through it closes too.",
       turnOffText_other: "Nobody new can ask with it, and the {{count}} requests made through it close too.",
-      earlier: "Earlier link · made {{when}} by {{name}} · works until {{date}}",
-      earlierNoName: "Earlier link · made {{when}} · works until {{date}}",
+      earlier: "Earlier link, made by {{name}} {{when}}. Works until {{date}}.",
+      earlierNoName: "Earlier link, made {{when}}. Works until {{date}}.",
       emailsJoin: "People you invite by email join directly.",
     },
     ownerLine: "Owner: {{name}}",
@@ -2741,7 +2739,7 @@ export const en: Translations = {
     },
     calendar_write: {
       label: "Propose events",
-      description: "Suggest events; the person asking confirms before any invitation.",
+      description: "Suggest events. The person asking confirms before any invitation.",
     },
     skills_read: {
       label: "Use skills",
@@ -2765,8 +2763,7 @@ export const en: Translations = {
     },
     sandbox_run: {
       label: "Run code",
-      description:
-        "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time.",
+      description: "Run code and skill scripts on the agent's computer. Files stay between conversations.",
     },
     browser_use: {
       label: "Use a browser",
@@ -2775,7 +2772,7 @@ export const en: Translations = {
     desktop_use: {
       label: "Use its desktop",
       description:
-        "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
+        "Use any app on its own desktop, on the agent's computer. People can watch and take control. It can run anything there, so it also needs Run code and that computer's desktop turned on.",
     },
     setup_write: {
       label: "Set up the workspace",
@@ -2785,7 +2782,7 @@ export const en: Translations = {
     github_git_read: {
       label: "Clone repositories (git)",
       description:
-        "Clone and update repositories on the agent's computer with git, through our proxy; the GitHub token never enters the machine.",
+        "Clone and update repositories on the agent's computer with git, through our proxy. The GitHub token never enters the machine.",
     },
     github_git_write: {
       label: "Push branches (git push)",
@@ -2828,7 +2825,7 @@ export const en: Translations = {
     movedDetail: "#{{number}} · {{title}}",
     column: "Column",
     flowHint:
-      "The task moves on its own: to the first column of In progress when an agent starts, of In review when it's ready to check, and of Done when you approve.",
+      "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve.",
     moreOptions: "More options",
     showCanceled: "Show canceled",
     canceledColumn: "Canceled",
@@ -2972,7 +2969,7 @@ export const en: Translations = {
       "{{name}} reads what it needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
-    asked: "Request sent. {{name}} posts progress here; your conversation stays in your DM.",
+    asked: "Request sent. {{name}} posts progress here. Your conversation stays in your DM.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     comment: "Comment on the task",
@@ -3142,7 +3139,7 @@ export const en: Translations = {
       },
       errors: {
         name: "Watch for new errors",
-        text: "Every hour; speaks only when there's a new error.",
+        text: "Every hour, only when there's a new error.",
         prompt:
           "Check the new Sentry errors since the last run. If there are any, summarize them and say where in the code they happen. If there's nothing new, don't send a message.",
         phrase: "every hour",
@@ -3173,7 +3170,7 @@ export const en: Translations = {
       save: "Save",
       saved: "Routine saved. {{next}}",
       savedNoNext: "Routine saved.",
-      utcHint: "This routine runs in UTC; use {{zone}} instead?",
+      utcHint: "This routine runs in UTC. Use {{zone}} instead?",
       keepUtc: "Keep UTC",
       adjust: "Adjust",
       next: "Next",
@@ -3258,7 +3255,7 @@ export const en: Translations = {
     access: {
       read: "Only look and tell",
       act: "Can act",
-      hint: "Only look and tell: it reads and tells what it found; to change anything, it asks someone. Can act: it can also create and update tasks, memory, the wiki and Drive files, and work on its own code. Changes in connected apps, merges and deploys always ask for approval first.",
+      hint: "Only look and tell: it reads and reports what it found. To change anything, it asks someone. Can act: it can also create and change tasks, memory, the wiki and Drive files, and work on its own code. Changes in connected apps, merges and deploys always ask for approval first.",
     },
     report: {
       always: "Every time",
@@ -3356,13 +3353,13 @@ export const en: Translations = {
     byAgent: "{{agent}} on {{computer}}",
     executor: {
       claude: "Claude Code",
-      claudeText: "Claude Code plans and codes on the computer; {{name}} follows and relays.",
+      claudeText: "Claude Code plans and codes on the computer. {{name}} follows and relays.",
       codex: "Codex (experimental)",
       codexText: "Codex codes on the computer. Still being tested.",
       agent: "{{name}} (the agent itself)",
       agentText: "{{name}} codes straight on the computer, with its own tools.",
     },
-    readOnlyNote: "You can read along; to ask for something, ask to take part.",
+    readOnlyNote: "You can read along. To ask for something, ask to take part.",
     items_one: "{{done}} of {{count}} item",
     items_other: "{{done}} of {{count}} items",
     itemsLabel_one: "{{done}} of {{count}} item done",
@@ -3403,7 +3400,6 @@ export const en: Translations = {
     },
     actions: {
       pause: "Pause",
-      pauseHint: "nothing new starts; what runs goes on",
       resume: "Resume",
       stop: "Stop",
       stopHint: "stops the running tasks and pauses",
@@ -3414,8 +3410,8 @@ export const en: Translations = {
       start: "The plan started",
       pause: "Mission paused: nothing new starts until you resume it.",
       resume: "Mission resumed",
-      stopped_one: "Stopped: {{count}} task canceled; the mission is paused.",
-      stopped_other: "Stopped: {{count}} tasks canceled; the mission is paused.",
+      stopped_one: "Stopped: {{count}} task canceled. The mission is paused.",
+      stopped_other: "Stopped: {{count}} tasks canceled. The mission is paused.",
       computer: "The mission now runs on {{name}}.",
     },
     commands: {
@@ -3615,8 +3611,8 @@ export const en: Translations = {
       releasing: "Allowing…",
       releasedResuming_one: "{{count}} command allowed · resuming the session",
       releasedResuming_other: "{{count}} commands allowed · resuming the session",
-      releasedQueued_one: "{{count}} command allowed · the session goes on when it can",
-      releasedQueued_other: "{{count}} commands allowed · the session goes on when it can",
+      releasedQueued_one: "{{count}} command allowed. The session goes on when it can.",
+      releasedQueued_other: "{{count}} commands allowed. The session goes on when it can.",
       releasePaused: "The mission is paused: resume it for the session to go on.",
       releaseClosed: "The mission is closed: the session won't go on.",
       onlyDeciders: "Only those who decide in this mission allow commands.",
@@ -3679,7 +3675,7 @@ export const en: Translations = {
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}",
       machine_task_interrupted: "“{{title}}” was interrupted on {{computer}} and didn't resume by itself",
       machine_access_requested:
-        "{{agent}} asked for the folder {{folder}} on {{computer}} — waiting for the answer on the computer",
+        "{{agent}} asked for the folder {{folder}} on {{computer}}. Waiting for the answer there.",
       machine_access_granted: "Allowed: {{agent}} can now use {{folder}} on {{computer}}",
       machine_access_denied: "Declined: {{agent}} won't use {{folder}} on {{computer}}",
       machine_access_expired: "The request for the folder {{folder}} on {{computer}} got no answer",
@@ -3725,7 +3721,7 @@ export const en: Translations = {
       decisionsSub: "Approved decisions",
       notesSub: "{{executor}}'s notes",
       synced: "synced {{when}}",
-      editedKept: "Edited on the computer — we kept the approved version",
+      editedKept: "Edited on the computer. We kept the approved version.",
       showDiff: "See the difference",
       hideDiff: "Hide the difference",
       diffLabel: "What changed in {{name}} on the computer",
@@ -3825,7 +3821,7 @@ export const en: Translations = {
     menu: {
       label: "Mission actions",
       pause: "Pause",
-      pauseHint: "Nothing new starts; what is running finishes.",
+      pauseHint: "Nothing new starts. What's running finishes.",
       resume: "Resume",
       resumeHint: "The queued tasks move again.",
       stop: "Stop now",
@@ -3833,7 +3829,7 @@ export const en: Translations = {
       share: "Share…",
       shareHint: "Bring someone in to see or decide.",
       close: "Close mission",
-      closeHint: "Ends the mission; nothing else runs.",
+      closeHint: "Ends the mission. Nothing else runs.",
       settings: "Mission settings…",
     },
     settings: {
@@ -3848,8 +3844,8 @@ export const en: Translations = {
       autonomy: {
         sub: "When the mission stops and asks you.",
         ex_always: "E.g. installing something or running the tests waits for you.",
-        ex_low_risk_auto: "E.g. running the tests goes on alone; deleting files outside the mission folder asks.",
-        ex_never: "E.g. installs, deletes and organizes without stopping; publishing still asks you.",
+        ex_low_risk_auto: "E.g. running the tests goes on alone, but deleting files outside the mission folder asks.",
+        ex_never: "E.g. installs, deletes and organizes without stopping, but publishing still asks you.",
         alwaysAsks: "Publishing and touching the main version always ask you.",
         stats: "In this mission: {{auto}} allowed automatically · {{asked}} asked · {{blocked}} blocked",
       },
@@ -3938,7 +3934,7 @@ export const en: Translations = {
     },
     share: {
       title: "Share mission",
-      text: "Whoever reads the conversation sees the mission; here you pick who can decide or comment.",
+      text: "Whoever reads the conversation sees the mission. Here you pick who can decide or comment.",
       search: "Search people",
       newRole: "Role for who joins",
       decide: "Can decide",
@@ -3960,9 +3956,9 @@ export const en: Translations = {
       done: "Done",
       handTitle: "Hand the mission to {{name}}?",
       handText:
-        "The computer doesn't change hands: {{executor}} keeps working on yours if you lend it; otherwise {{name}} picks a computer of their own.",
+        "The computer doesn't change hands. If you lend yours, {{executor}} keeps working on it. If not, {{name}} picks a computer of their own.",
       lend: "Keep using {{computer}}",
-      lendText: "{{name}} decides everything from now on; the work goes on on the agent's computer.",
+      lendText: "{{name}} decides everything from now on. The work continues on the agent's computer.",
       handNote: "You stay in the mission and can still decide.",
       handConfirm: "Hand to {{name}}",
       handed: "The mission is now {{name}}'s.",
@@ -4023,7 +4019,7 @@ export const en: Translations = {
     },
     notes: {
       archivedTitle: "Read only.",
-      archived: "Archived threads don't show in lists or search; unarchive to reply.",
+      archived: "Archived threads don't show in lists or search. Unarchive it to reply.",
       closed: "A closed thread reopens by itself when someone replies.",
     },
     empty: {
@@ -4043,7 +4039,7 @@ export const en: Translations = {
       created_one: "Thread created with {{count}} message",
       created_other: "Thread created with {{count}} messages",
       undone: "Undone: the thread was deleted and the channel is as it was.",
-      close: "Thread closed. In #{{channel}} it becomes one line; it reopens if someone replies.",
+      close: "Thread closed. It shows as one line in #{{channel}} and reopens if someone replies.",
       closeMany_one: "{{count}} thread closed",
       closeMany_other: "{{count}} threads closed",
       reopen: "Thread reopened",
@@ -4055,7 +4051,7 @@ export const en: Translations = {
       unarchive: "Thread unarchived",
       unarchiveMany_one: "{{count}} thread unarchived",
       unarchiveMany_other: "{{count}} threads unarchived",
-      move: "Taken out of the channel: the messages left #{{channel}}; a notice with the link stayed there.",
+      move: "The messages left #{{channel}}. A notice with the link stays there.",
       moveMany_one: "{{count}} range taken out of the channel",
       moveMany_other: "{{count}} ranges taken out of the channel",
       return: "Returned to the channel: the messages are back in #{{channel}}.",
@@ -4178,7 +4174,7 @@ export const en: Translations = {
       fromRange_other: "{{count}} messages from {{where}}",
       fromMessage: "Message from {{name}} in {{where}}",
       seeInChannel: "See in the channel",
-      movedHint: "Taken out of the channel; a notice stayed there",
+      movedHint: "Taken out of the channel, with a notice left there",
       peopleTitle: "Participants",
       people_one: "Participants · {{count}}",
       people_other: "Participants · {{count}}",
@@ -4263,7 +4259,6 @@ export const en: Translations = {
     upcoming: "Next",
     phrase: "Or type it",
     phrasePlaceholder: "E.g. every 2 weeks, Monday and Wednesday at 9am",
-    phraseUnknown: "Couldn't read that phrase; adjust it in the picker above.",
     s: {
       once: "Once, on {{date}}",
       minutely_one: "Every minute",
@@ -4599,8 +4594,7 @@ export const en: Translations = {
       nameLabel: "Name",
       renamed: "Now called {{label}}.",
       disconnectTitle: "Disconnect {{label}}?",
-      disconnectAgent:
-        "{{agent}} stops thinking with it and goes back to the API. {{computer}} signs out and deletes what it kept.",
+      disconnectAgent: "{{agent}} stops thinking with it. {{computer}} signs out and deletes what it kept.",
       disconnectAgents_one: "{{agents}} stops thinking with it. {{computer}} signs out and deletes what it kept.",
       disconnectAgents_other: "{{agents}} stop thinking with it. {{computer}} signs out and deletes what it kept.",
       disconnectNone: "{{computer}} signs out and deletes what it kept of it.",
@@ -4832,8 +4826,8 @@ export const en: Translations = {
       conversation: "A conversation",
     },
     track: {
-      label_one: "{{count}} agent turn; {{rounds}}",
-      label_other: "{{count}} agent turns; {{rounds}}",
+      label_one: "{{count}} agent turn, {{rounds}}",
+      label_other: "{{count}} agent turns, {{rounds}}",
       spoke: "Round {{round}} · {{name}} · {{stance}}",
       spokeNoStance: "Round {{round}} · {{name}}",
       person: "Round {{round}} · {{name}} joined",
@@ -4851,8 +4845,8 @@ export const en: Translations = {
       pending: "Round {{round}} · {{name}}'s turn",
       round: "Round {{n}}",
       roundShort: "R{{n}}",
-      key: "Each column is a turn, in the color of who spoke; its height is the length.",
-      keyLive: "The figure is who speaks now; the dots are the turns left.",
+      key: "Each column is a turn, in the color of who spoke. Its height is the turn's length.",
+      keyLive: "The figure is who speaks now. The dots are the turns left.",
       keyDone: "The wide block at the end is the synthesis.",
       keyClick: "Click to go to the turn.",
     },
@@ -4998,7 +4992,7 @@ export const en: Translations = {
       title: "Conclude the topic?",
       text: "Nobody starts a new turn. What was said becomes the synthesis.",
       finishes: "{{name}} finishes {{hers}} turn",
-      finishesSub: "It's their turn now; then nobody else speaks.",
+      finishesSub: "It's their turn now. After that, nobody else speaks.",
       nobody: "Nobody is writing now",
       nobodySub: "The synthesis starts right away.",
       writes: "{{name}} writes the synthesis",
@@ -5140,7 +5134,7 @@ export const en: Translations = {
       },
       question: "Question",
       questionPlaceholder: "E.g.: Move the outbox queue to LISTEN/NOTIFY?",
-      origin: "Origin: {{origin}} · the result goes back there",
+      origin: "From {{origin}}. The result goes back there.",
       format: "What comes out",
       goal: "Goal",
       goalPlaceholder: "E.g.: a decision with the risks and a rollout plan.",
@@ -5171,7 +5165,7 @@ export const en: Translations = {
       approvals: "Each turn is a normal run: approvals apply.",
       create: "Open topic",
       open: "Open forum",
-      created: "Topic opened. {{name}} speaks first; everyone in the organization can read it.",
+      created: "Topic opened. {{name}} speaks first. Everyone in the organization can read it.",
     },
     participantsDialog: {
       title: "Participants",
@@ -5241,7 +5235,7 @@ export const en: Translations = {
     label: "Photo",
     change: "Change photo",
     title: "Profile photo",
-    help: "Drag to frame it; the square is what shows.",
+    help: "Drag to frame it. The square is what shows.",
     pick: "Choose image",
     drop: "Drop an image here",
     dropHelp: "or click to choose (JPG, PNG or WebP, up to 8 MB)",
@@ -5260,7 +5254,7 @@ export const en: Translations = {
     add: "Upload logo",
     change: "Change logo",
     title: "Workspace logo",
-    help: "Drag to frame it; the square is what shows. A PNG with a transparent background works best.",
+    help: "Drag to frame it. The square is what shows. A PNG with a transparent background works best.",
     remove: "Remove logo",
     saved: "Logo updated.",
     removed: "Logo removed.",
@@ -5410,7 +5404,7 @@ export const en: Translations = {
     topReadsEmpty: "When agents use the wiki to answer, the pages they read most show up here.",
     last7Days: "last 7 days",
     openGraph: "See the graph",
-    graphText: "Each dot is a page; each line, a [[link]]. Click to open.",
+    graphText: "Each dot is a page and each line a [[link]]. Click to open.",
     graphAgents: "Written by agents",
     legend: { people: "People", agents: "Agents", obsidian: "Obsidian" },
     blankPage: "Blank page",
@@ -5540,7 +5534,7 @@ export const en: Translations = {
     },
     save: "Save to wiki",
     saveTitle: "Save to wiki",
-    saveText: "Choose the page or create one; the text goes at the end, with a link to the conversation.",
+    saveText: "Choose the page or create one. The text goes at the end, with a link to the conversation.",
     savePick: "Page",
     saveNew: "Create the page {{title}}",
     savedTo: "Saved to {{title}}.",
@@ -5668,8 +5662,6 @@ export const en: Translations = {
     modelLabel: "Model",
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",
-    fallback: "If the computer isn't available, answer through the API",
-    fallbackHint: "Uses {{name}}'s budget. Off: {{name}} says so and answers when the computer is back.",
     hidden: "{{owner}} or an admin chooses who thinks.",
     hiddenAdmins: "Only admins choose who thinks.",
     summary: {
@@ -5680,7 +5672,7 @@ export const en: Translations = {
     },
     mission: {
       modelLabel: "Model",
-      modelHint: "It can change any time; it applies from the next step.",
+      modelHint: "You can change it any time. It applies from the next step.",
       saved: "Model: {{model}}",
     },
   },
@@ -5730,7 +5722,7 @@ export const en: Translations = {
     target: {
       label: "Computer",
       offlineName: "{{name}} (offline)",
-      offlineText: "Offline now; the agent says so until it's back",
+      offlineText: "Offline now. The agent says so until it's back",
       connectHint: "Connect a computer of yours",
       none: "No computer",
       noneText: "Doesn't run programs or keep files",
@@ -5755,7 +5747,7 @@ export const en: Translations = {
     enabled: "Agents can use Daytona sandboxes",
     enabledHelp: "Off, only people with a computer of their own can run code.",
     internet: "Internet",
-    internetHelp: "What a sandbox reaches outside. Allow only the sites you need (up to 100; use *. for subdomains).",
+    internetHelp: "What a sandbox reaches outside. Allow only the sites you need, up to 100. Use *. for subdomains.",
     noInternet: "No internet.",
     addDomain: "Add site",
     add: "Add",
@@ -5819,14 +5811,14 @@ export const en: Translations = {
       issues: { read: "Reads tasks.", write: "Reads, creates and updates tasks." },
       calendar: {
         read: "Sees the calendar and free time.",
-        write: "Sees the calendar and proposes events; the requester confirms.",
+        write: "Sees the calendar and proposes events. The person who asked confirms.",
       },
       wiki: { read: "Searches and reads the wiki.", write: "Reads the wiki and edits it when someone asks." },
       skills: { read: "Uses the skills turned on for the agent." },
       schedule: { write: "Creates reminders and routines for whoever asked." },
       forum: { write: "Opens topics, reads and posts in the forum." },
-      sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
-      browser: { write: "Browses websites in its own browser on its computer; logins stay per agent." },
+      sandbox: { write: "Runs code on the agent's computer." },
+      browser: { write: "Browses websites in its own browser, on its computer. Logins are kept per agent." },
       setup: { write: "Offers to connect an AI and creates channels for whoever asked." },
       desktop: {
         write:
@@ -5846,7 +5838,7 @@ export const en: Translations = {
     seeVersions: "See versions",
     delete: "Delete file",
     deleteTitle: "Delete “{{title}}”?",
-    deleteBody: "It goes to the trash for 30 days; messages that cite it show “File removed”.",
+    deleteBody: "It stays in the trash for 30 days. Messages that cite it show “File removed”.",
     deleteConfirm: "Delete",
     deleteForbidden:
       "Only whoever created it, whoever asked the agent, the agent's owner or an admin can delete this file.",
@@ -5859,7 +5851,7 @@ export const en: Translations = {
     deletedMany_other: "{{count}} files deleted",
     deleteManyTitle_one: "Delete {{count}} file?",
     deleteManyTitle_other: "Delete {{count}} files?",
-    purged: "It's been more than 30 days in the trash; it can't be restored.",
+    purged: "It was in the trash for more than 30 days, so it can't be restored.",
     removedFile: "File removed",
     trash: "Trash",
     trashTitle: "Drive trash",
@@ -6109,7 +6101,7 @@ export const en: Translations = {
     suspended: "Suspended on GitHub",
     remove: "Remove",
     removeName: "Remove {{account}}",
-    removed: "{{account}} removed. It stays installed on GitHub; uninstall it there if you want.",
+    removed: "{{account}} removed. It stays installed on GitHub. Uninstall it there if you want.",
     installed: "GitHub app installed.",
   },
   repos: {
@@ -6156,7 +6148,7 @@ export const en: Translations = {
     truncated: "Some accounts have too many repositories to list here: search by name.",
     realTitle: "The repositories are enforced.",
     realText:
-      "Outside the list, {{name}} doesn't download or send code and doesn't open PRs; it says so in the chat and shows who can allow it.",
+      "Outside the list, {{name}} doesn't download or send code or open PRs. It says so in the chat and shows who can allow it.",
     allow: "Allow {{repo}}",
     deniedRun: "{{repo}} isn't one of {{name}}'s repositories.",
     added: "{{repo}} joins the list when you save.",
@@ -6165,7 +6157,7 @@ export const en: Translations = {
     title: "Connectors",
     add: "Add connector",
     addTitle: "Add connector",
-    catalogText: "Connect once for {{org}}; then choose what each agent can use.",
+    catalogText: "Connect once for {{org}}. Then choose what each agent can use.",
     catalog: "Available connectors",
     categories: "Categories",
     category: {
@@ -6297,7 +6289,7 @@ export const en: Translations = {
     toolsName: "{{name}} tools",
     connect: "Connect",
     apiKey: "API key",
-    apiKeyHelp: "Encrypted on the server; nobody sees it afterwards.",
+    apiKeyHelp: "Stored encrypted on the server. Nobody sees it again.",
     apiKeyInvalid: "Paste the API key (at least 8 characters).",
     serverUrl: "MCP server address",
     serverUrlHelp: "The https address of the MCP server {{org}} uses.",
@@ -6307,9 +6299,9 @@ export const en: Translations = {
     disconnectName: "Disconnect {{name}}",
     disconnectTitle: "Disconnect {{name}}?",
     disconnectText_one:
-      "{{count}} agent loses access right away. To come back, just connect again; permissions don't come back on their own.",
+      "{{count}} agent loses access right away. You can connect again later, but its permissions don't come back on their own.",
     disconnectText_other:
-      "{{count}} agents lose access right away. To come back, just connect again; permissions don't come back on their own.",
+      "{{count}} agents lose access right away. You can connect again later, but their permissions don't come back on their own.",
     disconnectTextNone: "No agent uses it now. To come back, just connect again.",
     disconnected: "{{name}} disconnected.",
     connectedToast: "{{name}} connected.",
@@ -6519,7 +6511,7 @@ export const en: Translations = {
     acceptAll: "Accept the suggestions",
     accepted_one: "{{count}} suggestion accepted",
     accepted_other: "{{count}} suggestions accepted",
-    suggestion: "Suggestion: <b>{{level}}</b> — {{reason}}",
+    suggestion: "Suggestion: <b>{{level}}</b> ({{reason}})",
     ok: "OK",
     confirm: "Confirm {{name}}",
     moved: "“{{name}}” moved to {{subject}}",
@@ -6567,7 +6559,7 @@ export const en: Translations = {
     sensitive: "Sensitive action: it can only ask for approval or be off.",
     reason: {
       reads_only: "it only looks at numbers, changes nothing",
-      changes_undoable: "it changes things, but deletes nothing and spends no money",
+      changes_undoable: "it deletes nothing and spends no money",
       replaces_data: "it replaces data that already exists",
       copies_only: "it copies without deleting anything",
       spends_money: "it can spend money",
@@ -6640,7 +6632,7 @@ export const en: Translations = {
     nameHelp: "How the database shows for you and for the agents.",
     namePlaceholder: "E.g.: Production",
     url: "Database address",
-    urlHelp: "Starts with postgres://. Stored encrypted on the server; nobody sees it again, not even the agents.",
+    urlHelp: "Starts with postgres://. Stored encrypted on the server. Nobody sees it again, not even the agents.",
     urlPlaceholder: "postgres://user:password@server:5432/database",
     urlInvalid: "Paste an address that starts with postgres://, or fill in the fields under Advanced.",
     howTitle: "How do I create a read-only user?",
@@ -6768,7 +6760,7 @@ export const en: Translations = {
     addressPlaceholder: "you@company.com",
     addressInvalid: "Type a valid email, like you@company.com.",
     password: "App password",
-    passwordHelp: "Encrypted on the server; nobody sees it again.",
+    passwordHelp: "Stored encrypted on the server. Nobody sees it again.",
     passwordInvalid: "Paste the app password.",
     whatIs: "What is an app password?",
     whatIsText:
@@ -6825,7 +6817,7 @@ export const en: Translations = {
       search: { name: "Search email", text: "Looks by sender, subject or text." },
       read: { name: "Read email", text: "Opens an email or a conversation, without marking it read." },
       folders: { name: "See folders", text: "Lists the mailbox's folders." },
-      draft: { name: "Create a draft", text: "Leaves a draft in the mailbox; never sends." },
+      draft: { name: "Create a draft", text: "Leaves a draft in the mailbox. Never sends." },
       organize: { name: "Organize", text: "Moves, flags and archives email." },
       send: { name: "Send", text: "A new email." },
       reply: { name: "Reply", text: "Answers in the same conversation." },
@@ -6861,7 +6853,7 @@ export const en: Translations = {
       help: "One row per {{org}} mailbox.",
       none: "{{org}} hasn't connected any email yet.",
       levelText: {
-        read: "Searches and reads email; nothing changes in the mailbox.",
+        read: "Searches and reads email. Nothing changes in the mailbox.",
         write: "Reads, drafts and organizes. Sending, replying and forwarding ask for approval.",
       },
       canDelete: "Can delete email",
@@ -6897,7 +6889,7 @@ export const en: Translations = {
       sendWithoutAskingHelp: "Only to the people in “Only send to”, up to the daily limit.",
       sendWithoutAskingLocked: "Fill in “Only send to” first. Without that list, every send asks for approval.",
       from: "Send as",
-      fromHelp: "Automatic: replies from the address the email was sent to; new emails go out from {{address}}.",
+      fromHelp: "Automatic: replies go out from the address the email was sent to. New emails go out from {{address}}.",
       fromAuto: "Automatic",
     },
     list: {
@@ -6959,11 +6951,11 @@ export const en: Translations = {
   errors: {
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
-      full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you by email.",
+      full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you.",
       rateLimited: "Too many requests from here. Try again in an hour.",
       linkBusy: "Many people asked through this link in the last hour. Try again later.",
       member: "You're already in this workspace.",
-      denied: "Your request wasn't approved. Ask someone there to invite you by email.",
+      denied: "Your request wasn't approved. Ask someone there to invite you.",
       answered: "Someone already answered this request.",
       expired: "This request expired: nobody answered it in 14 days.",
       codeWrong: "Wrong code. Try again.",
@@ -7006,11 +6998,11 @@ export const en: Translations = {
       notYourComputer: "Pick a computer you connected.",
       needsComputer: "The mission needs a computer to go on.",
       unavailable: "Missions aren't available on this server.",
-      machineChanged: "The mission's computer changed; try again.",
+      machineChanged: "The mission's computer changed. Try again.",
       executorUnavailable: "That way of programming isn't installed on the mission's computer.",
       executorOutdated: "Codex on that computer is too old: update it there.",
       invalidExecutor: "Choose who programs: Claude Code, Codex or the agent.",
-      rateLimited: "The mission did too much in the last hour; wait a little.",
+      rateLimited: "The mission did too much in the last hour. Wait a little and try again.",
       pausedStuck: "The mission paused because it stopped moving forward.",
     },
     thread: {
@@ -7166,7 +7158,7 @@ export const en: Translations = {
       ownFolder: "Each agent's folder",
       ownFolderText: "Always. An agent doesn't see another's.",
       noFolders: "No extra folders. Each agent only uses its own folder.",
-      noReport: "This computer hasn't said what it allows yet. Update the agentes app on it.",
+      noReport: "This computer hasn't said what it allows yet. Update agentes.chat on it.",
       hidden: "Only admins and whoever connected it see this computer's folders and tools.",
       nobody: "No agent uses it yet",
       usedBy: "Who uses {{folder}}",
@@ -7272,7 +7264,7 @@ export const en: Translations = {
       none: "No other computer can run these agents right now. Connect another computer or wait for this one to come back.",
       on: "On",
       cloud: "Daytona sandbox",
-      cloudText: "An isolated computer on Daytona; the repository comes from GitHub",
+      cloudText: "An isolated computer on Daytona, with the repository from GitHub",
       has: "Has {{brains}}",
       block: {
         offline: "Offline right now",
@@ -7422,7 +7414,7 @@ export const en: Translations = {
       usage: "{{percent}} of the budget used this month",
       keys_one: "{{count}} key",
       keys_other: "{{count}} keys",
-      platformKey: "Using the agentes.chat key",
+      platformKey: "Using this server's key",
       noKeys: "No keys yet",
       plans_one: "{{count}} plan",
       plans_other: "{{count}} plans",
@@ -7444,7 +7436,6 @@ export const en: Translations = {
     keysSubtitle: "Encrypted on the server and never shown in the browser. Agents use the key you choose.",
     keyEndsIn: "Ends in {{hint}}",
     keyAdded: "Added {{when}}",
-    defaultKey: "Pays for the router and summaries",
     makeDefault: "Make default",
     addKey: "Add key",
     addKeyTitle: "Add an API key",
@@ -7464,7 +7455,7 @@ export const en: Translations = {
     removeText:
       "The key is gone for good. If an agent still uses it, the server refuses: change those agents' key first.",
     noKeys: "No keys yet.",
-    platformAvailable: "The agentes key is also available on this server.",
+    platformAvailable: "This server's Claude key is also available.",
     usageTitle: "API spend by kind",
     usageAgentLine: "{{spent}} of {{budget}}",
     usageAgentLineDefault: "{{spent}} of {{budget}} (workspace default)",
@@ -7473,7 +7464,7 @@ export const en: Translations = {
     defaultBudgetSaved: "Default budget saved.",
     defaultBudget: "Monthly budget per agent (US$)",
     defaultBudgetHelp:
-      "Every agent without a budget of its own uses this one; change an agent's own budget on its page. Only admins see amounts; members see percentages.",
+      "Agents without a budget of their own use this one. Change an agent's own budget on its page. Admins see amounts, members see percentages.",
     usageTotal: "{{amount}} in total since {{since}}",
     kinds: { agent: "Agents", router: "Router", embedding: "Search", summary: "Summaries", sandbox: "Sandbox" },
     usageCalls_one: "{{count}} call",
@@ -7517,7 +7508,7 @@ export const en: Translations = {
       sharedWith: "shared with {{names}}",
       part: "{{name}}'s part: ≈ {{percent}}",
       estimate:
-        "{{name}}'s part is the stronger stretch of each bar. {{brand}} only tells how much the whole account used; each agent's part is an estimate, from what each one spent.",
+        "{{name}}'s part is the stronger stretch of each bar. {{brand}} only tells how much the whole account used, so each agent's part is an estimate from what it spent.",
       byAccount: "By account, this month",
       until: "until {{date}}",
       nowTag: "now",
@@ -7885,7 +7876,7 @@ export const en: Translations = {
     },
     propose_instruction_change: {
       label: "Propose an instruction change",
-      description: "Suggests changing its own instructions or the org context; a person decides.",
+      description: "Suggests changing its own instructions or the org context. A person decides.",
     },
     read_artifact: {
       label: "Read file",
@@ -7934,7 +7925,7 @@ export const en: Translations = {
     },
     propose_event: {
       label: "Propose event",
-      description: "Suggests an event; the person asking confirms.",
+      description: "Suggests an event. The person who asked confirms.",
     },
     load_skill: {
       label: "Load skill",
@@ -7967,6 +7958,10 @@ export const en: Translations = {
     cancel_reminder: {
       label: "Cancel reminder",
       description: "Cancels a reminder of the person asking.",
+    },
+    suggest_forum_topic: {
+      label: "Suggest forum topic",
+      description: "Suggests a discussion among agents. A person opens it.",
     },
     open_forum_topic: {
       label: "Open forum topic",
@@ -8046,7 +8041,7 @@ export const en: Translations = {
     },
     computer_stop: {
       label: "Turn off the computer",
-      description: "Turns off the computer; the files stay.",
+      description: "Turns off the computer. The files stay.",
     },
     computer_status: {
       label: "Check the computer",
@@ -8118,7 +8113,7 @@ export const en: Translations = {
     },
     browser_close: {
       label: "Close the browser",
-      description: "Closes the agent's browser; logins stay saved.",
+      description: "Closes the agent's browser. Logins stay saved.",
     },
     desktop_ask_person: {
       label: "Ask for help on the desktop",
@@ -8160,17 +8155,6 @@ export const en: Translations = {
       saveFailed: "Couldn't save. Try again.",
       signedIn: "{{name}} stays signed in to the sites it enters, on this computer.",
       cloud: "The browser runs on a connected computer. Pick one above to turn it on.",
-      reason: {
-        no_machine: "Pick a connected computer for {{name}} to use the browser.",
-        machine_removed: "{{name}}'s computer was removed.",
-        outdated: "<b>Update the agentes app on {{machine}}.</b> Its version doesn't have the browser yet.",
-        switched_off:
-          "<b>Turn on the browser on {{machine}}.</b> Only someone at the computer can: in the agentes app there, open <b>Preferences → Tools</b>. Then this option opens here.",
-        not_installed:
-          "<b>This computer doesn't have the browser yet.</b> It downloads on first use; if something is missing, what to do shows here.",
-        not_reported:
-          "<b>{{machine}} hasn't said whether it has the browser yet.</b> Open the agentes app on it to refresh.",
-      },
     },
     machine: {
       ready: "Ready",
@@ -8401,7 +8385,7 @@ export const en: Translations = {
     agentPaused: "This agent is paused for now.",
     onHold: "This workspace is on hold: {{reason}}",
     suspendedFor: "This workspace is suspended: {{reason}}",
-    bannerSub: "You can still read and write here; agents don't answer or work while it's on hold.",
+    bannerSub: "You can still read and write here. Agents don't answer or work while it's on hold.",
     label: "Workspace status",
     screen: {
       title: "This workspace is unavailable",
@@ -8496,7 +8480,7 @@ export const en: Translations = {
       you: "We'll email you at {{email}} when it's ready.",
       here: "It shows here as soon as it's ready.",
       /** After the capacity wait's line, for owners. */
-      short: "we'll email you",
+      short: "We'll email you.",
     },
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
@@ -8600,7 +8584,7 @@ export const en: Translations = {
       you: "You're using it",
       other: "{{person}} is using it",
       held: "Paused for now",
-      unavailable: "Its screen can't be shown right now",
+      unavailable: "It can't be shown right now",
       noScreen: "Doesn't use a screen or a browser",
       noBrowser: "Doesn't use a browser",
       preparingPlain: "Being prepared",
