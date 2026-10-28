@@ -8151,11 +8151,13 @@ a.machine-row__name:hover {
   gap: 8px;
 }
 /* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
-   sits nearer its own words than the next step's. */
+   sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
+   out of one (an agent's brain, Settings). */
 .agp-addacct {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  text-wrap: pretty;
 }
 .agp-addacct:focus {
   outline: none;
@@ -9997,6 +9999,11 @@ html[data-menu-overlay] .shell {
 .ai-panel--plan > .grid-options {
   margin-left: calc(var(--text-edge) - var(--space-3));
 }
+/* The account cards keep the chosen card's check clear in both states, so choosing one never rewraps a title and the
+   two cards keep their height. */
+.ai-panel--plan > .grid-options--sm .ac-option__title {
+  padding-right: 22px;
+}
 .ai-panel__head {
   flex-wrap: wrap;
   gap: 12px;
@@ -10130,6 +10137,14 @@ html[data-menu-overlay] .shell {
 }
 .ai-panel__row > .ac-acts > .ac-btn {
   max-width: 100%;
+}
+/* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
+   gap), as a step's button goes under its words. Before the plan's panel's rules, whose text column wins there. */
+.agp-addacct > .ai-panel__row > .ac-setnote {
+  flex-basis: 100%;
+}
+.agp-addacct > .ai-panel__row > :not(.ac-setnote) {
+  margin-left: 22px;
 }
 /* In a plan's panel the row's action is its sign-in's state: under the note's words, on the text's column, as a
    step's button. */
