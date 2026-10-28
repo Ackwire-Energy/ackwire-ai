@@ -384,6 +384,11 @@ html:has(.onb) {
   font-size: 13.5px;
   font-weight: 600;
 }
+/* Paid, until the billing service lifts the hold: the payment received, neutral, where the plan then says active. */
+.onb__paid[data-state="confirming"] {
+  background: var(--plate);
+  color: var(--muted);
+}
 /* The computer step waiting for the workspace's plan: the scene, what is done, and the banner with its one action. */
 .onb__offer {
   --card-pad: 10px;

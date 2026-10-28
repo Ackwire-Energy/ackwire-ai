@@ -551,6 +551,8 @@ export const ptBR = {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem chave de API.",
       paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
+      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0077). */
+      confirming: "Pagamento recebido. Ativando o plano do agentes.chat deste workspace.",
       leadNoComputer:
         "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
@@ -8503,6 +8505,8 @@ export const ptBR = {
         ended: "Assinar de novo",
       },
       askAdmin: "Quem administra o workspace pode resolver isso.",
+      /** In place of the hold's words, back from paying until the billing service lifts it. */
+      paid: "Pagamento recebido. O plano do agentes.chat começa em instantes.",
     },
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {

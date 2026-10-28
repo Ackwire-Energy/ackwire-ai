@@ -543,6 +543,8 @@ export const en: Translations = {
       title: "Which AI will they use?",
       lead: "Sign in with your AI plan: no API key needed.",
       paid: "Your agentes.chat plan is active. Their computer is on its way.",
+      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0077). */
+      confirming: "Payment received. Starting this workspace's agentes.chat plan.",
       leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
     },
     jev: {
@@ -8452,6 +8454,8 @@ export const en: Translations = {
         ended: "Subscribe again",
       },
       askAdmin: "Whoever runs this workspace can sort this out.",
+      /** In place of the hold's words, back from paying until the billing service lifts it. */
+      paid: "Payment received. The agentes.chat plan starts in a moment.",
     },
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {

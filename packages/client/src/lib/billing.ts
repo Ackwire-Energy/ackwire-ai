@@ -12,3 +12,9 @@ export const billingHoldOf = (
   standing: Pick<OrgStanding, "state" | "reason"> | null | undefined,
 ): BillingHold | null =>
   standing?.state === "hold" ? (BILLING_HOLDS.find((code) => code === standing.reason) ?? null) : null;
+
+/**
+ * Back from a paid Checkout, the billing service adds `?paid=1` to the return path (ADR 0077): until the hold lifts,
+ * the apps say the payment arrived. The router reads `1` as a number, and the onboarding forwards it as `true`.
+ */
+export const isPaidReturn = (search: Record<string, unknown>) => search.paid === 1 || search.paid === true;

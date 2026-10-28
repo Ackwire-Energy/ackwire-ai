@@ -301,9 +301,9 @@ function useGuideMood() {
  * on top fills as they get done); each step is one calm screen hosted by an
  * agent of the team, who asks in a speech bubble (introducing itself the first
  * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
- * back from paying for its plan, opened at the AI step.
+ * back from its plan, opened at the AI step; `paid`: back from paying for it.
  */
-export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null }) {
+export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnboarding | null; paid?: boolean }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const auth = useAuth();
@@ -679,6 +679,9 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0077): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
+  // Back at the AI step, the plan says active once its hold is gone. Back from paying, the billing service lifts it
+  // seconds later: until then the same line says the payment arrived.
+  const paidLine = !aiOpen || !resumed || !me.data ? null : !unpaid ? "paid" : paid ? "confirming" : null;
   // Its computer step offers that plan, as the step's one action.
   const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid;
   // Creating another refused while one waits for its plan: the way to that one's plan.
@@ -1150,10 +1153,10 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
             </button>
           ) : null}
 
-          {aiOpen && resumed && !unpaid && (
-            <p className="onb__paid ac-iconline" role="status">
-              <Icon name="check" size={16} />
-              <span>{t("onboarding.keyStep.paid")}</span>
+          {paidLine && (
+            <p className="onb__paid ac-iconline" role="status" data-state={paidLine}>
+              {paidLine === "paid" ? <Icon name="check" size={16} /> : <Spinner size={16} />}
+              <span>{t(`onboarding.keyStep.${paidLine}`)}</span>
             </p>
           )}
 

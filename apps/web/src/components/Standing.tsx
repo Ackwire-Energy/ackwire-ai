@@ -1,10 +1,10 @@
 import { type Me, type OrgSummary, useAuthConfig } from "@agenteschat/client";
-import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import { billingHoldOf, isPaidReturn } from "@agenteschat/client/lib/billing";
 import { holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, EmptyState, Icon } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -42,9 +42,23 @@ export function HoldBanner() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
+  const paid = isPaidReturn(useSearch({ strict: false }));
   const text = holdText(t, org.standing);
   if (!text) return null;
   const billing = billingHoldOf(org.standing);
+  // Back from paying, the billing service lifts the hold on its next pass: until `org.standing` says so, that's all.
+  if (billing && paid) {
+    return (
+      <section className="outages" aria-label={t("standing.label")}>
+        <div className="outage hold-banner" role="status">
+          <Spinner size={16} />
+          <span className="outage__text">
+            <b>{t("standing.billing.paid")}</b>
+          </span>
+        </div>
+      </section>
+    );
+  }
   const admin = can(org.role, "manage_billing");
   const fix = admin && billingUrl ? billing : null;
   return (

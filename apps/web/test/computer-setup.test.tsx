@@ -950,7 +950,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(lost.router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/c/`));
   });
 
-  test("back from paying before the billing service lifts the hold: asked again every 5 s until it does", async () => {
+  test("back from paying before the billing service lifts the hold: the payment received, asked again every 5 s until it does", async () => {
     const state = seedState({ context: "Clínicas." });
     state.authConfig = { workspaceComputer: true };
     const me = state.me;
@@ -959,9 +959,11 @@ describe("the onboarding where the workspace gets its own computer", () => {
       ...me,
       organizations: me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: "payment" } })),
     };
-    const r = await open(`/org/${ORG_ID}/onboarding`, { state: null }, state);
+    const r = await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, state);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
-    expect(document.querySelector(".onb__paid")).toBeNull();
+    const line = () => document.querySelector(".onb__paid");
+    expect(line()?.textContent).toBe("Pagamento recebido. Ativando o plano do agentes.chat deste workspace.");
+    expect(line()?.getAttribute("data-state")).toBe("confirming");
     // Its computer waits on the hold: both are asked about again, here and on every step after it.
     const qc = r.services.queryClient;
     expect(pollEvery(qc, "me")).toBe(5000);
@@ -972,9 +974,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     r.machines.setSetup({ state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS });
     await act(async () => qc.refetchQueries({ type: "active" }));
     await settle(6);
-    expect(document.querySelector(".onb__paid")?.textContent).toBe(
-      "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
-    );
+    expect(line()?.textContent).toBe("Seu plano do agentes.chat está ativo. O computador deles está a caminho.");
+    expect(line()?.getAttribute("data-state")).toBe("paid");
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.querySelector('.setup-progress [role="status"]')?.textContent).toBe("Passo 2 de 4 · Iniciando");
   });

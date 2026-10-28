@@ -14,7 +14,7 @@ afterEach(() => cleanup());
 const STATUS = "Status do workspace";
 const OTHER_ID = "00000000-0000-4000-8000-0000000000b2";
 
-/** #eng of Acme with the standing `/me` says, and its socket open to push what the operator changes. */
+/** #eng of Acme (or `path`) with the standing `/me` says, and its socket open to push what the operator changes. */
 async function open(
   standing?: OrgStanding,
   other = false,
@@ -24,7 +24,14 @@ async function open(
     billingUrl = null,
     state = seedState(),
     cloud = false,
-  }: { role?: Role; billingUrl?: string | null; state?: ReturnType<typeof seedState>; cloud?: boolean } = {},
+    path = `/org/${ORG_ID}/c/${ENG_ID}`,
+  }: {
+    role?: Role;
+    billingUrl?: string | null;
+    state?: ReturnType<typeof seedState>;
+    cloud?: boolean;
+    path?: string;
+  } = {},
 ) {
   state.authConfig = { ...state.authConfig, supportEmail, billingUrl, ...(cloud ? { workspaceComputer: true } : {}) };
   if (state.me) {
@@ -33,7 +40,7 @@ async function open(
       ...(other ? [{ id: OTHER_ID, name: "Beta", role: "member" as const }] : []),
     ];
   }
-  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  const r = await renderApp(path, { api: createFakeApi(state) });
   await settle(8);
   const socket = r.sockets.last();
   await act(async () => socket.open());
@@ -148,6 +155,18 @@ describe("a billing hold (ADR 0077): its own words, and its fix for whoever runs
     await set({ state: "hold", reason: "ended" });
     expect(banner().textContent).toContain("O plano do agentes.chat deste workspace terminou, e os agentes pararam.");
     expect(within(banner()).getByRole("button", { name: "Assinar de novo" })).toBeTruthy();
+  });
+
+  test("back from paying (`?paid=1`): the payment received and nothing to click, until the hold lifts", async () => {
+    const { set } = await open({ state: "hold", reason: "payment" }, false, null, {
+      billingUrl: BILLING,
+      path: `/org/${ORG_ID}?paid=1`,
+    });
+    const banner = () => screen().queryByRole("region", { name: STATUS });
+    expect(banner()?.textContent).toBe("Pagamento recebido. O plano do agentes.chat começa em instantes.");
+    expect(within(banner() as HTMLElement).queryByRole("button")).toBeNull();
+    await set({ state: "active", reason: null });
+    expect(banner()).toBeNull();
   });
 
   test("a link that can't be made says so; members read who can fix it, with no button", async () => {
