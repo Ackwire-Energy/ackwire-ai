@@ -7,8 +7,12 @@ import { mix, opaque } from "@agenteschat/ui/sky/math";
 /** The languages emails are written in. */
 export type EmailLocale = "pt-BR" | "en";
 
-/** Plain text; `{ b }` is bold. The layout escapes every string, so the words never hold HTML. */
-export type Inline = string | { b: string };
+/**
+ * Plain text; `{ b }` is bold. `{ mail }` is an address as a mailto link: already a link, no client links it on its
+ * own, so it needs none of the hair spaces that break copying typed text (`inertText`). The layout escapes every
+ * string, so the words never hold HTML.
+ */
+export type Inline = string | { b: string } | { mail: string };
 export type Text = Inline | Inline[];
 export type Block =
   | { p: Text }
@@ -18,8 +22,8 @@ export type Block =
   | { steps: [title: string, text: string][] }
   | { facts: [label: string, value: Text][] }
   | { note: Text; tone?: "warn" }
-  /** `agent`: the agent's color (its face); none: a person's initials tile. */
-  | { people: { name: string; detail?: Text; agent?: string }[] }
+  /** A name with a line under it. `agent`: the agent's color (its face); none: a person's initials tile. */
+  | { people: { name: string; detail: Text; agent?: string }[] }
   /** The primary button, and an optional second action as a link beside it. */
   | { button: string; url: string; also?: { label: string; url: string; danger?: boolean } }
   /** For emails whose link is the point: the address to copy when the button doesn't work. */
@@ -124,14 +128,23 @@ const PHONE = [
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
+/** The muted house link. */
+const LINK_MUTED = `color:${L.muted};text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px`;
+
 const inlines = (t: Text): Inline[] => (Array.isArray(t) ? t : [t]);
 const html = (t: Text, bold = `font-weight:600;color:${L.ink}`) =>
   inlines(t)
-    .map((i) => (typeof i === "string" ? esc(i) : `<b class="ink" style="${bold}">${esc(i.b)}</b>`))
+    .map((i) =>
+      typeof i === "string"
+        ? esc(i)
+        : "b" in i
+          ? `<b class="ink" style="${bold}">${esc(i.b)}</b>`
+          : `<a class="ln-m" href="mailto:${esc(i.mail)}" style="${LINK_MUTED}">${esc(i.mail)}</a>`,
+    )
     .join("");
 const plain = (t: Text) =>
   inlines(t)
-    .map((i) => (typeof i === "string" ? i : i.b))
+    .map((i) => (typeof i === "string" ? i : "b" in i ? i.b : i.mail))
     .join("");
 
 const T = (style: string) =>
@@ -202,20 +215,19 @@ function block(b: Block, src: (file: string) => string): string {
 <td class="${warn ? "warn-t" : "tx"}" style="padding:14px 16px;${PW};font-size:15px;line-height:22px;color:${warn ? L.warn : L.text}">${html(b.note, warn ? "font-weight:700" : `font-weight:600;color:${L.ink}`)}</td></tr></table>`;
   }
   if ("people" in b)
+    // The face starts 5 px down, where the name's capitals start on its 15/20 px line (4.5 px in Source Sans 3, 5.4
+    // in the system fonts): beside a name with a line under it, as the app's `.ac-captop`. Padding, not a negative
+    // margin, which classic Outlook ignores.
     return `<table width="100%" ${T("margin:0 0 8px")}>${b.people
       .map(
         (p) => `<tr>
-<td width="44" valign="top" style="width:44px;padding:0 0 12px">${
+<td width="44" valign="top" style="width:44px;padding:5px 0 12px">${
           p.agent
             ? `<img src="${esc(src(`agent-${AGENT_FACES.includes(p.agent) ? p.agent : "sky"}.png`))}" width="32" height="32" alt="" style="display:block;border:0;outline:none;width:32px;height:32px">`
             : `<table ${T("")}><tr><td class="avp" width="30" height="30" align="center" valign="middle" style="width:30px;height:30px;border:1px solid ${L.border};border-radius:10px;background:${L.well};color:${L.text};${P};font-size:13px;line-height:30px;font-weight:700">${esc(initialsOf(p.name))}</td></tr></table>`
         }</td>
 <td valign="top" style="padding:0 0 12px">
-<p class="ink" style="margin:0;${PW};font-size:15px;line-height:20px;font-weight:600;color:${L.ink}">${esc(p.name)}</p>${
-          p.detail
-            ? `<p class="mu" style="margin:0;${PW};font-size:14px;line-height:20px;color:${L.muted}">${html(p.detail)}</p>`
-            : ""
-        }</td>
+<p class="ink" style="margin:0;${PW};font-size:15px;line-height:20px;font-weight:600;color:${L.ink}">${esc(p.name)}</p><p class="mu" style="margin:0;${PW};font-size:14px;line-height:20px;color:${L.muted}">${html(p.detail)}</p></td>
 </tr>`,
       )
       .join("")}</table>`;
@@ -235,7 +247,7 @@ function block(b: Block, src: (file: string) => string): string {
       : "";
     return `<table ${T("margin:8px 0 20px")}><tr><td>${btn}${also}</td></tr></table>`;
   }
-  return `<p class="mu" style="margin:0 0 12px;${P};font-size:13px;line-height:19px;color:${L.muted}">${esc(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="color:${L.muted};text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px;word-break:break-all">${esc(b.url)}</a></p>`;
+  return `<p class="mu" style="margin:0 0 12px;${P};font-size:13px;line-height:19px;color:${L.muted}">${esc(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
 }
 
 /** The plain-text part of a block: the same words, a button as `Label: url`. */
@@ -247,7 +259,7 @@ function text(b: Block): string {
   if ("facts" in b) return b.facts.map(([label, v]) => `${label}: ${plain(v)}`).join("\n");
   if ("note" in b) return plain(b.note);
   // "Theo, Merge pull request #42" would read as an order to Theo.
-  if ("people" in b) return b.people.map((p) => (p.detail ? `${p.name} · ${plain(p.detail)}` : p.name)).join("\n");
+  if ("people" in b) return b.people.map((p) => `${p.name} · ${plain(p.detail)}`).join("\n");
   if ("code" in b) return b.code;
   if ("button" in b) return [`${b.button}: ${b.url}`, ...(b.also ? [`${b.also.label}: ${b.also.url}`] : [])].join("\n");
   // The address is already in the button's line.

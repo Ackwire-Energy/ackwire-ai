@@ -121,7 +121,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
 
   await t.drain();
   const [toOwner] = mailTo("owner@example.com").filter((m) => m.subject === "Alguém pede para entrar no seu workspace");
-  expect(toOwner?.text).toContain("Ana Souza · ana@\u200aexample.\u200acom");
+  expect(toOwner?.text).toContain("Ana Souza · ana@example.com\n");
   expect(toOwner?.text).toContain(`/org/${orgId}/settings/members?request=${request?.id}&do=approve`);
   expect(toOwner?.text).not.toContain("Paula");
   const inbox = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
