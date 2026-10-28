@@ -54,6 +54,7 @@ import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
+import { MemoryMarks } from "./MemoryMark";
 import {
   approvalIdOf,
   artifactsOf,
@@ -563,7 +564,7 @@ function PinMark() {
   );
 }
 
-/** People's pills show a count (mine outlined); an agent that reacted shows its face. */
+/** People's pills show a count (mine outlined); an agent that reacted shows its face; then the memory marks. */
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -571,7 +572,9 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
   const pills = reactionPills(cached.data ?? m.reactions, meId);
-  if (pills.length === 0 || m.local) return null;
+  // What an agent saved to memory from this message comes last in the row (the web's memory mark).
+  const remembered = (m.memories?.length ?? 0) > 0;
+  if ((pills.length === 0 && !remembered) || m.local) return null;
   return (
     <View style={styles.reacts}>
       {pills.flatMap((p) => [
@@ -613,6 +616,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
           </View>
         )),
       ])}
+      {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
     </View>
   );
 }
