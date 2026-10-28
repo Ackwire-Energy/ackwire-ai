@@ -1,49 +1,73 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
 import { useWraps } from "@/hooks/useWraps";
 
-afterEach(() => cleanup());
+const real = globalThis.ResizeObserver;
+/** Each observer's report, sent when a test says so. */
+let reports: (() => void)[] = [];
+/** How many lines the browser lays the words out on. */
+let lines = 1;
 
-/** Words laid out on `lines` lines of 22px, as a browser would report them. */
-function Words({ lines }: { lines: number }) {
+beforeEach(() => {
+  reports = [];
+  // A browser's observer reports after layout, and React applies that only after the frame has painted.
+  globalThis.ResizeObserver = class {
+    constructor(report: ResizeObserverCallback) {
+      reports.push(() => report([], this as unknown as ResizeObserver));
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+});
+afterEach(() => {
+  cleanup();
+  globalThis.ResizeObserver = real;
+});
+
+/** Words on `lines` lines of 22px. */
+function Words({ words }: { words: string }) {
   const ref = useRef<HTMLParagraphElement | null>(null);
   const wraps = useWraps(ref);
   return (
     <p
       ref={(el) => {
         ref.current = el;
-        if (el) Object.defineProperty(el, "clientHeight", { configurable: true, value: lines * 22 });
+        if (el) Object.defineProperty(el, "clientHeight", { configurable: true, get: () => lines * 22 });
       }}
       style={{ lineHeight: "22px" }}
+      data-wraps={wraps}
     >
-      {wraps ? "wraps" : "one line"}
+      {words}
     </p>
   );
 }
 
 describe("useWraps", () => {
-  test("one line, or more, as the browser lays the text out", () => {
-    const real = globalThis.ResizeObserver;
-    // A browser reports an observed element's size once it is laid out.
-    globalThis.ResizeObserver = class {
-      constructor(private readonly report: ResizeObserverCallback) {}
-      observe() {
-        this.report([], this as unknown as ResizeObserver);
-      }
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-    try {
-      expect(render(<Words lines={1} />).container.textContent).toBe("one line");
-      cleanup();
-      expect(render(<Words lines={2} />).container.textContent).toBe("wraps");
-    } finally {
-      globalThis.ResizeObserver = real;
-    }
+  test("knows the first words and new ones before they paint, with no word from the observer", () => {
+    lines = 2;
+    const { container, rerender } = render(<Words words="Felipe Ramos e Renata Lima pedem para entrar agora" />);
+    const p = container.querySelector("p") as HTMLElement;
+    expect(p.dataset.wraps).toBe("true");
+    lines = 1;
+    rerender(<Words words="Felipe Ramos pede para entrar agora" />);
+    expect(p.dataset.wraps).toBe("false");
+  });
+
+  test("and the observer keeps it current as the words reflow (a narrower window)", () => {
+    lines = 1;
+    const { container } = render(<Words words="Felipe Ramos pede para entrar agora" />);
+    const p = container.querySelector("p") as HTMLElement;
+    expect(p.dataset.wraps).toBe("false");
+    lines = 2;
+    act(() => {
+      for (const report of reports) report();
+    });
+    expect(p.dataset.wraps).toBe("true");
   });
 });
