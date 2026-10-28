@@ -148,17 +148,21 @@ describe("an agent's @mention of another agent", () => {
 });
 
 describe("short follow-ups without a mention", () => {
-  /** A router that hears "vocês" as for every agent, and anything else as for Dev only. */
+  /**
+   * A router that hears a message to the room ("vocês", "all of you") as for every agent, saying so the way every
+   * step does (`forEveryone`), and anything else as for Dev only.
+   */
   const scoreAll: RouterStrategy = {
     name: "fixed",
     async decide(input) {
-      const everyone = input.message.body.includes("vocês");
+      const everyone = /vocês|all of you/.test(input.message.body);
       return {
         agents: input.candidates.map((c) => ({
           agentId: c.agentId,
           score: everyone || c.handle === "dev" ? 0.9 : 0.2,
         })),
         needsAgent: 0.9,
+        forEveryone: everyone ? 0.9 : 0.1,
         reason: "t",
       };
     },
@@ -185,6 +189,14 @@ describe("short follow-ups without a mention", () => {
       { orgId: f.org.id, messageId: both.id },
     );
     expect(several.runs.map((r) => r.agentId).sort()).toEqual([f.agent.id, qa.id].sort());
+    await drainOutbox(f.db, f.handlers);
+
+    const all = await post("and now, all of you?");
+    const inEnglish = await routeMessage(
+      { db: f.db, strategy: scoreAll, policy },
+      { orgId: f.org.id, messageId: all.id },
+    );
+    expect(inEnglish.runs.map((r) => r.agentId).sort()).toEqual([f.agent.id, qa.id].sort());
   });
 
   test("a short message the router hears as for a person wakes nobody, even right after an agent spoke", async () => {
