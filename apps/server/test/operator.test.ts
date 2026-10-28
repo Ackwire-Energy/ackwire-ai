@@ -651,11 +651,18 @@ test("limits: set all four, read back with what the workspace uses; any standing
     expect({ bad, status: (await put(`/orgs/${orgId}/limits`, bad)).status }).toEqual({ bad, status: 400 });
   }
   expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/limits", limits)).status).toBe(404);
+  // Its apps hear of a change at once, and of nothing when the same limits are set again.
+  const heard: unknown[] = [];
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if (e.type === "org.broadcast") heard.push(e.event);
+  });
 
   const set = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
   expect(set).toEqual({ ...limits, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
   const again = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
   expect(again.updatedAt).toBe(set.updatedAt);
+  expect(heard).toHaveLength(1);
   const org = await body<{ limits: unknown; meters: unknown }>(await op(`/orgs/${orgId}`));
   expect(org.limits).toEqual(set);
   expect(org.meters).toEqual({ storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 });
@@ -663,7 +670,9 @@ test("limits: set all four, read back with what the workspace uses; any standing
   // Limits and standing are apart: a held workspace takes new limits too.
   await body(await put(`/orgs/${orgId}/billing-hold`, { hold: "unpaid" }));
   const none = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
+  heard.length = 0;
   expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({ ...none, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
   await body(await put(`/orgs/${orgId}/billing-hold`, { hold: null }));
 });
 

@@ -27,10 +27,10 @@ async function go(path: string, over: Partial<WorkspaceLimits>, billing = true) 
   const api = createFakeApi(state);
   const left: string[] = [];
   setNavigateAway((url) => left.push(url));
-  await renderApp(`/org/${ORG_ID}/${path}`, { api });
+  const { sockets } = await renderApp(`/org/${ORG_ID}/${path}`, { api });
   await settle(6);
   const billingLinks = () => state.calls.filter((c) => c.method === "orgs.billingLink").map((c) => c.args[1]);
-  return { api, state, left, billingLinks };
+  return { api, state, left, billingLinks, sockets };
 }
 
 describe("a workspace's limits (ADR 0077)", () => {
@@ -74,6 +74,20 @@ describe("a workspace's limits (ADR 0077)", () => {
     const room = screen().getByRole("region", { name: "Convidar pessoas" });
     expect(room.textContent).not.toContain("pessoas.");
     expect(within(room).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  test("a new plan opens a full workspace by itself: Convidar is back once the limits change, with no reload", async () => {
+    const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
+    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
+    expect(invite().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    state.limits = limits({ members: { used: 1, limit: 10 } });
+    await act(async () => socket.push({ type: "event", scope: "org", event: { type: "org.limits", orgId: ORG_ID } }));
+    await settle(6);
+    expect(invite().textContent).not.toContain("cabe 1 pessoa");
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
   });
 
   test("Armazenamento: the meter, near the limit with the plan's options; on its own bucket, no limit from us", async () => {

@@ -266,7 +266,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
   });
 });
 
-describe("live: machine.provisioning and org.standing", () => {
+describe("live: machine.provisioning, org.standing and org.limits", () => {
   test("a provisioning event replaces the setup; ready refreshes the computers", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.computerSetup("o1"), external({ step: "reserving" }));
@@ -368,6 +368,13 @@ describe("live: machine.provisioning and org.standing", () => {
       reason: "review",
       cloud: true,
     });
+  });
+
+  test("a limits event (a new plan, ADR 0077) asks for the workspace's limits again", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.limits("o1"), { members: { used: 1, limit: 1 } });
+    expect(applyWorkspaceEvent(qc, "o1", { type: "org.limits", orgId: "o1" } as { type: string })).toBe(true);
+    expect(qc.getQueryState(keys.limits("o1"))?.isInvalidated).toBe(true);
   });
 });
 

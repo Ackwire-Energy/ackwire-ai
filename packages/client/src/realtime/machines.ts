@@ -196,11 +196,12 @@ const SETUP_FIELDS = [
 ] as const;
 
 /**
- * The workspace's own computer and standing (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
+ * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. Returns whether the event was one of these.
+ * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0077) asks for the limits again, so a
+ * full workspace's invitations open by themselves. Returns whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "machine.provisioning") {
@@ -236,6 +237,10 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,
     );
     void qc.invalidateQueries({ queryKey: keys.computerSetup(target) });
+    return true;
+  }
+  if (event.type === "org.limits") {
+    void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
     return true;
   }
   return false;

@@ -37,7 +37,7 @@ ADR 0056 already gives every hook but one: a hold stops a workspace's agents and
 
 ### 4. Four limits, null meaning none
 
-`PUT /api/operator/v1/orgs/{orgId}/limits` sets `{ members, storageBytes, uploadBytesPerDay, platformUsdPerMonth }`, each a number or null (no limit); `GET /orgs/{orgId}` answers them with `updatedAt`, and the meters. A self-hosted server never sets any, so nothing is enforced there.
+`PUT /api/operator/v1/orgs/{orgId}/limits` sets `{ members, storageBytes, uploadBytesPerDay, platformUsdPerMonth }`, each a number or null (no limit); `GET /orgs/{orgId}` answers them with `updatedAt`, and the meters. A change (never the same limits set again) sends the workspace's apps `org.limits`, with no payload, and they read their limits again, so a new plan shows within seconds. A self-hosted server never sets any, so nothing is enforced there.
 
 | Limit | Counts | Enforced |
 | --- | --- | --- |

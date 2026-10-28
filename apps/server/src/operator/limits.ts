@@ -1,4 +1,4 @@
-import { BILLING_HOLDS, setBillingHold, setOrgLimits } from "@agenteschat/engine";
+import { BILLING_HOLDS, getOrgLimits, publishOrgEvent, setBillingHold, setOrgLimits } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../http/errors";
 import { body, iso, json, OrgParams } from "../routes/app/context";
@@ -110,8 +110,15 @@ export function registerOperatorLimits(api: OpenAPIHono, { db, pubsub, hub }: Op
       responses: { 200: json(LimitsState), ...errors },
     }),
     async (c) => {
-      const limits = await setOrgLimits(db, c.req.valid("param").orgId, c.req.valid("json"));
+      const { orgId } = c.req.valid("param");
+      const before = await getOrgLimits(db, orgId);
+      const limits = await setOrgLimits(db, orgId, c.req.valid("json"));
       if (!limits) return apiError(c, 404, "not_found", "No workspace with this id");
+      // A new plan shows in the apps within seconds. The billing service sets the same limits on every pass, which
+      // leaves `updatedAt` as it was: only a change is news.
+      if (limits.updatedAt?.getTime() !== before.updatedAt?.getTime()) {
+        await publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.limits", orgId } });
+      }
       return c.json(limitsJson(limits), 200);
     },
   );
