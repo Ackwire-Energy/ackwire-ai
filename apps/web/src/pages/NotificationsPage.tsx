@@ -68,6 +68,7 @@ import { useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useWraps } from "@/hooks/useWraps";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
@@ -1340,6 +1341,8 @@ function WaitRow({
   const unread = n.readAt === null;
   // A request to join says it all in its headline; an agent's hand and an approval add what they are about.
   const sub = n.kind === "join_request" ? null : (n.latest.title ?? n.latest.text);
+  const l1 = useRef<HTMLDivElement>(null);
+  const wraps = useWraps(l1);
   return (
     <article
       className={cx(
@@ -1367,7 +1370,7 @@ function WaitRow({
       <span className="nt-face">{face}</span>
       <div className="nt-wr__main">
         <div className="nt-wr__text">
-          <div className="nt-wr__l1 ac-captop">
+          <div ref={l1} className={cx("nt-wr__l1", (sub || wraps) && "ac-captop")}>
             <span className="nt-what">
               <Headline n={n} dir={dir} channelName={channelName} />
             </span>{" "}

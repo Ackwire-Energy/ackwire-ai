@@ -6615,7 +6615,7 @@ export const en: Translations = {
   },
   database: {
     name: "Database",
-    cardText: "Postgres: agents query your data to answer, read-only.",
+    cardText: "Postgres, read-only: agents query your data.",
     auth: "Address and password",
     connectText:
       "Agents read your Postgres database to answer questions about your data. They only read: nothing is changed.",

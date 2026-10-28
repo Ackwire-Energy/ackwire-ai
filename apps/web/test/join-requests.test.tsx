@@ -127,6 +127,9 @@ describe("an invitation link asks to join", () => {
     await type(screen().getByLabelText("Seu nome"), "Ana Souza");
     expect(button("Verificar").hasAttribute("disabled")).toBe(true);
     await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
+    // The suggestion comes with the address, before Verify, which would send the code to the typo.
+    const row = [...(screen().getByLabelText("Seu e-mail").parentElement?.children ?? [])];
+    expect(row.map((el) => el.className.split(" ")[0])).toEqual(["ac-input", "auth__fix", "invite-ask__slot"]);
     await click(button("Você quis dizer ana@gmail.com?"));
     const send = button("Pedir para entrar");
     expect(send.hasAttribute("disabled")).toBe(true);
@@ -213,6 +216,22 @@ describe("an invitation link asks to join", () => {
     expect(slot()).toBe("wait:0:42 Reenviar em 42 segundos");
     expect(codeField()).toBeTruthy();
     expect(screen().queryByRole("alert")).toBeNull();
+  });
+
+  test("at phone width the email takes its row and Verify's slot goes under it, after a typo's suggestion", async () => {
+    const css = (await Bun.file(new URL("../src/pages/invite.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("\n@media (max-width: 480px) {")[1]?.split("\n}")[0] ?? "";
+    const rule = (selector: string, sheet = css) =>
+      new RegExp(`\\n *${selector.replace(/[.>]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+    // Wider, the suggestion takes a row of its own under the address and the slot.
+    expect(rule(".invite-ask__verify")).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(rule(".invite-ask__verify > .auth__fix")).toMatch(/grid-row: 2;\s*grid-column: 1 \/ -1;/);
+    // On a phone one column, in the markup's order: the address, the suggestion, then the slot.
+    expect(rule(".invite-ask__verify", phone)).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(rule(".invite-ask__verify > .auth__fix", phone)).toContain("grid-row: auto");
   });
 
   test("every refusal of a code is said in both languages, never in the server's English", () => {

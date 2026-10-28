@@ -56,9 +56,10 @@ describe("Configurações → Armazenamento", () => {
     const s = section();
     const server = within(s).getByRole("radio", { name: /Este servidor/ });
     expect(server.getAttribute("aria-checked")).toBe("true");
-    // The title, then the choices: no line between them.
-    expect(s.textContent?.indexOf("Este servidor")).toBe("Armazenamento".length);
-    expect(server.closest("label")?.textContent).toBe("Este servidorOs arquivos ficam no disco dele.Em uso");
+    // The page's title names the card, so the choices come first, and the radio alone says which is in use.
+    expect(s.querySelector("h2, h3")).toBeNull();
+    expect(s.textContent?.indexOf("Este servidor")).toBe(0);
+    expect(server.closest("label")?.textContent).toBe("Este servidorOs arquivos ficam no disco dele.");
     // Our storage is the Cloud's: never said where the server is someone's own.
     expect(s.textContent).not.toMatch(/nosso armazenamento|Armazenamento do agentes/);
     for (const name of ["Google Drive", "OneDrive"]) {
@@ -96,7 +97,7 @@ describe("Configurações → Armazenamento", () => {
     const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
     expect(ours.closest("label")?.textContent).toBe(
-      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.Em uso",
+      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.",
     );
     expect(section().textContent).not.toContain("Este servidor");
   });
@@ -144,9 +145,9 @@ describe("Configurações → Armazenamento", () => {
       app({ files: true }, true);
       expect(await show({ kind: "database", folder: null })).toBeNull();
       const button = await show(folder);
-      // In the title's row: an option is a label, which can't hold a button.
+      // Under the options: an option is a label, which can't hold a button.
       expect(button?.closest("label")).toBeNull();
-      expect(button?.parentElement?.querySelector("#sec-storage")?.textContent).toBe("Armazenamento");
+      expect(button?.parentElement?.previousElementSibling?.getAttribute("role")).toBe("radiogroup");
       await click(button as HTMLElement);
       expect(asked.at(-1)).toEqual({ kind: "files" });
     } finally {
@@ -159,6 +160,9 @@ describe("Configurações → Armazenamento", () => {
     const { api } = await go();
     await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
     expect(activate().hasAttribute("disabled")).toBe(true);
+    // Until the bucket is saved, the server's option says it's still the one in use.
+    const inUse = () => [...section().querySelectorAll("label")].filter((l) => l.textContent?.endsWith("Em uso"));
+    expect(inUse().map((l) => l.textContent?.slice(0, 13))).toEqual(["Este servidor"]);
 
     // Empty form: the test does not run, fields explain why.
     await testConnection();
@@ -194,6 +198,7 @@ describe("Configurações → Armazenamento", () => {
     await click(activate());
     await settle(4);
     const s = section();
+    expect(inUse()).toEqual([]);
     expect(s.textContent).toContain("Arquivos antigos continuam onde estão. Novos arquivos vão para o seu bucket.");
     expect(s.textContent).toContain("Usando acme-arquivos em https://s3.amazonaws.com.");
     // Keys are masked: only hints, inputs empty.
