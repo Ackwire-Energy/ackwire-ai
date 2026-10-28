@@ -1,5 +1,5 @@
 import { ApiError } from "@agenteschat/client";
-import { ACCOUNT_BLOCKED, knownErrorText } from "@agenteschat/client/lib/errors";
+import { knownErrorText, type RestrictionFacts, restrictionLine } from "@agenteschat/client/lib/errors";
 import {
   type createHumanCheck,
   HUMAN_CHECK_BLOCKED,
@@ -127,12 +127,17 @@ export class CheckCancelled extends Error {}
 
 /**
  * A refused request in the phone's words: the bot check's blocked line names no browser (the app has none to
- * switch to), then a blocked account, a known code, too many tries, else the generic line. Never the server's text.
+ * switch to), then a known code (a blocked account's, with its kind on agentes.chat Cloud), too many tries, else the
+ * generic line. Never the server's text.
  */
-export function refusalText(t: TFunction, refusal: { status: number; code?: string | null }): string {
+export function refusalText(
+  t: TFunction,
+  refusal: { status: number; code?: string | null } & Pick<RestrictionFacts, "kind" | "cloud">,
+): string {
   if (refusal.code === HUMAN_CHECK_BLOCKED) return t("mobile.humanCheck.blocked");
-  if (refusal.code === ACCOUNT_BLOCKED) return t("auth.accountBlocked");
-  const error = refusal instanceof ApiError ? refusal : new ApiError(refusal.status, refusal.code ?? "", "");
+  const { kind, cloud } = refusal;
+  const error =
+    refusal instanceof ApiError ? refusal : new ApiError(refusal.status, refusal.code ?? "", "", { kind, cloud });
   return knownErrorText(t, error) ?? t(refusal.status === 429 ? "auth.tooManyTries" : "mobile.auth.errors.generic");
 }
 
@@ -141,8 +146,15 @@ export const failureText = (t: TFunction, error: unknown) =>
   error instanceof ApiError ? refusalText(t, error) : t("mobile.auth.errors.network");
 
 /** Better Auth's answer as a refusal `withHumanCheck` reads (its status and code on top), or null when it passed. */
-export const refusalOf = ({ error }: { error: { status: number; code?: string } | null }) =>
-  error ? { status: error.status, code: error.code } : null;
+export const refusalOf = ({ error }: { error: ({ status: number; code?: string } & RestrictionFacts) | null }) =>
+  error ? { status: error.status, code: error.code, kind: error.kind, cloud: error.cloud } : null;
+
+/**
+ * A social sign-in Better Auth refused: a blocked account's line (its kind on agentes.chat Cloud), since Apple's
+ * native sign-in gets the server's answer itself, else that it didn't work.
+ */
+export const socialRefusalText = (t: TFunction, error: { code?: string } & RestrictionFacts) =>
+  restrictionLine(t, error.code, error) ?? t("mobile.auth.social.failed");
 
 /** A refused sign-up means sign-up is closed only when it is a 403 that isn't the bot check's. */
 export const signUpClosed = (refusal: { status: number; code?: string | null }) =>

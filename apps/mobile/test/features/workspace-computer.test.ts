@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { suspendedText } from "@agenteschat/client/lib/errors";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
 import { suspendedOf } from "../../src/lib/org-choice";
@@ -52,9 +53,22 @@ describe("a suspended organization on the phone", () => {
   test("the chosen one suspended: why (when told) and where else to go", () => {
     expect(suspendedOf(orgs, "a")).toEqual({
       reason: "uso fora dos termos",
+      cloud: false,
       others: [orgs[1], orgs[2]],
     });
     expect(suspendedOf(orgs, "d")?.reason).toBeNull();
+  });
+
+  test("its line: why, and on agentes.chat Cloud how to contest it", async () => {
+    const t = await translator("pt-BR");
+    expect(suspendedText(t, suspendedOf(orgs, "a"))).toBe("Este workspace está suspenso: uso fora dos termos");
+    const cloud = [{ id: "e", name: "Eco", standing: { state: "suspended", reason: "Termos 5: spam", cloud: true } }];
+    expect(suspendedText(t, suspendedOf(cloud, "e"))).toBe(
+      "Este workspace está suspenso: Termos 5: spam. Para contestar, escreva para legal@agentes.chat.",
+    );
+    expect(suspendedText(t, suspendedOf(orgs, "d"))).toBe(
+      "As conversas e os agentes dele estão fechados por enquanto.",
+    );
   });
 
   test("active or on hold: no suspended screen", () => {

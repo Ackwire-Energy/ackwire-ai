@@ -193,6 +193,39 @@ describe("Entrar (e-mail primeiro)", () => {
       cleanup();
     }
   });
+
+  test("on agentes.chat Cloud a blocked account reads why by the block's kind, and how to contest it", async () => {
+    const contest = "Para contestar, escreva para legal@agentes.chat.";
+    for (const [block, says] of [
+      [
+        { kind: "abuse", cloud: true },
+        `Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). ${contest}`,
+      ],
+      [
+        { kind: "legal", cloud: true },
+        "Esta conta está bloqueada enquanto guardamos os dados dela por uma questão legal. Para perguntar sobre isso, escreva para legal@agentes.chat.",
+      ],
+      [{ kind: "other", cloud: true }, `Esta conta não pode entrar. ${contest}`],
+      // A self-hosted server: the line it always had.
+      [{}, "Esta conta não pode entrar."],
+    ] as const) {
+      const signIn = {
+        ok: false as const,
+        status: 403,
+        message: "This account can't sign in.",
+        code: "ACCOUNT_BLOCKED",
+        ...block,
+      };
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(screen().getByRole("alert").textContent).toBe(says);
+      cleanup();
+    }
+  });
 });
 
 describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
@@ -783,6 +816,28 @@ describe("Onboarding", () => {
     await act(() => new Promise((r) => setTimeout(r, 700)));
     await settle(4);
   };
+
+  test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {
+    for (const [cloud, says] of [
+      [
+        true,
+        "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
+      ],
+      [false, "Você não pode criar um workspace agora."],
+    ] as const) {
+      const { api } = await start();
+      api.orgs.create = async () => {
+        throw new ApiError(403, "org.create_refused", "You can't create a workspace right now", {
+          ...(cloud ? { cloud } : {}),
+        });
+      };
+      await type("Nome", "Acme Saúde");
+      await next();
+      expect(document.querySelector(".ac-toast")?.textContent).toContain(says);
+      expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+      cleanup();
+    }
+  });
 
   test("the step's actions: a bar always in view, Continue first, the text button after it, notes above it", async () => {
     sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");

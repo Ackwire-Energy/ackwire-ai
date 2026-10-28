@@ -8,6 +8,8 @@ import {
   useRoutines,
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { restrictionLine } from "@agenteschat/client/lib/errors";
+import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -329,14 +331,21 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const href = notificationHref(n, agentDmOf(dms.data), ai);
   const unread = n.readAt === null;
 
+  // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
+  const restriction = restrictionOf(n);
+  const held = restriction?.code === "agent.paused";
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
-  const names = who.second
-    ? who.more > 0
-      ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
-      : t("mobile.names.two", { first: who.first, second: who.second })
-    : who.first;
+  const names = held
+    ? (n.source.label ?? "")
+    : who.second
+      ? who.more > 0
+        ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
+        : t("mobile.names.two", { first: who.first, second: who.second })
+      : who.first;
   const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
-  const template = t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
+  const template = held
+    ? t("standing.notification.agentHold", { name: NAMES })
+    : t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.
@@ -344,9 +353,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
     return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
   };
-  const sub = [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")]
-    .filter(Boolean)
-    .join(" ");
+  const sub = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
+    : [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
   const toggleRead = () => {
@@ -441,6 +450,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           }
           time={time}
           sub={sub || null}
+          subLines={restriction ? 0 : undefined}
         />
       </Animated.View>
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { en, ptBR } from "../src/index";
 import { legalDocuments, legalInline } from "../src/legal";
 
 describe("legal pages", () => {
@@ -13,6 +14,33 @@ describe("legal pages", () => {
         expect(s.blocks.map(shape)).toEqual(en.sections[i]?.blocks.map(shape) ?? []);
       });
       expect(new Set(pt.sections.map((s) => s.id)).size).toBe(pt.sections.length);
+    });
+  }
+});
+
+describe("agentes.chat Cloud's restriction lines cite the Terms this server serves", () => {
+  // The section each line rests on, by its id: when the Terms are renumbered, this fails until the lines follow.
+  const RESTS_ON = {
+    review: "acceptable-use",
+    blockedAbuse: "acceptable-use",
+    agentNetwork: "acceptable-use",
+    agentOperator: "acceptable-use",
+  };
+  for (const [locale, lines] of [
+    ["en", en.standing.cloud],
+    ["pt-BR", ptBR.standing.cloud],
+  ] as const) {
+    test(locale, () => {
+      const { sections } = legalDocuments.terms[locale];
+      const cited = Object.entries(lines).flatMap(([key, line]) => {
+        const number = line.match(/(?:section|seção) (\d+)/)?.[1];
+        return number ? [[key, number]] : [];
+      });
+      const served = Object.entries(RESTS_ON).map(([key, id]) => [
+        key,
+        sections.find((s) => s.id === id)?.heading.match(/^(\d+)\./)?.[1],
+      ]);
+      expect(Object.fromEntries(cited)).toEqual(Object.fromEntries(served));
     });
   }
 });

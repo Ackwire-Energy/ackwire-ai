@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { MAX_UPLOAD_MB } from "./files";
+import { endSentence } from "./text";
 
 /**
  * Server error codes the app says in the person's language (the server's
@@ -75,7 +76,6 @@ const KNOWN = {
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
   "plan.personal": "aiAccounts.errors.planPersonal",
-  "org.create_refused": "standing.createRefused",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",
@@ -99,34 +99,79 @@ const KNOWN = {
   jev_key_invalid: "jev.steps.invalid",
 } as const;
 
-/** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
-const STANDING_REFUSALS = {
-  "org.paused": ["standing.paused", "standing.onHold"],
-  "org.suspended": ["standing.suspended", "standing.suspendedFor"],
-  "agent.paused": ["standing.agentPaused", "standing.agentPaused"],
-} as const;
+/** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
+/** Where a restriction on agentes.chat Cloud is contested. */
+export const LEGAL_EMAIL = "legal@agentes.chat";
+
+/** The reason agentes.chat Cloud's automatic hold is set with: it reads as the review line, never "on hold: review". */
+const REVIEW_REASON = "review";
 
 /**
- * A refusal by the workspace's standing in the person's words, with the reason when the workspace is told
- * one: the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`… Null for any
- * other code.
+ * Reasons agentes.chat Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
+ * of its own, and `ended` holds a workspace whose plan ended, a billing matter.
  */
-export function standingRefusalText(
+const UNCONTESTED: ReadonlySet<string> = new Set([REVIEW_REASON, "ended"]);
+
+/**
+ * What the server says of a restriction besides its code: the reason the workspace is told, and on agentes.chat
+ * Cloud `cloud` (`"true"` in a run's values, which are text) with a held agent's or a blocked account's kind.
+ */
+export interface RestrictionFacts {
+  reason?: unknown;
+  kind?: unknown;
+  cloud?: unknown;
+}
+
+/**
+ * A restriction in the person's words, the one place the apps pick it: a workspace on hold or suspended and a held
+ * agent (the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`…), a refused
+ * workspace (`org.create_refused`) and a blocked account (`ACCOUNT_BLOCKED`). On agentes.chat Cloud the line of its
+ * kind, with the Terms section and how to contest it. Elsewhere the words it always had. Null for any other code.
+ */
+export function restrictionLine(
   t: TFunction,
   code: string | null | undefined,
-  params?: Record<string, unknown> | null,
+  facts?: RestrictionFacts | null,
 ): string | null {
-  const plain = code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code;
-  const keys = plain ? STANDING_REFUSALS[plain as keyof typeof STANDING_REFUSALS] : undefined;
-  if (!keys) return null;
-  const reason = typeof params?.reason === "string" ? params.reason.trim() : "";
-  return reason ? t(keys[1], { reason }) : t(keys[0]);
+  const cloud = facts?.cloud === true || facts?.cloud === "true";
+  const reason = typeof facts?.reason === "string" ? facts.reason.trim() : "";
+  const kind = facts?.kind;
+  const email = { email: LEGAL_EMAIL };
+  const contested = (line: string) =>
+    cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
+  switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
+    case "org.paused":
+      if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);
+      return reason ? contested(t("standing.onHold", { reason })) : t("standing.paused");
+    case "org.suspended":
+      return reason ? contested(t("standing.suspendedFor", { reason })) : t("standing.suspended");
+    case "agent.paused":
+      if (cloud && kind === "network") return t("standing.cloud.agentNetwork", email);
+      if (cloud && kind === "operator") return t("standing.cloud.agentOperator", email);
+      return t("standing.agentPaused");
+    case "org.create_refused":
+      return cloud ? t("standing.cloud.createRefused", email) : t("standing.createRefused");
+    case ACCOUNT_BLOCKED:
+      if (cloud && kind === "abuse") return t("standing.cloud.blockedAbuse", email);
+      if (cloud && kind === "legal") return t("standing.cloud.blockedLegal", email);
+      return contested(t("auth.accountBlocked"));
+    default:
+      return null;
+  }
 }
 
 /** The hold banner's line: the reason when the workspace is told one, else what a refused run says. Null unless on hold. */
 export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
   if (standing?.state !== "hold") return null;
-  return standingRefusalText(t, "org.paused", { reason: standing.reason });
+  return restrictionLine(t, "org.paused", standing);
+}
+
+/** The suspended screen's line: why, when the workspace is told, else that it is closed for now. */
+export function suspendedText(t: TFunction, standing: Pick<OrgStanding, "reason" | "cloud"> | null | undefined) {
+  const told = standing?.reason ? restrictionLine(t, "org.suspended", standing) : null;
+  return told ?? t("standing.screen.text");
 }
 
 /**
@@ -151,26 +196,26 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
-/** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
-export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
-
 /** A known server code in the person's language; null for anything else (the caller keeps its own words). */
 export function knownErrorText(t: TFunction, error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;
-  const standing = standingRefusalText(t, error.code, error.params);
-  if (standing) return standing;
+  const restriction = restrictionLine(t, error.code, error.params);
+  if (restriction) return restriction;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
 }
 
 /**
- * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`) in the person's words: too many
- * tries, a blocked account and the bot check by their codes, else its own message.
+ * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
+ * in the person's words: too many tries, a blocked account and the bot check by their codes, else its own message.
  */
-export function authErrorText(t: TFunction, refusal: { status: number; code?: string; message: string }): string {
+export function authErrorText(
+  t: TFunction,
+  refusal: { status: number; code?: string; message: string } & RestrictionFacts,
+): string {
   if (refusal.status === 429) return t("auth.tooManyTries");
-  if (refusal.code === ACCOUNT_BLOCKED) return t("auth.accountBlocked");
-  const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message));
+  const { kind, cloud } = refusal;
+  const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message, { kind, cloud }));
   return known ?? (refusal.message || t("common.unknownError"));
 }
 

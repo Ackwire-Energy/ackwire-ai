@@ -554,6 +554,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* A restriction's notice: its whole line, how to contest it included. */
+.nt-snip--whole {
+  -webkit-line-clamp: unset;
+}
 .nt-item:not(.is-unread) .nt-snip {
   color: var(--muted);
 }
