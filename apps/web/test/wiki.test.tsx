@@ -497,8 +497,11 @@ describe("Obsidian vaults", () => {
     await renderPage(<SetupVaultCard />, { api: createFakeApi(seedState()) });
     const card = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
     expect(card.querySelector(".vault-card__t .small")?.textContent).toBe("Ela vira a wiki do workspace.");
-    // The drop zone already says a folder works too: under it, only the way to pick one.
-    expect(card.querySelector(".vault-drop > p")?.textContent).toBe("escolha a pasta");
+    // The drop zone already says a folder works too: under it, only the way to pick one, said as the import step
+    // says it, with its folder icon.
+    const folder = within(card).getByRole("button", { name: "Escolher uma pasta" });
+    expect(card.querySelector(".vault-drop__area + .ac-btn--ghost")).toBe(folder);
+    expect(folder.querySelector("svg")).not.toBeNull();
     await act(async () => {
       fireEvent.change(within(card).getByLabelText("Escolher .zip ou .md"), {
         target: { files: [new File(["Veja [[Notas]].\n#mapa"], "Início.md"), new File(["Volta."], "Notas.md")] },

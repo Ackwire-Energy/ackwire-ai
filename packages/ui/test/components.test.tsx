@@ -648,23 +648,88 @@ describe("Diff", () => {
   });
 });
 
-describe("Message aside", () => {
-  test("sits on the header line, or after the text for grouped messages", () => {
+describe("Message aside and foot", () => {
+  test("the aside ends the first line, the header's or a grouped message's text's; the foot is a line under both", () => {
     const { container } = render(
       <>
-        <Message author="João" time="10:42" aside={<span>✓</span>}>
+        <Message author="João" time="10:42" aside={<span>✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>oi</MessageText>
         </Message>
-        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>}>
+        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>} foot={<span>Ninguém vai responder</span>}>
           <MessageText>de novo</MessageText>
         </Message>
       </>,
     );
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
+    // Floated before the text, so the text's first line wraps before it.
+    expect(second?.querySelector(".ac-msg__aside--floating + .ac-msg__text")?.textContent).toBe("de novo");
     expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
-    // A receipt with words takes a line of its own under the text, which keeps its lines.
-    expect(second?.querySelector(".ac-msg__body > :last-child")?.className).toContain("ac-msg__aside--floating");
+    // The same line under the text on both: the text follows the name, and words that come and go never move it.
+    for (const row of [first, second]) {
+      expect(row?.querySelector(".ac-msg__body > :last-child")?.className).toBe("ac-msg__foot");
+      expect(row?.querySelector(".ac-msg__head .ac-msg__foot")).toBeNull();
+    }
+  });
+
+  test("the action bar sits on the first line, left of the check, clear of the lines around it", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const bodies = (selector: string) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
+        .map((m) => m[2] ?? "")
+        .join(";");
+    const value = (selector: string, prop: string) =>
+      new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(bodies(selector))?.[1]?.trim();
+    const bar = ".ac-msg__actions";
+    // Placed by its middle, never by its bottom: the 46px touch bar grows as much down as up.
+    expect(value(bar, "translate")).toBe("0 -50%");
+    expect(bodies(bar)).not.toMatch(/(^|;)\s*bottom:/);
+    // The name's capitals start at the row's top padding. A grouped row's first line is its text's, under the row's
+    // and the text's top margins.
+    expect(value(".ac-msg", "padding")).toBe("6px var(--msg-inline)");
+    expect(value(bar, "top")).toBe("calc(6px + var(--cap-top) - var(--cap-mid))");
+    const line =
+      Number.parseFloat(value(".ac-msg__text", "font-size") ?? "") * Number(value(".ac-msg__text", "line-height"));
+    expect(line).toBeCloseTo(26.35, 3);
+    expect(value(".ac-msg--grouped", "padding-top")).toBe("2px");
+    expect(value(".ac-msg__text", "margin")).toBe("2px 0 0");
+    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(
+      "calc(4px + 13.175px - var(--cap-mid))",
+    );
+    // A grouped row with a line under one line of text: between the row above's last line (its 6px bottom padding
+    // up) and that line (2px under the text), the room is under the touch bar's 46px. The bar takes its middle, so it
+    // reaches both lines' edges by the same few pixels, short of their letters, and the 38px mouse bar fits whole.
+    const footed =
+      ".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions";
+    const above = -6;
+    const under = 2 + 2 + line + 2;
+    expect(Number.parseFloat(value(footed, "top") ?? "")).toBeCloseTo((above + under) / 2, 3);
+    expect(under - above).toBeGreaterThanOrEqual(38);
+    expect((46 - (under - above)) / 2).toBeLessThan(4);
+    // Left of the check (a 16px icon, 2px each side) and 8px from it, past the row's own side padding.
+    expect(
+      value(".ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions", "right"),
+    ).toBe("calc(var(--msg-inline) + 28px)");
+    expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
+    expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");
+  });
+
+  test("an aside or a foot with nothing in it takes no room, in a stacked body too", async () => {
+    const Nothing = () => null;
+    const { container } = render(
+      <Message author="João" time="10:42" grouped stacked aside={<Nothing />} foot={<Nothing />}>
+        <div className="ac-card">Issue</div>
+      </Message>,
+    );
+    for (const part of [".ac-msg__aside", ".ac-msg__foot"]) {
+      expect(container.querySelector(part)?.childNodes.length).toBe(0);
+    }
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toContain(".ac-msg__aside:empty,\n.ac-msg__foot:empty {\n  display: none;\n}");
   });
 });
 

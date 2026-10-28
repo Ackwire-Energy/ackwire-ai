@@ -316,12 +316,10 @@
     box-shadow: var(--e2), var(--top);
   }
 }
-/* A line alone centres on the face: (40 - 22) / 2. With a line under it, or where the words wrap, the first line's
-   capitals start at the face's top (`.ac-captop`). */
-@media (min-width: 1024px) {
-  .nt-wr__l1:only-child {
-    margin-block-start: 9px;
-  }
+/* At every width a line alone centres on the face, (40 - 22) / 2, on the actions' middle. With a line under it, or
+   where the words wrap, the row gives the first line `.ac-captop`: its capitals start at the face's top. */
+.nt-wr__l1:not(.ac-captop) {
+  margin-block-start: 9px;
 }
 /* Under 1024px one line leaves the headline too little room beside the actions: the words wrap, three lines at most,
    the time at their end and never alone on the last line. A name with no spaces (an email) breaks too. */

@@ -133,3 +133,18 @@ describe("finding the settings", () => {
     expect(screen().getByText("Perfil salvo.")).toBeTruthy();
   });
 });
+
+describe("the current section in the nav", () => {
+  test("is the agent page's current tab, a raised key with its edge, so light shows it as dark does", async () => {
+    const css = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const body = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    const of = (selector: string, prop: string) => new RegExp(`\\s${prop}: ([^;]+);`).exec(body(selector))?.[1];
+    const current = '.settings__link[aria-current="page"]';
+    const tab = '.agp-subnav__item[aria-current="true"]';
+    for (const prop of ["background", "box-shadow"]) expect(of(current, prop)).toBe(of(tab, prop));
+    expect(of(current, "box-shadow")).toContain("var(--e1)");
+  });
+});

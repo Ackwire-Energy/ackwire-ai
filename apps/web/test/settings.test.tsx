@@ -486,7 +486,7 @@ describe("Configurações da organização", () => {
     // A section they can't open falls back to Geral.
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
-    expect(document.querySelector("#sec-storage")).toBeNull();
+    expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {

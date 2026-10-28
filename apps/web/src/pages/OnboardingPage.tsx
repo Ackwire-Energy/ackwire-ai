@@ -345,16 +345,17 @@ export function OnboardingPage() {
     setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
   }, [host, step.id]);
 
-  // Each step's column opens centered, then stays where it opened: what changes in it (the computer's progress,
-  // a toggle) grows or shrinks it downward instead of moving the question and Back under the pointer.
+  // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
+  // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
+  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with.
   const column = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
   useLayoutEffect(() => {
     const el = column.current;
     if (!el) return;
     const place = () => {
-      el.style.marginTop = "";
-      el.style.marginTop = `${el.getBoundingClientRect().top - (el.parentElement?.getBoundingClientRect().top ?? 0)}px`;
+      el.style.removeProperty("--onb-lead");
+      el.style.setProperty("--onb-lead", getComputedStyle(el, "::before").marginTop);
     };
     place();
     window.addEventListener("resize", place);
