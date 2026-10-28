@@ -2799,7 +2799,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const qc = useQueryClient();
   const dismissRun = useDismissRun();
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
-  const revealed = useRevealedText(live?.text ?? "");
+  const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;

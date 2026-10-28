@@ -23,7 +23,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { AccountKind, MachineAccount } from "./schemas";
+import { AccountKind, MachineAccount, PlanUsage } from "./schemas";
 import { SecretBox } from "./secrets";
 
 const tags = ["Connected computers"];
@@ -251,6 +251,15 @@ export function machineAccountRoutes(deps: AppDeps) {
                     description:
                       "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
                   }),
+                  own: z
+                    .object({
+                      claude_code: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
+                      codex: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
+                    })
+                    .openapi({
+                      description:
+                        "Each CLI's own sign-in there (\"this computer's account\"), on a computer the caller connected: its plan and usage when known.",
+                    }),
                 }),
               ),
             })

@@ -40,18 +40,20 @@ import {
  * "O que faz", between connecting and who uses it (the web's second step): a server connected by its address
  * shows its tools as they came classified, by subject, each with the web's control to change it (saved on
  * Continuar, through the same endpoint); our catalog services show theirs as they are (by scope: sensitive
- * ones always ask).
+ * ones always ask). On its own screen (Ferramentas) the server's button saves and the catalog's list has none.
  */
 export function ReviewStep({
   connectionId,
   def,
   name,
   onNext,
+  onScreen = false,
 }: {
   connectionId: string;
   def: ConnectorDef | null;
   name: string;
   onNext: () => void;
+  onScreen?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -64,7 +66,9 @@ export function ReviewStep({
     servers.isFetching,
   );
   if (target.kind === "server") {
-    return <ServerReview key={target.server.id} server={target.server} name={name} onNext={onNext} />;
+    return (
+      <ServerReview key={target.server.id} server={target.server} name={name} onNext={onNext} onScreen={onScreen} />
+    );
   }
   if (target.kind === "loading") return <ActivityIndicator color={c.muted} />;
   const tools = target.kind === "catalog" ? catalogReviewTools(t, target.def) : [];
@@ -82,13 +86,23 @@ export function ReviewStep({
       ) : (
         <ToolList tools={tools} levelOf={(x) => x.level} />
       )}
-      <Button variant="primary" wide label={t("connectFlow.next")} onPress={onNext} />
+      {onScreen ? null : <Button variant="primary" wide label={t("connectFlow.next")} onPress={onNext} />}
     </>
   );
 }
 
-/** A server's tools: the person settles what waits and changes what they want; Continuar saves it all. */
-function ServerReview({ server: first, name, onNext }: { server: CustomServer; name: string; onNext: () => void }) {
+/** A server's tools: the person settles what waits and changes what they want; Continuar (Salvar) saves it all. */
+function ServerReview({
+  server: first,
+  name,
+  onNext,
+  onScreen,
+}: {
+  server: CustomServer;
+  name: string;
+  onNext: () => void;
+  onScreen: boolean;
+}) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const { save, refresh } = useCustomServerAction(orgId);
@@ -148,7 +162,9 @@ function ServerReview({ server: first, name, onNext }: { server: CustomServer; n
       <Button
         variant="primary"
         wide
-        label={save.isPending ? t("mobile.connectors.review.saving") : t("connectFlow.next")}
+        label={
+          save.isPending ? t("mobile.connectors.review.saving") : onScreen ? t("common.save") : t("connectFlow.next")
+        }
         disabled={busy}
         onPress={next}
       />

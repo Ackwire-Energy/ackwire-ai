@@ -31,6 +31,7 @@
     "./sky/workspace": "./src/sky/workspace.ts",
     "./names": "./src/names.ts",
     "./plan-state": "./src/plan-state.ts",
+    "./recurrence": "./src/recurrence.ts",
     "./timezones": "./src/timezones.ts"
   },
   "scripts": {

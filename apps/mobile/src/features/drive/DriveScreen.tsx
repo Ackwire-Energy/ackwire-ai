@@ -82,9 +82,9 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
         </View>
       ) : total === 0 ? (
         search || type !== "all" ? (
-          <EmptyState title={t("mobile.drive.noResults")} />
+          <EmptyState icon="search" title={t("mobile.drive.noResults")} />
         ) : (
-          <EmptyState title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
+          <EmptyState icon="drive" title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
         )
       ) : (
         <>

@@ -22,6 +22,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -43,6 +44,7 @@ import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
+import { routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
@@ -52,6 +54,7 @@ import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
+import { MemoryMarks } from "./MemoryMark";
 import {
   approvalIdOf,
   artifactsOf,
@@ -258,12 +261,26 @@ export const MessageRow = memo(function MessageRow({
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
             {routine ? (
+              // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
               <Tag
                 icon="clock"
                 label={t("channel.routineTag", { name: routine.name })}
-                onPress={report ? () => setReportOpen((o) => !o) : undefined}
-                hint={report ? t(reportOpen ? "channel.routineReportHide" : "channel.routineReport") : undefined}
+                onPress={() => router.push(routineHref(routine.id))}
+                hint={t("channel.routineTagTip")}
               />
+            ) : null}
+            {routine && report ? (
+              <Pressable
+                onPress={() => setReportOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: reportOpen }}
+                hitSlop={6}
+                style={styles.shrink}
+              >
+                <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+                  {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
+                </Text>
+              </Pressable>
             ) : null}
             {talker ? (
               <Text
@@ -506,7 +523,7 @@ function StoppedLine({
 
 /**
  * A small neutral chip next to the name ("Lembrete", "Rotina «Bom dia»"): icon, no colored dot. With
- * `onPress` it unfolds what it stands for (the report a routine's message answers).
+ * `onPress` it opens what it stands for (the routine a message answers).
  */
 function Tag({
   icon,
@@ -547,7 +564,7 @@ function PinMark() {
   );
 }
 
-/** People's pills show a count (mine outlined); an agent that reacted shows its face. */
+/** People's pills show a count (mine outlined); an agent that reacted shows its face; then the memory marks. */
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -555,7 +572,9 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
   const pills = reactionPills(cached.data ?? m.reactions, meId);
-  if (pills.length === 0 || m.local) return null;
+  // What an agent saved to memory from this message comes last in the row (the web's memory mark).
+  const remembered = (m.memories?.length ?? 0) > 0;
+  if ((pills.length === 0 && !remembered) || m.local) return null;
   return (
     <View style={styles.reacts}>
       {pills.flatMap((p) => [
@@ -597,6 +616,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
           </View>
         )),
       ])}
+      {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
     </View>
   );
 }

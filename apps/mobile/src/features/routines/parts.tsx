@@ -1,0 +1,260 @@
+import type { Routine } from "@agenteschat/client";
+import { whenAt } from "@agenteschat/client/lib/format";
+import { pausedFix, type RoutineFix, routineStateWords, runPixels } from "@agenteschat/client/lib/routine-view";
+import { router } from "expo-router";
+import { memo, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Button, Chip, haptics, Icon, IconButton, PixelOrbit, Text, ToggleSwitch } from "@/ui";
+import { routineHref } from "../links/logic";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import {
+  useNextText,
+  useRoutineControls,
+  useRoutineMenu,
+  useRunWords,
+  useSay,
+  useTargetLabel,
+  useWhenText,
+} from "./hooks";
+import {
+  FIX_ICON,
+  hasFired,
+  isDoneOnce,
+  isPaused,
+  isReminder,
+  isRunning,
+  mailTrouble,
+  routineTitle,
+  STATE_ICON,
+  targetIcon,
+  whenIcon,
+} from "./logic";
+import { RunStrip } from "./RunPixels";
+
+/** The routine's state as a chip ("Pausada: o agente não está mais no canal", "Falhando (3 seguidas)"…). */
+export function StateChip({ routine: r }: { routine: Routine }) {
+  const { t, i18n } = useTranslation();
+  const say = useSay();
+  const dir = useDirectory();
+  const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
+  const state = routineStateWords(r, since);
+  if (r.state === "running")
+    return (
+      <Chip
+        label={say(state)}
+        leading={<PixelOrbit color={agentLook(dir.agentById.get(r.agentId)).color} size={10} />}
+      />
+    );
+  return <Chip label={say(state)} icon={STATE_ICON[state.icon]} />;
+}
+
+/** The one-tap fix of a paused routine ("Adicionar agente ao canal", "Assumir rotina", "Retomar"). */
+export function FixButton({
+  fix,
+  controls,
+}: {
+  fix: RoutineFix;
+  controls: ReturnType<typeof useRoutineControls>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      size="sm"
+      variant={fix === "resume" ? "secondary" : "primary"}
+      icon={FIX_ICON[fix]}
+      label={t(`routines.fix.${fix}`)}
+      loading={controls.action.isPending}
+      onPress={() => controls.fix(fix)}
+    />
+  );
+}
+
+/**
+ * "Ativa": the routine's switch, moved at once (the server's answer takes over when it comes; a refusal puts it
+ * back).
+ */
+export function ActiveSwitch({
+  routine: r,
+  controls,
+  label,
+}: {
+  routine: Routine;
+  controls: ReturnType<typeof useRoutineControls>;
+  label: string;
+}) {
+  const [want, setWant] = useState<boolean | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the server's answer (a new `active`) takes over
+  useEffect(() => setWant(null), [r.active]);
+  const on = want ?? r.active;
+  return (
+    <Pressable
+      onPress={() => {
+        haptics.selection();
+        setWant(!on);
+        controls.setActive(!on, () => setWant(null));
+      }}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: on }}
+      hitSlop={8}
+    >
+      <ToggleSwitch value={on} />
+    </Pressable>
+  );
+}
+
+/** A row's measures: the agent's face, the gap after it, the side inset. */
+const AVATAR = 36;
+const GAP = 12;
+const SIDE = 16;
+
+/**
+ * One routine in the list (the web's row, laid out for the phone): the agent, the title, where it delivers and
+ * its chips (a reminder, a mailbox to reconnect, a state that needs a look, its fix), the switch and "…"; then on
+ * lines of their own the "when" with the next run, and the last runs in pixels with a caption. Tapping opens the
+ * routine; a long press, its actions.
+ */
+export const RoutineRow = memo(function RoutineRow({
+  routine: r,
+  now,
+  divider,
+  live,
+}: {
+  routine: Routine;
+  /** "Now" in milliseconds, ticking each minute ("Próxima em 10 min" stays true). */
+  now: number;
+  divider: boolean;
+  live: boolean;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const controls = useRoutineControls(r);
+  const menu = useRoutineMenu(r, "list");
+  const whenText = useWhenText();
+  const nextText = useNextText();
+  const words = useRunWords();
+  const targetLabel = useTargetLabel();
+  const at = new Date(now);
+  const look = agentLook(dir.agentById.get(r.agentId));
+  const title = routineTitle(r);
+  const agent = dir.nameOf({ type: "agent", id: r.agentId });
+  const done = isDoneOnce(r);
+  const fired = hasFired(r);
+  const paused = isPaused(r);
+  const running = isRunning(r);
+  const trouble = mailTrouble(r);
+  const muted = paused || done;
+  // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
+  const needsLook = !done && routineStateWords(r).tone === "waiting";
+  const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  const delivery =
+    r.target.type === "conversation"
+      ? t("routines.deliversIn", { agent, place: targetLabel(r.target) })
+      : t("routines.deliversTo", { agent, target: targetLabel(r.target) });
+  const next = nextText(r, at);
+  const switchLabel = t("routines.activeLabel", { name: title });
+  return (
+    <Pressable
+      onPress={() => router.push(routineHref(r.id))}
+      onLongPress={menu.open}
+      delayLongPress={380}
+      accessibilityRole="button"
+      accessibilityLabel={[title, delivery, whenText(r), next].filter(Boolean).join(", ")}
+      // The row is one element to a screen reader: its switch and "…" are its actions.
+      accessibilityActions={[
+        ...(r.canManage && !fired ? [{ name: "toggle", label: switchLabel }] : []),
+        { name: "menu", label: menu.label },
+      ]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "toggle") controls.setActive(!r.active);
+        else if (e.nativeEvent.actionName === "menu") menu.open();
+      }}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }, done && styles.done]}
+    >
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
+      <View style={styles.top}>
+        <AgentFace agentId={r.agentId} size={AVATAR} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
+        <View style={styles.main}>
+          <Text variant="body" numberOfLines={2} style={[styles.title, muted ? { color: c.muted } : null]}>
+            {title}
+          </Text>
+          <View style={styles.line}>
+            <Icon name={targetIcon(r.target)} size={13} color={c.faint} />
+            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+              {delivery}
+            </Text>
+          </View>
+          {isReminder(r) || trouble || needsLook ? (
+            <View style={styles.chips}>
+              {isReminder(r) ? <Chip icon="bell" label={t("routines.reminder")} /> : null}
+              {trouble ? (
+                <Chip
+                  icon="mail"
+                  label={trouble === "error" ? t("mail.routine.error") : t("mail.routine.needsReconnect")}
+                />
+              ) : null}
+              {needsLook ? <StateChip routine={r} /> : null}
+              {fix && fix !== "resume" ? <FixButton fix={fix} controls={controls} /> : null}
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.acts}>
+          {r.canManage && !fired ? <ActiveSwitch routine={r} controls={controls} label={switchLabel} /> : null}
+          <IconButton icon="more" label={menu.label} onPress={menu.open} />
+        </View>
+      </View>
+      <View style={styles.below}>
+        <View style={styles.when}>
+          <View style={styles.whenIcon}>
+            <Icon name={whenIcon(r)} size={14} color={c.muted} />
+          </View>
+          <View style={styles.grow}>
+            <Text variant="subhead" tone={paused ? "muted" : "ink2"} numberOfLines={2}>
+              {whenText(r)}
+            </Text>
+            {next ? (
+              <Text variant="footnote" tone={running ? "ink2" : "faint"} style={running ? styles.bold : null}>
+                {next}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={styles.runs}>
+          <RunStrip
+            runs={runPixels(r.recentRuns)}
+            color={look.color}
+            running={running}
+            label={words.label(r)}
+            dim={muted}
+          />
+          <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+            {words.caption(r, at)}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+const styles = StyleSheet.create({
+  row: { paddingVertical: 12, paddingLeft: SIDE, paddingRight: 8, gap: 8 },
+  done: { opacity: 0.7 },
+  divider: { position: "absolute", top: 0, right: 0, left: SIDE + AVATAR + GAP, height: StyleSheet.hairlineWidth },
+  top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
+  main: { flex: 1, minWidth: 0, gap: 3, paddingTop: 1 },
+  title: { fontWeight: "600" },
+  line: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  grow: { flex: 1, minWidth: 0 },
+  chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
+  acts: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: -4 },
+  below: { marginLeft: AVATAR + GAP, paddingRight: 8, gap: 8 },
+  when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
+  whenIcon: { paddingTop: 2 },
+  runs: { flexDirection: "row", alignItems: "center", gap: 10 },
+  bold: { fontWeight: "600" },
+});

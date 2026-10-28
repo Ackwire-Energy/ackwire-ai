@@ -98,7 +98,8 @@ describe("receipts under an agent's reply", () => {
     expect(targetHref({ type: "thread", id: "t1" }, "c1")).toBe("/chat/c1?thread=t1");
     expect(targetHref({ type: "wiki_page", id: "w1", slug: "x" }, "c1")).toBeNull();
     expect(targetHref({ type: "memory", id: "m1" }, "c1")).toBeNull();
-    expect(targetHref({ type: "routine", id: "r1" }, "c1")).toBeNull();
+    expect(targetHref({ type: "routine", id: "r1" }, "c1")).toBe("/routines/r1");
+    expect(targetHref({ type: "routine", id: "" }, "c1")).toBeNull();
   });
 
   test("icons per kind and bold runs of the sentence", () => {

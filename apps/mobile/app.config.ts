@@ -56,9 +56,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // brings its own Firebase project.
     ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
     ...(process.env.ANDROID_VERSION_CODE ? { versionCode: Number(process.env.ANDROID_VERSION_CODE) } : {}),
+    // Two layers (the night sky, the tilted agent), so the launcher's mask and motion cut them like the iOS icon.
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
-      backgroundColor: "#0f0f0e",
+      backgroundImage: "./assets/images/adaptive-icon-background.png",
+      backgroundColor: "#02060f",
     },
     predictiveBackGestureEnabled: false,
     intentFilters: [

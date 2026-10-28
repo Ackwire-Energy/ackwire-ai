@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { MachineAccount, PlanUsage } from "../src/api/types";
-import { groupPlans } from "../src/lib/ai-accounts";
+import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
+import { groupPlans, ownSignIns, planWordOf } from "../src/lib/ai-accounts";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
   windows: [{ kind: "five_hour", usedPercent }],
@@ -81,5 +81,41 @@ describe("groupPlans: one row per account, its logins together", () => {
       ["a", ["a"]],
       ["b", ["b"]],
     ]);
+  });
+});
+
+describe("the computers' own sign-ins", () => {
+  const computer = (over: Partial<AiComputer>): AiComputer => ({
+    machineId: "mac",
+    name: "MacBook Air",
+    online: true,
+    mine: true,
+    canAdd: true,
+    keys: true,
+    brains: { claude_code: true, codex: true },
+    ...over,
+  });
+
+  test("each CLI's own sign-in a computer reported, Claude Code first, with its plan and usage", () => {
+    const u = usage("2026-10-27T10:00:00.000Z", 40);
+    const rows = ownSignIns({
+      computers: [
+        computer({ own: { codex: { usage: u }, claude_code: { plan: "max" } } }),
+        computer({ machineId: "pc", name: "PC", own: {} }),
+        // A server too old to say.
+        computer({ machineId: "old", name: "Old" }),
+      ],
+    });
+    expect(rows.map((r) => [r.key, r.computer, r.kind, r.plan, r.usage])).toEqual([
+      ["mac:claude_code", "MacBook Air", "claude_code", "max", null],
+      ["mac:codex", "MacBook Air", "codex", null, u],
+    ]);
+    expect(ownSignIns(undefined)).toEqual([]);
+  });
+
+  test("the plan's word", () => {
+    expect(planWordOf("max")).toBe("Max");
+    expect(planWordOf("PRO")).toBe("Pro");
+    expect(planWordOf(null)).toBeNull();
   });
 });

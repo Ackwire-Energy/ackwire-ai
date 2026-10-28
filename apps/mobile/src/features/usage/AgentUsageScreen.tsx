@@ -59,7 +59,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
   }
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("usageViews.agent.title", agentGrammar(t, name))} solid={false} />
+      <PushedHeader title={t("usageViews.agent.title", agentGrammar(t, name))} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}

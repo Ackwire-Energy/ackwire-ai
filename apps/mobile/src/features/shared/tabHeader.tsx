@@ -2,17 +2,28 @@ import { useMe } from "@agenteschat/client";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { type HeaderAction, PersonAvatar } from "@/ui";
+import { useColors } from "./hooks";
+import { OrgAvatar } from "./OrgAvatar";
 import { usePersonPhoto } from "./photo";
 
+/** The workspace's logo in the bar, and your photo on its corner. */
+const ORG = 34;
+const ME = 18;
+/** The ring around your photo, in the page's color, lifting it off the logo. */
+const RING = 2;
+
 /**
- * The bar of the three tabs: Você on the left, "+" on the right opens "Novo"
- * (agent, channel, a conversation with someone), in the native bar.
+ * The bar of the three tabs: on the left the workspace you are in (its logo, your photo small on its corner)
+ * opens Você; "+" on the right opens "Novo" (agent, channel, a conversation with someone), in the native bar.
  */
 export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
   const { t } = useTranslation();
   const me = useMe();
+  const { org } = useOrg();
+  const c = useColors();
   const photo = usePersonPhoto(me.data?.user.image);
   const actions: HeaderAction[] = [
     { icon: "plus", sf: "plus", label: t("mobile.new.title"), onPress: () => router.push("/new") },
@@ -22,12 +33,22 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
       <Pressable
         onPress={() => router.push("/me")}
         accessibilityRole="button"
-        accessibilityLabel={t("mobile.me.title")}
+        accessibilityLabel={org?.name ? `${t("mobile.me.title")}, ${org.name}` : t("mobile.me.title")}
         hitSlop={6}
+        style={styles.box}
       >
-        <PersonAvatar name={me.data?.user.name ?? "?"} size={32} photo={photo} />
+        <OrgAvatar logo={org?.logo} size={ORG} />
+        <View style={[styles.me, { borderColor: c.bg, backgroundColor: c.bg }]}>
+          <PersonAvatar name={me.data?.user.name ?? "?"} size={ME} photo={photo} />
+        </View>
       </Pressable>
     ),
     actions,
   };
 }
+
+const styles = StyleSheet.create({
+  // Room for the photo on the logo's corner.
+  box: { width: ORG + 6, height: ORG + 6 },
+  me: { position: "absolute", right: 0, bottom: 0, borderRadius: (ME + RING * 2) / 2, borderWidth: RING },
+});
