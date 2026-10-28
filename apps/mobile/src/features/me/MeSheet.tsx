@@ -1,4 +1,5 @@
-import { useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
+import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
+import { ownSignIns } from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import Constants from "expo-constants";
@@ -78,6 +79,9 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const admin = can(org.org?.role, "manage_credentials");
   const credentials = useCredentials(org.orgId, admin);
   const liveKeys = (credentials.data ?? []).filter((k) => !k.revokedAt).length;
+  // "Contas de IA" counts the plans the agents think with (the computers' own sign-ins too), then the API keys.
+  const ai = useAiAccounts(org.orgId);
+  const plans = (ai.data?.accounts.length ?? 0) + ownSignIns(ai.data).length;
   // Membros, for whoever manages them (the requests to join and the invitation link live there).
   const manager = can(org.org?.role, "manage_members");
   const requests = useJoinRequests(org.orgId, manager);
@@ -316,11 +320,13 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               icon="brain"
               label={t("mobile.ai.row")}
               value={
-                admin && credentials.data
-                  ? liveKeys > 0
-                    ? t("mobile.ai.rowKeys", { count: liveKeys })
-                    : t("mobile.ai.rowNone")
-                  : undefined
+                plans > 0
+                  ? t("mobile.ai.rowPlans", { count: plans })
+                  : admin && credentials.data
+                    ? liveKeys > 0
+                      ? t("mobile.ai.rowKeys", { count: liveKeys })
+                      : t("mobile.ai.rowNone")
+                    : undefined
               }
               chevron
               onPress={() => closeThenPush(onClose, "/ai-accounts")}

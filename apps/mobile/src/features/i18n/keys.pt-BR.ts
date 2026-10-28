@@ -1412,6 +1412,8 @@ export const featureKeysPtBR = {
     saving: "Salvando…",
     row: "Contas de IA",
     rowNone: "Nenhuma",
+    rowPlans_one: "{{count}} plano",
+    rowPlans_other: "{{count}} planos",
     rowKeys_one: "{{count}} chave",
     rowKeys_other: "{{count}} chaves",
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",

@@ -3543,6 +3543,11 @@ export interface AiComputer {
   keys: boolean;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
+  /**
+   * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
+   * too old to say). Its plan and usage when the computer reported them.
+   */
+  own?: Partial<Record<MachineAccountKind, { plan?: string; usage?: PlanUsage }>>;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */

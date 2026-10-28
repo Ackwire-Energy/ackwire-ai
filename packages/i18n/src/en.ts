@@ -4507,6 +4507,7 @@ export const en: Translations = {
       usedBy_one: "{{agents}} thinks with it",
       usedBy_other: "{{agents}} think with it",
       noAgent: "No agent yet",
+      ownOn: "Signed in on {{computer}} · its agents think with it",
       signedOut: "Signed out. Sign in again so your agents can use it.",
       signedOutFor_one: "{{agents}} is signed out.",
       signedOutFor_other: "{{agents}} are signed out.",

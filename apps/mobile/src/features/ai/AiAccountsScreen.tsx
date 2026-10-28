@@ -1,5 +1,6 @@
 import type { AiAccounts as AiAccountsView, Credential } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi, useCredentials, useSettings, useUpdateSettings } from "@agenteschat/client";
+import { ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
@@ -19,10 +20,11 @@ import { openConnectAi } from "./NoAiCard";
 import { Note } from "./parts";
 
 /*
- * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", the person's own accounts
- * on every computer, each with its plan's meter and the agent it thinks for, renamed, signed in again (a new key for
- * a coding plan) or disconnected here; then the workspace's API keys (admins), the default one, a key swapped or
- * deleted. Connecting a new one is the same picker as everywhere ("Conectar uma IA").
+ * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
+ * computers the person connected ("Conta deste computador", the agents there think with them), then their own
+ * accounts on every computer, each with its plan's meter and the agent it thinks for, renamed, signed in again (a new
+ * key for a coding plan) or disconnected here; then the workspace's API keys (admins), the default one, a key
+ * swapped or deleted. Connecting a new one is the same picker as everywhere ("Conectar uma IA").
  */
 
 type Account = AiAccountsView["accounts"][number];
@@ -71,6 +73,7 @@ export function AiAccountsScreen() {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
   }, [api, orgId]);
   const rows = ai.data?.accounts ?? [];
+  const own = ownSignIns(ai.data);
   const several = new Set(rows.map((r) => r.machineId)).size > 1;
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
   const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
@@ -159,10 +162,29 @@ export function AiAccountsScreen() {
         </View>
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
-        {ai.isSuccess && rows.length === 0 ? (
+        {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
           <Text variant="small" tone="muted">
             {t("aiAccounts.page.empty")}
           </Text>
+        ) : null}
+        {own.length > 0 ? (
+          <Card>
+            {own.map((o) => (
+              <Row
+                key={o.key}
+                leading={<ProviderLogo id={o.kind} size="sm" />}
+                title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
+                below={
+                  o.usage ? (
+                    <View style={styles.below}>
+                      <PlanMeter usage={o.usage} compact />
+                    </View>
+                  ) : undefined
+                }
+              />
+            ))}
+          </Card>
         ) : null}
         {rows.length > 0 ? (
           <Card>
@@ -233,7 +255,7 @@ export function AiAccountsScreen() {
         <View style={styles.start}>
           <Button
             size="sm"
-            variant={rows.length ? "secondary" : "primary"}
+            variant={rows.length || own.length ? "secondary" : "primary"}
             icon="plus"
             label={t("aiAccounts.page.connect")}
             onPress={() => openConnectAi()}

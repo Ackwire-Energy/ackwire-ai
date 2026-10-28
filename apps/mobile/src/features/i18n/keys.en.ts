@@ -1406,6 +1406,8 @@ export const featureKeysEn: FeatureTranslations = {
     saving: "Saving…",
     row: "AI accounts",
     rowNone: "None",
+    rowPlans_one: "{{count}} plan",
+    rowPlans_other: "{{count}} plans",
     rowKeys_one: "{{count}} key",
     rowKeys_other: "{{count}} keys",
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
