@@ -3,7 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { ApiError, type OrgStanding, type Role } from "@agenteschat/client";
+import { ApiError, keys, type OrgStanding, type Role } from "@agenteschat/client";
+import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -13,6 +14,11 @@ afterEach(() => cleanup());
 
 const STATUS = "Status do workspace";
 const OTHER_ID = "00000000-0000-4000-8000-0000000000b2";
+const meEvery = (qc: QueryClient) =>
+  qc
+    .getQueryCache()
+    .find({ queryKey: keys.me })
+    ?.observers.map((o) => o.options.refetchInterval);
 
 /** #eng of Acme (or `path`) with the standing `/me` says, and its socket open to push what the operator changes. */
 async function open(
@@ -134,11 +140,15 @@ describe("a billing hold (ADR 0077): its own words, and its fix for whoever runs
   test("owners and admins get the button of its code: it opens the billing service, signed in", async () => {
     const left: string[] = [];
     setNavigateAway((url) => left.push(url));
-    const { state, set } = await open({ state: "hold", reason: "payment" }, false, null, { billingUrl: BILLING });
+    const { state, set, services } = await open({ state: "hold", reason: "payment" }, false, null, {
+      billingUrl: BILLING,
+    });
     const banner = () => screen().getByRole("region", { name: STATUS });
     expect(banner().textContent).toContain(
       "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
     );
+    // Not back from paying: nothing to wait for, so `/me` isn't asked again.
+    expect(meEvery(services.queryClient)).not.toContain(5000);
     expect(banner().textContent).toContain(
       "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
     );
@@ -167,6 +177,23 @@ describe("a billing hold (ADR 0077): its own words, and its fix for whoever runs
     expect(within(banner() as HTMLElement).queryByRole("button")).toBeNull();
     await set({ state: "active", reason: null });
     expect(banner()).toBeNull();
+  });
+
+  test("back from paying, a lift this tab never heard of: `/me` is asked again every 5 s until the hold is gone", async () => {
+    const { state, services } = await open({ state: "hold", reason: "payment" }, false, null, {
+      billingUrl: BILLING,
+      path: `/org/${ORG_ID}?paid=1`,
+    });
+    const qc = services.queryClient;
+    expect(meEvery(qc)).toContain(5000);
+    // Lifted before this tab's socket opened: no `org.standing` comes, the next ask brings it.
+    const me = state.me;
+    if (!me) throw new Error("no me");
+    state.me = { ...me, organizations: [{ id: ORG_ID, name: "Acme", role: "owner" }] };
+    await act(async () => qc.refetchQueries({ queryKey: keys.me, type: "active" }));
+    await settle(6);
+    expect(screen().queryByRole("region", { name: STATUS })).toBeNull();
+    expect(meEvery(qc)).not.toContain(5000);
   });
 
   test("a link that can't be made says so; members read who can fix it, with no button", async () => {
