@@ -192,7 +192,7 @@ export const desktopPtBR = {
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
     reachOff: "O Tailscale não está conectado.",
     reachOffTerminal: "O Tailscale não está conectado. Conecte pelo terminal:",
-    reachTray: "O Tailscale não está conectado. Abra pelo ícone perto do relógio e entre na conta.",
+    reachTray: "O Tailscale não está conectado. Conecte pelo ícone perto do relógio.",
     reachMissing: "Precisa do Tailscale, que é grátis.",
     reachChecking: "Vendo se o Tailscale está conectado…",
     /** What turning access on or off is doing while it takes. */

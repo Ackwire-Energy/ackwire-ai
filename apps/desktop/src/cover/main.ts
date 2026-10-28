@@ -18,11 +18,12 @@ import "../fonts.css";
 import "./cover.css";
 import {
   coverHere,
+  coverTailnet,
   isHereServer,
   type LocalServerStatus,
   STEP_SLOW_MS,
   stepClock,
-  tailscaleFrom,
+  type Tailnet,
   UPDATE_SLOW_MS,
 } from "../control/local-server";
 import { platformOf } from "../control/platform";
@@ -189,7 +190,7 @@ const copyDiagnostics = () =>
     .catch(() => {});
 
 /** The server here's state on the cover, with what fixes it. */
-function showHere(state: NonNullable<ReturnType<typeof coverHere>>) {
+function showHere(state: NonNullable<ReturnType<typeof coverHere>>, tailnet: Tailnet | null) {
   const start = () => void invoke("local_server_start").catch(() => {});
   const fill = (text: string) => fillIn(text, { device });
   if (state === "starting" || state === "migrating") {
@@ -214,12 +215,12 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>) {
       fill(words.onlyHere),
       () => void invoke("local_server_reach", { on: false }).catch(() => {}),
     ];
-    const from = tailscaleFrom(platform);
-    if (from === "app") {
+    const next = coverTailnet(platform, tailnet);
+    if (next === "openTailscale") {
       say(fill(words.tailnetOff));
       buttons([[words.openTailscale, () => void invoke("tailscale_open", { page: "app" }).catch(() => {})], onlyHere]);
     } else {
-      say(`${fill(words.tailnetOff)} ${from === "tray" ? words.tailnetTray : words.tailnetUp}`);
+      say(`${fill(words.tailnetOff)} ${words[next]}`);
       buttons([onlyHere]);
     }
   }
@@ -236,7 +237,8 @@ async function check() {
     if (state) {
       hereWaiting = true;
       unreachable = state === "stopped" || state === "failing" || state === "tailnetOff";
-      showHere(state);
+      const tailnet = state === "tailnetOff" ? await invoke<Tailnet>("tailscale_status").catch(() => null) : null;
+      showHere(state, tailnet);
       return;
     }
     if (hereWaiting) {

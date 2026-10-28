@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tailscaleFrom } from "../src/control/local-server";
+import { coverTailnet } from "../src/control/local-server";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
 
@@ -22,10 +22,19 @@ test("the cover names only fonts its own page loads (it doesn't load the app's s
   for (const family of named) expect(loaded).toContain(family);
 });
 
-test("Tailscale off over the server here: a Mac opens its app, Windows its icon by the clock, Linux the terminal", () => {
-  expect((["mac", "windows", "linux"] as const).map(tailscaleFrom)).toEqual(["app", "tray", "terminal"]);
-  // What follows "Connect Tailscale on this PC to open agentes.chat.": no sudo on Windows, the command on Linux.
+test("Tailscale off over the server here: the Mac's app, Windows' icon by the clock, the terminal elsewhere", () => {
+  for (const app of [true, false]) {
+    expect(coverTailnet("windows", { state: "off", app })).toBe("tailnetTray");
+    expect(coverTailnet("linux", { state: "off", app })).toBe("tailnetUp");
+  }
+  expect(coverTailnet("mac", { state: "off", app: true })).toBe("openTailscale");
+  // Only the command-line tool (Homebrew's): nothing to open, the command instead.
+  expect(coverTailnet("mac", { state: "off", app: false })).toBe("tailnetUp");
+  // Not read: its app.
+  expect(coverTailnet("mac", null)).toBe("openTailscale");
+  // What follows "Connect Tailscale on this PC to open agentes.chat.": no sudo on Windows, the command elsewhere.
   for (const { cover } of [desktopEn, desktopPtBR]) {
+    expect(cover.openTailscale).toBeTruthy();
     expect(cover.tailnetTray).not.toMatch(/sudo|terminal/);
     expect(cover.tailnetUp).toContain("sudo tailscale up");
   }

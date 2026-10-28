@@ -13,7 +13,7 @@ import { CommandCopy } from "./bits";
 import { hintFor, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
-/** Connecting Tailscale where it has no app or icon of its own to open (Linux). */
+/** Connecting Tailscale where it has no app or icon of its own to open (Linux, a Mac with only its command line). */
 const TAILSCALE_UP = "sudo tailscale up";
 /** What lets this computer's user change what Tailscale shares (Linux). */
 const TAILSCALE_OPERATOR = "sudo tailscale set --operator=$USER";
@@ -66,7 +66,7 @@ export function ReachRow({
   const host = useHost();
   const usable = tailnet?.state === "on" || on;
   const missing = tailnet?.state === "missing";
-  const from = tailscaleFrom(host.platform);
+  const from = tailscaleFrom(host.platform, tailnet);
   const fromTerminal = !usable && !missing && from === "terminal";
   let line: ReactNode = null;
   if (!tailnet && !on)

@@ -117,7 +117,7 @@ export function createFakeHost(
     here.tailscale === "missing"
       ? { state: "missing" }
       : here.tailscale === "off"
-        ? { state: "off" }
+        ? { state: "off", app: platform === "mac" }
         : { state: "on", device: "ana-mac.tail1234.ts.net" };
   const running = scenario === "here" && here.run !== false;
   let local: LocalServerStatus = {

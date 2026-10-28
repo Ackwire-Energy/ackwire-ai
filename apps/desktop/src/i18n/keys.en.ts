@@ -185,7 +185,7 @@ export const desktopEn: DesktopTranslations = {
       "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.",
     reachOff: "Tailscale isn't connected.",
     reachOffTerminal: "Tailscale isn't connected. Connect it in the terminal:",
-    reachTray: "Tailscale isn't connected. Open it from its icon by the clock and log in.",
+    reachTray: "Tailscale isn't connected. Connect it from its icon by the clock.",
     reachMissing: "Needs Tailscale, which is free.",
     reachChecking: "Checking whether Tailscale is connected…",
     /** What turning access on or off is doing while it takes. */

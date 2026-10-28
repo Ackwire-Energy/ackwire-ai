@@ -562,6 +562,18 @@ fn checked(request: &Value) -> Result<Value, String> {
     }
 }
 
+/// `files` reaches the popover only from the server here's own page, marked `local`: the folder it shows is this
+/// computer's.
+fn files_gate(mut request: Value, server_here: bool) -> Result<Value, String> {
+    if request["kind"] == "files" {
+        if !server_here {
+            return Err("not_here".into());
+        }
+        request["local"] = json!(true);
+    }
+    Ok(request)
+}
+
 /// The site's notifications: at most one every 3 seconds and 60 an hour, only while the window isn't in
 /// front, and only while the person wants them (Preferences › General). Coming back to the app within 30
 /// seconds opens the last one's page.
@@ -747,10 +759,7 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             }
         }
     }
-    // The popover shows a folder of this computer only to the page of the server that keeps it.
-    if request["kind"] == "files" && server_here {
-        request["local"] = json!(true);
-    }
+    request = files_gate(request, server_here)?;
     if request["kind"] == "connect" {
         if !here {
             return Err("not_here".into());
@@ -939,6 +948,14 @@ mod tests {
             Ok(json!({ "kind": "files" }))
         );
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
+    }
+
+    #[test]
+    fn files_only_for_the_server_here() {
+        let files = checked(&json!({ "kind": "files", "local": true })).unwrap();
+        assert_eq!(files_gate(files.clone(), false), Err("not_here".to_string()));
+        assert_eq!(files_gate(files, true), Ok(json!({ "kind": "files", "local": true })));
+        assert_eq!(files_gate(json!({ "kind": "status" }), false), Ok(json!({ "kind": "status" })));
     }
 
     #[test]
