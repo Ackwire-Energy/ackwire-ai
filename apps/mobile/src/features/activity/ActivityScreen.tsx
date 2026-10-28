@@ -14,7 +14,6 @@ import { useTranslation } from "react-i18next";
 import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import {
   Button,
-  Card,
   Filters,
   Fuse,
   Icon,
@@ -104,11 +103,10 @@ export function ActivityScreen() {
       {days.map(([group, groupItems]) => (
         <View key={group}>
           <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
-          <Card style={styles.inset}>
-            {groupItems.map((n, i) => (
-              <ActivityRow key={n.id} item={n} divider={i > 0} />
-            ))}
-          </Card>
+          {/* Loose rows on the page, as Conversas' (no card around them). */}
+          {groupItems.map((n, i) => (
+            <ActivityRow key={n.id} item={n} divider={i > 0} />
+          ))}
         </View>
       ))}
       {list.hasNextPage ? (
@@ -390,7 +388,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
         <View style={styles.back}>
           <Face who={faceOf(faces[0])} size={STACKED} live={false} />
         </View>
-        <View style={[styles.front, { backgroundColor: c.raised, borderRadius: STACKED / 2 + 2 }]}>
+        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED / 2 + 2 }]}>
           <Face who={faceOf(faces[1])} size={STACKED} live={false} />
         </View>
       </View>
@@ -412,7 +410,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           <Icon name="archive" size={18} color={c.muted} />
         </View>
       </View>
-      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.raised }} {...responder.panHandlers}>
+      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.bg }} {...responder.panHandlers}>
         <ListRow
           onPress={open}
           accessibilityRole="button"
@@ -454,7 +452,6 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
   a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
 
 const styles = StyleSheet.create({
-  inset: { marginHorizontal: 16 },
   cards: { gap: 10, paddingHorizontal: 16 },
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
