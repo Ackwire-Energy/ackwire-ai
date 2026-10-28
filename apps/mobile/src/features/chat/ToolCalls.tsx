@@ -40,7 +40,7 @@ import { useColors, useOrgId } from "../shared/hooks";
 import { MONO, tapHaptic } from "../shared/parts";
 import { CodeCard } from "./CodeCard";
 import { MessageText } from "./MessageText";
-import { outputTail, withOpacity } from "./turn";
+import { outputTail } from "./turn";
 
 /**
  * The tools of one reply, as on the web (`ToolCalls.tsx`, the UI kit's `ToolBlock`): one
@@ -217,7 +217,8 @@ function ToolBlock({
             ))}
           </View>
         ) : null}
-        <View style={styles.grow}>
+        {/* The new words come up inside the line, never over the divider under it. */}
+        <View style={[styles.grow, styles.clip]}>
           <Animated.View key={head.textKey ?? head.text} entering={moving ? FadeInDown.duration(350) : undefined}>
             <Breathing on={head.state === "run"}>
               <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.medium}>
@@ -292,7 +293,8 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
     </>
   );
   return (
-    <View style={[styles.line, line.state === "fail" && { backgroundColor: withOpacity(c.danger, 0.06) }]}>
+    // A failed call says so by its mark and its reason, on the block's own surface (no tinted plate).
+    <View style={styles.line}>
       {opens ? (
         <Pressable
           onPress={() => {
@@ -663,6 +665,7 @@ const styles = StyleSheet.create({
   stacked: { borderRadius: 7, borderWidth: 1.5 },
   overlap: { marginLeft: -7 },
   grow: { flex: 1, minWidth: 0 },
+  clip: { overflow: "hidden" },
   shrink: { flexShrink: 1 },
   medium: { fontWeight: "500" },
   num: { fontVariant: ["tabular-nums"] },
