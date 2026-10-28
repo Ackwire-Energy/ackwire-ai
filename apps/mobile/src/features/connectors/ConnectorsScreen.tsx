@@ -16,12 +16,15 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
 import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, suggestionsOf } from "./logic";
+import { opensTools } from "./review";
+import { openTools } from "./ToolsScreen";
 
 /**
  * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
  * brand's tone, then every service as even tiles in two columns, filtered by category. A tile opens a sheet
- * over the gallery with the whole flow in four steps: what agents could do → connect → its tools → who uses it.
+ * over the gallery with the whole flow in four steps: what agents could do → connect → its tools → who uses it;
+ * a connection's tools are a screen of their own (Ferramentas), where one whose tools wait for a review opens.
  */
 export function ConnectorsScreen() {
   return (
@@ -62,11 +65,17 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
-  const open = (def: ConnectorDef) => sheet.open(<ConnectSheet def={def} />);
+  const open = (def: ConnectorDef) => {
+    const existing = connectionOf(def, items);
+    if (existing && opensTools(existing, admin)) openTools(existing.id);
+    else sheet.open(<ConnectSheet def={def} />);
+  };
   // A connection opens on itself: its service's sheet, or (a server connected by an address we don't know)
-  // its own with the address.
+  // its own with the address; while its tools wait for a review, on them.
   const openItem = (item: ConnectedItem) =>
-    sheet.open(item.def ? <ConnectSheet def={item.def} item={item} /> : <ServerSheet item={item} />);
+    opensTools(item, admin)
+      ? openTools(item.id)
+      : sheet.open(item.def ? <ConnectSheet def={item.def} item={item} /> : <ServerSheet item={item} />);
   // Back from a sign-in that finished on the link route (`?connected=<id>`): its tools, as the web opens
   // "O que faz" for the connection that just came in (admins; anyone else had the toast).
   const { connected } = useLocalSearchParams<{ connected?: string }>();

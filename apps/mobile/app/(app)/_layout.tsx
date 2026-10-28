@@ -59,9 +59,10 @@ function AppStack() {
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="issues/new" options={formSheet} />
+      <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen
         name="connectors/oauth"
         options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}

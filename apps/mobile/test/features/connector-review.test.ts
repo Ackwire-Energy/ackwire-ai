@@ -13,6 +13,7 @@ import {
   emptyReview,
   firstStep,
   isWaiting,
+  opensTools,
   returnHref,
   reviewAgain,
   reviewTarget,
@@ -86,15 +87,21 @@ describe("where the sheet is", () => {
     expect(ADDRESS_STEPS).toEqual(["connect", "review", "who"]);
   });
 
-  test("a new service opens on what it does; a connection on who uses it, or its tools while they wait", () => {
+  test("a new service opens on what it does; a connection on who uses it (its tools are a screen)", () => {
     expect(firstStep(undefined, true)).toBe("about");
     expect(firstStep({ needsReview: false }, true)).toBe("who");
-    expect(firstStep({ needsReview: true }, true)).toBe("review");
-    // Only admins review (as on the web): anyone else sees who uses it.
+    expect(firstStep({ needsReview: true }, true)).toBe("who");
     expect(firstStep({ needsReview: true }, false)).toBe("who");
     // Back from a sign-in: on its tools, reviewed or not; never for someone who can't change them.
     expect(firstStep({ needsReview: false }, true, "review")).toBe("review");
     expect(firstStep({ needsReview: true }, false, "review")).toBe("who");
+  });
+
+  test("a connection whose tools wait for a review opens them, for admins only (as the web's Revisar)", () => {
+    expect(opensTools({ needsReview: true }, true)).toBe(true);
+    expect(opensTools({ needsReview: false }, true)).toBe(false);
+    expect(opensTools({ needsReview: true }, false)).toBe(false);
+    expect(opensTools(undefined, true)).toBe(false);
   });
 
   test("each step has a name in both languages, and the dashes say where the flow is", async () => {
