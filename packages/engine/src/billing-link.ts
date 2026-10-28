@@ -49,10 +49,12 @@ export function signBillingLink(secret: string, claims: BillingLinkClaims): stri
   return `${signed}.${createHmac("sha256", secret).update(signed).digest("base64url")}`;
 }
 
+/** Where under the workspace each entry point sends people back (the onboarding's opens it again at its AI step). */
 const RETURN_TO: Partial<Record<BillingFrom, string>> = {
   settings: "/settings/billing",
   storage: "/settings/storage",
   invite_full: "/members",
+  onboarding: "/onboarding",
 };
 
 /**

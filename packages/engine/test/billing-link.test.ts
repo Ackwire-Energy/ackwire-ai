@@ -102,7 +102,7 @@ describe("mintBillingLink", () => {
     expect(returns).toEqual({
       settings: `${org}/settings/billing`,
       hold: org,
-      onboarding: org,
+      onboarding: `${org}/onboarding`,
       new_workspace: org,
       invite_full: `${org}/members`,
       upload_full: org,
