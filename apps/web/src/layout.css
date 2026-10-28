@@ -4042,6 +4042,11 @@ p {
   border: 0;
   min-width: 0;
 }
+/* A legend sits outside the fieldset's flex flow, so the gap above doesn't reach it. */
+.mail-rules__group > legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
 .mail-rules__unit {
   display: flex;
   align-items: center;
