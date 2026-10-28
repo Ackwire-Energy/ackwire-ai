@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -1179,8 +1179,16 @@ describe("Onboarding", () => {
 
     test("Back goes to the AI; never after Conectar depois, with a key in the server's settings, or for anyone else", async () => {
       await toJev();
+      // Each of the two screens opens at the page's top, never at the other's scroll.
+      const scrolls = spyOn(window, "scrollTo");
       await click(button(/Voltar/), 6);
       expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+      expect(scrolls).toHaveBeenLastCalledWith({ top: 0 });
+      scrolls.mockClear();
+      await click(button("Continuar"), 8);
+      expect(heading().textContent).toContain("Ajude os agentes a trabalhar em equipe");
+      expect(scrolls).toHaveBeenLastCalledWith({ top: 0 });
+      scrolls.mockRestore();
       cleanup();
 
       const later = await start({ jev: OFF });

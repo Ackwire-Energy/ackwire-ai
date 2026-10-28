@@ -868,14 +868,16 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     },
   });
 
-  const go = (i: number) => {
+  // Every screen opens at the page's top, Jev's too (`onJev`): a screen switched without `go` keeps the last one's
+  // scroll.
+  const go = (i: number, onJev = false) => {
     const next = Math.max(0, Math.min(total - 1, i));
     // Done asks again whether the agents have an AI: one connected on a way back there counts.
     if (created && ONBOARDING_STEPS[next]?.id === "done")
       void qc.invalidateQueries({ queryKey: keys.aiStatus(created.orgId), refetchType: "none" });
     setIndex(next);
     setReached((r) => Math.max(r, next));
-    setJev(false);
+    setJev(onJev);
     if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
       try {
         window.scrollTo({ top: 0 });
@@ -909,7 +911,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         if (!jev && how !== "keyLater") {
           await finishAi.mutateAsync();
           if (jevKey.data?.source === null) {
-            setJev(true);
+            go(index, true);
             return;
           }
         }
@@ -1062,10 +1064,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   // message, while there is one.
   const showSkip =
     step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.id === "done" ? asking : step.optional;
-  const back = () => {
-    if (jevOpen) setJev(false);
-    else go(index - 1);
-  };
+  const back = () => go(jevOpen ? index : index - 1);
 
   return (
     <div className="onb">
