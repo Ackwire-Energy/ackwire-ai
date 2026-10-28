@@ -5,8 +5,9 @@ import { MARKS, unplainServerWords } from "../../../packages/i18n/test/plain-mar
 
 const REPO = join(import.meta.dir, "..", "..", "..");
 
-test("the API's error words: no semicolon, no em dash", () => {
-  expect(unplainServerWords(["apps/server/src", "packages/engine/src"].map((d) => join(REPO, d)))).toEqual([]);
+test("the API's and the runner's error words: no semicolon, no em dash", () => {
+  const dirs = ["apps/server/src", "apps/server/runner", "packages/engine/src"];
+  expect(unplainServerWords(dirs.map((d) => join(REPO, d)))).toEqual([]);
   // Passed by name, so the scan above doesn't read it.
   expect(REMOVED_COMPUTER_MESSAGE).not.toMatch(MARKS);
 });

@@ -291,7 +291,7 @@ export class Supervisor {
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
+    if (this.closed) throw new RunnerError("internal", "The runner is stopping. Try again in a minute.");
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -309,7 +309,7 @@ export class Supervisor {
         );
     }
     await this.ready(w, scope.signal);
-    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     if (req.op === "task.start") this.own(req.taskId, w);
     const id = String(++this.seq);
     return new Promise((resolve, reject) => {
@@ -400,10 +400,10 @@ export class Supervisor {
    * brings the agent's Chrome there, and gets the desktop from root meanwhile (`desktop.ensure`).
    */
   async showBrowser(agent: AgentScope, installing: () => void): Promise<void> {
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
+    if (this.closed) throw new RunnerError("internal", "The runner is stopping. Try again in a minute.");
     const w = this.entry(this.opts.user(agent));
     await this.ready(w, new AbortController().signal);
-    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     const showId = String(++this.seq);
     await new Promise<void>((resolve, reject) => {
       // The agent's own code can stop its worker (same user): past the launcher's own wait the click is over, and
@@ -442,7 +442,7 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      const stopping = "The runner is stopping; try again in a minute";
+      const stopping = "The runner is stopping. Try again in a minute.";
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", stopping));
       w.ready = false;
       this.endSession(w, stopping);
@@ -573,8 +573,8 @@ export class Supervisor {
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
-    this.endSession(w, "The agent's worker stopped on this computer; try again");
-    this.endShows(w, "The agent's worker stopped on this computer; try again");
+    this.endSession(w, "The agent's worker stopped on this computer. Try again.");
+    this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
@@ -708,7 +708,7 @@ export class Supervisor {
 
   /** A new session of the worker: whatever the last one ran is gone (the worker aborted it). */
   private hello(w: Worker) {
-    this.endSession(w, "The agent's worker started over; try again");
+    this.endSession(w, "The agent's worker started over. Try again.");
     w.ready = true;
     w.state = "";
     this.sendState(w);

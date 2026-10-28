@@ -502,7 +502,7 @@ class Helper {
       const last = this.stderr.trim().split("\n").pop()?.slice(0, 200) ?? "";
       const why = `it exited (${signal ?? `code ${code}`})${last ? `: ${last}` : ""}`;
       this.finish(
-        new RunnerError("desktop_unavailable", "The desktop helper stopped; it starts again on the next use"),
+        new RunnerError("desktop_unavailable", "The desktop helper stopped. It starts again on the next use."),
         why,
       );
     });
@@ -556,7 +556,7 @@ class Helper {
 
   private violation(why: string) {
     this.finish(
-      new RunnerError("internal", `The desktop helper misbehaved (${why}); it starts again on the next use`),
+      new RunnerError("internal", `The desktop helper misbehaved (${why}). It starts again on the next use.`),
       why,
     );
     this.child.kill("SIGKILL");
@@ -737,7 +737,7 @@ export class DesktopManager {
     if (refusal) throw new RunnerError("desktop_unavailable", refusal);
     const started = await this.opts.desktops.ensure(agent);
     const s = this.opts.desktops.session(agent.id);
-    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again.");
     const at = Date.parse(started.startedAt);
     const since = Number.isFinite(at) ? at : 0;
     let use = this.uses.get(agent.id);
@@ -1129,7 +1129,7 @@ export class DesktopManager {
   /** The helper broke the protocol: it stops (starting again on the next use), and the request fails. */
   private malformed(use: Use, what: string) {
     this.stop(use);
-    return new RunnerError("internal", `The desktop helper sent a malformed ${what}; it starts again on the next use`);
+    return new RunnerError("internal", `The desktop helper sent a malformed ${what}. It starts again on the next use.`);
   }
 
   private stop(use: Use) {
@@ -1157,7 +1157,7 @@ function lastLook(use: Use, points: DesktopPoint[]): NonNullable<Use["last"]> {
   const ref = points.find((p) => "ref" in p);
   throw ref && "ref" in ref
     ? staleRef(ref.ref)
-    : new RunnerError("not_found", "stale: the desktop isn't as last seen; look at it again");
+    : new RunnerError("not_found", "stale: the desktop isn't as last seen. Look at it again.");
 }
 
 /** A window is activated by its id: what `focus` does, and a click on a window's own line. */

@@ -266,7 +266,7 @@ export class McpBridge {
       clearTimeout(p.timer);
       p.resolve({
         ok: false,
-        error: "The computer lost its connection to agentes.chat; try again in a minute.",
+        error: "The computer lost its connection to agentes.chat. Try again in a minute.",
         transient: true,
       });
       this.pending.delete(callId);
@@ -321,7 +321,7 @@ export class McpBridge {
     if (!info.running) {
       // A brain process between turns: its background refresh waits for the next turn, quietly.
       if (info.idle)
-        return { ok: false, error: "No turn is running right now; try again in your next turn.", idle: true };
+        return { ok: false, error: "No turn is running right now. Try again in your next turn.", idle: true };
       return { ok: false, error: "This task has ended." };
     }
     if (req.kind === "list") {
@@ -383,7 +383,7 @@ export class McpBridge {
           waited
             ? {
                 ok: false,
-                error: "The computer is not connected to agentes.chat right now; try again in a minute.",
+                error: "The computer is not connected to agentes.chat right now. Try again in a minute.",
                 transient: true,
               }
             : { ok: false, error: "agentes.chat did not answer in time." },
@@ -427,7 +427,7 @@ export class McpBridge {
     this.detach();
     for (const [callId, p] of this.pending) {
       clearTimeout(p.timer);
-      p.resolve({ ok: false, error: "The runner is stopping; try again in a minute.", transient: true });
+      p.resolve({ ok: false, error: "The runner is stopping. Try again in a minute.", transient: true });
       this.pending.delete(callId);
     }
     this.waiting.clear();

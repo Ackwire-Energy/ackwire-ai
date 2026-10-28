@@ -547,7 +547,7 @@ function missingLibraries(exe: string, output: string): string[] {
 function missingLibrariesText(missing: string[]): string {
   const names =
     missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
-  return `the agent's computer is missing system libraries Chrome needs (${names}); install them on it, then try again`;
+  return `the agent's computer is missing system libraries Chrome needs (${names}). Install them on it, then try again.`;
 }
 
 /**
@@ -1447,7 +1447,7 @@ export class BrowserManager {
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
         "browser_unavailable",
-        `This computer already has ${live.length} agent browsers open (its limit); try again in a few minutes`,
+        `This computer already has ${live.length} agent browsers open (its limit). Try again in a few minutes.`,
       );
     }
     for (const [id, s] of this.sessions) {
