@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { join, relative } from "node:path";
+import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
+import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
+import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
 import { createDesktopI18n, pickLocale, withDesktopKeys } from "../src/i18n";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
@@ -34,6 +37,19 @@ describe("desktop strings", () => {
       expect(s.trim().length).toBeGreaterThan(0);
       expect(s).not.toMatch(/\b(runner|MCP|protocol|protocolo|sidecar|Tauri|PGlite)\b/i);
     }
+  });
+
+  test("no semicolon, no em dash", () => {
+    expect([desktopEn, desktopPtBR].flatMap((tree) => unplainLeaves(tree))).toEqual([]);
+  });
+
+  test("words true in every setup", () => {
+    const desktop = (tree: object) => entries(tree).map(([k, v]): [string, string] => [`desktop.${k}`, String(v)]);
+    const en = desktop(desktopEn);
+    const pt = desktop(desktopPtBR);
+    expect([...misplaced(en, "en"), ...misplaced(pt, "pt-BR")]).toEqual([]);
+    const keys = [...en, ...pt].map(([k]) => k);
+    expect(staleLines(keys, "desktop.")).toEqual([]);
   });
 
   test("Claude and ChatGPT, not their makers, in what the app shows", () => {

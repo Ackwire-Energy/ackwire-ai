@@ -80,8 +80,10 @@ describe("computer portraits", () => {
       expect(Math.max(...ys)).toBe(first + count - 1);
     }
     const { container, unmount } = render(<ComputerPortrait kind="mac" state="online" size={96} />);
-    // The Mac starts 6 cells down: 12px at twice the grid.
-    expect((container.querySelector("canvas") as HTMLElement).style.getPropertyValue("--art-top")).toBe("12px");
+    // The Mac starts 6 cells down and ends 9 cells over the bottom (48 − 6 − 33): 12px and 18px at twice the grid.
+    const box = container.querySelector("canvas") as HTMLElement;
+    expect(box.style.getPropertyValue("--art-top")).toBe("12px");
+    expect(box.style.getPropertyValue("--art-bottom")).toBe("18px");
     unmount();
   });
 

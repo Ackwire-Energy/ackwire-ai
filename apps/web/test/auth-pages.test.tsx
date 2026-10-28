@@ -193,6 +193,39 @@ describe("Entrar (e-mail primeiro)", () => {
       cleanup();
     }
   });
+
+  test("on agentes.chat Cloud a blocked account reads why by the block's kind, and how to contest it", async () => {
+    const contest = "Para contestar, escreva para legal@agentes.chat.";
+    for (const [block, says] of [
+      [
+        { kind: "abuse", cloud: true },
+        `Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). ${contest}`,
+      ],
+      [
+        { kind: "legal", cloud: true },
+        "Esta conta está bloqueada enquanto guardamos os dados dela por uma questão legal. Para perguntar sobre isso, escreva para legal@agentes.chat.",
+      ],
+      [{ kind: "other", cloud: true }, `Esta conta não pode entrar. ${contest}`],
+      // A self-hosted server: the line it always had.
+      [{}, "Esta conta não pode entrar."],
+    ] as const) {
+      const signIn = {
+        ok: false as const,
+        status: 403,
+        message: "This account can't sign in.",
+        code: "ACCOUNT_BLOCKED",
+        ...block,
+      };
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(screen().getByRole("alert").textContent).toBe(says);
+      cleanup();
+    }
+  });
 });
 
 describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
@@ -697,7 +730,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     // No computer here: the API key first, and the plans (all six, dimmed) wait for one.
     expect(document.body.textContent).toContain(
-      "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
+      "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     );
     expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
     for (const name of [/^Claude$/, /^ChatGPT$/, /^GLM Coding$/, /^Kimi Code$/, /^MiniMax$/, /^OpenCode Go$/])
@@ -714,7 +747,7 @@ describe("Onboarding", () => {
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");
     // The platform key isn't offered by this server.
-    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
+    expect(within(makers).queryByRole("button", { name: "Este servidor" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
@@ -784,6 +817,28 @@ describe("Onboarding", () => {
     await settle(4);
   };
 
+  test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {
+    for (const [cloud, says] of [
+      [
+        true,
+        "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
+      ],
+      [false, "Você não pode criar um workspace agora."],
+    ] as const) {
+      const { api } = await start();
+      api.orgs.create = async () => {
+        throw new ApiError(403, "org.create_refused", "You can't create a workspace right now", {
+          ...(cloud ? { cloud } : {}),
+        });
+      };
+      await type("Nome", "Acme Saúde");
+      await next();
+      expect(document.querySelector(".ac-toast")?.textContent).toContain(says);
+      expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+      cleanup();
+    }
+  });
+
   test("the step's actions: a bar always in view, Continue first, the text button after it, notes above it", async () => {
     sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
     await start();
@@ -808,6 +863,20 @@ describe("Onboarding", () => {
     const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
     expect(rule("\n.onb__actions")).toContain("position: sticky");
     expect(rule("\n.onb__actions")).toContain("bottom: 0");
+    // On a short step too: the column is the screen's height at least (no auto margin centres it any more) and the
+    // bar's own auto top margin takes the room left, so it rests at the bottom, in the same place on every step.
+    expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
+    expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
+    // The room above the step is the one the page pins as the step opens (computer-setup.test.tsx).
+    expect(rule("\n.onb__body::before")).toContain("margin-block: var(--onb-lead, auto) -24px");
+    // A text button that doesn't fit beside Continue goes above it: Continue keeps its place on every step.
+    expect(rule("\n.onb__actions")).toContain("flex-wrap: wrap-reverse");
+    // Its ground spans the column's gutters, and its bottom clears the home bar at every width.
+    expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
+    expect(rule("\n.onb__actions")).toContain(
+      "padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    );
+    expect(rule("\n.onb__actions")).toContain("background: var(--pane)");
     const phone = css.indexOf("@media (max-width: 760px) {\n  .onb__actions");
     expect(phone).toBeGreaterThan(-1);
     expect(rule("  .onb__actions", phone)).toContain("safe-area-inset-bottom");
@@ -877,7 +946,7 @@ describe("Onboarding", () => {
     const hintOf = (name: string) =>
       document.getElementById(button(name).getAttribute("aria-describedby") ?? "")?.textContent;
     expect(hintOf("Sobre E-mails")).toBe("Cada pessoa recebe um convite por e-mail e entra direto.");
-    expect(hintOf("Sobre Link de convite")).toBe("Vale 30 dias. Dá para desativar em Membros.");
+    expect(hintOf("Sobre Link de convite")).toBe("Vale por 30 dias. Dá para desativar em Membros.");
     const emails = screen().getByLabelText("E-mails");
     expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint");
     // What makes sharing the link in a group safe stays in view, under it.
@@ -1006,8 +1075,9 @@ describe("Onboarding", () => {
       await type("Cole aqui", "ts_live_9f2c");
       await click(button("Salvar e continuar"), 8);
       const field = screen().getByLabelText("Cole aqui");
+      // In the person's language, never the server's English.
       expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
-        "Too many tries. Wait a minute.",
+        "Muitas tentativas. Tente de novo mais tarde.",
       );
       // Never a way past a key that wasn't kept.
       expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
@@ -1074,7 +1144,7 @@ describe("Onboarding", () => {
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
     expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
-    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac, um PC ou um servidor, conectado com um código.");
     expect(document.body.textContent).toContain(
       "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
     );
@@ -1099,11 +1169,14 @@ describe("Onboarding", () => {
     ])
       expect(option(name)).toBeTruthy();
     expect(option(/^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    expect(document.querySelector(".onb__lead")?.textContent).toBe("Entre com o seu plano de IA: sem chave de API.");
+    // "sem chave de API" stays on one line.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
+    );
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    // For the first agent with no AI in the team's order (Theo, made first), as Connect an AI picks in the app.
-    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Theo");
+    // For Ada, whose face asks the step's question, before Theo (made first, the team's first with no AI).
+    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
     // Ada picked: another plan's tile keeps her while she has none.
     const agent = () => screen().getByRole("combobox", { name: "Agentes que usam este plano" });
@@ -1116,7 +1189,7 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
 
-  test("a plan for Theo: he thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
+  test("a plan for Ada, who asks: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
     // The computer finishes the sign-in as soon as the code goes.
@@ -1156,19 +1229,19 @@ describe("Onboarding", () => {
       window.open = realOpen;
     }
     await settle(6);
-    // No "Usar" to click: Theo thinks with it as soon as it's in.
+    // No "Usar" to click: Ada thinks with it as soon as it's in.
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
       { brain: "claude_code", account: "acct_max" },
     ]);
-    expect(document.body.textContent).toContain("Theo agora pensa com Claude Max.");
+    expect(document.body.textContent).toContain("Ada agora pensa com Claude Max.");
     // In the team's order, as the workspace lists them.
     const who = screen().getByRole("region", { name: "Quem pensa" });
     expect([...who.querySelectorAll(".ai-who__row")].map((r) => r.textContent)).toEqual([
-      "TheoClaude Max",
-      "AdaSem IA",
+      "TheoSem IA",
+      "AdaClaude Max",
     ]);
     expect(who.textContent).not.toContain("Cada plano pensa por um agente.");
-    const keyFor = within(who).getByRole("button", { name: "Chave de API para Ada" });
+    const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });
     expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
       ["claude", "openai"],
     );
@@ -1260,7 +1333,7 @@ describe("Onboarding", () => {
     await click(button(/Criar 1 agente/), 8);
     const panel = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(panel).getByRole("group", { name: "Provedor" });
-    const ours = within(makers).getByRole("button", { name: "agentes.chat" });
+    const ours = within(makers).getByRole("button", { name: "Este servidor" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
     const PAYS = "Você paga pelo uso, direto ao provedor.";
@@ -1269,7 +1342,7 @@ describe("Onboarding", () => {
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
     // Our key isn't paid to a provider: its own line says what it is.
     expect(panel.textContent).not.toContain(PAYS);
-    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do Claude deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
@@ -1332,7 +1405,7 @@ describe("Onboarding", () => {
     fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
-    expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
+    expect(document.body.textContent).toContain("MacBook do Walter (macOS) conectado.");
     // Choosing a plan asks nothing: only letting others talk to an agent on it does (ADR 0059 §5).
     expect(screen().queryByRole("dialog")).toBeNull();
     await next();

@@ -301,7 +301,11 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Faltam uns 6 min");
-    expect(panel.textContent).toContain("Você entra aqui assim que o computador ficar pronto.");
+    // The well says how far it is and, with no email to promise, when the sign-in under it turns on: once.
+    expect(panel.querySelector(".ai-panel__wait")?.lastElementChild?.textContent).toBe(
+      "Você entra aqui assim que o computador ficar pronto.",
+    );
+    expect(panel.textContent?.split("pronto")).toHaveLength(2);
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
     await click(option(plan, /^Chave de API/));
     expect(within(plan).getByRole("region", { name: "Chave de API" })).toBeTruthy();
@@ -368,7 +372,7 @@ describe("receipts and the live block", () => {
     expect(document.querySelector(".ac-msg__error")).toBeNull();
     const receipt = receiptOf("e o login?");
     const check = receipt.querySelector(".ac-receipt__check") as HTMLElement;
-    expect(check.getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check.getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
@@ -393,7 +397,7 @@ describe("receipts and the live block", () => {
     const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     // Read as her run started.
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     // She has no AI: her card and her run's end come before the socket is even open, so no event carries them.
     state.messages = state.messages.map((m) =>
       m.id === "m-asked" ? asked([{ agentId: ADA_ID, runId: "r-noai", status: "failed", reason: "no_ai" }]) : m,
@@ -408,7 +412,7 @@ describe("receipts and the live block", () => {
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
       "Ninguém vai responder: falta uma IA ·",
     );
@@ -420,7 +424,7 @@ describe("receipts and the live block", () => {
     const { socket } = await open(state);
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     await click(within(cardRow()).getByRole("button", { name: "Responder agora" }));
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     // The server starts her again on Walter's message, in a new run.
@@ -435,7 +439,7 @@ describe("receipts and the live block", () => {
       socket.push(frame({ type: "agent.run", ...run, status: "running" }));
     });
     await settle(2);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     // Her answer and her run's end arrive together, before the page draws the answer.
     const answer: Message = {
       id: "m-answer",
@@ -458,7 +462,7 @@ describe("receipts and the live block", () => {
       .getAllByRole("article")
       .some((a) => a.textContent?.includes("Os três maiores são a Orbe, a Lumen e a Quadra."));
     expect(shown).toBe(true);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
   });
 });
 

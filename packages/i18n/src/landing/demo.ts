@@ -40,7 +40,7 @@ export const pt = {
       action: "Voltar versão",
       refused: "Recusado por você · o motivo vira lição para o {{agent}}",
       noReply:
-        "Combinado, ninguém mexe em produção. Abri o PR #513, que comprime em partes; o merge também vai pedir a sua aprovação.",
+        "Combinado, ninguém mexe em produção. Abri o PR #513, que comprime em partes. O merge também vai pedir a sua aprovação.",
       yes1: "Voltou produção para a v3.8.1",
       yes2: "Conferiu os erros: nenhum em 2 minutos",
       yes3: "Criou a tarefa #88 para o Dev comprimir em partes",
@@ -123,7 +123,7 @@ export const en: Widen<typeof pt> = {
       action: "Roll back version",
       refused: "Declined by you · the reason becomes a lesson for {{agent}}",
       noReply:
-        "Got it, nobody touches production. I opened PR #513, which compresses in chunks; the merge will also ask for your approval.",
+        "Got it, nobody touches production. I opened PR #513, which compresses in chunks. The merge will also ask for your approval.",
       yes1: "Rolled production back to v3.8.1",
       yes2: "Checked errors: none in 2 minutes",
       yes3: "Created task #88 for Dev to compress in chunks",

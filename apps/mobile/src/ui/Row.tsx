@@ -8,6 +8,8 @@ export interface RowProps {
   leading?: ReactNode;
   title: string;
   subtitle?: string;
+  /** Lines the subtitle may take (default 1). */
+  subtitleLines?: number;
   /** Right side: a time, a badge (`<Count inverted />`)… */
   meta?: ReactNode;
   chevron?: boolean;
@@ -19,7 +21,17 @@ export interface RowProps {
 }
 
 /** A list row: leading avatar or tile, title in ink, a muted line, meta on the right. */
-export function Row({ leading, title, subtitle, meta, chevron = false, onPress, divider = false, below }: RowProps) {
+export function Row({
+  leading,
+  title,
+  subtitle,
+  subtitleLines = 1,
+  meta,
+  chevron = false,
+  onPress,
+  divider = false,
+  below,
+}: RowProps) {
   const { colors } = useTheme();
   const body = (pressed: boolean) => (
     <View
@@ -51,7 +63,7 @@ export function Row({ leading, title, subtitle, meta, chevron = false, onPress, 
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="small" numberOfLines={1}>
+          <Text variant="small" numberOfLines={subtitleLines}>
             {subtitle}
           </Text>
         ) : null}

@@ -398,7 +398,7 @@ export class RunnerDaemon implements RequestObserver {
     }
     const started = await this.desktops.ensure(agent, { chrome: use === "browser" });
     const s = this.desktops.session(agent.id);
-    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again.");
     return { ...started, xauthority: s.xauthority, home: s.home };
   }
 
@@ -411,7 +411,7 @@ export class RunnerDaemon implements RequestObserver {
     if (!session) {
       throw new RunnerError(
         "internal",
-        "This computer isn't connected to agentes.chat right now; try again in a minute",
+        "This computer isn't connected to agentes.chat right now. Try again in a minute.",
       );
     }
     const { tools } = this.access();
@@ -419,7 +419,7 @@ export class RunnerDaemon implements RequestObserver {
       throw new RunnerError("not_allowed", "The browser is turned off on this computer");
     }
     if (this.pauseState().paused) {
-      throw new RunnerError("paused", "This computer is paused; open the browser again once it resumes");
+      throw new RunnerError("paused", "This computer is paused. Open the browser again once it resumes.");
     }
     if (session.supervisor) return session.supervisor.showBrowser(agent, installing);
     return session.browser.show(agent, await this.agentFolder(agent), installing);

@@ -1,5 +1,5 @@
 import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
-import type { ConnectedItem } from "@agenteschat/client/lib/connected";
+import { CONNECTOR_MARK, type ConnectedItem, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 
 /**
@@ -118,18 +118,17 @@ export const markFinishing = (state: string) => finishing.add(state);
 export const isFinishing = (state: string) => finishing.has(state);
 export const doneFinishing = (state: string) => finishing.delete(state);
 
-/** Only our own icons (`/connectors/{name}.svg`), never an arbitrary URL. */
-const ICON_URL = /^\/connectors\/[a-z0-9-]+\.svg$/;
-
-/** The brand icon's address on the server, or null (a monogram then). */
+/** A one-color brand icon's address on the server (`/connectors/{name}.svg`, tinted), or null. */
 export function iconUri(base: string, iconUrl: string | null): string | null {
-  return iconUrl && ICON_URL.test(iconUrl) ? `${base}${iconUrl}` : null;
+  return iconUrl && CONNECTOR_MARK.test(iconUrl) ? `${base}${iconUrl}` : null;
 }
 
-/** A server's own icon, as the backend keeps and serves it behind the session (never the server's URL). */
-const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
+/** A mark's address on the server when it keeps its maker's colors (`/brands/{name}.svg`, never tinted), or null. */
+export function ownMarkUri(base: string, iconUrl: string | null): string | null {
+  return iconUrl && OWN_MARK.test(iconUrl) ? `${base}${iconUrl}` : null;
+}
 
-/** That icon's address on the server, or null. */
+/** A server's own icon's address on the server (`/api/app/connector-icons/…`), or null. */
 export function serverIconUri(base: string, image: string | null | undefined): string | null {
   return image && SERVER_ICON.test(image) ? `${base}${image}` : null;
 }

@@ -2,14 +2,15 @@
  * The conversation list's scroll rules, kept pure so they can be tested: when the list follows new
  * content, which rows just arrived at the bottom (they animate in), what sits below the person while
  * they read older ones (the "↓ N novas" pill and the "Novas" line), how a finished reply's block waits
- * for its saved message so the swap never leaves an empty frame, and the keys that keep an agent's
- * block the same row from "pensando" to its saved reply.
+ * for its saved message so the swap never leaves an empty frame, the keys that keep an agent's
+ * block the same row from "pensando" to its saved reply, and where the person was while something
+ * covered the list.
  */
 
 /**
  * The list follows new content only while the person is this close to the end, as a fraction of the
- * visible height (Legend List's `maintainScrollAtEndThreshold`). Farther up, they are reading: nothing
- * moves and the pill counts what arrived.
+ * visible height (Legend List's `maintainScrollAtEndThreshold`, measured from the physical end since 3.7:
+ * about Bluesky's 100 points). Farther up, they are reading: nothing moves and the pill counts what arrived.
  */
 export const STICK_TO_END_THRESHOLD = 0.15;
 
@@ -88,6 +89,30 @@ export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null):
  */
 export const landsOnDivider = (contentLength: number, dividerAt: number | undefined, viewport: number) =>
   dividerAt !== undefined && contentLength - dividerAt > viewport * 1.2;
+
+/**
+ * Where the person is in the conversation, kept while something covers it (a sheet, the agent's computer): at the
+ * end, or reading, with the scroll, a row on screen and where that row was (rows above can change size meanwhile).
+ */
+export type Place = { end: true } | { end: false; scroll: number; key: string | null; position: number | null };
+
+/** How far the list may drift from a kept place before it is put back (points). */
+export const PLACE_SLACK = 40;
+
+/**
+ * What puts a kept place back on screen, or null when it is still there: the end (`"end"`), or the scroll that
+ * shows the row where it was, either way the list moved (toward older messages or toward the end).
+ */
+export function placeCorrection(
+  place: Place,
+  now: { scroll: number; distanceFromEnd: number; positionOf: (key: string) => number | undefined },
+): "end" | number | null {
+  if (place.end) return now.distanceFromEnd > PLACE_SLACK ? "end" : null;
+  const at = place.key !== null ? now.positionOf(place.key) : undefined;
+  const moved = at !== undefined && place.position !== null ? at - place.position : 0;
+  const target = place.scroll + moved;
+  return Math.abs(now.scroll - target) > PLACE_SLACK ? target : null;
+}
 
 /** An agent's block key, and what lets a guessed "pensando…" hand it to the real run. */
 export interface TurnKey {

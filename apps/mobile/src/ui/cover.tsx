@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { type ReactNode, useEffect } from "react";
 import { Platform, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, {
@@ -104,8 +105,9 @@ const legacyBlur = needsHeaderBlur(Platform.OS, Platform.Version);
 const liquidGlass = Platform.OS === "ios" && !legacyBlur;
 
 /**
- * What a clear native bar becomes once content scrolls under it: the bar's blur on iOS before 26, the
- * opaque bar with its hairline on Android, fading in as `y` goes `from` → `to`. On iOS 26 the system
+ * What a clear native bar becomes once content scrolls under it: the bar's blur on iOS before 26; on
+ * Android, which has no blur, no bar at all: the content fades into the screen's color under the floating
+ * buttons (as iOS 26's scroll edge does); fading in as `y` goes `from` → `to`. On iOS 26 the system
  * draws it (the scroll edge effect of the Liquid Glass bar), so this renders nothing. Place it after the
  * scroll view (it lies over the content, under the native bar), `height` = the header height.
  */
@@ -114,26 +116,46 @@ export function CoverBarBackdrop({
   from,
   to,
   height,
+  tone,
 }: {
   y: SharedValue<number>;
   from: number;
   to: number;
   height: number;
+  /** The screen's color the content fades into on Android (`#rrggbb`; the plain background by default). */
+  tone?: string;
 }) {
   const { colors } = useTheme();
   const fade = useScrollFade(y, from, to, true);
   if (liquidGlass) return null;
+  if (Platform.OS === "android") {
+    const base = tone ?? colors.bg;
+    return (
+      <Animated.View pointerEvents="none" style={[styles.backdrop, { height: height + EDGE_FADE }, fade]}>
+        <LinearGradient
+          colors={[base, fadeStop(base, 0.86), fadeStop(base, 0)]}
+          locations={[0, 0.62, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    );
+  }
   return (
     <Animated.View pointerEvents="none" style={[styles.backdrop, { height }, fade]}>
-      {Platform.OS === "ios" ? (
-        <Glass intensity={80} style={StyleSheet.absoluteFill} />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
-      )}
+      <Glass intensity={80} style={StyleSheet.absoluteFill} />
       <View style={[styles.hairline, { backgroundColor: colors.line }]} />
     </Animated.View>
   );
 }
+
+/** How far below the bar the content's fade reaches (Android), as the conversation's under its glass header. */
+const EDGE_FADE = 28;
+
+/** A `#rrggbb` color at `alpha`: a stop of the fade. */
+const fadeStop = (hex: string, alpha: number) =>
+  `${hex.slice(0, 7)}${Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, "0")}`;
 
 const styles = StyleSheet.create({
   title: { fontWeight: "600" },

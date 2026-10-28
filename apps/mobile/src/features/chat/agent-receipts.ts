@@ -4,14 +4,15 @@ import { isEventLine } from "@agenteschat/client/lib/notices";
 /**
  * The agents' receipt under a person's message, the phone's way: one quiet line under the latest one (the
  * web marks every message with a check and a popover). Faces of the agents it is about, a small mark, and
- * words only where the faces and the live rows can't say it: who saw it, a wait, a failure, nobody or no AI.
- * While an agent answers, its block at the end and the line above the box already say so, and once they
- * answered the reply is right there: then only the faces and the mark. Pure, so it is tested; the state
- * itself is the shared `receipts.ts` (seeded from the lists, moved by the channel's events).
+ * words only where the faces and the live rows can't say it: who saw it, a wait, a failure, nobody or no AI,
+ * and while the author's own plan picks who answers. While an agent answers, its block at the end and the line
+ * above the box already say so, and once they answered the reply is right there: then only the faces and the
+ * mark. Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved by the
+ * channel's events).
  */
 
-/** The small mark before the words: a check (seen, answered), the orbit (on it), paused, a question, none. */
-export type ReceiptMark = "seen" | "working" | "waiting" | "asking" | "done" | "none";
+/** The small mark before the words: a check (seen, answered), the orbit (on it), paused, a question, the clock, none. */
+export type ReceiptMark = "seen" | "working" | "waiting" | "asking" | "done" | "picking" | "none";
 
 export interface ReceiptLine {
   /** The agents whose faces show (at most `FACES`), and how many more there are. */
@@ -37,6 +38,8 @@ export type ReceiptWords =
   | "receipts.handled"
   | "receipts.failed"
   | "receipts.nobody"
+  | "receipts.mentionNeeded"
+  | "receipts.picking"
   | "noAi.receipt";
 
 export const FACES = 3;
@@ -47,6 +50,10 @@ const faces = (ids: string[]) => ({ faces: ids.slice(0, FACES), more: Math.max(0
 export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | null {
   const view = receiptView(receipt);
   const status = view.status;
+  if (view.picking) {
+    const words = { key: "receipts.picking" as const, agents: [] };
+    return { faces: [], more: 0, mark: "picking", words, label: words, action: null, alert: false };
+  }
   if (view.seen.length === 0 && status?.kind !== "no_ai") return null;
   if (status === null) {
     const words = { key: "receipts.seenBy" as const, agents: view.seen };
@@ -72,7 +79,8 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
       return { ...faces(status.agents), mark: "none", words, label: words, action: "retry", alert: true };
     }
     case "nobody": {
-      const words = { key: "receipts.nobody" as const, agents: [] };
+      const key = status.mentionNeeded ? ("receipts.mentionNeeded" as const) : ("receipts.nobody" as const);
+      const words = { key, agents: [] };
       return { faces: [], more: 0, mark: "none", words, label: words, action: null, alert: false };
     }
     case "no_ai": {

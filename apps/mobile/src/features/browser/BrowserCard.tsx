@@ -131,6 +131,10 @@ export function BrowserCard({
   const canTake = canTakeOver && (ready || (surface && closed));
   const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
   const note = pageNoteOf(live.unavailable, live.hidden, mine);
+  // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
+  const hiddenNote = surface
+    ? t("browser.inCard.hiddenHelp", agentGrammar(t, name))
+    : t("mobile.browser.live.hidden", { name: helper });
   const sky = !live.frame && skyBehind(note);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
 
@@ -384,7 +388,7 @@ export function BrowserCard({
                     {note.say === "starting"
                       ? t(`mobile.browser.card.starting${g}`, { name })
                       : note.say === "hidden"
-                        ? t("mobile.browser.live.hidden", { name: helper })
+                        ? hiddenNote
                         : t(pageGapKey(note.say, g, cloud), { name })}
                   </Text>
                   {note.help ? (

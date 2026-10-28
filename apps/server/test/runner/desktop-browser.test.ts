@@ -152,7 +152,7 @@ test.if(posix)("a browser that can't open: why, in plain words, in a note that s
   expect(await why(new RunnerError("not_allowed", "The browser on the agent's desktop needs switches on"))).toBe(
     "The browser didn't open.\nThe browser is turned off on this computer.",
   );
-  expect(await why(new RunnerError("paused", "This computer is paused; open the browser again once it resumes"))).toBe(
+  expect(await why(new RunnerError("paused", "This computer is paused. Open the browser again once it resumes."))).toBe(
     "The browser didn't open.\nThis computer is paused. Open the browser again once it resumes.",
   );
   expect(await why(new RunnerError("desktop_busy", "This computer is short of memory for the agent's browser"))).toBe(
@@ -162,8 +162,8 @@ test.if(posix)("a browser that can't open: why, in plain words, in a note that s
     "The browser didn't open.\nThe browser can't run on this computer right now. Try again in a few minutes.",
   );
   for (const err of [
-    new RunnerError("internal", "The agent's worker isn't connected right now; try again"),
-    new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again"),
+    new RunnerError("internal", "The agent's worker isn't connected right now. Try again."),
+    new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again."),
     new Error("spawn EACCES"),
   ]) {
     expect(await why(err)).toBe("The browser didn't open.\nSomething went wrong. Try again in a minute.");

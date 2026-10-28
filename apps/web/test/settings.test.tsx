@@ -316,7 +316,7 @@ describe("Configurações da organização", () => {
     expect(keys().textContent).toContain("Claude · Termina em 7f2a");
     expect(keys().textContent).toContain("Padrão do workspace");
     // Platform key not offered by this server: not mentioned.
-    expect(keys().textContent).not.toContain("chave do agentes");
+    expect(keys().textContent).not.toContain("chave do Claude deste servidor");
     const del = within(keys()).getByRole("button", { name: "Apagar" });
     expect(del.hasAttribute("disabled")).toBe(true);
     expect(keys().textContent).toContain("Escolha outra chave padrão antes de apagar esta.");
@@ -389,7 +389,7 @@ describe("Configurações da organização", () => {
     expect(field.value).toBe("50");
     // Who it applies to and who sees amounts: the field's ⓘ, which also describes the field.
     expect(describedBy(field)).toEqual([
-      "Todo agente sem orçamento próprio usa este; o orçamento de cada agente muda na página dele. Só admins veem valores; os membros veem porcentagens.",
+      "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     ]);
     await act(async () => fireEvent.change(field, { target: { value: "80" } }));
     await click(within(fallback).getByRole("button", { name: "Salvar" }));
@@ -486,7 +486,7 @@ describe("Configurações da organização", () => {
     // A section they can't open falls back to Geral.
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
-    expect(document.querySelector("#sec-storage")).toBeNull();
+    expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {

@@ -879,7 +879,7 @@ export class TaskManager {
     if (this.running >= max) {
       throw new RunnerError(
         "no_slot",
-        `This computer already runs ${max} background tasks (its limit); wait for one to finish or cancel one`,
+        `This computer already runs ${max} background tasks (its limit). Wait for one to finish or cancel one.`,
       );
     }
     const executor: TaskExecutor = req.executor === "claude" || req.executor === "codex" ? req.executor : "shell";

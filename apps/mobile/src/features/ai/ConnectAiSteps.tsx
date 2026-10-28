@@ -3,6 +3,7 @@ import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachin
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
+import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   firstAgent,
@@ -519,13 +520,19 @@ function PlanSteps({
       </>
     );
   } else if (gate.state === "unsupported") {
+    const off = toolOffReason(
+      machines.data?.find((m) => m.id === view?.computer?.machineId),
+      kind,
+    );
     wait = (
       <InfoCard icon="laptop">
         {edition === "cloud"
           ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
           : gate.reason === "keys"
             ? t("aiAccounts.connect.needs.keys")
-            : t(`brain.reasons.${gate.reason}`, { computer })}
+            : gate.reason === "tool_off"
+              ? t(off.key, { computer, command: off.command })
+              : t(`brain.reasons.${gate.reason}`, { computer })}
       </InfoCard>
     );
   } else if (gate.state === "locked") {

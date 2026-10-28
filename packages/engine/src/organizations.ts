@@ -24,7 +24,14 @@ import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
-import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
+import {
+  assertCanWork,
+  cloudNotice,
+  isUserBlocked,
+  OrgPausedError,
+  STANDING_COLUMNS,
+  type WorkspaceStanding,
+} from "./standing";
 
 const {
   organizations,
@@ -154,7 +161,7 @@ export function assertInviting(membership: Membership) {
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
  * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
- * (`org.create_refused`, the same words whatever the cause).
+ * (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
  */
 export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
   const [paused] = await db
@@ -164,7 +171,7 @@ export async function createOrganization(db: Database, userId: string, input: { 
     .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
     .limit(1);
   if (paused || (await isUserBlocked(db, userId)))
-    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)

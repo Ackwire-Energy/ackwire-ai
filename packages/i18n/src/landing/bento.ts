@@ -92,7 +92,7 @@ export const pt = {
     },
     connectors: {
       title: "Conectado ao que vocês já usam",
-      sub: "A empresa conecta uma vez; cada agente recebe só o que precisa",
+      sub: "A empresa conecta uma vez, e cada agente recebe só o que precisa",
       calendar: "Google Agenda",
       own: "Seu próprio servidor",
       also: "E também: calendário, busca em tudo, DMs com agentes e e-mail.",
@@ -190,7 +190,7 @@ export const en: Widen<typeof pt> = {
     },
     connectors: {
       title: "Connected to what you already use",
-      sub: "The company connects once; each agent gets only what it needs",
+      sub: "The company connects once, and each agent gets only what it needs",
       calendar: "Google Calendar",
       own: "Your own server",
       also: "Also: calendar, search across everything, DMs with agents and email.",

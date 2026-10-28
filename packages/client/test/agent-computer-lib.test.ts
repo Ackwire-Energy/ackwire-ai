@@ -331,7 +331,7 @@ describe("the entry's status line, first match wins", () => {
     // Waiting for a computer, in the words every screen says it; "we'll email you" only where it was promised (owners).
     expect(line({ kind: "waiting" })).toBe("computerSetup.status.capacity");
     expect(line({ kind: "waiting" }, { emailPromised: true })).toBe(
-      "computerSetup.status.capacity · computerSetup.email.short",
+      "computerSetup.status.capacity. computerSetup.email.short",
     );
     expect(line({ kind: "problem" })).toBe("agentComputer.status.problem");
     // The Cloud's computer isn't answering; a self-hoster's is offline since a time.
@@ -386,26 +386,22 @@ describe("the entry's status line, first match wins", () => {
 });
 
 describe("the dialog's sub-line while its stage is live", () => {
-  const w = { name: "Desk", computer: "Mac mini", person: (id: string) => (id === "ana" ? "Ana" : "?"), nowMs: NOW };
+  const w = { name: "Desk", person: (id: string) => (id === "ana" ? "Ana" : "?"), nowMs: NOW };
   const active = (over: Partial<BrowserHandoff> = {}) =>
     request({ status: "active", controllerUserId: "me", expiresAt: null, ...over });
 
-  test("who holds it first, then the hold, the pause on the computer, a request, the agent at work", () => {
+  test("who holds it first, then the agent at work; a hold, a pause or a request has its banner, so the line is Live alone", () => {
     expect(liveSubLine(t, facts(), w)).toBe("agentComputer.sub.watching");
     expect(liveSubLine(t, facts({ working: true }), w)).toContain("agentComputer.sub.working ");
-    expect(liveSubLine(t, facts({ working: true, handoff: request() }), w)).toContain("agentComputer.sub.needsYou ");
-    expect(liveSubLine(t, facts({ handoff: request({ requestedForUserId: "ana" }) }), w)).toContain(
-      'agentComputer.sub.askedOther {"name":"Desk"',
-    );
+    // The banner says who asks, what, and for how long; the line never says it again, nor that the agent works.
+    expect(liveSubLine(t, facts({ working: true, handoff: request() }), w)).toBe("browser.watch.live");
+    expect(liveSubLine(t, facts({ handoff: request({ requestedForUserId: "ana" }) }), w)).toBe("browser.watch.live");
     const paused = { ...MAC, paused: { until: new Date(NOW + 600_000).toISOString() } };
-    expect(liveSubLine(t, facts({ machine: paused, handoff: request() }), w)).toBe(
-      'agentComputer.sub.paused {"computer":"Mac mini"}',
-    );
-    // A pause on the computer is self-host's: the Cloud's computer has none.
+    expect(liveSubLine(t, facts({ machine: paused, handoff: request() }), w)).toBe("browser.watch.live");
+    // A pause on the computer is self-host's: the Cloud's computer has none, and no banner.
     expect(liveSubLine(t, facts({ edition: "cloud", machine: paused }), w)).toBe("agentComputer.sub.watching");
-    expect(liveSubLine(t, facts({ held: true, machine: paused, handoff: request() }), w)).toBe(
-      "agentComputer.sub.held",
-    );
+    expect(liveSubLine(t, facts({ held: true, machine: paused, handoff: request() }), w)).toBe("browser.watch.live");
+    expect(liveSubLine(t, facts({ held: true, working: true }), w)).toBe("browser.watch.live");
     // In control: mine (a take over, or the agent's own request), or someone else's, its screen hidden.
     expect(liveSubLine(t, facts({ held: true, handoff: active({ kind: "takeover" }) }), w)).toContain(
       "desktop.sub.control ",

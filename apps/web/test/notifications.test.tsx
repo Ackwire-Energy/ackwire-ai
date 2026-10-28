@@ -429,6 +429,54 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);
     expect(css).toMatch(/\.nt-item:not\(\.is-unread\) \.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 500/);
   });
+
+  test("an agent held on agentes.chat Cloud: its name, then the hold's whole line, never its reason", async () => {
+    const held = notification({
+      id: "n-held",
+      kind: "org_standing",
+      source: { agentId: ADA_ID, label: "Ada" },
+      latest: { statusTo: "agent_hold", holdKind: "network" },
+      updatedAt: ago(2),
+    });
+    await go(seedState({ notifications: [held] }));
+    const row = document.querySelector('[data-n="n-held"]') as HTMLElement;
+    expect(row.querySelector(".nt-what")?.textContent).toBe("Ada está em pausa");
+    const line = row.querySelector(".nt-snip");
+    expect(line?.textContent).toBe(
+      "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). Para contestar, escreva para legal@agentes.chat.",
+    );
+    // How to contest it is never cut off.
+    expect(line?.classList.contains("nt-snip--whole")).toBe(true);
+    expect(row.querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    expect(row.getAttribute("aria-label")).toBe("Ada está em pausa, não lida");
+  });
+
+  test("the workspace held or suspended on agentes.chat Cloud reads as the restriction, never 'review'", async () => {
+    const contest = "Para contestar, escreva para legal@agentes.chat.";
+    const standing = (id: string, latest: AppNotification["latest"]) =>
+      notification({ id, kind: "org_standing", latest, updatedAt: ago(2) });
+    await go(
+      seedState({
+        notifications: [
+          standing("n-review", { statusTo: "hold", text: "review", cloud: true }),
+          standing("n-hold", { statusTo: "hold", text: "Termos 5: phishing", cloud: true }),
+          standing("n-suspended", { statusTo: "suspended", text: "Termos 5: spam", cloud: true }),
+          standing("n-self", { statusTo: "hold", text: "review" }),
+        ],
+      }),
+    );
+    const line = (id: string) => document.querySelector(`[data-n="${id}"] .nt-snip`);
+    expect(line("n-review")?.textContent).toBe(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${contest}`,
+    );
+    expect(line("n-hold")?.textContent).toBe(`Este workspace está em espera: Termos 5: phishing. ${contest}`);
+    expect(line("n-suspended")?.textContent).toBe(`Este workspace está suspenso: Termos 5: spam. ${contest}`);
+    for (const id of ["n-review", "n-hold", "n-suspended"])
+      expect(line(id)?.classList.contains("nt-snip--whole")).toBe(true);
+    // A self-hosted server: the reason, as it always read.
+    expect(line("n-self")?.textContent).toBe("review");
+    expect(line("n-self")?.classList.contains("nt-snip--whole")).toBe(false);
+  });
 });
 
 describe("its computer is ready: what comes next", () => {
@@ -567,6 +615,8 @@ describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
     expect(row.classList.contains("nt-wr")).toBe(true);
     expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("Entrar no painel");
     expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    // Two lines: the first one's capitals start at the face's top.
+    expect(row.querySelector(".nt-wr__l1")?.classList.contains("ac-captop")).toBe(true);
     await click(row.querySelector(".nt-wr__sub") as HTMLElement);
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
@@ -595,6 +645,8 @@ describe("Esperando você: what only points somewhere is one row", () => {
     expect(l1.querySelector(".nt-what")?.textContent).toBe("Felipe Ramos pede para entrar");
     expect(l1.querySelector(".nt-wr__src")?.textContent).toBe("Membros");
     expect(l1.querySelector(".nt-wr__tm")?.textContent).toBe("agora");
+    // One line: it centres on the face, with the actions.
+    expect(l1.classList.contains("ac-captop")).toBe(false);
     const acts = row().querySelector(".nt-wr__acts") as HTMLElement;
     expect(acts.classList.contains("ac-acts")).toBe(true);
     const buttons = within(acts).getAllByRole("button");
@@ -690,7 +742,6 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const block = (sheet: string, media: string) => sheet.split(`\n@media ${media} {`)[1]?.split("\n}")[0] ?? "";
     const phone = block(css, "(max-width: 720px)");
     const wraps = block(css, "(max-width: 1023px)");
-    const wide = block(css, "(min-width: 1024px)");
     /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
     const rule = (selector: string, sheet = css) =>
       new RegExp(`\\n *${selector.replace(/[.()>:*]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
@@ -715,13 +766,13 @@ describe("Esperando você: what only points somewhere is one row", () => {
     // Rows and cards end at one padding line, wide and on a phone: every clock and check share two columns.
     expect(right(".nt-wr")).toBe(right(".nt-wi"));
     expect(right(".nt-wr", phone)).toBe(right(".nt-wi", phone));
-    // A line alone centres on the face; the line is the chips'.
+    // A line alone centres on the face, at every width, and the line is the chips'. Two or more take `.ac-captop`.
     const line = px(".nt-wr__l1", "line-height");
     expect(line).toBe(px(".ac-chip", "height", kit));
-    expect(px(".nt-wr__l1:only-child", "margin-block-start", wide)).toBe((px(".nt-av40", "height") - line) / 2);
-    // Under 1024px the words wrap, three lines at most, the time at their end and never alone on the last line, their
-    // first line's capitals at the face's top. A chip on its line's top keeps every line the chips' height, and a name
-    // with no spaces breaks instead of running under the clip.
+    expect(px(".nt-wr__l1:not(.ac-captop)", "margin-block-start")).toBe((px(".nt-av40", "height") - line) / 2);
+    // Under 1024px the words wrap, three lines at most, the time at their end and never alone on the last line. A
+    // chip on its line's top keeps every line the chips' height, and a name with no spaces breaks instead of running
+    // under the clip.
     expect(value(".nt-wr__l1", "display", wraps)).toBe("-webkit-box");
     expect(value(".nt-wr__l1", "-webkit-line-clamp", wraps)).toBe("3");
     expect(value(".nt-wr__l1", "text-wrap", wraps)).toBe("pretty");

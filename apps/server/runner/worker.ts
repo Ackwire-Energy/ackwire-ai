@@ -126,7 +126,7 @@ export class WorkerLink {
   }
 
   private ended() {
-    this.unanswered("The runner is stopping; try again in a minute");
+    this.unanswered("The runner is stopping. Try again in a minute.");
     this.onEnd();
   }
 

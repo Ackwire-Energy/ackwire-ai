@@ -1,6 +1,6 @@
 import { NewIssueForm } from "@/features/issues/NewIssueForm";
 
-/** "Nova issue" as a native form sheet over Issues. */
+/** "Nova tarefa", pushed over Tarefas (presentation set in `_layout`). */
 export default function NewIssueRoute() {
   return <NewIssueForm />;
 }

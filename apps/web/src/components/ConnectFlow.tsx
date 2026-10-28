@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
@@ -82,16 +83,19 @@ export function ConnectFlow({
       open
       onOpenChange={(o) => !o && onClose()}
       title={
-        <span className="cflow__title">
-          {name ? (
-            <ConnectorIcon def={icon} image={flow.step === 0 ? null : flow.item.image} label={name} size="lg" />
-          ) : (
-            <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
-              <Icon name="plus" />
-            </span>
-          )}
-          <span>{title}</span>
-        </span>
+        <FlowTitle
+          tile={
+            name ? (
+              <ConnectorIcon def={icon} image={flow.step === 0 ? null : flow.item.image} label={name} size="lg" />
+            ) : (
+              <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
+                <Icon name="plus" />
+              </span>
+            )
+          }
+        >
+          {title}
+        </FlowTitle>
       }
       closeLabel={t("common.close")}
       width={620}

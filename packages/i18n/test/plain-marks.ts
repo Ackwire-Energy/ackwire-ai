@@ -1,14 +1,35 @@
 import { readFileSync } from "node:fs";
+import { leaves } from "./leaves";
 import { sourceFiles } from "./maker-words";
 
 /**
  * Words people read use no semicolon and no em dash: two short sentences read plainer, and both marks read as
- * machine-written.
+ * machine-written. A "·" separates data and never two clauses, which review checks, not this file.
  */
 export const MARKS = /[;—]/;
 
-/** An `apiError(c, status, code, "…")`, or an engine error the API answers with, up to its `(`. */
-const SERVER_WORDS = /\b(?:apiError|new (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential)Error)\(/g;
+/** Code the landing shows as code. */
+const CODE_SAMPLES: ReadonlySet<string> = new Set(["landing.bento.db.read", "landing.bento.db.write"]);
+
+/** Code keeps its marks: `code` spans, help code blocks (`….blocks.N.code`) and HTML entities (`&amp;`). */
+const outsideCode = (text: string) => text.replace(/&#?\w+;/g, "").replace(/`[^`]*`/g, "");
+
+/** A help page's code block. A key merely named `code` ("Code from the email") is words. */
+const CODE_BLOCK = /\.blocks\.\d+\.code$/;
+
+/** A string tree's leaves that break the rule, as "key: text", for one readable failure. */
+export const unplainLeaves = (tree: unknown) =>
+  leaves(tree)
+    .filter((leaf): leaf is [string, string] => typeof leaf[1] === "string")
+    .filter(([key, text]) => !CODE_SAMPLES.has(key) && !CODE_BLOCK.test(key) && MARKS.test(outsideCode(text)))
+    .map(([key, text]) => `${key}: ${text}`);
+
+/**
+ * An `apiError(c, status, code, "…")`, an engine or runner error the API answers with, or a runner call that ends
+ * waiting work with a message (`endSession`, `endShows`, `unanswered`), up to its `(`.
+ */
+const SERVER_WORDS =
+  /\b(?:apiError|endSession|endShows|unanswered|new (?:Validation|Conflict|NotFound|Forbidden|TooMany|MissingCredential|Runner|ChromeStart)Error)\(/g;
 
 /**
  * Reads code from `i` to the bracket that closes the one just before it, and returns the index after that bracket.
@@ -56,18 +77,19 @@ function scanTemplate(src: string, i: number, out: string[]): number {
 }
 
 /**
- * The server's words for people that break the rule, as "file: text": every string in those calls' arguments, so
- * both sides of a ternary count. It reads the raw source: `withoutComments` takes a `/*` inside a string ("owner/*")
- * for a comment and drops the rest of the file.
+ * The strings in one source's calls above that break the rule: every string in their arguments, so both sides of a
+ * ternary count. It reads the raw source: `withoutComments` takes a `/*` inside a string ("owner/*") for a comment
+ * and drops the rest of the file.
  */
+export const unplainCalls = (source: string) =>
+  [...source.matchAll(SERVER_WORDS)].flatMap((m) => {
+    const strings: string[] = [];
+    scanCode(source, m.index + m[0].length, strings);
+    return strings.filter((s) => MARKS.test(s));
+  });
+
+/** The server's words for people that break the rule, as "file: text". */
 export const unplainServerWords = (dirs: string[]) =>
   dirs
     .flatMap((dir) => sourceFiles(dir))
-    .flatMap((file) => {
-      const source = readFileSync(file, "utf8");
-      return [...source.matchAll(SERVER_WORDS)].flatMap((m) => {
-        const strings: string[] = [];
-        scanCode(source, m.index + m[0].length, strings);
-        return strings.filter((s) => MARKS.test(s)).map((s) => `${file}: ${s}`);
-      });
-    });
+    .flatMap((file) => unplainCalls(readFileSync(file, "utf8")).map((s) => `${file}: ${s}`));

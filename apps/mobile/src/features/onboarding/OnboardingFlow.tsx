@@ -1,5 +1,15 @@
-import { keys, newClientId, useAiStatus, useApi, useMe } from "@agenteschat/client";
-import { computerName } from "@agenteschat/client/lib/computer";
+import {
+  keys,
+  newClientId,
+  useAiStatus,
+  useApi,
+  useAuthConfig,
+  useComputerSetup,
+  useMachines,
+  useMe,
+} from "@agenteschat/client";
+import { computerEdition, computerName } from "@agenteschat/client/lib/computer";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -51,6 +61,7 @@ import {
   introducesAt,
   inviteEach,
   joiningLeft,
+  noComputerOf,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
@@ -62,6 +73,7 @@ import {
   progressAt,
   STEPS,
   type StepId,
+  stepFailedText,
   stepText,
   zoneLabel,
 } from "./logic";
@@ -105,6 +117,14 @@ export function OnboardingFlow() {
   const [aiShown, setAiShown] = useState<AiChoice | null>(null);
   const [planned, setPlanned] = useState<string[]>([]);
   const [aiSaved, setAiSaved] = useState(false);
+  const authConfig = useAuthConfig().data;
+  // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
+  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created));
+  const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
+  const machines = useMachines(created?.orgId ?? "", Boolean(created) && edition === "selfhost");
+  const noComputer = noComputerOf(edition, machines.data);
+  // A server that sends no email invites by link only.
+  const emailsGoOut = sendsEmail(authConfig);
   // Done's first message, written for whoever asks it when the step opens (`team`: the crew it was written for).
   // Its `clientId` changes with its text: sent again after an answer that never came back, it's posted once.
   const [firstAsk, setFirstAsk] = useState<{ team: string; asker: Preset; text: string; clientId: string } | null>(
@@ -157,8 +177,8 @@ export function OnboardingFlow() {
     try {
       await work();
       setStep(typeof then === "function" ? then() : then);
-    } catch {
-      setError({ at: step, text: t("mobile.onb.failed") });
+    } catch (e) {
+      setError({ at: step, text: stepFailedText(t, e) });
     } finally {
       setPending(false);
     }
@@ -252,8 +272,8 @@ export function OnboardingFlow() {
     try {
       const { url } = await api.invites.createLink(created.orgId);
       await Share.share({ message: t("mobile.onb.shareMessage", { org: orgName, url }) });
-    } catch {
-      setError({ at: step, text: t("mobile.onb.failed") });
+    } catch (e) {
+      setError({ at: step, text: stepFailedText(t, e) });
     }
   };
 
@@ -304,7 +324,7 @@ export function OnboardingFlow() {
 
   const host = HOST[step];
   const count = joiningLeft(chosen, agentIds);
-  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved, invited });
+  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved, invited, noComputer });
 
   const primary: Partial<Record<StepId, { label: string; onPress: () => void; ready: boolean }>> = {
     workspace: {
@@ -481,35 +501,39 @@ export function OnboardingFlow() {
 
       {step === "team" ? (
         <>
-          <View style={styles.emails}>
-            {emails.map((e) => (
-              <Pressable
-                key={e}
-                onPress={() => setEmails(emails.filter((x) => x !== e))}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.onb.removeEmail", { email: e })}
-                style={[styles.chip, { borderColor: c.line2, backgroundColor: c.sunken }]}
-              >
-                <Text variant="small">{e}</Text>
-                <Icon name="x" size={12} />
-              </Pressable>
-            ))}
-          </View>
-          <Field
-            value={typing}
-            onChangeText={(v) => {
-              setBad([]);
-              if (/[\s,;]$/.test(v)) addTyped(v);
-              else setTyping(v);
-            }}
-            onSubmitEditing={() => addTyped()}
-            onBlur={() => addTyped()}
-            placeholder={t("mobile.onb.emailsPlaceholder")}
-            label={t("onboarding.team.emails")}
-            keyboardType="email-address"
-          />
-          {bad.length ? <Note icon="help" text={t("mobile.onb.invalidEmail")} danger /> : null}
-          <Note icon="agent" text={t("mobile.onb.membersNote")} />
+          {emailsGoOut ? (
+            <>
+              <View style={styles.emails}>
+                {emails.map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => setEmails(emails.filter((x) => x !== e))}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.onb.removeEmail", { email: e })}
+                    style={[styles.chip, { borderColor: c.line2, backgroundColor: c.sunken }]}
+                  >
+                    <Text variant="small">{e}</Text>
+                    <Icon name="x" size={12} />
+                  </Pressable>
+                ))}
+              </View>
+              <Field
+                value={typing}
+                onChangeText={(v) => {
+                  setBad([]);
+                  if (/[\s,;]$/.test(v)) addTyped(v);
+                  else setTyping(v);
+                }}
+                onSubmitEditing={() => addTyped()}
+                onBlur={() => addTyped()}
+                placeholder={t("mobile.onb.emailsPlaceholder")}
+                label={t("onboarding.team.emails")}
+                keyboardType="email-address"
+              />
+              {bad.length ? <Note icon="help" text={t("mobile.onb.invalidEmail")} danger /> : null}
+              <Note icon="agent" text={t("mobile.onb.membersNote")} />
+            </>
+          ) : null}
           <Button
             variant="secondary"
             wide

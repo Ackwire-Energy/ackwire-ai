@@ -24,6 +24,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import {
   type ComputerKind,
   type ComputerState,
@@ -344,16 +345,17 @@ export function OnboardingPage() {
     setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
   }, [host, step.id]);
 
-  // Each step's column opens centered, then stays where it opened: what changes in it (the computer's progress,
-  // a toggle) grows or shrinks it downward instead of moving the question and Back under the pointer.
+  // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
+  // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
+  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with.
   const column = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
   useLayoutEffect(() => {
     const el = column.current;
     if (!el) return;
     const place = () => {
-      el.style.marginTop = "";
-      el.style.marginTop = `${el.getBoundingClientRect().top - (el.parentElement?.getBoundingClientRect().top ?? 0)}px`;
+      el.style.removeProperty("--onb-lead");
+      el.style.setProperty("--onb-lead", getComputedStyle(el, "::before").marginTop);
     };
     place();
     window.addEventListener("resize", place);
@@ -566,8 +568,8 @@ export function OnboardingPage() {
   const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
-  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
-  const emails = authConfig?.passwordReset !== false;
+  // A server that sends no email invites by link only.
+  const emails = sendsEmail(authConfig);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
@@ -594,7 +596,8 @@ export function OnboardingPage() {
   // The crew shares one computer here.
   const setOf = (c: AiChoice) =>
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
-  const aimed = { agents: crewAgents, hasAi, picked: aiTarget };
+  // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
+  const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.agents] };
   // With no set, the agent whose computer the panel reads, "All agents" too.
   const gates = usePlanGates(
     created?.orgId ?? "",
@@ -614,7 +617,7 @@ export function OnboardingPage() {
     setAiPicked(next);
     // Another plan moves on to whoever still has no AI once a plan thinks for someone.
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
-      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, set: setOf(next) }));
+      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
   };
   // A computer the person connected: its own sign-in, unless they chose another account.
   const ownChosen =
@@ -1671,14 +1674,14 @@ function ComputerStep({
 
       {computer === "cloud" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{t("onboarding.computer.cloudReady")}</span>
         </p>
       )}
 
       {computer === "host" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{host?.online ? t("onboarding.computer.hostReady") : t("onboarding.computer.hostConnecting")}</span>
         </p>
       )}
@@ -1688,7 +1691,7 @@ function ComputerStep({
           {machine ? (
             <>
               <p className="onb__status ac-iconline" role="status">
-                <Icon name="check" />
+                <Icon name="check" size={14} />
                 <span>{t("onboarding.computer.thisMacConnected", { name: machine.name })}</span>
               </p>
               <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -1721,7 +1724,7 @@ function ComputerStep({
         <Card as="div">
           {machine ? (
             <p className="onb__status ac-iconline" role="status">
-              <Icon name="check" />
+              <Icon name="check" size={14} />
               <span>
                 {t("onboarding.computer.connected", {
                   name: machine.name,
@@ -1772,19 +1775,22 @@ function WorkspaceComputerStep({
           </ComputerTitle>
         </span>
       </div>
-      {hold && (
-        <p className="setup-line ac-iconline" role="status">
-          <Icon name="pause" size={14} />
-          <span>{hold}</span>
-        </p>
-      )}
-      <SetupWait view={view} reader={reader} />
-      {setupPending(view) && (
-        <p className="onb__status ac-iconline">
-          <Icon name="check" />
-          <span>{t("computerSetup.continue")}</span>
-        </p>
-      )}
+      {/* The whole wait in one well, as the AI step's: every line's icon and words on one column. */}
+      <div className="onb__wait">
+        {hold && (
+          <p className="setup-line ac-iconline" role="status">
+            <Icon name="pause" size={14} />
+            <span>{hold}</span>
+          </p>
+        )}
+        <SetupWait view={view} reader={reader} />
+        {setupPending(view) && (
+          <p className="setup-line ac-iconline">
+            <Icon name="check" size={14} />
+            <span>{t("computerSetup.continue")}</span>
+          </p>
+        )}
+      </div>
     </Card>
   );
 }

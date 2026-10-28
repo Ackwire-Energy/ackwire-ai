@@ -56,10 +56,13 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/notion.svg");
     const linear = within(dialog).getByRole("button", { name: "Linear" });
     expect(linear.querySelector(".connector-icon__mark")?.getAttribute("style")?.toLowerCase()).toContain("#5e6ad2");
-    // No icon (Canva): a monogram.
+    // Canva's mark keeps its colors: drawn as it is, not as a mask. No icon (Slack here): a monogram.
+    expect(within(dialog).getByRole("button", { name: "Canva" }).querySelector("img")?.getAttribute("src")).toBe(
+      "/brands/canva.svg",
+    );
     expect(
-      within(dialog).getByRole("button", { name: "Canva" }).querySelector(".connector-icon--mono")?.textContent,
-    ).toBe("C");
+      within(dialog).getByRole("button", { name: "Slack" }).querySelector(".connector-icon--mono")?.textContent,
+    ).toBe("S");
     // Not configured on this server: last before "Não achou?", and its pane can't connect.
     expect(names(dialog).slice(-2)).toEqual(["Slack", "Não achou?"]);
     await click(within(dialog).getByRole("button", { name: "Slack" }));
@@ -192,7 +195,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(flow().textContent).toContain("Classificamos as 5 ferramentas do Linear.");
     const decide = within(flow()).getByRole("region", { name: "Precisam da sua decisão · 1" });
     expect(decide.textContent).toContain("Fechar chamado");
-    expect(decide.textContent).toContain("Sugestão: muda coisas — muda coisas, mas não apaga nada nem gasta dinheiro");
+    expect(decide.textContent).toContain("Sugestão: muda coisas (não apaga nada nem gasta dinheiro)");
     expect(flow().textContent).toContain("Falta 1 decisão. Se continuar, vale a sugestão.");
     expect(within(flow()).queryByRole("region", { name: "Pronto. Tudo revisado." })).toBeNull();
     await click(within(decide).getByRole("button", { name: "Aceitar as sugestões" }));

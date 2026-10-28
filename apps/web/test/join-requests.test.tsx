@@ -127,6 +127,9 @@ describe("an invitation link asks to join", () => {
     await type(screen().getByLabelText("Seu nome"), "Ana Souza");
     expect(button("Verificar").hasAttribute("disabled")).toBe(true);
     await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
+    // The suggestion comes with the address, before Verify, which would send the code to the typo.
+    const row = [...(screen().getByLabelText("Seu e-mail").parentElement?.children ?? [])];
+    expect(row.map((el) => el.className.split(" ")[0])).toEqual(["ac-input", "auth__fix", "invite-ask__slot"]);
     await click(button("Você quis dizer ana@gmail.com?"));
     const send = button("Pedir para entrar");
     expect(send.hasAttribute("disabled")).toBe(true);
@@ -213,6 +216,22 @@ describe("an invitation link asks to join", () => {
     expect(slot()).toBe("wait:0:42 Reenviar em 42 segundos");
     expect(codeField()).toBeTruthy();
     expect(screen().queryByRole("alert")).toBeNull();
+  });
+
+  test("at phone width the email takes its row and Verify's slot goes under it, after a typo's suggestion", async () => {
+    const css = (await Bun.file(new URL("../src/pages/invite.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("\n@media (max-width: 480px) {")[1]?.split("\n}")[0] ?? "";
+    const rule = (selector: string, sheet = css) =>
+      new RegExp(`\\n *${selector.replace(/[.>]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+    // Wider, the suggestion takes a row of its own under the address and the slot.
+    expect(rule(".invite-ask__verify")).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(rule(".invite-ask__verify > .auth__fix")).toMatch(/grid-row: 2;\s*grid-column: 1 \/ -1;/);
+    // On a phone one column, in the markup's order: the address, the suggestion, then the slot.
+    expect(rule(".invite-ask__verify", phone)).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(rule(".invite-ask__verify > .auth__fix", phone)).toContain("grid-row: auto");
   });
 
   test("every refusal of a code is said in both languages, never in the server's English", () => {
@@ -310,7 +329,7 @@ describe("an invitation link asks to join", () => {
     expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
     expect(note?.querySelector("b")?.textContent).toBe("Recado:");
     expect(note?.querySelector("i")).toBeNull();
-    expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você por e-mail.");
+    expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você.");
     cleanup();
 
     await openLink({ ...LINK, you: you({ request: { status: "approved", reason: null } }) }, { signedIn: true });
@@ -629,11 +648,9 @@ describe("Members › Invitation link", () => {
     expect(writes).toEqual(["http://localhost:3000/invite/k3J"]);
     expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
     // Who can get in through a shared link stays on screen, not behind an ⓘ.
-    const linkLine = within(invite).getByText(
-      /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
-    );
+    const linkLine = within(invite).getByText(/^Um admin aprova cada pessoa que pedir\. Vale até \S+/);
     expect(linkLine.closest("[hidden]")).toBeNull();
-    expect(invite.textContent).toMatch(/Link anterior · criado .+ por João · vale até /);
+    expect(invite.textContent).toMatch(/Link anterior, criado por João .+\. Vale até /);
 
     const [turnOff] = within(invite).getAllByRole("button", { name: "Desativar" });
     await click(turnOff as HTMLElement);

@@ -84,6 +84,7 @@ async function connect({
   mine = [ADA_ID],
   crew = false,
   path = `/org/${ORG_ID}/settings/keys`,
+  role,
 }: {
   computers?: AiComputer[];
   setup?: Partial<ComputerSetup>;
@@ -95,8 +96,12 @@ async function connect({
   crew?: boolean;
   /** Where the dialog opens: Settings' button, or a link that asks for it. */
   path?: string;
+  /** Walter's role in the workspace, when he isn't its owner. */
+  role?: "admin" | "member";
 } = {}) {
   const state = seedState();
+  const workspace = state.me?.organizations[0];
+  if (role && workspace) workspace.role = role;
   const ada = state.agents[0];
   if (crew && ada) {
     state.agents.push({ ...ada, id: LIA_ID, name: "Lia", handle: "lia" });
@@ -213,11 +218,14 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    // The sign-in step is its title, its ⓘ and its button: the ⓘ says what to do on the wrong account.
-    expect(hintOf("Entre no Claude", panel)).toMatchObject({
+    // The sign-in step is its title, its ⓘ and its button: the title names the account, the button the sign-in,
+    // and the ⓘ says what to do on the wrong account. Its one step takes no number.
+    expect(hintOf("A conta com o seu plano", panel)).toMatchObject({
       text: "Conta errada? Saia na página do Claude e tente de novo.",
       hidden: true,
     });
+    expect(panel.querySelector(".agp-addacct__step")?.classList.contains("ac-iconline")).toBe(false);
+    expect(panel.querySelector(".agp-addacct__step > i")).toBeNull();
     expect(shownText(panel)).not.toMatch(/Abre a página|nunca vê a senha|senha vai só/);
     // Who the agent answers, once, in the panel's foot (no lock note above it), and where the account stays in its ⓘ.
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
@@ -225,8 +233,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(foot.firstElementChild?.getAttribute("data-icon") ?? foot.querySelector("svg")).toBeTruthy();
     expect(shownText(foot)).toBe("Com o seu plano, a Ada só responde a você. ");
     expect(hintOf("Com o seu plano, a Ada só responde a você.", foot).text).toBe(
-      "A conta fica só no MacBook. A sua senha vai só para o Claude.",
+      "A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
     );
+    expect(panel.classList.contains("ai-panel--plan")).toBe(true);
     expect(panel.querySelectorAll(".ac-setnote")).toHaveLength(0);
     // One agent of the viewer's: nobody to choose.
     expect(within(panel).queryByRole("combobox")).toBeNull();
@@ -240,7 +249,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
 
   test("a tile's check sits on its name's line; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
     const ui = await stylesheet("../../../packages/ui/src/styles/components.css");
-    const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after,\n.ac-option[data-state="checked"]::after');
+    const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after');
     expect(check).toContain("height: 18px");
     const layout = await stylesheet("../src/layout.css");
     // A one-line tile's in its middle.
@@ -278,13 +287,13 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Each step is its title and its control: the team plan's key and where the key goes are their ⓘ, and the
     // field is described by its own.
     expect(hintOf("Crie a chave do seu plano", panel).text).toBe(
-      "Num plano de equipe, use a chave da página Team Plan.",
+      "Num plano de equipe, use a chave da página Team\u00a0Plan.",
     );
     // Where the key goes is the foot's ⓘ, said once for the panel: the paste step has none.
     expect(within(panel).queryByRole("button", { name: "Sobre Cole a chave aqui" })).toBeNull();
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
     expect(hintOf("Com o seu plano, a Ada só responde a você.", foot).text).toBe(
-      "A chave vai criptografada para o MacBook e fica só lá.",
+      "A chave vai criptografada para o MacBook e\u00a0fica\u00a0só\u00a0lá.",
     );
     expect(shownText(panel)).not.toMatch(/Fica em|Num plano de equipe|criptografada/);
     expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("aria-describedby")).toBe(false);
@@ -337,10 +346,12 @@ describe("Conectar uma IA: one picker, plans first", () => {
     );
     // Who has to turn it on stays in view (a member of a Business plan can't do it alone): no ⓘ on this step.
     expect(shownText(panel)).toContain(
-      "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem administra liga.",
+      "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
     );
     expect(within(panel).queryByRole("button", { name: "Sobre Permita o login com código no ChatGPT" })).toBeNull();
-    expect(hintOf("Entre no ChatGPT", panel).text).toBe("Conta errada? Saia na página do ChatGPT e tente de novo.");
+    expect(hintOf("A conta com o seu plano", panel).text).toBe(
+      "Conta errada? Saia na página do ChatGPT e tente de novo.",
+    );
     const { opened, popup } = await withPopup(() =>
       click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })),
     );
@@ -396,6 +407,43 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(retry.parentElement?.querySelector(":scope > .ac-setnote")).not.toBeNull();
   });
 
+  test("a plan's panel: every line's words on its head's text edge, every lead centred in the mark's column, an even well", async () => {
+    const layout = await stylesheet("../src/layout.css");
+    const plan = ruleOf(layout, ".ai-panel--plan");
+    expect(plan).toContain("--lead: 30px");
+    expect(plan).toContain("--text-edge: calc(var(--lead) + 12px)");
+    // 14px icons and 20px numbers, centred in the mark's 30px, 12px before the words. Only the panel's own lines: a
+    // note inside a step's words ("Isso não parece uma chave…") keeps its icon on the step's text.
+    const own = ".ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline";
+    const row = ".ai-panel--plan .ai-panel__row > .ac-setnote";
+    expect(layout).toContain(`\n${own},\n${row} {\n  gap: 12px;`);
+    expect(layout).toContain(
+      `\n${own} > :first-child,\n${row} > :first-child {\n  margin-inline: calc((var(--lead) - 14px) / 2);`,
+    );
+    expect(layout).not.toContain(".ai-panel--plan :is(.ac-setnote");
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > i")).toContain(
+      "margin-inline: calc((var(--lead) - 20px) / 2)",
+    );
+    // The well's 12px of padding all round start before the words' column, so its words are on it; an option card's
+    // 12px too.
+    const well = ruleOf(layout, ".ai-panel__wait");
+    expect(well).toContain("margin-left: calc(var(--text-edge) - 12px)");
+    expect(well).toContain("padding: 12px;");
+    expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
+      "margin-left: calc(var(--text-edge) - var(--space-3))",
+    );
+    // At phone width a step's wait goes under its words: its spinner in the mark's column, its word on the text's.
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > .agp-addacct__wait")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge))",
+    );
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2)",
+    );
+    // The head's hairline runs edge to edge, as the foot's does; for whom centres on the head's mark.
+    expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
+    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--lead)");
+  });
+
   test("a step's number and title come down to the middle of the button beside it; a failure's note sits in its button's middle", async () => {
     const layout = await stylesheet("../src/layout.css");
     expect(ruleOf(layout, ".agp-addacct__step")).toContain("line-height: 20px");
@@ -408,16 +456,27 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(atMedia(layout, "(min-width: 641px) and (pointer: coarse)"), step)).toContain(
       "margin-top: calc((var(--control-h-md) - 20px) / 2)",
     );
+    // The list's steps without a button take the same first line, so its numbers are evenly spaced.
+    const plain = ":has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm))";
+    for (const [media, height] of [
+      ["(min-width: 641px)", "--control-h-sm"],
+      ["(min-width: 641px) and (pointer: coarse)", "--control-h-md"],
+    ] as const) {
+      expect(ruleOf(atMedia(layout, media), plain)).toContain(`min-height: var(${height})`);
+      expect(ruleOf(atMedia(layout, media), plain)).toContain(`padding-top: calc((var(${height}) - 20px) / 2)`);
+    }
     expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
     expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
-    // A key's field can narrow to 112px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
-    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 112px");
+    // A key's field can narrow to 102px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
+    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
   });
 
   test("a computer the person connected: its own sign-in, saved for the agent at once; or another account", async () => {
     const { state, dialog } = await connect({ brain: { ownSignIn: true } });
     const own = within(dialog).getByRole("button", { name: /^A conta do Claude com login no MacBook/ });
     expect(own.textContent).toBe("A conta do Claude com login no MacBookTodos os agentes pensam com ela.");
+    // Small columns, so the two cards sit side by side on the panel's text column in the setup too.
+    expect(own.parentElement?.className).toBe("grid-options grid-options--sm");
     // Who it replies to is the foot's, once, either way.
     expect(shownText(dialog).split("Com o seu plano, a Ada só responde a você.")).toHaveLength(2);
     // Another account: its title alone; then the steps, asking which one with nothing under the field.
@@ -534,14 +593,39 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Passo 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
     );
     expect(panel.textContent).not.toContain("walter@");
-    // Each step says its own timing: the sign-in's, under it.
-    const step = within(panel).getByText("Entre no Claude").closest(".agp-addacct__step") as HTMLElement;
-    expect(shownText(step)).toContain("Você entra aqui assim que o computador ficar pronto.");
-    expect(panel.textContent?.split("assim que")).toHaveLength(2);
+    // "Ready" once, in the well: the sign-in's step says nothing more of when.
+    const step = within(panel).getByText("A conta com o seu plano").closest(".agp-addacct__step") as HTMLElement;
+    expect(shownText(step)).not.toContain("pronto");
+    expect(panel.textContent?.split("pronto")).toHaveLength(2);
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
     expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado|seu computador/);
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
+  });
+
+  test("an admin while the Cloud's computer is prepared: no email for them, so the well says when the step turns on", async () => {
+    const { dialog, tile } = await connect({
+      role: "admin",
+      computers: [],
+      brain: { computer: null, machines: [] },
+      setup: {
+        step: "installing",
+        secondsLeft: 330,
+        expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
+        notifyByEmail: true,
+      },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(shownText(panel.querySelector(".ai-panel__wait") as HTMLElement)).toBe(
+      "Passo 3 de 4 · Instalando os programasFaltam uns 6 minVocê entra aqui assim que o computador ficar pronto.",
+    );
+    expect(panel.textContent?.split("pronto")).toHaveLength(2);
+    // A coding plan's step sends a key.
+    await click(tile("GLM Coding"));
+    const glm = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    expect(glm.querySelector(".ai-panel__wait")?.lastElementChild?.textContent).toBe(
+      "Você envia a chave assim que o computador ficar pronto.",
+    );
   });
 
   test("on the Cloud, its computer not answering: said by name, looked after, a key meanwhile", async () => {
@@ -769,6 +853,8 @@ describe("All agents: one plan for the team, a login per agent", () => {
       const panel = within(dialog).getByRole("region", { name: `Seu plano do ${plan}` });
       expect(within(panel).getByRole("combobox").textContent).toBe("Ada");
       expect((await openFor(panel)).map((o) => o.textContent)).toEqual(["Ada", "Atlas", "Lia"]);
+      // The select ends the head's row: its list keeps the trigger's end edge, the panel's.
+      expect(screen().getByRole("listbox").getAttribute("data-align")).toBe("end");
       await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
       await settle(2);
     }

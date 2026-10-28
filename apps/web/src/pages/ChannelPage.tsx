@@ -76,7 +76,7 @@ import {
 } from "@agenteschat/client/lib/chat";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
-import { errorCode, errorText, standingRefusalText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -2799,10 +2799,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   const qc = useQueryClient();
   const dismissRun = useDismissRun();
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
-  const revealed = useRevealedText(live?.text ?? "");
+  const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   // Refused by the workspace's standing: its own words, not the server's English.
-  const refusal = liveFailed ? standingRefusalText(t, live?.errorCode, live?.errorParams) : null;
+  const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
@@ -3068,7 +3068,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               }
             : undefined
       }
-      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
+      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
+      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
       stacked={Boolean(card)}
     >
       {live ? (

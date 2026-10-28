@@ -32,8 +32,10 @@ describe("one-click MCP connectors", () => {
   });
 
   test("every connector in the catalog has a logo the web app serves", () => {
-    const dir = resolve(import.meta.dir, "../../../apps/web/public/connectors");
-    for (const b of Object.values(CONNECTOR_BRANDS)) expect(existsSync(`${dir}/${b.file}.svg`)).toBe(true);
+    const web = resolve(import.meta.dir, "../../../apps/web/public");
+    for (const b of Object.values(CONNECTOR_BRANDS)) {
+      expect(existsSync(`${web}/${b.own ? "brands" : "connectors"}/${b.file}.svg`)).toBe(true);
+    }
     const missing = connectorListing({}).filter((e) => !e.iconUrl).map((e) => e.id);
     expect(missing).toEqual([]);
   });

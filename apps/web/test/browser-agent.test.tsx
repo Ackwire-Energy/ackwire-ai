@@ -204,7 +204,8 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     await push(frame());
     const banner = document.querySelector(".cmp-banner") as HTMLElement;
     expect(banner.textContent).toContain("A Ada pediu para João: “Entrar no Stripe” · 8 min");
-    expect(sub()).toBe("Ao vivo · a Ada pediu para João");
+    // Who asked whom is the banner's: the head says only that it's live.
+    expect(sub()).toBe("Ao vivo");
     // Walter owns the workspace: he may still help.
     expect(within(banner).getByRole("button", { name: "Ajudar" })).toBeTruthy();
     expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Assumir o controle" })).toBeNull();
@@ -226,8 +227,10 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
       hidden: true,
     });
     expect(card().querySelector("img")).toBeNull();
+    // Who is in control is the head's; that the page stays hidden, and until when, the cover's alone.
     expect(card().textContent).toContain("Por privacidade, a tela fica oculta até voltar para a Ada.");
-    expect(sub()).toBe("João no controle · tela oculta");
+    expect(sub()).toBe("João no controle");
+    expect(card().textContent).not.toContain("João");
     expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Assumir o controle" })).toBeNull();
   });
 });

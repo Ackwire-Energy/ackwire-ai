@@ -62,7 +62,10 @@ export const NOTIFICATION_KINDS = [
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
-  /** The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8). */
+  /**
+   * The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8), or on
+   * agentes.chat Cloud one of its agents was held (`statusTo: "agent_hold"`, also its responsible person, §9).
+   */
   "org_standing",
   /** The workspace's own computer is ready (owners, ADR 0056 §10). */
   "computer_ready",
@@ -101,6 +104,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
+  agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }
@@ -125,6 +130,10 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine (its name) or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /** `org_standing` to `agent_hold`: the hold's kind, `network` or `operator`, never its reason. */
+  holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: the apps read `text` as the restriction does, with how to contest it. */
+  cloud?: boolean;
   /**
    * `join_request`: who asked, by name (they aren't members, so no actors), the first `MAX_NAMES` in the order they
    * asked: a merged row names whoever its time is from, and `count` says how many asked in all.

@@ -5,9 +5,17 @@ import {
   type EntryWords,
   entryLine,
   entryState,
+  liveSubLine,
 } from "@agenteschat/client/lib/agent-computer";
-import { type SetupView, setupEta, setupView } from "@agenteschat/client/lib/computer";
+import {
+  type SetupView,
+  setupEta,
+  setupNoticeTitleKey,
+  setupView,
+  statusRestatesChip,
+} from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { resources } from "@agenteschat/i18n";
 import { bannedIn, CLOUD_BANNED } from "../../../../packages/i18n/test/edition-words";
 import { offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
@@ -208,6 +216,22 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     );
     expect(pt("agentComputer.phone.fromComputer")).toBe("Para ver a tela, abra o agentes.chat num notebook");
   });
+
+  test("its header says each thing once: live alone under a banner, who holds it over a page that hides", async () => {
+    const pt = await translator("pt-BR");
+    const words = { name: "Ada", person: (id: string) => (id === "u-joao" ? "João" : "?"), nowMs: NOW };
+    // A hold, or a request waiting: the banner (or the page) says it.
+    expect(liveSubLine(pt, facts({ held: true }), words)).toBe("Ao vivo");
+    expect(liveSubLine(pt, facts({ handoff: request({ screen: "desktop" }) }), words)).toBe("Ao vivo");
+    // Someone else in control: the header says who, and the page only why nothing shows.
+    const joao = request({ status: "active", controllerUserId: "u-joao", kind: "takeover", expiresAt: null });
+    expect(liveSubLine(pt, facts({ handoff: joao }), words)).toBe("João no controle");
+    expect(pt("browser.inCard.hiddenHelp", agentGrammar(pt, "Ada"))).toBe(
+      "Por privacidade, a tela fica oculta até voltar para a Ada.",
+    );
+    const card = await Bun.file(new URL("../../src/features/browser/BrowserCard.tsx", import.meta.url).pathname).text();
+    expect(card).toContain('? t("browser.inCard.hiddenHelp", agentGrammar(t, name))');
+  });
 });
 
 describe("the profile's Computador entry on the phone", () => {
@@ -273,13 +297,15 @@ describe("the profile's Computador entry on the phone", () => {
 describe("the workspace's computer on its way, on Conversas", () => {
   test("its notice: the time left, else where it is; waiting for a computer, the email for those who get it", async () => {
     const t = await translator("pt-BR");
-    expect(t("computerSetup.notice.title", { org: "Acme" })).toBe("Preparando o computador da Acme");
     const view = viewOf();
-    expect(setupNoticeLine(t, view, setupEta(view, NOW), true)).toBe("Faltam uns 6 min");
     const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    // Titled as the web's: being prepared once it is, its name alone while in line, where nothing is yet.
+    expect(t(setupNoticeTitleKey(view), { org: "Acme" })).toBe("Preparando o computador da Acme");
+    expect(t(setupNoticeTitleKey(wait), { org: "Acme" })).toBe("Computador da Acme");
+    expect(setupNoticeLine(t, view, setupEta(view, NOW), true)).toBe("Faltam uns 6 min");
     expect(setupNoticeLine(t, wait, setupEta(wait, NOW), false)).toBe("Esperando um computador disponível");
     expect(setupNoticeLine(t, wait, setupEta(wait, NOW), true)).toBe(
-      "Esperando um computador disponível · avisamos por e-mail",
+      "Esperando um computador disponível. Avisamos por e-mail.",
     );
     // On hold no time is said: where it is instead.
     expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");
@@ -296,6 +322,27 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(setupSub(en, viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null }))).toBe(
       "In line",
     );
+  });
+
+  test("under that header the wait names nothing and says no status the header says (`said`), as on the web", async () => {
+    const source = await Bun.file(
+      new URL("../../src/features/computer/SetupWait.tsx", import.meta.url).pathname,
+    ).text();
+    // Its title is the computer's name, in every state, and only where no header names it.
+    expect(source).toContain('const name = t("computerSetup.title", { org: wait.org });');
+    expect(source).not.toContain("computerSetup.notice.title");
+    expect(source).toContain("{said ? null : (");
+    // In line, or being prepared before a step: the header's word already says it.
+    expect(source).toContain(") : said && statusRestatesChip(view) ? null : (");
+    expect(statusRestatesChip(viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null }))).toBe(
+      true,
+    );
+    expect(statusRestatesChip(viewOf({ state: "preparing", step: null, secondsLeft: null }))).toBe(true);
+    expect(statusRestatesChip(viewOf({ state: "problem", step: null, secondsLeft: null }))).toBe(false);
+    const screen = await Bun.file(
+      new URL("../../src/features/computer/ComputerScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain("<SetupWait view={f.setup} said />");
   });
 
   test("the AI step offers an API key now in every wait, a page away on the phone, but not on hold", () => {

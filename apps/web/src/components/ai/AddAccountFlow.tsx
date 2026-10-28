@@ -5,7 +5,7 @@ import { isSignInCode } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { isEmail } from "@agenteschat/client/lib/text";
-import { Button, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -47,8 +47,6 @@ export interface AddAccountProps {
   ready?: boolean;
   /** It just got ready and the page is still asking about it: what starts there shows it's loading. */
   loading?: boolean;
-  /** Under the step that waits for the computer (the sign-in, or the key's), while it isn't ready. */
-  waitLine?: string;
   /** False in a plan's panel, whose foot says where the account stays: the steps' ⓘ leave that out. */
   privacy?: boolean;
   /** The sign-in button's words when it signs in for one agent of several ("Sign in for Theo"). */
@@ -88,11 +86,14 @@ export function AddAccount(props: AddAccountProps) {
   );
 }
 
-/** A numbered step: its number on the title's line, the text under it, its button at the side. */
-export function Step({ n, children, side }: { n: number; children: ReactNode; side?: ReactNode }) {
+/**
+ * A step: its number on the title's line, the text under it, its button at the side. Unnumbered where each step shows
+ * only once the one before it is done (Claude's sign-in, then its code): a lone 1 counts nothing.
+ */
+export function Step({ n, children, side }: { n?: number; children: ReactNode; side?: ReactNode }) {
   return (
-    <div className="agp-addacct__step ac-iconline">
-      <i aria-hidden="true">{n}</i>
+    <div className={cx("agp-addacct__step", n !== undefined && "ac-iconline")}>
+      {n !== undefined && <i aria-hidden="true">{n}</i>}
       <span className="agp-addacct__text">{children}</span>
       {side}
     </div>
@@ -169,7 +170,6 @@ function AddAccountFlow({
   local,
   ready = true,
   loading = false,
-  waitLine,
   privacy = true,
   signInLabel,
   fanOut,
@@ -438,7 +438,6 @@ function AddAccountFlow({
   const signInHint = privacy
     ? t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) })
     : t(`agentPage.work.brain.add.stepOneTip.${kind}`);
-  const waits = !ready && waitLine ? <span>{waitLine}</span> : null;
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);
@@ -465,7 +464,6 @@ function AddAccountFlow({
             hintId={keyHintId}
           />
           {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
-          {waits}
           {key && !keyOk && (
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
@@ -500,7 +498,6 @@ function AddAccountFlow({
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
-          {waits}
         </Step>
         {login?.userCode && (
           <Step n={3} side={waiting}>
@@ -524,7 +521,6 @@ function AddAccountFlow({
     steps = (
       <>
         <Step
-          n={1}
           side={
             login ? (
               openAgain(login.url)
@@ -544,7 +540,6 @@ function AddAccountFlow({
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.claude_code")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
-          {waits}
           {asks && (
             <span className="agp-addacct__paste">
               <Input
@@ -566,7 +561,7 @@ function AddAccountFlow({
           {asks && (startFailed === "email" || !emailOk) && <span>{t("aiAccounts.add.emailInvalid")}</span>}
         </Step>
         {login && opened && (
-          <Step n={2} side={waiting}>
+          <Step side={waiting}>
             <label htmlFor={codeId}>
               <b>{t("agentPage.work.brain.add.stepTwo")}</b>
             </label>

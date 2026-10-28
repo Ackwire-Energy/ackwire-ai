@@ -75,9 +75,6 @@ export function DeleteAccountScreen() {
           holdLabel={t("mobile.delete.holding")}
           onConfirm={() => void confirm()}
         />
-        <Text variant="caption" tone="faint" style={styles.center}>
-          {t("mobile.delete.note")}
-        </Text>
       </ScrollView>
     </View>
   );
@@ -89,5 +86,4 @@ const styles = StyleSheet.create({
   list: { padding: 14, gap: 10 },
   item: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1 },
-  center: { textAlign: "center" },
 });

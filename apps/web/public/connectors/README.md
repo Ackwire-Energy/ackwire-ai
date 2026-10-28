@@ -1,9 +1,9 @@
 # Connector icons
 
-Brand icons for the connector catalog. One single-color SVG per service; the app draws them as a mask in the brand color (or the ink, for near-black, very light or many-colored brands). Brand colors live with the catalog in code (`CONNECTOR_BRANDS`, `packages/engine/src/connectors/listing.ts`), and every connector in the catalog has one (a test checks it).
+One-color brand icons for the connector catalog: the app draws them as a mask in the brand color (or the ink, for near-black, very light or many-colored brands). Brand colors live with the catalog in code (`CONNECTOR_BRANDS` in `packages/engine/src/connectors/listing.ts`), and every connector in the catalog has an icon (a test checks it).
 
-Most come from [Simple Icons](https://simpleicons.org) 16.32.0 (CC0 1.0, public domain). The ones Simple Icons doesn't have are the brand's own mark, from its site or press kit, reduced to one color: AbacatePay, Ahrefs, Amplitude, Attio, Canva, Close, Fireflies, Gamma, Granola, Himetrica, Jam, Jotform, Klaviyo, MillionSend, monday.com, Superwall and Tally.
+Most come from [Simple Icons](https://simpleicons.org) 16.32.0 (CC0 1.0, public domain). `square.svg` is Square's own mark, the first three subpaths (the mark without the wordmark) of `Black/Square_Logo_2025_Black.svg` in the logo set at https://squareup.com/us/en/press/logo (https://assets.ctfassets.net/2d5q1td6cyxq/3xNJXOyxBSmmJ1lUafqHGJ/0d3bcea3bf9426dbf9a54f424e3d1fab/Square_Logo.zip), unchanged and scaled to the 24×24 view box. Square shows it only in black or white, which the ink gives in each theme. The others Simple Icons doesn't have are the brand's own mark, from its site or press kit, reduced to one color: AbacatePay, Ahrefs, Amplitude, Attio, Close, Fireflies, Gamma, Granola, Himetrica, Jam, Jotform, Klaviyo, MillionSend, monday.com, Superwall and Tally.
 
-Microsoft Outlook is not in Simple Icons (removed at the brand's request), so it keeps the monogram tile. The email cards' colors (Gmail, iCloud) live in `apps/web/src/components/MailConnect.tsx`.
+A mark in its maker's colors, which a mask would flatten (PayPal's, Canva's, Outlook's), is in `../brands/`. The email cards' marks (Gmail, Outlook, iCloud) and colors live in `apps/web/src/components/MailConnect.tsx`.
 
 Each icon is a trademark of its owner, used only to name the service.

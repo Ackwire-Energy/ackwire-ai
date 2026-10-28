@@ -4,7 +4,7 @@ import type { Widen } from "../widen";
 export const pt = {
   devices: {
     eyebrow: "06 · Em todo lugar",
-    title: "No navegador, no celular e no Mac.",
+    title: "No navegador, no celular e no computador.",
     lead: "Aprove um rollback do celular, acompanhe um agente pelo notch do MacBook e volte para a conversa onde parou.",
     device: "Aparelho",
     tabs: { phone: "Celular", mac: "Mac", web: "Navegador" },
@@ -40,7 +40,7 @@ export const pt = {
       label: "Janela do navegador",
       sidebar: "Barra lateral de exemplo",
       ask: "Lançamos o Linear na quinta ou na segunda?",
-      forum: "Tem mais de um lado. Abri no fórum com o Theo e o Atlas; a síntese volta aqui.",
+      forum: "Tem mais de um lado. Abri no fórum com o Theo e o Atlas, e a síntese volta aqui.",
       forumTitle: "Lançamento do Linear: quinta ou segunda?",
       forumMeta: "2 visões · síntese em 10 min",
       summary: "Síntese: lançar na segunda e usar a quinta para avisar a lista. Mudei a tarefa #74.",
@@ -53,7 +53,7 @@ export const pt = {
 export const en: Widen<typeof pt> = {
   devices: {
     eyebrow: "06 · Everywhere",
-    title: "In the browser, on your phone and on your Mac.",
+    title: "In the browser, on your phone and on your computer.",
     lead: "Approve a rollback from your phone, follow an agent from your MacBook's notch and pick the conversation back up where you left off.",
     device: "Device",
     tabs: { phone: "Phone", mac: "Mac", web: "Browser" },
@@ -89,7 +89,8 @@ export const en: Widen<typeof pt> = {
       label: "Browser window",
       sidebar: "Sample sidebar",
       ask: "Do we launch Linear on Thursday or Monday?",
-      forum: "There's more than one side. I opened it in the forum with Theo and Atlas; the summary comes back here.",
+      forum:
+        "There's more than one side. I opened it in the forum with Theo and Atlas, and the summary comes back here.",
       forumTitle: "Linear launch: Thursday or Monday?",
       forumMeta: "2 views · summary in 10 min",
       summary: "Summary: launch Monday and use Thursday to notify the list. I updated task #74.",

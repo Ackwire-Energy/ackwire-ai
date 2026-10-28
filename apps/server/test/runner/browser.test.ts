@@ -400,7 +400,7 @@ test.if(posix)(
     let err = await failedStart(loader);
     expect(err.missing).toEqual(["libnspr4.so"]);
     expect(err.message).toBe(
-      "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+      "the agent's computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
     );
     expect(err.detail).toMatch(
       /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
@@ -424,7 +424,7 @@ test.if(posix)(
       process.env.PATH = PATH;
     }
     expect(err.missing).toEqual(all);
-    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more); install them on it`);
+    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more). Install them on it`);
     expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
 
     // A profile another Chrome holds, as Chrome for Testing says it and exits.

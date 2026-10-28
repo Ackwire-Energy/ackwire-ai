@@ -7,6 +7,7 @@ import {
   useTurnOffInviteLink,
 } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Share, StyleSheet, View } from "react-native";
@@ -22,11 +23,11 @@ import { membersByName } from "./logic";
 const COPIED_MS = 1800;
 
 /**
- * Membros, a page of the Você sheet for admins: the requests to join (they open in their sheet), the workspace's
+ * Membros, a screen of Você's for admins: the requests to join (they open in their sheet), the workspace's
  * invitation link as the web's Members has it (ADR 0068: copy or share it, when it works until, turn it off; links
  * made before links could be shown again, to turn off; make one), then the people.
  */
-export function MembersPage({ onBack, onRequests }: { onBack: () => void; onRequests: () => void }) {
+export function MembersPage() {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const c = useColors();
@@ -56,7 +57,7 @@ export function MembersPage({ onBack, onRequests }: { onBack: () => void; onRequ
     ]);
 
   return (
-    <Page title={t("members.title")} onBack={onBack}>
+    <Page title={t("members.title")}>
       <View style={styles.gap} />
       <GroupedList>
         <GroupedRow
@@ -64,7 +65,7 @@ export function MembersPage({ onBack, onRequests }: { onBack: () => void; onRequ
           label={t("members.requests.title")}
           value={waiting > 0 ? String(waiting) : undefined}
           chevron
-          onPress={onRequests}
+          onPress={() => router.push("/join-requests")}
         />
       </GroupedList>
 

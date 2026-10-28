@@ -11,6 +11,7 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
+  cacheMessageMemories,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -214,6 +215,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);
+      break;
+    case "message.memories":
+      // What an agent saved from a person's message: the memory mark under it.
+      cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);
       break;
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.

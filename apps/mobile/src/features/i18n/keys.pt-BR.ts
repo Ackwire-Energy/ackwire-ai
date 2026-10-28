@@ -503,7 +503,7 @@ export const featureKeysPtBR = {
     noAgents: "Nenhum agente pode fazer missões ainda. Conecte um computador pelo site.",
     reason: {
       no_computer: "Precisa de um computador conectado",
-      cloud_computer: "Missões nas sandboxes da Daytona chegam em breve",
+      cloud_computer: "Missões num computador na nuvem chegam em breve",
       exec_off: "O computador não deixa rodar comandos",
       runner_outdated: "O computador precisa de uma atualização",
       not_in_audience: "Não atende você",
@@ -781,6 +781,12 @@ export const featureKeysPtBR = {
     connectors: "Conectores",
     usage: "Uso",
     preferences: "Preferências",
+    editProfile: "Editar perfil",
+    switchWorkspace: "Trocar workspace",
+    yourAgents: "Seus agentes",
+    newAgent: "Novo",
+    thinksWith: "Pensam com",
+    ownOn: "Login no {{computer}}",
     on: "Ligadas",
     off: "Desligadas",
     notificationsPhone: "Notificações no celular",
@@ -835,7 +841,6 @@ export const featureKeysPtBR = {
       "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     hold: "Segure para apagar",
     holding: "Segure…",
-    note: "Os planos são assinados e cancelados no site.",
   },
   files: {
     type: {
@@ -950,6 +955,12 @@ export const featureKeysPtBR = {
     noResults: "Nada com esses filtros.",
     loadFailed: "Não deu para carregar o Drive.",
     more: "Mostrar mais",
+  },
+  // Rotinas (the rest of its words are the web's, `routines.*`).
+  routines: {
+    loadFailed: "Não deu para carregar as rotinas.",
+    anyAgent: "Todos os agentes",
+    create: "Criar",
   },
   // intentional: chats/activity/ui
   homeNow: {
@@ -1098,6 +1109,7 @@ export const featureKeysPtBR = {
     tasks_one: "{{count}} tarefa",
     tasks_other: "{{count}} tarefas",
     switch: "Trocar computador",
+    dismiss: "Fechar aviso",
     rowWaiting: "Esperando o {{computer}}",
     rowWaitingLabel: "{{name}}, esperando o {{computer}}",
     waiting: {
@@ -1120,10 +1132,10 @@ export const featureKeysPtBR = {
       submit_other: "Trocar {{count}} agentes",
       later: "Agora não",
       on: "Ligado",
-      cloud: "Sandbox da Daytona",
+      cloud: "Computador na nuvem",
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
-      cloudDesc: "Um computador isolado na Daytona",
+      cloudDesc: "Um computador isolado na nuvem",
       has: "Tem o {{brains}}",
       and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
@@ -1157,7 +1169,7 @@ export const featureKeysPtBR = {
       target_not_found: "Esse computador não está mais conectado. Escolha outro.",
       target_same: "Escolha um computador diferente do {{computer}}.",
       target_paused: "Esse computador está pausado. Escolha outro.",
-      target_cloud_unavailable: "As sandboxes da Daytona não estão disponíveis agora.",
+      target_cloud_unavailable: "O computador na nuvem não está disponível agora.",
       not_found: "O {{computer}} não está mais na lista de computadores.",
     },
     card: {
@@ -1386,7 +1398,7 @@ export const featureKeysPtBR = {
     agentsLead: "Marque quem mais vem.",
     share: "Compartilhar link de convite",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
-    shareNote: "Quem abrir pede para entrar; você aprova.",
+    shareNote: "Você aprova cada pessoa que pedir.",
     emailsPlaceholder: "nome@empresa.com",
     membersNote: "Entram como membros.",
     invalidEmail: "Confira este e-mail.",
@@ -1411,6 +1423,8 @@ export const featureKeysPtBR = {
     saving: "Salvando…",
     row: "Contas de IA",
     rowNone: "Nenhuma",
+    rowPlans_one: "{{count}} plano",
+    rowPlans_other: "{{count}} planos",
     rowKeys_one: "{{count}} chave",
     rowKeys_other: "{{count}} chaves",
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
@@ -1419,10 +1433,34 @@ export const featureKeysPtBR = {
     audience: "Para quem responde",
     another: "Outra IA",
   },
+  crash: {
+    title: "Algo deu errado nesta tela",
+    subtitle: "O app achou um erro ao mostrar isto. Tente de novo. Se continuar, mande o texto abaixo pra gente.",
+    retry: "Tentar de novo",
+  },
   notFound: {
     title: "Não achamos isso",
     subtitle: "O link pode ter mudado ou você não tem acesso.",
     home: "Ir para as conversas",
+  },
+  settings: {
+    edit: "Editar workspace",
+    access: {
+      how: "Toque numa linha para trocar o nível: Sem acesso, Ler, Ler e escrever.",
+    },
+    logo: {
+      failed: "Não deu para enviar o logo",
+      tooBig: "Imagem grande demais. Tente outra.",
+    },
+    machine: {
+      toolsHow: "Toque numa ferramenta ligada para desligar. Para ligar de novo, só no próprio computador.",
+    },
+    import: {
+      onComputer:
+        "Trazer agentes, skills e canais de outro app é pelo computador: abra o agentes.chat no navegador, em Configurações\u00a0›\u00a0Importar e exportar.",
+      preparing: "Preparando o arquivo…",
+      failed: "Não deu para baixar o arquivo. Tente de novo.",
+    },
   },
 };
 

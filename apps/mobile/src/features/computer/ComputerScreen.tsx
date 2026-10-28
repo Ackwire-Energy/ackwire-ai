@@ -128,29 +128,27 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   }, [navigation]);
   const pausedUntil = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
 
+  // The header's sub-line says only what a cover or a banner doesn't, as on the web: each thing once.
   let sub = "";
   let body: ReactNode;
   if (!f || !view.ready) {
-    sub = t("agentComputer.sub.opening");
     body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
   } else if (view.forbidden) {
     body = <Cover icon="lock" text={t("agentComputer.state.forbidden")} />;
   } else if (flashing) {
-    sub = t("agentComputer.state.ready");
     body = <Cover icon="check" text={t("agentComputer.state.ready")} />;
   } else if (stage === "held") {
-    sub = t("agentComputer.sub.held");
     body = <Cover icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />;
   } else if (stage === "preparing" && f.setup) {
     sub = setupSub(t, f.setup);
-    body = <SetupWait view={f.setup} />;
+    body = <SetupWait view={f.setup} said />;
   } else if (stage === "page" || stage === "otherApp") {
     const controlled = f.handoff?.status === "active" && Boolean(f.handoff.controllerUserId);
     // A closed browser shows nothing live to watch: "Ao vivo" alone, as on the web.
     sub =
       stage === "page" && pageClosed && !controlled
         ? t("browser.watch.live")
-        : liveSubLine(t, f, { name, computer, person, nowMs: now });
+        : liveSubLine(t, f, { name, person, nowMs: now });
     const ask = screenRequest(f.handoff, now);
     const last = steps.at(-1);
     body = (
@@ -204,8 +202,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       body = (
         <Cover
           art={<ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="offline" size={96} />}
-          text={t("agentComputer.state.notAnswering", { computer })}
-          help={t("agentComputer.state.notAnsweringHelp")}
+          text={t("agentComputer.state.notAnsweringHelp")}
         />
       );
     } else {
@@ -230,7 +227,6 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     }
   } else if (stage === "joining") {
     // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
-    sub = t("agentComputer.sub.opening");
     body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");

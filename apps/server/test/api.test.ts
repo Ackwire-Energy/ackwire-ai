@@ -100,12 +100,14 @@ describe("app API protections", () => {
     expect(form.status).toBe(415);
   });
 
-  test("validation errors use the error shape", async () => {
+  test("validation errors use the error shape, a sentence per field", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
-    const res = await owner("/api/app/organizations", { json: { name: "" } });
+    const res = await owner("/api/app/organizations", { json: { name: "", teamSize: "huge" } });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("invalid_request");
+    const { error } = (await res.json()) as { error: { code: string; message: string } };
+    expect(error.code).toBe("invalid_request");
+    expect(error.message).toMatch(/^name: [^;]+\. teamSize: [^;]+$/);
   });
 });
 
