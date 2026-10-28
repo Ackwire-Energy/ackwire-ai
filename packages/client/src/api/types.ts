@@ -906,7 +906,7 @@ export interface ConnectorDef {
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
-  /** Brand icon served by this app (`/connectors/github.svg`); null = a monogram. */
+  /** Brand icon served by this app, null for a monogram: one color (`/connectors/github.svg`) or its maker's colors (`/brands/paypal.svg`). */
   iconUrl: string | null;
   /** Tint of the icon; null = the ink. */
   brandColor: string | null;

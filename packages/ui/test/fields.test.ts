@@ -38,5 +38,10 @@ describe("fields are v2 (no black borders)", () => {
     expect(chosen).toContain("background: var(--chosen-bg)");
     expect(chosen).toContain("box-shadow: var(--chosen-shadow)");
     expect(chosen).not.toContain("0 0 0 2px var(--ink)");
+    // Its own radio marks it: the corner check is a pressed card's alone.
+    expect(rules(css).filter(([s]) => s.includes("::after") && s.includes('.ac-option[data-state="checked"]'))).toEqual(
+      [],
+    );
+    expect(rules(css).some(([s]) => s === '.ac-option[aria-pressed="true"]::after')).toBe(true);
   });
 });

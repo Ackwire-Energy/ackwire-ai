@@ -3068,7 +3068,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               }
             : undefined
       }
-      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
+      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
+      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
       stacked={Boolean(card)}
     >
       {live ? (

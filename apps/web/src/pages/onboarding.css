@@ -36,17 +36,27 @@
   justify-content: center;
   min-width: 0;
 }
-/* One calm column per step, centered where it opens: the host asks, the answer, one big action. */
+/*
+ * One calm column per step: the host asks, the answer, one big action. It is as tall as the screen at least, so the
+ * step's actions rest at the screen's bottom however short the step is. On a desktop the step centres in the room
+ * above them.
+ */
 .onb__body {
+  --onb-gutter: clamp(16px, 4vw, 32px);
   display: flex;
   flex-direction: column;
   gap: 24px;
   width: 100%;
   max-width: 600px;
-  margin: auto 0;
-  padding: 48px clamp(16px, 4vw, 32px) 0;
+  padding: 48px var(--onb-gutter) 0;
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
+}
+/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. The page pins
+   that room as the step opens (`--onb-lead`), so what changes in the step grows or shrinks it downward. */
+.onb__body::before {
+  content: "";
+  margin-block: var(--onb-lead, auto) -24px;
 }
 @keyframes onb-in {
   from {
@@ -239,23 +249,32 @@ textarea.onb__big.ac-input {
   outline: none;
 }
 /*
- * The step's actions, always in view: a bar that holds the bottom of the screen while the step is longer than it, on
- * the page's ground with a 16px fade at its top, so the step slides under it. It sits under the content's last line
- * at the end of the scroll, as far below it as the column's gap. Continue first, the step's text button beside it
- * (Skip, I'll do it later, Open #general without sending), centred under it when both don't fit.
+ * The step's actions, in one place on every step: a bar at the bottom of the screen, clear of the home bar, on the
+ * page's ground with a 16px fade above it, so a longer step slides under it. The ground spans the column's gutters
+ * too: a card's ring passing under the bar never shows beside it. At the end of the scroll the bar sits under the
+ * content's last line, as far below it as the column's gap. Continue first, the step's text button beside it (Skip,
+ * I'll do it later, Open #general without sending), centred above it when both don't fit, so Continue keeps its place.
  */
 .onb__actions {
   position: sticky;
   bottom: 0;
   z-index: var(--z-sticky);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
   align-items: center;
   gap: 8px 12px;
-  margin-top: -16px;
-  padding: 16px 0 24px;
-  background: linear-gradient(to bottom, transparent, var(--pane) 16px);
+  margin: auto calc(-1 * var(--onb-gutter)) 0;
+  padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background: var(--pane);
   animation: onb-in 0.36s var(--out) 0.16s both;
+}
+.onb__actions::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 100%;
+  height: 16px;
+  background: linear-gradient(to bottom, transparent, var(--pane));
+  pointer-events: none;
 }
 .onb__actions > .ac-btn--primary {
   flex: 1 1 160px;
@@ -483,8 +502,11 @@ html:has(.onb) {
     display: none;
   }
   .onb__body {
-    margin: 0;
     padding-top: 24px;
+  }
+  /* The step starts under the step bar, and the spare room all goes above the actions. */
+  .onb__body::before {
+    display: none;
   }
   .onb__ask .onb__title {
     font-size: 18px;

@@ -1039,30 +1039,34 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(note()).toBeFalsy();
   });
 
-  test("a step's column stays where it opened as its content changes; a resize or the next step places it", async () => {
-    // Where the column sits, centered, as the browser lays it out.
-    let top = 120;
-    const real = Element.prototype.getBoundingClientRect;
-    Element.prototype.getBoundingClientRect = function (this: Element) {
-      return this.classList.contains("onb__body") ? ({ top, y: top } as DOMRect) : real.call(this);
-    };
+  test("a step stays where it opened as its content changes; a resize or the next step places it", async () => {
+    // The room above the step as the browser lays it out: the auto margin of the column's empty first row, or the
+    // room pinned on the column.
+    let room = 120;
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      pseudo === "::before" && el instanceof HTMLElement && el.classList.contains("onb__body")
+        ? ({ marginTop: el.style.getPropertyValue("--onb-lead") || `${room}px` } as CSSStyleDeclaration)
+        : real(el, pseudo);
     try {
       const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 330, specs: SPECS });
-      const column = () => document.querySelector(".onb__body") as HTMLElement;
-      expect(column().style.marginTop).toBe("120px");
-      // The computer's progress grows and shrinks it (centered, it would move): the question and Back stay put.
-      top = 60;
+      const lead = () => (document.querySelector(".onb__body") as HTMLElement).style.getPropertyValue("--onb-lead");
+      expect(lead()).toBe("120px");
+      // The computer's progress grows and shrinks the step (left to the browser, the room would change and the step
+      // would move): the question and Back stay put.
+      room = 60;
       await r.reported({ state: "preparing", step: "connecting", secondsLeft: 6, specs: SPECS });
       await r.reported({ state: "ready", machineId: "m-1", specs: SPECS });
-      expect(column().style.marginTop).toBe("120px");
+      expect(lead()).toBe("120px");
       await act(async () => window.dispatchEvent(new Event("resize")));
-      expect(column().style.marginTop).toBe("60px");
-      top = 80;
+      expect(lead()).toBe("60px");
+      room = 80;
       await click(screen().getByRole("button", { name: "Continuar" }));
       expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-      expect(column().style.marginTop).toBe("80px");
+      expect(lead()).toBe("80px");
     } finally {
-      Element.prototype.getBoundingClientRect = real;
+      g.getComputedStyle = real;
     }
   });
 });

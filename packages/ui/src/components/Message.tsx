@@ -31,8 +31,10 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   children: ReactNode;
   /** Wraps the body in a column with gaps (approval cards). */
   stacked?: boolean;
-  /** Muted, right-aligned on the header line (e.g. the receipt check). */
+  /** Muted, at the end of the first line, the header's or a grouped message's text's (e.g. the receipt check). */
   aside?: ReactNode;
+  /** A line under the message, the same on a first and a grouped one (e.g. a receipt with words). */
+  foot?: ReactNode;
 }
 
 /** Taps on these keep doing their own thing (the bar stays as it is). */
@@ -67,6 +69,7 @@ export function Message({
   children,
   stacked,
   aside,
+  foot,
   className,
   onClick,
   ...rest
@@ -136,8 +139,9 @@ export function Message({
           )}
           {aside && !grouped && <span className="ac-msg__aside">{aside}</span>}
         </div>
-        {children}
         {aside && grouped && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
+        {children}
+        {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>
     </article>
   );

@@ -735,12 +735,14 @@ textarea.ac-input {
   margin-left: 0;
 }
 
-/* Message: a fixed avatar column at the top, the text column beside it. */
+/* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
+   `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
+  --msg-inline: var(--space-4);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 6px var(--space-4);
+  padding: 6px var(--msg-inline);
 }
 .ac-msg--grouped {
   padding-top: 2px;
@@ -1609,8 +1611,8 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark), with a check in the corner; in dark the other options
-   of the group step back. */
+/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other options of the group step back. A pressed card
+   also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
   background: var(--chosen-bg);
@@ -1631,8 +1633,7 @@ textarea.ac-input {
     0 0 0 1px var(--line2),
     var(--e1);
 }
-.ac-option[aria-pressed="true"]::after,
-.ac-option[data-state="checked"]::after {
+.ac-option[aria-pressed="true"]::after {
   content: "";
   position: absolute;
   top: 10px;
@@ -1646,17 +1647,14 @@ textarea.ac-input {
     center / 12px no-repeat;
 }
 /* Nothing runs under the check: the title, and whatever sits on the right (a chip like "Em uso"). */
-.ac-option[aria-pressed="true"] .ac-option__title,
-.ac-option[data-state="checked"] .ac-option__title {
+.ac-option[aria-pressed="true"] .ac-option__title {
   padding-right: 22px;
 }
-.ac-option[aria-pressed="true"] .ac-option__aside,
-.ac-option[data-state="checked"] .ac-option__aside {
+.ac-option[aria-pressed="true"] .ac-option__aside {
   margin-right: 26px;
 }
 /* Dark: the check's mark takes the page color (ink is light there). */
-[data-theme="dark"] .ac-option[aria-pressed="true"]::after,
-[data-theme="dark"] .ac-option[data-state="checked"]::after {
+[data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
 .ac-option:focus-visible,
@@ -2521,7 +2519,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-msg__actions {
   position: absolute;
-  top: -12px;
   right: 16px;
   display: flex;
   gap: 2px;
@@ -2836,21 +2833,37 @@ a.ac-list__row:focus-visible {
   line-height: 16px;
   color: var(--ink-muted);
 }
+/*
+ * A grouped message's check ends its first line, its middle on the line's capitals as an `.ac-iconline` lead's, so
+ * it takes the text's type (`.ac-msg__text`) and top margin. The line wraps before it, never under it.
+ */
 .ac-msg__aside--floating {
-  position: absolute;
-  top: 0;
-  right: 16px;
+  float: right;
+  /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
+  align-self: flex-end;
+  margin: 2px 0 0 8px;
+  font-size: 15.5px;
+  line-height: 1.7;
+  /* Browsers without the lh unit: the text's 26.35px line. */
+  translate: 0 calc(13.175px - var(--cap-mid) - 50%);
 }
-/* With words ("Picking who answers · Call an agent"): a line of its own under the text, at the right, so the text
-   keeps its lines while the words come and go. */
-.ac-msg__aside--floating:has(.ac-receipt > span) {
-  position: static;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 2px;
+@supports (top: 1lh) {
+  .ac-msg__aside--floating {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-msg__aside .ac-receipt {
   margin-top: 0;
+}
+/* A receipt with words: a line of its own under the message, from the text's start, the same on a first and a
+   grouped message, so the text still follows the name and the words come and go without moving it. */
+.ac-msg__foot > .ac-receipt {
+  margin-top: 2px;
+}
+/* A receipt part with nothing to show (a message no agent was asked about) takes no room, in a stacked body too. */
+.ac-msg__aside:empty,
+.ac-msg__foot:empty {
+  display: none;
 }
 
 /* Date picker (our month grid in a popover; never the native input) */
@@ -4313,11 +4326,17 @@ a.ac-list__row:focus-visible {
 .ac-msg:hover {
   background: var(--plate-soft);
 }
-/* A raised bar of 32px ghost icon buttons at the row's top-right: react, reply, more. Hidden at rest,
-   shown on hover and on keyboard focus inside the row. */
+/*
+ * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
+ * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
+ * check's is, and it stands left of the check. So it only reaches into the room between rows: never over the row
+ * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
+ */
 .ac-msg__actions {
-  top: -14px;
+  /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
+  top: calc(6px + var(--cap-top) - var(--cap-mid));
   right: 10px;
+  translate: 0 -50%;
   z-index: var(--z-sticky);
   padding: 3px;
   border: 0;
@@ -4334,6 +4353,19 @@ a.ac-list__row:focus-visible {
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: none;
+}
+/* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
+.ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
+  top: calc(4px + 13.175px - var(--cap-mid));
+}
+/* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
+   last one (6px up) is shorter than the bar on touch (46px), so the bar takes that room's middle. */
+.ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  top: 13.175px;
+}
+/* Left of the check (20px wide), 8px from it, past the row's side padding. */
+.ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
   min-width: 32px;
@@ -6231,7 +6263,6 @@ button.ac-tools__row:focus-visible {
     outline: none;
   }
   .ac-msg__actions {
-    top: -36px;
     right: 8px;
   }
   /* The time's details: on a tap of the time, not only on hover. */

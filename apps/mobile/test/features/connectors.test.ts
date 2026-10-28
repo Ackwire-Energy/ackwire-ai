@@ -13,6 +13,7 @@ import {
   isHttpsUrl,
   markFinishing,
   monogram,
+  ownMarkUri,
   searchConnectors,
   stateOf,
   suggestionsOf,
@@ -149,6 +150,12 @@ test("icons only from our own path; brand colors only as #rrggbb; monograms; htt
   expect(iconUri("https://agentes.chat", "/connectors/github.svg")).toBe("https://agentes.chat/connectors/github.svg");
   expect(iconUri("https://agentes.chat", "https://evil.example/x.svg")).toBeNull();
   expect(iconUri("https://agentes.chat", null)).toBeNull();
+  // A mark in its maker's colors (PayPal's, Canva's) is drawn as it is, never tinted, and only a file of ours.
+  expect(ownMarkUri("https://agentes.chat", "/brands/paypal.svg")).toBe("https://agentes.chat/brands/paypal.svg");
+  expect(iconUri("https://agentes.chat", "/brands/paypal.svg")).toBeNull();
+  expect(ownMarkUri("https://agentes.chat", "/connectors/github.svg")).toBeNull();
+  expect(ownMarkUri("https://agentes.chat", "/brands/../x.svg")).toBeNull();
+  expect(ownMarkUri("https://agentes.chat", "https://evil.example/brands/x.svg")).toBeNull();
   expect(brandOf("#1a2b3c")).toBe("#1a2b3c");
   expect(brandOf("red")).toBeNull();
   expect(monogram("Google Drive")).toBe("GD");

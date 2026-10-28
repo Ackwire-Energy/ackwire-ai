@@ -38,6 +38,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { DatabaseRulesPanel } from "@/components/DatabaseRules";
+import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -96,12 +97,7 @@ export function DatabaseConnectFlow({
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={
-        <span className="cflow__title">
-          <DatabaseIcon size="lg" />
-          <span>{title}</span>
-        </span>
-      }
+      title={<FlowTitle tile={<DatabaseIcon size="lg" />}>{title}</FlowTitle>}
       closeLabel={t("common.close")}
       width={620}
       className="cflow"
