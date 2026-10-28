@@ -291,6 +291,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    follow_lights(app, &window);
     fit_page(app);
     front(app)
 }
@@ -352,11 +354,67 @@ const LIGHTS_AGAIN: Duration = Duration::from_millis(300);
 
 #[cfg(target_os = "macos")]
 fn place_now(app: &AppHandle) {
+    if PLACING.with(|p| p.replace(true)) {
+        return;
+    }
     if let Some(window) = app.get_window(LABEL) {
         if !window.is_fullscreen().unwrap_or(false) {
             place_lights(&window);
         }
     }
+    PLACING.with(|p| p.set(false));
+}
+
+/// Puts the buttons back the moment AppKit moves them. A new title (every chat switched to) lays the title
+/// bar out on the next display pass, after `keep_lights` has already placed them, and the buttons showed at
+/// the bar's top until the later pass (a visible jump). Watching their frames places them again inside that
+/// same layout pass, before anything is drawn. Observers are synchronous (no queue) and on the main thread.
+#[cfg(target_os = "macos")]
+fn follow_lights(app: &AppHandle, window: &tauri::Window) {
+    use block2::RcBlock;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use std::ptr::NonNull;
+
+    let Ok(ns) = window.ns_window() else { return };
+    let ns = ns as *mut AnyObject;
+    if ns.is_null() {
+        return;
+    }
+    // SAFETY: `ns` is this window's live NSWindow, on the main thread (the window is built there); the views
+    // watched are its own buttons, their row and its container, which live as long as the window.
+    unsafe {
+        let close: *mut AnyObject = msg_send![ns, standardWindowButton: 0usize];
+        if close.is_null() {
+            return;
+        }
+        let row: *mut AnyObject = msg_send![close, superview];
+        let container: *mut AnyObject = if row.is_null() { row } else { msg_send![row, superview] };
+        let views: [*mut AnyObject; 5] = [
+            close,
+            msg_send![ns, standardWindowButton: 1usize],
+            msg_send![ns, standardWindowButton: 2usize],
+            row,
+            container,
+        ];
+        let center: *mut AnyObject = msg_send![class!(NSNotificationCenter), defaultCenter];
+        let name: *mut AnyObject =
+            msg_send![class!(NSString), stringWithUTF8String: c"NSViewFrameDidChangeNotification".as_ptr()];
+        let handle = app.clone();
+        let block = RcBlock::new(move |_: NonNull<AnyObject>| place_now(&handle));
+        for view in views.into_iter().filter(|v| !v.is_null()) {
+            let _: () = msg_send![view, setPostsFrameChangedNotifications: true];
+            let nil: *mut AnyObject = std::ptr::null_mut();
+            let _: *mut AnyObject =
+                msg_send![center, addObserverForName: name, object: view, queue: nil, usingBlock: &*block];
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    /// Placing the buttons moves them too: their own frame notices are not answered again.
+    static PLACING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The site's title bar (apps/web desktop.css), in points.
