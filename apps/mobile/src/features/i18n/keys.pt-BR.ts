@@ -1434,6 +1434,11 @@ export const featureKeysPtBR = {
     audience: "Para quem responde",
     another: "Outra IA",
   },
+  crash: {
+    title: "Algo deu errado nesta tela",
+    subtitle: "O app achou um erro ao mostrar isto. Tente de novo; se continuar, mande o texto abaixo pra gente.",
+    retry: "Tentar de novo",
+  },
   notFound: {
     title: "Não achamos isso",
     subtitle: "O link pode ter mudado ou você não tem acesso.",

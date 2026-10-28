@@ -1428,6 +1428,11 @@ export const featureKeysEn: FeatureTranslations = {
     audience: "Who it replies to",
     another: "Another AI",
   },
+  crash: {
+    title: "Something went wrong on this screen",
+    subtitle: "The app hit an error showing this. Try again; if it keeps happening, send us the text below.",
+    retry: "Try again",
+  },
   notFound: {
     title: "We couldn't find that",
     subtitle: "The link may have changed or you can't see it.",

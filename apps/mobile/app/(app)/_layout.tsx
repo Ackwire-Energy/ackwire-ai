@@ -1,7 +1,8 @@
 import { usePrefetchRecent } from "@agenteschat/client";
-import { Stack } from "expo-router";
+import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { View } from "react-native";
 import { useRememberAgentLooks } from "@/features/shared/hooks";
+import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
 import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
@@ -9,6 +10,11 @@ import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderP
 
 /** A link straight to a pushed screen or a sheet still has the tabs under it (the back button works). */
 export const unstable_settings = { anchor: "(tabs)" };
+
+/** A screen that breaks while drawing shows what happened and a way back, instead of closing the app. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 /**
  * The signed-in app: the native tabs, and the screens pushed over them with the platform's push (the tab
