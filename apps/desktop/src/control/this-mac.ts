@@ -2,14 +2,16 @@
  * The site in the app's main window asks this computer a few things, relayed by Rust (`this_mac` in
  * main_window.rs, which checked the request and added the asking page's own `origin` and whether agents
  * may work here for it, `agentsHere`): which of its organizations this computer works for, pairing it with
- * one, reconnecting it, Preferences on a tab, and the access requests (the popover). The popover answers,
- * since it owns the runners. Pairing starts the device-code sign-in with the page's own server; the site
- * confirms the code with its own session and the machine's token stays with the runner. Rust already asked
- * the person (the system's own dialog) before a `connect` gets here.
+ * one, reconnecting it, Preferences on a tab, the access requests (the popover), and on the server here the
+ * folder of its files (Storage's "Show the folder"). The popover answers, since it owns the runners. Pairing
+ * starts the device-code sign-in with the page's own server; the site confirms the code with its own session
+ * and the machine's token stays with the runner. Rust already asked the person (the system's own dialog)
+ * before a `connect` gets here.
  */
 
 import type { RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import { ControlError } from "./client";
+import { filesFolder } from "./local-server";
 import { homeServer } from "./server";
 import { type DesktopStore, type Home, isPairedHome, isRefusedHome, orgName, pairedHomes } from "./store";
 
@@ -22,7 +24,8 @@ export type ThisMacRequest =
   | { kind: "connect"; orgId: string; origin: string; agentsHere: boolean; local?: boolean; also?: string }
   | { kind: "reconnect"; orgId: string; origin: string; local?: boolean; also?: string }
   | { kind: "prefs"; tab: PrefsTab }
-  | { kind: "requests" };
+  | { kind: "requests" }
+  | { kind: "files"; local?: boolean };
 
 export type PrefsTab = "folders" | "tools" | "updates";
 
@@ -45,6 +48,10 @@ export interface ThisMacDeps {
   openPrefs(tab: PrefsTab): Promise<void>;
   /** The popover, where access requests are answered. */
   showRequests(): Promise<void>;
+  /** The server here's folder (`~/.agentes`), as the app runs it now. */
+  localDir(): Promise<string>;
+  /** A folder of this computer in Finder or the file manager; rejects when it isn't one. */
+  revealFolder(path: string): Promise<void>;
   /** How long to wait for the runner's code. */
   codeTimeoutMs?: number;
 }
@@ -86,6 +93,14 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
   }
   if (request.kind === "requests") {
     await deps.showRequests();
+    return {};
+  }
+  if (request.kind === "files") {
+    // A folder of this computer, only for the page of the server it keeps.
+    if (request.local !== true) throw new Error("not_here");
+    const dir = await deps.localDir();
+    // The server makes `files` with the first upload: until then, its own folder.
+    await deps.revealFolder(filesFolder(dir)).catch(() => deps.revealFolder(dir));
     return {};
   }
   if (request.kind === "reconnect") {

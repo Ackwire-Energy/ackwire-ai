@@ -4,6 +4,8 @@
  * banners, the cover's line, Preferences' words). Pure, so it is tested without the app.
  */
 
+import type { Platform } from "./platform";
+
 export type LocalPhase = "off" | "starting" | "updating" | "running" | "stopped" | "failing";
 
 export interface LocalServerStatus {
@@ -35,7 +37,22 @@ export interface LocalServerStatus {
   backTo: string | null;
 }
 
-export type Tailnet = { state: "missing" } | { state: "off" } | { state: "on"; device: string };
+/** `app`: Tailscale's Mac app is there to open, not only its command-line tool (Homebrew's). */
+export type Tailnet = { state: "missing" } | { state: "off"; app: boolean } | { state: "on"; device: string };
+/**
+ * Where Tailscale gets connected on this system: its app, which the app opens (a Mac with that app), its icon by the
+ * clock (Windows: tailscale.com/kb/1022/install-windows), or `sudo tailscale up` in the terminal (Linux, and a Mac
+ * with only the command-line tool). `tailnet` not read yet: a Mac's app.
+ */
+export function tailscaleFrom(platform: Platform, tailnet: Tailnet | null): "app" | "tray" | "terminal" {
+  if (platform === "windows") return "tray";
+  if (platform === "linux") return "terminal";
+  return tailnet?.state === "off" && !tailnet.app ? "terminal" : "app";
+}
+const COVER_TAILNET = { app: "openTailscale", tray: "tailnetTray", terminal: "tailnetUp" } as const;
+/** After the cover's "Connect Tailscale on this {{device}}…": the Open Tailscale button, or how it connects. */
+export const coverTailnet = (platform: Platform, tailnet: Tailnet | null) =>
+  COVER_TAILNET[tailscaleFrom(platform, tailnet)];
 /**
  * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale refused, the person
  * stopped waiting for HTTPS, or the server didn't answer again at its new address.
@@ -191,6 +208,12 @@ export function hereBanner(status: LocalServerStatus): "stopped" | "failing" | "
   if (status.phase === "stopped") return "stopped";
   return status.backTo ? "back" : null;
 }
+
+/**
+ * Where the server here keeps uploaded files: `files` in its folder (`FILES_DIR`, apps/server native.ts), written
+ * with the folder's own separator (`C:\Users\ana\.agentes` on Windows).
+ */
+export const filesFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}files`;
 
 /** Whether `server` is the server here, at either of its addresses. */
 export const isHereServer = (status: LocalServerStatus, server: string | null) =>

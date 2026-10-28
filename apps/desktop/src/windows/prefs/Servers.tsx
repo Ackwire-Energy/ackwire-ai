@@ -189,8 +189,8 @@ function StoppedHere({ local }: { local: LocalServerStatus }) {
 
 /**
  * agentes.chat on this computer (the app runs it): its state and address, reach from the person's other
- * devices (Tailscale) and the phone's QR code with it, the usage-statistics switch, its version, data and
- * backups, Restart and Stop, and "Stop running it here…" (its data stays).
+ * devices (Tailscale) and the phone's QR code with it, the usage-statistics switch, the way to Jev's key, its
+ * version, data and backups, Restart and Stop, and "Stop running it here…" (its data stays).
  */
 function HereServer({ local, current }: { local: LocalServerStatus; current: string | null }) {
   const { t } = useTranslation();
@@ -300,6 +300,22 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
               disabled={busy === "usage"}
               onCheckedChange={(on) => void act("usage", () => host.setLocalUsage(on))}
             />
+          }
+        />
+        {/* Only the way there, no state: Jev's key is the server's, its owner sets it on the web, and the app has no
+            session there to read it with. */}
+        <PrefRow
+          title={t("desktop.server.jev")}
+          hint={hintFor(t, t("desktop.server.jev"), t("desktop.server.jevText"))}
+          desc={t("desktop.server.jevWhere")}
+          end={
+            <Button
+              size="sm"
+              disabled={!running}
+              onClick={() => void host.openExternal(`${address}/?open=jev`).catch(() => {})}
+            >
+              {t("desktop.servers.open")}
+            </Button>
           }
         />
         {local.version && <PrefRow desc={t("desktop.server.version", { version: local.version })} />}
