@@ -56,7 +56,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <span className="ac-receipt__clock">
           <Icon name="waiting" />
         </span>
-        <span>{t("receipts.picking")} ·</span>
+        <span>{t("receipts.picking")}</span>
+        <span aria-hidden="true">·</span>
         <CallAgentMenu />
       </div>
     );
@@ -135,7 +136,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
       {status?.kind === "failed" && actions && (
         <>
-          <span>{t("receipts.failedShort")} ·</span>
+          <span>{t("receipts.failedShort")}</span>
+          <span aria-hidden="true">·</span>
           <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
             {t("receipts.retry")}
           </button>
@@ -150,36 +152,37 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                 {t("receipts.mentionNeededHint")}
               </InfoHint>
             </span>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <CallAgentMenu />
           </>
         ) : (
           <>
-            <span>{t("receipts.nobody")} ·</span>
+            <span>{t("receipts.nobody")}</span>
+            <span aria-hidden="true">·</span>
             <CallAgentMenu />
           </>
         ))}
       {status?.kind === "no_ai" && (
         <>
-          <span>
-            {t("noAi.receipt")}
-            {connect && " ·"}
-          </span>
+          <span>{t("noAi.receipt")}</span>
           {connect && (
-            <button
-              type="button"
-              className="ac-receipt__action"
-              onClick={() =>
-                connect.open({
-                  intent: receipt?.noAi?.intent,
-                  provider: receipt?.noAi?.provider,
-                  agentId: status.agents.length === 1 ? status.agents[0] : undefined,
-                  from: message.id,
-                })
-              }
-            >
-              {t("noAi.action")}
-            </button>
+            <>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                className="ac-receipt__action"
+                onClick={() =>
+                  connect.open({
+                    intent: receipt?.noAi?.intent,
+                    provider: receipt?.noAi?.provider,
+                    agentId: status.agents.length === 1 ? status.agents[0] : undefined,
+                    from: message.id,
+                  })
+                }
+              >
+                {t("noAi.action")}
+              </button>
+            </>
           )}
         </>
       )}

@@ -2407,7 +2407,7 @@ p {
   color: var(--ink2);
   cursor: pointer;
 }
-/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its first line. */
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its line. */
 .ac-hintline:has(> .ac-field__label) {
   font-size: 13px;
   line-height: 18px;
@@ -8041,7 +8041,7 @@ a.machine-row__name:hover {
   gap: 10px;
 }
 /*
- * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
  * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
  */
 .agp-brainoff {

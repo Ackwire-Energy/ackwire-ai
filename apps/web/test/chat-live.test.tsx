@@ -78,7 +78,7 @@ describe("optimistic send", () => {
     await settle(4);
     const row = rowsWith("vai falhar")[0] as HTMLElement;
     expect(row.className).toContain("ac-msg--failed");
-    expect(within(row).getByRole("alert").textContent).toContain("Não enviada ·");
+    expect(within(row).getByRole("alert").textContent).toBe("Não enviada·Tentar de novo");
     state.failPosts = false;
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Tentar de novo" })));
     await settle(4);
@@ -272,7 +272,7 @@ describe("receipts: a check with a popover", () => {
     expect(checkOf("alguém viu o erro?").getAttribute("aria-label")).toBe(
       "Vista por Ada e Atlas. Nenhum agente vai responder",
     );
-    expect(receipt().textContent).toContain("Nenhum agente vai responder ·");
+    expect(receipt().textContent).toContain("Nenhum agente vai responder·Chamar um agente");
     await act(async () => {
       const call = within(receipt()).getByRole("button", { name: "Chamar um agente" });
       call.focus();
@@ -285,7 +285,7 @@ describe("receipts: a check with a popover", () => {
     await push(socket, { type: "message.claimed", messageId: root?.id, agentId: ATLAS_ID });
     await push(socket, { type: "message.handled", messageId: root?.id, agentId: ATLAS_ID, status: "failed" });
     expect(icon(checkOf("alguém viu o erro?"))).toBe("M10 6.5v4M10 13.5v.01");
-    expect(receipt().textContent).toContain("Não conseguiu responder ·");
+    expect(receipt().textContent).toContain("Não conseguiu responder·Tentar de novo");
     await act(async () => fireEvent.click(within(receipt()).getByRole("button", { name: "Tentar de novo" })));
     await settle(4);
     expect(
@@ -343,7 +343,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     const root = lastPerson(state);
     await push(socket, { type: "message.routing", messageId: root?.id, step: "plan" });
     const picking = receiptOf("revisa o PR?");
-    expect(picking.textContent).toBe("Escolhendo quem responde ·Chamar um agente");
+    expect(picking.textContent).toBe("Escolhendo quem responde·Chamar um agente");
     expect(picking.querySelector(".ac-receipt__clock path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
     expect(picking.querySelector(".ac-receipt__check")).toBeNull();
     await push(socket, {
@@ -408,7 +408,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       expect([text, pop.querySelector(".who-by")]).toEqual([text, null]);
       await closePopover(pop);
     }
-    expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder ·");
+    expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
   });
 });
 

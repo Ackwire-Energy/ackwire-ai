@@ -1356,10 +1356,9 @@ body[data-window="popover"] {
   font-weight: 600;
   margin: 18px 4px 8px;
 }
-/* A card title with its ⓘ after the heading: the heading keeps the title's type, the ⓘ sits on its line. */
+/* A card title with its ⓘ after the heading: the heading keeps the title's type, the ⓘ follows its last word. */
 .dk-ctitle.ac-hintline {
-  align-items: flex-start;
-  gap: 4px;
+  display: block;
 }
 .dk-ctitle > h3 {
   display: flex;
@@ -1414,9 +1413,17 @@ body[data-window="popover"] {
 .dk-crow:has(> .dk-crow__end > .ac-switch) .dk-crow__title {
   font-weight: 400;
 }
-/* A chip after a title's ⓘ keeps the title's own gap. */
+/* A chip on a title's line: 8px after the title, or 4px after its ⓘ's glyph (the ⓘ takes no room of its own). The
+   chip, not the ⓘ, ends the line. */
 .dk-crow .ac-hintline > .ac-chip {
-  margin-left: 4px;
+  margin-left: 8px;
+  vertical-align: top;
+}
+.dk-crow .ac-hintline > .ac-hint ~ .ac-chip {
+  margin-left: 26px;
+}
+.dk-crow .ac-hintline:has(> .ac-chip) {
+  padding-inline-end: 0;
 }
 .dk-crow__text small {
   color: var(--muted);

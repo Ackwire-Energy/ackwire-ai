@@ -685,9 +685,12 @@ describe("Message aside and foot", () => {
     const value = (selector: string, prop: string) =>
       new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(bodies(selector))?.[1]?.trim();
     const bar = ".ac-msg__actions";
-    // Placed by its middle, never by its bottom: the 46px touch bar grows as much down as up.
-    expect(value(bar, "translate")).toBe("0 -50%");
-    expect(bodies(bar)).not.toMatch(/(^|;)\s*bottom:/);
+    // Placed by its middle, never by its bottom: the 46px touch bar grows as much down as up. 4px lower at rest, it
+    // slides up as it shows. One transform (built-css.test.ts in the web app checks the built stylesheet keeps it).
+    expect(value(bar, "transform")).toBe("translateY(calc(-50% + 4px))");
+    expect(value(".ac-msg:hover .ac-msg__actions", "transform")).toBe("translateY(-50%)");
+    expect(value(".ac-msg:focus-within .ac-msg__actions", "transform")).toBe("translateY(-50%)");
+    expect(bodies(bar)).not.toMatch(/(^|;)\s*(bottom|translate):/);
     // The name's capitals start at the row's top padding. A grouped row's first line is its text's, under the row's
     // and the text's top margins.
     expect(value(".ac-msg", "padding")).toBe("6px var(--msg-inline)");
