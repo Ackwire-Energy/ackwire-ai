@@ -144,7 +144,10 @@ export function NewSheet() {
   );
 }
 
-/** One agent a request can go to: its face, its name and its role; picked, it turns dark. */
+/**
+ * One agent a request can go to: its face in its own sky tile (as the "Esperando você" strip shows it), its name
+ * and its role; picked, the chip turns dark.
+ */
 function WhoChip({
   agentId,
   name,
@@ -170,9 +173,7 @@ function WhoChip({
       accessibilityLabel={role ? `${name}, ${role}` : name}
       style={({ pressed }) => [styles.who, picked ? { backgroundColor: c.ink } : surface, pressed && styles.pressed]}
     >
-      <View style={[styles.face, { backgroundColor: picked ? c.ink2 : c.sunken }]}>
-        <AgentFace agentId={agentId} size={30} mode={working ? "run" : "idle"} live={picked} />
-      </View>
+      <AgentFace agentId={agentId} size={32} mode={working ? "run" : "idle"} live={picked} />
       <Text variant="subhead" style={[styles.bold, { color: picked ? c.bg : c.ink2 }]} numberOfLines={1}>
         {name}
       </Text>
@@ -198,12 +199,11 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 44,
     maxWidth: 260,
-    paddingLeft: 5,
+    paddingLeft: 6,
     paddingRight: 14,
     borderRadius: 22,
   },
   pressed: { transform: [{ scale: 0.96 }] },
-  face: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   bold: { fontWeight: "600" },
   role: { flexShrink: 1, opacity: 0.85 },
 });
