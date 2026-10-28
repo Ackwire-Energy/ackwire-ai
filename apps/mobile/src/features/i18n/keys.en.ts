@@ -1379,7 +1379,7 @@ export const featureKeysEn: FeatureTranslations = {
     agentsLead: "Check who else joins.",
     share: "Share an invite link",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
-    shareNote: "Whoever opens it asks to join; you approve.",
+    shareNote: "You approve each person who asks.",
     emailsPlaceholder: "name@company.com",
     membersNote: "They join as members.",
     invalidEmail: "Check this e-mail.",

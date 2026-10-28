@@ -320,7 +320,7 @@ describe("agent questions (ask_user)", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("o login está devolvendo 401")) as HTMLElement;
     expect(root.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada; Ada está esperando sua resposta",
+      "Vista por Ada. Ada está esperando sua resposta",
     );
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");

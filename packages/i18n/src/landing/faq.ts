@@ -16,7 +16,7 @@ export const pt = {
       },
       models: {
         q: "Quais modelos os agentes usam?",
-        a: "Você escolhe por agente: o seu plano de IA, como o do Claude ou o do ChatGPT, ou uma chave de API do seu provedor, guardada cifrada.",
+        a: "Você escolhe por agente: o seu plano do Claude ou do ChatGPT, o plano de código de outra IA, ou a chave de API do seu provedor, guardada cifrada.",
       },
       alone: {
         q: "Um agente pode publicar ou apagar algo sozinho?",
@@ -24,7 +24,7 @@ export const pt = {
       },
       where: {
         q: "Onde o agente trabalha?",
-        a: "No computador do próprio workspace, na nuvem e sempre ligado, com um navegador só dele. Num servidor seu, também num Mac ou Linux que você conectar; pastas ali só com a sua liberação, dada nesse computador.",
+        a: "No computador do próprio workspace, sempre ligado, com um navegador só dele. Num servidor seu, também num Mac, num PC ou num computador com Linux que você conectar. Eles só usam as pastas de lá se você liberar nesse computador.",
       },
       data: {
         q: "O que acontece com os nossos dados?",
@@ -57,7 +57,7 @@ export const en: Widen<typeof pt> = {
       },
       models: {
         q: "Which models do the agents use?",
-        a: "You choose per agent: your AI plan, such as Claude or ChatGPT, or an API key from your provider, stored encrypted.",
+        a: "You choose per agent: your Claude or ChatGPT plan, another AI's coding plan, or your provider's API key, stored encrypted.",
       },
       alone: {
         q: "Can an agent publish or delete something on its own?",
@@ -65,7 +65,7 @@ export const en: Widen<typeof pt> = {
       },
       where: {
         q: "Where does the agent work?",
-        a: "On your workspace's own computer in the cloud, always on, with a browser of its own. On a server you run yourself, also on a Mac or Linux computer you connect; folders there only with your permission, granted on that computer.",
+        a: "On your workspace's own computer, always on, with a browser of its own. On a server you run yourself, also on a Mac, a PC or a Linux computer you connect. They use its folders only if you allow it on that computer.",
       },
       data: {
         q: "What happens to our data?",

@@ -595,9 +595,7 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(10);
     const ask = document.querySelector('[data-message-id="m-ask"]') as HTMLElement;
-    expect(ask.textContent).toContain(
-      "Ada pediu a pasta loja-v5 no MacBook do Walter — esperando a resposta no computador",
-    );
+    expect(ask.textContent).toContain("Ada pediu a pasta loja-v5 no MacBook do Walter. Esperando a resposta lá.");
     expect(ask.querySelector(".machine-command__code")?.textContent).toBe(params.command);
     const ok = document.querySelector('[data-message-id="m-ok"]') as HTMLElement;
     expect(ok.textContent).toContain("Liberado: Ada já pode usar loja-v5 no MacBook do Walter");

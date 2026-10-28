@@ -1385,7 +1385,7 @@ export const featureKeysPtBR = {
     agentsLead: "Marque quem mais vem.",
     share: "Compartilhar link de convite",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
-    shareNote: "Quem abrir pede para entrar; você aprova.",
+    shareNote: "Você aprova cada pessoa que pedir.",
     emailsPlaceholder: "nome@empresa.com",
     membersNote: "Entram como membros.",
     invalidEmail: "Confira este e-mail.",

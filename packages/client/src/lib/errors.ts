@@ -205,7 +205,8 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
 /**
- * A known server code in the person's language; null for anything else (the caller keeps its own words). `locale`
+ * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
+ * since the server says those in English. Null for anything else (the caller keeps its own words). `locale`
  * writes the sizes a limit's refusal names.
  */
 export function knownErrorText(t: TFunction, error: unknown, locale = "en"): string | null {
@@ -215,7 +216,8 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   const limit = limitRefusalText(t, locale, error.code, error.params);
   if (limit) return limit;
   const key = KNOWN[error.code as keyof typeof KNOWN];
-  return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
+  if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+  return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
 
 /**

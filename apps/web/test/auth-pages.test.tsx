@@ -756,7 +756,7 @@ describe("Onboarding", () => {
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");
     // The platform key isn't offered by this server.
-    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
+    expect(within(makers).queryByRole("button", { name: "Este servidor" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
@@ -941,7 +941,7 @@ describe("Onboarding", () => {
     const hintOf = (name: string) =>
       document.getElementById(button(name).getAttribute("aria-describedby") ?? "")?.textContent;
     expect(hintOf("Sobre E-mails")).toBe("Cada pessoa recebe um convite por e-mail e entra direto.");
-    expect(hintOf("Sobre Link de convite")).toBe("Vale 30 dias. Dá para desativar em Membros.");
+    expect(hintOf("Sobre Link de convite")).toBe("Vale por 30 dias. Dá para desativar em Membros.");
     const emails = screen().getByLabelText("E-mails");
     expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint");
     // What makes sharing the link in a group safe stays in view, under it.
@@ -1108,8 +1108,9 @@ describe("Onboarding", () => {
       await type("Cole aqui", "ts_live_9f2c");
       await click(button("Salvar e continuar"), 8);
       const field = screen().getByLabelText("Cole aqui");
+      // In the person's language, never the server's English.
       expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
-        "Too many tries. Wait a minute.",
+        "Muitas tentativas. Tente de novo mais tarde.",
       );
       // Never a way past a key that wasn't kept.
       expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
@@ -1172,7 +1173,7 @@ describe("Onboarding", () => {
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
     expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
-    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac, um PC ou um servidor, conectado com um código.");
     expect(document.body.textContent).toContain(
       "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
     );
@@ -1363,7 +1364,7 @@ describe("Onboarding", () => {
     await skip();
     const panel = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(panel).getByRole("group", { name: "Provedor" });
-    const ours = within(makers).getByRole("button", { name: "agentes.chat" });
+    const ours = within(makers).getByRole("button", { name: "Este servidor" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
     const PAYS = "Você paga pelo uso, direto ao provedor.";
@@ -1372,7 +1373,7 @@ describe("Onboarding", () => {
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
     // Our key isn't paid to a provider: its own line says what it is.
     expect(panel.textContent).not.toContain(PAYS);
-    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do Claude deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
@@ -1434,7 +1435,7 @@ describe("Onboarding", () => {
     fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
-    expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
+    expect(document.body.textContent).toContain("MacBook do Walter (macOS) conectado.");
     // Choosing a plan asks nothing: only letting others talk to an agent on it does (ADR 0059 §5).
     expect(screen().queryByRole("dialog")).toBeNull();
     await next();

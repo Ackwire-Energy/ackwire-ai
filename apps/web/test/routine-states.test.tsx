@@ -176,6 +176,16 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(card("Avaliações").textContent).toContain("A cada 30 minutos");
     expect(card("Avaliações").textContent).not.toContain("Every");
   });
+
+  test("the strip's last runs read as sentences: each after the first starts with a capital", async () => {
+    const now = routineRun({ at: ago(0.5), status: "reported" });
+    const yesterday = routineRun({ at: ago(24 * 60), status: "silent" });
+    await open([routine({ id: "rt-runs", name: "Erros do Sentry", lastRun: now, recentRuns: [now, yesterday] })]);
+    const strip = within(card("Erros do Sentry")).getByRole("img", { name: /^Últimas execuções/ });
+    expect(strip.getAttribute("aria-label")).toMatch(
+      /^Últimas execuções: agora: respondeu\. Ontem \d{1,2}:\d{2}: nada novo, ficou em silêncio$/,
+    );
+  });
 });
 
 describe("Rotinas: a routine's details", () => {
@@ -350,7 +360,7 @@ describe("Rotinas: the form's two plain questions", () => {
     const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
     const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
     expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou; para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e atualizar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
     await click(within(dialog).getByRole("radio", { name: "Pode agir" }));

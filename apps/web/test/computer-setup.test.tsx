@@ -160,7 +160,7 @@ describe("the workspace's computer on its way: the notice on top of the work are
     const line = () =>
       screen().getByRole("region", { name: NOTICE }).querySelector(".outage__text > span")?.textContent ?? null;
     await open(`/org/${ORG_ID}/c/${ENG_ID}`, wait);
-    expect(line()).toBe("Esperando um computador disponível · avisamos por e-mail");
+    expect(line()).toBe("Esperando um computador disponível. Avisamos por e-mail.");
     cleanup();
     const member = seedState();
     if (member.me?.organizations[0]) member.me.organizations[0].role = "member";

@@ -23,7 +23,7 @@ import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
-import { CheckCancelled, failureText, refusalOf, refusalText, signUpClosed } from "./human-check";
+import { CheckCancelled, lookUpFailureText, refusalOf, refusalText, signUpClosed } from "./human-check";
 import { pendingInvite } from "./invite";
 import { signInPurpose } from "./links";
 
@@ -119,7 +119,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       if (found.account) go(found.password ? "password" : usable ? "social" : "noPassword");
       else go(found.canSignUp ? "name" : "closed");
     } catch (e) {
-      if (!(e instanceof CheckCancelled)) setError(failureText(t, e));
+      if (!(e instanceof CheckCancelled)) setError(lookUpFailureText(t, e));
     } finally {
       setPending(false);
     }

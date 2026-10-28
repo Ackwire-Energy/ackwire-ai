@@ -72,7 +72,7 @@ export function MessageReceipts({ message }: { message: Message }) {
             : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
   const label = [view.seen.length > 0 && t("receipts.seenBy", { names: names(view.seen) }), statusText]
     .filter(Boolean)
-    .join("; ");
+    .join(". ");
   const phases = new Map<string, ReceiptPhase>(receipt?.agents ?? []);
   const phaseText = (id: string) => {
     const phase = phases.get(id) ?? "seen";

@@ -10,6 +10,7 @@ import {
   humanCheckStays,
   humanCheckUrl,
   loadsAgain,
+  lookUpFailureText,
   refusalOf,
   refusalText,
   signUpClosed,
@@ -194,6 +195,17 @@ describe("refusals in the phone's words", () => {
     expect(refusalText(en, { status: 500, code: "internal" })).toBe("Something went wrong. Try again.");
     expect(failureText(en, new TypeError("Network request failed"))).toBe(en("mobile.auth.errors.network"));
     expect(failureText(en, new ApiError(400, "join.code_wrong", "x"))).toBe("Wrong code. Try again.");
+  });
+
+  test("a limit: the sign-in's e-mail step says the sign-in's words, as the web's does, other calls the API's", async () => {
+    const en = await translator("en");
+    const limit = new ApiError(429, "rate_limited", "Too many requests. Try again later.");
+    expect(lookUpFailureText(en, limit)).toBe(en("auth.tooManyTries"));
+    expect(failureText(en, limit)).toBe(en("common.tooMany"));
+    expect(lookUpFailureText(en, new ApiError(403, "human_check", "x"))).toBe(
+      "We couldn't confirm you're a person. Try again.",
+    );
+    expect(lookUpFailureText(en, new TypeError("Network request failed"))).toBe(en("mobile.auth.errors.network"));
   });
 
   test("a social sign-in refused: a blocked account's line, with its kind on agentes.chat Cloud, else it failed", async () => {

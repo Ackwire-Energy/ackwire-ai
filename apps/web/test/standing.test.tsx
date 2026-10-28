@@ -56,7 +56,7 @@ describe("on hold: a line on top of the work area", () => {
     const banner = () => screen().getByRole("region", { name: STATUS });
     expect(banner().textContent).toContain("Este workspace está em espera: verificação de pagamento");
     expect(banner().textContent).toContain(
-      "Dá para ler e escrever normalmente; os agentes não respondem nem trabalham enquanto ele estiver em espera.",
+      "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     );
     // Where to ask: nobody named on this server, so whoever runs it.
     expect(banner().textContent).toContain("Precisa de ajuda? Fale com quem cuida deste servidor.");
