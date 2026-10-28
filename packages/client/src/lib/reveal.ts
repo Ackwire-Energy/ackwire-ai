@@ -142,3 +142,12 @@ export function wholeMarkdown(text: string, end: number) {
   }
   return mark.at;
 }
+
+/**
+ * Keeps the revealed length when the text only grew; starts over when it
+ * was replaced (a run resumed after an approval streams a fresh text).
+ */
+export function rebaseReveal(shown: number, previous: string, next: string) {
+  const kept = Math.min(shown, previous.length);
+  return next.startsWith(previous.slice(0, kept)) ? Math.min(kept, next.length) : 0;
+}
