@@ -98,6 +98,9 @@ export function webmailOf(
   return null;
 }
 
+/** The text ended as a sentence: a full stop added unless it already ends with one, "!", "?" or "…". */
+export const endSentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
+
 /** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
 const STOPS = /[.!?…](?=\s)|\n/g;
 

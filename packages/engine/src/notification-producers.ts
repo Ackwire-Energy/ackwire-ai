@@ -750,6 +750,30 @@ export async function notifyOrgStanding(
   });
 }
 
+const agentHoldGroup = (agentId: string) => `org_standing:agent:${agentId}:`;
+
+/**
+ * An agent was held on agentes.chat Cloud (ADR 0056 §9): its responsible person and the workspace's owners and admins
+ * hear it, with the hold's kind (`latest.holdKind`), never its reason. One row per hold.
+ */
+export async function notifyAgentHold(
+  deps: NotificationDeps,
+  hold: { orgId: string; agentId: string; name: string; kind: string; heldAt: Date },
+) {
+  await notify(deps, {
+    orgId: hold.orgId,
+    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId))],
+    kind: "org_standing",
+    groupKey: `${agentHoldGroup(hold.agentId)}${hold.heldAt.getTime()}`,
+    source: { agentId: hold.agentId, label: hold.name },
+    latest: { statusTo: "agent_hold", holdKind: hold.kind },
+  });
+}
+
+/** The agent was let go: what its people were told of the hold is done. */
+export const resolveAgentHold = (deps: NotificationDeps, orgId: string, agentId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: agentHoldGroup(agentId), kind: "org_standing" });
+
 // ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
 
 /** Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner. */

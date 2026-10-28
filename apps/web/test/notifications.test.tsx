@@ -429,6 +429,27 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);
     expect(css).toMatch(/\.nt-item:not\(\.is-unread\) \.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 500/);
   });
+
+  test("an agent held on agentes.chat Cloud: its name, then the hold's whole line, never its reason", async () => {
+    const held = notification({
+      id: "n-held",
+      kind: "org_standing",
+      source: { agentId: ADA_ID, label: "Ada" },
+      latest: { statusTo: "agent_hold", holdKind: "network" },
+      updatedAt: ago(2),
+    });
+    await go(seedState({ notifications: [held] }));
+    const row = document.querySelector('[data-n="n-held"]') as HTMLElement;
+    expect(row.querySelector(".nt-what")?.textContent).toBe("Ada está em pausa");
+    const line = row.querySelector(".nt-snip");
+    expect(line?.textContent).toBe(
+      "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 8). Para contestar, escreva para legal@agentes.chat.",
+    );
+    // How to contest it is never cut off.
+    expect(line?.classList.contains("nt-snip--whole")).toBe(true);
+    expect(row.querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    expect(row.getAttribute("aria-label")).toBe("Ada está em pausa, não lida");
+  });
 });
 
 describe("its computer is ready: what comes next", () => {

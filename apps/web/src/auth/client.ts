@@ -3,7 +3,17 @@
  * session cookie: nothing auth-related is stored in JavaScript). Pages use
  * this interface; `better-auth.ts` implements it and tests pass a fake.
  */
-export type AuthResult = { ok: true } | { ok: false; status: number; message: string; code?: string };
+export type AuthResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      message: string;
+      code?: string;
+      /** A blocked account on agentes.chat Cloud: the block's kind, with `cloud` (`restrictionLine`). */
+      kind?: string;
+      cloud?: boolean;
+    };
 
 /** `humanCheck` on the email forms: the bot check's token, when the server has one (ADR 0075). */
 export interface AuthClient {

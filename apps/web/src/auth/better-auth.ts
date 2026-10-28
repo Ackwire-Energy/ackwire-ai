@@ -2,13 +2,17 @@ import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
 
-const toResult = (error: { status?: number; message?: string; code?: string } | null | undefined): AuthResult =>
+const toResult = (
+  error: { status?: number; message?: string; code?: string; kind?: unknown; cloud?: unknown } | null | undefined,
+): AuthResult =>
   error
     ? {
         ok: false,
         status: error.status ?? 500,
         message: error.message ?? "",
         ...(error.code ? { code: error.code } : {}),
+        ...(typeof error.kind === "string" ? { kind: error.kind } : {}),
+        ...(error.cloud === true ? { cloud: true } : {}),
       }
     : { ok: true };
 

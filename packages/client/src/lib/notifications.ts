@@ -172,8 +172,8 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
 });
 
 /**
- * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed): its
- * headline's key, the whole of what it says; null for what someone did.
+ * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed, one of its
+ * agents was held): its headline's key, the held agent's name as `name` (`source.label`); null for what someone did.
  */
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
@@ -183,8 +183,17 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
     ? ("standing.notification.suspended" as const)
     : to === "active"
       ? ("standing.notification.active" as const)
-      : ("standing.notification.hold" as const);
+      : to === "agent_hold"
+        ? ("standing.notification.agentHold" as const)
+        : ("standing.notification.hold" as const);
 }
+
+/**
+ * An agent held on agentes.chat Cloud (`org_standing` to `agent_hold`): its kind as a refused run carries it, so the
+ * notice reads `restrictionLine`'s `agent.paused` line; null for any other notice.
+ */
+export const agentHoldOf = (n: Pick<AppNotification, "kind" | "latest">) =>
+  n.kind === "org_standing" && n.latest.statusTo === "agent_hold" ? { kind: n.latest.holdKind, cloud: true } : null;
 
 /** Grouped (several replies or comments): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>

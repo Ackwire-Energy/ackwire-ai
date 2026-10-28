@@ -3,11 +3,11 @@ import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import {
+  accountBlock,
   countUsers,
   deriveSecret,
   emailLocale,
   isSignupAllowed,
-  isUserBlocked,
   onUserCreated,
   queueEmail,
   recordSession,
@@ -254,10 +254,16 @@ export function createAuth(deps: {
       session: {
         create: {
           // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
-          // makes a social sign-in's callback send the person back to the sign-in page.
+          // makes a social sign-in's callback send the person back to the sign-in page. On agentes.chat Cloud the
+          // body adds the block's kind, never its reason.
           before: async (session) => {
-            if (await isUserBlocked(db, session.userId)) {
-              throw new APIError("FORBIDDEN", { code: "ACCOUNT_BLOCKED", message: "This account can't sign in." });
+            const block = await accountBlock(db, session.userId);
+            if (block) {
+              throw new APIError("FORBIDDEN", {
+                code: "ACCOUNT_BLOCKED",
+                message: "This account can't sign in.",
+                ...block,
+              });
             }
           },
           after: async (session) => {
