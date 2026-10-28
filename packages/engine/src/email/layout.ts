@@ -215,9 +215,9 @@ function block(b: Block, src: (file: string) => string): string {
 <td class="${warn ? "warn-t" : "tx"}" style="padding:14px 16px;${PW};font-size:15px;line-height:22px;color:${warn ? L.warn : L.text}">${html(b.note, warn ? "font-weight:700" : `font-weight:600;color:${L.ink}`)}</td></tr></table>`;
   }
   if ("people" in b)
-    // The face starts 5 px down, where the name's capitals start on its 15/20 px line (4.5 px in Source Sans 3, 5.4
-    // in the system fonts): beside a name with a line under it, as the app's `.ac-captop`. Padding, not a negative
-    // margin, which classic Outlook ignores.
+    // The face starts 5 px down, where the name's capitals start on its 15/20 px line (4.5 to 5.7 px across Source
+    // Sans 3 and the system fonts): beside a name with a line under it, as the app's `.ac-captop`. Padding, not a
+    // negative margin, which classic Outlook ignores.
     return `<table width="100%" ${T("margin:0 0 8px")}>${b.people
       .map(
         (p) => `<tr>
