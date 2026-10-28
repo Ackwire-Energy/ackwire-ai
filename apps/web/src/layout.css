@@ -10061,6 +10061,11 @@ html[data-menu-overlay] .shell {
 .onb__wait > .setup-wait {
   display: contents;
 }
+/* So are the team's line and the steps under it, in both wells. */
+.onb__wait .setup-progress--steps,
+.ai-panel__wait > .setup-progress--steps {
+  display: contents;
+}
 /* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
    face and mark centre on it. */
 .ai-panel__who {

@@ -700,6 +700,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(shared).toContain("background: var(--surface-sunken)");
     expect(shared).toContain("gap: 8px");
     expect(layout.split("\n.onb__wait > .setup-wait {")[1]?.split("}")[0]).toContain("display: contents");
+    // The team's line and the steps under it are lines of either well too, at its gap: none of their own between them.
+    const steps = layout.split("\n.onb__wait .setup-progress--steps,\n.ai-panel__wait > .setup-progress--steps {")[1];
+    expect(steps?.split("}")[0]).toContain("display: contents");
     // The self-hosted step's callouts are that well too, in that type: never a plate lighter than its ground in dark.
     const onb = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
     const status = onb.split("\n.onb__status {")[1]?.split("}")[0] ?? "";
