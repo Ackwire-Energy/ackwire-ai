@@ -6749,15 +6749,6 @@ a.machine-row__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A step with its answer under its name: the number stays on the name's 17.5px line, as an `.ac-iconline` lead. */
-@media (min-width: 761px) {
-  .onb__step:has(.onb__step-sub) {
-    align-items: flex-start;
-  }
-  .onb__step:has(.onb__step-sub) > .onb__n {
-    translate: 0 calc(8.75px - var(--cap-mid) - 50%);
-  }
-}
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
   display: flex;
