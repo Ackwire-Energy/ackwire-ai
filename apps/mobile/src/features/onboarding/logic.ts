@@ -1,4 +1,4 @@
-import type { AiStatus } from "@agenteschat/client";
+import type { AiStatus, Edition } from "@agenteschat/client";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
 import { isEmail } from "@agenteschat/client/lib/text";
@@ -73,6 +73,13 @@ export const HOST: Record<StepId, Preset> = {
   team: "theo",
   done: "ada",
 };
+
+/**
+ * A self-hosted workspace with no computer yet. The phone has no computer step, so its list says it: only once it
+ * came back empty, never while it loads.
+ */
+export const noComputerOf = (edition: Edition | null, machines: readonly unknown[] | undefined) =>
+  edition === "selfhost" && machines?.length === 0;
 
 /**
  * A step's question and the one line under it. The phone can't import, so its import step says where to; the

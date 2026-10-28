@@ -17,6 +17,7 @@ import {
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   joinCode,
+  sendsEmail,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,8 +61,8 @@ export function InviteScreen({ token }: { token: string }) {
     queryFn: () => api.orgs.previewInvitation(token),
     retry: false,
   });
-  // Asking for a new one is an email to whoever invited. Strictly false: an older server says nothing and keeps it.
-  const emails = useAuthConfig().data?.passwordReset !== false;
+  // Asking for a new one is an email to whoever invited.
+  const emails = sendsEmail(useAuthConfig().data);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [asked, setAsked] = useState(false);
@@ -278,7 +279,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
 
   const org = preview.orgName;
   const address = sent?.email ?? preview.you?.email ?? user?.email ?? "";
-  const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
+  const emailsGoOut = sent?.emailed ?? sendsEmail(config.data);
   // On a server that sends email, an address that isn't a confirmed account's proves itself first (ADR 0072).
   const proofNeeded = emailsGoOut && !user?.emailVerified;
   const typedEmail = user ? user.email : email;

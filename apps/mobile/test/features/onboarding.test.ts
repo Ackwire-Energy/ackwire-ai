@@ -15,6 +15,7 @@ import {
   inviteEach,
   joiningLeft,
   nextStep,
+  noComputerOf,
   OPTIONAL,
   PRESET_ROWS,
   PRESETS,
@@ -185,6 +186,15 @@ test("each step's question and its one line: the phone's own where it can't do w
     "O #general está pronto. Crie um agente quando quiser.",
   );
   expect(stepText(pt, "import", acme)[1]).toBe("Traga pela web, em Configurações\u00a0›\u00a0Importar e exportar.");
+});
+
+test("no computer: a self-hosted workspace whose list came back empty, not one still loading, not the Cloud", () => {
+  expect(noComputerOf("selfhost", [])).toBe(true);
+  expect(noComputerOf("selfhost", undefined)).toBe(false);
+  expect(noComputerOf("selfhost", [{ id: "m1" }])).toBe(false);
+  expect(noComputerOf("cloud", [])).toBe(false);
+  // Neither the setup nor the server said which edition yet.
+  expect(noComputerOf(null, [])).toBe(false);
 });
 
 test("invitations: each is sent once, and the ones that failed are what is left to send again", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AppNotification, JoinStatus } from "../src/api/types";
-import { approvalNews, askedLabel, askView, joinCode } from "../src/lib/join-requests";
+import { approvalNews, askedLabel, askView, joinCode, sendsEmail } from "../src/lib/join-requests";
 import { openTarget, sortWaiting } from "../src/lib/notifications";
 
 const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
@@ -61,6 +61,18 @@ describe("approving a request to join", () => {
     expect(approvalNews({ outcome: "invited", url: "https://x/invite/t", emailed: false })).toEqual({
       send: "https://x/invite/t",
     });
+  });
+});
+
+describe("whether this server sends email", () => {
+  test("no: an expired invitation says whom to ask instead of its button, and the setup invites by link only", () => {
+    expect(sendsEmail({ passwordReset: false })).toBe(false);
+  });
+
+  test("yes, an older server that doesn't say, or auth-config still loading: today's screens", () => {
+    expect(sendsEmail({ passwordReset: true })).toBe(true);
+    expect(sendsEmail({})).toBe(true);
+    expect(sendsEmail(undefined)).toBe(true);
   });
 });
 

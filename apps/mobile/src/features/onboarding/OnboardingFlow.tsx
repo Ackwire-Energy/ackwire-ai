@@ -9,6 +9,7 @@ import {
   useMe,
 } from "@agenteschat/client";
 import { computerEdition, computerName } from "@agenteschat/client/lib/computer";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -60,6 +61,7 @@ import {
   introducesAt,
   inviteEach,
   joiningLeft,
+  noComputerOf,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
@@ -119,9 +121,9 @@ export function OnboardingFlow() {
   const setup = useComputerSetup(created?.orgId ?? "", Boolean(created));
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
   const machines = useMachines(created?.orgId ?? "", Boolean(created) && edition === "selfhost");
-  const noComputer = edition === "selfhost" && machines.data?.length === 0;
-  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
-  const emailsGoOut = authConfig?.passwordReset !== false;
+  const noComputer = noComputerOf(edition, machines.data);
+  // A server that sends no email invites by link only.
+  const emailsGoOut = sendsEmail(authConfig);
   // Done's first message, written for whoever asks it when the step opens (`team`: the crew it was written for).
   // Its `clientId` changes with its text: sent again after an answer that never came back, it's posted once.
   const [firstAsk, setFirstAsk] = useState<{ team: string; asker: Preset; text: string; clientId: string } | null>(
