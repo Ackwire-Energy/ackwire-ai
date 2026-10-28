@@ -353,6 +353,11 @@ html:has(.onb) {
   background: var(--plate);
   overflow-wrap: anywhere;
 }
+/* "You can go on meanwhile." under the computer's wait: its well (layout.css), in the type of the lines above it. */
+.onb__workspace-computer > .onb__status {
+  gap: 8px;
+  font-size: 13px;
+}
 .onb__emails {
   display: flex;
   flex-wrap: wrap;

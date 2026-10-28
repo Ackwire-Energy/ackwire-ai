@@ -1782,7 +1782,7 @@ function WorkspaceComputerStep({
       <SetupWait view={view} reader={reader} />
       {setupPending(view) && (
         <p className="onb__status ac-iconline">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{t("computerSetup.continue")}</span>
         </p>
       )}

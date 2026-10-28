@@ -612,11 +612,19 @@ describe("the onboarding where the workspace gets its own computer", () => {
     // The wait leads with the orbit, like any wait that is under way, never a clock.
     expect(step.querySelector(".setup-progress--line")?.firstElementChild?.matches("canvas.ac-pixspin")).toBe(true);
     expect(lines.filter(leadsWithClock)).toEqual([]);
-    // One lead size, so those lines' words start in one column (the status under them is a box of its own).
-    for (const line of lines.filter((l) => !l.matches(".onb__status"))) {
+    // One lead size, so those lines' words start in one column; the status under them, a box of its own, leads with
+    // the same size, in the same type as the lines above it (onboarding.css).
+    for (const line of lines) {
       const lead = line.firstElementChild as HTMLElement;
       expect(lead.style.width).toBe("14px");
     }
+    const onb = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    expect(onb.split("\n.onb__workspace-computer > .onb__status {")[1]?.split("}")[0]).toContain("font-size: 13px");
+    // Sunk into its card in both themes, as the AI step's wait is: one well (layout.css).
+    const layout = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    expect(layout.split("\n.ai-panel__wait,\n.onb__workspace-computer > .onb__status {")[1]?.split("}")[0]).toContain(
+      "background: var(--surface-sunken)",
+    );
     // The lead says where, and the rail says how far: never "opcional".
     expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
