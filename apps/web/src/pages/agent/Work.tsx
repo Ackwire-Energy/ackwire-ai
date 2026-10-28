@@ -1138,7 +1138,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                         ? { provider: also.provider }
                         : {})}
                     email={signedOut ? current?.email : also?.email}
-                    askEmail={!also && (view.ownSignIn || accounts.some((a) => a.mine))}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {

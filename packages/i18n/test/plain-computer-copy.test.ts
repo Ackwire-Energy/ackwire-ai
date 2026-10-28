@@ -118,6 +118,9 @@ const CLOUD_EXTRA = [
   "aiAccounts.share.fixedHint",
   "connectAi.titleFor",
   "agentPage.work.brain.add.startFailed",
+  "agentPage.work.brain.add.duplicate.claude_code",
+  "agentPage.work.brain.add.duplicate.codex",
+  "connectAi.useAnyway",
   "outage.titleCloud",
   "outage.cloudSub",
   "aiAccounts.connect.needsCloud.claude_code",
@@ -174,7 +177,10 @@ const SELFHOST_EXTRA = [
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
-  ...["this", "thisText", "other", "note"].map((k) => `connectAi.own.${k}`),
+  ...["all", "one", "note"].map((k) => `connectAi.own.${k}`),
+  "agentPage.work.brain.add.duplicate.claude_code",
+  "agentPage.work.brain.add.duplicate.codex",
+  "connectAi.useAnyway",
   "aiAccounts.connect.needs.keys",
   "aiAccounts.connect.noComputer",
   "aiAccounts.connect.addComputer",
@@ -251,6 +257,20 @@ describe("computer copy", () => {
       expect(keys.filter((k) => k.startsWith("terminal.") || k.startsWith("computers.kinds."))).toEqual([]);
       expect(keys.filter((k) => k.startsWith("computerSetup.") && k.endsWith(".approval"))).toEqual([]);
     }
+  });
+
+  test("the account choice says who shares the sign-in, never which computer it is on", () => {
+    // Shown only where the person connected the computer (the server's own, a computer of theirs), never on the
+    // Cloud's: words that name no computer and no sign-in are true on each.
+    for (const strings of [ptBR, en]) {
+      const values = valuesOf(strings);
+      const choice = ["all", "one"].map((k) => values.get(`connectAi.own.${k}`) ?? "");
+      expect(choice.every(Boolean)).toBe(true);
+      const placed = /\{\{(computer|brand)\}\}|comput|login|signed in|outra|another/i;
+      expect(choice.filter((v) => placed.test(v))).toEqual([]);
+    }
+    expect(SELFHOST_EXTRA).toEqual(expect.arrayContaining(["connectAi.own.all", "connectAi.own.one"]));
+    expect(CLOUD_EXTRA.filter((k) => k.startsWith("connectAi.own."))).toEqual([]);
   });
 
   test("catches the words it bans, whatever the case", () => {

@@ -1063,9 +1063,8 @@ export const en: Translations = {
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
     own: {
-      this: "The {{brand}} account signed in on {{computer}}",
-      thisText: "Every agent thinks with it.",
-      other: "Another {{brand}} account",
+      all: "The account for all agents",
+      one: "An account just for {{name}}",
       note: "They only reply to you while they think with your plan.",
     },
     onlyYou: "{{name}} will only reply to you.",
@@ -1092,10 +1091,6 @@ export const en: Translations = {
     eachHint: "Each agent keeps its own sign-in. They all share your plan's limits.",
     signInFor: "Sign in for {{name}}",
     doneAll: "{{names}} now think with {{label}}.",
-    otherAccount: {
-      claude_code: "Claude signed in as {{email}}. To use {{wanted}}, sign out on Claude's page and try again.",
-      codex: "ChatGPT signed in as {{email}}. To use {{wanted}}, sign out on ChatGPT's page and try again.",
-    },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
     noAgents: "A plan thinks only for its owner's agents, and you have none yet.",
@@ -1903,9 +1898,9 @@ export const en: Translations = {
           expired: "The time to sign in ran out. Try again.",
           duplicate: {
             claude_code:
-              "That account is already here, as {{account}}. To add another, sign out on Claude's page and sign in with the other one.",
+              "Claude signed in as {{account}}, an account you already connected. To use another, sign out on Claude's page and try again.",
             codex:
-              "That account is already here, as {{account}}. To add another, sign out on ChatGPT's page and sign in with the other one.",
+              "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
           },
           startFailed: "{{computer}} didn't answer. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
@@ -4541,9 +4536,6 @@ export const en: Translations = {
     add: {
       paste: "Paste",
       pasteFailed: "The browser didn't let us paste. Use Ctrl+V (⌘V on a Mac).",
-      email: "Which account? (optional)",
-      emailInvalid: "Use a plain email, like ana@example.com.",
-      emailPlaceholder: "Claude account email (optional)",
       titleKey: "Connect {{plan}}",
       keyStep: "Create your plan's key",
       openKeys: "Open {{site}}",

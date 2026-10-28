@@ -76,4 +76,20 @@ describe("the agent's AI", () => {
     expect(sharePlanBody(t, "codex", null)).toContain("ChatGPT plans are meant for personal use");
     expect(sharePlanBody(t, "claude_code", "max", "Z.ai")).toContain("Z.ai says the plan is for its subscriber only");
   });
+
+  test("Claude's sign-in asks for no address: Claude's page picks the account, an account already there is offered", async () => {
+    // The flow is a component the tests can't render: what it wires in, as text.
+    const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+    expect(flow).not.toMatch(/TextInput|emailAddress|aiAccounts\.add\.email/);
+    // The hint (the account's own email, signing in again) goes through the shared start the client tests pin.
+    expect(flow).toMatch(/beginLogin\(\s*\(input\) => api\.machines\.beginAccountLogin\(/);
+    expect(flow).toMatch(/\{\s*again,\s*provider,\s*hint,\s*\}/);
+    expect(flow).toContain("freeDuplicate(result)");
+    expect(flow).toContain('t("connectAi.useAnyway"');
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.duplicate.claude_code", { account: "ana@acme.com" })).toBe(
+      "O Claude entrou como ana@acme.com, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
+    );
+    expect(t("connectAi.own.one", { for: "para a", name: "Ada" })).toBe("Uma conta só para a Ada");
+  });
 });

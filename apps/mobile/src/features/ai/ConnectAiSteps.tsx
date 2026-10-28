@@ -549,7 +549,6 @@ function PlanSteps({
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
   const steps = ready || gate.state === "preparing";
   const ownable = ready && !coding && view?.ownSignIn === true;
-  const brand = planLabel(t, choice);
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
   );
@@ -566,13 +565,12 @@ function PlanSteps({
       {ownable ? (
         <>
           <GroupedList>
+            <GroupedRow label={t("connectAi.own.all")} onPress={() => void saveOwn()} />
             <GroupedRow
-              label={t("connectAi.own.this", { brand, computer })}
-              sub={t("connectAi.own.thisText")}
-              subLines={2}
-              onPress={() => void saveOwn()}
+              label={t("connectAi.own.one", agentGrammar(t, agentName))}
+              checked={other}
+              onPress={() => setOther(true)}
             />
-            <GroupedRow label={t("connectAi.own.other", { brand })} checked={other} onPress={() => setOther(true)} />
           </GroupedList>
           <Note icon="lock">{t("connectAi.own.note")}</Note>
         </>
@@ -585,7 +583,6 @@ function PlanSteps({
           {...(isPlanId(choice) ? { provider: choice } : {})}
           again={signedOut?.id}
           email={signedOut?.email}
-          askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}

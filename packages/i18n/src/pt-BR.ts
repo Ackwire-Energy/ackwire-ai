@@ -1078,9 +1078,8 @@ export const ptBR = {
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
     own: {
-      this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela.",
-      other: "Outra conta do {{brand}}",
+      all: "A conta de todos os agentes",
+      one: "Uma conta só {{for}} {{name}}",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
     /** Under a plan's sign-in: it changes how the agent treats everyone else. */
@@ -1110,10 +1109,6 @@ export const ptBR = {
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
     signInFor: "Fazer login {{for}} {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
-    otherAccount: {
-      claude_code: "O Claude entrou como {{email}}. Para usar {{wanted}}, saia na página do Claude e tente de novo.",
-      codex: "O ChatGPT entrou como {{email}}. Para usar {{wanted}}, saia na página do ChatGPT e tente de novo.",
-    },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
     noAgents: "Um plano só pensa pelos agentes de quem o conecta, e você ainda não tem nenhum.",
@@ -1926,9 +1921,9 @@ export const ptBR = {
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
             claude_code:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do Claude e entre com a outra.",
+              "O Claude entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
             codex:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do ChatGPT e entre com a outra.",
+              "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -4574,9 +4569,6 @@ export const ptBR = {
     add: {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
-      email: "Qual conta? (opcional)",
-      emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
       openKeys: "Abrir {{site}}",

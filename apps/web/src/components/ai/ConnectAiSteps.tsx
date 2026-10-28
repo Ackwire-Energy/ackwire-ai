@@ -419,6 +419,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
+    const label = lowerFirst(t("connectAi.own.all"), i18n.language);
     return (
       <>
         <SettingNote icon="check" live>
@@ -428,9 +429,9 @@ function PlanSteps({
                   todo.map((a) => a.name),
                   t("newAgent.and"),
                 ),
-                label: lowerFirst(t("connectAi.own.this", { brand, computer }), i18n.language),
+                label,
               })
-            : t("agentPage.work.saved.accountHere", { name: agent.name, computer })}
+            : t("aiAccounts.done.savedAgent", { agent: agent.name, label })}
         </SettingNote>
         {foot}
       </>
@@ -620,18 +621,19 @@ function PlanSteps({
       )}
       {retry}
       {ownable && (
-        // Small columns: indented to the panel's text column, the two still fit side by side in the setup's column.
+        // Who shares the sign-in: the computer's own, which any of its pairer's agents thinks with, or a sign-in for
+        // this agent alone (ADR 0059 §2). Small columns: indented to the panel's text column, the two still fit side
+        // by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
         <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
           <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
             <span className="ac-option__text">
-              <span className="ac-option__title">{t("connectAi.own.this", { brand, computer })}</span>
-              <span className="ac-option__desc">{t("connectAi.own.thisText")}</span>
+              <span className="ac-option__title">{t("connectAi.own.all")}</span>
             </span>
           </OptionCard>
           <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
             <span className="ac-option__text">
-              <span className="ac-option__title">{t("connectAi.own.other", { brand })}</span>
+              <span className="ac-option__title">{t("connectAi.own.one", agentGrammar(t, agent.name))}</span>
             </span>
           </OptionCard>
         </div>
@@ -645,11 +647,6 @@ function PlanSteps({
           {...(coding ? { provider: choice } : {})}
           again={signedOut?.id}
           email={turn && sameAs ? sameAs : signedOut?.email}
-          askEmail={
-            turn && sameAs
-              ? false
-              : view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)
-          }
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}

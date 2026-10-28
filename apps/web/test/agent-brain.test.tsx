@@ -396,17 +396,32 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(within(d).getByRole("slider", { name: "Esforço" })).toBeTruthy();
   });
 
-  test("a signed-out account says so and offers to sign in again", async () => {
-    await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
+  test("a signed-out account says so and offers to sign in again, its own email going to Claude's sign-in unasked", async () => {
+    const { state } = await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
     const d = await brainDialog();
     expect(d.textContent).toContain("Saiu da conta, entre de novo");
-    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
-    account.focus();
-    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
-    expect(screen().getByRole("option", { name: /^Entrar de novo/ })).toBeTruthy();
+    await pick(d, "Conta do Claude", /^Entrar de novo/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    expect(block.querySelector("input")).toBeNull();
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { accountId: "acct_work", email: "walt@acme.com" },
+    ]);
+    expect(shownText(block)).not.toContain("walt@acme.com");
   });
 
-  test("Adicionar conta: the account to sign in to goes with the click, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
+  test("Adicionar conta: no address asked, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
@@ -432,16 +447,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
       );
       expect(shownText(block)).not.toContain("digita a senha");
-      fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
-        target: { value: "walt@acme.com" },
-      });
+      // The person already has an account here: still no address to type, Claude's own page picks the account.
+      expect(block.querySelector("input")).toBeNull();
       await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
       await settle(6);
       expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
         ORG_ID,
         "machine_1",
         "claude_code",
-        { email: "walt@acme.com" },
       ]);
       // The window opened on the click itself went to Claude's page, cut off from the app.
       expect(opened).toEqual(["about:blank"]);

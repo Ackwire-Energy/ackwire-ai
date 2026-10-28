@@ -8086,11 +8086,16 @@ a.machine-row__name:hover {
   font-size: 15px;
   font-weight: 650;
 }
-/* A step (an `.ac-iconline`): its number centred on the title's 14/20 line. */
+/*
+ * A step (an `.ac-iconline`): its number centred on the title's 14/20 line. Its words take the row and what acts on it
+ * (a button, the wait) goes under them, in their column, at every width: right under the words it answers, never
+ * across the row from them. As far under them as a field is under its title, nearer than the next group.
+ */
 .agp-addacct__step {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px 12px;
   font-size: 14px;
   line-height: 20px;
 }
@@ -8153,37 +8158,21 @@ a.machine-row__name:hover {
   font-weight: 600;
   color: var(--faint);
 }
-/* At phone width a step's words take the row, and its button goes under them, in their column. */
-@media (max-width: 640px) {
-  .agp-addacct__step {
-    flex-wrap: wrap;
-  }
-  .agp-addacct__step.ac-iconline > .agp-addacct__text {
-    flex-basis: calc(100% - 32px);
-  }
-  .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
-    margin-left: 32px;
-  }
+.agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - 32px);
 }
-/* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
-   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
-   spaced. A touch screen's small button is the ruler's default step. */
-@media (min-width: 641px) {
-  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
-    margin-top: calc((var(--control-h-sm) - 20px) / 2);
-  }
-  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
-    min-height: var(--control-h-sm);
-    padding-top: calc((var(--control-h-sm) - 20px) / 2);
-  }
+.agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: 32px;
 }
-@media (min-width: 641px) and (pointer: coarse) {
-  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
-    margin-top: calc((var(--control-h-md) - 20px) / 2);
-  }
-  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
-    min-height: var(--control-h-md);
-    padding-top: calc((var(--control-h-md) - 20px) / 2);
+/* With no number, the words are the step's whole row and the title's capitals are its top. */
+.agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+  flex-basis: 100%;
+  /* Browsers without the lh unit: the step's 20px line. */
+  margin-top: calc(var(--cap-top) - 10px);
+}
+@supports (top: 1lh) {
+  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+    margin-top: calc(var(--cap-top) - 0.5lh);
   }
 }
 
@@ -10107,7 +10096,23 @@ html[data-menu-overlay] .shell {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* At phone width for whom goes under the name, and a step's button under its words, on the text's column. */
+/* A step's button goes under its words, on the text's column. */
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: var(--text-edge);
+}
+/* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+   text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+.ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+  gap: calc((var(--lead) - 14px) / 2 + 12px);
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+  margin-left: calc((var(--lead) - 14px) / 2);
+}
+/* At phone width for whom goes under the name, on the text's column. */
 @media (max-width: 640px) {
   .ai-panel__agent {
     flex-basis: calc(100% - var(--text-edge));
@@ -10116,32 +10121,6 @@ html[data-menu-overlay] .shell {
   }
   .ai-panel__agent > .ac-select {
     flex: 1;
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
-    flex-basis: calc(100% - var(--text-edge));
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
-    margin-left: var(--text-edge);
-  }
-  /* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
-     text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
-  .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
-    gap: calc((var(--lead) - 14px) / 2 + 12px);
-    margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
-    margin-left: calc((var(--lead) - 14px) / 2);
-  }
-  /* With no number, the title's capitals are the step's top. */
-  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
-    flex-basis: 100%;
-    /* Browsers without the lh unit: the step's 20px line. */
-    margin-top: calc(var(--cap-top) - 10px);
-  }
-  @supports (top: 1lh) {
-    .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
-      margin-top: calc(var(--cap-top) - 0.5lh);
-    }
   }
 }
 /* Who thinks (the setup, after a plan): each agent and what it thinks with. */
