@@ -487,7 +487,7 @@ describe("Configurações do workspace", () => {
     // A section they can't open falls back to Geral.
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
-    expect(document.querySelector("#sec-storage")).toBeNull();
+    expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
   test("Plano e cobrança: only where a billing service runs, for owners and admins, opened there signed in", async () => {

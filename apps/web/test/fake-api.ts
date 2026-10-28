@@ -684,7 +684,11 @@ export const CATALOG: ConnectorCatalog = {
     remote("notion", "Notion", "docs", "Páginas e bancos de dados.", "https://mcp.notion.com/mcp", null),
     remote("stripe", "Stripe", "payments", "Clientes e cobranças.", "https://mcp.stripe.com", "#635BFF"),
     remote("zapier", "Zapier", "automation", "Ações do Zapier.", "https://oauth.zapier.example/mcp", "#FF4F00"),
-    remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null, false),
+    // A mark in its maker's colors, from the web app's brands folder.
+    {
+      ...remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null),
+      iconUrl: "/brands/canva.svg",
+    },
     {
       ...remote("slack", "Slack", "support", "Canais e mensagens.", "https://mcp.slack.example/mcp", null, false),
       kind: "catalog",

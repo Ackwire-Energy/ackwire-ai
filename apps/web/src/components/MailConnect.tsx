@@ -45,6 +45,7 @@ import { useApi } from "@/api/context";
 import { AddressList } from "@/components/AddressList";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
@@ -61,9 +62,10 @@ import { useToast } from "@/lib/toast";
  * mailbox has (replies go out from the one the email arrived at).
  */
 
-/** Brand masks (Simple Icons, CC0). Outlook was removed from Simple Icons at Microsoft's request: monogram, like Canva. */
-const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string }>> = {
+/** Each mailbox's mark: Gmail's and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. */
+const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string | null }>> = {
   gmail: { iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
+  outlook: { iconUrl: "/brands/outlook.svg", brandColor: null },
   icloud: { iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
 };
 
@@ -132,12 +134,7 @@ export function MailConnectFlow({
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={
-        <span className="cflow__title">
-          <MailIcon choice={choice} size="lg" />
-          <span>{title}</span>
-        </span>
-      }
+      title={<FlowTitle tile={<MailIcon choice={choice} size="lg" />}>{title}</FlowTitle>}
       closeLabel={t("common.close")}
       width={620}
       className="cflow"

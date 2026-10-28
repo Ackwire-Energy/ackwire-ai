@@ -5480,7 +5480,6 @@ export const en: Translations = {
       dropText: "The vault folder or a few .md files work too",
       pickZip: "Choose .zip or .md",
       pickFolder: "Choose folder",
-      pickFolderShort: "choose the folder",
       howTo:
         "To make the .zip: in Finder, right-click the vault folder → Compress. On Windows, Send to → Compressed folder. The .obsidian folder (plugins and themes) is left out.",
       nothingYet: "Nothing goes in before you review it.",
@@ -6642,7 +6641,7 @@ export const en: Translations = {
   },
   database: {
     name: "Database",
-    cardText: "Postgres: agents query your data to answer, read-only.",
+    cardText: "Postgres, read-only: agents query your data.",
     auth: "Address and password",
     connectText:
       "Agents read your Postgres database to answer questions about your data. They only read: nothing is changed.",

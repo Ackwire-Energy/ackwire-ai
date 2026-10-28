@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
+import { z } from "zod";
 import { approverIds } from "./approvals";
 import { inertText } from "./email/inert";
 import { type Block, EMAIL_PICTURES, type EmailArt, type EmailDoc, type EmailLocale, renderDoc } from "./email/layout";
@@ -375,12 +376,16 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
     case "join_request": {
       const c = w.joinRequest;
       const org = inertText(t.orgName);
+      // The address proved itself with a code (ADR 0072), so it is a mailto link, which copies whole. Only an address
+      // the ask route would accept (`z.email()`): its characters stand as they are in a mailto URL. Anything else
+      // stays typed text.
+      const address = z.email().safeParse(t.email).success ? { mail: t.email } : inertText(t.email);
       return doc(
         c.subject,
         c.preheader,
         c.headline,
         [
-          { people: [{ name: inertText(t.name, JOIN_NAME_SHOWN), detail: inertText(t.email) }] },
+          { people: [{ name: inertText(t.name, JOIN_NAME_SHOWN), detail: address }] },
           { p: c.body(org) },
           { note: c.note },
           { button: c.approve, url: t.url, also: { label: c.deny, url: t.denyUrl, danger: true } },
