@@ -722,6 +722,73 @@ test("the same email twice for one owner on one computer is refused, and the new
   });
 });
 
+test("signing in again as another account: it stays signed out with its agents, and the answer says who came back", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const PESSOAL_ID = "0193dddd-0000-4000-8000-000000000003";
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { status: "signed_out", plan: "max" });
+  await addAccount(machineId, PESSOAL_ID, "claude_code", { label: "Pessoal", email: "walt@gmail.com", plan: "max" });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: CLAUDE_ID })
+    .where(eq(schema.agents.id, f.agent.id));
+  let as = "walt@gmail.com";
+  const runner = signingRunner(machineId, () => ({ loggedIn: true, email: as, plan: "max" }));
+  const again = async () => {
+    const { deps } = runner;
+    const login = await beginAccountLogin(
+      deps,
+      f.owner.id,
+      f.org.id,
+      machineId,
+      "claude_code",
+      CLAUDE_ID,
+      "ana@example.com",
+    );
+    const box = await sealSecret(login.publicKey ?? "", "abc#123", accountCodeAad(login.loginId, f.org.id));
+    await sendAccountLoginCode(deps, f.owner.id, f.org.id, machineId, login.loginId, box);
+    return accountLoginStatus(deps, f.owner.id, f.org.id, machineId, login.loginId);
+  };
+  const reported = (email: string) =>
+    syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, [
+      { id: CLAUDE_ID, kind: "claude_code", loggedIn: true, email, plan: "max" },
+      { id: PESSOAL_ID, kind: "claude_code", loggedIn: true, email: "walt@gmail.com", plan: "max" },
+    ]);
+  const asItWas = { status: "signed_out", email: "ana@example.com", label: "Trabalho" };
+
+  // Claude's page came back as an account already connected: that one, named, and nothing removed.
+  expect(await again()).toMatchObject({
+    state: "failed",
+    signedInAs: "walt@gmail.com",
+    duplicate: { label: "Pessoal", account: { id: PESSOAL_ID, email: "walt@gmail.com", status: "active", usedBy: [] } },
+  });
+  expect(runner.calls.filter((c) => c.action === "remove")).toEqual([]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject(asItWas);
+  expect((await agentRow()).brainAccountId).toBe(CLAUDE_ID);
+  // The runner reports the new login at once, before or after that answer: the same.
+  await reported("walt@gmail.com");
+  expect(await accountRow(CLAUDE_ID)).toMatchObject(asItWas);
+
+  // An email of its own, not connected: said, and the account stays as it was.
+  as = "bob@other.com";
+  const other = await again();
+  expect(other).toMatchObject({ state: "failed", signedInAs: "bob@other.com" });
+  expect(other.duplicate).toBeUndefined();
+  expect(await accountRow(CLAUDE_ID)).toMatchObject(asItWas);
+  expect((await agentRow()).brainAccountId).toBe(CLAUDE_ID);
+
+  // Its own: signed in, the same account for the same agent.
+  as = "ana@example.com";
+  expect(await again()).toMatchObject({
+    state: "done",
+    account: { id: CLAUDE_ID, label: "Trabalho", status: "active", usedBy: ["Dev"] },
+  });
+  // Signed in there as someone else afterwards: it reads as signed out, as itself.
+  await reported("bob@other.com");
+  expect(await accountRow(CLAUDE_ID)).toMatchObject(asItWas);
+  expect((await agentRow()).brainAccountId).toBe(CLAUDE_ID);
+});
+
 /** A runner where ChatGPT signs in with a device code at once, as `email`. */
 function codexRunner(machineId: string, email: string) {
   return fakeHub(machineId, (req) => {
