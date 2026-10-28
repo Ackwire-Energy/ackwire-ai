@@ -141,12 +141,13 @@ describe("message action bars", () => {
     // Words with an action: the message's last line, on a first and a grouped message alike, never in the header.
     for (const id of ["w1", "w2"]) {
       const foot = row(id).querySelector(".ac-msg__body > .ac-msg__foot:last-child") as HTMLElement;
-      // The dot is a part of its own, so the line's gap is on both its sides.
+      // The dot is a part of its own, as far from the words as from the action (the kit's `.ac-receipt__dot`).
       expect([...(foot.querySelector(".ac-receipt")?.children ?? [])].map((part) => part.textContent)).toEqual([
         "Ninguém vai responder: falta uma IA",
         "·",
         "Conectar",
       ]);
+      expect(foot.querySelector(".ac-receipt > .ac-receipt__dot[aria-hidden='true']")?.textContent).toBe("·");
       expect(within(foot).getByRole("button", { name: "Conectar" })).toBeTruthy();
       expect(row(id).querySelector(".ac-msg__head .ac-receipt, .ac-msg__aside .ac-receipt")).toBeNull();
     }

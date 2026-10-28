@@ -677,16 +677,16 @@ describe("Message aside and foot", () => {
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    const bodies = (selector: string) =>
-      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    const bodies = (selector: string, sheet = css) =>
+      [...sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
         .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
         .map((m) => m[2] ?? "")
         .join(";");
-    const value = (selector: string, prop: string) =>
-      new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(bodies(selector))?.[1]?.trim();
+    const value = (selector: string, prop: string, sheet = css) =>
+      new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(bodies(selector, sheet))?.[1]?.trim();
     const bar = ".ac-msg__actions";
-    // Placed by its middle, never by its bottom: the 46px touch bar grows as much down as up. 4px lower at rest, it
-    // slides up as it shows. One transform (built-css.test.ts in the web app checks the built stylesheet keeps it).
+    // Placed by its middle, never by its bottom. 4px lower at rest, it slides up as it shows. One transform
+    // (built-css.test.ts in the web app checks the built stylesheet keeps it).
     expect(value(bar, "transform")).toBe("translateY(calc(-50% + 4px))");
     expect(value(".ac-msg:hover .ac-msg__actions", "transform")).toBe("translateY(-50%)");
     expect(value(".ac-msg:focus-within .ac-msg__actions", "transform")).toBe("translateY(-50%)");
@@ -704,15 +704,28 @@ describe("Message aside and foot", () => {
       "calc(4px + 13.175px - var(--cap-mid))",
     );
     // A grouped row with a line under one line of text: between the row above's last line (its 6px bottom padding
-    // up) and that line (2px under the text), the room is under the touch bar's 46px. The bar takes its middle, so it
-    // reaches both lines' edges by the same few pixels, short of their letters, and the 38px mouse bar fits whole.
+    // up) and that line (2px under the text), the room holds the bar (its 32px buttons, 3px around them) whole, and
+    // the bar takes its middle.
     const footed =
       ".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions";
     const above = -6;
     const under = 2 + 2 + line + 2;
     expect(Number.parseFloat(value(footed, "top") ?? "")).toBeCloseTo((above + under) / 2, 3);
-    expect(under - above).toBeGreaterThanOrEqual(38);
-    expect((46 - (under - above)) / 2).toBeLessThan(4);
+    expect(under - above).toBeGreaterThanOrEqual(32 + 2 * 3);
+    // On touch too, where small buttons grow to 40px: the bar's keep their 32px plates, and each target reaches 4px
+    // past its plate to the ruler's 40px, the plates 8px apart so no two targets overlap.
+    const touch = [...css.matchAll(/@media \(pointer: coarse\) \{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
+      .map((m) => m[1] ?? "")
+      .join("\n");
+    expect(value(".ac-btn--sm", "min-height", touch)).toBe("var(--control-h-md)");
+    const buttons = ".ac-msg__actions .ac-btn--sm";
+    expect(value(buttons, "min-height", touch)).toBe("var(--control-h-sm)");
+    expect(value(buttons, "min-width", touch)).toBe("var(--control-h-sm)");
+    expect(value(buttons, "position", touch)).toBe("relative");
+    expect(value(`${buttons}::after`, "position", touch)).toBe("absolute");
+    const reach = -Number.parseFloat(value(`${buttons}::after`, "inset", touch) ?? "");
+    expect(32 + 2 * reach).toBe(40);
+    expect(Number.parseFloat(value(bar, "gap", touch) ?? "")).toBe(2 * reach);
     // Left of the check (a 16px icon, 2px each side) and 8px from it, past the row's own side padding.
     expect(
       value(".ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions", "right"),

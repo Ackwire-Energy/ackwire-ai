@@ -328,6 +328,8 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     );
     expect(within(receipt).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
     expect(receipt.textContent).toContain("Nenhum agente vai responder sem @");
+    // The dot right after the ⓘ's line, which the kit draws closer (its circle stops inside its box).
+    expect(receipt.querySelector(".ac-hintline + .ac-receipt__dot")?.textContent).toBe("·");
     const pop = await popoverOf("alguém sabe?");
     expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
       "https://agentes.chat/help/who-answers?lang=pt-BR",

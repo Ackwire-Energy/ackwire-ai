@@ -2612,6 +2612,14 @@ a.ac-list__row:focus-visible {
   line-height: 16px;
   color: var(--ink-muted);
 }
+/* The dot between the words and the action, 4px from each: the line's whole gap on both sides makes it wrap sooner. */
+.ac-receipt__dot {
+  margin-inline: -2px;
+}
+/* After an ⓘ, 1.5px closer: the ⓘ's circle stops 1.54px inside its box. */
+.ac-hintline + .ac-receipt__dot {
+  margin-inline-start: -3.5px;
+}
 .ac-receipt__avatars {
   display: inline-flex;
   gap: 2px;
@@ -4420,7 +4428,7 @@ a.ac-list__row:focus-visible {
   top: calc(4px + 13.175px - var(--cap-mid));
 }
 /* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
-   last one (6px up) is shorter than the bar on touch (46px), so the bar takes that room's middle. */
+   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
 .ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 13.175px;
 }
@@ -6340,6 +6348,22 @@ button.ac-tools__row:focus-visible {
   }
   .ac-btn--sm.ac-btn--icon {
     min-width: var(--control-h-md);
+  }
+  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
+     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-msg__actions {
+    gap: 8px;
+  }
+  .ac-msg__actions .ac-btn--sm {
+    position: relative;
+    min-width: var(--control-h-sm);
+    min-height: var(--control-h-sm);
+    border-radius: var(--control-r-sm);
+  }
+  .ac-msg__actions .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
   .ac-composer__format-btn {
     width: var(--control-h-md);

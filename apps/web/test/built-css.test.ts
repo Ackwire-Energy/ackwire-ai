@@ -24,8 +24,19 @@ const normal = (selector: string) =>
   selector
     .replace(/\s*([>+~,])\s*/g, "$1")
     .replace(/="([^"]*)"/g, "=$1")
+    .replace(/::(before|after)\b/g, ":$1")
     .replace(/\s+/g, " ")
     .trim();
+
+/** The rules of every `@media (pointer: coarse)` block, in order, as one sheet. */
+const touchRules = (css: string) =>
+  [
+    ...css
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .matchAll(/@media\s*\(pointer:\s*coarse\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g),
+  ]
+    .map((m) => m[1] ?? "")
+    .join("\n");
 
 /** The declarations of every rule whose selector list holds `selector`, in order, as [property, value]. */
 function declarations(css: string, selector: string) {
@@ -85,6 +96,29 @@ test("the built stylesheet keeps the hover bar placed by its middle, 4px lower a
     const source = declarations(kit, selector);
     expect(source.length).toBeGreaterThan(0);
     expect(declarations(css, selector)).toEqual(expect.arrayContaining(source));
+  }
+});
+
+test("the built stylesheet keeps the bar's 32px plates on touch, their 40px targets, and the receipt dot's room", async () => {
+  const css = await builtCss();
+  const kit = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
+  const [built, source] = [touchRules(css), touchRules(kit)];
+  for (const selector of [".ac-msg__actions", ".ac-msg__actions .ac-btn--sm", ".ac-msg__actions .ac-btn--sm::after"]) {
+    expect(declarations(source, selector).length).toBeGreaterThan(0);
+    expect(declarations(built, selector)).toEqual(expect.arrayContaining(declarations(source, selector)));
+  }
+  // As specific as the touch rule that grows icon buttons to 40px, so it only wins after it.
+  const at = (selector: string) =>
+    [...built.matchAll(/([^{}]+)\{/g)].findIndex((m) =>
+      normal(m[1] ?? "")
+        .split(",")
+        .includes(normal(selector)),
+    );
+  expect(at(".ac-btn--sm.ac-btn--icon")).toBeGreaterThanOrEqual(0);
+  expect(at(".ac-msg__actions .ac-btn--sm")).toBeGreaterThan(at(".ac-btn--sm.ac-btn--icon"));
+  for (const selector of [".ac-receipt__dot", ".ac-hintline + .ac-receipt__dot"]) {
+    expect(declarations(kit, selector).length).toBeGreaterThan(0);
+    expect(declarations(css, selector)).toEqual(expect.arrayContaining(declarations(kit, selector)));
   }
 });
 

@@ -28,6 +28,14 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   follow_up: "thread",
 };
 
+function ReceiptDot() {
+  return (
+    <span className="ac-receipt__dot" aria-hidden="true">
+      ·
+    </span>
+  );
+}
+
 /**
  * A person's message's receipt: a small muted check (our icons) at the end of its first line (`part="check"`).
  * Clicking or focusing it opens a popover with each agent and its status, and who picked them. Words only for what
@@ -57,7 +65,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <Icon name="waiting" />
         </span>
         <span>{t("receipts.picking")}</span>
-        <span aria-hidden="true">·</span>
+        <ReceiptDot />
         <CallAgentMenu />
       </div>
     );
@@ -137,7 +145,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "failed" && actions && (
         <>
           <span>{t("receipts.failedShort")}</span>
-          <span aria-hidden="true">·</span>
+          <ReceiptDot />
           <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
             {t("receipts.retry")}
           </button>
@@ -152,13 +160,13 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                 {t("receipts.mentionNeededHint")}
               </InfoHint>
             </span>
-            <span aria-hidden="true">·</span>
+            <ReceiptDot />
             <CallAgentMenu />
           </>
         ) : (
           <>
             <span>{t("receipts.nobody")}</span>
-            <span aria-hidden="true">·</span>
+            <ReceiptDot />
             <CallAgentMenu />
           </>
         ))}
@@ -167,7 +175,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <span>{t("noAi.receipt")}</span>
           {connect && (
             <>
-              <span aria-hidden="true">·</span>
+              <ReceiptDot />
               <button
                 type="button"
                 className="ac-receipt__action"
