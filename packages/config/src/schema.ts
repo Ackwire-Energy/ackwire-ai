@@ -284,7 +284,8 @@ export const envVars = {
   },
   JEV_TIMEOUT_MS: {
     schema: z.coerce.number().int().min(200).max(30_000).default(2000),
-    description: "Timeout for a Jev call that picks who answers. After it, the next step decides.",
+    description:
+      "Timeout for each Jev call: picking who answers and its judgments (memory, stops, hand-offs, the tools a turn loads). Screen judgments wait at least 6 s. After it, the next step decides, as without Jev.",
     section: "Agents",
   },
   JEV_VISION_MODEL: {

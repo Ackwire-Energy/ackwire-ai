@@ -385,13 +385,20 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "data",
         heading: "Os seus dados",
         blocks: [
+          "O que o Jev lê para decidir:",
           {
             list: [
-              "O Jev lê só o que precisa para decidir: a mensagem e as poucas antes dela, os nomes e papéis dos agentes, os itens de memória que ele compara, a tarefa de um agente e o começo dos resultados das ferramentas, e a página ou a tela que um agente está usando, inclusive capturas.",
-              "A TypeSafe roda o Jev nos Estados Unidos e não treina os modelos dela com o que você envia. Ela guarda os dados pelo tempo necessário para operar o serviço. A TypeSafe oferece retenção zero nos planos enterprise.",
-              "Política de privacidade da TypeSafe: https://typesafe.ai/legal/privacy-policy. Contrato de tratamento de dados: https://typesafe.ai/legal/data-processing.",
+              "O nome e a descrição do canal, a mensagem e as poucas antes dela",
+              "Os nomes e papéis dos agentes, o começo das instruções deles e as ferramentas que eles podem usar",
+              "Os itens de memória que ele compara",
+              "A tarefa de um agente e o começo dos resultados das ferramentas",
+              "O objetivo de uma missão e os comandos que um agente quer rodar nela",
+              "As ferramentas que um app conectado oferece",
+              "A página ou a tela que um agente está usando, inclusive capturas",
             ],
           },
+          "A TypeSafe roda o Jev nos Estados Unidos e não treina os modelos dela com o que você envia. Ela guarda os dados pelo tempo necessário para operar o serviço. A TypeSafe oferece retenção zero nos planos enterprise.",
+          "Política de privacidade da TypeSafe: https://typesafe.ai/legal/privacy-policy. Contrato de tratamento de dados: https://typesafe.ai/legal/data-processing.",
         ],
       },
       {

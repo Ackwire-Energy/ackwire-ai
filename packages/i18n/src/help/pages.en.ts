@@ -381,13 +381,20 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "data",
         heading: "Your data",
         blocks: [
+          "What Jev reads to decide:",
           {
             list: [
-              "Jev reads only what it decides on: the message and the few before it, your agents' names and roles, the memory items it compares, an agent's task and the start of its tool results, and the page or screen an agent is using, screenshots included.",
-              "TypeSafe runs Jev in the United States and doesn't train its models on what you send. It keeps data as long as it needs to run the service. Zero retention is available on its enterprise plans.",
-              "TypeSafe's privacy policy: https://typesafe.ai/legal/privacy-policy. Its data processing agreement: https://typesafe.ai/legal/data-processing.",
+              "The channel's name and description, the message and the few before it",
+              "Your agents' names and roles, the start of their instructions and the tools they can use",
+              "The memory items it compares",
+              "An agent's task and the start of its tool results",
+              "A mission's goal and the commands an agent wants to run for it",
+              "The tools a connected app offers",
+              "The page or screen an agent is using, screenshots included",
             ],
           },
+          "TypeSafe runs Jev in the United States and doesn't train its models on what you send. It keeps data as long as it needs to run the service. Zero retention is available on its enterprise plans.",
+          "TypeSafe's privacy policy: https://typesafe.ai/legal/privacy-policy. Its data processing agreement: https://typesafe.ai/legal/data-processing.",
         ],
       },
       {
