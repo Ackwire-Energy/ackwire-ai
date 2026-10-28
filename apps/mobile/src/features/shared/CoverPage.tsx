@@ -83,7 +83,10 @@ export function PageSection({ title, count }: { title: string; count?: number | 
   );
 }
 
-/** A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. */
+/**
+ * A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. With
+ * `below` the tile stays at the top with the label; the chevron stays in the middle, as the system's.
+ */
 export function PageRow({
   icon,
   leading,
@@ -106,6 +109,7 @@ export function PageRow({
   chevron?: boolean;
 }) {
   const c = useColors();
+  const lead = leading ?? (icon ? <Tile icon={icon} size={TILE} /> : null);
   return (
     <Pressable
       onPress={onPress}
@@ -114,7 +118,10 @@ export function PageRow({
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
     >
       {divider ? <View style={[styles.rowLine, { backgroundColor: c.line2 }]} /> : null}
-      {leading ?? (icon ? <Tile icon={icon} size={TILE} /> : null)}
+      {lead ? (
+        // Beside a row that grows under its label (a plan's meter), the tile stays with the label, at the top.
+        <View style={below ? styles.top : undefined}>{lead}</View>
+      ) : null}
       <View style={styles.grow}>
         <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1}>
           {label}
@@ -161,4 +168,5 @@ const styles = StyleSheet.create({
   // From the text column: 20 + the 36 tile + 13.
   rowLine: { position: "absolute", top: 0, right: 0, left: 69, height: StyleSheet.hairlineWidth },
   value: { maxWidth: "45%" },
+  top: { alignSelf: "flex-start" },
 });

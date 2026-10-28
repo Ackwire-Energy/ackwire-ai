@@ -36,7 +36,9 @@ describe("one-click MCP connectors", () => {
     for (const b of Object.values(CONNECTOR_BRANDS)) {
       expect(existsSync(`${web}/${b.own ? "brands" : "connectors"}/${b.file}.svg`)).toBe(true);
     }
-    const missing = connectorListing({}).filter((e) => !e.iconUrl).map((e) => e.id);
+    const missing = connectorListing({})
+      .filter((e) => !e.iconUrl)
+      .map((e) => e.id);
     expect(missing).toEqual([]);
   });
 
