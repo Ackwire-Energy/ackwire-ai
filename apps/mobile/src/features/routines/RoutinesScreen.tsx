@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Button, EmptyState, Filters, Icon, SearchField, SectionHeader, Segmented, Text } from "@/ui";
+import { Button, EmptyState, Filters, Icon, IconButton, SearchField, SectionHeader, Segmented, Text } from "@/ui";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -18,8 +18,8 @@ const LIVE_ROWS = 8;
 const WORKING_POLL_MS = 15_000;
 
 /**
- * Rotinas, pushed from Você (the web's page on the phone): what the agents do on their own, "Nova rotina" across
- * the screen, the next hours as a horizon, then the search, the status (Todas, Ativas, Pausadas, Por evento, with
+ * Rotinas, pushed from Você (the web's page on the phone): what the agents do on their own, "Nova rotina" as the
+ * bar's "+" (as Tarefas; with none yet, the empty state's own button), the next hours as a horizon, then the search, the status (Todas, Ativas, Pausadas, Por evento, with
  * counts) and the agent; "No ar" and "Pausadas" in the server's order, the one-offs that already ran folded under
  * "Concluídos". A row opens its routine; "…" (or a long press) its actions.
  */
@@ -67,13 +67,13 @@ function RoutineList() {
   return (
     <PushedLargeTitle
       title={t("routines.title")}
+      right={<IconButton icon="plus" label={t("routines.new")} onPress={openNew} />}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <View style={styles.head}>
         <Text variant="subhead" tone="muted">
           {t("routines.subtitle")}
         </Text>
-        <Button variant="primary" icon="plus" label={t("routines.new")} wide onPress={openNew} />
       </View>
       {routines.isLoading ? (
         <View style={styles.center}>
