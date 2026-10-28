@@ -94,9 +94,7 @@ export const landsOnDivider = (contentLength: number, dividerAt: number | undefi
  * Where the person is in the conversation, kept while something covers it (a sheet, the agent's computer): at the
  * end, or reading, with the scroll, a row on screen and where that row was (rows above can change size meanwhile).
  */
-export type Place =
-  | { end: true }
-  | { end: false; scroll: number; key: string | null; position: number | null };
+export type Place = { end: true } | { end: false; scroll: number; key: string | null; position: number | null };
 
 /** How far the list may drift from a kept place before it is put back (points). */
 export const PLACE_SLACK = 40;

@@ -53,7 +53,6 @@ export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen
 export { LineIcon, type LineIconProps } from "./LineIcon";
 export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
 export { LogoMark } from "./LogoMark";
-export { PillButton } from "./PillButton";
 export {
   CoverTabStack,
   coverBarOptions,
@@ -68,6 +67,7 @@ export {
   useScrollUnderPushedOptions,
 } from "./navigation";
 export { OptionTile } from "./OptionTile";
+export { PillButton } from "./PillButton";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";
@@ -78,8 +78,8 @@ export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
 export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
 export { SheetSurface } from "./SheetSurface";
-export { searchCancelVisible, searchShowsResults } from "./searchMode";
 export { type SwipeAction, SwipeRow } from "./SwipeRow";
+export { searchCancelVisible, searchShowsResults } from "./searchMode";
 export { fieldText, systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";

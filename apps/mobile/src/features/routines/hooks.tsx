@@ -20,16 +20,7 @@ import { routineHref } from "../links/logic";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { type ActionItem, ActionList, copyText, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import {
-  everyMinutes,
-  isInbox,
-  isRunning,
-  nextLine,
-  RUN_SLOTS,
-  routineTitle,
-  runCaption,
-  toastParts,
-} from "./logic";
+import { everyMinutes, isInbox, isRunning, nextLine, RUN_SLOTS, routineTitle, runCaption, toastParts } from "./logic";
 import { fromApiRule, nextLabel, ruleSentence } from "./rule";
 
 /** Rotinas' words and actions, shared by the list, a routine's screen and the form. */

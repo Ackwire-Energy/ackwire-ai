@@ -13,8 +13,8 @@ import { Icon, Text } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, Tile } from "../shared/parts";
-import { AgentLevels, DisconnectButton, SafeNote } from "./ConnectSheet";
 import { ConnectorIcon } from "./ConnectorIcon";
+import { AgentLevels, DisconnectButton, SafeNote } from "./ConnectSheet";
 import { brandOf, brandTones } from "./logic";
 import { openTools } from "./ToolsScreen";
 

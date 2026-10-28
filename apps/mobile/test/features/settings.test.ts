@@ -111,7 +111,10 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       .filter((f) => f.endsWith(".tsx"))
       .map((f) => `settings/${f.replace(/\\/g, "/").replace(/\.tsx$/, "")}`);
     expect(routes.length).toBeGreaterThan(10);
-    for (const route of routes) expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
+    // The workspace's settings page wears the cover bar, like Você's; the screens it opens scroll under the bar.
+    expect(layout).toContain(`name="settings/index" options={{ ...pushed, ...coverBarOptions }}`);
+    for (const route of routes.filter((r) => r !== "settings/index"))
+      expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
   });
 });
 
@@ -156,7 +159,7 @@ describe("Geral", () => {
       storage: "Seu próprio bucket",
     });
     expect(tileStates(t, "pt-BR", { keys: { manages: true, live: 0, platform: true } })).toEqual({
-      keys: "Usando a chave do agentes.chat",
+      keys: "Usando a chave deste servidor",
     });
     expect(tileStates(t, "pt-BR", {})).toEqual({});
     const en = await translator("en");
@@ -238,9 +241,7 @@ describe("Computadores", () => {
 
   test("paused until a time, until resumed, or not paused", async () => {
     const t = await translator("pt-BR");
-    expect(pauseText(t, "pt-BR", { until: new Date(2026, 9, 28, 16, 0).toISOString() }, NOW)).toBe(
-      "Pausado até 16:00",
-    );
+    expect(pauseText(t, "pt-BR", { until: new Date(2026, 9, 28, 16, 0).toISOString() }, NOW)).toBe("Pausado até 16:00");
     expect(pauseText(t, "pt-BR", { until: null }, NOW)).toBe("Pausado");
     expect(pauseText(t, "pt-BR", { until: new Date(2026, 9, 28, 14, 0).toISOString() }, NOW)).toBeNull();
     expect(pauseText(t, "pt-BR", null, NOW)).toBeNull();
@@ -324,9 +325,9 @@ describe("Computadores", () => {
       done: "loja foi removida.",
       input: { removeFolder: { path: "/Users/dev/Projects/loja/" } },
     });
-    expect(
-      reduceTexts(t, { kind: "folder", path: "/srv/loja", agent: { id: "infra", name: "Infra" } }).input,
-    ).toEqual({ removeFolder: { path: "/srv/loja", agentId: "infra" } });
+    expect(reduceTexts(t, { kind: "folder", path: "/srv/loja", agent: { id: "infra", name: "Infra" } }).input).toEqual({
+      removeFolder: { path: "/srv/loja", agentId: "infra" },
+    });
     expect(reduceTexts(t, { kind: "tool", tool: "browser" })).toMatchObject({
       title: "Desligar Navegador?",
       action: "Desligar",

@@ -365,7 +365,7 @@ export function ruleOf(r: Routine | undefined, zone: string, today = new Date())
   if (r?.trigger.type === "once") return onceRule(r.trigger.at, zone);
   if (r?.trigger.type === "schedule" && r.trigger.rule)
     return { ...fromApiRule(r.trigger.rule, base.start), timezone: zone };
-  if (r?.trigger.type === "schedule") return base;
+  if (!r || r.trigger.type === "schedule") return base;
   return { freq: "weekly", interval: 1, byWeekday: ["MO"], times: ["09:00"], timezone: zone, start: base.start };
 }
 

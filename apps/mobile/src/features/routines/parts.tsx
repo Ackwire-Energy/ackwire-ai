@@ -52,13 +52,7 @@ export function StateChip({ routine: r }: { routine: Routine }) {
 }
 
 /** The one-tap fix of a paused routine ("Adicionar agente ao canal", "Assumir rotina", "Retomar"). */
-export function FixButton({
-  fix,
-  controls,
-}: {
-  fix: RoutineFix;
-  controls: ReturnType<typeof useRoutineControls>;
-}) {
+export function FixButton({ fix, controls }: { fix: RoutineFix; controls: ReturnType<typeof useRoutineControls> }) {
   const { t } = useTranslation();
   return (
     <Button

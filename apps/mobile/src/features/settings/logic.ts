@@ -189,11 +189,7 @@ export const SKILLS_INLINE = 6;
 export const skillSourceKey = (s: Pick<Skill, "source" | "sourceUrl">) =>
   s.source === "url" ? (/github\.com/i.test(s.sourceUrl ?? "") ? "github" : "url") : s.source;
 
-const fold = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /** The skills whose name or description has the query, accents aside. */
 export function searchSkills<S extends Pick<Skill, "name" | "description">>(skills: S[], query: string): S[] {

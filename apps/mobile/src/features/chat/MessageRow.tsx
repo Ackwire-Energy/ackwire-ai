@@ -54,7 +54,6 @@ import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
-import { MemoryMarks } from "./MemoryMark";
 import {
   approvalIdOf,
   artifactsOf,
@@ -67,6 +66,7 @@ import {
   reactionPills,
   workStepsOf,
 } from "./logic";
+import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";

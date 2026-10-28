@@ -189,7 +189,14 @@ function NowLine({ left, height, label }: { left: number; height: number; label:
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 16, marginTop: 4, marginBottom: 8, paddingTop: 12, paddingHorizontal: 12, borderRadius: 20 },
+  card: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
   head: { gap: 1, marginBottom: 6 },
   bold: { fontWeight: "600" },
   body: { paddingBottom: BOTTOM },
