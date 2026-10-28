@@ -399,7 +399,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain(
       "O Claude entrou como Trabalho, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
     );
-    // What went wrong and its button on one row, the note in the button's middle.
+    // What went wrong, then its button under the note's words.
     const retry = within(dialog).getByRole("button", { name: "Tentar de novo" });
     expect(retry.parentElement?.className).toBe("ai-panel__row");
     expect(retry.parentElement?.querySelector(":scope > .ac-setnote")).not.toBeNull();
@@ -480,6 +480,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(await stylesheet("../src/responsive.css")).not.toContain(".agp-addacct__step");
     expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
     expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
+    // In a plan's panel what went wrong is the sign-in's state: its buttons under the note's words, as a step's.
+    expect(layout).toContain("\n.ai-panel--plan .ai-panel__row > .ac-setnote {\n  flex-basis: 100%;\n}");
+    expect(ruleOf(layout, ".ai-panel--plan .ai-panel__row > :not(.ac-setnote)")).toContain(
+      "margin-left: var(--text-edge)",
+    );
     // A key's field can narrow to 102px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
     expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
   });
@@ -1091,7 +1096,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
     // No address the person never typed, and nothing saved until they choose.
     expect(shownText(dialog)).not.toMatch(/Para usar \S+@/);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
-    // The note in its buttons' middle; the two of them stack when they don't fit.
+    // Its two buttons under the note's words; they stack when they don't fit.
     const use = within(dialog).getByRole("button", { name: "Usar rafael@gmail.com" });
     expect(use.parentElement?.className).toBe("ac-acts");
     expect(use.parentElement?.parentElement?.className).toBe("ai-panel__row");

@@ -4,7 +4,7 @@ import { builtCss, declarations, topLevel } from "./built-css";
 
 const LAYOUT = join(import.meta.dir, "../src/layout.css");
 
-/** What places a step's button: under its words, on their column, at every width. */
+/** What places a step's button, and a failed sign-in's: under its words, on their column, at every width. */
 const PLACEMENT = [
   ".agp-addacct__step",
   ".agp-addacct__step.ac-iconline > .agp-addacct__text",
@@ -13,6 +13,8 @@ const PLACEMENT = [
   ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text",
   ".ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)",
   ".ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline)",
+  ".ai-panel--plan .ai-panel__row > .ac-setnote",
+  ".ai-panel--plan .ai-panel__row > :not(.ac-setnote)",
 ];
 
 test("the built stylesheet keeps a step's button under its words at every width, as the source writes it", async () => {
