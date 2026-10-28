@@ -99,7 +99,25 @@ const sendText = async (text: string) => {
 describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens on Claude's sign-in for the first agent with no AI", async () => {
     const jev = { by: "jev", mine: "jev", model: null, noSmallModel: null } as const;
-    await open(walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID));
+    const { api } = await open(
+      walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID),
+    );
+    // The MacBook he connected, its Claude Code signed in there.
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_1",
+          name: "MacBook",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: true },
+          own: { claude_code: { plan: "max" } },
+        },
+      ],
+    });
     const shown = banner();
     // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
     // line is a whole sentence). Jev is what understands that ask.
@@ -123,7 +141,7 @@ describe("no AI connected: above the composer", () => {
     // Ada is Walter's and has no AI: the plan is for her (Atlas isn't his), on the MacBook he connected.
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
+    expect(panel.textContent).toContain("A conta que os seus agentes dividem");
   });
 
   test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {

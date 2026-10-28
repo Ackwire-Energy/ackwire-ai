@@ -1,10 +1,8 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { errorCode } from "@agenteschat/client/lib/errors";
-import { isSignInCode } from "@agenteschat/client/lib/machines";
+import { beginLogin, freeDuplicate, isSignInCode } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { isEmail } from "@agenteschat/client/lib/text";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -14,16 +12,16 @@ import { openPopup, sendPopup } from "@/lib/popup";
 
 /*
  * "Adicionar conta" (ADR 0041 §2, ADR 0059): the computer starts the
- * provider's own sign-in and its link opens here, in a window of its own.
- * Claude: the account to sign in to (optional) goes with the click; the code
- * Claude shows comes back by "Colar" (sent by itself only when it is this
- * sign-in's) or by hand, sealed here to the computer's key. ChatGPT: device
- * code sign-in allowed in its settings first, then the device page and the
- * one-time code to type there. A coding plan: its own key page, then the key,
- * sealed the same way; it never reaches our server. Every start is a click,
- * never the block showing. The page asks every 2 s; Voltar or closing stops
- * the sign-in on the computer. One key can go to several logins at once
- * (`fanOut`): each is begun, sealed to and watched on its own.
+ * provider's own sign-in and its link opens here, in a window of its own: the
+ * account chosen there is the one connected. Claude: the code Claude shows
+ * comes back by "Colar" (sent by itself only when it is this sign-in's) or by
+ * hand, sealed here to the computer's key. ChatGPT: device code sign-in
+ * allowed in its settings first, then the device page and the one-time code
+ * to type there. A coding plan: its own key page, then the key, sealed the
+ * same way; it never reaches our server. Every start is a click, never the
+ * block showing. The page asks every 2 s; Voltar or closing stops the sign-in
+ * on the computer. One key can go to several logins at once (`fanOut`): each
+ * is begun, sealed to and watched on its own.
  */
 
 /** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
@@ -37,10 +35,11 @@ export interface AddAccountProps {
   provider?: PlanId;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
-  /** The account to sign in to (Claude), when it is already known. */
+  /**
+   * Claude's login hint, never asked: the email of the account signing in again, or of the one a turn shares. A sign-in
+   * that comes back as another account says so instead of thinking with it.
+   */
   email?: string | null;
-  /** Claude: ask which account (the person already has one on that computer). Signing in again always asks. */
-  askEmail?: boolean;
   /** The computer is one the person connected: its own browser may open the page itself. */
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
@@ -60,6 +59,11 @@ export interface AddAccountProps {
   onBack?: () => void;
   /** `target`: the `fanOut` target it signed in for. */
   onAdded: (account: MachineAccount, target?: string) => void;
+  /**
+   * Where an agent is in view: the sign-in came back as an account the person already connected there, signed in and
+   * thinking for no agent, and it thinks for that agent instead ("Use x").
+   */
+  onUse?: (account: MachineAccount) => void;
   /** The code or the key went to the computer. */
   onSent?: () => void;
   /** A `fanOut` target's login ended without signing in (failed or expired). */
@@ -87,8 +91,9 @@ export function AddAccount(props: AddAccountProps) {
 }
 
 /**
- * A step: its number on the title's line, the text under it, its button at the side. Unnumbered where each step shows
- * only once the one before it is done (Claude's sign-in, then its code): a lone 1 counts nothing.
+ * A step: its number on the title's line, the text under it, its button (or the wait) under its words, on the text's
+ * column. Unnumbered where each step shows only once the one before it is done (Claude's sign-in, then its code): a
+ * lone 1 counts nothing.
  */
 export function Step({ n, children, side }: { n?: number; children: ReactNode; side?: ReactNode }) {
   return (
@@ -165,8 +170,7 @@ function AddAccountFlow({
   computer,
   provider,
   again,
-  email: knownEmail,
-  askEmail,
+  email: hint,
   local,
   ready = true,
   loading = false,
@@ -175,6 +179,7 @@ function AddAccountFlow({
   fanOut,
   onBack,
   onAdded,
+  onUse,
   onSent,
   onFailed,
   onRetry,
@@ -184,20 +189,18 @@ function AddAccountFlow({
   const api = useApi();
   const qc = useQueryClient();
   const codeId = useId();
-  const emailId = useId();
   const plan = planOf(provider);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
-  const [startFailed, setStartFailed] = useState<"" | "start" | "email">("");
+  const [startFailed, setStartFailed] = useState(false);
   const [opened, setOpened] = useState(false);
-  const [email, setEmail] = useState(knownEmail ?? "");
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
   const [pasteFailed, setPasteFailed] = useState(false);
   const [copied, setCopied] = useState(false);
-  // Signed in, but not as the account the person named (or the first of "All agents"): theirs to use or not.
+  // Signed in, but not as the account it was for (the hint): theirs to use or not.
   const [other, setOther] = useState<MachineAccount | null>(null);
   // The logins a key went to (`fanOut`), and the first of them that didn't end signed in.
   const [fan, setFan] = useState<{ id: string; loginId: string }[]>([]);
@@ -221,13 +224,12 @@ function AddAccountFlow({
 
   const begin = async (popup?: Window | null): Promise<AccountLoginStart | null> => {
     setStarting(true);
-    setStartFailed("");
+    setStartFailed(false);
     try {
-      const typed = email.trim();
-      const l = await api.machines.beginAccountLogin(org.id, machineId, kind, {
-        ...(again ? { accountId: again } : {}),
-        ...(kind === "claude_code" && !plan && typed ? { email: typed } : {}),
-        ...(plan ? { provider } : {}),
+      const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
+        again,
+        provider,
+        hint,
       });
       if (gone.current) {
         void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);
@@ -237,9 +239,9 @@ function AddAccountFlow({
       setLogin(l);
       if (popup) sendPopup(popup, l.url);
       return l;
-    } catch (error) {
+    } catch {
       popup?.close();
-      if (!gone.current) setStartFailed(errorCode(error) === "account.invalid_email" ? "email" : "start");
+      if (!gone.current) setStartFailed(true);
       return null;
     } finally {
       if (!gone.current) setStarting(false);
@@ -258,8 +260,6 @@ function AddAccountFlow({
     };
   }, []);
 
-  // The account the person named, or the first of "All agents" (signing in again keeps its own).
-  const wanted = again ? "" : email.trim();
   useEffect(() => {
     if (!result || result.state === "waiting" || !login) return;
     // Ended on the computer: nothing left to stop.
@@ -267,10 +267,10 @@ function AddAccountFlow({
     if (result.state === "done" && result.account && !reported.current) {
       reported.current = true;
       const got = result.account.email;
-      if (wanted && got && got.toLowerCase() !== wanted.toLowerCase()) setOther(result.account);
+      if (hint && got && got.toLowerCase() !== hint.toLowerCase()) setOther(result.account);
       else onAdded(result.account);
     }
-  }, [result, login, wanted, onAdded]);
+  }, [result, login, hint, onAdded]);
 
   /** One login a key went to (`fanOut`) ended on the computer. */
   const fanEnd = (loginId: string, end: AccountLoginStatus) => {
@@ -286,7 +286,7 @@ function AddAccountFlow({
   };
 
   const shown = fanFailed ?? result;
-  const ended = startFailed === "start" || status.isError || shown?.state === "failed" || shown?.state === "expired";
+  const ended = startFailed || status.isError || shown?.state === "failed" || shown?.state === "expired";
 
   /** The code or the plan's key, sealed here to the computer's key for a sign-in. */
   const seal = async (l: AccountLoginStart | null, text: string) => {
@@ -407,20 +407,47 @@ function AddAccountFlow({
     </>
   );
 
-  const why =
-    startFailed === "start"
+  // Not the account it was for: one that came back done (`other`), or signing in again, which the server refuses.
+  const otherEmail = other?.email ?? (hint ? shown?.signedInAs : undefined);
+  const why = otherEmail
+    ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
+    : startFailed
       ? t("agentPage.work.brain.add.startFailed", { computer })
       : shown?.state === "expired"
         ? t("agentPage.work.brain.add.expired")
         : shown?.duplicate
           ? plan
             ? t("aiAccounts.add.duplicateKey", { account: shown.duplicate.label })
-            : t(`agentPage.work.brain.add.duplicate.${kind}`, { account: shown.duplicate.label })
+            : t(`agentPage.work.brain.add.duplicate.${kind}`, {
+                account: shown.duplicate.account?.email ?? shown.duplicate.label,
+              })
           : t("agentPage.work.brain.add.failed");
 
   const title = plan ? t("aiAccounts.add.titleKey", { plan: plan.label }) : t(`agentPage.work.brain.add.title.${kind}`);
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
+
+  const retry = (
+    <Button
+      size="sm"
+      icon="refresh"
+      onClick={() => {
+        // A new login that came back as another account goes; one signed in again stays the person's account.
+        if (other && !again) void api.machines.removeAccount(org.id, machineId, other.id).catch(() => undefined);
+        onRetry();
+      }}
+    >
+      {t("common.retry")}
+    </Button>
+  );
+  // What the person may think with instead: the account that came back (`other`), or, for the agent in view, one they
+  // already connected there, signed in and thinking for no agent.
+  const free = plan ? null : freeDuplicate(shown);
+  const instead = other
+    ? { account: other, use: () => onAdded(other) }
+    : free && onUse
+      ? { account: free, use: () => onUse(free) }
+      : null;
 
   // Opened on the click itself, then sent to the provider's page once the computer has it.
   const start = () => {
@@ -514,10 +541,6 @@ function AddAccountFlow({
       </>
     );
   } else {
-    const typed = email.trim();
-    const emailOk = !typed || isEmail(typed);
-    // Which account, only where it helps: signing in again, or a second account beside one already there.
-    const asks = !login && (askEmail || again !== undefined);
     steps = (
       <>
         <Step
@@ -530,7 +553,7 @@ function AddAccountFlow({
                 variant="primary"
                 icon="external"
                 loading={starting || loading}
-                disabled={!emailOk || !ready}
+                disabled={!ready}
                 onClick={start}
               >
                 {signInLabel ?? t("agentPage.work.brain.add.open.claude_code")}
@@ -540,25 +563,6 @@ function AddAccountFlow({
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.claude_code")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
-          {asks && (
-            <span className="agp-addacct__paste">
-              <Input
-                id={emailId}
-                type="email"
-                value={email}
-                autoComplete="email"
-                spellCheck={false}
-                placeholder={t("aiAccounts.add.emailPlaceholder")}
-                aria-label={t("aiAccounts.add.email")}
-                disabled={starting}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setStartFailed("");
-                }}
-              />
-            </span>
-          )}
-          {asks && (startFailed === "email" || !emailOk) && <span>{t("aiAccounts.add.emailInvalid")}</span>}
         </Step>
         {login && opened && (
           <Step side={waiting}>
@@ -597,35 +601,23 @@ function AddAccountFlow({
           </Button>
         </div>
       )}
-      {other ? (
-        <div className="ai-panel__row">
-          <SettingNote icon="alert" live>
-            {t(`connectAi.otherAccount.${kind}`, { email: other.email, wanted })}
-          </SettingNote>
-          <span className="ac-acts">
-            <Button
-              size="sm"
-              icon="refresh"
-              onClick={() => {
-                void api.machines.removeAccount(org.id, machineId, other.id).catch(() => undefined);
-                onRetry();
-              }}
-            >
-              {t("common.retry")}
-            </Button>
-            <Button size="sm" onClick={() => onAdded(other)}>
-              <span className="ai-panel__use">{t("connectAi.useAnyway", { email: other.email })}</span>
-            </Button>
-          </span>
-        </div>
-      ) : ended ? (
+      {other || ended ? (
         <div className="ai-panel__row">
           <SettingNote icon="alert" live>
             {why}
           </SettingNote>
-          <Button size="sm" icon="refresh" onClick={onRetry}>
-            {t("common.retry")}
-          </Button>
+          {instead ? (
+            <span className="ac-acts">
+              {retry}
+              <Button size="sm" onClick={instead.use}>
+                <span className="ai-panel__use">
+                  {t("connectAi.useAnyway", { email: instead.account.email ?? instead.account.label })}
+                </span>
+              </Button>
+            </span>
+          ) : (
+            retry
+          )}
         </div>
       ) : (
         steps

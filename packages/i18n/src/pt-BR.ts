@@ -1078,9 +1078,8 @@ export const ptBR = {
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
     own: {
-      this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela.",
-      other: "Outra conta do {{brand}}",
+      shared: "A conta que os seus agentes dividem",
+      one: "Uma conta só {{for}} {{name}}",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
     /** Under a plan's sign-in: it changes how the agent treats everyone else. */
@@ -1111,8 +1110,8 @@ export const ptBR = {
     signInFor: "Fazer login {{for}} {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
     otherAccount: {
-      claude_code: "O Claude entrou como {{email}}. Para usar {{wanted}}, saia na página do Claude e tente de novo.",
-      codex: "O ChatGPT entrou como {{email}}. Para usar {{wanted}}, saia na página do ChatGPT e tente de novo.",
+      claude_code: "O Claude entrou como {{email}}, não como {{account}}. Saia na página do Claude e tente de novo.",
+      codex: "O ChatGPT entrou como {{email}}, não como {{account}}. Saia na página do ChatGPT e tente de novo.",
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1848,7 +1847,6 @@ export const ptBR = {
         brain: "{{The}} {{name}} agora pensa com {{brain}}.",
         brainMoved: "{{The}} {{name}} agora pensa com {{brain}} no {{computer}}.",
         account: "{{The}} {{name}} agora usa a conta {{account}}.",
-        accountHere: "{{The}} {{name}} agora usa a conta do próprio {{computer}}.",
         computer: "{{The}} {{name}} agora trabalha no {{computer}}.",
         daytona: "{{The}} {{name}} agora trabalha numa sandbox da Daytona.",
         none: "{{The}} {{name}} agora está sem computador.",
@@ -1877,7 +1875,6 @@ export const ptBR = {
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
-        thisComputerText: "A que já está no {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
         accountAlso: "Também usada por {{agents}}",
         accountOf: "De {{name}}",
@@ -1926,9 +1923,9 @@ export const ptBR = {
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
             claude_code:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do Claude e entre com a outra.",
+              "O Claude entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
             codex:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do ChatGPT e entre com a outra.",
+              "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -4575,9 +4572,6 @@ export const ptBR = {
     add: {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
-      email: "Qual conta? (opcional)",
-      emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
       openKeys: "Abrir {{site}}",
@@ -7631,6 +7625,7 @@ export const ptBR = {
       sentence: "Em {{month}}, {{article}} {{name}} usou {{tokens}} tokens: {{parts}}.",
       accountPart: "{{percent}} na conta {{account}}",
       computerPart: "{{percent}} na conta deste {{computer}}",
+      sharedPart: "{{percent}} na conta que os seus agentes dividem",
       removedPart: "{{percent}} numa conta removida",
       oldPart: "{{percent}} no {{brand}}, de antes das contas",
       apiPart: "{{percent}} pela API",

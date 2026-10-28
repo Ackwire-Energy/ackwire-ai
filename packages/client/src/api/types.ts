@@ -3614,8 +3614,10 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
-  /** `failed`: the viewer already has this account on that computer (named `label`). */
-  duplicate?: { label: string };
+  /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
+  duplicate?: { label: string; account?: MachineAccount };
+  /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
+  signedInAs?: string;
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

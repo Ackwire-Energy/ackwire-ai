@@ -1063,9 +1063,8 @@ export const en: Translations = {
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
     own: {
-      this: "The {{brand}} account signed in on {{computer}}",
-      thisText: "Every agent thinks with it.",
-      other: "Another {{brand}} account",
+      shared: "The account your agents share",
+      one: "An account just for {{name}}",
       note: "They only reply to you while they think with your plan.",
     },
     onlyYou: "{{name}} will only reply to you.",
@@ -1093,8 +1092,8 @@ export const en: Translations = {
     signInFor: "Sign in for {{name}}",
     doneAll: "{{names}} now think with {{label}}.",
     otherAccount: {
-      claude_code: "Claude signed in as {{email}}. To use {{wanted}}, sign out on Claude's page and try again.",
-      codex: "ChatGPT signed in as {{email}}. To use {{wanted}}, sign out on ChatGPT's page and try again.",
+      claude_code: "Claude signed in as {{email}}, not {{account}}. Sign out on Claude's page and try again.",
+      codex: "ChatGPT signed in as {{email}}, not {{account}}. Sign out on ChatGPT's page and try again.",
     },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
@@ -1828,7 +1827,6 @@ export const en: Translations = {
         brain: "{{name}} now thinks with {{brain}}.",
         brainMoved: "{{name}} now thinks with {{brain}} on {{computer}}.",
         account: "{{name}} now uses the {{account}} account.",
-        accountHere: "{{name}} now uses {{computer}}'s own account.",
         computer: "{{name}} now works on {{computer}}.",
         daytona: "{{name}} now works on a Daytona sandbox.",
         none: "{{name}} now has no computer.",
@@ -1857,7 +1855,6 @@ export const en: Translations = {
         accountLocked: "Only {{name}} changes it",
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
-        thisComputerText: "The one already on {{computer}}",
         accountMove: "In use by {{agents}} · Move it here",
         accountAlso: "Also used by {{agents}}",
         accountOf: "{{name}}'s",
@@ -1903,9 +1900,9 @@ export const en: Translations = {
           expired: "The time to sign in ran out. Try again.",
           duplicate: {
             claude_code:
-              "That account is already here, as {{account}}. To add another, sign out on Claude's page and sign in with the other one.",
+              "Claude signed in as {{account}}, an account you already connected. To use another, sign out on Claude's page and try again.",
             codex:
-              "That account is already here, as {{account}}. To add another, sign out on ChatGPT's page and sign in with the other one.",
+              "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
           },
           startFailed: "{{computer}} didn't answer. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
@@ -4542,9 +4539,6 @@ export const en: Translations = {
     add: {
       paste: "Paste",
       pasteFailed: "The browser didn't let us paste. Use Ctrl+V (⌘V on a Mac).",
-      email: "Which account? (optional)",
-      emailInvalid: "Use a plain email, like ana@example.com.",
-      emailPlaceholder: "Claude account email (optional)",
       titleKey: "Connect {{plan}}",
       keyStep: "Create your plan's key",
       openKeys: "Open {{site}}",
@@ -7586,6 +7580,7 @@ export const en: Translations = {
       sentence: "In {{month}}, {{name}} used {{tokens}} tokens: {{parts}}.",
       accountPart: "{{percent}} on the {{account}} account",
       computerPart: "{{percent}} on {{computer}}'s own account",
+      sharedPart: "{{percent}} on the account your agents share",
       removedPart: "{{percent}} on a removed account",
       oldPart: "{{percent}} on {{brand}}, from before accounts",
       apiPart: "{{percent}} through the API",

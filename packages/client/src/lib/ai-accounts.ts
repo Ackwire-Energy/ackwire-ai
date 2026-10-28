@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { AiAccounts, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
@@ -76,3 +77,10 @@ export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefine
 /** The plan's name as people know it ("Max", "Pro"): the CLI's word with a capital, or nothing. */
 export const planWordOf = (plan: string | null) =>
   plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
+
+/**
+ * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on
+ * someone else's, that computer's ("MacBook's account").
+ */
+export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
+  mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });
