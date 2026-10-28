@@ -237,8 +237,9 @@ export const ptBR = {
       workspace: "Workspace",
       context: "Contexto",
       import: "Trazer seus agentes",
-      agents: "Agentes e IA",
+      agents: "Agentes",
       computer: "Computador",
+      ai: "IA",
       team: "Time",
       done: "Pronto",
     },
@@ -548,6 +549,7 @@ export const ptBR = {
     keyStep: {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem chave de API.",
+      paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
       leadNoComputer:
         "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
@@ -599,9 +601,20 @@ export const ptBR = {
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, sempre ligado.",
       leadCloudPaused: "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
+      /** A new workspace waiting for its first plan: the team made, the computer the one thing left. */
       payment: {
-        title: "O computador do workspace vem com o plano do agentes.chat",
-        body: "Escolha um plano do agentes.chat e o computador fica pronto em minutos, sempre ligado. Dá para seguir e voltar a isso depois.",
+        title: "{{names}} e eu já chegamos. Só falta o nosso computador para a gente começar.",
+        titleAlone: "Eu já cheguei. Só falta o nosso computador para a gente começar.",
+        lead: "É onde a gente trabalha, cada um com a sua pasta.",
+        workspace: "Workspace criado",
+        context: "Contexto salvo",
+        contextNote: "Todos os agentes leem",
+        agents_one: "{{names}} já está no time",
+        agents_other: "{{names}} criados",
+        offer: "Sempre ligado, pronto em minutos",
+        offerNote: "Vem em todos os planos · cancele quando quiser",
+        get: "Garantir o computador deles",
+        later: "Agora não",
       },
     },
     team: {

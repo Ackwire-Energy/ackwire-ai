@@ -4,15 +4,17 @@ import { isEmail } from "./text";
 /**
  * The onboarding's steps, in order.
  * "import" reads another product's export (apps/web/src/lib/import); its
- * agents arrive chosen in "agents". "computer" comes before "agents": with a
- * computer connected, the model step can also pick its Claude Code.
+ * agents arrive chosen in "agents", which only picks and creates the team.
+ * "computer" comes before "ai": a computer the agents can use helps that step,
+ * whose plan sign-in runs on it.
  */
 export const ONBOARDING_STEPS = [
   { id: "workspace", optional: false },
   { id: "context", optional: false },
   { id: "import", optional: true },
-  { id: "computer", optional: true },
   { id: "agents", optional: false },
+  { id: "computer", optional: true },
+  { id: "ai", optional: false },
   { id: "team", optional: true },
   { id: "done", optional: false },
 ] as const;

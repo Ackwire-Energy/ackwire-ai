@@ -590,6 +590,26 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   );
 }
 
+/** The top of the onboarding's computer offer: the agents' blue sky, densest at the top, fading into the banner. */
+export function OnboardingOfferSky() {
+  return (
+    <span className="onb__offer-sky" aria-hidden="true">
+      <PixelSky
+        options={{
+          pixel: 4,
+          surface: "--agent-soft",
+          palette: (bg) => softTones("sky", bg),
+          light: 0,
+          base: (u, v, tt) => {
+            const fade = Math.max(0, 1 - v);
+            return fade * fade * (0.86 + 0.06 * S(u * 6 + tt * 0.4));
+          },
+        }}
+      />
+    </span>
+  );
+}
+
 /**
  * The onboarding's progress at the top of the rail: a strip of pixel
  * sky that fills as steps get done, with a pixel agent walking at its front. `progress` is 0..1.

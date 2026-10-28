@@ -9,6 +9,7 @@ import {
   SETUP_STEPS,
   type SetupView,
   setupEta,
+  setupLines,
   setupNoticeKey,
   setupPending,
   setupPortrait,
@@ -17,6 +18,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
   Card,
@@ -30,10 +32,11 @@ import {
   Steps,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
@@ -88,17 +91,59 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   paused: "pause",
 };
 
-/** While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. */
+/** How long each of the team's lines stays while it's prepared. */
+const LINE_MS = 3500;
+
+/**
+ * While it's prepared, the team's lines about what it's doing (`setupLines`), one at a time, crossfading every 3.5 s;
+ * with reduced motion the first stays until the step changes. Only for sighted readers: the step under it is what's
+ * announced. With no line for this team, the plain chip.
+ */
+function SetupSays({ view }: { view: SetupView }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const lines = setupLines(view, useAgents(org.id).data ?? []);
+  const still = usePrefersReducedMotion();
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (still || lines.length < 2) return;
+    const timer = setInterval(() => setShown((n) => n + 1), LINE_MS);
+    return () => clearInterval(timer);
+  }, [still, lines.length]);
+  if (lines.length === 0) return <Chip icon={PHASE_ICON[view.phase]}>{t(view.chipKey)}</Chip>;
+  return (
+    <span className="setup-says" aria-hidden="true">
+      {lines.map(({ key, agent }, i) => (
+        <Chip
+          key={key}
+          className="setup-say"
+          data-on={i === shown % lines.length || undefined}
+          lead={<AgentAvatar agentId={agent.id} name={agent.name} size="xs" framed />}
+        >
+          {t(key, { ...agentGrammar(t, agent.name), gb: view.specs?.memoryGb })}
+        </Chip>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * While it's on its way: the team's line, then the four steps as bars ("Passo 2 de 4 · Iniciando"); or why it waits,
+ * in one line.
+ */
 export function SetupProgress({ view }: { view: SetupView }) {
   const { t } = useTranslation();
   if (view.step) {
     return (
-      <div className="setup-progress" role="status">
-        <Steps
-          current={view.stepNumber}
-          total={SETUP_STEPS.length}
-          label={t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
-        />
+      <div className="setup-progress setup-progress--steps">
+        <SetupSays key={view.textKey} view={view} />
+        <div role="status">
+          <Steps
+            current={view.stepNumber}
+            total={SETUP_STEPS.length}
+            label={t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
+          />
+        </div>
       </div>
     );
   }
@@ -225,9 +270,12 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
               )}
             </h2>
           </ComputerTitle>
-          <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            <SetupChip view={view} machine={machine} />
-          </span>
+          {/* Being prepared within a step, the chip is the progress's own, over its steps. */}
+          {!view.step && (
+            <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <SetupChip view={view} machine={machine} />
+            </span>
+          )}
         </span>
       </div>
       {view.phase !== "ready" && <SetupProgress view={view} />}

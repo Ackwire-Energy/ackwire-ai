@@ -528,10 +528,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
       },
     });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    // The computer's wait in one well: how far, the time left, and the owner's email line (no address, no clock).
+    // The computer's wait in one well: the team's line, how far, the time left, and the owner's email line (no
+    // address, no clock).
     const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
     expect(shownText(well)).toBe(
-      "Passo 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
+      "A Ada está arrumando as ferramentasPasso 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
     );
     expect(panel.textContent).not.toContain("walter@");
     // Each step says its own timing: the sign-in's, under it.

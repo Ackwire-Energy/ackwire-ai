@@ -1,8 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
-import { OnboardingPage } from "@/pages/OnboardingPage";
+import { OnboardingPage, resumeOnboarding } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
+  // `?resume=<orgId>`: back from paying for that workspace's plan (`/org/$orgId/onboarding`, ADR 0077).
+  validateSearch: (search: Record<string, unknown>): { resume?: string } =>
+    typeof search.resume === "string" ? { resume: search.resume } : {},
   beforeLoad: ({ context, location }) => requireUser(context, location.href),
-  component: OnboardingPage,
+  loaderDeps: ({ search }) => ({ resume: search.resume }),
+  // A workspace that can't be read back is opened as it is, never set up again from its first step.
+  loader: ({ context, deps: { resume } }) =>
+    resume
+      ? resumeOnboarding(context.api, resume).catch(() => {
+          throw redirect({ to: "/org/$orgId", params: { orgId: resume } });
+        })
+      : null,
+  component: function Onboarding() {
+    return <OnboardingPage resumed={Route.useLoaderData()} />;
+  },
 });

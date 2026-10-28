@@ -117,8 +117,9 @@ describe("text", () => {
       "workspace",
       "context",
       "import",
-      "computer",
       "agents",
+      "computer",
+      "ai",
       "team",
       "done",
     ]);

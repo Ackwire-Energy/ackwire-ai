@@ -6357,6 +6357,44 @@ a.machine-row__name:hover {
 .setup-progress {
   margin: 0;
 }
+.setup-progress--steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-progress--steps > .ac-chip {
+  align-self: flex-start;
+}
+/* A plate, so it shows on a sunken well too (the AI step's wait). */
+.setup-progress--steps .ac-chip {
+  background: var(--plate);
+}
+/* The team's lines share one cell, so the next one fades in where the last fades out. */
+.setup-says {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+}
+.setup-say {
+  grid-area: 1 / 1;
+  max-width: 100%;
+  padding-left: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.6s var(--out),
+    visibility 0s linear 0.6s;
+}
+.setup-say[data-on] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.15s, 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup-say {
+    transition: none;
+  }
+}
 .setup-progress--line {
   font-size: 13px;
   color: var(--ink-muted);

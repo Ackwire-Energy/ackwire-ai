@@ -230,8 +230,9 @@ export const en: Translations = {
       workspace: "Workspace",
       context: "Context",
       import: "Bring your agents",
-      agents: "Agents and AI",
+      agents: "Agents",
       computer: "Computer",
+      ai: "AI",
       team: "Team",
       done: "Done",
     },
@@ -540,6 +541,7 @@ export const en: Translations = {
     keyStep: {
       title: "Which AI will they use?",
       lead: "Sign in with your AI plan: no API key needed.",
+      paid: "Your agentes.chat plan is active. Their computer is on its way.",
       leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
     },
     jev: {
@@ -589,9 +591,20 @@ export const en: Translations = {
       hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
       leadCloud: "On a computer just for this workspace, always on.",
       leadCloudPaused: "On a computer just for this workspace, prepared once the workspace is working again.",
+      /** A new workspace waiting for its first plan: the team made, the computer the one thing left. */
       payment: {
-        title: "The workspace's computer comes with its agentes.chat plan",
-        body: "Choose an agentes.chat plan and the computer is ready in minutes, always on. You can go on and come back to this later.",
+        title: "{{names}} and I are here. Our computer is all we need to start.",
+        titleAlone: "I'm here. Our computer is all we need to start.",
+        lead: "It's where we work, each with our own folder.",
+        workspace: "Workspace created",
+        context: "Context saved",
+        contextNote: "Every agent reads it",
+        agents_one: "{{names}} created",
+        agents_other: "{{names}} created",
+        offer: "Always on, ready in minutes",
+        offerNote: "Comes with every plan · cancel anytime",
+        get: "Get their computer",
+        later: "Not now",
       },
     },
     team: {

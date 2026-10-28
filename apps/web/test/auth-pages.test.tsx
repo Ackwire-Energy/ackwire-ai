@@ -634,7 +634,7 @@ describe("Onboarding", () => {
   /** Workspace → Contexto, up to the import step. */
   const throughContext = async (state: ReturnType<typeof seedState>) => {
     // How many are left, said once.
-    expect(progress()).toBe("Faltam 6 etapas");
+    expect(progress()).toBe("Faltam 7 etapas");
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     // The host introduces itself the first time it asks.
     expect(document.body.textContent).toContain("Oi, eu sou a Ada. Vou montar tudo com você.");
@@ -659,15 +659,24 @@ describe("Onboarding", () => {
       context: "A Acme Saúde faz um app para clínicas.",
     });
     expect(screen().getByRole("heading", { name: "Já usa agentes em outro app?" })).toBeTruthy();
-    expect(screen().getByText("Faltam 4 etapas")).toBeTruthy();
+    expect(screen().getByText("Faltam 5 etapas")).toBeTruthy();
     // Continue waits for a read file or link; not using another app is "Pular esta etapa".
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
   };
 
-  /** Workspace → Contexto → (import skipped) → Computador, before the agents. */
+  /** Workspace → Contexto → (import skipped) → Agentes. */
   const throughImport = async (state: ReturnType<typeof seedState>) => {
     await throughContext(state);
     await skip();
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    expect(screen().getByText("Faltam 4 etapas")).toBeTruthy();
+  };
+
+  /** … → Agentes (Theo joins Ada, both made as the team is kept) → Computador, after the agents. */
+  const toComputer = async (state: ReturnType<typeof seedState>) => {
+    await throughImport(state);
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(screen().getByText("Faltam 3 etapas")).toBeTruthy();
   };
@@ -676,12 +685,9 @@ describe("Onboarding", () => {
   const picker = () => screen().getByRole("group", { name: "Qual IA eles vão usar?" });
   const option = (name: RegExp) => within(picker()).getByRole("button", { name });
 
-  /** … → (no computer) → Agentes (Ada and Theo, made as the team is kept), then the API key, saved. */
+  /** … → Agentes (Ada and Theo, made as the team is kept) → (no computer) → the API key, saved. */
   const throughAgents = async (state: ReturnType<typeof seedState>) => {
     await throughImport(state);
-    await skip();
-
-    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     // Ada is already on the team (her lead says so): no card to leave her out. The others start picked.
     expect(document.querySelector(".onb__lead")?.textContent).toBe("Eu já estou no time: desmarque quem não quiser.");
     expect(screen().queryByRole("button", { name: /Ada · Dev/ })).toBeNull();
@@ -691,10 +697,12 @@ describe("Onboarding", () => {
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
     expect(button(/Atlas · Ops/).getAttribute("aria-pressed")).toBe("false");
     expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
-    // The team is made as it's kept, before any AI: leaving the next screen leaves a whole team.
+    // The team is made as it's kept, before the computer and any AI: leaving the next steps leaves a whole team.
     await click(button(/Criar 1 agente/), 8);
     expect(calls(state, "agents.create")).toHaveLength(2);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    await skip();
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     // No computer here: the API key first, and the plans (all six, dimmed) wait for one.
     expect(document.body.textContent).toContain(
@@ -747,12 +755,12 @@ describe("Onboarding", () => {
     ).toBe(true);
   };
 
-  /** … → (no computer) → these join Ada, with no AI yet ("Conectar depois") → Time skipped: Done. */
+  /** … → these join Ada → (no computer), with no AI yet ("Conectar depois") → Time skipped: Done. */
   const toDone = async (state: ReturnType<typeof seedState>, ...keep: string[]) => {
     await throughImport(state);
-    await skip();
     await keepOnly(...keep);
     await click(button(keep.length ? /^Criar \d+ agentes?$/ : "Continuar"), 8);
+    await skip();
     await click(button("Conectar depois"), 8);
     await skip();
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
@@ -956,10 +964,8 @@ describe("Onboarding", () => {
 
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await skip();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     // Nothing under "Conectar depois": Done says what it means for the first message.
     expect(button("Conectar depois").nextElementSibling).toBeNull();
@@ -999,8 +1005,8 @@ describe("Onboarding", () => {
       );
       // The big button saves: no button of the field's own.
       expect(screen().queryByRole("button", { name: "Salvar chave" })).toBeNull();
-      // Its place on the rail is the AI's: Agentes e IA, still.
-      expect(railStep(/^Agentes e IA/).getAttribute("aria-current")).toBe("step");
+      // Its place on the rail is the AI's, still.
+      expect(railStep(/^IA/).getAttribute("aria-current")).toBe("step");
       expect(button("Continuar").hasAttribute("disabled")).toBe(false);
       await next();
       expect(calls(state, "system.saveJev")).toHaveLength(0);
@@ -1076,10 +1082,8 @@ describe("Onboarding", () => {
       cleanup();
 
       const later = await start({ jev: OFF });
-      await throughImport(later.state);
+      await toComputer(later.state);
       await skip();
-      await keepOnly("Theo · PM");
-      await click(button(/Criar 1 agente/), 8);
       await click(button("Conectar depois"), 8);
       expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
       cleanup();
@@ -1096,10 +1100,8 @@ describe("Onboarding", () => {
 
   test("no computer yet: a plan's panel says where it signs in, and goes back to the computer step", async () => {
     const { state } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await skip();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     await click(option(/^Claude$/), 6);
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
@@ -1111,7 +1113,7 @@ describe("Onboarding", () => {
   test("this server's own computer comes first and already picked; the agents go to it", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
-    await throughImport(state);
+    await toComputer(state);
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
     expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
@@ -1121,12 +1123,9 @@ describe("Onboarding", () => {
     );
     expect(document.body.textContent).toContain("Os agentes escolhidos vão trabalhar no computador deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+    expect(calls(state, "sandbox.setTarget")).toHaveLength(0);
     await next();
-
-    expect(screen().queryByRole("heading", { name: "Quem pensa" })).toBeNull();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
-    // They go to it as they're made.
+    // The team, made a step before, goes to it as the step is left.
     expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
     // A computer that takes plans: every plan, then the key, with Claude chosen and its sign-in open, for Ada first.
     for (const name of [
@@ -1179,10 +1178,8 @@ describe("Onboarding", () => {
         keyHint: null,
       },
     });
-    await throughImport(state);
+    await toComputer(state);
     await next();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
@@ -1225,10 +1222,8 @@ describe("Onboarding", () => {
 
   test("a computer connected after the team is made: the agents move to it, and its plans sign in for them", async () => {
     const { state, api, services } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await skip();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     await click(option(/^Claude$/), 6);
     await click(button("Conectar um computador"), 6);
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
@@ -1237,13 +1232,9 @@ describe("Onboarding", () => {
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
     expect(button(/Computador deste servidor/).getAttribute("aria-pressed")).toBe("true");
+    // The team, on no computer since the step was skipped, goes to it now.
     await next();
     expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
-    // The team kept: the ones made stay picked, and there's nothing left to make.
-    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
-    await click(button(/Theo · PM/), 1);
-    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
-    await next();
     expect(calls(state, "agents.create")).toHaveLength(2);
     expect(option(/^Claude$/).querySelector(".ac-brand--off")).toBeNull();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
@@ -1253,18 +1244,14 @@ describe("Onboarding", () => {
   test("the team made on a computer, then the Computer step skipped: the agents leave it, as the AI step says", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
-    await throughImport(state);
+    await toComputer(state);
     await next();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
     // Back to the Computer step, and on without one this time.
-    await click(button("Voltar"), 4);
     await click(button("Voltar"), 4);
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     await skip();
     expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id, null, null]);
-    await next();
     // No computer for them now: the key first, the plans dimmed, and Claude's panel asks for one.
     expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
     await click(option(/^Claude$/), 6);
@@ -1275,14 +1262,12 @@ describe("Onboarding", () => {
 
   test("a computer's own sign-in that some agents can't switch to: the toast names the plan and the computer", async () => {
     const { state, api, services } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await click(button(/Outro computador/), 8);
     fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
     await next();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     api.agents.setBrain = async () => {
       throw new Error("offline");
     };
@@ -1295,10 +1280,8 @@ describe("Onboarding", () => {
 
   test("where the server offers its own key: a seventh maker, by our mark, and nothing to paste", async () => {
     const { state } = await start({ platformKey: true });
-    await throughImport(state);
+    await toComputer(state);
     await skip();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
     const panel = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(panel).getByRole("group", { name: "Provedor" });
     const ours = within(makers).getByRole("button", { name: "agentes.chat" });
@@ -1332,7 +1315,6 @@ describe("Onboarding", () => {
     await act(async () => fireEvent.change(input));
     await settle(10);
     await next();
-    await skip();
     await keepOnly();
     await keyAndCreate(/Criar 2 agentes/);
     // Made on Automático with the team (no key yet), then the one whose model the Claude key runs gets it back.
@@ -1346,7 +1328,7 @@ describe("Onboarding", () => {
   test("this server's computer not connected yet: offered, but not picked for you", async () => {
     const { state, api } = await start();
     fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host", online: false });
-    await throughImport(state);
+    await toComputer(state);
     expect(button(/Computador deste servidor/).getAttribute("aria-pressed")).toBe("false");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await click(button(/Computador deste servidor/), 4);
@@ -1354,9 +1336,9 @@ describe("Onboarding", () => {
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
-  test("computer before the agents: it connects live, its Claude Code thinks for them (no key); team invites go out", async () => {
+  test("the computer after the agents: it connects live, its Claude Code thinks for them (no key); team invites go out", async () => {
     const { state, api, services, router } = await start();
-    await throughImport(state);
+    await toComputer(state);
 
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await click(button(/Outro computador/), 8);
@@ -1377,12 +1359,7 @@ describe("Onboarding", () => {
     // Choosing a plan asks nothing: only letting others talk to an agent on it does (ADR 0059 §5).
     expect(screen().queryByRole("dialog")).toBeNull();
     await next();
-
-    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-    expect(screen().queryByRole("heading", { name: "Quem pensa" })).toBeNull();
-    await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 8);
-    // Both agents use the connected computer.
+    // Both agents, made a step before, use the connected computer.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
     // The AI step: the account signed in on that computer, chosen, thinks for every agent; nothing to sign in.
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
@@ -1451,7 +1428,7 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__crew-computer")).toBeNull();
     // The rail marks the steps done and lets you go back.
     const steps = screen().getByRole("navigation", { name: "Passos para começar" });
-    expect(steps.querySelectorAll("li[data-done]")).toHaveLength(6);
+    expect(steps.querySelectorAll("li[data-done]")).toHaveLength(7);
     expect(progress()).toBe("Tudo certo");
 
     // Back to Team: it's open again, so one step is left until it's answered again, and it was no less
@@ -1495,9 +1472,9 @@ describe("Onboarding", () => {
     const first = await start();
     fakeMachinesOf.get(first.api)?.pair({ name: "srv-1", kind: "host" });
     await throughImport(first.state);
-    await next();
     await keepOnly("Theo · PM", "Lia · Pesquisa");
     await click(button(/^Criar 2 agentes$/), 8);
+    await next();
     await click(button("Conectar depois"), 8);
     await skip();
     expect(asker()).toBe("Lia");
@@ -1660,9 +1637,9 @@ describe("Onboarding", () => {
     await pickVault();
     await next();
     await skip();
-    await skip();
     await keepOnly("Theo · PM");
     await click(button(/^Criar 1 agente$/), 8);
+    await skip();
     await click(button("Conectar depois"), 8);
     const emails = screen().getByLabelText("E-mails");
     await act(async () => fireEvent.change(emails, { target: { value: "marina@acme.com.br, bia@acme.com.br" } }));
@@ -1698,9 +1675,9 @@ describe("Onboarding", () => {
     await settle(4);
     expect(imports).toBe(1);
     await skip();
-    await skip();
     await keepOnly("Theo · PM");
     await click(button(/^Criar 1 agente$/), 8);
+    await skip();
     await click(button("Conectar depois"), 8);
     await skip();
     expect(welcome()).toBe("Theo e Ada já estão no #general.");
@@ -1708,10 +1685,8 @@ describe("Onboarding", () => {
 
   test("with no AI yet, the line says to send anyway, for the agent named or every agent; one connected on a way back counts", async () => {
     const { state } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await skip();
-    await keepOnly("Theo · PM");
-    await click(button(/^Criar 1 agente$/), 8);
     await click(button("Conectar depois"), 8);
     state.aiStatus = {
       any: false,
@@ -1733,14 +1708,12 @@ describe("Onboarding", () => {
 
   test("an agent whose computer is away: the line waits for it, asked about again every 5 s, until it can start", async () => {
     const { state, api, services } = await start();
-    await throughImport(state);
+    await toComputer(state);
     await click(button(/Outro computador/), 8);
     const mac = fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
     await next();
-    await keepOnly("Theo · PM");
-    await click(button(/^Criar 1 agente$/), 8);
     // Its own sign-in thinks for them.
     await next();
     // The Mac went to sleep meanwhile.
@@ -1795,7 +1768,7 @@ describe("Onboarding", () => {
       ["Outro app", "svg"],
     ]);
     await skip();
-    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
   });
 
@@ -1862,9 +1835,10 @@ describe("Onboarding", () => {
     await act(async () => fireEvent.change(input));
     await settle(8);
   };
-  /** Keeps the team (`count`: its button), then saves a Claude key for it. */
+  /** Keeps the team (`count`: its button), no computer, then saves a Claude key for it. */
   const keyAndCreate = async (count: RegExp) => {
     await click(button(count), 8);
+    await skip();
     await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
     await click(button("Salvar e continuar"), 6);
     await settle(4);
@@ -1903,7 +1877,6 @@ describe("Onboarding", () => {
     await click(bring("Quill"), 1);
     expect(bring("Quill").getAttribute("aria-checked")).toBe("false");
     await next();
-    await skip();
 
     expect(screen().getByRole("heading", { name: "Seus agentes, e mais alguém?" })).toBeTruthy();
     expect(button(/Morgan · Sales lead/).getAttribute("aria-pressed")).toBe("true");
@@ -1987,7 +1960,6 @@ describe("Onboarding", () => {
 
     // Skipped: nothing imported reaches the agents step, which offers the whole team.
     await skip();
-    await skip();
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
     await keyAndCreate(/Criar 3 agentes/);
@@ -2007,6 +1979,6 @@ describe("Onboarding", () => {
     expect(screen().getByRole("alert").textContent).toContain("Não reconhecemos esses arquivos");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await skip();
-    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
   });
 });

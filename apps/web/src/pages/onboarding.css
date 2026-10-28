@@ -353,6 +353,129 @@ html:has(.onb) {
   background: var(--plate);
   overflow-wrap: anywhere;
 }
+/* Back from paying: the plan is active, said once over the AI step's question. */
+.onb__paid {
+  align-self: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+/* The computer step waiting for the workspace's plan: the scene, what is done, and the banner with its one action. */
+.onb__offer {
+  --card-pad: 10px;
+  gap: 0;
+}
+/* The computer in the middle whatever the team's size, the agents standing on one floor on both sides. */
+.onb__scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 18px;
+  height: 216px;
+  padding: 0 16px 20px;
+  overflow: hidden;
+  border-radius: 14px 14px 14px 3px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ink) 5%, transparent), transparent 44px) var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.onb__scene-side {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.onb__scene-side:last-child {
+  justify-content: flex-start;
+}
+.onb__done-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 6px 10px 2px;
+  list-style: none;
+}
+.onb__done-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 48px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.onb__done-row:first-child {
+  border-top: 0;
+}
+.onb__done-row > .ac-icon {
+  color: var(--ok);
+}
+.onb__done-note {
+  justify-self: end;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+}
+.onb__done-faces {
+  display: flex;
+  gap: 4px;
+}
+/* The step's one action on the agents' sky, in their blue. */
+.onb__offer-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 16px;
+  margin-top: 6px;
+  padding: 46px 16px 16px;
+  border-radius: 14px 14px 14px 3px;
+  background: var(--agent-soft);
+}
+.onb__offer-sky {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 56px;
+  pointer-events: none;
+}
+.onb__offer-text {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.onb__offer-text > b {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.onb__offer-text > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.onb__offer-banner > .ac-btn {
+  flex: none;
+}
+/* "Agora não": quiet, under the card, never a second button beside the plan. */
+.onb__later {
+  align-self: flex-end;
+  margin: -4px -4px 0 0;
+  color: var(--muted);
+}
 .onb__emails {
   display: flex;
   flex-wrap: wrap;
@@ -492,6 +615,34 @@ html:has(.onb) {
   /* Four faces and the computer on one line from 360 px wide; the portrait keeps its 48 px, whole pixels. */
   .onb__crew {
     gap: 8px;
+  }
+  /* Two agents a side around the computer from 360 px wide; the checklist names everyone. */
+  .onb__scene {
+    gap: 8px;
+    height: 184px;
+    padding: 0 8px 16px;
+  }
+  .onb__scene .ac-avatar--lg {
+    width: 40px;
+    height: 40px;
+  }
+  .onb__scene-side > :nth-child(n + 3) {
+    display: none;
+  }
+  .onb__done-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .onb__done-note {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+    text-align: left;
+  }
+  .onb__offer-banner > .ac-btn {
+    flex: 1 1 100%;
+  }
+  .onb__later {
+    align-self: center;
   }
   .onb__crew .ac-avatar--lg,
   .onb__crew-computer {
