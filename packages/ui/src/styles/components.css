@@ -1704,6 +1704,23 @@ textarea.ac-input {
   gap: 2px;
   min-width: 0;
 }
+/* A radio card's chip ("Em uso", "Em breve") rides on its title's first line, at the card's end: the description
+   under them takes the card's whole width. Where the title's longest word and the chip can't share a line (a
+   decision's narrow cards), the chip drops under the title, on its edge. */
+.ac-option__text:has(> .ac-option__head) {
+  flex: 1;
+}
+.ac-option__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: var(--space-3);
+}
+/* A zero basis: the line breaks only when the longest word can't sit beside the chip, and the title takes the rest
+   of the line, so the chip ends it. */
+.ac-option__head > .ac-option__title {
+  flex: 1 1 0;
+}
 .ac-option__title {
   font-weight: 600;
 }
@@ -1711,15 +1728,18 @@ textarea.ac-input {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
+/* A flex box, so the chip alone sets its height: on a text line's baseline it would leave the row 2px taller. */
 .ac-option__aside {
-  margin-left: auto;
+  display: flex;
   flex: none;
 }
 .ac-option[data-disabled] {
   cursor: not-allowed;
 }
-.ac-option[data-disabled] .ac-option__text {
+/* The option dims, not the chip that says why ("Em breve"). */
+.ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc) {
   opacity: 0.55;
 }
 .ac-pill {
