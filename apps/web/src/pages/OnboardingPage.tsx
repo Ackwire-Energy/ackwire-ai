@@ -596,7 +596,8 @@ export function OnboardingPage() {
   // The crew shares one computer here.
   const setOf = (c: AiChoice) =>
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
-  const aimed = { agents: crewAgents, hasAi, picked: aiTarget };
+  // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
+  const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.agents] };
   // With no set, the agent whose computer the panel reads, "All agents" too.
   const gates = usePlanGates(
     created?.orgId ?? "",
@@ -616,7 +617,7 @@ export function OnboardingPage() {
     setAiPicked(next);
     // Another plan moves on to whoever still has no AI once a plan thinks for someone.
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
-      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, set: setOf(next) }));
+      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
   };
   // A computer the person connected: its own sign-in, unless they chose another account.
   const ownChosen =
