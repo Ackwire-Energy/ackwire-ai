@@ -479,7 +479,8 @@ function PlanSteps({
   else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits, then when the step under it
     // turns on, said once (the owner's email line says it for them). A hold decides when anything runs there: it
-    // speaks alone. The well's lines start on the panel's text edge, so none leads with an icon.
+    // speaks alone. Every line starts on the panel's text edge (the team's line with its pill's plate, the face inside
+    // it), so none leads with an icon.
     wait = (hold || preparing) && (
       <div className="ai-panel__wait">
         {hold ? (
