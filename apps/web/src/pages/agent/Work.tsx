@@ -137,8 +137,8 @@ function useWork() {
   return { brain, computer, browser, scopes, machines, granted, machineId, target, browserWord };
 }
 
-/** A cell of "Como trabalha": its icon, what it is, the value; a button for who may change it. */
-function Cell({
+/** A cell of "Como trabalha" (and the memory's counts): its icon, what it is, the value; a button for who may change it. */
+export function Cell({
   icon,
   label,
   value,
@@ -154,7 +154,7 @@ function Cell({
   more?: string | null;
   sub?: string | null;
   muted?: boolean;
-  openLabel: string;
+  openLabel?: string;
   onOpen?: () => void;
 }) {
   const body = (
