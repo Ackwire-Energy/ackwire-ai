@@ -465,7 +465,7 @@ function useRunWords() {
       const runs = runPixels(r.recentRuns).slice(0, RUN_SLOTS);
       if (runs.length === 0) return t("routines.stripNone");
       return t("routines.stripLabel", {
-        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join("; "),
+        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join(". "),
       });
     },
   };

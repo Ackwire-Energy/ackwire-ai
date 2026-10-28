@@ -233,13 +233,13 @@ describe("receipts: a check with a popover", () => {
     await settle(4);
     const root = lastPerson(state);
     const check = () => checkOf("e o login?");
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada vai responder");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada vai responder");
     expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
     const run = { threadId: root?.id, runId: "r-rc", agentId: ADA_ID };
     await push(socket, { type: "agent.run", ...run, status: "running" });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     await push(socket, { type: "agent.run", ...run, status: "waiting_approval" });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está esperando aprovação");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está esperando aprovação");
     expect(icon(check())).toBe("M10 6v4l2.6 1.8");
     await push(socket, {
       type: "message.handled",
@@ -248,7 +248,7 @@ describe("receipts: a check with a popover", () => {
       runId: "r-rc",
       status: "done",
     });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
     expect(icon(check())).toBe("m2.5 10.5 3 3 6-7M9 13l.5.5 6-7");
     // Keyboard-openable popover; Esc closes.
     check().focus();
@@ -270,7 +270,7 @@ describe("receipts: a check with a popover", () => {
     const receipt = () => rowsWith("alguém viu o erro?")[0]?.querySelector(".ac-receipt") as HTMLElement;
     await push(socket, { type: "message.routed", messageId: root?.id, seenBy: [ADA_ID, ATLAS_ID], pickedBy: [] });
     expect(checkOf("alguém viu o erro?").getAttribute("aria-label")).toBe(
-      "Vista por Ada e Atlas; Nenhum agente vai responder",
+      "Vista por Ada e Atlas. Nenhum agente vai responder",
     );
     expect(receipt().textContent).toContain("Nenhum agente vai responder ·");
     await act(async () => {
@@ -320,7 +320,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     });
     const receipt = receiptOf("alguém sabe?");
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada e Atlas; Nenhum agente vai responder sem @",
+      "Vista por Ada e Atlas. Nenhum agente vai responder sem @",
     );
     const hint = within(receipt).getByRole("button", { name: "Sobre Quem escolhe os agentes" });
     expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
@@ -460,11 +460,11 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     const receipt = rowsWith("oi").at(-1)?.querySelector(".ac-receipt") as HTMLElement;
     expect(receipt.textContent).toContain("Nenhum agente vai responder");
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada; Nenhum agente vai responder",
+      "Vista por Ada. Nenhum agente vai responder",
     );
     // The first message keeps its own receipt.
     const firstReceipt = rowsWith("oi @Ada")[0]?.querySelector(".ac-receipt__check");
-    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
   });
 });
 
@@ -807,7 +807,7 @@ describe("caught up once the server confirms the channel's subscription", () => 
     const { socket } = await open(state);
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
-    expect(receiptOfM1()).toBe("Vista por Ada; Ada está respondendo");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está respondendo");
     // Her card, her question and her run's wait arrive together, before the page draws the card.
     await act(async () => {
       socket.push(event({ type: "message.created", messageId: "msg-q", message: questionCard }));
@@ -818,21 +818,21 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
   });
 
   test("her question before then: its card and the wait for the answer show, and stay as the list changes", async () => {
     const state = seedState();
     askedAda(state, "running");
     const { socket } = await open(state);
-    expect(receiptOfM1()).toBe("Vista por Ada; Ada está respondendo");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está respondendo");
     // She asks while the channel's subscription opens: no event carries it.
     state.messages.push(questionCard);
     askedAda(state, "waiting_input");
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
     await push(socket, {
       type: "message.created",
       messageId: "m-atlas",
@@ -849,6 +849,6 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(rowsWith("Deploy das 9h no ar.")).toHaveLength(1);
-    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
   });
 });
