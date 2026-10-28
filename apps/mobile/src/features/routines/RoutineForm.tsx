@@ -194,7 +194,9 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const parsing =
     schedule && phraseTyped && phrase.trim().length > 0 && (phrase.trim() !== typed || parsed.isFetching);
   // A routine kept as a cron (every N minutes) says so until a phrase replaces it.
-  const cron = routine?.trigger.type === "schedule" && !routine.trigger.rule && !phraseTyped ? routine.trigger : null;
+  // A phrase read into a rule replaces it; one typed and erased doesn't (the form's rule is still a placeholder).
+  const ruleTyped = phraseTyped && phrase.trim().length > 0;
+  const cron = routine?.trigger.type === "schedule" && !routine.trigger.rule && !ruleTyped ? routine.trigger : null;
   const every = cron ? everyMinutes(cron.cron) : null;
   const sentence = cron
     ? every
@@ -270,7 +272,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const submit = () => {
     if (!ready) return;
     if (routine) {
-      const patch = draftChanges(routine, d, savedRule, savedZone);
+      const patch = draftChanges(routine, d, savedRule, ruleTyped);
       if (Object.keys(patch).length === 0) {
         close();
         return;
@@ -485,13 +487,16 @@ function Form({ routine }: { routine: Routine | undefined }) {
                   </Text>
                 ) : null}
               </View>
-              <GroupedField label={t("routines.form.timezone")} onPress={pickZone}>
-                <Text variant="callout" numberOfLines={1}>
-                  {zoneLabel(d.rule.timezone, i18n.language)}
-                </Text>
-              </GroupedField>
+              {/* A cron keeps its own zone until a phrase replaces it: nothing here could change it. */}
+              {cron ? null : (
+                <GroupedField label={t("routines.form.timezone")} onPress={pickZone}>
+                  <Text variant="callout" numberOfLines={1}>
+                    {zoneLabel(d.rule.timezone, i18n.language)}
+                  </Text>
+                </GroupedField>
+              )}
             </GroupedList>
-            {utc && !isUtc(d.rule.timezone) ? (
+            {utc && !cron && !isUtc(d.rule.timezone) ? (
               <View style={styles.utc}>
                 <Text variant="footnote" tone="faint">
                   {t("routines.form.utcHint", { zone: timezoneName(d.rule.timezone, i18n.language) })}

@@ -44,14 +44,17 @@ function RoutineList() {
   const whenText = useWhenText();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [agentId, setAgentId] = useState<string | null>(null);
+  const [picked, setAgentId] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const list = useMemo(() => routines.data ?? [], [routines.data]);
+  const agents = useMemo(() => routineAgents(list), [list]);
+  // The agent filter holds only while its row shows and has that agent: one gone (its routines deleted, or one
+  // agent left) never keeps the list filtered with no way to see why.
+  const agentId = picked && agents.length > 1 && agents.includes(picked) ? picked : null;
   const sections = useMemo(
     () => routineSections(list, { status, agentId, query: q }, whenText),
     [list, status, agentId, q, whenText],
   );
-  const agents = useMemo(() => routineAgents(list), [list]);
   const working = list.some(isAtWork);
   const { refetch } = routines;
   useEffect(() => {

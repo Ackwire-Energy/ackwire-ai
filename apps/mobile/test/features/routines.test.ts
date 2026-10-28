@@ -319,48 +319,76 @@ describe("the form", () => {
     const r = routine({ id: "r" });
     const saved = JSON.stringify(toApiRule(ruleOf(r, SP, today)));
     const d = draftOf(r, SP, today);
-    expect(draftChanges(r, d, saved, SP)).toEqual({});
-    expect(draftChanges(r, { ...d, name: "  Novo nome " }, saved, SP)).toEqual({ name: "Novo nome" });
-    expect(draftChanges(r, { ...d, target: "dm" }, saved, SP)).toEqual({ target: { type: "dm" } });
-    expect(draftChanges(r, { ...d, active: false, report: "always", access: "act" }, saved, SP)).toEqual({
+    expect(draftChanges(r, d, saved)).toEqual({});
+    expect(draftChanges(r, { ...d, name: "  Novo nome " }, saved)).toEqual({ name: "Novo nome" });
+    expect(draftChanges(r, { ...d, target: "dm" }, saved)).toEqual({ target: { type: "dm" } });
+    expect(draftChanges(r, { ...d, active: false, report: "always", access: "act" }, saved)).toEqual({
       active: false,
       report: "always",
       access: "act",
     });
     const later10 = { ...d.rule, times: ["10:00"] };
-    expect(draftChanges(r, { ...d, rule: later10 }, saved, SP)).toEqual({
+    expect(draftChanges(r, { ...d, rule: later10 }, saved)).toEqual({
       trigger: { type: "schedule", rule: toApiRule(later10) },
     });
-    expect(draftChanges(r, { ...d, kind: "event" }, saved, SP)).toEqual({
+    expect(draftChanges(r, { ...d, kind: "event" }, saved)).toEqual({
       trigger: { type: "event", event: "sentry.issue_created" },
     });
     // A prompt the viewer can't see is never sent.
     const hidden = routine({ id: "h", prompt: null });
-    expect(draftChanges(hidden, draftOf(hidden, SP, today), saved, SP)).toEqual({});
+    expect(draftChanges(hidden, draftOf(hidden, SP, today), saved)).toEqual({});
   });
 
   test("a forum topic: its agents in any order and its rounds; a chat-made routine keeps its conversation", () => {
     const r = routine({ id: "f", target: { type: "forum", agentIds: ["dev", "infra"], rounds: 3 } });
     const saved = JSON.stringify(toApiRule(ruleOf(r, SP, today)));
     const d = draftOf(r, SP, today);
-    expect(draftChanges(r, { ...d, forumAgents: ["infra", "dev"] }, saved, SP)).toEqual({});
-    expect(draftChanges(r, { ...d, forumRounds: "5" }, saved, SP)).toEqual({
+    expect(draftChanges(r, { ...d, forumAgents: ["infra", "dev"] }, saved)).toEqual({});
+    expect(draftChanges(r, { ...d, forumRounds: "5" }, saved)).toEqual({
       target: { type: "forum", agentIds: ["dev", "infra"], rounds: 5 },
     });
     const chat = routine({ id: "k", target: { type: "conversation", channelId: "c1", threadId: "t1" } });
     expect(draftOf(chat, SP, today).target).toBe("keep");
-    expect(draftChanges(chat, draftOf(chat, SP, today), saved, SP)).toEqual({});
+    expect(draftChanges(chat, draftOf(chat, SP, today), saved)).toEqual({});
   });
 
   test("a one-off and an email routine left as they were change nothing", () => {
     const one = routine({ id: "o", trigger: once("2026-11-02T12:00:00.000Z") });
     const saved = JSON.stringify(toApiRule(ruleOf(one, SP, today)));
-    expect(draftChanges(one, draftOf(one, SP, today), saved, SP)).toEqual({});
+    expect(draftChanges(one, draftOf(one, SP, today), saved)).toEqual({});
     const mail = routine({ id: "m", trigger: email });
     const d = draftOf(mail, SP, today);
-    expect(draftChanges(mail, d, saved, SP)).toEqual({});
-    expect(draftChanges(mail, { ...d, email: { ...d.email, filter: { subject: "fatura" } } }, saved, SP)).toEqual({
+    expect(draftChanges(mail, d, saved)).toEqual({});
+    expect(draftChanges(mail, { ...d, email: { ...d.email, filter: { subject: "fatura" } } }, saved)).toEqual({
       trigger: { type: "email", accountId: "m1", folder: "INBOX", filter: { subject: "fatura" } },
+    });
+  });
+
+  test("a one-off that already ran, saved as it was, sends no time: the server's instant has seconds", () => {
+    // Fired at 12:03:27 (made with "em 10 minutos"); the form shows 12:03.
+    const fired = routine({ id: "o", active: false, trigger: once("2026-10-20T12:03:27.512Z") });
+    const saved = JSON.stringify(toApiRule(ruleOf(fired, SP, today)));
+    const d = draftOf(fired, SP, today);
+    expect(draftChanges(fired, d, saved)).toEqual({});
+    expect(draftChanges(fired, { ...d, name: "Lembrete" }, saved)).toEqual({ name: "Lembrete" });
+    // Moved to another minute: sent.
+    const moved = { ...d.rule, times: ["12:30"] };
+    expect(draftChanges(fired, { ...d, rule: moved }, saved)).toEqual({ trigger: draftTrigger({ ...d, rule: moved }) });
+  });
+
+  test("a cron (every 15 minutes) changes only with a phrase read into a rule, never to the form's placeholder", () => {
+    const cron = routine({
+      id: "c",
+      trigger: { type: "schedule", rule: null, cron: "*/15 * * * *", timezone: "UTC", description: "Every 15 minutes" },
+    });
+    const saved = JSON.stringify(toApiRule(ruleOf(cron, "UTC", today)));
+    // Read in UTC, the form starts in my zone: still nothing to send.
+    const d = draftOf(cron, SP, today);
+    expect(draftChanges(cron, d, saved)).toEqual({});
+    expect(draftChanges(cron, { ...d, name: "Checagem" }, saved)).toEqual({ name: "Checagem" });
+    const typed = { ...d.rule, freq: "daily" as const, times: ["08:00"] };
+    expect(draftChanges(cron, { ...d, rule: typed }, saved, true)).toEqual({
+      trigger: { type: "schedule", rule: toApiRule(typed) },
     });
   });
 

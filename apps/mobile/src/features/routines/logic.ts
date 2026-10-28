@@ -446,12 +446,16 @@ export function draftInput(d: RoutineDraft): RoutineInput {
   };
 }
 
+/** An instant to the minute (a one-off's "when", as the form shows and compares it). */
+const minuteOf = (iso: string) => Math.floor(Date.parse(iso) / 60_000);
+
 /**
  * What changed against the routine (`PATCH` sends only this). `savedRule` is the routine's rule as the API
- * takes it, read when the form opened (`JSON.stringify(toApiRule(ruleOf(r, savedZone)))`), and `savedZone`
- * its zone then: "when" counts as changed only when it differs from those.
+ * takes it, read when the form opened (`JSON.stringify(toApiRule(ruleOf(r, savedZone)))`): "when" counts as
+ * changed only when it differs from it, a one-off's when its minute differs, and a cron's only when a phrase
+ * was read into a rule (`ruleTyped`).
  */
-export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, savedZone: string): RoutinePatch {
+export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, ruleTyped = false): RoutinePatch {
   const patch: RoutinePatch = {};
   if (d.name.trim() && d.name.trim() !== r.name) patch.name = d.name.trim();
   if (r.prompt !== null && d.prompt.trim() !== r.prompt) patch.prompt = d.prompt.trim();
@@ -476,9 +480,13 @@ export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, sav
       : d.kind === "event"
         ? r.trigger.type !== "event" || r.trigger.event !== d.event
         : once
-          ? r.trigger.type !== "once" ||
-            JSON.stringify(draftTrigger(d)) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
-          : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(d.rule)) !== savedRule;
+          ? // To the minute, as the form shows it: the server's instant has seconds ("em 10 minutos"), and a
+            // one-off that already ran would be sent again as a time in the past.
+            r.trigger.type !== "once" || minuteOf(onceAt(d.rule)) !== minuteOf(r.trigger.at)
+          : r.trigger.type !== "schedule" ||
+            // A routine kept as a cron (every N minutes) changes only with a phrase read into a rule (`ruleTyped`):
+            // its form holds a placeholder rule, which must never replace it.
+            (r.trigger.rule ? JSON.stringify(toApiRule(d.rule)) !== savedRule : ruleTyped);
   if (triggerChanged) patch.trigger = draftTrigger(d);
   if (d.active !== r.active) patch.active = d.active;
   if (d.report !== r.report) patch.report = d.report;
