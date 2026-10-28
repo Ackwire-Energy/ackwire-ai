@@ -2632,6 +2632,14 @@ a.ac-list__row:focus-visible {
   line-height: 16px;
   color: var(--ink-muted);
 }
+/* The dot between the words and the action, 4px from each: the line's whole gap on both sides makes it wrap sooner. */
+.ac-receipt__dot {
+  margin-inline: -2px;
+}
+/* After an ⓘ, 1.5px closer: the ⓘ's circle stops 1.54px inside its box. */
+.ac-hintline + .ac-receipt__dot {
+  margin-inline-start: -3.5px;
+}
 .ac-receipt__avatars {
   display: inline-flex;
   gap: 2px;
@@ -4132,16 +4140,34 @@ a.ac-list__row:focus-visible {
 
 /*
  * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
- * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before, and
- * sits on the label's first line where an `.ac-iconline` lead would (the glyph's middle on the capitals' middle),
- * so it stays there when the label wraps. The line sets the label's font size and line height (a field's and a
- * card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
+ * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before. The
+ * label flows as text, every line of it 18px short of the line's end, and the ⓘ follows its last word in that room,
+ * taking none of its own, so it never goes to a line alone; it sits on that line's capitals' middle, as an
+ * `.ac-iconline` lead sits on its line's. A label element is set from each line's top, as the ⓘ is, so the line's
+ * own type never moves it; one with its own icon or logo stays one box. The line sets the label's font size and line
+ * height (a field's and a card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
  */
 .ac-hintline {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 4px;
+  display: inline-block;
   min-width: 0;
+  padding-inline-end: 18px;
+  /* No word alone on a wrapped label's last line. Not `pretty`: Chrome skips it in a paragraph holding a box, as the
+     ⓘ is. */
+  text-wrap: balance;
+}
+.ac-hintline:not(:has(> .ac-hint)) {
+  padding-inline-end: 0;
+}
+.ac-hintline > :first-child:not(.ac-hint) {
+  display: inline;
+  vertical-align: top;
+}
+.ac-hintline > :first-child:not(.ac-hint):has(> .ac-icon, > .ac-brand) {
+  display: inline-flex;
+}
+/* 4px after the last letter (the glyph is 5px inside its target), taking no room of its own. */
+.ac-hintline > .ac-hint {
+  margin-inline: -1px -23px;
 }
 .ac-field > .ac-hintline,
 .ac-field__label-row > .ac-hintline {
@@ -4398,14 +4424,15 @@ a.ac-list__row:focus-visible {
   /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
   top: calc(6px + var(--cap-top) - var(--cap-mid));
   right: 10px;
-  translate: 0 -50%;
   z-index: var(--z-sticky);
   padding: 3px;
   border: 0;
   border-radius: 13px;
   background: var(--raised);
   box-shadow: var(--e2);
-  transform: translateY(4px);
+  /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
+     `translate` declared beside a `transform`. */
+  transform: translateY(calc(-50% + 4px));
   transition:
     opacity 0.12s,
     transform 0.16s var(--out);
@@ -4414,14 +4441,14 @@ a.ac-list__row:focus-visible {
 .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
-  transform: none;
+  transform: translateY(-50%);
 }
 /* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
   top: calc(4px + 13.175px - var(--cap-mid));
 }
 /* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
-   last one (6px up) is shorter than the bar on touch (46px), so the bar takes that room's middle. */
+   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
 .ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 13.175px;
 }
@@ -6341,6 +6368,22 @@ button.ac-tools__row:focus-visible {
   }
   .ac-btn--sm.ac-btn--icon {
     min-width: var(--control-h-md);
+  }
+  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
+     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-msg__actions {
+    gap: 8px;
+  }
+  .ac-msg__actions .ac-btn--sm {
+    position: relative;
+    min-width: var(--control-h-sm);
+    min-height: var(--control-h-sm);
+    border-radius: var(--control-r-sm);
+  }
+  .ac-msg__actions .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
   .ac-composer__format-btn {
     width: var(--control-h-md);

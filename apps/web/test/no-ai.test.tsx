@@ -353,7 +353,7 @@ describe("receipts and the live block", () => {
       intent: "task",
     });
     const receipt = receiptOf("alguém resume o canal?");
-    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
+    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA·Conectar");
     await click(within(receipt).getByRole("button", { name: "Conectar" }));
     expect(dialog("Conectar uma IA")).not.toBeNull();
   });
@@ -373,7 +373,7 @@ describe("receipts and the live block", () => {
     const receipt = receiptOf("e o login?");
     const check = receipt.querySelector(".ac-receipt__check") as HTMLElement;
     expect(check.getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
-    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
+    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA·Conectar");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
 
@@ -414,7 +414,7 @@ describe("receipts and the live block", () => {
     expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
-      "Ninguém vai responder: falta uma IA ·",
+      "Ninguém vai responder: falta uma IA·Conectar",
     );
   });
 

@@ -560,7 +560,7 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     await connected();
-    // The line's words stay as they are, the ⓘ on their first line.
+    // The line's words stay as they are, the ⓘ after their last one.
     const hintLine = document.querySelector(".dsk-line > .ac-hintline") as HTMLElement;
     expect(hintLine.querySelector(":scope > .muted")?.textContent).toBe(
       "Copiar e colar como sempre: Ctrl+C, Ctrl+V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
