@@ -35,10 +35,10 @@ export function GreetingSky() {
 }
 
 /**
- * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Walter", then one line of
- * what changed, the agents' own faces in it: who finished something (its face before its name; opens where it
- * happened) and who works now (their faces, working, before the count; opens Agentes). With nothing going on,
- * everyone's faces resting, eyes closed.
+ * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Walter", then one short
+ * line with the agents' own faces in it: what one finished (its face before its name; opens where it happened),
+ * else who works now (their faces, working, before the count; opens Agentes; the list below says what each
+ * does), else everyone's faces resting, eyes closed.
  */
 export function Greeting({
   working,
@@ -56,11 +56,9 @@ export function Greeting({
   const greeting = useGreeting();
   const line = greetingLine(finished, working.length);
   const workingText =
-    line.kind === "finished"
-      ? t("mobile.homeNow.working", { count: line.working })
-      : line.kind === "working"
-        ? t("mobile.chats.workingNowLine", { count: line.working })
-        : t("mobile.chats.nobodyWorking");
+    line.kind === "working"
+      ? t("mobile.chats.workingNowLine", { count: line.working })
+      : t("mobile.chats.nobodyWorking");
   const finishedName = line.kind === "finished" ? (dir.agentById.get(line.finished.agentId)?.name ?? "") : "";
   const finishedText =
     line.kind === "finished" ? t(finishedKey(line.finished), { what: line.finished.what ?? "" }) : "";
@@ -84,41 +82,23 @@ export function Greeting({
       </Text>
       <View style={styles.line}>
         {line.kind === "finished" ? (
-          <>
-            <Pressable
-              onPress={() => openFinished(line.finished)}
-              accessibilityRole="button"
-              accessibilityLabel={`${finishedName} ${finishedText}`}
-              hitSlop={8}
-              style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
-            >
-              <AgentFace agentId={line.finished.agentId} size={FACE} framed />
-              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-                {finishedName ? (
-                  <Text variant="footnote" tone="ink2" style={styles.bold}>
-                    {`${finishedName} `}
-                  </Text>
-                ) : null}
-                {finishedText}
-              </Text>
-            </Pressable>
-            {line.working > 0 ? (
-              <>
-                <Text variant="footnote" tone="faint">
-                  ·
+          <Pressable
+            onPress={() => openFinished(line.finished)}
+            accessibilityRole="button"
+            accessibilityLabel={`${finishedName} ${finishedText}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+          >
+            <AgentFace agentId={line.finished.agentId} size={FACE} framed />
+            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+              {finishedName ? (
+                <Text variant="footnote" tone="ink2" style={styles.bold}>
+                  {`${finishedName} `}
                 </Text>
-                <Pressable
-                  onPress={openAgents}
-                  accessibilityRole="button"
-                  accessibilityLabel={workingText}
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.noShrink, pressed && styles.pressed]}
-                >
-                  {workingPart}
-                </Pressable>
-              </>
-            ) : null}
-          </>
+              ) : null}
+              {finishedText}
+            </Text>
+          </Pressable>
         ) : line.kind === "working" ? (
           <Pressable
             onPress={openAgents}
@@ -228,7 +208,6 @@ const styles = StyleSheet.create({
   line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   part: { flexDirection: "row", alignItems: "center", gap: 6 },
   shrink: { flexShrink: 1 },
-  noShrink: { flexShrink: 0 },
   pressed: { opacity: 0.6 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -5 },
