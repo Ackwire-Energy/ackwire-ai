@@ -25,7 +25,16 @@ export interface ConnectorTool {
 }
 
 /** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "data" | "payments" | "sales" | "support" | "marketing" | "automation";
+export type ConnectorCategory =
+  | "dev"
+  | "product"
+  | "docs"
+  | "data"
+  | "payments"
+  | "sales"
+  | "support"
+  | "marketing"
+  | "automation";
 
 export interface ConnectorDefinition {
   id: string;
