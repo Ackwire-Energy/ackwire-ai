@@ -90,6 +90,21 @@ export const mobilePtBR = {
   push: {
     channel: "Avisos",
     channelDescription: "O que espera você, menções e conversas.",
+    ask: {
+      title: "Saiba quando um agente precisar de você",
+      text: "Eles trabalham enquanto você faz outra coisa. Avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
+      on: "Ativar avisos",
+      later: "Agora não",
+      done: "Avisos ativados",
+      failed: "Não deu para ativar os avisos. Tente de novo em Você › Notificações.",
+      someone: "Um agente",
+      examples: "Exemplos de avisos",
+      now: "agora",
+      minutes: "{{n}} min",
+      approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
+      finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
+      mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+    },
   },
   a11y: {
     agent: "{{name}}, agente",

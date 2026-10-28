@@ -1,7 +1,8 @@
 import { usePrefetchRecent } from "@agenteschat/client";
-import { Stack } from "expo-router";
+import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { View } from "react-native";
 import { useRememberAgentLooks } from "@/features/shared/hooks";
+import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
 import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
@@ -10,10 +11,16 @@ import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderP
 /** A link straight to a pushed screen or a sheet still has the tabs under it (the back button works). */
 export const unstable_settings = { anchor: "(tabs)" };
 
+/** A screen that breaks while drawing shows what happened and a way back, instead of closing the app. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
+
 /**
  * The signed-in app: the native tabs, and the screens pushed over them with the platform's push (the tab
- * bar hides there; the native back button and the edge swipe go back). Requests, Você and "Novo" (the "+"
- * of the tabs, with its three forms stacked over it) are native form sheets over whatever is on screen.
+ * bar hides there; the native back button and the edge swipe go back), Você and its screens among them.
+ * Requests and "Novo" (the "+" of the tabs, with its three forms stacked over it) are native form sheets over
+ * whatever is on screen.
  * Header options are set here so the first frame of a push already has its bar; `PushedHeader` fills in
  * the title and actions.
  */
@@ -37,13 +44,13 @@ function AppStack() {
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
   const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
-  const meSheet = useFormSheetOptions([0.7, 1]);
   const newSheet = useFormSheetOptions([0.6, 1]);
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
+  const pushSheet = useFormSheetOptions([0.74, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -58,9 +65,15 @@ function AppStack() {
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="issues/new" options={formSheet} />
+      <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen
         name="connectors/oauth"
         options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}
@@ -70,7 +83,34 @@ function AppStack() {
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="connect-ai" options={formSheet} />
-      <Stack.Screen name="me" options={meSheet} />
+      {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
+      <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
+      <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
+      {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
+      <Stack.Screen name="settings/index" options={{ ...pushed, ...coverBarOptions }} />
+      <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/access" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/[machineId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/rename" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/folder" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/agent" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />

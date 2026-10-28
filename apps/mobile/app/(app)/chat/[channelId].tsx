@@ -1,7 +1,13 @@
-import { useLocalSearchParams } from "expo-router";
+import { type ErrorBoundaryProps, useLocalSearchParams } from "expo-router";
 import { ChatScreen } from "@/features/chat/ChatScreen";
 import { isSafeId } from "@/features/shared/logic";
 import { FocusLive } from "@/features/shared/parts";
+import { ScreenError } from "@/features/shared/ScreenError";
+
+/** A conversation that breaks while drawing shows what happened in its own screen; back still goes back. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 /**
  * A conversation (deep link `agenteschat://chat/<channelId>?thread=<rootId>`). `handoff=<id>`: an agent's

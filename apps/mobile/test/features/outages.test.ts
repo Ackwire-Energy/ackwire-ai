@@ -5,6 +5,7 @@ import { teamLines, type WorkItem } from "../../src/features/agents/logic";
 import { agentRowState } from "../../src/features/chats/now";
 import {
   computerIcon,
+  dismissedOutages,
   type MachineOutage,
   moveToast,
   namesText,
@@ -81,29 +82,38 @@ describe("Computador desconectado (phone)", () => {
     expect(sheetDesc(t, air, new Set(["ada", "theo"]))).toBe("Escolha onde Ada e Theo passam a trabalhar.");
     expect(sheetDesc(t, air, new Set(["ada"]))).toBe("Escolha onde Ada passa a trabalhar.");
     expect(sheetDesc(await translator("en"), air, new Set(["ada"]))).toBe("Choose where Ada works from now on.");
-    const [on, off, cloud] = targetOptions(air, [office, pro, { kind: "cloud", available: true, brains: [] }], ["ada"]);
+    // A cloud computer that runs no brain is no option (the web leaves it out the same way).
+    const [on, off, ...rest] = targetOptions(
+      air,
+      [office, pro, { kind: "cloud", available: true, brains: [] }],
+      ["ada"],
+    );
+    expect(rest).toEqual([]);
     expect(on && targetText(t, on)).toEqual({
       title: "MacBook Pro do Walter",
       tag: "Ligado",
       desc: "Tem o Claude Code",
     });
     expect(off && targetText(t, off)).toEqual({ title: "PC do escritório", tag: null, desc: "Desconectado" });
-    expect(cloud && targetText(t, cloud)).toEqual({
-      title: "Sandbox da Daytona",
-      tag: null,
-      desc: "Não tem o Claude Code",
-    });
     const paused = targetOptions(air, [{ ...pro, reasonOff: "paused" }], ["ada"])[0];
     expect(paused && targetText(t, paused).desc).toBe("Pausado");
     const odd = targetOptions(air, [{ ...pro, reasonOff: "something_new" }], ["ada"])[0];
     expect(odd && targetText(t, odd).desc).toBe("Não dá para usar agora");
     const able = targetOptions(air, [{ kind: "cloud", available: true, brains: ["claude_code"] }], ["ada"])[0];
-    // Daytona's sandbox carries no tag: "always on" is the Cloud's word, and this is self-host.
-    expect(able && targetText(t, able)).toMatchObject({ title: "Sandbox da Daytona", tag: null });
+    // The cloud computer carries no tag: "always on" is the Cloud's word, and this is self-host.
+    expect(able && targetText(t, able)).toMatchObject({ title: "Computador na nuvem", tag: null });
     expect(computerIcon("darwin")).toBe("computerMac");
     expect(computerIcon("windows")).toBe("computerWindows");
     expect(computerIcon("linux")).toBe("computerLinux");
     expect(computerIcon(null, true)).toBe("computerCloud");
+  });
+
+  test("closed notices: the kept list, nothing when it can't be read", () => {
+    expect(dismissedOutages('["air@2026-10-18T20:00:00.000Z"]')).toEqual(["air@2026-10-18T20:00:00.000Z"]);
+    expect(dismissedOutages('["a", 2, null]')).toEqual(["a"]);
+    expect(dismissedOutages(null)).toEqual([]);
+    expect(dismissedOutages("{}")).toEqual([]);
+    expect(dismissedOutages("not json")).toEqual([]);
   });
 
   test("the toast after switching", async () => {

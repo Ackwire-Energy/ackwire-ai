@@ -501,9 +501,38 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
       canAdd: true,
       keys: true,
       brains: { claude_code: expect.any(Boolean), codex: expect.any(Boolean) },
+      own: {},
     },
   ]);
   expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).accounts).toEqual([]);
+
+  // "Conta deste computador": the CLI's own sign-in, with its plan and usage, for whoever connected the computer.
+  const [before] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  const usage = {
+    windows: [{ kind: "five_hour" as const, usedPercent: 40 }],
+    source: "turn" as const,
+    at: new Date().toISOString(),
+  };
+  await f.db
+    .update(schema.machines)
+    .set({
+      execAllowed: true,
+      executors: {
+        claude: { version: "2.1.0", loggedIn: true, plan: "max" },
+        ownUsage: { claude_code: usage },
+        detectedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.own).toEqual({
+    claude_code: { plan: "max", usage },
+  });
+  // Someone else in the workspace: not theirs.
+  expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).computers[0]?.own).toEqual({});
+  await f.db
+    .update(schema.machines)
+    .set({ execAllowed: before?.execAllowed ?? false, executors: before?.executors ?? {} })
+    .where(eq(schema.machines.id, machineId));
 
   // Only plans we know; a runner that doesn't keep keys is too old for one.
   const unknown = await beginAccountLogin(

@@ -59,10 +59,14 @@ export function GroupedFooter({ children }: { children: ReactNode }) {
 
 export interface GroupedRowProps {
   label: string;
+  /** Lines the label may take (default 1): a setting's long name beside its switch. */
+  labelLines?: number;
   /** A small line under the label. */
   sub?: string;
   /** Lines the small line may take (default 1). */
   subLines?: number;
+  /** Under the small line, in the text column (a second line of facts). */
+  below?: ReactNode;
   /** A rounded tile with this icon on the left. */
   icon?: IconName;
   /** Anything else on the left (an organization's tile). */
@@ -83,8 +87,10 @@ export interface GroupedRowProps {
 /** One row of a group: icon tile, label, the value in faint, a chevron, a check or a switch. */
 export function GroupedRow({
   label,
+  labelLines = 1,
   sub,
   subLines = 1,
+  below,
   icon,
   leading,
   value,
@@ -117,7 +123,7 @@ export function GroupedRow({
       ) : null}
       {leading}
       <View style={styles.grow}>
-        <Text variant="body" numberOfLines={1} style={{ color: tone }}>
+        <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
           {label}
         </Text>
         {sub ? (
@@ -125,6 +131,7 @@ export function GroupedRow({
             {sub}
           </Text>
         ) : null}
+        {below}
       </View>
       {value ? (
         <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>

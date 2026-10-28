@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SheetSurface } from "./SheetSurface";
 
 export interface SheetScreenProps {
   children?: ReactNode;
@@ -8,21 +9,24 @@ export interface SheetScreenProps {
 
 /**
  * The content of a route presented as a native form sheet (`useFormSheetOptions`): the system draws the
- * sheet, its grabber, the drag to dismiss and the dimmed, scaled screen behind. This is only the
- * scrolling body (the first scroll view, so dragging at its top edge moves the sheet), keyboard-aware.
+ * sheet, the drag to dismiss and the dimmed, scaled screen behind (the grabber too on iOS; `SheetSurface`
+ * draws it on Android, with the sheet's colors). This is only the scrolling body (the first scroll view, so
+ * dragging at its top edge moves the sheet), keyboard-aware.
  */
 export function SheetScreen({ children }: SheetScreenProps) {
   const insets = useSafeAreaInsets();
   return (
-    <ScrollView
-      style={styles.fill}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      automaticallyAdjustKeyboardInsets
-      contentContainerStyle={[styles.in, { paddingBottom: 22 + insets.bottom }]}
-    >
-      {children}
-    </ScrollView>
+    <SheetSurface>
+      <ScrollView
+        style={styles.fill}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={[styles.in, { paddingBottom: 22 + insets.bottom }]}
+      >
+        {children}
+      </ScrollView>
+    </SheetSurface>
   );
 }
 

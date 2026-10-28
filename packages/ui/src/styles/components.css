@@ -5399,9 +5399,6 @@ a.ac-list__row:focus-visible {
 .ac-tools__line {
   border-radius: var(--radius-item);
 }
-.ac-tools__line[data-s="fail"] {
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
-}
 .ac-tools__row {
   display: flex;
   align-items: center;
