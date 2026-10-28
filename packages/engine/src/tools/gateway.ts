@@ -21,15 +21,7 @@ import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
-import {
-  approvalOrigin,
-  type PolicyDecision,
-  takeWhy,
-  toolKind,
-  toolPolicy,
-  WHY_REFUSAL,
-  withWhy,
-} from "./run-policy";
+import { approvalOrigin, type PolicyDecision, takeWhy, toolKind, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 

@@ -114,7 +114,7 @@ describe("agents' tool calls in the audit log", () => {
         connectorLabel: "Sentry",
         describe: () => ({ title: "Sentry: List issues" }),
       }),
-      tool("drive_delete", "drive:write"),
+      tool("drive_delete", "drive:delete"),
     ];
     const source: ToolSource = { name: "fake", tools: async () => tools };
     return createToolGateway({ sources: [source] });
@@ -151,10 +151,10 @@ describe("agents' tool calls in the audit log", () => {
 
     await call("create_issue", { title: "Login quebrado" });
     await call("broken_issue", { title: "Outra" });
-    await call("drive_delete", { title: "relatorio.pdf" }); // no drive:write: refused
+    await call("drive_delete", { title: "relatorio.pdf" }); // no drive:delete: refused
     await call("search_context", { title: "login" }); // looking around: not kept
     await call("sentry_list_issues", { title: "login" }); // someone's data: kept
-    const asked = await call("close_all_issues", { title: "tudo", why: "the board was cleaned up by hand" });
+    const asked = await call("close_all_issues", { title: "tudo", why: "the board was cleaned up by hand after the release" });
     expect(asked.type).toBe("approval");
 
     const rows = await toolRows(f);
@@ -177,10 +177,10 @@ describe("agents' tool calls in the audit log", () => {
     }
     expect(rows[0]?.details).toMatchObject({ kind: "internal", behind: "person", input: { title: "Login quebrado" } });
     expect(rows[1]?.details.reason).toContain("the issue tracker is down");
-    expect(rows[2]?.details.reason).toContain("lacks the scope drive:write");
+    expect(rows[2]?.details.reason).toContain("lacks the scope drive:delete");
     expect(rows[3]?.details).toMatchObject({ kind: "read", connector: "Sentry", title: "Sentry: List issues" });
     const approvalId = asked.type === "approval" ? asked.approval.id : "";
-    expect(rows[4]?.details).toMatchObject({ approvalId, reason: "the board was cleaned up by hand" });
+    expect(rows[4]?.details).toMatchObject({ approvalId, reason: "the board was cleaned up by hand after the release" });
 
     // Waiting on a person: the reader says so until someone answers.
     const waiting = await listAudit(f.db, f.owner.id, f.org.id, { waiting: true });

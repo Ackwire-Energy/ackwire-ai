@@ -22,17 +22,7 @@ import {
   TOOL_CALL,
 } from "@agenteschat/client/lib/audit";
 import { dayLabel, formatTime, whenAt } from "@agenteschat/client/lib/format";
-import {
-  Button,
-  Chip,
-  type ChipProps,
-  Icon,
-  Menu,
-  MenuItem,
-  Segmented,
-  Select,
-  Toolbar,
-} from "@agenteschat/ui";
+import { Button, Chip, type ChipProps, Icon, Menu, MenuItem, Segmented, Select, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -177,7 +167,7 @@ function Face({ row, size = "sm" }: { row: AuditRow; size?: "xs" | "sm" }) {
   if (row.actor.type === "system" || !row.actor.id) {
     return (
       <span className={`audit-face audit-face--${size}`} aria-hidden="true">
-        <Icon name="settings" size={size === "xs" ? 12 : 16} />
+        <Icon name="settings" size={size === "xs" ? 14 : 16} />
       </span>
     );
   }
@@ -228,11 +218,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
       facts.push([
         t("audit.panel.asked"),
         <span key="asked" className="audit-panel__who">
-          <ActorAvatar
-            actor={{ type: "person", id: row.onBehalfOf.id }}
-            name={row.onBehalfOf.name ?? ""}
-            size="xs"
-          />
+          <ActorAvatar actor={{ type: "person", id: row.onBehalfOf.id }} name={row.onBehalfOf.name ?? ""} size="xs" />
           {row.onBehalfOf.name ?? t("audit.removed")}
         </span>,
       ]);
@@ -242,7 +228,12 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
         routine ? t("audit.panel.routine", { name: routine }) : t("audit.behind.routineAny"),
       ]);
     } else if (behind === "unattended") {
-      facts.push([t("audit.panel.asked"), <span key="nobody" className="muted">{t("audit.panel.nobody")}</span>]);
+      facts.push([
+        t("audit.panel.asked"),
+        <span key="nobody" className="muted">
+          {t("audit.panel.nobody")}
+        </span>,
+      ]);
     }
   }
   if (where && row.channel) {
