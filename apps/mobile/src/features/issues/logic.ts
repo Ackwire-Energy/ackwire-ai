@@ -25,6 +25,18 @@ export function issueState(i: Pick<Issue, "status" | "work">): IssueState {
   return "todo";
 }
 
+/**
+ * The state a row in the list still says. The list is grouped by status, so "A fazer", "Em andamento",
+ * "Em revisão", "Feita" and "Cancelada" are already its section; only what happens inside one shows
+ * (working, waiting on you, stalled, a PR in review).
+ */
+export function listState(i: Pick<Issue, "status" | "work" | "pullRequests">): IssueState | null {
+  const state = issueState(i);
+  if (state === "running" || state === "waiting" || state === "stalled") return state;
+  if (state === "review" && latestPr(i)) return state;
+  return null;
+}
+
 /** The agent on it waits on a person (an approval, an answer): the dark strip on top and "Com você". */
 export const waitsOnYou = (i: Pick<Issue, "status" | "work">) => issueState(i) === "waiting";
 
