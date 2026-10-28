@@ -5454,7 +5454,6 @@ export const en: Translations = {
       dropText: "The vault folder or a few .md files work too",
       pickZip: "Choose .zip or .md",
       pickFolder: "Choose folder",
-      pickFolderShort: "choose the folder",
       howTo:
         "To make the .zip: in Finder, right-click the vault folder → Compress. On Windows, Send to → Compressed folder. The .obsidian folder (plugins and themes) is left out.",
       nothingYet: "Nothing goes in before you review it.",

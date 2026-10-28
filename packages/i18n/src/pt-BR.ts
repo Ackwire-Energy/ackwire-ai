@@ -5488,7 +5488,6 @@ export const ptBR = {
       dropText: "Também serve a pasta da vault ou só alguns arquivos .md",
       pickZip: "Escolher .zip ou .md",
       pickFolder: "Escolher pasta",
-      pickFolderShort: "escolha a pasta",
       howTo:
         "Para gerar o .zip: no Finder, clique com o botão direito na pasta da vault → Comprimir. No Windows, Enviar para → Pasta compactada. A pasta .obsidian (plugins e temas) fica de fora.",
       nothingYet: "Nada entra antes de você revisar.",

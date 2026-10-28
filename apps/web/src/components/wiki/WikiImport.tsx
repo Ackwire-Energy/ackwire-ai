@@ -128,11 +128,9 @@ export function VaultDropZone({
         </div>
       )}
       {compact && (
-        <p className="small muted">
-          <button type="button" className="ac-link vault-drop__link" onClick={() => dir.current?.click()}>
-            {t("wiki.import.pickFolderShort")}
-          </button>
-        </p>
+        <Button size="sm" variant="ghost" icon="drive" onClick={() => dir.current?.click()}>
+          {t("onboarding.import.pickFolder")}
+        </Button>
       )}
       {children}
       <VaultInputs onFiles={onFiles} zipRef={zip} dirRef={dir} />
