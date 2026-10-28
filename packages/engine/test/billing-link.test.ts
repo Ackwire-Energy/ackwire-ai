@@ -2,16 +2,28 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { eq, schema } from "@agenteschat/db";
 import {
+  archiveChannel,
   BILLING_FROM,
   type BillingLinkClaims,
+  createAgent,
+  createChannel,
   createFileArtifact,
+  createIssue,
+  createWikiPage,
+  deleteArtifact,
+  deleteWikiPage,
+  insertMessage,
   mintBillingLink,
+  openAgentDm,
+  openPersonAgentDm,
   saveStorage,
   setBillingHold,
   setOrgStanding,
   signBillingLink,
   testStorage,
+  updateIssue,
 } from "../src";
+import { openRoutineRoom } from "../src/routine-room";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -36,10 +48,20 @@ const VECTOR: BillingLinkClaims = {
   locale: "pt-BR",
   from: "settings",
   return: "/org/00000000-0000-4000-8000-0000000000aa/settings/billing",
-  usage: { members: 3, agents: 6, storageBytes: 1073741824 },
+  usage: {
+    members: 3,
+    agents: 6,
+    storageBytes: 1073741824,
+    messages: 48210,
+    channels: 12,
+    files: 37,
+    wikiPages: 9,
+    issues: 54,
+    since: 1782864000,
+  },
 };
 const TOKEN =
-  "v1.eyJhdWQiOiJhZ2VudGVzLWJpbGxpbmciLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJpYXQiOjE3OTg3NjE2MDAsImV4cCI6MTc5ODc2MTkwMCwib3JnSWQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWEiLCJvcmdOYW1lIjoiQWNtZSIsInVzZXJJZCI6InVzZXJfdGVzdF8xIiwiZW1haWwiOiJhbmFAZXhhbXBsZS5jb20iLCJuYW1lIjoiQW5hIiwicm9sZSI6Im93bmVyIiwibG9jYWxlIjoicHQtQlIiLCJmcm9tIjoic2V0dGluZ3MiLCJyZXR1cm4iOiIvb3JnLzAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDBhYS9zZXR0aW5ncy9iaWxsaW5nIiwidXNhZ2UiOnsibWVtYmVycyI6MywiYWdlbnRzIjo2LCJzdG9yYWdlQnl0ZXMiOjEwNzM3NDE4MjR9fQ.dvyPwQDNmTuhUO1sFg7AEXupL2WW8PZMVBjHbgKxVYg";
+  "v1.eyJhdWQiOiJhZ2VudGVzLWJpbGxpbmciLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJpYXQiOjE3OTg3NjE2MDAsImV4cCI6MTc5ODc2MTkwMCwib3JnSWQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWEiLCJvcmdOYW1lIjoiQWNtZSIsInVzZXJJZCI6InVzZXJfdGVzdF8xIiwiZW1haWwiOiJhbmFAZXhhbXBsZS5jb20iLCJuYW1lIjoiQW5hIiwicm9sZSI6Im93bmVyIiwibG9jYWxlIjoicHQtQlIiLCJmcm9tIjoic2V0dGluZ3MiLCJyZXR1cm4iOiIvb3JnLzAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDBhYS9zZXR0aW5ncy9iaWxsaW5nIiwidXNhZ2UiOnsibWVtYmVycyI6MywiYWdlbnRzIjo2LCJzdG9yYWdlQnl0ZXMiOjEwNzM3NDE4MjQsIm1lc3NhZ2VzIjo0ODIxMCwiY2hhbm5lbHMiOjEyLCJmaWxlcyI6MzcsIndpa2lQYWdlcyI6OSwiaXNzdWVzIjo1NCwic2luY2UiOjE3ODI4NjQwMDB9fQ.f02uFh5tHCLVCq8HCwhzN8RM2Ne6EdD5DDxmHFR2qv4";
 
 const NOW = new Date("2027-01-01T00:00:00Z");
 const mint = (
@@ -86,7 +108,18 @@ describe("mintBillingLink", () => {
       locale: "pt-BR",
       from: "settings",
       return: `/org/${f.org.id}/settings/billing`,
-      usage: { members: 1, agents: 1, storageBytes: 0 },
+      // A new workspace: #general, its owner and @dev, nothing written yet.
+      usage: {
+        members: 1,
+        agents: 1,
+        storageBytes: 0,
+        messages: 0,
+        channels: 1,
+        files: 0,
+        wikiPages: 0,
+        issues: 0,
+        since: Math.floor(f.org.createdAt.getTime() / 1000),
+      },
     });
     // Single use on the billing side: every link is its own.
     expect(claimsOf((await mint(f.owner.id)).url).jti).not.toBe(claims.jti);
@@ -128,6 +161,49 @@ describe("mintBillingLink", () => {
     expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket)).ok).toBe(true);
     await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket });
     expect(claimsOf((await mint(f.owner.id)).url).usage.storageBytes).toBeNull();
+  });
+
+  test("usage counts what people can read, live: messages, named channels, Drive files, wiki pages, tasks", async () => {
+    const ana = { type: "person" as const, userId: f.owner.id };
+    const say = (channelId: string, author: Parameters<typeof insertMessage>[1]["author"] = ana, threadId?: string) =>
+      insertMessage(f.db, { orgId: f.org.id, channelId, threadId, author, body: "Oi" });
+    const root = await say(f.general.id);
+    await say(f.general.id, ana, root.id);
+    const old = await createChannel(f.db, f.owner.id, f.org.id, { name: "old" });
+    await say(old.id);
+    await archiveChannel(f.db, f.owner.id, f.org.id, old.id);
+    await say((await openPersonAgentDm(f.db, f.org.id, f.owner.id, f.agent.id)).id);
+    // Rooms no person reads: two agents' DM and a routine's room.
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "Watch.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const dev = { type: "agent" as const, agentId: f.agent.id, runId: null, hop: 1 };
+    await say((await openAgentDm(f.db, f.org.id, f.agent.id, ops.id)).id, dev);
+    await say((await openRoutineRoom(f.db, f.org.id, f.agent.id, crypto.randomUUID())).id, ana);
+
+    const file = (name: string) =>
+      createFileArtifact(f.artifactDeps, ana, f.org.id, { title: name, name, bytes: new Uint8Array(1) });
+    await file("kept.txt");
+    await deleteArtifact(f.artifactDeps, f.owner.id, f.org.id, (await file("trashed.txt")).id);
+    const wiki = { db: f.db };
+    await createWikiPage(wiki, ana, f.org.id, { title: "Glossário" });
+    await deleteWikiPage(wiki, ana, f.org.id, (await createWikiPage(wiki, ana, f.org.id, { title: "Rascunho" })).id);
+    const tasks = { db: f.db };
+    await createIssue(tasks, ana, f.org.id, { title: "Lançar" });
+    const dropped = await createIssue(tasks, ana, f.org.id, { title: "Esquecer" });
+    await updateIssue(tasks, ana, f.org.id, dropped.id, { status: "canceled" });
+
+    expect(claimsOf((await mint(f.owner.id)).url).usage).toMatchObject({
+      messages: 4,
+      channels: 1,
+      files: 1,
+      wikiPages: 1,
+      issues: 1,
+    });
   });
 
   test("members and strangers never get one; a held workspace does, a suspended one doesn't", async () => {
