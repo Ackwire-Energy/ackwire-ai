@@ -6,6 +6,7 @@ const LAYOUT = join(import.meta.dir, "../src/layout.css");
 
 /** What places a step's button, and a failed sign-in's: under its words, on their column, at every width. */
 const PLACEMENT = [
+  ".agp-addacct",
   ".agp-addacct__step",
   ".agp-addacct__step.ac-iconline > .agp-addacct__text",
   ".agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)",

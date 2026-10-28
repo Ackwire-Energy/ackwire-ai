@@ -8145,11 +8145,12 @@ a.machine-row__name:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* "Adicionar conta": the provider's own sign-in, in numbered steps. */
+/* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
+   sits nearer its own words than the next step's. */
 .agp-addacct {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 .agp-addacct:focus {
   outline: none;

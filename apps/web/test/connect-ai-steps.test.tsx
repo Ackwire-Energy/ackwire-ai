@@ -447,8 +447,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // The words take the row and what acts on them wraps under: no width puts a button across the row from them.
     expect(ruleOf(layout, ".agp-addacct__step")).toContain("flex-wrap: wrap");
     expect(ruleOf(layout, ".agp-addacct__step")).toContain("line-height: 20px");
-    // As far under the words as a field is under its title (the words' 4px gap and the field's 4px margin).
+    // As far under the words as a field is under its title (the words' 4px gap and the field's 4px margin), and
+    // nearer them than the next step, as far as a panel's groups.
     expect(ruleOf(layout, ".agp-addacct__step")).toContain("gap: 8px 12px");
+    expect(ruleOf(layout, ".agp-addacct")).toContain("gap: 16px");
     expect(ruleOf(layout, ".agp-addacct__text")).toContain("gap: 4px");
     expect(ruleOf(layout, ".agp-addacct__paste,\n.agp-addacct__code")).toContain("margin: 4px 0");
     expect(ruleOf(layout, ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text")).toContain("flex-basis: 100%");
