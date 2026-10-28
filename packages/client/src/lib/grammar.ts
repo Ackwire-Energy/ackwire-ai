@@ -2,13 +2,18 @@ import type { TFunction } from "i18next";
 import { capitalize } from "./format";
 import { providerOf } from "./providers";
 
+/** The app's own starter names (`newAgent.roles.*.agent`) that are feminine without ending in "a". */
+const FEMININE = new Set(["iris"]);
+
 /**
  * An agent's grammatical gender, for its articles in Portuguese ("a Ada", "o Theo") and its pronouns in both
  * languages (she/ela, he/ele): one agent is never "it" in one line and "her" in the next. Agents don't store one,
- * so we infer it from the name: names ending in "a" are feminine. English ignores the articles.
+ * so we infer it from the name: names ending in "a" are feminine. English ignores the articles. A name someone types
+ * that is feminine and ends otherwise ("Beatriz") still reads as masculine.
  */
 export function isFeminineName(name: string) {
-  return /a$/i.test(name.trim().normalize("NFD").replace(/[̀-ͯ]/g, ""));
+  const plain = name.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return plain.endsWith("a") || FEMININE.has(plain);
 }
 
 export function agentGrammar(t: TFunction, name: string) {

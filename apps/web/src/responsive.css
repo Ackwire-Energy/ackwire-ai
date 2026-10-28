@@ -224,10 +224,12 @@
   .wiki-editor__text {
     font-size: 16px;
   }
-  /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). */
+  /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
+     follow its keys goes with them. */
   .sidebar__jump .ac-kbd,
   .titlebar__search .ac-kbd,
-  .wiki-suggest .ac-kbd {
+  .wiki-suggest .ac-kbd,
+  .newag__hint:has(> .ac-kbd) {
     display: none;
   }
 }

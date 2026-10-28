@@ -161,6 +161,18 @@ describe("Adicionar conector: one catalog", () => {
     expect([kind("linear"), kind("github"), kind("sentry")]).toEqual(["oneClick", "oauthOrKey", "key"]);
     expect(searchCatalog(CATALOG.connectors, "ciclos").map((d) => d.id)).toEqual(["linear"]);
   });
+
+  test("the close sits on its big title's capitals' middle; a service's, in the corner, isn't lifted", async () => {
+    const css = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = (selector: string, from = css) => from.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".catalog .ac-dialog__head")).toContain("--title-cap-mid: 0.88px;");
+    const phone = css.split("\n@media (max-width: 760px) {\n  .catalog__body {")[1] ?? "";
+    expect(rule("  .catalog .ac-dialog__head", phone)).toContain("--title-cap-mid: 0.51px;");
+    expect(rule(".catalog-svc .ac-dialog__acts")).toContain("translate: none");
+  });
 });
 
 const REVIEW = "Revise o que o agente pode fazer sozinho";

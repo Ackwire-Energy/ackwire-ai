@@ -122,7 +122,10 @@ describe("Dialog", () => {
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    expect(css).toContain("\n.ac-dialog__title + .ac-dialog__acts {\n  translate: 0 calc(-1 * var(--cap-mid));\n}");
+    // On the middle an app measured for its title's face, --cap-mid without one.
+    expect(css).toContain(
+      "\n.ac-dialog__title + .ac-dialog__acts {\n  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));\n}",
+    );
     // Nothing else moves the row: a transform beside the translate would be merged away by the build.
     const moved = [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)].filter(
       ([, selector, rule]) => /ac-dialog__acts(?![\w-])/.test(selector ?? "") && /transform/.test(rule ?? ""),

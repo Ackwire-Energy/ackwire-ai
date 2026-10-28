@@ -1789,7 +1789,7 @@ export const en: Translations = {
     runNoText: "No text",
     runTokens: "{{input}} in · {{cached}} cached · {{output}} out",
     runTokensTip: "{{input}} new input tokens, {{cached}} read from the cache (cheaper), {{output}} output",
-    budgetHelp: "When it reaches the limit, {{name}} stops and says so in the channel. {{ownerNote}}",
+    budgetHelp: "At the limit, {{name}} stops and says so in the channel. {{ownerNote}}",
     budgetDefaultChoice: "Workspace default ({{amount}})",
     budgetOther: "Other amount",
     budgetDefaultHelp: "Empty: the workspace default.",
@@ -2103,7 +2103,7 @@ export const en: Translations = {
       fineTune: "Fine-tuning, tool by tool, lives in the connector. Here it's one level per app.",
     },
     memory: {
-      counts: "What's in its memory",
+      counts: "What's in memory",
       verified_one: "{{count}} verified",
       verified_other: "{{count}} verified",
       lessons: "Lessons",
@@ -2535,7 +2535,7 @@ export const en: Translations = {
     noKeys: "No keys yet",
     budgetTitle: "Monthly budget",
     budget: "Monthly budget (US$)",
-    budgetHelp: "When it reaches the limit, {{name}} stops and says so.",
+    budgetHelp: "At the limit, {{name}} stops and says so.",
     budgetInvalid: "Use a value greater than zero.",
     warnsOwner: "We alert {{name}} at 80%.",
     warnsAdmins: "We alert the admins at 80%.",
@@ -5257,7 +5257,7 @@ export const en: Translations = {
   look: {
     previous: "Previous",
     next: "Next",
-    onHead: "On its head",
+    onHead: "On the head",
     change: "Change look",
     dialogTitle: "{{name}}'s look",
     parts: "Look parts",
@@ -5798,8 +5798,8 @@ export const en: Translations = {
     },
     areaText: {
       context: {
-        read: "Searches messages, summaries and facts in its channels.",
-        write: "Searches the context and keeps its own notes.",
+        read: "Searches messages, summaries and facts in the channels.",
+        write: "Searches the context and keeps {{hers}} own notes.",
       },
       drive: { read: "Reads Drive files.", write: "Reads, creates and edits Drive files." },
       issues: { read: "Reads tasks.", write: "Reads, creates and updates tasks." },
@@ -5812,11 +5812,11 @@ export const en: Translations = {
       schedule: { write: "Creates reminders and routines for whoever asked." },
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's computer." },
-      browser: { write: "Browses websites in its own browser, on its computer. Logins are kept per agent." },
+      browser: { write: "Browses websites in {{hers}} own browser, on {{hers}} computer. Logins are kept per agent." },
       setup: { write: "Offers to connect an AI and creates channels for whoever asked." },
       desktop: {
         write:
-          "Uses any app on its own desktop on its computer, while people watch or take control. Needs Run code too.",
+          "Uses any app on {{hers}} own desktop on {{hers}} computer, while people watch or take control. Needs Run code too.",
       },
     },
   },
@@ -6810,7 +6810,7 @@ export const en: Translations = {
     agent: {
       title: "Databases",
       help: "Databases {{org}} connected. The agent only reads.",
-      levelText: "Queries the tables its rules allow, read-only.",
+      levelText: "Queries the tables the rules allow, read-only.",
       rulesOf: "Rules in {{name}}",
       saved: "{{name}}'s database access saved.",
     },
@@ -7229,8 +7229,8 @@ export const en: Translations = {
       readOnly: "Only {{name}} and admins change what this computer allows.",
       readOnlyNobody: "Only admins change what this computer allows.",
       agents: "Agents that use this computer",
-      agentFolders: "Uses {{folders}} and its own folder",
-      agentOwnFolder: "Only its own folder",
+      agentFolders: "Uses {{folders}} and {{hers}} own folder",
+      agentOwnFolder: "Only {{hers}} own folder",
     },
     access: {
       folders: "Allowed folders",

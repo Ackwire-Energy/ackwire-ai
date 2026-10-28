@@ -23,3 +23,7 @@ A person's message without mentions enqueues `message.posted`; the handler calls
 ## Addendum (2026-10-20): up to four agents
 
 Since ADR 0034 (2026-10-17) policy picks at most `DEFAULT_ROUTER_POLICY.maxAgents` (4, `packages/engine/src/router.ts`) instead of 2, so a message to the room can wake several agents; an agent's own message still brings in at most one.
+
+## Addendum (2026-10-28): one agent unless it is for every agent
+
+Up to four agents meant every agent that could help took a question with one answer: "how many subscriptions today?" woke the PM and the researcher, who ran the same query and posted the same list. Each step now also says `for_everyone`, the probability that the message speaks to all the agents and each one has its own answer (the small model and the plan in the answer schema, Jev as a Noul with two or more candidates). `selectAgents` picks the best agent alone unless it is at least `FOR_EVERYONE_THRESHOLD` (0.5); then up to `maxAgents`. A step that doesn't say means one.
