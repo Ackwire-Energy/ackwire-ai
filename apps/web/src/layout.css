@@ -2971,14 +2971,15 @@ p {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
-/* Hover is a tint; the current page is a raised key (never the same look). */
+/* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
+   and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
-  box-shadow: var(--card-key);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   color: var(--ink);
   font-weight: 600;
 }
