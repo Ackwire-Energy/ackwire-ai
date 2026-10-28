@@ -756,7 +756,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     }
     await click(screen().getByRole("button", { name: "Pular esta etapa" }));
     if (keep) await keepOnly(...keep);
-    await click(screen().getByRole("button", { name: /^Criar \d agentes?$/ }));
+    await click(screen().getByRole("button", { name: keep?.length === 0 ? "Continuar" : /^Criar \d agentes?$/ }));
     const reported = async (next: Partial<ComputerSetup>) => {
       r.machines.setSetup(next);
       computer.ready = next.state === "ready";
@@ -851,6 +851,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
       }),
     ).toBeTruthy();
     expect(document.querySelector(".onb__lead")?.textContent).toBe("É onde a gente trabalha, cada um com a sua pasta.");
+    // The rail says what it waits for, not its state.
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Esperando você");
+    expect(rail.textContent).not.toContain("Pausado");
     const offer = document.querySelector(".onb__offer") as HTMLElement;
     // Their computer waiting, the team standing around it: a picture only.
     const scene = offer.querySelector(".onb__scene") as HTMLElement;
@@ -879,6 +883,18 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(document.querySelector(".onb__offer")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Agora não" }));
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+  });
+
+  test("Ada alone waiting for the plan: her row agrees with her name", async () => {
+    const r = await toComputerStep({ state: null }, undefined, []);
+    const me = r.state.me;
+    if (!me) throw new Error("no me");
+    r.state.me = {
+      ...me,
+      organizations: me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: "payment" } })),
+    };
+    await r.reported({ state: null });
+    expect([...document.querySelectorAll(".onb__done-row")].map((row) => row.textContent).at(-1)).toBe("Ada criada");
   });
 
   test("back from paying: the AI step, the plan said active over its question, the team's computer on its way", async () => {

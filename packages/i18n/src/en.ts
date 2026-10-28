@@ -599,12 +599,16 @@ export const en: Translations = {
         workspace: "Workspace created",
         context: "Context saved",
         contextNote: "Every agent reads it",
-        agents_one: "{{names}} created",
-        agents_other: "{{names}} created",
+        agentsF_one: "{{names}} created",
+        agentsF_other: "{{names}} created",
+        agentsM_one: "{{names}} created",
+        agentsM_other: "{{names}} created",
         offer: "Always on, ready in minutes",
         offerNote: "Comes with every plan · cancel anytime",
         get: "Get their computer",
         later: "Not now",
+        /** The rail's note under Computer while it waits for the plan. */
+        rail: "Waiting for you",
       },
     },
     team: {

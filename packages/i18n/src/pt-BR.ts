@@ -609,12 +609,16 @@ export const ptBR = {
         workspace: "Workspace criado",
         context: "Contexto salvo",
         contextNote: "Todos os agentes leem",
-        agents_one: "{{names}} já está no time",
-        agents_other: "{{names}} criados",
+        agentsF_one: "{{names}} criada",
+        agentsF_other: "{{names}} criadas",
+        agentsM_one: "{{names}} criado",
+        agentsM_other: "{{names}} criados",
         offer: "Sempre ligado, pronto em minutos",
         offerNote: "Vem em todos os planos · cancele quando quiser",
         get: "Garantir o computador deles",
         later: "Agora não",
+        /** The rail's note under Computer while it waits for the plan. */
+        rail: "Esperando você",
       },
     },
     team: {

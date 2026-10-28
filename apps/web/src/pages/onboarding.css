@@ -399,23 +399,30 @@ html:has(.onb) {
   padding: 6px 10px 2px;
   list-style: none;
 }
+/* Everything on the first line, so a name that wraps keeps its check, its note and the faces there; a row of one
+   line stays in the middle. */
 .onb__done-row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: center;
+  align-content: center;
+  align-items: baseline;
   column-gap: 10px;
   min-height: 48px;
   padding: 9px 0;
   border-top: 1px solid var(--line);
   font-size: 14px;
   font-weight: 600;
-  line-height: 1.35;
+  /* In em, so the note and the faces inherit the name's line as a length. */
+  line-height: 1.35em;
 }
 .onb__done-row:first-child {
   border-top: 0;
 }
+/* An `.ac-iconline` lead: on the first line's capitals' middle. */
 .onb__done-row > .ac-icon {
+  align-self: start;
   color: var(--ok);
+  translate: 0 calc(9.45px - var(--cap-mid) - 50%);
 }
 .onb__done-note {
   justify-self: end;
@@ -425,9 +432,23 @@ html:has(.onb) {
   color: var(--muted);
   text-align: right;
 }
+/* No baseline to share: the faces take the first line's height, centred on it. */
+.onb__done-note:has(> .onb__done-faces) {
+  align-self: start;
+}
 .onb__done-faces {
   display: flex;
+  align-items: center;
   gap: 4px;
+  height: 18.9px;
+}
+@supports (top: 1lh) {
+  .onb__done-row > .ac-icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+  .onb__done-faces {
+    height: 1lh;
+  }
 }
 /* The step's one action on the agents' sky, in their blue. */
 .onb__offer-banner {
@@ -637,6 +658,10 @@ html:has(.onb) {
     justify-self: start;
     margin-top: 4px;
     text-align: left;
+  }
+  /* A line of their own. */
+  .onb__done-faces {
+    height: auto;
   }
   .onb__offer-banner > .ac-btn {
     flex: 1 1 100%;

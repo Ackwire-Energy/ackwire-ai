@@ -26,6 +26,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   type ComputerKind,
   type ComputerState,
@@ -1105,7 +1106,10 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
             // A computer is a choice only where people connect their own: the workspace's own says how far it is.
             optional: s.id === "computer" ? edition === "selfhost" : s.optional,
             value: railValue[s.id],
-            ...(s.id === "computer" && workspaceComputer ? { note: t(workspaceComputer.chipKey) } : {}),
+            // Waiting for its plan, it waits for the person: said as that, not as a state of ours ("Pausado").
+            ...(s.id === "computer" && workspaceComputer
+              ? { note: unpaid ? t("onboarding.computer.payment.rail") : t(workspaceComputer.chipKey) }
+              : {}),
           }))}
         />
         <OnboardingHorizon progress={answered / toAnswer} />
@@ -1985,13 +1989,19 @@ function ComputerOffer({
         {context && row(t("onboarding.computer.payment.context"), t("onboarding.computer.payment.contextNote"))}
         {agents.length > 0 &&
           row(
-            t("onboarding.computer.payment.agents", {
-              count: agents.length,
-              names: joinNames(
-                agents.map((a) => a.name),
-                t("newAgent.and"),
-              ),
-            }),
+            // pt-BR agrees with their names' gender: "Ada criada", "Ada e Lia criadas", "Theo e Ada criados".
+            t(
+              agents.every((a) => isFeminineName(a.name))
+                ? "onboarding.computer.payment.agentsF"
+                : "onboarding.computer.payment.agentsM",
+              {
+                count: agents.length,
+                names: joinNames(
+                  agents.map((a) => a.name),
+                  t("newAgent.and"),
+                ),
+              },
+            ),
             <span className="onb__done-faces">
               {agents.map((a) => (
                 <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
