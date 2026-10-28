@@ -123,7 +123,7 @@ describe("no AI connected: above the composer", () => {
     // Ada is Walter's and has no AI: the plan is for her (Atlas isn't his), on the MacBook he connected.
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(panel.textContent).toContain("A conta de todos os agentes");
+    expect(panel.textContent).toContain("A conta de todos os seus agentes");
   });
 
   test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {

@@ -1063,7 +1063,7 @@ export const en: Translations = {
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
     own: {
-      all: "The account for all agents",
+      all: "The account for all your agents",
       one: "An account just for {{name}}",
       note: "They only reply to you while they think with your plan.",
     },

@@ -1078,7 +1078,7 @@ export const ptBR = {
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
     own: {
-      all: "A conta de todos os agentes",
+      all: "A conta de todos os seus agentes",
       one: "Uma conta só {{for}} {{name}}",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },

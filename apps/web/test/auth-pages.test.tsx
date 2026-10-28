@@ -1416,9 +1416,9 @@ describe("Onboarding", () => {
     await click(button(/Criar 1 agente/), 8);
     // Both agents use the connected computer.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
-    // The AI step: the account for all agents, chosen, thinks for every agent; nothing to sign in.
+    // The AI step: the account for all their agents, chosen, thinks for every agent; nothing to sign in.
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    const own = within(panel).getByRole("button", { name: "A conta de todos os agentes" });
+    const own = within(panel).getByRole("button", { name: "A conta de todos os seus agentes" });
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);

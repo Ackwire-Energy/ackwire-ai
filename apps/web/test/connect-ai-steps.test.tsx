@@ -484,11 +484,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
   });
 
-  test("a computer the person connected: the account for all agents, saved for the agent at once; or one just for it", async () => {
+  test("a computer the person connected: the account for all their agents, saved for the agent at once; or one just for it", async () => {
     const { state, dialog } = await connect({ brain: { ownSignIn: true } });
     // Who shares the sign-in, in the person's words: never which computer it's on.
-    const own = within(dialog).getByRole("button", { name: "A conta de todos os agentes" });
-    expect(own.textContent).toBe("A conta de todos os agentes");
+    const own = within(dialog).getByRole("button", { name: "A conta de todos os seus agentes" });
+    expect(own.textContent).toBe("A conta de todos os seus agentes");
     expect(shownText(dialog)).not.toMatch(/login no|MacBook\b.*conta|Outra conta/);
     // Small columns, so the two cards sit side by side on the panel's text column in the setup too.
     expect(own.parentElement?.className).toBe("grid-options grid-options--sm");
@@ -512,7 +512,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     await click(own);
     await settle(4);
     expect(calls(state, "agents.setBrain")[0]?.args).toEqual([ORG_ID, ADA_ID, { brain: "claude_code", account: null }]);
-    expect(dialog.textContent).toContain("Ada agora pensa com a conta de todos os agentes.");
+    expect(dialog.textContent).toContain("Ada agora pensa com a conta de todos os seus agentes.");
   });
 
   test("a plan its computer can't take: its tile dims, and its panel says why, with the key one click away", async () => {
