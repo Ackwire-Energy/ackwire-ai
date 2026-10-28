@@ -1704,6 +1704,16 @@ textarea.ac-input {
   gap: 2px;
   min-width: 0;
 }
+/* A radio card's chip ("Em uso", "Em breve") rides on its title's first line, at the card's end: the description
+   under them takes the card's whole width. */
+.ac-option__text:has(> .ac-option__head) {
+  flex: 1;
+}
+.ac-option__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
 .ac-option__title {
   font-weight: 600;
 }
@@ -1711,15 +1721,19 @@ textarea.ac-input {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
+/* A flex box, so the chip alone sets its height: on a text line's baseline it would leave the row 2px taller. */
 .ac-option__aside {
+  display: flex;
   margin-left: auto;
   flex: none;
 }
 .ac-option[data-disabled] {
   cursor: not-allowed;
 }
-.ac-option[data-disabled] .ac-option__text {
+/* The option dims, not the chip that says why ("Em breve"). */
+.ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc) {
   opacity: 0.55;
 }
 .ac-pill {

@@ -6041,7 +6041,7 @@ export const en: Translations = {
       server: "this server",
     },
     s3: "Your own bucket",
-    s3Text: "S3, R2, MinIO and other S3-compatible services.",
+    s3Text: "S3, R2, MinIO and others compatible with S3.",
     gdrive: "Google Drive",
     onedrive: "OneDrive",
     soon: "Coming soon",
