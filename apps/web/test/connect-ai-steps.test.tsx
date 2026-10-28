@@ -408,6 +408,15 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(atMedia(layout, "(min-width: 641px) and (pointer: coarse)"), step)).toContain(
       "margin-top: calc((var(--control-h-md) - 20px) / 2)",
     );
+    // The list's steps without a button take the same first line, so its numbers are evenly spaced.
+    const plain = ":has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm))";
+    for (const [media, height] of [
+      ["(min-width: 641px)", "--control-h-sm"],
+      ["(min-width: 641px) and (pointer: coarse)", "--control-h-md"],
+    ] as const) {
+      expect(ruleOf(atMedia(layout, media), plain)).toContain(`min-height: var(${height})`);
+      expect(ruleOf(atMedia(layout, media), plain)).toContain(`padding-top: calc((var(${height}) - 20px) / 2)`);
+    }
     expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
     expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
     // A key's field can narrow to 112px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.

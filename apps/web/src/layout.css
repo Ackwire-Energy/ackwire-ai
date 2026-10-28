@@ -8141,15 +8141,24 @@ a.machine-row__name:hover {
   }
 }
 /* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
-   many lines follow the title. A touch screen's small button is the ruler's default step. */
+   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
+   spaced. A touch screen's small button is the ruler's default step. */
 @media (min-width: 641px) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-sm);
+    padding-top: calc((var(--control-h-sm) - 20px) / 2);
   }
 }
 @media (min-width: 641px) and (pointer: coarse) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-md);
+    padding-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
