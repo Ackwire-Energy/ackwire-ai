@@ -747,7 +747,7 @@ describe("Onboarding", () => {
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");
     // The platform key isn't offered by this server.
-    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
+    expect(within(makers).queryByRole("button", { name: "Este servidor" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
