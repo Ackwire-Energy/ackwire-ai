@@ -938,6 +938,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
     );
     expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
     expect(screen().queryByRole("button", { name: "Pular esta etapa" })).toBeNull();
+    // With no bar, an empty last row keeps the bar's room under the step (onboarding.css): it centres like the
+    // others, and "Agora não" stays clear of the screen's bottom and a phone's home bar.
+    expect(document.querySelector(".onb__body > .onb__actions")).toBeNull();
+    const onb = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    const spacer = onb.split("\n.onb__body:not(:has(> .onb__actions))::after {")[1]?.split("}")[0] ?? "";
+    expect(spacer).toContain("margin-top: auto");
+    expect(spacer).toContain("padding-bottom: env(safe-area-inset-bottom, 0px)");
     await click(within(banner).getByRole("button", { name: "Garantir o computador deles" }));
     expect(r.state.calls.find((c) => c.method === "orgs.billingLink")?.args.slice(1)).toEqual(["onboarding"]);
     expect(left).toEqual(["https://billing.example.com/link?t=onboarding"]);
