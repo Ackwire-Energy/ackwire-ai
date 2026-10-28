@@ -1,4 +1,5 @@
-import type { AiRouting } from "../api/types";
+import type { AiRouting, AiStatus } from "../api/types";
+import { providerLabel } from "./providers";
 
 /**
  * Whether something reads this person's messages that mention nobody (Jev, a small model, or their own plan), so an
@@ -14,3 +15,19 @@ export const replyAloneKey = (routing: AiRouting | undefined) =>
     : routing?.mine === "off"
       ? "channelMembers.replyAloneOff"
       : "channelMembers.replyAloneRules";
+
+/**
+ * The line on who picks the agents now, by `ai-status`: its key and words. Null while it loads, in a workspace with
+ * no AI, and for a small model the catalog can't name.
+ */
+export function routingLineOf(status: AiStatus | undefined, modelLabel: (id: string) => string | null) {
+  const routing = status?.any ? status.routing : undefined;
+  if (!routing) return null;
+  if (routing.by === "model") {
+    const model = routing.model ? modelLabel(routing.model) : null;
+    return model ? { key: "routing.by.model" as const, params: { model } } : null;
+  }
+  if (routing.by === "rules" && routing.noSmallModel)
+    return { key: "routing.by.noSmall" as const, params: { provider: providerLabel(routing.noSmallModel) } };
+  return { key: `routing.by.${routing.by}` as const, params: {} };
+}

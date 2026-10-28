@@ -1,9 +1,9 @@
-import type { AiStatus, JevKey } from "@agenteschat/client";
+import type { AiRouting, JevKey } from "@agenteschat/client";
 import { useAiStatus, useCheckJevKey, useJevKey, useRemoveJevKey, useSaveJevKey } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatDecimal, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { providerLabel } from "@agenteschat/client/lib/providers";
+import { routingLineOf } from "@agenteschat/client/lib/routing";
 import {
   Button,
   Card,
@@ -20,8 +20,7 @@ import {
   SettingNote,
 } from "@agenteschat/ui";
 import { useRouterState } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
-import { Fragment, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { Fragment, type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { useOrg } from "@/components/org-context";
@@ -43,8 +42,11 @@ const JEV_CALL = 0.0001;
 /** Save is on from this length: TypeSafe publishes no format for its keys, and the server checks each with it. */
 export const JEV_KEY_MIN = 8;
 
-/** Why Jev helps: three reasons, each a quiet icon, the reason in bold and a few words. */
-export function JevWhy() {
+/**
+ * Why Jev helps: three reasons, each a quiet icon, the reason in bold and a few words. Where the server's router is off
+ * (`routing` "off"), nothing picks who answers, so that reason is left out.
+ */
+export function JevWhy({ routing }: { routing?: AiRouting["by"] }) {
   const { t } = useTranslation();
   const reasons: [IconName, "route" | "memory" | "screen"][] = [
     ["agent", "route"],
@@ -53,14 +55,16 @@ export function JevWhy() {
   ];
   return (
     <ul className="jev-why">
-      {reasons.map(([icon, why]) => (
-        <li key={why} className="ac-iconline">
-          <Icon name={icon} size={16} />
-          <span>
-            <b>{t(`jev.why.${why}`)}</b> <span className="muted">{t(`jev.why.${why}Text`)}</span>
-          </span>
-        </li>
-      ))}
+      {reasons
+        .filter(([, why]) => why !== "route" || routing !== "off")
+        .map(([icon, why]) => (
+          <li key={why} className="ac-iconline">
+            <Icon name={icon} size={16} />
+            <span>
+              <b>{t(`jev.why.${why}`)}</b> <span className="muted">{t(`jev.why.${why}Text`)}</span>
+            </span>
+          </li>
+        ))}
     </ul>
   );
 }
@@ -139,6 +143,8 @@ export function JevSteps({
             autoComplete="off"
             spellCheck={false}
             placeholder={t("jev.steps.placeholder")}
+            // Settings opens the steps in place of the button pressed: the field takes the focus.
+            autoFocus={Boolean(onCancel)}
             invalid={Boolean(error)}
             aria-describedby={below}
             onChange={(e) => onChange(e.target.value)}
@@ -172,19 +178,6 @@ export function JevSteps({
   );
 }
 
-/** One line on who picks the agents now, by `ai-status`; null while it loads, and in a workspace with no AI. */
-function routingLine(t: TFunction, status: AiStatus | undefined, modelLabel: (id: string) => string | null) {
-  const routing = status?.any ? status.routing : undefined;
-  if (!routing) return null;
-  if (routing.by === "model") {
-    const model = routing.model ? modelLabel(routing.model) : null;
-    return model && t("routing.by.model", { model });
-  }
-  if (routing.by === "rules" && routing.noSmallModel)
-    return t("routing.by.noSmall", { provider: providerLabel(routing.noSmallModel) });
-  return t(`routing.by.${routing.by}`);
-}
-
 /**
  * Settings › AI accounts, after Provider keys: who picks the agents for a message nobody mentioned, for admins, and
  * under it Jev's key for the installation's owner on a self-hosted server (the API answers null to everyone else).
@@ -193,10 +186,11 @@ export function WhoPicksSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org.role, "manage_credentials");
-  const status = useAiStatus(org.id, admin);
   const jev = useJevKey();
+  // The server's owner gets Jev's card where they aren't an admin too, and its reasons follow who picks.
+  const status = useAiStatus(org.id, admin || Boolean(jev.data));
   const modelLabel = useModelLabel();
-  const line = admin ? routingLine(t, status.data, modelLabel) : null;
+  const line = admin ? routingLineOf(status.data, modelLabel) : null;
   if (!line && !jev.data) return null;
   return (
     <Card aria-labelledby="sec-routing">
@@ -206,8 +200,8 @@ export function WhoPicksSection() {
         </h2>
         <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
       </div>
-      {line && <p className="who-line">{line}</p>}
-      {jev.data && <JevCard view={jev.data} />}
+      {line && <p className="who-line">{t(line.key, line.params)}</p>}
+      {jev.data && <JevCard routing={status.data?.routing?.by} />}
     </Card>
   );
 }
@@ -223,8 +217,10 @@ const CHIP: Record<
 };
 
 /** Jev's key: why it helps and the steps while there's none; the key's last 4, this month's use and its state once set. */
-function JevCard({ view }: { view: JevKey }) {
+function JevCard({ routing }: { routing?: AiRouting["by"] }) {
   const { t, i18n } = useTranslation();
+  // Read here rather than handed down: a save or a removal shows its key at once, so focus lands on what stays.
+  const view = useJevKey().data;
   const save = useSaveJevKey();
   const check = useCheckJevKey();
   const remove = useRemoveJevKey();
@@ -233,6 +229,15 @@ function JevCard({ view }: { view: JevKey }) {
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   const box = useRef<HTMLElement>(null);
+  // The steps open in place of the button pressed and close into the card as it is now: focus goes back to its way in
+  // ("Configurar o Jev", "Trocar a chave"), or to the card, never to the page.
+  const opener = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    (opener.current ?? box.current)?.focus();
+  });
   const hash = useRouterState({ select: (s) => s.location.hash });
   // `?open=jev` (the desktop app's row) lands here: brought into view and focused.
   useEffect(() => {
@@ -240,12 +245,14 @@ function JevCard({ view }: { view: JevKey }) {
     box.current?.scrollIntoView?.({ block: "start" });
     box.current?.focus({ preventScroll: true });
   }, [hash]);
+  if (!view) return null;
   const env = view.source === "env";
   const chip = CHIP[view.state];
   const close = () => {
     setSteps(null);
     setDraft("");
     setError(null);
+    refocus.current = true;
   };
   const submit = () => save.mutate(draft.trim(), { onSuccess: close, onError: (e) => setError(errorText(t, e)) });
   const stepsOf = (replace: boolean) => (
@@ -268,8 +275,13 @@ function JevCard({ view }: { view: JevKey }) {
     ) : view.state === "no_credit" ? (
       <OpenPage href={TYPESAFE_CONSOLE}>{t("jev.steps.openSite")}</OpenPage>
     ) : null;
-  const ghost = (label: string, onClick: () => void, extra?: { danger?: boolean; loading?: boolean }) => (
+  const ghost = (
+    label: string,
+    onClick: () => void,
+    extra?: { danger?: boolean; loading?: boolean; ref?: Ref<HTMLButtonElement> },
+  ) => (
     <Button
+      ref={extra?.ref}
       size="sm"
       variant="ghost"
       className={extra?.danger ? "ac-btn--danger" : undefined}
@@ -286,7 +298,7 @@ function JevCard({ view }: { view: JevKey }) {
   ) : view.state === "invalid" ? (
     <>
       {site}
-      {ghost(t("settings.rotate"), () => setSteps("replace"))}
+      {ghost(t("settings.rotate"), () => setSteps("replace"), { ref: opener })}
     </>
   ) : view.state === "no_credit" ? (
     <>
@@ -295,7 +307,7 @@ function JevCard({ view }: { view: JevKey }) {
     </>
   ) : (
     <>
-      {ghost(t("settings.rotate"), () => setSteps("replace"))}
+      {ghost(t("settings.rotate"), () => setSteps("replace"), { ref: opener })}
       {ghost(t("settings.remove"), () => setRemoving(true), { danger: true })}
     </>
   );
@@ -332,11 +344,11 @@ function JevCard({ view }: { view: JevKey }) {
         </div>
         {view.source === null ? (
           <div className="ac-list__row jev__body">
-            <JevWhy />
+            <JevWhy routing={routing} />
             {steps ? (
               stepsOf(false)
             ) : (
-              <Button size="sm" variant="primary" onClick={() => setSteps("set")}>
+              <Button ref={opener} size="sm" variant="primary" onClick={() => setSteps("set")}>
                 {t("jev.setUp")}
               </Button>
             )}
@@ -379,7 +391,14 @@ function JevCard({ view }: { view: JevKey }) {
             variant="danger"
             disabled={remove.isPending}
             loading={remove.isPending}
-            onClick={() => remove.mutate(undefined, { onSuccess: () => setRemoving(false) })}
+            onClick={() =>
+              remove.mutate(undefined, {
+                onSuccess: () => {
+                  setRemoving(false);
+                  close();
+                },
+              })
+            }
           >
             {t("settings.remove")}
           </Button>

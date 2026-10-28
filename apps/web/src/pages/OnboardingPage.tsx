@@ -22,7 +22,7 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { errorText, holdText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import {
   type ComputerKind,
@@ -722,8 +722,9 @@ export function OnboardingPage() {
   // Whoever the text mentions first speaks, and gets it; with nobody named, the router picks who answers.
   const mentioned = firstMentioned(askText, crew);
   const speaker = mentioned ?? crew.find((c) => c.key === firstAsk?.asker);
-  // No socket is open here: an agent waiting for its computer is asked about again until it can start.
-  const aiNow = useAiStatus(created?.orgId ?? "", step.id === "done" && speaker !== undefined, (status) =>
+  // No socket is open here: an agent waiting for its computer is asked about again until it can start. Jev's screen
+  // reads it too: its reasons leave out picking who answers where this server's router is off.
+  const aiNow = useAiStatus(created?.orgId ?? "", (step.id === "done" && speaker !== undefined) || jevOpen, (status) =>
     mentioned && aiStateOf(status, mentioned.id) === "waiting" ? COMPUTER_POLL_MS : false,
   );
   const lineState = !asking
@@ -810,7 +811,8 @@ export function OnboardingPage() {
         }
         if (agentsPhase === "jev" && jevSaves) {
           const saved = await saveJev.mutateAsync(jevTyped).catch((error: unknown) => {
-            setJevDone({ text: jevTyped, saved: false });
+            // Only TypeSafe's refusal answers for this text: after a limit or an outage, the same key can be tried again.
+            if (errorCode(error) === "jev_key_invalid") setJevDone({ text: jevTyped, saved: false });
             setJevError(errorText(t, error));
             return null;
           });
@@ -1304,7 +1306,7 @@ export function OnboardingPage() {
 
           {jevOpen && (
             <div className="onb__answer">
-              <JevWhy />
+              <JevWhy routing={aiNow.data?.routing?.by} />
               <Card as="div">
                 <JevSteps
                   value={jevDraft}

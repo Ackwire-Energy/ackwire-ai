@@ -35,6 +35,104 @@ const field = () => within(card()).getByLabelText("Cole aqui") as HTMLInputEleme
 const calls = (state: ReturnType<typeof seedState>, method: string) =>
   state.calls.filter((c) => c.method === method).map((c) => c.args);
 
+/** [Portuguese, English] */
+type Words = readonly [string, string];
+const SECTION: Words = ["Quem escolhe os agentes", "Who picks the agents"];
+const HOW_PICKED: Words = ["Como os agentes são escolhidos", "How agents are picked"];
+const ABOUT: Words = ["Sobre Jev", "About Jev"];
+const HOW_JEV: Words = ["Como o Jev funciona", "How Jev works"];
+const THIS_MONTH: Words = [
+  "Termina em 9f2c · 1.240 decisões este mês · US$ 0,13",
+  "Ends in 9f2c · 1,240 decisions this month · US$ 0.13",
+];
+const REPLACE: Words = ["Trocar a chave", "Replace the key"];
+const KEYS_PAGE: Words = ["Abrir as chaves de API", "Open API keys"];
+/** Each state of the card: its chip, its key's line, the note under it, its buttons after the ⓘ, its links before "How Jev works". */
+const STATES: {
+  state: string;
+  jev: JevKey;
+  chip: Words;
+  facts: Words | null;
+  note: Words | null;
+  buttons: Words[];
+  links: Words[];
+  text?: Words[];
+}[] = [
+  {
+    state: "off",
+    jev: OFF,
+    chip: ["Desligado", "Off"],
+    facts: null,
+    note: null,
+    buttons: [["Configurar o Jev", "Set up Jev"]],
+    links: [],
+    text: [
+      ["Ajuda os agentes a trabalhar em equipe.", "Helps your agents work as a team."],
+      ["Escolhe quem responde Mesmo sem @menção.", "Picks who answers Even without an @mention."],
+      [
+        "Organiza a memória Percebe repetições ditas de outro jeito.",
+        "Keeps memory tidy Spots repeats said in other words.",
+      ],
+      [
+        "Enxerga a tela Os agentes acham botões pela descrição.",
+        "Sees the screen Agents find buttons from a description.",
+      ],
+    ],
+  },
+  {
+    state: "on",
+    jev: ON,
+    chip: ["Ligado", "On"],
+    facts: THIS_MONTH,
+    note: null,
+    buttons: [REPLACE, ["Apagar", "Delete"]],
+    links: [],
+    text: [["Chave da TypeSafe", "TypeSafe key"]],
+  },
+  {
+    state: "key not accepted",
+    jev: { ...ON, state: "invalid", month: { decisions: 0, costUsd: 0 } },
+    chip: ["Chave recusada", "Key not accepted"],
+    facts: ["Termina em 9f2c", "Ends in 9f2c"],
+    note: ["A TypeSafe não aceitou esta chave. Crie uma nova.", "TypeSafe didn't accept this key. Create a new one."],
+    buttons: [REPLACE],
+    links: [KEYS_PAGE],
+  },
+  {
+    state: "out of credit",
+    jev: { ...ON, state: "no_credit" },
+    chip: ["Sem crédito", "Out of credit"],
+    facts: THIS_MONTH,
+    note: ["Adicione crédito na TypeSafe. O Jev volta sozinho.", "Add credit at TypeSafe. Jev resumes by itself."],
+    buttons: [["Verificar de novo", "Check again"]],
+    links: [["Abrir a TypeSafe", "Open TypeSafe"]],
+  },
+  {
+    state: "from .env",
+    jev: { ...ON, source: "env" },
+    chip: ["Ligado", "On"],
+    facts: THIS_MONTH,
+    note: [
+      "Definida nas configurações deste servidor (TYPESAFE_API_KEY).",
+      "Set in this server's settings (TYPESAFE_API_KEY).",
+    ],
+    buttons: [],
+    links: [],
+  },
+  {
+    state: "from .env, not accepted",
+    jev: { ...ON, source: "env", state: "invalid" },
+    chip: ["Chave recusada", "Key not accepted"],
+    facts: THIS_MONTH,
+    note: [
+      "A TypeSafe não aceitou esta chave. Troque nas configurações deste servidor (TYPESAFE_API_KEY).",
+      "TypeSafe didn't accept this key. Change it in this server's settings (TYPESAFE_API_KEY).",
+    ],
+    buttons: [],
+    links: [KEYS_PAGE],
+  },
+];
+
 describe("Jev's key in Configurações › Contas de IA", () => {
   test("nobody but the server's owner sees it: who picks, and no Jev", async () => {
     await open({ aiStatus: routed("plans") });
@@ -68,6 +166,8 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
 
     await click(within(card()).getByRole("button", { name: "Configurar o Jev" }));
+    // The button pressed gives way to the steps: the field takes the focus.
+    expect(document.activeElement).toBe(field());
     const site = within(card()).getByRole("link", { name: "Abrir a TypeSafe" });
     const keys = within(card()).getByRole("link", { name: "Abrir as chaves de API" });
     expect([site.getAttribute("href"), keys.getAttribute("href")]).toEqual([
@@ -97,6 +197,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Ligado");
     expect(card().textContent).toContain("Termina em 9f2c");
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
+    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Trocar a chave" }));
     // The key itself is never on the page.
     expect(document.body.innerHTML).not.toContain("ts_live_9f2c");
   });
@@ -118,6 +219,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(field().hasAttribute("aria-invalid")).toBe(false);
     await click(within(card()).getByRole("button", { name: "Cancelar" }));
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
+    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Configurar o Jev" }));
   });
 
   test("on: its last 4 and this month's use; Trocar a chave asks only for the new key; Apagar asks first", async () => {
@@ -131,6 +233,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(card().querySelector(".ac-setnote")).toBeNull();
 
     await click(within(card()).getByRole("button", { name: "Trocar a chave" }));
+    expect(document.activeElement).toBe(field());
     // Steps ② and ③ only, numbered 1 and 2.
     expect(within(card()).queryByRole("link", { name: "Abrir a TypeSafe" })).toBeNull();
     expect([...card().querySelectorAll(".agp-addacct__step > i")].map((n) => n.textContent)).toEqual(["1", "2"]);
@@ -139,6 +242,9 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(calls(state, "system.saveJev")).toEqual([["ts_new_key_7777"]]);
     expect(card().textContent).toContain("Termina em 7777");
 
+    // Removed with Trocar a chave open and a key half typed: the card starts over, its steps closed and empty.
+    await click(within(card()).getByRole("button", { name: "Trocar a chave" }));
+    await type(field(), "ts_half_typed");
     await click(within(card()).getByRole("button", { name: "Apagar" }));
     const ask = screen().getByRole("dialog", { name: "Remover a chave do Jev?" });
     expect(ask.textContent).toContain("Os agentes continuam trabalhando sem ele.");
@@ -146,7 +252,23 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     await click(within(ask).getByRole("button", { name: "Apagar" }), 6);
     expect(calls(state, "system.removeJev")).toEqual([[]]);
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Desligado");
-    expect(within(card()).getByRole("button", { name: "Configurar o Jev" })).toBeTruthy();
+    expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
+    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Configurar o Jev" }));
+    await click(within(card()).getByRole("button", { name: "Configurar o Jev" }));
+    expect(field().value).toBe("");
+  });
+
+  test("with the router off nothing picks who answers, so no reason says Jev does, for an owner who isn't an admin too", async () => {
+    const state = seedState({ aiStatus: routed("off"), jev: OFF });
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await renderApp(`/org/${ORG_ID}/settings/keys`, { api: createFakeApi(state) });
+    await settle(5);
+    expect([...card().querySelectorAll(".jev-why b")].map((b) => b.textContent)).toEqual([
+      "Organiza a memória",
+      "Enxerga a tela",
+    ]);
+    // Who picks now is said to admins only.
+    expect(screen().getByRole("region", { name: "Quem escolhe os agentes" }).querySelector(".who-line")).toBeNull();
   });
 
   test("a key not accepted, out of credit: the state, what to do, and the console where it's done", async () => {
@@ -209,21 +331,45 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(within(card()).getByRole("link", { name: "Abrir as chaves de API" })).toBeTruthy();
   });
 
-  test("in English", async () => {
-    const { services } = await open({ aiStatus: routed("model"), jev: { ...ON, state: "no_credit" } });
-    await act(async () => {
-      await services.i18n.changeLanguage("en");
+  for (const [i, lang] of [
+    [0, "pt-BR"],
+    [1, "en"],
+  ] as const) {
+    test(`each state's chip, line, note, buttons and links, in ${lang}`, async () => {
+      for (const c of STATES) {
+        const { services } = await open({ aiStatus: routed("jev"), jev: c.jev });
+        if (lang === "en") {
+          await act(async () => {
+            await services.i18n.changeLanguage("en");
+          });
+          await settle(3);
+        }
+        const section = screen().getByRole("region", { name: SECTION[i] });
+        expect(within(section).getByRole("link", { name: HOW_PICKED[i] })).toBeTruthy();
+        expect({
+          state: c.state,
+          chip: card().querySelector(".ac-chip")?.textContent,
+          facts: card().querySelector(".jev__key .list-col > .small")?.textContent ?? null,
+          note: card().querySelector(".ac-setnote")?.textContent ?? null,
+          buttons: within(card())
+            .queryAllByRole("button")
+            .map((b) => b.getAttribute("aria-label") ?? b.textContent),
+          links: within(card())
+            .queryAllByRole("link")
+            .map((l) => l.textContent),
+        }).toEqual({
+          state: c.state,
+          chip: c.chip[i],
+          facts: c.facts?.[i] ?? null,
+          note: c.note?.[i] ?? null,
+          buttons: [ABOUT[i], ...c.buttons.map((b) => b[i])],
+          links: [...c.links.map((l) => l[i]), HOW_JEV[i]],
+        });
+        for (const text of c.text ?? []) expect(card().textContent).toContain(text[i]);
+        cleanup();
+      }
     });
-    await settle(3);
-    const section = screen().getByRole("region", { name: "Who picks the agents" });
-    expect(within(section).getByRole("link", { name: "How agents are picked" })).toBeTruthy();
-    expect(card().querySelector(".ac-chip")?.textContent).toBe("Out of credit");
-    expect(card().textContent).toContain("TypeSafe key");
-    expect(card().textContent).toContain("Ends in 9f2c · 1,240 decisions this month · US$ 0.13");
-    expect(card().textContent).toContain("Add credit at TypeSafe. Jev resumes by itself.");
-    expect(within(card()).getByRole("button", { name: "Check again" })).toBeTruthy();
-    expect(within(card()).getByRole("link", { name: "Open TypeSafe" })).toBeTruthy();
-  });
+  }
 
   test("?open=jev lands on it, scrolled to and focused", async () => {
     const state = seedState({ jev: ON });

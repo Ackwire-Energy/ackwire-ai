@@ -10121,6 +10121,12 @@ html[data-menu-overlay] .shell {
 .jev-steps__below {
   margin: 0;
 }
+/* On a phone the key's field takes its row, so its placeholder fits, and Save and Cancel go under it together. */
+@media (max-width: 640px) {
+  .jev-steps .agp-addacct__paste .ac-input {
+    flex-basis: 100%;
+  }
+}
 /* "Picking who answers": the receipt's clock where its check goes once an agent has seen the message. */
 .ac-receipt__clock {
   display: inline-flex;

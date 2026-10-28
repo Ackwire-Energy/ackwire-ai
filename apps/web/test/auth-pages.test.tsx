@@ -966,6 +966,15 @@ describe("Onboarding", () => {
       expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
     });
 
+    test("with the server's router off, no reason says Jev picks who answers", async () => {
+      const routing = { by: "off", mine: "off", model: null, noSmallModel: null } as const;
+      await toJev({ aiStatus: { any: true, agents: [], routing, apiKey: true } });
+      expect([...document.querySelectorAll(".jev-why b")].map((b) => b.textContent)).toEqual([
+        "Organiza a memória",
+        "Enxerga a tela",
+      ]);
+    });
+
     test("Save and continue keeps a key TypeSafe accepts, and moves on", async () => {
       const { state } = await toJev();
       await type("Cole aqui", "ts_1234");
@@ -989,6 +998,22 @@ describe("Onboarding", () => {
       await click(button("Continuar"), 8);
       expect(calls(state, "system.saveJev")).toHaveLength(1);
       expect(state.jev?.source).toBeNull();
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a limit is no refusal: its words stay under the field, and the same key is saved on the next try", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_live_9f2c: "rate_limited" } });
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      const field = screen().getByLabelText("Cole aqui");
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "Too many tries. Wait a minute.",
+      );
+      // Never a way past a key that wasn't kept.
+      expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"], ["ts_live_9f2c"]]);
+      expect(state.jev?.source).toBe("settings");
       expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
     });
 
