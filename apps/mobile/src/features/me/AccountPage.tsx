@@ -3,7 +3,8 @@ import { browserTimezone, zoneDisplayName } from "@agenteschat/client/lib/routin
 import { filterZones, type ZoneOption, zoneOptions } from "@agenteschat/ui/timezones";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +23,7 @@ import {
   useToast,
 } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { goBack, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import {
   type AccountDraft,
@@ -31,7 +33,7 @@ import {
   PHOTO_MAX_BASE64,
   photoContentType,
 } from "./logic";
-import { Page, SheetBar } from "./parts";
+import { Page, setAccountDraft, useAccountDraft } from "./parts";
 
 /** A zone as the list says it: "Horário de Brasília" (a friendly name) or the city. */
 const zoneName = (zone: string, locale: string) =>
@@ -39,21 +41,10 @@ const zoneName = (zone: string, locale: string) =>
 
 /**
  * Conta: the photo and "Alterar foto", Nome (editable), E-mail (read only),
- * then in this workspace your @ and the time zone, as the web's Perfil. "OK" saves; Apagar conta at the end.
+ * then in this workspace your @ and the time zone (Fuso, pushed over it), as the web's Perfil. "OK" in the bar
+ * saves and goes back; Apagar conta at the end.
  */
-export function AccountPage({
-  draft,
-  setDraft,
-  onBack,
-  onZone,
-  onDelete,
-}: {
-  draft: AccountDraft;
-  setDraft: (draft: AccountDraft) => void;
-  onBack: () => void;
-  onZone: () => void;
-  onDelete: () => void;
-}) {
+export function AccountPage() {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const api = useApi();
@@ -65,7 +56,18 @@ export function AccountPage({
   const dir = useDirectory();
   const mine = meId ? dir.memberById.get(meId) : undefined;
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
-  const [initial] = useState(draft);
+  // The form starts from the profile when Conta opens (Fuso, over it, changes its zone) and is dropped when it closes.
+  const [initial] = useState<AccountDraft>(() => ({
+    name: me.data?.user.name ?? "",
+    handle: mine?.handle ?? "",
+    zone: mine?.timezone ?? null,
+  }));
+  useEffect(() => {
+    setAccountDraft(initial);
+    return () => setAccountDraft(null);
+  }, [initial]);
+  const draft = useAccountDraft() ?? initial;
+  const setDraft = setAccountDraft;
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export function AccountPage({
       if (changes.profile) await api.orgs.updateMe(org.orgId, changes.profile);
       refresh();
       toast({ title: t("mobile.me.account.saved") });
-      onBack();
+      goBack();
     } catch (e) {
       const key = e instanceof ApiError ? handleErrorKey(e.code) : null;
       setError(key ? t(`mobile.me.account.${key}`) : t("mobile.app.failed"));
@@ -186,20 +188,11 @@ export function AccountPage({
   return (
     <Page
       title={t("mobile.me.account.title")}
-      onBack={onBack}
-      right={
-        <Pressable
-          onPress={() => void save()}
-          disabled={!changed || Boolean(problem) || saving}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !changed || Boolean(problem) || saving }}
-          hitSlop={8}
-        >
-          <Text variant="title" tone={!changed || problem || saving ? "faint" : "ink"}>
-            {t("mobile.me.account.save")}
-          </Text>
-        </Pressable>
-      }
+      action={{
+        label: t("mobile.me.account.save"),
+        disabled: !changed || Boolean(problem) || saving,
+        onPress: () => void save(),
+      }}
     >
       <View style={styles.photo}>
         <PersonAvatar name={draft.name || "?"} size={92} photo={photo} />
@@ -256,7 +249,7 @@ export function AccountPage({
             name: t("common.about", { label: t("mobile.me.account.timezone") }),
             text: t("mobile.me.account.timezoneHint"),
           }}
-          onPress={onZone}
+          onPress={() => router.push("/me/zone")}
         >
           <Text variant="callout" numberOfLines={1}>
             {zoneLabel}
@@ -270,24 +263,32 @@ export function AccountPage({
       ) : null}
       <View style={styles.gapBig} />
       <GroupedList>
-        <GroupedRow icon="x" label={t("mobile.me.deleteAccount")} danger chevron onPress={onDelete} />
+        <GroupedRow
+          icon="x"
+          label={t("mobile.me.deleteAccount")}
+          danger
+          chevron
+          onPress={() => router.push("/account-delete")}
+        />
       </GroupedList>
     </Page>
   );
 }
 
-/** Fuso: "Usar o fuso do workspace", then the suggested zones and every other, with a search. */
-export function ZonePage({
-  value,
-  onBack,
-  onPick,
-}: {
-  value: string | null;
-  onBack: () => void;
-  onPick: (zone: string | null) => void;
-}) {
+/**
+ * Fuso, pushed over Conta: the search, "Usar o fuso do workspace", then the suggested zones and every other. A pick
+ * goes into Conta's form and back to it.
+ */
+export function ZonePage() {
   const { t, i18n } = useTranslation();
+  const c = useColors();
   const insets = useSafeAreaInsets();
+  const draft = useAccountDraft();
+  const value = draft?.zone ?? null;
+  const onPick = (zone: string | null) => {
+    if (draft) setAccountDraft({ ...draft, zone });
+    goBack();
+  };
   const org = useOrg();
   const settings = useSettings(org.orgId);
   const dir = useDirectory();
@@ -311,29 +312,32 @@ export function ZonePage({
       ];
 
   return (
-    <View style={styles.fill}>
-      <SheetBar title={t("mobile.me.zone.title")} onBack={onBack} />
-      <View style={styles.search}>
-        <SearchField value={query} onChangeText={setQuery} placeholder={t("mobile.me.zone.search")} />
-      </View>
+    <View style={[styles.fill, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("mobile.me.zone.title")} solid={false} grouped />
       <FlatList
         data={rows}
         keyExtractor={(r) => ("header" in r ? `h:${r.header}` : r.zone)}
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         initialNumToRender={20}
         contentContainerStyle={[styles.zoneList, { paddingBottom: 24 + insets.bottom }]}
         ListHeaderComponent={
-          q ? undefined : (
-            <GroupedList>
-              <GroupedRow
-                label={t("mobile.me.zone.useOrg")}
-                {...(orgZone ? { sub: zoneName(orgZone, i18n.language) } : {})}
-                checked={value === null}
-                onPress={() => onPick(null)}
-              />
-            </GroupedList>
-          )
+          <>
+            <View style={styles.search}>
+              <SearchField value={query} onChangeText={setQuery} placeholder={t("mobile.me.zone.search")} />
+            </View>
+            {q ? null : (
+              <GroupedList>
+                <GroupedRow
+                  label={t("mobile.me.zone.useOrg")}
+                  {...(orgZone ? { sub: zoneName(orgZone, i18n.language) } : {})}
+                  checked={value === null}
+                  onPress={() => onPick(null)}
+                />
+              </GroupedList>
+            )}
+          </>
         }
         ListEmptyComponent={<GroupedFooter>{t("mobile.me.zone.none")}</GroupedFooter>}
         renderItem={({ item }) =>
@@ -366,7 +370,7 @@ const styles = StyleSheet.create({
   handle: { flexDirection: "row", alignItems: "center", gap: 1 },
   error: { paddingTop: 8, paddingHorizontal: 16 },
   gapBig: { height: 22 },
-  search: { paddingHorizontal: 16, paddingBottom: 8 },
+  search: { paddingTop: 4, paddingBottom: 8 },
   zoneList: { paddingHorizontal: 16 },
   zoneRow: { borderBottomWidth: StyleSheet.hairlineWidth },
 });

@@ -12,8 +12,9 @@ export const unstable_settings = { anchor: "(tabs)" };
 
 /**
  * The signed-in app: the native tabs, and the screens pushed over them with the platform's push (the tab
- * bar hides there; the native back button and the edge swipe go back), Você among them. Requests and "Novo" (the "+"
- * of the tabs, with its three forms stacked over it) are native form sheets over whatever is on screen.
+ * bar hides there; the native back button and the edge swipe go back), Você and its screens among them.
+ * Requests and "Novo" (the "+" of the tabs, with its three forms stacked over it) are native form sheets over
+ * whatever is on screen.
  * Header options are set here so the first frame of a push already has its bar; `PushedHeader` fills in
  * the title and actions.
  */
@@ -70,8 +71,16 @@ function AppStack() {
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="connect-ai" options={formSheet} />
-      {/* Você: a pushed page that draws its own bar (the sky goes up behind the status bar). */}
-      <Stack.Screen name="me" options={{ ...pushed, headerShown: false }} />
+      {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
+      <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
+      <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />

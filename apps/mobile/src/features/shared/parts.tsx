@@ -1,8 +1,10 @@
 import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, router, Stack, useIsFocused } from "expo-router";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { needsHeaderBlur } from "@/lib/nav";
 import {
+  Button,
   Card,
   coverBarOptions,
   fonts,
@@ -98,6 +100,10 @@ export function ActionList({ items }: { items: ActionItem[] }) {
   );
 }
 
+const IOS = Platform.OS === "ios";
+/** iOS 26's Liquid Glass bar (a saving word there is a prominent button). */
+const liquidGlass = IOS && !needsHeaderBlur(Platform.OS, Platform.Version);
+
 /**
  * The bar of a pushed screen, as the native header (react-native-screens): the system back chevron with
  * the edge swipe, a title (with a subtitle under it when given), an action on the right. Renders nothing
@@ -107,11 +113,14 @@ export function ActionList({ items }: { items: ActionItem[] }) {
  * `contentInsetAdjustmentBehavior="automatic"`); `plate` puts a clear bar over a full-bleed cover. On Android
  * the right actions float in a `HeaderCapsule` and the back button is a round plate (`usePushedOptions`);
  * its opaque bar takes the screen's color (`grouped`), so no band shows above a grouped gray screen.
+ * `action` is a word on the right that saves (Conta's "OK"): the system's bar button on iOS (prominent on
+ * iOS 26), our small primary button on Android.
  */
 export function PushedHeader({
   title,
   subtitle,
   right,
+  action,
   plate = false,
   solid = true,
   grouped = false,
@@ -119,6 +128,7 @@ export function PushedHeader({
   title?: ReactNode;
   subtitle?: string;
   right?: ReactNode;
+  action?: HeaderWordAction;
   /** Over a sky cover: a clear bar, the back button over the art. */
   plate?: boolean;
   solid?: boolean;
@@ -133,6 +143,13 @@ export function PushedHeader({
   const rightNode = useHeaderSlot(right);
   const custom = Boolean(subtitle) || (title != null && typeof title !== "string");
   const hasRight = Boolean(right);
+  // The action's press always reaches its latest handler; the options change only with its word and state.
+  const press = useRef(action?.onPress);
+  useLayoutEffect(() => {
+    press.current = action?.onPress;
+  });
+  const word = action?.label ?? null;
+  const wordOff = action?.disabled ?? false;
   // Stable options: `setOptions` runs when the title, subtitle or the presence of actions change, not on
   // every render of the screen (a conversation re-renders while agents stream).
   const options = useMemo<NativeStackNavigationOptions>(
@@ -141,6 +158,20 @@ export function PushedHeader({
       ...(barTone && !plate ? { headerStyle: { backgroundColor: barTone } } : null),
       title: text,
       headerTitle: custom ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} /> : text,
+      ...(word !== null && IOS
+        ? {
+            unstable_headerRightItems: () => [
+              {
+                type: "button" as const,
+                label: word,
+                accessibilityLabel: word,
+                variant: liquidGlass ? ("prominent" as const) : ("done" as const),
+                disabled: wordOff,
+                onPress: () => press.current?.(),
+              },
+            ],
+          }
+        : null),
       headerRight: hasRight
         ? () => (
             <View style={styles.headerRight}>
@@ -149,11 +180,30 @@ export function PushedHeader({
               </HeaderCapsule>
             </View>
           )
-        : undefined,
+        : word !== null && !IOS
+          ? () => (
+              <View style={styles.headerRight}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  label={word}
+                  disabled={wordOff}
+                  onPress={() => press.current?.()}
+                />
+              </View>
+            )
+          : undefined,
     }),
-    [plate, solid, scrollUnder, barTone, text, custom, subtitle, titleNode, hasRight, rightNode],
+    [plate, solid, scrollUnder, barTone, text, custom, subtitle, titleNode, hasRight, rightNode, word, wordOff],
   );
   return <Stack.Screen options={options} />;
+}
+
+/** A word on the right of a pushed screen's bar that saves (`PushedHeader`'s `action`). */
+export interface HeaderWordAction {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
 }
 
 /** A title with a subtitle under it, in the native bar (centered on iOS, leading on Android). */

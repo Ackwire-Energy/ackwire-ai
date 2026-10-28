@@ -116,6 +116,8 @@ import {
   HOLD_FINISHED_RUN_MS,
   landsOnDivider,
   lastSeenKey,
+  type Place,
+  placeCorrection,
   runsToShow,
   type ScrollRow,
   STICK_TO_END_THRESHOLD,
@@ -174,7 +176,7 @@ const FRESH_MS = 800;
 /** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
-/** How long the conversation is held in place after something opens over it or closes (ms). */
+/** How long the conversation is held in place after something opens over it and after it closes (ms). */
 const HOLD_MS = 900;
 /** How long the list keeps ignoring the keyboard after what covered it closed (its closing animation, ms). */
 const FREEZE_AFTER_MS = 450;
@@ -483,8 +485,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
   // marks the first of it, and the pill lands there when it is far.
   const listRef = useRef<LegendListRef>(null);
-  // The person is dragging the list (a hold on its place lets go).
+  // The person is dragging the list, and the hold on their place (see "Keeping the place"): either lets go of it.
   const dragging = useRef(false);
+  const holding = useRef(0);
   const scrollRows = useMemo<ScrollRow[]>(
     () =>
       rows.map((r) => ({
@@ -538,6 +541,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return [...rows.slice(0, at), { kind: "unseen", key: DIVIDER_KEY, fading: divider.fading }, ...rows.slice(at)];
   }, [rows, divider]);
   const toEnd = useCallback(() => {
+    // Going to the end on purpose (sending, the pill) lets go of a held place.
+    holding.current++;
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
   }, []);
@@ -547,6 +552,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const index = shownRows.findIndex((r) => r.key === DIVIDER_KEY);
     const far = state && landsOnDivider(state.contentLength, state.positionByKey(DIVIDER_KEY), state.scrollLength);
     if (far && index >= 0) {
+      holding.current++;
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: 12 });
       // What is new is in view now: the pill goes, the line fades after a while.
       setSeenKey(latestSeen);
@@ -831,6 +837,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const rowsRef = useRef<Row[]>([]);
   const goToPin = (pin: MessagePin) => {
     sheet.close();
+    // The pin is where the list goes now, not where it was under the sheet.
+    holding.current++;
     const shown = rowsRef.current;
     const target = pinTarget(pin, new Set(shown.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))));
     if (target.kind === "scroll") {
@@ -902,18 +910,38 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
-  // Something opening over the conversation must not move it: on iOS it jumped toward its top when a header
-  // button opened a sheet or the agent's computer (the cause sits between the modal and the list's insets). For
-  // a moment after it opens and after it closes, the list is held where it was, unless the person drags it.
-  const holdPlace = useCallback((at?: number) => {
-    const from = at ?? listRef.current?.getState().scroll;
-    if (from == null) return;
+  // ── Keeping the place ──
+  // Something opening over the conversation must not move it: on iOS it jumped when a header button opened a sheet
+  // or the agent's computer. Where the person was (the end, or a row on screen) is taken before it opens, and given
+  // back for a moment after it opens and after it closes, whichever way the list moved, unless they drag it or
+  // the app scrolls it on purpose (sending, the pill, a pin).
+  const placeNow = useCallback((): Place | null => {
+    const list = listRef.current;
+    const state = list?.getState();
+    if (!list || !state) return null;
+    if (state.isFollowingEnd) return { end: true };
+    const anchor = list.anchorVisibleContent({ hold: false });
+    const position = anchor ? state.positionByKey(anchor.key) : undefined;
+    return { end: false, scroll: state.scroll, key: anchor?.key ?? null, position: position ?? null };
+  }, []);
+  const holdPlace = useCallback((place: Place | null) => {
+    if (!place) return;
+    const hold = ++holding.current;
     dragging.current = false;
     const until = Date.now() + HOLD_MS;
     const check = () => {
-      if (dragging.current) return;
-      const now = listRef.current?.getState().scroll;
-      if (now != null && from - now > 40) listRef.current?.scrollToOffset({ offset: from, animated: false });
+      if (dragging.current || holding.current !== hold) return;
+      const list = listRef.current;
+      const state = list?.getState();
+      if (list && state) {
+        const fix = placeCorrection(place, {
+          scroll: state.scroll,
+          distanceFromEnd: state.distanceFromEnd,
+          positionOf: state.positionByKey,
+        });
+        if (fix === "end") void list.scrollToEnd({ animated: false });
+        else if (fix !== null) void list.scrollToOffset({ offset: fix, animated: false });
+      }
       if (Date.now() < until) requestAnimationFrame(check);
     };
     requestAnimationFrame(check);
@@ -932,24 +960,37 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       if (!covered.current) freeze.value = false;
     }, FREEZE_AFTER_MS);
   }, [freeze]);
-  useEffect(() => sheet.subscribe((open) => (open ? cover() : uncover())), [sheet, cover, uncover]);
+  // Every sheet of this screen says when it opens (before the keyboard leaves) and closes: one place for all of
+  // them (the header's, a message's, the composer's).
+  useEffect(() => {
+    let place: Place | null = null;
+    return sheet.subscribe((open) => {
+      if (open) {
+        place = covered.current ? place : placeNow();
+        cover();
+      } else uncover();
+      holdPlace(place);
+    });
+  }, [sheet, cover, uncover, placeNow, holdPlace]);
   // The agent's computer opens full screen: where the conversation was is kept, and given back on return.
-  const away = useRef<number | null>(null);
+  const away = useRef<Place | null>(null);
+  const left = useRef(false);
   const leavePlace = useCallback(() => {
-    away.current = listRef.current?.getState().scroll ?? null;
+    away.current = placeNow();
+    left.current = true;
+    holdPlace(away.current);
     cover();
     Keyboard.dismiss();
-  }, [cover]);
+  }, [placeNow, holdPlace, cover]);
   useFocusEffect(
     useCallback(() => {
-      const at = away.current;
-      away.current = null;
-      if (at == null) return;
-      holdPlace(at);
+      if (!left.current) return;
+      left.current = false;
+      holdPlace(away.current);
       uncover();
     }, [holdPlace, uncover]),
   );
-  const showOptions = () =>
+  const openOptions = () =>
     info && isThread
       ? sheet.open(
           <ThreadOptions
@@ -958,7 +999,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onMission={() => openNewMission("", info.id)}
             onPins={openPins}
           />,
-          { onClose: () => holdPlace() },
         )
       : sheet.open(
           <ChannelOptions
@@ -972,12 +1012,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
           />,
-          { onClose: () => holdPlace() },
         );
-  const openOptions = () => {
-    holdPlace();
-    showOptions();
-  };
   const pill =
     isThread && info ? (
       <HeaderPill
@@ -1036,10 +1071,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </View>
           ) : undefined
         }
-        onPress={() => {
-          holdPlace();
-          openMembers();
-        }}
+        onPress={openMembers}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
