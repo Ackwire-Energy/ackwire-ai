@@ -442,7 +442,8 @@ unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
     use objc2::{msg_send, sel};
     use std::ffi::CString;
 
-    unsafe extern "C-unwind" fn layout(this: &AnyObject, _: Sel) {
+    unsafe extern "C-unwind" fn layout(this: *mut AnyObject, _: Sel) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
         let Some(superclass) = this.class().superclass() else { return };
         let _: () = unsafe { msg_send![super(this, superclass), layout] };
         let key = this as *const AnyObject as usize;
@@ -462,7 +463,7 @@ unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
         None => {
             let Some(mut builder) = ClassBuilder::new(&name, class) else { return };
             unsafe {
-                builder.add_method(sel!(layout), layout as unsafe extern "C-unwind" fn(&AnyObject, Sel));
+                builder.add_method(sel!(layout), layout as unsafe extern "C-unwind" fn(*mut AnyObject, Sel));
             }
             builder.register()
         }
