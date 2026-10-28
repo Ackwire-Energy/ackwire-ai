@@ -2,7 +2,6 @@ import {
   type AppNotification,
   type Routine,
   useAiStatus,
-  useDms,
   useNotificationAction,
   useNotifications,
   useRoutines,
@@ -30,7 +29,7 @@ import {
   weights,
 } from "@/ui";
 import { ApprovalWhy } from "../approvals/parts";
-import { agentDmOf, notificationHref } from "../links/logic";
+import { notificationHref, routineHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
@@ -141,11 +140,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   // Someone asking to join: who asked (the first names, how many in all), with their faces.
   const join = card.kind === "join" ? joinRequestLine(t, n) : null;
   const title = card.kind === "approval" && request ? approvalTitle(t, request) : join ? join.text : card.title;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
-  // an AI while no agent has one.
-  const dms = useDms(orgId);
+  // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = notificationHref(n, agentDmOf(dms.data), ai);
+  const href = notificationHref(n, ai);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -258,7 +255,12 @@ function AllClear() {
         {t("mobile.activityNow.clear.text")}
       </Text>
       {next ? (
-        <View style={[styles.next, { backgroundColor: c.sunken }]}>
+        // The routine opens on a tap (Rotinas).
+        <Pressable
+          onPress={() => router.push(routineHref(next.id))}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.next, { backgroundColor: c.sunken }, pressed && styles.wpressed]}
+        >
           {nextAgent ? <AgentFace agentId={nextAgent.id} size={26} live={false} /> : <Tile icon="clock" size={26} />}
           <View style={styles.grow}>
             <Text variant="small" tone="ink2" numberOfLines={1}>
@@ -266,7 +268,7 @@ function AllClear() {
             </Text>
             <NextWhen routine={next} agent={nextAgent?.name ?? ""} />
           </View>
-        </View>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -319,11 +321,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const c = useColors();
   const when = useWhen();
   const act = useNotificationAction(orgId);
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
-  // an AI while no agent has one.
-  const dms = useDms(orgId);
+  // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = notificationHref(n, agentDmOf(dms.data), ai);
+  const href = notificationHref(n, ai);
   const unread = n.readAt === null;
 
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));

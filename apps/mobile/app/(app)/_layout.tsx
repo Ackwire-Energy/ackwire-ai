@@ -61,6 +61,10 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />

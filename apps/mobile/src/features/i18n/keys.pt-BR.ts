@@ -957,6 +957,12 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar o Drive.",
     more: "Mostrar mais",
   },
+  // Rotinas (the rest of its words are the web's, `routines.*`).
+  routines: {
+    loadFailed: "Não deu para carregar as rotinas.",
+    anyAgent: "Todos os agentes",
+    create: "Criar",
+  },
   // intentional: chats/activity/ui
   homeNow: {
     working_one: "{{count}} trabalhando",

@@ -275,20 +275,41 @@ export function AccountPage() {
   );
 }
 
-/**
- * Fuso, pushed over Conta: the search, "Usar o fuso do workspace", then the suggested zones and every other. A pick
- * goes into Conta's form and back to it.
- */
+/** Fuso, pushed over Conta: a pick goes into Conta's form and back to it ("Usar o fuso do workspace" is null). */
 export function ZonePage() {
+  const { t } = useTranslation();
+  const draft = useAccountDraft();
+  return (
+    <ZoneList
+      title={t("mobile.me.zone.title")}
+      value={draft?.zone ?? null}
+      withWorkspace
+      onPick={(zone) => {
+        if (draft) setAccountDraft({ ...draft, zone });
+        goBack();
+      }}
+    />
+  );
+}
+
+/**
+ * A time zone chosen on a screen of its own (Conta's Fuso, a routine's "Fuso horário"): the search, "Usar o fuso do
+ * workspace" (`withWorkspace`: a pick of null), then the suggested zones and every other.
+ */
+export function ZoneList({
+  title,
+  value,
+  withWorkspace = false,
+  onPick,
+}: {
+  title: string;
+  value: string | null;
+  withWorkspace?: boolean;
+  onPick: (zone: string | null) => void;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const draft = useAccountDraft();
-  const value = draft?.zone ?? null;
-  const onPick = (zone: string | null) => {
-    if (draft) setAccountDraft({ ...draft, zone });
-    goBack();
-  };
   const org = useOrg();
   const settings = useSettings(org.orgId);
   const dir = useDirectory();
@@ -313,7 +334,7 @@ export function ZonePage() {
 
   return (
     <View style={[styles.fill, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("mobile.me.zone.title")} solid={false} grouped />
+      <PushedHeader title={title} solid={false} grouped />
       <FlatList
         data={rows}
         keyExtractor={(r) => ("header" in r ? `h:${r.header}` : r.zone)}
@@ -327,7 +348,7 @@ export function ZonePage() {
             <View style={styles.search}>
               <SearchField value={query} onChangeText={setQuery} placeholder={t("mobile.me.zone.search")} />
             </View>
-            {q ? null : (
+            {q || !withWorkspace ? null : (
               <GroupedList>
                 <GroupedRow
                   label={t("mobile.me.zone.useOrg")}

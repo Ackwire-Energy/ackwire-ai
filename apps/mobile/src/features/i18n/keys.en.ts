@@ -952,6 +952,12 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't load the Drive.",
     more: "Show more",
   },
+  // Rotinas (the rest of its words are the web's, `routines.*`).
+  routines: {
+    loadFailed: "Couldn't load the routines.",
+    anyAgent: "All agents",
+    create: "Create",
+  },
   // intentional: chats/activity/ui
   homeNow: {
     working_one: "{{count}} working",

@@ -92,6 +92,7 @@ export function MeScreen() {
       ...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {}),
       href: "/issues",
     },
+    { icon: "clock", label: t("routines.title"), href: "/routines" },
     { icon: "doc", label: t("mobile.me.drive"), href: "/drive" },
     { icon: "bolt", label: t("mobile.me.connectors"), href: "/connectors" },
     { icon: "chart", label: t("mobile.me.usage"), href: "/usage" },
