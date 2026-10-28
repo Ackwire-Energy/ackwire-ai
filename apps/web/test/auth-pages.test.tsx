@@ -621,7 +621,8 @@ describe("A verificação contra robôs (agentes.chat Cloud)", () => {
 });
 
 describe("Onboarding", () => {
-  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}) => {
+  /** `claudeSignedIn`: each computer the person connects has Claude Code signed in there (its own sign-in). */
+  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}, { claudeSignedIn = true } = {}) => {
     const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
@@ -640,6 +641,20 @@ describe("Onboarding", () => {
         ownSignIn: machine !== undefined && machine.kind !== "host",
       };
     };
+    // Each computer's row as the server makes it: its own Claude Code sign-in, where it is signed in there.
+    api.machines.aiAccounts = async () => ({
+      accounts: [],
+      computers: (fakeMachinesOf.get(api)?.all() ?? []).map((m) => ({
+        machineId: m.id,
+        name: m.name,
+        online: m.online,
+        mine: m.kind !== "host",
+        canAdd: true,
+        keys: true,
+        brains: { claude_code: true, codex: true },
+        own: claudeSignedIn && m.kind !== "host" ? { claude_code: {} } : {},
+      })),
+    });
     const r = await renderApp("/onboarding", { api });
     return { ...r, api, state };
   };
@@ -1416,9 +1431,9 @@ describe("Onboarding", () => {
     await click(button(/Criar 1 agente/), 8);
     // Both agents use the connected computer.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
-    // The AI step: the account for all their agents, chosen, thinks for every agent; nothing to sign in.
+    // The AI step: the account their agents share, chosen, thinks for every agent; nothing to sign in.
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    const own = within(panel).getByRole("button", { name: "A conta de todos os seus agentes" });
+    const own = within(panel).getByRole("button", { name: "A conta que os seus agentes dividem" });
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
@@ -1461,6 +1476,24 @@ describe("Onboarding", () => {
     const posts = calls(state, "chat.post");
     expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
     expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
+  });
+
+  test("a computer whose Claude Code isn't signed in: no account to share, Claude's sign-in instead, nothing saved on Continue", async () => {
+    const { state, api, services } = await start({}, { claudeSignedIn: false });
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    // Continue would point every agent at a sign-in that isn't there: it waits for one.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
 
   test("optional steps can be skipped: no computer, no invites", async () => {

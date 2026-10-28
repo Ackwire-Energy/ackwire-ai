@@ -369,7 +369,7 @@ describe("Configurações da organização", () => {
     // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0063).
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
     expect(plans.textContent).toContain("MacBook");
-    expect(plans.textContent).toContain("Conta deste MacBookMax");
+    expect(plans.textContent).toContain("A conta que os seus agentes dividemMax");
     expect(plans.textContent).toContain("Claude Code · de Walter");
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
     expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");

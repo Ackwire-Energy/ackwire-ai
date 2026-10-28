@@ -44,6 +44,11 @@ export interface AddAccountProps {
   /** Under the steps. */
   note?: ReactNode;
   onAdded: (account: MachineAccount) => void;
+  /**
+   * Where an agent is in view: the sign-in came back as an account the person already connected there, signed in and
+   * thinking for no agent, and it thinks for that agent instead ("Usar x").
+   */
+  onUse?: (account: MachineAccount) => void;
 }
 
 export function AddAccount(props: AddAccountProps) {
@@ -64,6 +69,7 @@ function AddAccountFlow({
   loading = false,
   note,
   onAdded,
+  onUse,
   onRetry,
 }: AddAccountProps & { onRetry: () => void }) {
   const { t } = useTranslation();
@@ -134,8 +140,8 @@ function AddAccountFlow({
   }, [result, onAdded]);
 
   const ended = startFailed || status.isError || result?.state === "failed" || result?.state === "expired";
-  // The account that came back is one the person already connected there: theirs to use here instead.
-  const reuse = plan ? null : freeDuplicate(result);
+  // For the agent in view: the account that came back, one the person already connected there and free.
+  const reuse = plan || !onUse ? null : freeDuplicate(result);
 
   /** The code (Claude) or the plan's key, sealed here to the computer's key for this sign-in. */
   const send = async (value = code) => {
@@ -206,17 +212,21 @@ function AddAccountFlow({
     </>
   );
 
-  const why = startFailed
-    ? t("agentPage.work.brain.add.startFailed", { computer })
-    : result?.state === "expired"
-      ? t("agentPage.work.brain.add.expired")
-      : result?.duplicate
-        ? plan
-          ? t("aiAccounts.add.duplicateKey", { account: result.duplicate.label })
-          : t(`agentPage.work.brain.add.duplicate.${kind}`, {
-              account: result.duplicate.account?.email ?? result.duplicate.label,
-            })
-        : t("agentPage.work.brain.add.failed");
+  // Signing in again came back as another account: the server keeps this one signed out and says which came back.
+  const why =
+    hint && result?.signedInAs
+      ? t(`connectAi.otherAccount.${kind}`, { email: result.signedInAs, account: hint })
+      : startFailed
+        ? t("agentPage.work.brain.add.startFailed", { computer })
+        : result?.state === "expired"
+          ? t("agentPage.work.brain.add.expired")
+          : result?.duplicate
+            ? plan
+              ? t("aiAccounts.add.duplicateKey", { account: result.duplicate.label })
+              : t(`agentPage.work.brain.add.duplicate.${kind}`, {
+                  account: result.duplicate.account?.email ?? result.duplicate.label,
+                })
+            : t("agentPage.work.brain.add.failed");
 
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
@@ -355,12 +365,12 @@ function AddAccountFlow({
             {why}
           </Note>
           <Button size="sm" variant="secondary" icon="undo" label={t("common.retry")} onPress={onRetry} />
-          {reuse ? (
+          {reuse && onUse ? (
             <Button
               size="sm"
               variant="secondary"
               label={t("connectAi.useAnyway", { email: reuse.email ?? reuse.label })}
-              onPress={() => onAdded(reuse)}
+              onPress={() => onUse(reuse)}
             />
           ) : null}
         </View>

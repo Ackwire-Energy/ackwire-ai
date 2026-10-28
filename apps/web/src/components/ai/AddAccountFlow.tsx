@@ -35,7 +35,10 @@ export interface AddAccountProps {
   provider?: PlanId;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
-  /** Claude's login hint, never asked: the email of the account signing in again, or of the one a turn shares. */
+  /**
+   * Claude's login hint, never asked: the email of the account signing in again, or of the one a turn shares. A sign-in
+   * that comes back as another account says so instead of thinking with it.
+   */
   email?: string | null;
   /** The computer is one the person connected: its own browser may open the page itself. */
   local?: boolean;
@@ -56,6 +59,11 @@ export interface AddAccountProps {
   onBack?: () => void;
   /** `target`: the `fanOut` target it signed in for. */
   onAdded: (account: MachineAccount, target?: string) => void;
+  /**
+   * Where an agent is in view: the sign-in came back as an account the person already connected there, signed in and
+   * thinking for no agent, and it thinks for that agent instead ("Use x").
+   */
+  onUse?: (account: MachineAccount) => void;
   /** The code or the key went to the computer. */
   onSent?: () => void;
   /** A `fanOut` target's login ended without signing in (failed or expired). */
@@ -83,8 +91,9 @@ export function AddAccount(props: AddAccountProps) {
 }
 
 /**
- * A step: its number on the title's line, the text under it, its button at the side. Unnumbered where each step shows
- * only once the one before it is done (Claude's sign-in, then its code): a lone 1 counts nothing.
+ * A step: its number on the title's line, the text under it, its button (or the wait) under its words, on the text's
+ * column. Unnumbered where each step shows only once the one before it is done (Claude's sign-in, then its code): a
+ * lone 1 counts nothing.
  */
 export function Step({ n, children, side }: { n?: number; children: ReactNode; side?: ReactNode }) {
   return (
@@ -170,6 +179,7 @@ function AddAccountFlow({
   fanOut,
   onBack,
   onAdded,
+  onUse,
   onSent,
   onFailed,
   onRetry,
@@ -190,6 +200,8 @@ function AddAccountFlow({
   const [sendFailed, setSendFailed] = useState(false);
   const [pasteFailed, setPasteFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Signed in, but not as the account it was for (the hint): theirs to use or not.
+  const [other, setOther] = useState<MachineAccount | null>(null);
   // The logins a key went to (`fanOut`), and the first of them that didn't end signed in.
   const [fan, setFan] = useState<{ id: string; loginId: string }[]>([]);
   const [fanFailed, setFanFailed] = useState<AccountLoginStatus | null>(null);
@@ -254,9 +266,11 @@ function AddAccountFlow({
     running.current = running.current.filter((r) => r.loginId !== login.loginId);
     if (result.state === "done" && result.account && !reported.current) {
       reported.current = true;
-      onAdded(result.account);
+      const got = result.account.email;
+      if (hint && got && got.toLowerCase() !== hint.toLowerCase()) setOther(result.account);
+      else onAdded(result.account);
     }
-  }, [result, login, onAdded]);
+  }, [result, login, hint, onAdded]);
 
   /** One login a key went to (`fanOut`) ended on the computer. */
   const fanEnd = (loginId: string, end: AccountLoginStatus) => {
@@ -273,8 +287,6 @@ function AddAccountFlow({
 
   const shown = fanFailed ?? result;
   const ended = startFailed || status.isError || shown?.state === "failed" || shown?.state === "expired";
-  // The account that came back is one the person already connected there: theirs to use here instead.
-  const reuse = plan ? null : freeDuplicate(shown);
 
   /** The code or the plan's key, sealed here to the computer's key for a sign-in. */
   const seal = async (l: AccountLoginStart | null, text: string) => {
@@ -395,27 +407,47 @@ function AddAccountFlow({
     </>
   );
 
-  const why = startFailed
-    ? t("agentPage.work.brain.add.startFailed", { computer })
-    : shown?.state === "expired"
-      ? t("agentPage.work.brain.add.expired")
-      : shown?.duplicate
-        ? plan
-          ? t("aiAccounts.add.duplicateKey", { account: shown.duplicate.label })
-          : t(`agentPage.work.brain.add.duplicate.${kind}`, {
-              account: shown.duplicate.account?.email ?? shown.duplicate.label,
-            })
-        : t("agentPage.work.brain.add.failed");
+  // Not the account it was for: one that came back done (`other`), or signing in again, which the server refuses.
+  const otherEmail = other?.email ?? (hint ? shown?.signedInAs : undefined);
+  const why = otherEmail
+    ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
+    : startFailed
+      ? t("agentPage.work.brain.add.startFailed", { computer })
+      : shown?.state === "expired"
+        ? t("agentPage.work.brain.add.expired")
+        : shown?.duplicate
+          ? plan
+            ? t("aiAccounts.add.duplicateKey", { account: shown.duplicate.label })
+            : t(`agentPage.work.brain.add.duplicate.${kind}`, {
+                account: shown.duplicate.account?.email ?? shown.duplicate.label,
+              })
+          : t("agentPage.work.brain.add.failed");
 
   const title = plan ? t("aiAccounts.add.titleKey", { plan: plan.label }) : t(`agentPage.work.brain.add.title.${kind}`);
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
 
   const retry = (
-    <Button size="sm" icon="refresh" onClick={onRetry}>
+    <Button
+      size="sm"
+      icon="refresh"
+      onClick={() => {
+        // A new login that came back as another account goes; one signed in again stays the person's account.
+        if (other && !again) void api.machines.removeAccount(org.id, machineId, other.id).catch(() => undefined);
+        onRetry();
+      }}
+    >
       {t("common.retry")}
     </Button>
   );
+  // What the person may think with instead: the account that came back (`other`), or, for the agent in view, one they
+  // already connected there, signed in and thinking for no agent.
+  const free = plan ? null : freeDuplicate(shown);
+  const instead = other
+    ? { account: other, use: () => onAdded(other) }
+    : free && onUse
+      ? { account: free, use: () => onUse(free) }
+      : null;
 
   // Opened on the click itself, then sent to the provider's page once the computer has it.
   const start = () => {
@@ -569,16 +601,18 @@ function AddAccountFlow({
           </Button>
         </div>
       )}
-      {ended ? (
+      {other || ended ? (
         <div className="ai-panel__row">
           <SettingNote icon="alert" live>
             {why}
           </SettingNote>
-          {reuse ? (
+          {instead ? (
             <span className="ac-acts">
               {retry}
-              <Button size="sm" onClick={() => onAdded(reuse)}>
-                <span className="ai-panel__use">{t("connectAi.useAnyway", { email: reuse.email ?? reuse.label })}</span>
+              <Button size="sm" onClick={instead.use}>
+                <span className="ai-panel__use">
+                  {t("connectAi.useAnyway", { email: instead.account.email ?? instead.account.label })}
+                </span>
               </Button>
             </span>
           ) : (

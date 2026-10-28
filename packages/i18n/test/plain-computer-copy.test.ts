@@ -120,6 +120,8 @@ const CLOUD_EXTRA = [
   "agentPage.work.brain.add.startFailed",
   "agentPage.work.brain.add.duplicate.claude_code",
   "agentPage.work.brain.add.duplicate.codex",
+  "connectAi.otherAccount.claude_code",
+  "connectAi.otherAccount.codex",
   "connectAi.useAnyway",
   "outage.titleCloud",
   "outage.cloudSub",
@@ -177,9 +179,12 @@ const SELFHOST_EXTRA = [
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
-  ...["all", "one", "note"].map((k) => `connectAi.own.${k}`),
+  ...["shared", "one", "note"].map((k) => `connectAi.own.${k}`),
+  "usageViews.agent.sharedPart",
   "agentPage.work.brain.add.duplicate.claude_code",
   "agentPage.work.brain.add.duplicate.codex",
+  "connectAi.otherAccount.claude_code",
+  "connectAi.otherAccount.codex",
   "connectAi.useAnyway",
   "aiAccounts.connect.needs.keys",
   "aiAccounts.connect.noComputer",
@@ -261,16 +266,25 @@ describe("computer copy", () => {
 
   test("the account choice says who shares the sign-in, never which computer it is on", () => {
     // Shown only where the person connected the computer (the server's own, a computer of theirs), never on the
-    // Cloud's: words that name no computer and no sign-in are true on each.
+    // Cloud's: words that name no computer and no sign-in are true on each. Someone with agents on two such computers
+    // sees one shared account on each, so it never claims to be every agent's.
     for (const strings of [ptBR, en]) {
       const values = valuesOf(strings);
-      const choice = ["all", "one"].map((k) => values.get(`connectAi.own.${k}`) ?? "");
-      expect(choice.every(Boolean)).toBe(true);
+      const choice = ["own.shared", "own.one"].map((k) => values.get(`connectAi.${k}`) ?? "");
+      const shared = [values.get("connectAi.own.shared") ?? "", values.get("usageViews.agent.sharedPart") ?? ""];
+      expect([...choice, ...shared].every(Boolean)).toBe(true);
       const placed = /\{\{(computer|brand)\}\}|comput|login|signed in|outra|another/i;
-      expect(choice.filter((v) => placed.test(v))).toEqual([]);
+      expect([...choice, ...shared].filter((v) => placed.test(v))).toEqual([]);
+      expect(shared.filter((v) => /\ball\b|\btod[oa]s\b/i.test(v))).toEqual([]);
+      // The usage sentence says the same name.
+      expect(shared[1]?.toLowerCase()).toContain((shared[0] ?? "").replace(/^(the|a) /i, "").toLowerCase());
     }
-    expect(SELFHOST_EXTRA).toEqual(expect.arrayContaining(["connectAi.own.all", "connectAi.own.one"]));
-    expect(CLOUD_EXTRA.filter((k) => k.startsWith("connectAi.own."))).toEqual([]);
+    expect(SELFHOST_EXTRA).toEqual(
+      expect.arrayContaining(["connectAi.own.shared", "connectAi.own.one", "usageViews.agent.sharedPart"]),
+    );
+    expect(CLOUD_EXTRA.filter((k) => k.startsWith("connectAi.own.") || k === "usageViews.agent.sharedPart")).toEqual(
+      [],
+    );
   });
 
   test("catches the words it bans, whatever the case", () => {

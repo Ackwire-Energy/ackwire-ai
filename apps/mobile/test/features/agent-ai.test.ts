@@ -86,10 +86,30 @@ describe("the agent's AI", () => {
     expect(flow).toMatch(/\{\s*again,\s*provider,\s*hint,\s*\}/);
     expect(flow).toContain("freeDuplicate(result)");
     expect(flow).toContain('t("connectAi.useAnyway"');
+    // "Usar" only where an agent is in view (`onUse`); signing in again as someone else says both addresses.
+    expect(flow).toContain("onPress={() => onUse(reuse)}");
+    expect(flow).toMatch(/hint && result\?\.signedInAs\s*\?\s*t\(`connectAi\.otherAccount\.\$\{kind\}`/);
     const t = await translator("pt-BR");
     expect(t("agentPage.work.brain.add.duplicate.claude_code", { account: "ana@acme.com" })).toBe(
       "O Claude entrou como ana@acme.com, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
     );
+    expect(t("connectAi.otherAccount.claude_code", { email: "walt@gmail.com", account: "walt@acme.com" })).toBe(
+      "O Claude entrou como walt@gmail.com, não como walt@acme.com. Saia na página do Claude e tente de novo.",
+    );
     expect(t("connectAi.own.one", { for: "para a", name: "Ada" })).toBe("Uma conta só para a Ada");
+    expect(t("connectAi.own.shared")).toBe("A conta que os seus agentes dividem");
+  });
+
+  test("signing in again sends the account's own email as the hint, from Settings and from Connect an AI", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const settings = await read("AiAccountsScreen.tsx");
+    const connect = await read("ConnectAiSteps.tsx");
+    expect(settings).toMatch(/again=\{again\.id\}\s+email=\{again\.email\}/);
+    expect(connect).toMatch(/again=\{signedOut\?\.id\}\s+email=\{signedOut\?\.email\}/);
+    // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
+    expect(connect).toContain("onUse={(a) => void assign(a)}");
+    expect(settings).not.toContain("onUse=");
+    // "Só responde a você" said once: under the sign-in only when the cards (whose note says it) aren't there.
+    expect(connect).toMatch(/note=\{!coding && !ownable \?/);
   });
 });

@@ -26,9 +26,9 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
+import { groupPlans, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
@@ -220,7 +220,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? null
       : view?.account
         ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
-        : t("agentPage.work.brain.thisComputer", { computer: view?.computer?.name ?? "" });
+        : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
     !view || (kind !== "claude_code" && kind !== "codex")
@@ -773,7 +773,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             ? t(onlyOwner ? "aiAccounts.share.savedOwner" : "aiAccounts.share.savedEveryone", g)
             : onlyAccount
               ? account === null
-                ? t("agentPage.work.saved.accountHere", { ...g, computer: computerName })
+                ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
+                  t("aiAccounts.done.savedAgent", {
+                    agent: agent.name,
+                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                  })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
                 ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
@@ -837,12 +841,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const accountOptions: SelectOption[] = [
     {
       value: HERE,
-      label: t("agentPage.work.brain.thisComputer", { computer: computerName }),
+      label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
       // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
       disabled: !view.ownSignIn && view.account !== null,
-      description: view.ownSignIn
-        ? t("agentPage.work.brain.thisComputerText", { computer: computerName })
-        : t("aiAccounts.share.hereNotYours", { computer: computerName }),
+      ...(view.ownSignIn ? {} : { description: t("aiAccounts.share.hereNotYours", { computer: computerName }) }),
       leading: accountIcon,
     },
     // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
@@ -1144,6 +1146,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                       setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
                       setAccount(a.id);
                       setArrived(a);
+                      setAdding(false);
+                    }}
+                    onUse={(a) => {
+                      setArrived(null);
+                      setAccount(a.id);
                       setAdding(false);
                     }}
                   />

@@ -1,5 +1,6 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
+import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, etaLine, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
@@ -10,6 +11,7 @@ import {
   ALL_AGENTS,
   KEY_MARKS,
   kindOf,
+  ownSignInFor,
   PLAN_CHOICES,
   type PlanChoice,
   type PlanGate,
@@ -90,12 +92,13 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key.
-          brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
+          // person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited, catching };
+  return { gateOf, view, row, failed: brain.isError && !view, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -210,10 +213,7 @@ export function PlanPanel(props: PlanPanelProps) {
   const title = planTitle(t, choice);
   // The computer's own sign-in covers every agent: no agent to choose then.
   const everyAgent =
-    own?.chosen === true &&
-    !isPlanId(choice) &&
-    gates.view?.ownSignIn === true &&
-    gates.gateOf(choice).state === "ready";
+    own?.chosen === true && ownSignInFor(choice, gates.view, gates.row) && gates.gateOf(choice).state === "ready";
   const forWhom: PlanSetAgent[] = target === ALL_AGENTS ? all : agents.filter((a) => a.id === target);
   const [agent] = forWhom;
   return (
@@ -419,7 +419,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
-    const label = lowerFirst(t("connectAi.own.all"), i18n.language);
+    const label = lowerFirst(t("connectAi.own.shared"), i18n.language);
     return (
       <>
         <SettingNote icon="check" live>
@@ -572,7 +572,9 @@ function PlanSteps({
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
   const steps = ready || gate.state === "preparing" || (gate.state === "offline" && hostConnecting);
-  const ownable = ready && !coding && view?.ownSignIn === true;
+  const ownable = ready && ownSignInFor(choice, view, gates.row);
+  // The shared sign-in's plan, where the computer says it ("Claude Max").
+  const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
   const otherChosen = own ? !own.chosen : other;
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
@@ -621,14 +623,15 @@ function PlanSteps({
       )}
       {retry}
       {ownable && (
-        // Who shares the sign-in: the computer's own, which any of its pairer's agents thinks with, or a sign-in for
-        // this agent alone (ADR 0059 §2). Small columns: indented to the panel's text column, the two still fit side
-        // by side in the setup's column.
+        // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, or a sign-in
+        // for this agent alone (ADR 0059 §2). Small columns: indented to the panel's text column, the two still fit
+        // side by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
         <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
           <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
             <span className="ac-option__text">
-              <span className="ac-option__title">{t("connectAi.own.all")}</span>
+              <span className="ac-option__title">{t("connectAi.own.shared")}</span>
+              {ownPlan && <span className="ac-option__desc">{`${brand} ${ownPlan}`}</span>}
             </span>
           </OptionCard>
           <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
@@ -660,6 +663,7 @@ function PlanSteps({
           }}
           onFailed={(id) => setMissed((m) => [...m, id])}
           onAdded={(a, id) => void assign(id ?? turn?.id ?? agent.id, a)}
+          onUse={(a) => void assign(turn?.id ?? agent.id, a)}
         />
       )}
       {(steps || ownable) && foot}

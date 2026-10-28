@@ -1,5 +1,6 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
+import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -10,6 +11,7 @@ import {
   gateDims,
   KEY_MARKS,
   kindOf,
+  ownSignInFor,
   type PlanChoice,
   type PlanGate,
   planGate,
@@ -92,12 +94,13 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key.
-          brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
+          // person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited, catching };
+  return { gateOf, view, row, failed: brain.isError && !view, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -548,7 +551,9 @@ function PlanSteps({
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
   const steps = ready || gate.state === "preparing";
-  const ownable = ready && !coding && view?.ownSignIn === true;
+  const ownable = ready && ownSignInFor(choice, view, gates.row);
+  // The shared sign-in's plan, where the computer says it ("Claude Max").
+  const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
   );
@@ -565,7 +570,11 @@ function PlanSteps({
       {ownable ? (
         <>
           <GroupedList>
-            <GroupedRow label={t("connectAi.own.all")} onPress={() => void saveOwn()} />
+            <GroupedRow
+              label={t("connectAi.own.shared")}
+              {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
+              onPress={() => void saveOwn()}
+            />
             <GroupedRow
               label={t("connectAi.own.one", agentGrammar(t, agentName))}
               checked={other}
@@ -586,8 +595,12 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          note={!coding ? <Note icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</Note> : null}
+          // Said once: with the cards, their note already says it.
+          note={
+            !coding && !ownable ? <Note icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</Note> : null
+          }
           onAdded={(a) => void assign(a)}
+          onUse={(a) => void assign(a)}
         />
       ) : null}
     </View>
