@@ -3671,9 +3671,16 @@ p {
   gap: 12px;
   min-width: 0;
 }
-/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. */
+/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
+   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
 .cflow__title > :first-child {
   translate: 0 calc(-1 * var(--cap-mid));
+}
+.cflow__title:has(> .ac-captop) {
+  align-items: flex-start;
+}
+.cflow__title:has(> .ac-captop) > :first-child {
+  translate: none;
 }
 .cflow__steps {
   display: flex;

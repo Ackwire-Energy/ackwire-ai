@@ -5,6 +5,7 @@ setupDom();
 
 import { act, cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
+import { FlowTitle } from "@/components/FlowTitle";
 import { useWraps } from "@/hooks/useWraps";
 
 const real = globalThis.ResizeObserver;
@@ -69,5 +70,38 @@ describe("useWraps", () => {
       for (const report of reports) report();
     });
     expect(p.dataset.wraps).toBe("true");
+  });
+});
+
+describe("a connect flow's title", () => {
+  test("one line centres on the tile; words that wrap take .ac-captop, their first line on its top", async () => {
+    const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => lines * 24 });
+    try {
+      lines = 1;
+      const title = (words: string) => (
+        <h2 style={{ lineHeight: "24px" }}>
+          <FlowTitle tile={<span className="connector-icon connector-icon--lg" />}>{words}</FlowTitle>
+        </h2>
+      );
+      const { container, rerender } = render(title("Conectar Banco de dados"));
+      const text = () => container.querySelector(".cflow__title > span:last-child") as HTMLElement;
+      expect(text().className).toBe("");
+      lines = 2;
+      rerender(title("Quem pode usar Postgres de produção"));
+      expect(text().className).toBe("ac-captop");
+    } finally {
+      if (height) Object.defineProperty(HTMLElement.prototype, "clientHeight", height);
+      else delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight;
+    }
+    const css = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".cflow__title")).toContain("align-items: center");
+    expect(rule(".cflow__title > :first-child")).toContain("translate: 0 calc(-1 * var(--cap-mid))");
+    expect(rule(".cflow__title:has(> .ac-captop)")).toContain("align-items: flex-start");
+    expect(rule(".cflow__title:has(> .ac-captop) > :first-child")).toContain("translate: none");
   });
 });

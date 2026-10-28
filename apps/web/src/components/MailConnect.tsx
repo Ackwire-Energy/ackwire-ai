@@ -45,6 +45,7 @@ import { useApi } from "@/api/context";
 import { AddressList } from "@/components/AddressList";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
@@ -132,12 +133,7 @@ export function MailConnectFlow({
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={
-        <span className="cflow__title">
-          <MailIcon choice={choice} size="lg" />
-          <span>{title}</span>
-        </span>
-      }
+      title={<FlowTitle tile={<MailIcon choice={choice} size="lg" />}>{title}</FlowTitle>}
       closeLabel={t("common.close")}
       width={620}
       className="cflow"
