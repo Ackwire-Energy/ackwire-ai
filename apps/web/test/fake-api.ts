@@ -1017,7 +1017,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             (!query.actorType || r.actor.type === query.actorType) &&
             (!query.actorId || r.actor.id === query.actorId) &&
             (!query.outcome?.length || (r.outcome !== null && query.outcome.includes(r.outcome))) &&
-            (!query.waiting || (r.outcome === "pending" && r.approval?.status === "pending")) &&
+            (!query.waiting ||
+              (r.outcome === "pending" && (r.approval?.status === "pending" || r.secret?.status === "pending"))) &&
             (!query.kind || (query.kind === "tool") === (r.action === "tool.call")),
         );
         const from = query.before ? rows.findIndex((r) => r.id === query.before) + 1 : 0;

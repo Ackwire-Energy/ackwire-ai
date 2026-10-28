@@ -4061,7 +4061,7 @@ export interface AuditRow {
   target: { type: string; id: string | null };
   /**
    * A tool call's: `kind`, `connector`, `title` (the call in words), `behind` (`person`, `routine`,
-   * `unattended`), `routine` ({ id, name }), `input` (secrets masked), `reason`, `approvalId`.
+   * `unattended`), `routine` ({ id, name }), `input` (secrets masked), `reason`, `approvalId`, `secretRequestId`.
    */
   details: Record<string, unknown>;
   runId: string | null;
@@ -4071,6 +4071,8 @@ export interface AuditRow {
   outcome: AuditOutcome | null;
   /** The approval the call waited for or ran after, as it stands now. */
   approval: { id: string; status: string; decidedBy: { id: string; name: string | null } | null } | null;
+  /** The secret the call waited for (`request_secret`), as it stands now. */
+  secret: { id: string; status: "pending" | "delivered" | "declined" | "expired" | "canceled" } | null;
 }
 
 export interface AuditPage {
@@ -4082,7 +4084,7 @@ export interface AuditQuery {
   actorType?: "person" | "agent" | "system";
   actorId?: string;
   outcome?: AuditOutcome[];
-  /** Only calls whose approval nobody has answered yet. */
+  /** Only calls whose approval or secret nobody has answered yet. */
   waiting?: boolean;
   kind?: "tool" | "change";
 }

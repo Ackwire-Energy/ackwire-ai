@@ -9,6 +9,8 @@ import {
   grantScopes,
   listAudit,
   postPersonMessage,
+  recordAudit,
+  recordToolCall,
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
@@ -121,7 +123,13 @@ describe("agents' tool calls in the audit log", () => {
   async function team(fx: Fixture) {
     const [conn] = await fx.db
       .insert(schema.connectorConnections)
-      .values({ orgId: fx.org.id, connector: "sentry", label: "Sentry", serverUrl: "https://mcp.sentry.dev", authType: "none" })
+      .values({
+        orgId: fx.org.id,
+        connector: "sentry",
+        label: "Sentry",
+        serverUrl: "https://mcp.sentry.dev",
+        authType: "none",
+      })
       .returning();
     await grantScopes(fx.db, fx.org.id, fx.agent.id, [
       { connectionId: null, scope: "issues:write" },
@@ -237,5 +245,94 @@ describe("agents' tool calls in the audit log", () => {
 
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await expect(listAudit(f.db, bia.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("one action is one row; what a change kept leaves cleaned", async () => {
+    f = await setup();
+    const ctx = await runIn(f);
+    await recordToolCall(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: ctx.runId,
+      channelId: f.general.id,
+      authority: null,
+      tool: "post_message",
+      kind: "elsewhere",
+      input: { channel: "geral", text: "oi" },
+      outcome: "done",
+    });
+    // What the tool writes about itself next to the gateway's row.
+    await recordAudit(f.db, {
+      orgId: f.org.id,
+      actor: { type: "agent", id: f.agent.id },
+      action: "message.posted_elsewhere",
+      target: { type: "channel", id: f.general.id },
+    });
+    await recordAudit(f.db, {
+      orgId: f.org.id,
+      actor: { type: "agent", id: f.agent.id },
+      action: "mail.sent",
+      target: { type: "mail_account", id: "m1" },
+    });
+    await recordAudit(f.db, {
+      orgId: f.org.id,
+      actor: { type: "person", id: f.owner.id },
+      action: "connector.created",
+      target: { type: "connector", id: "c1" },
+      details: { serverUrl: "https://mcp.acme.com/sse?api_key=abc123supersecret", token: "t0ps3cret" },
+    });
+
+    const rows = (await listAudit(f.db, f.owner.id, f.org.id)).rows;
+    expect(rows.map((r) => r.action)).toEqual(["connector.created", "tool.call"]);
+    const change = JSON.stringify(rows[0]?.details);
+    expect(change).toContain("mcp.acme.com");
+    expect(change).not.toContain("abc123supersecret");
+    expect(change).not.toContain("t0ps3cret");
+  });
+
+  test("a call waiting for a secret follows the request", async () => {
+    f = await setup();
+    const ctx = await runIn(f);
+    const [request] = await f.db
+      .insert(schema.secretRequests)
+      .values({
+        orgId: f.org.id,
+        runId: ctx.runId,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        toolUseId: "tu_secret",
+        requestedForUserId: f.owner.id,
+        name: "GITHUB_TOKEN",
+        purpose: "push the fix",
+        targetKind: "env",
+        publicKey: "pk",
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .returning();
+    if (!request) throw new Error("no request");
+    await recordToolCall(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: ctx.runId,
+      channelId: f.general.id,
+      authority: null,
+      tool: "request_secret",
+      kind: "elsewhere",
+      input: { name: "GITHUB_TOKEN" },
+      outcome: "pending",
+      secretRequestId: request.id,
+    });
+
+    const waiting = await listAudit(f.db, f.owner.id, f.org.id, { waiting: true });
+    expect(waiting.rows.map((r) => r.target.id)).toEqual(["request_secret"]);
+    expect(waiting.rows[0]?.secret).toEqual({ id: request.id, status: "pending" });
+
+    await f.db
+      .update(schema.secretRequests)
+      .set({ status: "delivered" })
+      .where(eq(schema.secretRequests.id, request.id));
+    expect((await listAudit(f.db, f.owner.id, f.org.id, { waiting: true })).rows).toEqual([]);
+    const after = (await listAudit(f.db, f.owner.id, f.org.id, { kind: "tool" })).rows[0];
+    expect(after?.secret).toEqual({ id: request.id, status: "delivered" });
   });
 });

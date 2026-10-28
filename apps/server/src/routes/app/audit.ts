@@ -22,7 +22,7 @@ const AuditRow = z
     target: z.object({ type: z.string(), id: z.string().nullable() }),
     details: z.record(z.string(), z.unknown()).openapi({
       description:
-        "A tool call's: `kind`, `connector`, `title`, `behind` (`person`, `routine`, `unattended`), `routine`, `input` (secrets masked, cut), `reason`, `approvalId`.",
+        "A tool call's: `kind`, `connector`, `title`, `behind` (`person`, `routine`, `unattended`), `routine`, `input` (secrets masked, cut), `reason`, `approvalId`, `secretRequestId`.",
     }),
     runId: z.string().nullable(),
     channelId: z.string().nullable(),
@@ -43,6 +43,10 @@ const AuditRow = z
       })
       .nullable()
       .openapi({ description: "The approval the call waited for or ran after, as it stands now." }),
+    secret: z
+      .object({ id: z.string(), status: z.enum(["pending", "delivered", "declined", "expired", "canceled"]) })
+      .nullable()
+      .openapi({ description: "The secret the call waited for (`request_secret`), as it stands now." }),
   })
   .openapi("AuditRow");
 
@@ -72,7 +76,7 @@ export function auditRoutes(deps: AppDeps) {
           waiting: z
             .enum(["true", "false"])
             .optional()
-            .openapi({ description: "`true`: only calls whose approval nobody has answered yet." }),
+            .openapi({ description: "`true`: only calls whose approval or secret nobody has answered yet." }),
           kind: z.enum(["tool", "change"]).optional(),
           before: z.uuid().optional().openapi({ description: "`next` from the previous page." }),
           limit: z.coerce.number().int().min(1).max(AUDIT_PAGE_MAX).optional(),

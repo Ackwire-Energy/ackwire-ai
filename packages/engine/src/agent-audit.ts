@@ -5,7 +5,7 @@ import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";
 import { maskCredentials } from "./tool-detail";
 
-const { auditLog, agents, approvals, channels, users } = schema;
+const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
 
 /**
  * The audit of what agents do: every tool call that matters, written by the
@@ -104,6 +104,8 @@ export async function recordToolCall(
     /** Why it was refused or failed, or the agent's `why` for an approval. */
     reason?: string | null;
     approvalId?: string | null;
+    /** A call waiting for a person's secret (`request_secret`): the request. */
+    secretRequestId?: string | null;
   },
 ) {
   await recordAudit(db, {
@@ -122,6 +124,7 @@ export async function recordToolCall(
       input: auditInput(call.input),
       ...(call.reason ? { reason: masked(call.reason).slice(0, MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
+      ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
     },
     runId: call.runId,
     channelId: call.channelId,
@@ -131,6 +134,20 @@ export async function recordToolCall(
 }
 
 // ── Reading it ────────────────────────────────────────────────────────────
+
+/**
+ * Rows a tool writes about itself while the gateway records the same call (`tool.call`): the reader leaves
+ * them out so one action is one row. They stay in the table for whoever reads it raw.
+ */
+const TOOL_CALL_ECHOES = [
+  "message.posted_elsewhere",
+  "message.sent_dm",
+  "secret.requested",
+  "desktop.app_opened",
+  "desktop.file_opened",
+];
+/** A mailbox tool's own rows (`mail.sent`, `mail.archive`…), echoes too. */
+const MAIL_ECHO = "mail.%";
 
 export type AuditActorType = "person" | "agent" | "system";
 
@@ -164,6 +181,8 @@ export interface AuditRow {
   outcome: schema.AuditOutcome | null;
   /** The approval a call waited for (or ran after), as it stands now: a `pending` row may be decided since. */
   approval: { id: string; status: string; decidedBy: { id: string; name: string | null } | null } | null;
+  /** The secret a call waited for, as it stands now (`pending`, `delivered`, `declined`, `expired`, `canceled`). */
+  secret: { id: string; status: (typeof schema.secretRequestStatusEnum.enumValues)[number] } | null;
 }
 
 export const AUDIT_PAGE = 50;
@@ -194,10 +213,15 @@ export async function listAudit(
         filter.waiting
           ? and(
               eq(auditLog.outcome, "pending"),
-              sql`exists (select 1 from ${approvals} where ${approvals.orgId} = ${auditLog.orgId}
-                and ${approvals.id}::text = ${auditLog.details}->>'approvalId' and ${approvals.status} = 'pending')`,
+              sql`(exists (select 1 from ${approvals} where ${approvals.orgId} = ${auditLog.orgId}
+                and ${approvals.id}::text = ${auditLog.details}->>'approvalId' and ${approvals.status} = 'pending')
+              or exists (select 1 from ${secretRequests} where ${secretRequests.orgId} = ${auditLog.orgId}
+                and ${secretRequests.id}::text = ${auditLog.details}->>'secretRequestId'
+                and ${secretRequests.status} = 'pending'))`,
             )
           : undefined,
+        sql`not (${auditLog.actorType} = 'agent' and (${inArray(auditLog.action, TOOL_CALL_ECHOES)}
+          or ${auditLog.action} like ${MAIL_ECHO}))`,
         filter.kind === "tool" ? eq(auditLog.action, TOOL_CALL) : undefined,
         filter.kind === "change" ? ne(auditLog.action, TOOL_CALL) : undefined,
         filter.before ? lt(auditLog.id, filter.before) : undefined,
@@ -209,14 +233,26 @@ export async function listAudit(
 
   const approvalOf = (r: (typeof page)[number]) =>
     typeof r.details.approvalId === "string" ? r.details.approvalId : null;
-  const approvalIds = [...new Set(page.map(approvalOf).filter((id): id is string => Boolean(id)))];
-  const channelIds = [...new Set(page.map((r) => r.channelId).filter((id): id is string => Boolean(id)))];
-  const [approvalRows, channelRows] = await Promise.all([
+  const secretOf = (r: (typeof page)[number]) =>
+    typeof r.details.secretRequestId === "string" ? r.details.secretRequestId : null;
+  const ids = (of: (r: (typeof page)[number]) => string | null) => [
+    ...new Set(page.map(of).filter((id): id is string => Boolean(id))),
+  ];
+  const approvalIds = ids(approvalOf);
+  const secretIds = ids(secretOf);
+  const channelIds = ids((r) => r.channelId);
+  const [approvalRows, secretRows, channelRows] = await Promise.all([
     approvalIds.length
       ? db
           .select({ id: approvals.id, status: approvals.status, decidedBy: approvals.decidedByUserId })
           .from(approvals)
           .where(and(eq(approvals.orgId, orgId), inArray(approvals.id, approvalIds)))
+      : Promise.resolve([]),
+    secretIds.length
+      ? db
+          .select({ id: secretRequests.id, status: secretRequests.status })
+          .from(secretRequests)
+          .where(and(eq(secretRequests.orgId, orgId), inArray(secretRequests.id, secretIds)))
       : Promise.resolve([]),
     channelIds.length
       ? db
@@ -226,6 +262,7 @@ export async function listAudit(
       : Promise.resolve([]),
   ]);
   const approvalById = new Map(approvalRows.map((a) => [a.id, a]));
+  const secretById = new Map(secretRows.map((s) => [s.id, s]));
   const channelById = new Map(channelRows.map((c) => [c.id, c]));
 
   const agentIds = new Set<string>();
@@ -262,7 +299,9 @@ export async function listAudit(
       actor: { type: r.actorType as AuditActorType, id: r.actorId, name: nameOf(r.actorType, r.actorId) },
       action: r.action,
       target: { type: r.targetType, id: r.targetId },
-      details: r.details,
+      // A tool call's input was cleaned when it was written; the rest (a server's address, a database's
+      // host…) is cleaned here, as it leaves.
+      details: r.action === TOOL_CALL ? r.details : auditInput(r.details),
       runId: r.runId,
       channelId: r.channelId,
       channel: (r.channelId && channelById.get(r.channelId)) || null,
@@ -279,6 +318,7 @@ export async function listAudit(
           decidedBy: a.decidedBy ? { id: a.decidedBy, name: userName.get(a.decidedBy) ?? null } : null,
         };
       })(),
+      secret: secretById.get(secretOf(r) ?? "") ?? null,
     })),
     next: found.length > limit ? (page.at(-1)?.id ?? null) : null,
   };

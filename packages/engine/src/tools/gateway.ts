@@ -285,7 +285,10 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // delivers, never to its room.
       const actionChannel =
         authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
-      const audit = (outcome: AuditOutcome, extra: { reason?: string | null; approvalId?: string } = {}) => {
+      const audit = (
+        outcome: AuditOutcome,
+        extra: { reason?: string | null; approvalId?: string; secretRequestId?: string } = {},
+      ) => {
         if (!tool) return Promise.resolve();
         const kind = toolKind(tool).kind;
         if (!auditsCall(kind, tool, outcome)) return Promise.resolve();
@@ -484,7 +487,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
       if (!tool.connectionId && output.waitForSecret?.requestId) {
-        await audit("pending");
+        // The reader follows the request (delivered, declined, expired) from here.
+        await audit("pending", { secretRequestId: output.waitForSecret.requestId });
         return { type: "secret", requestId: output.waitForSecret.requestId };
       }
       return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done");

@@ -25,6 +25,7 @@ const row = (over: Partial<AuditRow> & Pick<AuditRow, "id">): AuditRow => ({
   onBehalfOf: { id: "u-walter", name: "Walter" },
   outcome: "done",
   approval: null,
+  secret: null,
   ...over,
 });
 
@@ -61,7 +62,10 @@ const AUDIT: AuditRow[] = [
     target: { type: "tool", id: "sentry_list_issues" },
     details: { kind: "read", connector: "Sentry", title: "Sentry: List issues", behind: "person", input: {} },
   }),
-  row({ id: "a2", details: { kind: "internal", behind: "routine", routine: { id: "r1", name: "Follow-up" }, input: {} } }),
+  row({
+    id: "a2",
+    details: { kind: "internal", behind: "routine", routine: { id: "r1", name: "Follow-up" }, input: {} },
+  }),
   row({
     id: "a1",
     at: at(60 * 24),
@@ -141,6 +145,26 @@ describe("Configurações → Auditoria", () => {
     expect(within(panel).getByRole("link", { name: "Ver o pedido" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/approvals?open=ap-1`,
     );
+  });
+
+  test("a call waiting for a secret says what became of it", async () => {
+    const asked = (status: NonNullable<AuditRow["secret"]>["status"]) =>
+      row({
+        id: `s-${status}`,
+        target: { type: "tool", id: "request_secret" },
+        details: { kind: "elsewhere", behind: "person", secretRequestId: "sr-1", input: { name: "GITHUB_TOKEN" } },
+        outcome: "pending",
+        secret: { id: "sr-1", status },
+      });
+    await go(seedState({ audit: [asked("pending")] }));
+    expect(section().querySelector(".audit-row")?.textContent).toContain("Esperando um segredo");
+    cleanup();
+    await go(seedState({ audit: [asked("delivered")] }));
+    const delivered = section().querySelector(".audit-row") as HTMLElement;
+    expect(delivered.textContent).toContain("Segredo entregue");
+    await click(delivered);
+    const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
+    expect(panel.textContent).toContain("SegredoEntregue");
   });
 
   test("members don't see it", async () => {
