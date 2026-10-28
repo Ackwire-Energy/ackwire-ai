@@ -316,6 +316,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
       }),
     );
     await settle(8);
+    expect(card()).toContain("Sendo preparado");
     expect(card()).toContain("O Atlas está separando um para a gente");
     expect(card()).toContain("Passo 1 de 4 · Reservando o computador");
     // The notice's See leads here, where the card says it all: no notice on this page.
