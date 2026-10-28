@@ -50,6 +50,8 @@ export const STORAGE_KEYS = {
   menuLook: "agentes.desktop.menu",
   /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */
   noAiOpened: "agentes.noAi.opened",
+  /** Prefix (`.<orgId>`, in `sessionStore`): the agents the onboarding imported there, with their models (JSON). */
+  onboardingImports: "agentes.onboarding.imports",
   /** In `sessionStore`: the address this tab signed up with, when the server emailed it a confirmation link. */
   confirmationSent: "agentes.confirmation.sent",
   /** The app's sounds on this device: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */

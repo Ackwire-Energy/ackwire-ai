@@ -9,7 +9,7 @@ import { icons } from "@agenteschat/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
-import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -912,6 +912,64 @@ describe("the onboarding where the workspace gets its own computer", () => {
     };
     const lost = await open(`/org/${ORG_ID}/onboarding`, { state: null }, lostState, gone);
     expect(lost.router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/c/`));
+  });
+
+  test("back from paying before the billing service lifts the hold: asked again every 5 s until it does", async () => {
+    const state = seedState({ context: "Clínicas." });
+    state.authConfig = { workspaceComputer: true };
+    const me = state.me;
+    if (!me) throw new Error("no me");
+    state.me = {
+      ...me,
+      organizations: me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: "payment" } })),
+    };
+    const r = await open(`/org/${ORG_ID}/onboarding`, { state: null }, state);
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(document.querySelector(".onb__paid")).toBeNull();
+    // Its computer waits on the hold: both are asked about again, here and on every step after it.
+    const qc = r.services.queryClient;
+    expect(pollEvery(qc, "me")).toBe(5000);
+    expect(pollEvery(qc, "computer-setup")).toBe(5000);
+
+    // The billing service's next pass lifts the hold and the computer is ordered; the next asks bring both.
+    state.me = me;
+    r.machines.setSetup({ state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS });
+    await act(async () => qc.refetchQueries({ type: "active" }));
+    await settle(6);
+    expect(document.querySelector(".onb__paid")?.textContent).toBe(
+      "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
+    );
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.querySelector('.setup-progress [role="status"]')?.textContent).toBe("Passo 2 de 4 · Iniciando");
+  });
+
+  test("back from paying with an imported agent named like a ready-made one: still the import's, its model given back", async () => {
+    // Ada, and the team's own Atlas the import brought (the ready-made Atlas wasn't picked), which ran on Sonnet.
+    const state = seedState({ context: "Clínicas." });
+    state.authConfig = { workspaceComputer: true };
+    state.agents = state.agents.map((a) =>
+      a.id === ATLAS_ID ? { ...a, role: "Suporte", appearance: { color: "rose" } } : a,
+    );
+    sessionStorage.setItem(`agentes.onboarding.imports.${ORG_ID}`, JSON.stringify([[ATLAS_ID, "claude-sonnet-5-5"]]));
+    try {
+      await open(`/org/${ORG_ID}/onboarding`, { state: null }, state);
+      const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+      expect(within(rail).getByRole("button", { name: /^Trazer seus agentes/ }).textContent).toContain("Atlas");
+      expect(within(rail).getByRole("button", { name: /^Agentes/ }).textContent).toContain("Ada e Atlas");
+      // A key that runs Sonnet gives it back to that Atlas, as it does without the way through billing.
+      const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
+      await click(within(picker).getByRole("button", { name: /^Chave de API/ }));
+      await act(async () =>
+        fireEvent.change(screen().getByLabelText("Cole aqui"), { target: { value: "sk-ant-api03-abcdefghijklmnop" } }),
+      );
+      await click(screen().getByRole("button", { name: "Salvar e continuar" }));
+      await settle(6);
+      expect(state.calls.filter((c) => c.method === "agents.update").map((c) => [c.args[1], c.args[2]])).toEqual([
+        [ATLAS_ID, { model: "claude-sonnet-5-5" }],
+      ]);
+    } finally {
+      sessionStorage.clear();
+    }
   });
 
   test("on hold before its computer is made: the lead says when it gets prepared, not that it's always on", async () => {

@@ -198,8 +198,9 @@ export interface ResumedOnboarding {
 }
 
 /**
- * Back from the billing service (ADR 0077): the workspace, its context and its team. The ready-made agents are known
- * by the handles the onboarding gives them; any other agent came with the import (its own model is no longer known).
+ * Back from the billing service (ADR 0077): the workspace, its context and its team. The agents the import made, and
+ * their models, are the ones this tab kept (`createTeam`); the ready-made agents are known by the handles the
+ * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
  */
 export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<ResumedOnboarding> {
   const [channels, settings, agents, platform] = await Promise.all([
@@ -210,11 +211,17 @@ export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<R
   ]);
   const general = channels.find((c) => c.name === "general") ?? channels[0];
   if (!general) throw new Error("onboarding: the workspace has no channel");
+  let imported = new Map<string, string | null>();
+  try {
+    imported = new Map(JSON.parse(sessionStore.get(`${STORAGE_KEYS.onboardingImports}.${orgId}`) ?? "[]"));
+  } catch {
+    // Nothing readable kept: the handles say who's who.
+  }
   const agentIds: Partial<Record<Preset, string>> = {};
   const handles: Partial<Record<Preset, string>> = {};
   const importedCrew: ImportedCrew[] = [];
   for (const a of agents) {
-    const preset = PRESETS.find((p) => p === a.handle);
+    const preset = imported.has(a.id) ? undefined : PRESETS.find((p) => p === a.handle);
     if (preset) {
       agentIds[preset] = a.id;
       handles[preset] = a.handle;
@@ -227,7 +234,7 @@ export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<R
         name: a.name,
         role: a.role,
         appearance: look,
-        model: null,
+        model: imported.get(a.id) ?? null,
       });
     }
   }
@@ -575,6 +582,13 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
       // Imported: one apply after the presets (a handle a preset took gets the next free one). A new workspace has
       // no key yet, so they start on Automático; saving one later gives back the models it runs.
       const crewSoFar = await applyImported([]);
+      // The way back from paying reads the team from the server, which can't tell an imported agent with a ready-made
+      // one's handle from that one, and no longer knows the models they came with: this tab keeps both.
+      if (crewSoFar.length)
+        sessionStore.set(
+          `${STORAGE_KEYS.onboardingImports}.${created.orgId}`,
+          JSON.stringify(crewSoFar.map((c) => [c.id, c.model])),
+        );
       if ((computer !== "machine" && computer !== "host") || !machine) return;
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
       for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
@@ -626,10 +640,13 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
   const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
+  // Back from paying, the billing service lifts the payment hold on its next pass, seconds later: until then the
+  // computer waits on it, and every step asks about both again, so the plan shows active without a reload.
+  const awaiting = (view: SetupView | null) => resumed != null && view?.phase === "paused";
   const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), (data) => {
     const view = setupView(data);
     if (view?.phase === "preparing" && view.secondsLeft === null && (view.waited ?? 0) < 60) return FIRST_TIME_POLL_MS;
-    return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
+    return computerPoll || (setupPending(view) || awaiting(view) ? COMPUTER_POLL_MS : false);
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   const aiOpen = step.id === "ai" && !jev;
@@ -641,7 +658,9 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
   // A refused key never blocks the setup: once answered for, the same text moves on.
   const jevSaves = jevTyped !== "" && jevTyped !== jevDone?.text;
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
-  const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
+  const mePoll =
+    computerPoll ||
+    ((aiOpen && setupPending(workspaceComputer)) || awaiting(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
