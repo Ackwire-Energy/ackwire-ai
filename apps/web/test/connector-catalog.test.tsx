@@ -7,6 +7,7 @@ import type { AccessInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { setNavigateAway } from "@/lib/navigate";
+import { pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -27,14 +28,7 @@ const filterNames = (cats: HTMLElement) =>
   within(cats)
     .getAllByRole("radio")
     .map((b) => b.firstChild?.textContent);
-/** The detail pane of the service picked. */
-const pane = (dialog: HTMLElement, name: string) =>
-  within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
-/** Picks a service (its tile or suggestion) and presses the pane's Conectar: the connect flow opens. */
-const pick = async (dialog: HTMLElement, name: string) => {
-  await click(within(dialog).getByRole("button", { name }));
-  await click(within(pane(dialog, name)).getByRole("button", { name: `Conectar ${name}` }));
-};
+const pressEsc = (el: Element) => act(async () => fireEvent.keyDown(el, { key: "Escape" }));
 
 describe("Adicionar conector: one catalog", () => {
   test("even tiles with no tags; suggestions on top; categories with counts and search", async () => {
@@ -63,24 +57,30 @@ describe("Adicionar conector: one catalog", () => {
     expect(
       within(dialog).getByRole("button", { name: "Slack" }).querySelector(".connector-icon--mono")?.textContent,
     ).toBe("S");
-    // Not configured on this server: last before "Não achou?", and its pane can't connect.
+    // Not configured on this server: last before "Não achou?", and its service can't connect.
     expect(names(dialog).slice(-2)).toEqual(["Slack", "Não achou?"]);
     await click(within(dialog).getByRole("button", { name: "Slack" }));
-    expect(within(pane(dialog, "Slack")).getByRole("button", { name: "Em breve" }).hasAttribute("disabled")).toBe(true);
-    expect(dialog.textContent).not.toMatch(/MCP/);
+    const slack = service("Slack");
+    expect(within(slack).getByRole("button", { name: "Em breve" }).hasAttribute("disabled")).toBe(true);
+    expect(`${dialog.textContent} ${slack.textContent}`).not.toMatch(/MCP/);
+    await click(within(slack).getByRole("button", { name: "Fechar detalhe" }));
 
-    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
-    expect(filterNames(cats)).toEqual([
+    // "Todos" and "Conectados", then the categories by name: in the list beside the grid, and in the phone's row.
+    const order = [
       "Todos",
       "Conectados",
-      "Desenvolvimento",
-      "Produto",
-      "Docs",
-      "Pagamentos",
-      "Suporte",
-      "Marketing",
       "Automação",
-    ]);
+      "Desenvolvimento",
+      "Docs",
+      "Marketing",
+      "Pagamentos",
+      "Produto",
+      "Suporte",
+    ];
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
+    expect(filterNames(cats)).toEqual(order);
+    const list = within(dialog).getByRole("navigation", { name: "Categorias" });
+    expect([...list.querySelectorAll(".catalog__cat-name")].map((el) => el.textContent)).toEqual(order);
     await click(within(cats).getByRole("radio", { name: /^Docs/ }));
     expect(names(dialog)).toEqual(["Google Drive", "Notion", "Não achou?"]);
     await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "notion");
@@ -89,38 +89,64 @@ describe("Adicionar conector: one catalog", () => {
     expect(dialog.textContent).toContain("Nenhum conector encontrado com “zzz”.");
   });
 
-  test("a tile opens its detail: what agents could do, what asks, how it connects; Esc closes the pane first", async () => {
+  test("a tile opens its service over the catalog: what agents could do, what asks, how it connects; Esc closes the service first", async () => {
     const { dialog } = await open();
-    await click(within(dialog).getByRole("button", { name: "Notion" }));
-    expect(within(dialog).getByRole("button", { name: "Notion" }).getAttribute("aria-pressed")).toBe("true");
-    const notion = pane(dialog, "Notion");
+    const tile = within(dialog).getByRole("button", { name: "Notion" });
+    // It opens a dialog, it isn't a toggle.
+    expect([tile.getAttribute("aria-haspopup"), tile.hasAttribute("aria-pressed")]).toEqual(["dialog", false]);
+    await click(tile);
+    const notion = service("Notion");
     expect(notion.textContent).toContain("O que os agentes poderão fazer");
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
     // What connecting changes, as one line under what it can do (no heading of its own).
     expect(notion.textContent).toContain("Nenhum agente usa até você escolher.");
     expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
-    // The same tile again closes it; another tile swaps it.
-    await click(within(dialog).getByRole("button", { name: "Notion" }));
-    expect(within(dialog).queryByRole("complementary")).toBeNull();
+    // × goes back to the catalog; another tile opens its own.
+    await click(within(notion).getByRole("button", { name: "Fechar detalhe" }));
+    expect(screen().queryByRole("dialog", { name: "Notion" })).toBeNull();
     await click(within(dialog).getByRole("button", { name: "GitHub" }));
-    const github = pane(dialog, "GitHub");
+    const github = service("GitHub");
     // What always asks for approval is marked.
     const asks = github.querySelector("[data-asks]");
     expect(asks?.textContent).toBe("Merge e deploy sempre pedem sua aprovação");
     expect(github.textContent).toContain("Você autoriza na página do serviço, ou usa uma chave de API");
-    // Esc: the pane closes, the catalog stays; again: the catalog closes.
-    await act(async () => fireEvent.keyDown(dialog, { key: "Escape" }));
-    expect(within(dialog).queryByRole("complementary")).toBeNull();
-    expect(screen().getByRole("dialog", { name: "Adicionar conector" })).toBeTruthy();
-    await act(async () => fireEvent.keyDown(dialog, { key: "Escape" }));
+    // Esc: the service closes, the catalog stays; again: the catalog closes.
+    await pressEsc(github);
+    expect(screen().queryByRole("dialog", { name: "GitHub" })).toBeNull();
+    expect(screen().getByRole("dialog", { name: "Adicionar conector" })).toBe(dialog);
+    await pressEsc(dialog);
     expect(screen().queryByRole("dialog", { name: "Adicionar conector" })).toBeNull();
   });
 
-  test("the pane's Conectar starts that service's flow; 'Não achou?' connects by address", async () => {
+  test("from the keyboard: focus lands in the service; Esc closes only it, back on its tile, the catalog as it was", async () => {
+    const { dialog } = await open();
+    const search = within(dialog).getByRole("searchbox", { name: "Buscar conector" }) as HTMLInputElement;
+    const docs = within(within(dialog).getByRole("radiogroup", { name: "Categorias" })).getByRole("radio", {
+      name: /^Docs/,
+    });
+    await click(docs);
+    await type(search, "notion");
+    const list = within(dialog).getByRole("region", { name: "Conectores disponíveis" });
+    list.scrollTop = 48;
+    const tile = within(dialog).getByRole("button", { name: "Notion" });
+    // Enter on a tile presses it with the focus on it.
+    tile.focus();
+    await click(tile);
+    expect(service("Notion").contains(document.activeElement)).toBe(true);
+    await pressEsc(document.activeElement as Element);
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Notion" })).toBeNull();
+    expect(document.activeElement).toBe(tile);
+    expect([search.value, docs.getAttribute("aria-checked"), list.scrollTop]).toEqual(["notion", "true", 48]);
+    expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
+  });
+
+  test("the service's Conectar starts its flow; 'Não achou?' connects by address", async () => {
     const { dialog } = await open();
     await pick(dialog, "Notion");
     expect(screen().getByRole("dialog", { name: "Conectar Notion" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Notion" })).toBeNull();
     expect(screen().queryByRole("dialog", { name: "Adicionar conector" })).toBeNull();
   });
 
@@ -141,11 +167,13 @@ describe("Adicionar conector: one catalog", () => {
     expect(within(dialog).getByRole("button", { name: "Zapier, conectado" })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Notion" }).querySelector(".catalog-icon__check")).toBeNull();
     await click(github);
-    const detail = pane(dialog, "GitHub");
+    const detail = service("GitHub");
+    expect(detail.querySelector(".catalog-icon__check")).toBeTruthy();
     expect(detail.textContent).toContain("Já conectado");
     expect(within(detail).getByRole("button", { name: "Conectar GitHub de novo" }).textContent).toBe(
       "Conectar outra conta",
     );
+    await pressEsc(detail);
     await click(
       within(dialog).getByRole("radiogroup", { name: "Categorias" }).querySelectorAll("[role=radio]")[1] as Element,
     );
@@ -318,7 +346,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
   test("any MCP server by address; back from its OAuth (`?connected=custom:{id}`) the review opens", async () => {
     const { state, dialog } = await open();
     await click(within(dialog).getByRole("button", { name: /Não achou/ }));
-    await click(within(pane(dialog, "Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
     expect(screen().getByRole("dialog", { name: "Conectar servidor MCP" })).toBeTruthy();
     await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "http://inseguro");

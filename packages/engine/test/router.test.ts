@@ -16,6 +16,7 @@ import {
   type RouterStrategy,
   type RoutingCandidate,
   routeMessage,
+  routerPrompt,
   selectAgents,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -39,8 +40,21 @@ describe("selectAgents (policy)", () => {
         { agentId: "d", score: 0.2 },
         { agentId: "intruder", score: 1 },
       ],
+      forEveryone: 0.9,
     };
     expect(selectAgents(candidates, result, policy)).toEqual(["b", "c"]);
+  });
+
+  test("a message with one answer goes to one agent, even when several could take it", () => {
+    // "quantas assinaturas tivemos hoje?" to the PM (0.8) and the researcher (0.75), 2026-10-28: both answered the same.
+    const candidates = ["pm", "research"].map(cand);
+    const agents = [
+      { agentId: "pm", score: 0.8 },
+      { agentId: "research", score: 0.75 },
+    ];
+    expect(selectAgents(candidates, { agents, needsAgent: 0.9, forEveryone: 0.1 }, policy)).toEqual(["pm"]);
+    expect(selectAgents(candidates, { agents, needsAgent: 0.9 }, policy)).toEqual(["pm"]);
+    expect(selectAgents(candidates, { agents, needsAgent: 0.9, forEveryone: 0.8 }, policy)).toEqual(["pm", "research"]);
   });
 
   test("a low need-any-agent score means nobody", () => {
@@ -69,7 +83,11 @@ describe("selectAgents (policy)", () => {
 
   test("a message to the room may wake up to four agents by default", () => {
     const candidates = ["a", "b", "c", "d", "e"].map(cand);
-    const result = { agents: candidates.map((c) => ({ agentId: c.agentId, score: 0.9 })), needsAgent: 0.9 };
+    const result = {
+      agents: candidates.map((c) => ({ agentId: c.agentId, score: 0.9 })),
+      needsAgent: 0.9,
+      forEveryone: 0.9,
+    };
     expect(selectAgents(candidates, result, { ...DEFAULT_ROUTER_POLICY, maxHops: 3 })).toHaveLength(4);
   });
 });
@@ -80,6 +98,7 @@ describe("parseRouterOutput", () => {
       parseRouterOutput('{"needs_agent":0.8,"scores":[{"handle":"dev","score":0.9},{"x":1}],"reason":"r"}'),
     ).toEqual({
       needs_agent: 0.8,
+      for_everyone: 0,
       scores: [{ handle: "dev", score: 0.9 }],
       reason: "r",
     });
@@ -89,8 +108,25 @@ describe("parseRouterOutput", () => {
   });
 });
 
+describe("routerPrompt", () => {
+  test("names a message to the room in both languages, and asks whether each agent has its own answer", () => {
+    const { system, schema: answer } = routerPrompt({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "e agora, vocês dois?" },
+      thread: [],
+      candidates: [cand("dev"), cand("qa")],
+    });
+    const room = system.split("\n").find((line) => line.includes("the whole room"));
+    for (const phrase of ["everyone", "all of you", "gente", "vocês", "agentes"]) expect(room).toContain(`"${phrase}"`);
+    expect(room).toContain("score every agent high");
+    expect(system).toContain("And `for_everyone`:");
+    expect(answer.required).toContain("for_everyone");
+  });
+});
+
 /** A strategy that returns fixed scores by handle and records what it saw. */
-function fixedStrategy(scores: Record<string, number>) {
+function fixedStrategy(scores: Record<string, number>, forEveryone?: number) {
   const seen: RoutingCandidate[][] = [];
   const strategy: RouterStrategy = {
     name: "fixed",
@@ -98,6 +134,7 @@ function fixedStrategy(scores: Record<string, number>) {
       seen.push(input.candidates);
       return {
         agents: input.candidates.map((c) => ({ agentId: c.agentId, score: scores[c.handle] ?? 0 })),
+        ...(forEveryone === undefined ? {} : { forEveryone }),
         reason: "test",
       };
     },
@@ -149,7 +186,8 @@ describe("routeMessage", () => {
     await f.db.update(schema.channelMembers).set({ autoReply: false }).where(eq(schema.channelMembers.agentId, ops.id));
     await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, archived.id));
 
-    const { strategy, seen } = fixedStrategy({ qa: 0.95, dev: 0.7, outsider: 1 });
+    // Heard as for every agent: both answer.
+    const { strategy, seen } = fixedStrategy({ qa: 0.95, dev: 0.7, outsider: 1 }, 0.9);
     const message = await post("the build is red again");
     const result = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: message.id });
     expect(seen[0]?.map((c) => c.handle).sort()).toEqual(["dev", "qa"]);

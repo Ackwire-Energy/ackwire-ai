@@ -58,7 +58,11 @@ describe("Quem pode falar com a Ada", () => {
     await go(`c/${ENG_ID}`, onlyOwner());
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     const sidebarAda = within(nav).getByRole("link", { name: /^Ada/ });
-    expect(sidebarAda.textContent).toContain("Pessoal");
+    // In the sidebar: her role, then a lock that says who she answers. The chip is in the DM's header.
+    expect(sidebarAda.textContent).toContain("Dev");
+    expect(within(sidebarAda).getByRole("img", { name: "Pessoal" }).getAttribute("title")).toBe(
+      "A Ada só responde a João.",
+    );
     const box = screen().getByRole("combobox", { name: /Mensagem para/ }) as HTMLTextAreaElement;
     await typeIn(box, "oi @a");
     const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
@@ -69,6 +73,7 @@ describe("Quem pode falar com a Ada", () => {
     expect(names.some((n) => n.includes("Atlas"))).toBe(true);
     cleanup();
     await go(`dm/agent/${ADA_ID}`, onlyOwner());
+    expect(screen().getByRole("heading", { level: 1, name: /^Ada/ }).textContent).toContain("Pessoal");
     const dm = screen().getByRole("combobox", { name: /Mensagem para Ada/ }) as HTMLTextAreaElement;
     expect(dm.disabled).toBe(true);
     expect(screen().getByText("A Ada só responde a João.")).toBeTruthy();
