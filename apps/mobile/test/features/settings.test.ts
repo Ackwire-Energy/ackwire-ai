@@ -79,6 +79,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
       "org:general",
       "org:members",
+      "org:audit",
       "agents:access",
       "agents:connectors",
       "agents:skills",
