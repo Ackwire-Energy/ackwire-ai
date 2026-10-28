@@ -904,8 +904,20 @@ p {
   font-size: 13px;
   color: var(--ink-muted);
 }
-.sidebar__item-meta .audience-chip--compact {
-  font-size: 11px;
+/* The role, then a lock when not everyone can talk to the agent (the tooltip says who). */
+.sidebar__item-meta--audience {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sidebar__item-meta--audience > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__lock {
+  display: inline-flex;
+  flex: none;
 }
 /* First-message suggestions in an empty conversation: neutral buttons that wrap */
 .channel__suggestions {
@@ -9427,16 +9439,17 @@ a.machine-row__name:hover {
 .agp-look {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+/* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   min-width: 0;
 }
 .agp-look__row .newag__swatch {
@@ -9457,10 +9470,6 @@ a.machine-row__name:hover {
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
-  }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
   }
 }
 

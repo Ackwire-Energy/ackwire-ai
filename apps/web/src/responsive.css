@@ -494,10 +494,6 @@
   .agp-id {
     flex-direction: column;
   }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
 }
 
 /* ── Offline computer notice on phones: the words, then the buttons sharing the width ── */
