@@ -55,7 +55,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useStreams } from "@/realtime/context";
-import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed } from "../computer/head";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
@@ -402,6 +402,8 @@ export function BrowserCard({
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
   useEffect(() => setHolding(inControl), [inControl]);
+  // A chat card's Hand back keeps its check and words: only the dialog's head folds it.
+  const back = useHandBack(surface && handoff?.kind === "takeover");
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";
   // The computer the browser runs on: the request's, else the one this agent works on.
   const machine = (machines.data ?? []).find((m) =>
@@ -823,8 +825,8 @@ export function BrowserCard({
         <Button
           size="sm"
           variant="primary"
-          icon="check"
-          className={handoff?.kind === "takeover" ? "cmp-back cmp-words" : "cmp-back"}
+          icon={back.icon}
+          className={back.className}
           onClick={() => {
             setOpen(true);
             setFailing(false);

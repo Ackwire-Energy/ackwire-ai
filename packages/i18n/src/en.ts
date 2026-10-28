@@ -8542,7 +8542,7 @@ export const en: Translations = {
     status: {
       preparing: "Getting the computer ready.",
       capacity: "Waiting for an available computer",
-      problem: "Something went wrong while preparing it. We're on it.",
+      problem: "Something went wrong while preparing it. We're\u00a0on\u00a0it.",
       ready: "Ready.",
       paused: "Not being prepared while the workspace is on hold.",
     },

@@ -1190,6 +1190,24 @@ describe("the computer's wait in words: one edge for the words, whole phrases, e
       expect(breaks(strings.computerSetup.specs)).toHaveLength(3);
       expect(strings.computerSetup.specs).toContain(specs[0]);
     }
+    // A problem's last sentence wraps whole.
+    expect(breaks(ptBR.computerSetup.status.problem).at(-1)).toBe("Já estamos cuidando.");
+    expect(breaks(en.computerSetup.status.problem).at(-1)).toBe("We're on it.");
+  });
+
+  test("a problem's line wraps plainly, so its last sentence goes whole to the next line", async () => {
+    // `pretty` takes that sentence, one phrase, for a short last line and pulls the word before it under it.
+    expect(
+      rule(
+        await sheet("../src/layout.css"),
+        ':is(.setup-wait, .setup-card) > .setup-progress--line[data-phase="problem"]',
+      ),
+    ).toContain("text-wrap: wrap");
+    await open(`/org/${ORG_ID}/settings/computers`, { state: "problem", notifyByEmail: true, specs: SPECS });
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    expect(card.querySelector(':scope > .setup-progress--line[data-phase="problem"]')?.textContent).toBe(
+      "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+    );
   });
 
   test("Settings › Computers' card ends as far under its last line's baseline as its drawing starts under its top", async () => {

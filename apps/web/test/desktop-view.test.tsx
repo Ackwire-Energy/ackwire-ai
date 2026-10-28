@@ -201,7 +201,7 @@ async function controlled(cloud = false) {
   };
 }
 /** The line under the screen in control: its words. */
-const line = () => document.querySelector(".dsk-line > .muted")?.textContent;
+const line = () => document.querySelector(".dsk-line > .dsk-words")?.textContent;
 /** What the clipboard just did, said in that line in its words' place. */
 const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
 /** The last picture the screen holds over its next connection. */
@@ -506,8 +506,9 @@ describe("the agent's screen in the computer dialog", () => {
     // The person's keys go to the screen at once, through a field over it.
     expect(document.activeElement).toBe(view().getByRole("textbox", { name: "Digitar no computador da Ada" }));
     expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
+    // What programs there can see first: the window keeps that whole, and the keys after it where they fit.
     expect(line()).toBe(
-      "Copiar e colar como sempre: Ctrl+C, Ctrl+V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+      "Os programas do computador da Ada veem a tela e o que você digita ou cola. Copiar e colar como sempre: Ctrl+C, Ctrl+V.",
     );
     // No box to paste into and no keyboard to pick: the person's own keys paste, and type in their own layout.
     expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
@@ -560,11 +561,12 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     await connected();
-    // The line's words stay as they are, the ⓘ on their first line.
-    const hintLine = document.querySelector(".dsk-line > .ac-hintline") as HTMLElement;
+    // The ⓘ goes with what programs there can see, which the window never parts from it; the keys come after them.
+    const hintLine = document.querySelector(".dsk-line > .dsk-words > .ac-hintline") as HTMLElement;
     expect(hintLine.querySelector(":scope > .muted")?.textContent).toBe(
-      "Copiar e colar como sempre: Ctrl+C, Ctrl+V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+      "Os programas do computador da Ada veem a tela e o que você digita ou cola.",
     );
+    expect(hintLine.nextElementSibling?.textContent).toBe("Copiar e colar como sempre: Ctrl+C, Ctrl+V.");
     const hint = about() as HTMLElement;
     expect(hintLine.contains(hint)).toBe(true);
     const words =
@@ -793,7 +795,7 @@ describe("the agent's screen in the computer dialog", () => {
     replaceOn(navigator, "platform", "MacIntel");
     const board = clipboard();
     const t = await controlled();
-    expect(line()).toStartWith("Copiar e colar como sempre: ⌘C, ⌘V. ");
+    expect(line()).toEndWith(". Copiar e colar como sempre: ⌘C, ⌘V.");
     const field = t.field();
     fireEvent.keyDown(field, { key: "Meta", code: "MetaLeft", metaKey: true });
     fireEvent.keyDown(field, { key: "c", code: "KeyC", metaKey: true });
@@ -868,7 +870,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.querySelector(".dsk-got")).toBeNull();
     expect(document.querySelector(".ac-toast")).toBeNull();
     expect(t.closed()).toBe(0);
-    // Handed back and taken again: the line starts with its own words, nothing said from before.
+    // Handed back and taken again: the line has its own words, nothing said from before.
     await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
@@ -877,7 +879,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     await connected();
     expect(said()).toBeUndefined();
-    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl+C, Ctrl+V. ");
+    expect(line()).toEndWith(". Copiar e colar como sempre: Ctrl+C, Ctrl+V.");
   });
 
   test("the newest copy speaks: one kept out right after a Copiado is offered at once, not under the older word", async () => {
@@ -917,7 +919,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.activeElement).not.toBe(field);
     const keyboard = view().getByRole("button", { name: "Teclado" });
     expect(keyboard.getAttribute("aria-pressed")).toBe("false");
-    expect(line()).toBe("Os programas do computador da Ada podem ver a tela e o que você digita ou cola.");
+    expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
     await click(keyboard);
     expect(document.activeElement).toBe(field);
     expect(keyboard.getAttribute("aria-pressed")).toBe("true");
@@ -1149,13 +1151,12 @@ describe("the dialog's size (computer.css)", () => {
     // and 42 px of the page above and below, so a notice along its top stays whole.
     const frame = rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))");
     expect(frame).toContain("--cmp-around: calc(124px + var(--cmp-line))");
-    expect(frame).toContain("--cmp-extra: calc(var(--cmp-over, 0px) + var(--cmp-under, 0px))");
-    expect(frame).toContain(
-      "--cmp-room: calc(100dvh - 84px - var(--cmp-bar, 0px) - var(--cmp-around) - var(--cmp-extra))",
-    );
+    expect(frame).toContain("--cmp-room: calc(100dvh - 84px - var(--cmp-bar, 0px) - var(--cmp-around))");
     expect(frame).toContain("--cmp-screen: min(96vw - 40px, 1280px, var(--cmp-room) * 1280 / 900)");
     expect(frame).toContain("width: calc(var(--cmp-screen) + 40px)");
-    expect(frame).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + var(--cmp-around) + var(--cmp-extra))");
+    expect(frame).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + var(--cmp-around))");
+    // Sized once: nothing that comes and goes (a banner, a request, the note) gives the window room of its own.
+    expect(text).not.toMatch(/--cmp-(extra|over|under)/);
     expect(text).toContain(".ac-dialog.cmp-dialog {\n  --cmp-button: var(--control-h-sm);\n  --cmp-line: 22px;\n}");
     // No state sizes the dialog on its own: no rule but the frame's (and full screen's) gives it a height.
     expect(text.match(/\n {0,2}height: calc\(var\(--cmp-screen\)[^;]*;/g)).toHaveLength(1);
@@ -1186,6 +1187,20 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(text, ".cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
     const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
     expect(rule(desk, ".dsk-line")).toContain("min-height: 22px");
+    // In the window its words stay one 22 px line, whatever the window's width: what programs there can see first
+    // (the Cloud's ⓘ with it), cut short only where nothing else fits, and the keys after it only when they fit whole
+    // (they wrap to a second row it never shows). The phone's sheet and full screen keep no line's room: there it wraps.
+    const frame = desk.split("@media (min-width: 721px) {")[1]?.split("\n}\n")[0] ?? "";
+    const inFrame = (selector: string) => frame.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
+    const words = inFrame(".cmp-dialog:not(.is-screen-only) .dsk-words");
+    for (const d of ["display: flex", "flex-wrap: wrap", "height: 22px", "overflow: hidden", "min-width: 0"]) {
+      expect(words).toContain(d);
+    }
+    expect(inFrame(".cmp-dialog:not(.is-screen-only) .dsk-words > *")).toContain("min-width: 0");
+    const each = inFrame(".cmp-dialog:not(.is-screen-only) .dsk-words .muted");
+    for (const d of ["min-width: 0", "overflow: hidden", "white-space: nowrap", "text-overflow: ellipsis"]) {
+      expect(each).toContain(d);
+    }
   });
 
   test("a phone's Keyboard button leads the line with the words' first line on its middle", async () => {
@@ -1206,7 +1221,7 @@ describe("the dialog's size (computer.css)", () => {
   const phoneRule = async (selector: string) =>
     (await css()).split("@media (max-width: 640px) {")[1]?.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
 
-  test("a phone's head keeps one row: Hand back in words, any other action its icon alone, the face aside", async () => {
+  test("a phone's head keeps one row and one height: Hand back in words, any other action its icon alone, the face aside", async () => {
     // No second row for the actions: the head is the kit's one flex row.
     expect(await css()).not.toContain("grid-template-columns: auto minmax(0, 1fr) auto");
     const square = await phoneRule(".cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words)");
@@ -1217,9 +1232,15 @@ describe("the dialog's size (computer.css)", () => {
     expect(words).toContain("clip: rect(0 0 0 0)");
     // A check alone reads as Done: Hand back keeps its words and drops the check.
     expect(await phoneRule(".cmp-acts > .cmp-words > .ac-icon")).toContain("display: none");
-    // The name and the line under it keep a line each beside the controls: the title names the agent, so the face goes.
+    // The name and the line under it keep a line each beside the controls: the title names the agent, so the face goes,
+    // and either one cut short is still one line.
     expect(await phoneRule(".cmp-dialog .ac-dialog__lead")).toContain("display: none");
-    expect(await phoneRule(".cmp-dialog .ac-dialog__title")).toContain("text-wrap: balance");
+    const titles = await phoneRule(".cmp-dialog .ac-dialog__titles > *");
+    expect(titles).toContain("white-space: nowrap");
+    expect(titles).toContain("text-overflow: ellipsis");
+    expect(titles).toContain("overflow: hidden");
+    // A failed action's words in the line's place wrap whole instead, for the moment they show.
+    expect(await phoneRule(".cmp-dialog .ac-dialog__sub:has(> .cmp-said)")).toContain("white-space: normal");
     // An icon alone sits in the middle of its square: no reaching out by its drawing's air there.
     const square2 = await phoneRule(".cmp-acts > :is(.cmp-take, .cmp-back)");
     expect(square2).toContain("--lead-air: initial");
@@ -1239,9 +1260,27 @@ describe("the dialog's size (computer.css)", () => {
     const back = view().getByRole("button", { name: "Devolver" });
     expect(back.querySelector(".cmp-act-label")?.textContent).toBe("Devolver");
     expect([...back.classList]).toEqual(expect.arrayContaining(["cmp-back", "cmp-words"]));
+    cleanup();
+    // 360 px and narrower its words don't fit beside the name: it folds to its square with a give-back arrow, never
+    // the check, which reads as Done. Its words stay its name.
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = ((query: string) =>
+      query === "(max-width: 360px)"
+        ? { matches: true, media: query, addEventListener() {}, removeEventListener() {} }
+        : real(query)) as typeof window.matchMedia;
+    try {
+      await controlled();
+      const folded = view().getByRole("button", { name: "Devolver" });
+      expect(folded.classList.contains("cmp-back")).toBe(true);
+      expect(folded.classList.contains("cmp-words")).toBe(false);
+      expect(folded.querySelector(":scope > svg path")?.getAttribute("d")).toBe(icons.undo[0]?.[1].d);
+      expect(folded.querySelector(".cmp-act-label")?.textContent).toBe("Devolver");
+    } finally {
+      window.matchMedia = real;
+    }
   });
 
-  test("on a phone a cover, the wait and the page fill the sheet; the live screen and what goes with it sit at its top", async () => {
+  test("on a phone a cover, the wait and the page fill the sheet; the live screen sits at its top, all else under it", async () => {
     const text = await css();
     const sheet = text.split("@media (max-width: 720px) {")[1]?.split("\n}\n")[0] ?? "";
     const inSheet = (selector: string) => sheet.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
@@ -1255,17 +1294,27 @@ describe("the dialog's size (computer.css)", () => {
         ".cmp-body > .cmp-stage,\n  .cmp-body > .cmp-prep,\n  .cmp-body > .brw-ac.is-surface,\n  .cmp-body > .brw-ac.is-surface > .brw-ac__body,\n  .cmp-body > .brw-ac.is-surface .brw-ac__stage",
       ),
     ).toContain("flex: 1 0 auto");
-    // The screen keeps its own height, at the sheet's top under the head, with the request over it and the line under
-    // it: taking control brings that line and moves nothing. No auto margins float the group in the sheet's middle.
+    // The screen's covers fill it too (opening, someone else in control, a pause), its box stretched under them.
+    expect(
+      inSheet('.cmp-body > .dsk:not([data-state="live"]),\n  .cmp-body > .dsk:not([data-state="live"]) > .dsk-stage'),
+    ).toContain("flex: 1 0 auto");
+    const covered = inSheet('.cmp-body .cmp-stage__box,\n  .cmp-body > .dsk:not([data-state="live"]) .dsk-screen');
+    expect(covered).toContain("place-self: stretch");
+    expect(covered).toContain("aspect-ratio: auto");
+    expect(sheet).toContain('\n  .cmp-body > .dsk:not([data-state="live"]) .dsk-screen {\n    contain: size;\n  }');
+    // The live screen keeps its own height, at the sheet's top under the head, in every state: what comes and goes goes
+    // under it, so nothing moves it. The request being helped with right under it, then the line or the note, a banner
+    // after the steps. No auto margins float it in the sheet's middle; full screen places them itself.
     expect(inSheet(".cmp-body > .dsk,\n  .cmp-body .dsk-stage")).toContain("flex: none");
+    expect(inSheet(".cmp-dialog:not(.is-screen-only) .dsk > .dsk-stage")).toContain("order: -1");
+    expect(inSheet(".cmp-dialog:not(.is-screen-only) .cmp-body > .cmp-banner")).toContain("order: 1");
     expect(sheet).not.toContain("margin-top: auto");
     expect(sheet).not.toContain("margin-bottom: auto");
+    // The agent's page starts at its stage's top, as the screen does: its tools coming under it move nothing.
+    expect(sheet).toContain("\n  .cmp-body > .brw-ac.is-surface .brw-ac__stage {\n    place-items: start center;\n  }");
     // With no steps, the line under the screen takes no room on the sheet.
     expect(inSheet(".cmp-steps-row:empty")).toContain("display: none");
-    // A cover's box takes all of its stage; the screen and the page keep their shape, centred in theirs.
-    const box = inSheet(".cmp-body .cmp-stage__box");
-    expect(box).toContain("place-self: stretch");
-    expect(box).toContain("aspect-ratio: auto");
+    // In the window's frame the screen keeps its shape, centred in its stage.
     expect(rule(text, ".cmp-body .dsk-stage,\n.cmp-body > .cmp-stage")).toContain("place-items: center");
   });
 
@@ -1346,30 +1395,37 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(kit, ".ac-dialog__sub")).toContain("line-height: 18px");
   });
 
-  test("what sits over or under the screen takes room of its own, so the screen keeps its 20 px from the sides", async () => {
+  test("what comes over or under the screen takes the screen's room, never the window's", async () => {
     const text = await css();
     expect(text).toContain(".ac-dialog.cmp-dialog {\n  --cmp-button: var(--control-h-sm);\n  --cmp-line: 22px;\n}");
     expect(text).toContain(
       "@media (pointer: coarse) {\n  .ac-dialog.cmp-dialog {\n    --cmp-button: var(--control-h-md);",
     );
-    expect(rule(text, ".ac-dialog.cmp-dialog:has(> .cmp-body > .dsk > .cmp-asked)")).toContain("--cmp-over: 30px");
-    expect(rule(text, ".ac-dialog.cmp-dialog:has(> .cmp-body > .cmp-banner)")).toContain("--cmp-over: 50px");
-    expect(rule(text, ".ac-dialog.cmp-dialog:has(> .cmp-body > .cmp-banner > .ac-btn)")).toContain(
-      "--cmp-over: calc(28px + var(--cmp-button))",
-    );
-    expect(rule(text, ".ac-dialog.cmp-dialog:has(> .cmp-body > .cmp-banner > .cmp-banner__t > span)")).toContain(
-      "--cmp-over: 72px",
-    );
-    expect(rule(text, ".ac-dialog.cmp-dialog:has(> .cmp-body > .dsk > .brw-ac__fail)")).toContain(
-      "--cmp-under: calc(46px + var(--cmp-button))",
-    );
-    // The window has what those rules look for, where they look: the request over the screen, the note in its line.
+    // A banner, the request and the note sit in the body's column with the screen's stage, which gets what they leave
+    // and shrinks the screen inside it, keeping its shape.
+    const column = rule(text, ".cmp-body > .dsk");
+    expect(column).toContain("flex: 1 1 0");
+    expect(column).toContain("min-height: 0");
+    expect(rule(text, ".cmp-body .dsk-stage,\n.cmp-body > .cmp-stage")).toContain("container-type: size");
+    // The window has them where that column holds them: the request over the screen, the note in its line's place.
     const t = await controlled();
     const body = () => document.querySelector(".ac-dialog.cmp-dialog > .cmp-body");
     expect(body()?.querySelector(":scope > .dsk")).toBeTruthy();
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(body()?.querySelector(":scope > .dsk > .brw-ac__fail")).toBeTruthy();
     expect(t.sockets.desktops.length).toBeGreaterThan(0);
+  });
+
+  test("the agent's page keeps its tools' room under it in every state, so taking control moves it nowhere", async () => {
+    const text = await css();
+    // The 48 px field and the 8 px over it, the line's place in control, taken from the page's stage: the window keeps
+    // the screen's size, so nothing moves when the page opens after a cover either.
+    const room = text.split("@media (min-width: 721px) {\n  .cmp-body:has(> .brw-ac.is-surface) > .cmp-steps-row {")[1];
+    expect(room?.split("}")[0]).toContain("height: calc(var(--control-h-lg) + 8px)");
+    expect(text).not.toContain("is-surface) {\n  --cmp-line");
+    expect(rule(text, ".cmp-body .brw-ac__foot")).toContain("padding: 8px 0 0");
+    const browser = await Bun.file(new URL("../src/components/browser/browser.css", import.meta.url).pathname).text();
+    expect(rule(browser, ".brw-tfield")).toContain("height: var(--control-h-lg)");
   });
 
   test("the desktop app: the window centres in the work area under its title bar", async () => {

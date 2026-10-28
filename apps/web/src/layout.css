@@ -6487,6 +6487,13 @@ a.machine-row__name:hover {
 :is(.setup-wait, .setup-card) > * {
   text-wrap: pretty;
 }
+/*
+ * A problem's line ends on a phrase its no-break spaces keep whole ("We're on it."): `pretty` would take it for a
+ * short last line and pull the sentence before's last word under it, so this line wraps plainly.
+ */
+:is(.setup-wait, .setup-card) > .setup-progress--line[data-phase="problem"] {
+  text-wrap: wrap;
+}
 .setup-progress .ac-eyebrow > span {
   display: inline-block;
 }

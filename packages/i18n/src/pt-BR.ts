@@ -8593,7 +8593,7 @@ export const ptBR = {
     status: {
       preparing: "Preparando o computador.",
       capacity: "Esperando um computador disponível",
-      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+      problem: "Algo deu errado ao preparar o computador. Já\u00a0estamos\u00a0cuidando.",
       ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
@@ -8654,7 +8654,7 @@ export const ptBR = {
     },
     control: {
       keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
-      notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
     session: {
