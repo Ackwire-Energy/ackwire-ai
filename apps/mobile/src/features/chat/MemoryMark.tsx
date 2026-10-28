@@ -11,8 +11,8 @@ import { Button, Card, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { tapHaptic } from "../shared/parts";
 import { SheetTitle } from "../shared/PromptForm";
+import { tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 
@@ -68,15 +68,7 @@ export function MemoryMarks({ message, divided }: { message: Message; divided: b
  * What one agent saved from a message, as the web's card: the fact, where it came from, Corrigir (in place) and
  * Esquecer (with Desfazer) for the agent's owner or an admin, and Ver na memória.
  */
-function MemorySheet({
-  message,
-  memory,
-  onClose,
-}: {
-  message: Message;
-  memory: MessageMemory;
-  onClose: () => void;
-}) {
+function MemorySheet({ message, memory, onClose }: { message: Message; memory: MessageMemory; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();

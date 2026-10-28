@@ -1429,7 +1429,7 @@ export const featureKeysEn: FeatureTranslations = {
   },
   crash: {
     title: "Something went wrong on this screen",
-    subtitle: "The app hit an error showing this. Try again; if it keeps happening, send us the text below.",
+    subtitle: "The app hit an error showing this. Try again. If it keeps happening, send us the text below.",
     retry: "Try again",
   },
   notFound: {

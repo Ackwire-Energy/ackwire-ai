@@ -58,7 +58,12 @@ describe("a routine's last runs as a pixel strip (the web's RunStrip as cells)",
   test("newest on the right; only the last 14 fit", () => {
     const runs = stripCells([px("failed"), px("ok")], "green", tones, { slots: SLOTS });
     expect(Math.min(...xsOf(runs, (c) => c === tones.danger))).toBe(52);
-    const full = stripCells(Array.from({ length: 20 }, () => px("ok", 1)), "green", tones, { slots: SLOTS });
+    const full = stripCells(
+      Array.from({ length: 20 }, () => px("ok", 1)),
+      "green",
+      tones,
+      { slots: SLOTS },
+    );
     expect(count(full)).toBe(14 * 30);
     expect(cellsOf(full, tones.dot)).toBe(0);
     expect(inside(full, W, STRIP_ROWS)).toBe(true);
