@@ -120,7 +120,9 @@ describe("the workspace's computer on its way: the notice on top of the work are
   test("how far it is, the time left and who waits for it, live, closed until the state changes, gone once ready", async () => {
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { state: "waiting", reason: "capacity" });
     const notice = () => screen().getByRole("region", { name: NOTICE });
-    expect(notice().textContent).toContain("Preparando o computador da Acme");
+    const title = () => notice().querySelector(".outage__text > b")?.textContent;
+    // In line nothing is prepared yet: its name alone, and its line says it waits.
+    expect(title()).toBe("Computador da Acme");
     expect(notice().textContent).toContain("Esperando um computador disponível");
     expect(notice().textContent).not.toContain("Nada se perde");
     // Who waits for it: their faces, each named, and no sentence of names.
@@ -136,6 +138,7 @@ describe("the workspace's computer on its way: the notice on top of the work are
 
     await push({ state: "preparing", step: "installing", secondsLeft: 330 });
     const line = () => notice().querySelector(".outage__text > span")?.textContent;
+    expect(title()).toBe("Preparando o computador da Acme");
     expect(line()).toBe("Passo 3 de 4 · Instalando os programas · faltam uns 6 min");
     await push({ state: "preparing", step: "starting" });
     expect(line()).toBe("Passo 2 de 4 · Iniciando");
@@ -337,11 +340,14 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(screen().queryByText("Na nuvem")).toBeNull();
     expect(screen().queryByRole("region", { name: "Computador na nuvem" })).toBeNull();
 
+    // The chip is the one place the card says where it is, so its live region: a screen reader hears each change.
+    expect(card().querySelector(".computers-card__head [role='status'] .ac-chip")?.textContent).toBe("Sendo preparado");
     await push({ state: "waiting", reason: "capacity" });
     // In line said once, by its chip: no line under it saying it waits, and no notice over the page.
     expect(card().textContent).toContain("Na fila");
     expect(card().textContent).not.toContain("Esperando um computador disponível");
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
+    expect(card().querySelector(".computers-card__head [role='status'] .ac-chip")?.textContent).toBe("Na fila");
 
     // Its first hello: ready, its row among the computers, the agents on it (each with its own folder only).
     const m = machines.pair({
@@ -351,6 +357,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     });
     await push({ state: "ready", machineId: m.id });
     expect(card().textContent).toContain("Online");
+    expect(card().querySelector(".computers-card__head [role='status'] .ac-chip")?.textContent).toBe("Online");
     expect(card().textContent).toContain("Usado por Ada");
     // The page says what the agents' computer is here in one line, and its card doesn't say it again; nothing
     // else to connect or pick.
@@ -602,29 +609,37 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(step.textContent).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
     // No plans: the AI step is where they are.
     expect(step.textContent).not.toContain("plano de IA");
-    // Every line starts with its icon, set on the line's first line of text.
+    // The whole wait in one well, every line in it its own: each starts with its icon, set on its first line of text.
+    const well = step.querySelector(":scope > .onb__wait") as HTMLElement;
     const lines = [...step.querySelectorAll(".setup-progress--line, .setup-line, .onb__status")];
     expect(lines.length).toBe(4);
     for (const line of lines) {
+      expect(well.contains(line)).toBe(true);
+      expect(line.classList.contains("setup-progress--line") || line.classList.contains("setup-line")).toBe(true);
       expect(line.classList.contains("ac-iconline")).toBe(true);
       expect(line.firstElementChild?.matches("svg.ac-icon, canvas.ac-pixspin")).toBe(true);
     }
     // The wait leads with the orbit, like any wait that is under way, never a clock.
     expect(step.querySelector(".setup-progress--line")?.firstElementChild?.matches("canvas.ac-pixspin")).toBe(true);
     expect(lines.filter(leadsWithClock)).toEqual([]);
-    // One lead size, so those lines' words start in one column; the status under them, a box of its own, leads with
-    // the same size, in the same type as the lines above it (onboarding.css).
+    // One lead size, so every line's words start in one column.
     for (const line of lines) {
       const lead = line.firstElementChild as HTMLElement;
       expect(lead.style.width).toBe("14px");
     }
-    const onb = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
-    expect(onb.split("\n.onb__workspace-computer > .onb__status {")[1]?.split("}")[0]).toContain("font-size: 13px");
-    // Sunk into its card in both themes, as the AI step's wait is: one well (layout.css).
+    // Sunk into its card in both themes, the AI step's well, its lines at the well's own gap (layout.css).
     const layout = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
-    expect(layout.split("\n.ai-panel__wait,\n.onb__workspace-computer > .onb__status {")[1]?.split("}")[0]).toContain(
-      "background: var(--surface-sunken)",
-    );
+    const shared = layout.split("\n.ai-panel__wait,\n.onb__wait {")[1]?.split("}")[0] ?? "";
+    expect(shared).toContain("background: var(--surface-sunken)");
+    expect(shared).toContain("gap: 8px");
+    expect(layout.split("\n.onb__wait > .setup-wait {")[1]?.split("}")[0]).toContain("display: contents");
+    // The self-hosted step's callouts are that well too, in that type: never a plate lighter than its ground in dark.
+    const onb = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    const status = onb.split("\n.onb__status {")[1]?.split("}")[0] ?? "";
+    expect(status).toContain("background: var(--surface-sunken)");
+    expect(status).toContain("font-size: 13px");
+    expect(status).not.toContain("--plate");
+    expect(onb).not.toContain(".onb__workspace-computer > .onb__status");
     // The lead says where, and the rail says how far: never "opcional".
     expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });

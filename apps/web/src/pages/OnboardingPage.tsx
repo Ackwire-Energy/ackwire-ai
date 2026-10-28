@@ -1673,14 +1673,14 @@ function ComputerStep({
 
       {computer === "cloud" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{t("onboarding.computer.cloudReady")}</span>
         </p>
       )}
 
       {computer === "host" && (
         <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" />
+          <Icon name="check" size={14} />
           <span>{host?.online ? t("onboarding.computer.hostReady") : t("onboarding.computer.hostConnecting")}</span>
         </p>
       )}
@@ -1690,7 +1690,7 @@ function ComputerStep({
           {machine ? (
             <>
               <p className="onb__status ac-iconline" role="status">
-                <Icon name="check" />
+                <Icon name="check" size={14} />
                 <span>{t("onboarding.computer.thisMacConnected", { name: machine.name })}</span>
               </p>
               <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -1723,7 +1723,7 @@ function ComputerStep({
         <Card as="div">
           {machine ? (
             <p className="onb__status ac-iconline" role="status">
-              <Icon name="check" />
+              <Icon name="check" size={14} />
               <span>
                 {t("onboarding.computer.connected", {
                   name: machine.name,
@@ -1774,19 +1774,22 @@ function WorkspaceComputerStep({
           </ComputerTitle>
         </span>
       </div>
-      {hold && (
-        <p className="setup-line ac-iconline" role="status">
-          <Icon name="pause" size={14} />
-          <span>{hold}</span>
-        </p>
-      )}
-      <SetupWait view={view} reader={reader} />
-      {setupPending(view) && (
-        <p className="onb__status ac-iconline">
-          <Icon name="check" size={14} />
-          <span>{t("computerSetup.continue")}</span>
-        </p>
-      )}
+      {/* The whole wait in one well, as the AI step's: every line's icon and words on one column. */}
+      <div className="onb__wait">
+        {hold && (
+          <p className="setup-line ac-iconline" role="status">
+            <Icon name="pause" size={14} />
+            <span>{hold}</span>
+          </p>
+        )}
+        <SetupWait view={view} reader={reader} />
+        {setupPending(view) && (
+          <p className="setup-line ac-iconline">
+            <Icon name="check" size={14} />
+            <span>{t("computerSetup.continue")}</span>
+          </p>
+        )}
+      </div>
     </Card>
   );
 }

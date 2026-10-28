@@ -10,6 +10,7 @@ import {
   type SetupView,
   setupEta,
   setupNoticeKey,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
@@ -231,7 +232,8 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
               )}
             </h2>
           </ComputerTitle>
-          <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          {/* The card says where it is only here, so here a screen reader hears it change. */}
+          <span className="row" role="status" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <SetupChip view={view} machine={machine} />
           </span>
         </span>
@@ -261,11 +263,11 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 }
 
 /**
- * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), or the
- * wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents that wait for it,
- * each named by its label. Everyone sees it, except on Settings › Computers, where its See leads and the card says it;
- * closed, it stays closed until the state (or the step) changes.
+ * "Preparando o computador da Acme" (in line, its name alone): the notice at the top of the work area while the
+ * workspace's own computer is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam
+ * uns 6 min"), or the wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents
+ * that wait for it, each named by its label. Everyone sees it, except on Settings › Computers, where its See leads and
+ * the card says it; closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
@@ -300,7 +302,7 @@ export function ComputerSetupNotice() {
       <div className="outage setup-notice" role="status" data-phase={view.phase}>
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
-          <b>{t("computerSetup.notice.title", { org: org.name })}</b>
+          <b>{t(setupNoticeTitleKey(view), { org: org.name })}</b>
           <span>{line}</span>
         </span>
         <span className="outage__crew">

@@ -12,6 +12,7 @@ import {
   SETUP_STAGES,
   SETUP_STEPS,
   setupNoticeKey,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
@@ -172,6 +173,15 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(statusRestatesChip(at({ state: "preparing", step: "installing" }))).toBe(false);
     expect(statusRestatesChip(at({ state: "problem" }))).toBe(false);
     expect(statusRestatesChip(at({ state: null }))).toBe(false);
+  });
+
+  test("the notice is titled by its name while in line, where nothing is being set up yet", () => {
+    const at = (patch: Partial<ComputerSetup>) =>
+      setupView(external(patch)) as NonNullable<ReturnType<typeof setupView>>;
+    expect(setupNoticeTitleKey(at({ state: "waiting", reason: "capacity" }))).toBe("computerSetup.title");
+    expect(setupNoticeTitleKey(at({ state: "preparing" }))).toBe("computerSetup.notice.title");
+    expect(setupNoticeTitleKey(at({ state: "preparing", step: "installing" }))).toBe("computerSetup.notice.title");
+    expect(setupNoticeTitleKey(at({ state: "problem" }))).toBe("computerSetup.notice.title");
   });
 
   test("who waits for it: the agents no computer lists", () => {

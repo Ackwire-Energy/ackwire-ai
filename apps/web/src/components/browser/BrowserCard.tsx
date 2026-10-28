@@ -742,17 +742,19 @@ export function BrowserCard({
               ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
               : t("browser.live.watchOnly");
   const live_ = working && !blocker && !closed;
-  // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold).
-  const surfaceSub =
-    inControl || otherInControl || reconnecting
-      ? sub
-      : blocker
+  // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold). Over a cover
+  // it says nothing the cover says (opening, reconnecting): only who holds the page.
+  const surfaceSub = inControl
+    ? sub
+    : otherInControl
+      ? hidden
+        ? t("desktop.sub.hidden", { person: controllerName })
+        : sub
+      : blocker || reconnecting || (open && starting) || opening
         ? ""
-        : (open && starting) || opening
-          ? t("agentComputer.sub.opening")
-          : closed
-            ? t("browser.watch.live")
-            : (head?.watching ?? sub);
+        : closed
+          ? t("browser.watch.live")
+          : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
   const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
 
@@ -807,13 +809,14 @@ export function BrowserCard({
         <Button
           size="sm"
           variant="ghost"
+          {...(surface ? { icon: "block" as const, className: "cmp-couldnt ac-btn--glyph" } : {})}
           onClick={() => {
             setOpen(true);
             setHandingBack(false);
             setFailing(true);
           }}
         >
-          {surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}
+          <span className="cmp-act-label">{surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}</span>
         </Button>
       )}
       {!handingBack && (
@@ -847,12 +850,8 @@ export function BrowserCard({
   const cover = blocker ? (
     <Cover color={color} text={blocker} />
   ) : hidden ? (
-    <Cover
-      color={color}
-      icon="eyeOff"
-      text={t("browser.live.otherInControl", { name: controllerName })}
-      help={t("browser.inCard.hiddenHelp", g)}
-    />
+    // Its head says who is in control.
+    <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
   ) : closed ? (
     <Cover
       color={color}

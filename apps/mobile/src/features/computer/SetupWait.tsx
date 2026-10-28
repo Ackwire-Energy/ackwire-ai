@@ -5,9 +5,11 @@ import {
   SETUP_STEPS,
   type SetupView,
   setupEta,
+  setupNoticeTitleKey,
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
@@ -88,34 +90,37 @@ function Line({ icon, text }: { icon: IconName; text: string }) {
 }
 
 /**
- * The workspace's computer on its way, as the web's preparing screen: the server's portrait, "Preparando o
- * computador da Acme" with its ⓘ (one user per agent), the steps ("Passo 3 de 4 · Instalando os programas") or why
- * it waits, the time left, who hears when it's ready (owners, by email) and the size. Ready: its name.
+ * The workspace's computer on its way, as the web's preparing screen: the server's portrait, "Computador da Acme"
+ * with its ⓘ (one user per agent), the steps ("Passo 3 de 4 · Instalando os programas") or why it waits, the time
+ * left, who hears when it's ready (owners, by email) and the size. `said`: the screen's header names the computer
+ * and says where it is, so the name and a line that would only say it again stay out.
  */
 export function SetupWait({
   view,
   online = false,
   workspace,
+  said = false,
 }: {
   view: SetupView;
   online?: boolean;
   /** The first run's workspace (no workspace is chosen in the app yet). */
   workspace?: WaitWorkspace;
+  said?: boolean;
 }) {
   const { t } = useTranslation();
   const wait = useSetupWait(view, workspace);
-  const orgName = wait.org;
-  const pending = setupPending(view);
-  const name = t("computerSetup.title", { org: orgName });
+  const name = t("computerSetup.title", { org: wait.org });
   return (
     <View style={styles.wait}>
       <View style={styles.head}>
         <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, online)} size={96} />
-        <InfoHint name={t("common.about", { label: name })} text={t("computerSetup.users")} variant="title" center>
-          <Text variant="title" style={styles.center}>
-            {pending ? t("computerSetup.notice.title", { org: orgName }) : name}
-          </Text>
-        </InfoHint>
+        {said ? null : (
+          <InfoHint name={t("common.about", { label: name })} text={t("computerSetup.users")} variant="title" center>
+            <Text variant="title" style={styles.center}>
+              {name}
+            </Text>
+          </InfoHint>
+        )}
         {view.step ? (
           <>
             <Steps n={view.stepNumber} total={SETUP_STEPS.length} />
@@ -123,7 +128,7 @@ export function SetupWait({
               {t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })}
             </Text>
           </>
-        ) : (
+        ) : said && statusRestatesChip(view) ? null : (
           <Text variant="small" tone="muted" style={styles.center}>
             {t(view.textKey)}
           </Text>
@@ -160,8 +165,9 @@ export function ComputerSetupSheet({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * On Conversas while the workspace's own computer is being prepared, in the outage notices' style: "Preparando
- * o computador da Acme" and the time left (or where it is). It opens the whole wait in a sheet. Everyone sees it.
+ * On Conversas while the workspace's own computer is on its way, in the outage notices' style: "Preparando o
+ * computador da Acme" (in line, its name alone) and the time left (or where it is). It opens the whole wait in a
+ * sheet. Everyone sees it.
  */
 export function SetupNotice() {
   const { t } = useTranslation();
@@ -171,7 +177,7 @@ export function SetupNotice() {
   const view = useSetupView();
   const wait = useSetupWait(view);
   if (!setupPending(view)) return null;
-  const title = t("computerSetup.notice.title", { org: org?.name ?? "" });
+  const title = t(setupNoticeTitleKey(view), { org: org?.name ?? "" });
   const line = setupNoticeLine(t, view, wait.eta, wait.emailed);
   return (
     <View style={styles.list}>

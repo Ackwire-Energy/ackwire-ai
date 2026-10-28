@@ -166,6 +166,37 @@ samp {
 .ac-acts > .ac-btn--ghost:not(.ac-btn--icon) {
   padding-inline: var(--ghost-plate);
 }
+/*
+ * A ghost whose icon leaves air inside its box (`--glyph-air` on each side, e.g. the ×'s 5.2 of its 20 units) reaches
+ * out by that air too, so the row's gap stands between what shows. Its plate and focus ring keep to the box less that
+ * air: they end where a neighbour's plate starts, under its glyph.
+ */
+.ac-acts > .ac-btn--glyph {
+  margin-inline: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
+}
+.ac-btn--ghost.ac-btn--glyph {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph::before {
+  content: "";
+  position: absolute;
+  inset: 0 var(--glyph-air, 0px);
+  border-radius: inherit;
+  transition: inherit;
+}
+.ac-btn--ghost.ac-btn--glyph > * {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+}
+.ac-btn--ghost.ac-btn--glyph:hover::before {
+  background: var(--plate);
+}
+.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+  box-shadow: var(--focus-ring);
+}
 
 /* Button */
 .ac-btn {
@@ -1805,14 +1836,14 @@ textarea.ac-input {
 }
 /*
  * The head's actions and its close, in one `.ac-acts` row. The close's × spans 9.6 of its icon's 20 units, so it reaches
- * out by the 5.2 units of air on each side too: its ink ends on the head's padding line, as far from the edge as the
- * face starts, and stands as far from the shape before it as the row's gap.
+ * out by the 5.2 units of air on each side too (`.ac-btn--glyph`): its ink ends on the head's padding line, as far from
+ * the edge as the face starts, and stands as far from the shape before it as the row's gap.
  */
 .ac-dialog__acts {
   flex: none;
 }
-.ac-dialog__acts > .ac-btn--icon:last-child {
-  margin-inline: calc(-1 * (var(--ghost-plate) + var(--control-icon-sm) * 5.2 / 20));
+.ac-dialog__acts > .ac-btn--glyph:last-child {
+  --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
 }
 .ac-dialog__title {
   margin: 0;

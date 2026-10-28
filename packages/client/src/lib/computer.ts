@@ -259,6 +259,10 @@ export function setupPortrait(view: SetupView, online: boolean): ComputerState {
 export const statusRestatesChip = (view: SetupView) =>
   view.step === null && (view.phase === "waiting" || view.phase === "preparing");
 
+/** The notice's title ("Preparando o computador da Acme"): in line nothing is prepared yet, so its name alone. */
+export const setupNoticeTitleKey = (view: SetupView) =>
+  view.phase === "waiting" ? "computerSetup.title" : "computerSetup.notice.title";
+
 /** On its way: the notice, the waiting agents and the onboarding's progress show. */
 export const setupPending = (view: SetupView | null): view is SetupView =>
   view !== null && view.phase !== "ready" && view.phase !== "paused";
