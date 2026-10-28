@@ -55,6 +55,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
+import { WhoPicksSection } from "@/components/ai/Jev";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
@@ -164,6 +165,7 @@ export function SettingsPage({
           <>
             <AiAccountsSection />
             <KeysSection />
+            <WhoPicksSection />
           </>
         )}
         {current === "storage" && <StorageSection />}

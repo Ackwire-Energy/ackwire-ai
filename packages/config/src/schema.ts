@@ -266,25 +266,26 @@ export const envVars = {
   ROUTER_MODEL: {
     schema: modelId.default("claude-haiku-5-5"),
     description:
-      "Small, fixed model that scores which agents should answer a message without mentions (router). Any model in the catalog; an organization can override it in its settings. Billed to the organization's default provider key.",
+      "Small model the router uses on a Claude key when Jev doesn't decide. An OpenAI key uses `OPENAI_CHEAP_MODEL`, other providers their catalog's routing pick. Any model in the catalog. An organization can override it in its settings.",
     section: "Agents",
   },
   ROUTER_STRATEGY: {
     schema: z.enum(["jev", "llm"]).optional(),
     description:
-      "Who picks first which agents answer a message nobody @mentioned. Unset or `jev`: Jev, whenever this server has its TypeSafe key (`TYPESAFE_API_KEY`, or one the server's owner saves with `PUT /api/app/jev`), then the next step after an error or a timeout. `llm`: never Jev, so the organization's small model goes first.",
+      "How the router starts: `jev` (TypeSafe Jev, with the server's Jev key from `TYPESAFE_API_KEY` or Settings › AI accounts) or `llm` (skips Jev). When a step can't decide, the next one does: a small model on the organization's keys, then, on a self-hosted server, the author's own plan, then simple rules. Default: `jev` when a Jev key is set.",
     section: "Agents",
   },
   TYPESAFE_API_KEY: {
     schema: z.string().optional(),
     description:
-      "This server's own TypeSafe key for Jev. Jev picks who answers a message nobody @mentioned, makes quick judgments for agents (memory, stops, hand-offs) and reads screens for computer use. It wins over a key the server's owner saves with `PUT /api/app/jev` (ADR 0073). One key for the whole server, never per organization, never returned by the API. TypeSafe bills the account the key belongs to. Calls are recorded per organization as `router` usage, kept out of the organization's total.",
+      "Your TypeSafe key for Jev (https://console.typesafe.ai/keys), optional. Jev picks who answers messages nobody @mentioned, keeps memory tidy and finds what agents look for on their screens. The installation's owner can also add it in Settings › AI accounts. This variable wins over that one. Never sent to a browser. Calls are billed to your TypeSafe account.",
     section: "Agents",
     secret: true,
   },
   JEV_TIMEOUT_MS: {
     schema: z.coerce.number().int().min(200).max(30_000).default(2000),
-    description: "Timeout for a Jev router call; after it the LLM router decides.",
+    description:
+      "Timeout for each Jev call: picking who answers and its judgments (memory, stops, hand-offs, the tools a turn loads). Screen judgments wait at least 6 s. After it, the next step decides, as without Jev.",
     section: "Agents",
   },
   JEV_VISION_MODEL: {
@@ -293,13 +294,13 @@ export const envVars = {
       .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
       .default("jev-preview"),
     description:
-      "Jev model for judgments over images (the agent browser finding a target on a screenshot). Needs a release that takes images.",
+      "Jev model for judgments over images (an agent finding a target on a screenshot of its browser or desktop). Needs a release that takes images.",
     section: "Agents",
   },
   OPENAI_CHEAP_MODEL: {
     schema: modelId.default("gpt-6-luna"),
     description:
-      "Cheap OpenAI model for the organization's own calls (router fallback, summaries, reflection) when its default key is an OpenAI key.",
+      "Small OpenAI model for the organization's own calls on an OpenAI key: picking who answers when Jev doesn't, summaries, reflection.",
     section: "Agents",
   },
   ROUTER_MIN_SCORE: {
@@ -337,7 +338,7 @@ export const envVars = {
   PLATFORM_ANTHROPIC_API_KEY: {
     schema: z.string().optional(),
     description:
-      "The platform's Claude API key (Cloud): organizations without a key of their own, and the onboarding option “Use the agentes.chat key”, use it. Usage is still recorded per organization.",
+      "The server's own Claude API key. Workspaces without a key of their own can use it (the setup's key step offers it beside the providers), and the router uses its small model when a workspace has no key with one. Usage is still recorded per organization.",
     section: "Agents",
     secret: true,
   },

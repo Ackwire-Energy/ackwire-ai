@@ -98,10 +98,11 @@ const sendText = async (text: string) => {
 
 describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens on Claude's sign-in for the first agent with no AI", async () => {
-    await open(walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID));
+    const jev = { by: "jev", mine: "jev", model: null, noSmallModel: null } as const;
+    await open(walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID));
     const shown = banner();
     // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
-    // line is a whole sentence).
+    // line is a whole sentence). Jev is what understands that ask.
     expect(shownText(shown as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", shown as HTMLElement).text).toBe(
       "Você também pode pedir no chat, como “usar meu plano do Claude”.",
@@ -123,6 +124,15 @@ describe("no AI connected: above the composer", () => {
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
+  });
+
+  test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {
+    for (const routing of [undefined, { by: "rules", mine: "rules", model: null, noSmallModel: null } as const]) {
+      await open(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), ...(routing ? { routing } : {}) } }));
+      expect(shownText(banner() as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+      expect(within(banner() as HTMLElement).queryByRole("button", { name: "Sobre Conectar uma IA" })).toBeNull();
+      cleanup();
+    }
   });
 
   test("the ready email's Connect your AI: the picker on Claude, with the computer said ready first; not from the banner", async () => {

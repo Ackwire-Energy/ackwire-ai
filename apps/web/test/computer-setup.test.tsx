@@ -235,8 +235,13 @@ describe("the workspace's computer on its way: the notice on top of the work are
 
 describe("no AI yet while the workspace's computer is on its way", () => {
   test("the banner is the one it always is: its line, its ⓘ and Connect, nothing about the computer", async () => {
+    // The Cloud: Jev picks, so asking in the chat is understood (the line's ⓘ).
     const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
+      aiStatus: {
+        any: false,
+        agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }],
+        routing: { by: "jev", mine: "jev", model: null, noSmallModel: null },
+      },
     });
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;

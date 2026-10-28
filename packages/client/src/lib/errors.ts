@@ -95,6 +95,8 @@ const KNOWN = {
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
+  // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
+  jev_key_invalid: "jev.steps.invalid",
 } as const;
 
 /** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */

@@ -542,6 +542,10 @@ export const en: Translations = {
       lead: "Sign in with your AI plan: no API key needed.",
       leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
     },
+    jev: {
+      title: "Help your agents work as a team",
+      lead: "Jev, by TypeSafe, makes quick decisions for them.",
+    },
     budget: {
       title: "Spending limit per agent",
       label: "Monthly limit per agent, in dollars",
@@ -977,6 +981,30 @@ export const en: Translations = {
     popoverTitle: "Agents",
     seenBy: "Seen by {{names}}",
     retry: "Try again",
+    mentionNeeded: "No agent will answer without an @",
+    mentionNeededHint: "No AI here could pick an agent for this message. Mention an agent to call it.",
+    picking: "Picking who answers",
+    by: {
+      jev: "Picked by Jev",
+      model: "Picked by {{model}}",
+      planYours: "Picked by your {{brand}} plan",
+      planOf: "Picked by {{person}}'s {{brand}} plan",
+      reply: "A reply to {{name}}",
+      only_agent: "Only {{name}} answers here without a mention",
+      follow_up: "Follows the talk with {{name}}",
+    },
+  },
+  routing: {
+    title: "Who picks the agents",
+    how: "How agents are picked",
+    by: {
+      jev: "Jev picks who answers each message without a mention.",
+      model: "{{model}} picks who answers each message without a mention.",
+      plans: "Each plan picks only for its owner's messages.",
+      rules: "Agents answer mentions, replies and follow-ups.",
+      off: "Agents answer only when mentioned.",
+      noSmall: "{{provider}} has no small model for this. Agents answer mentions, replies and follow-ups.",
+    },
   },
   noAi: {
     banner: {
@@ -1248,6 +1276,8 @@ export const en: Translations = {
     replyHeading: "When it answers",
     replyAlone: "On its own",
     replyAloneHelp: "Answers when the topic calls for it, no @ needed",
+    replyAloneRules: "Also answers replies and follow-ups",
+    replyAloneOff: "For now it answers only when mentioned",
     replyMention: "When mentioned",
     replyMentionHelp: "Only answers when someone writes @{{handle}}",
     aloneLine: "Joins the conversation on its own",
@@ -4421,6 +4451,56 @@ export const en: Translations = {
     unsaved: "Unsaved changes",
     keepEditing: "Keep editing",
     discard: "Discard",
+  },
+  jev: {
+    title: "Jev",
+    about:
+      "A fast model by TypeSafe, made for quick decisions. agentes.chat asks it small questions, like who should answer. You pay TypeSafe directly.",
+    lead: "Helps your agents work as a team.",
+    how: "How Jev works",
+    why: {
+      route: "Picks who answers",
+      routeText: "Even without an @mention.",
+      memory: "Keeps memory tidy",
+      memoryText: "Spots repeats said in other words.",
+      screen: "Sees the screen",
+      screenText: "Agents find buttons from a description.",
+    },
+    withoutHint:
+      "Without Jev, a small model on one of your API keys picks who answers. Without a key, each person's own Claude or ChatGPT plan picks for the messages they write, in a few seconds. Otherwise a reply or a follow-up still reaches its agent. Mention an agent to call it.",
+    setUp: "Set up Jev",
+    steps: {
+      account: "Create a TypeSafe account and add credit",
+      accountHint: "Jev is prepaid: US$ {{price}} per million tokens. Picking who answers costs about US$ {{call}}.",
+      openSite: "Open TypeSafe",
+      key: "Create a key",
+      openKeys: "Open API keys",
+      paste: "Paste it here",
+      placeholder: "Your TypeSafe key",
+      sealed: "Encrypted on this server. Never shown again.",
+      invalid: "TypeSafe didn't accept this key. Copy it again from the keys page.",
+      savedNoCredit: "Saved. Add credit at TypeSafe and Jev starts by itself.",
+    },
+    keyName: "TypeSafe key",
+    month_one: "{{count, number}} decision this month · {{cost}}",
+    month_other: "{{count, number}} decisions this month · {{cost}}",
+    state: {
+      off: "Off",
+      on: "On",
+      invalid: "Key not accepted",
+      no_credit: "Out of credit",
+    },
+    line: {
+      invalid: "TypeSafe didn't accept this key. Create a new one.",
+      no_credit: "Add credit at TypeSafe. Jev resumes by itself.",
+      env: "Set in this server's settings (TYPESAFE_API_KEY).",
+      envInvalid: "TypeSafe didn't accept this key. Change it in this server's settings (TYPESAFE_API_KEY).",
+    },
+    checkAgain: "Check again",
+    remove: {
+      title: "Remove the Jev key?",
+      text: "Agents keep working without it.",
+    },
   },
   aiAccounts: {
     share: {
