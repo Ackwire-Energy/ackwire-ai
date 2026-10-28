@@ -649,7 +649,7 @@ describe("Diff", () => {
 });
 
 describe("Message aside", () => {
-  test("sits on the header line, or floats for grouped messages", () => {
+  test("sits on the header line, or after the text for grouped messages", () => {
     const { container } = render(
       <>
         <Message author="João" time="10:42" aside={<span>✓</span>}>
@@ -663,6 +663,8 @@ describe("Message aside", () => {
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
     expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
+    // A receipt with words takes a line of its own under the text, which keeps its lines.
+    expect(second?.querySelector(".ac-msg__body > :last-child")?.className).toContain("ac-msg__aside--floating");
   });
 });
 
