@@ -8251,7 +8251,11 @@ a.machine-row__name:hover {
   color: var(--warn);
 }
 .agp-view {
-  padding: 8px var(--agp-gutter) 0;
+  /* Room under the tabs before the first card, and the same 16px between whatever a tab stacks. */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px var(--agp-gutter) 0;
   animation: agp-in 0.3s var(--out) both;
 }
 @keyframes agp-in {
