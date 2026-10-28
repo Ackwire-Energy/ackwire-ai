@@ -3553,7 +3553,7 @@ p {
   }
 }
 
-/* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
+/* A connector's one-color brand icon as a mask in its color, a mark in its own colors, or a monogram. */
 .connector-icon {
   flex: none;
   width: 36px;
@@ -3586,7 +3586,7 @@ p {
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
 }
-/* A mark in its maker's own colors (PostgreSQL's), which a mask would flatten to one color. */
+/* A mark in its maker's own colors (PostgreSQL's, PayPal's, Canva's), which a mask would flatten to one color. */
 .connector-icon__img {
   width: 58%;
   height: 58%;
