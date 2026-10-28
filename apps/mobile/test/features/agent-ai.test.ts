@@ -110,6 +110,6 @@ describe("the agent's AI", () => {
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
     // "Só responde a você" said once: under the sign-in only when the cards (whose note says it) aren't there.
-    expect(connect).toMatch(/note=\{!coding && !ownable \?/);
+    expect(connect).toMatch(/note=\{\s*!coding && !ownable \?/);
   });
 });
