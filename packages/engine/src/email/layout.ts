@@ -47,7 +47,7 @@ export interface EmailDoc {
  * (`base` null, `files` read from the web app's `email/` folder), for a server people outside can't reach.
  */
 export interface EmailArt {
-  /** The server's own address: the logo links there, and every email loads the app's face from its `/email/`. */
+  /** The server's own address: the logo links there. */
   home: string;
   /** `{PUBLIC_URL}/email/`, or null when the pictures are attached. */
   base: string | null;
@@ -275,10 +275,11 @@ const FILLER = "&#847;&zwnj;&nbsp;&#8199;&shy;".repeat(60);
  */
 export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: string; inline: InlinePart[] } {
   const { src, inline } = pictures(art);
-  // The app's face from this server's own `/email/`, attached pictures or not: a reader who can reach the server gets
-  // it, any other reads the stack after it at once (`swap`). Classic Outlook never sees the rule, and Gmail, which
+  // The app's face from this server's own `/email/`, beside the pictures. A mail app that can't load it shows the stack
+  // after it at once (`swap`). With the pictures attached the email fetches nothing, the face included: an address no
+  // reader can reach would only bring remote-content warnings. Classic Outlook never sees the rule, and Gmail, which
   // loads no web font, drops this block alone.
-  const fonts = art.base ?? (URL.canParse(art.home) ? `${art.home}/email/` : null);
+  const fonts = art.base;
   const lang = doc.lang;
   const body = doc.blocks.map((b) => block(b, src)).join("\n");
   const logo = (file: string, cls: string, display: string, color: string) =>
