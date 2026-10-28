@@ -147,6 +147,10 @@ export function refusalText(
 export const failureText = (t: TFunction, error: unknown) =>
   error instanceof ApiError ? refusalText(t, error) : t("mobile.auth.errors.network");
 
+/** The sign-in's e-mail step: any limit in the sign-in's own words, as the web's sign-in says it. */
+export const lookUpFailureText = (t: TFunction, error: unknown) =>
+  error instanceof ApiError && error.status === 429 ? t("auth.tooManyTries") : failureText(t, error);
+
 /** Better Auth's answer as a refusal `withHumanCheck` reads (its status and code on top), or null when it passed. */
 export const refusalOf = ({ error }: { error: ({ status: number; code?: string } & RestrictionFacts) | null }) =>
   error ? { status: error.status, code: error.code, kind: error.kind, cloud: error.cloud } : null;
