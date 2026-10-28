@@ -8499,6 +8499,7 @@ export const ptBR = {
       hold: "O workspace está em espera: os agentes estão pausados",
       suspended: "O workspace foi suspenso",
       active: "O workspace voltou a funcionar",
+      agentHold: "{{name}} está em pausa",
       /** A hold the billing service set (ADR 0077): its code, never shown as it comes. */
       billing: {
         payment: "O workspace precisa de um plano do agentes.chat",
@@ -8520,6 +8521,22 @@ export const ptBR = {
         ended: "Assinar de novo",
       },
       askAdmin: "Quem administra o workspace pode resolver isso.",
+    },
+    /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
+    cloud: {
+      review:
+        "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
+      blockedAbuse:
+        "Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      blockedLegal:
+        "Esta conta está bloqueada enquanto guardamos os dados dela por uma questão legal. Para perguntar sobre isso, escreva para {{email}}.",
+      agentNetwork:
+        "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      agentOperator:
+        "Este agente está pausado enquanto a nossa equipe analisa a atividade dele (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      createRefused:
+        "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para {{email}}.",
+      contest: "Para contestar, escreva para {{email}}.",
     },
   },
   /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */

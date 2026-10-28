@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { desc, eq, schema, sql } from "@agenteschat/db";
+import { setRestrictionNotices } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
 import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -407,7 +408,10 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect(await (await bia("/api/app/me")).json()).toMatchObject({ organizations: [] });
   const refused = await signIn();
   expect(refused.status).toBe(403);
-  expect(await refused.json()).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+  const said = await refused.json();
+  expect(said).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+  // A self-hosted server says nothing more.
+  expect(said).not.toHaveProperty("kind");
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({
     blockedAt: blocked.blockedAt,
     blockedReason: "Phishing",
@@ -423,6 +427,29 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect((await signIn()).status).toBe(200);
   expect((await members()).status).toBe(200);
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({ blockedAt: null, blockedReason: null });
+});
+
+test("on agentes.chat Cloud a blocked sign-in says the block's kind, never its reason", async () => {
+  setRestrictionNotices("https://agentes.chat");
+  try {
+    const cid = browser(t);
+    await signUp(cid, "cid@acme.test");
+    const [row] = await t.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, "cid@acme.test"));
+    if (!row) throw new Error("no user");
+    await put(`/users/${row.id}/block`, { blocked: true, reason: "abuse.resignup" });
+    const refused = await cid("/api/auth/sign-in/email", {
+      json: { email: "cid@acme.test", password: "correct horse battery" },
+    });
+    expect(refused.status).toBe(403);
+    const said = await refused.json();
+    expect(said).toMatchObject({ code: "ACCOUNT_BLOCKED", kind: "abuse", cloud: true });
+    expect(JSON.stringify(said)).not.toContain("resignup");
+  } finally {
+    setRestrictionNotices("http://localhost:3000");
+  }
 });
 
 test("external provisioning: requests, progress, the workspace's computer and its single-use code", async () => {

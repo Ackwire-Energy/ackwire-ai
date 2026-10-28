@@ -8448,6 +8448,7 @@ export const en: Translations = {
       hold: "The workspace is on hold: its agents are paused",
       suspended: "The workspace was suspended",
       active: "The workspace is working again",
+      agentHold: "{{name}} is paused",
       /** A hold the billing service set (ADR 0077): its code, never shown as it comes. */
       billing: {
         payment: "The workspace needs an agentes.chat plan",
@@ -8468,6 +8469,22 @@ export const en: Translations = {
         ended: "Subscribe again",
       },
       askAdmin: "Whoever runs this workspace can sort this out.",
+    },
+    /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
+    cloud: {
+      review:
+        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}.",
+      blockedAbuse:
+        "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to {{email}}.",
+      blockedLegal:
+        "This account is blocked while we keep its data for a legal matter. To ask about it, write to {{email}}.",
+      agentNetwork:
+        "This agent is paused. Our network rules saw signs of abuse in its traffic (Terms, section 5). To contest it, write to {{email}}.",
+      agentOperator:
+        "This agent is paused while our team reviews its activity (Terms, section 5). To contest it, write to {{email}}.",
+      createRefused:
+        "You can't create a workspace while your account or one of your workspaces is restricted. To contest it, write to {{email}}.",
+      contest: "To contest it, write to {{email}}.",
     },
   },
   /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */

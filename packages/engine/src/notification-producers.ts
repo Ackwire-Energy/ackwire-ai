@@ -734,12 +734,13 @@ export async function notifyComputerReady(
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
  * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
- * ADR 0077), which the apps say in the person's words. One row per change.
+ * ADR 0077), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
+ * read a restriction as the restriction itself reads. One row per change.
  */
 export async function notifyOrgStanding(
   deps: NotificationDeps,
   orgId: string,
-  standing: { state: string; reason: string | null; changedAt: Date | null; billing: boolean },
+  standing: { state: string; reason: string | null; changedAt: Date | null; billing?: boolean; cloud?: boolean },
 ) {
   const why = standing.billing
     ? { billingHold: standing.reason ?? "" }
@@ -752,9 +753,34 @@ export async function notifyOrgStanding(
     kind: "org_standing",
     groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
     source: {},
-    latest: { statusTo: standing.state, ...why },
+    latest: { statusTo: standing.state, ...why, ...(standing.cloud ? { cloud: true } : {}) },
   });
 }
+
+const agentHoldGroup = (agentId: string) => `org_standing:agent:${agentId}:`;
+
+/**
+ * An agent was held on agentes.chat Cloud (ADR 0056 §9): its responsible person and the workspace's owners and admins
+ * hear it, with the hold's kind (`latest.holdKind`), never its reason. One row each time they are told (`at`): when
+ * it is held, and when it is held again for another kind.
+ */
+export async function notifyAgentHold(
+  deps: NotificationDeps,
+  hold: { orgId: string; agentId: string; name: string; kind: string; at: Date },
+) {
+  await notify(deps, {
+    orgId: hold.orgId,
+    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId))],
+    kind: "org_standing",
+    groupKey: `${agentHoldGroup(hold.agentId)}${hold.at.getTime()}:${hold.kind}`,
+    source: { agentId: hold.agentId, label: hold.name },
+    latest: { statusTo: "agent_hold", holdKind: hold.kind },
+  });
+}
+
+/** The agent was let go: what its people were told of the hold is done. */
+export const resolveAgentHold = (deps: NotificationDeps, orgId: string, agentId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: agentHoldGroup(agentId), kind: "org_standing" });
 
 // ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
 

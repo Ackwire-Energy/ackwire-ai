@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
 import type { AppNotification } from "../src/api/types";
 import { BILLING_HOLDS, billingHoldOf } from "../src/lib/billing";
-import { errorText, holdText, standingRefusalText } from "../src/lib/errors";
+import { errorText, holdText, restrictionLine } from "../src/lib/errors";
 import { workspaceHeadline } from "../src/lib/notifications";
 import { can } from "../src/lib/permissions";
 
@@ -26,13 +26,13 @@ describe("billing holds in words (ADR 0077)", () => {
     for (const code of BILLING_HOLDS) {
       const words = `standing.billing.${code}`;
       expect(holdText(t, { state: "hold", reason: code })).toBe(words);
-      expect(standingRefusalText(t, "run.org_paused", { reason: code })).toBe(words);
+      expect(restrictionLine(t, "run.org_paused", { reason: code })).toBe(words);
       expect(
         errorText(t, new ApiError(403, "org.paused", `This workspace is on hold: ${code}`, { reason: code })),
       ).toBe(words);
     }
     // A suspension's reason is the operator's, whatever it says.
-    expect(standingRefusalText(t, "org.suspended", { reason: "payment" })).toBe(
+    expect(restrictionLine(t, "org.suspended", { reason: "payment" })).toBe(
       'standing.suspendedFor {"reason":"payment"}',
     );
   });

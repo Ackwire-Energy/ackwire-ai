@@ -12,6 +12,7 @@ import {
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   joinCode,
+  sendsEmail,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Alert, AvatarStack, Button, Card, Field, Icon, Input, Textarea } from "@agenteschat/ui";
@@ -38,8 +39,7 @@ export function InvitePage({ token }: { token: string }) {
   const navigate = useNavigate();
   const me = useMe();
   const preview = useQuery(invitationQuery(api, token));
-  // Strictly false: an older server says nothing and keeps the button.
-  const emails = useAuthConfig().data?.passwordReset !== false;
+  const emails = sendsEmail(useAuthConfig().data);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -450,7 +450,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const [error, setError] = useState<string | null>(null);
   const [proof, setProof] = useState<{ email: string; code: string } | null>(null);
   const noteInput = useRef<HTMLTextAreaElement>(null);
-  const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
+  const emailsGoOut = sent?.emailed ?? sendsEmail(config.data);
   const proofNeeded = emailsGoOut && !user?.emailVerified;
   const typedEmail = user ? user.email : email;
   const proven = proof !== null && proof.email === typedEmail.trim().toLowerCase();

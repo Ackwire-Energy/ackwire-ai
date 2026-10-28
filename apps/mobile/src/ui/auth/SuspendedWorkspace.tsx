@@ -1,4 +1,5 @@
 import { useAuthConfig } from "@agenteschat/client";
+import { supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -20,18 +21,13 @@ export function SuspendedWorkspace({
 }: {
   state: OrgState;
   /** `suspendedOf` the chosen organization. */
-  suspended: { reason: string | null; others: OrgState["orgs"] };
+  suspended: { reason: string | null; cloud: boolean; others: OrgState["orgs"] };
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} accessibilityViewIsModal>
-      <AuthScaffold
-        title={t("standing.screen.title")}
-        subtitle={
-          suspended.reason ? t("standing.suspendedFor", { reason: suspended.reason }) : t("standing.screen.text")
-        }
-      >
+      <AuthScaffold title={t("standing.screen.title")} subtitle={suspendedText(t, suspended)}>
         <SupportLine />
         {suspended.others.map((o) => (
           <Button key={o.id} variant="secondary" wide label={o.name} onPress={() => state.setOrgId(o.id)} />
@@ -42,16 +38,18 @@ export function SuspendedWorkspace({
   );
 }
 
-/** "Precisa de ajuda? Escreva para …" when the server says where (`SUPPORT_EMAIL`), else to ask who runs it. */
+/** "Precisa de ajuda? Escreva para …", or to ask who runs the server, as `supportLineOf` says. */
 function SupportLine() {
   const { t } = useTranslation();
-  const email = useAuthConfig().data?.supportEmail;
-  if (!email)
+  const line = supportLineOf(useAuthConfig().data);
+  if (!line) return null;
+  if (line === "ask")
     return (
       <Text tone="muted" style={CENTER}>
         {t("support.ask")}
       </Text>
     );
+  const { email } = line;
   return (
     <Text tone="muted" style={CENTER}>
       {t("support.writeBefore")}

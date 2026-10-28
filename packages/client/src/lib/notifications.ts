@@ -173,8 +173,8 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
 });
 
 /**
- * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed): its
- * headline's key, the whole of what it says; null for what someone did.
+ * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed, one of its
+ * agents was held): its headline's key, the held agent's name as `name` (`source.label`); null for what someone did.
  */
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
@@ -186,7 +186,22 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
     ? ("standing.notification.suspended" as const)
     : to === "active"
       ? ("standing.notification.active" as const)
-      : ("standing.notification.hold" as const);
+      : to === "agent_hold"
+        ? ("standing.notification.agentHold" as const)
+        : ("standing.notification.hold" as const);
+}
+
+/**
+ * The restriction a notice of agentes.chat Cloud tells, as `restrictionLine` reads it: an agent held (its kind, as a
+ * refused run carries it), or the workspace held or suspended with a reason (`latest.cloud`), so `review` reads as the
+ * review line and an operator's reason with how to contest it. Null for any other notice, which keeps its own text.
+ */
+export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
+  const l = n.latest;
+  if (n.kind !== "org_standing") return null;
+  if (l.statusTo === "agent_hold") return { code: "agent.paused", facts: { kind: l.holdKind, cloud: true } };
+  if (!l.cloud || !l.text || (l.statusTo !== "hold" && l.statusTo !== "suspended")) return null;
+  return { code: l.statusTo === "hold" ? "org.paused" : "org.suspended", facts: { reason: l.text, cloud: true } };
 }
 
 /** Grouped (several replies or comments): it expands to show them. */

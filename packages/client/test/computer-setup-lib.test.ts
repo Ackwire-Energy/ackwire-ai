@@ -19,7 +19,7 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "../src/lib/computer";
-import { errorText, holdText, standingRefusalText, supportLineOf } from "../src/lib/errors";
+import { errorText, holdText, restrictionLine, supportLineOf } from "../src/lib/errors";
 import { canReduceAccess } from "../src/lib/machines";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 
@@ -353,6 +353,21 @@ describe("live: machine.provisioning and org.standing", () => {
       state: "suspended",
       reason: "Pagamento",
     });
+    // agentes.chat Cloud says so, and the apps add how to contest it.
+    applyWorkspaceEvent(qc, "o1", {
+      type: "org.standing",
+      orgId: "o1",
+      state: "hold",
+      reason: "review",
+      cloud: true,
+    } as {
+      type: string;
+    });
+    expect(qc.getQueryData<Me>(keys.me)?.organizations[0]?.standing).toEqual({
+      state: "hold",
+      reason: "review",
+      cloud: true,
+    });
   });
 });
 
@@ -382,17 +397,15 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
   });
 
   test("refusals, from the API or a run, in the person's language with the reason told", () => {
-    expect(standingRefusalText(t, "run.org_paused", { reason: "payment check" })).toBe(
+    expect(restrictionLine(t, "run.org_paused", { reason: "payment check" })).toBe(
       'standing.onHold {"reason":"payment check"}',
     );
-    expect(standingRefusalText(t, "run.org_paused", { reason: "  " })).toBe("standing.paused");
-    expect(standingRefusalText(t, "run.org_suspended", undefined)).toBe("standing.suspended");
-    expect(standingRefusalText(t, "run.org_suspended", { reason: "spam" })).toBe(
-      'standing.suspendedFor {"reason":"spam"}',
-    );
-    expect(standingRefusalText(t, "run.agent_paused", null)).toBe("standing.agentPaused");
-    expect(standingRefusalText(t, "run.budget_exceeded", null)).toBeNull();
-    expect(standingRefusalText(t, undefined, null)).toBeNull();
+    expect(restrictionLine(t, "run.org_paused", { reason: "  " })).toBe("standing.paused");
+    expect(restrictionLine(t, "run.org_suspended", undefined)).toBe("standing.suspended");
+    expect(restrictionLine(t, "run.org_suspended", { reason: "spam" })).toBe('standing.suspendedFor {"reason":"spam"}');
+    expect(restrictionLine(t, "run.agent_paused", null)).toBe("standing.agentPaused");
+    expect(restrictionLine(t, "run.budget_exceeded", null)).toBeNull();
+    expect(restrictionLine(t, undefined, null)).toBeNull();
     // The API's own codes, through errorText.
     expect(errorText(t, new ApiError(403, "org.paused", "This workspace is on hold: x", { reason: "x" }))).toBe(
       'standing.onHold {"reason":"x"}',
@@ -403,5 +416,14 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
     expect(errorText(t, new ApiError(403, "agent.paused", "This agent is paused for now."))).toBe(
       "standing.agentPaused",
     );
+    // On agentes.chat Cloud, the hold's kind and how to contest it; a run's values say "true".
+    const email = '{"email":"legal@agentes.chat"}';
+    expect(restrictionLine(t, "run.agent_paused", { kind: "network", cloud: "true" })).toBe(
+      `standing.cloud.agentNetwork ${email}`,
+    );
+    const held = new ApiError(403, "agent.paused", "This agent is paused: operator", { kind: "operator", cloud: true });
+    expect(errorText(t, held)).toBe(`standing.cloud.agentOperator ${email}`);
+    // Without `cloud`, a kind changes nothing.
+    expect(restrictionLine(t, "agent.paused", { kind: "network" })).toBe("standing.agentPaused");
   });
 });

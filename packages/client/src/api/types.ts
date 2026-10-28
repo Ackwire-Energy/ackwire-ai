@@ -136,6 +136,8 @@ export type StandingState = "active" | "hold" | "suspended";
 export interface OrgStanding {
   state: StandingState;
   reason: string | null;
+  /** agentes.chat Cloud: a reason reads with how to contest it, and `review` as the automatic hold's line. */
+  cloud?: boolean;
 }
 
 export interface OrgSummary {
@@ -3954,7 +3956,10 @@ export type NotificationKind =
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
-  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  /**
+   * ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`:
+   * why. On agentes.chat Cloud also an agent held (`statusTo: "agent_hold"`, `latest.holdKind`, `source.agentId`).
+   */
   | "org_standing"
   /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
   | "computer_ready"
@@ -3989,6 +3994,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
+  /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
+  agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -4022,6 +4029,10 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /** `org_standing` to `agent_hold` (agentes.chat Cloud): `network` or `operator`, never the hold's reason. */
+  holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: `text` is the reason a restriction reads with (`restrictionOf`). */
+  cloud?: boolean;
   /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
   names?: string[];
 }

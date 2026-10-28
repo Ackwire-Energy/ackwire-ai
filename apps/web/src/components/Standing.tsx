@@ -1,6 +1,6 @@
 import { type Me, type OrgSummary, useAuthConfig } from "@agenteschat/client";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
-import { holdText, supportLineOf } from "@agenteschat/client/lib/errors";
+import { holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -74,7 +74,6 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const reason = org.standing?.reason;
   const others = me.organizations.filter((o) => o.id !== org.id && o.standing?.state !== "suspended");
   return (
     <div className="page page--mid suspended-page">
@@ -96,7 +95,7 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
           </Button>
         }
       >
-        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")}
+        {suspendedText(t, org.standing)}
         <SupportLine />
       </EmptyState>
       {others.length > 0 && (

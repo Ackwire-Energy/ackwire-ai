@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/client";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
@@ -27,6 +28,7 @@ import {
   NOTIFICATION_FILTERS,
   opensConnectAi,
   replyTarget,
+  restrictionOf,
   snoozeTimes,
   sortWaiting,
   stepCells,
@@ -298,7 +300,7 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
     <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
   );
   const own = workspaceHeadline(n);
-  if (own) return t(own);
+  if (own) return t(own, { name: n.source.label });
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -636,7 +638,7 @@ function Row({
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
   const own = workspaceHeadline(n);
-  const label = own ? t(own) : name;
+  const label = own ? t(own, { name: n.source.label }) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));
@@ -678,7 +680,12 @@ function Row({
   // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
-  const text = why ? sayWords(t, why, l.text ?? "") : l.text;
+  const restriction = restrictionOf(n);
+  const text = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
+    : why
+      ? sayWords(t, why, l.text ?? "")
+      : l.text;
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -752,7 +759,7 @@ function Row({
         ) : (
           <>
             {(text || lead) && (
-              <p className="nt-snip">
+              <p className={cx("nt-snip", restriction && "nt-snip--whole")}>
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
                 {speaker && <b>{t("notifications.speaker", { name: speaker })} </b>}
                 {text && <Snippet text={text} mine={mine} />}

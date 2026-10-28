@@ -28,6 +28,10 @@ export const Organization = z
       .object({
         state: z.enum(STANDING_STATES),
         reason: z.string().nullable().openapi({ description: "Only when the workspace is told why; else null." }),
+        cloud: z.literal(true).optional().openapi({
+          description:
+            "agentes.chat Cloud: the apps read `review` as the automatic review hold's line, and add how to contest a reason.",
+        }),
       })
       .optional()
       .openapi({ description: "In `GET /me` (ADR 0056 §8). Changes come as `org.standing` org events." }),

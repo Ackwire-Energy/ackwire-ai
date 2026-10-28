@@ -1,4 +1,5 @@
-import type { AiStatus } from "@agenteschat/client";
+import type { AiStatus, Edition } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
 import { isEmail } from "@agenteschat/client/lib/text";
@@ -75,8 +76,17 @@ export const HOST: Record<StepId, Preset> = {
 };
 
 /**
+ * A self-hosted workspace with no computer yet. The phone has no computer step, so its list says it: only once it
+ * came back empty, never while it loads.
+ */
+export const noComputerOf = (edition: Edition | null, machines: readonly unknown[] | undefined) =>
+  edition === "selfhost" && machines?.length === 0;
+
+/**
  * A step's question and the one line under it. The phone can't import, so its import step says where to; the
  * agents step has its own (Ada is a row of its own here); the team step has none (the link and the emails say it).
+ * `noComputer`: a self-hosted workspace with no computer yet. No plan can sign in there, so the AI step's lead
+ * names the API key first.
  */
 export function stepText(
   t: TFunction,
@@ -86,7 +96,8 @@ export function stepText(
     chosen,
     aiSaved,
     invited = 0,
-  }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean; invited?: number },
+    noComputer = false,
+  }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean; invited?: number; noComputer?: boolean },
 ): [title: string, lead?: string] {
   switch (step) {
     case "workspace":
@@ -98,7 +109,12 @@ export function stepText(
     case "agents":
       return [t("onboarding.agents.title"), t("mobile.onb.agentsLead")];
     case "ai":
-      return [t("onboarding.keyStep.title"), aiSaved ? t("connectAi.key.saved") : t("onboarding.keyStep.lead")];
+      return [
+        t("onboarding.keyStep.title"),
+        aiSaved
+          ? t("connectAi.key.saved")
+          : t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
+      ];
     case "team":
       return [t("onboarding.team.title")];
     case "done": {
@@ -168,6 +184,10 @@ export function askLineOf(
   const line = t(`onboarding.done.first.${key}`, { name: mentioned?.name, computer });
   return { state, icon: LINE_ICON[state], text: line };
 }
+
+/** A step that failed: what the server's code says (a refused workspace, a restriction), else that it didn't save. */
+export const stepFailedText = (t: TFunction, error: unknown, locale?: string) =>
+  knownErrorText(t, error, locale) ?? t("mobile.onb.failed");
 
 /** Sends each invitation in turn; the addresses whose invitation failed, in order. */
 export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {

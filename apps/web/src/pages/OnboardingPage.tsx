@@ -27,6 +27,7 @@ import {
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { isFeminineName } from "@agenteschat/client/lib/grammar";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import {
   type ComputerKind,
   type ComputerState,
@@ -671,8 +672,8 @@ export function OnboardingPage({ resumed }: { resumed?: ResumedOnboarding | null
   const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
-  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
-  const emails = authConfig?.passwordReset !== false;
+  // A server that sends no email invites by link only.
+  const emails = sendsEmail(authConfig);
   const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0077): its computer and its invitations come with the plan.

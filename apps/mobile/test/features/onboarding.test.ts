@@ -16,6 +16,7 @@ import {
   inviteEach,
   joiningLeft,
   nextStep,
+  noComputerOf,
   OPTIONAL,
   PRESET_ROWS,
   PRESETS,
@@ -23,6 +24,7 @@ import {
   prevStep,
   progressAt,
   STEPS,
+  stepFailedText,
   stepText,
   zoneCity,
   zoneLabel,
@@ -162,6 +164,13 @@ test("each step's question and its one line: the phone's own where it can't do w
     "Sign in with your AI plan: no API key needed.",
   ]);
   expect(stepText(en, "ai", { ...acme, aiSaved: true })[1]).toBe("Saved. Every agent without a plan thinks with it.");
+  // A self-hosted workspace with no computer yet: a plan has nowhere to sign in.
+  expect(stepText(en, "ai", { ...acme, noComputer: true })[1]).toBe(
+    "Your agents think with an API key, or with your AI plan on a computer you connect.",
+  );
+  expect(stepText(en, "ai", { ...acme, noComputer: true, aiSaved: true })[1]).toBe(
+    "Saved. Every agent without a plan thinks with it.",
+  );
   // The link and the emails say how; their own notes say what happens.
   expect(stepText(en, "team", acme)).toEqual(["Who else works with you?"]);
   expect(stepText(en, "done", { ...acme, chosen: new Set<Preset>(["ada"]) })).toEqual([
@@ -179,6 +188,15 @@ test("each step's question and its one line: the phone's own where it can't do w
     "O #general está pronto. Crie um agente quando quiser.",
   );
   expect(stepText(pt, "import", acme)[1]).toBe("Traga pela web, em Configurações\u00a0›\u00a0Importar e exportar.");
+});
+
+test("no computer: a self-hosted workspace whose list came back empty, not one still loading, not the Cloud", () => {
+  expect(noComputerOf("selfhost", [])).toBe(true);
+  expect(noComputerOf("selfhost", undefined)).toBe(false);
+  expect(noComputerOf("selfhost", [{ id: "m1" }])).toBe(false);
+  expect(noComputerOf("cloud", [])).toBe(false);
+  // Neither the setup nor the server said which edition yet.
+  expect(noComputerOf(null, [])).toBe(false);
 });
 
 test("invitations: each is sent once, and the ones that failed are what is left to send again", async () => {
@@ -202,4 +220,16 @@ test("a second workspace refused while one isn't active: the facts, with no plan
     expect(said).toBe(t("standing.createInactive"));
     expect(said).not.toMatch(/plan|pag|pay|escolh|choose/i);
   }
+});
+
+test("a step that failed says why the server refused it, else that it didn't save", async () => {
+  const pt = await translator("pt-BR");
+  const refused = (params?: Record<string, unknown>) =>
+    new ApiError(403, "org.create_refused", "You can't create a workspace right now", params);
+  expect(stepFailedText(pt, refused({ cloud: true }))).toBe(
+    "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
+  );
+  expect(stepFailedText(pt, refused())).toBe("Você não pode criar um workspace agora.");
+  expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
+  expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });

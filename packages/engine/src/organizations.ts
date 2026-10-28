@@ -28,6 +28,7 @@ import { enqueue } from "./outbox";
 import {
   assertCanWork,
   type BillingHold,
+  cloudNotice,
   isBillingHold,
   isUserBlocked,
   OrgPausedError,
@@ -168,7 +169,8 @@ export function assertInviting(membership: Membership) {
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
  * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
- * one (`org.create_refused`, the same words whatever the cause). Billing holds refuse nobody, but one person
+ * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * Billing holds refuse nobody, but one person
  * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
  * `holdForPayment`: the workspace starts on that hold (ADR 0077), with no audit row or notification.
  */
@@ -188,7 +190,7 @@ export async function createOrganization(
       .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
       .orderBy(asc(organizations.createdAt));
     if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
-      throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+      throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
     const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
     if (unpaid)
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {

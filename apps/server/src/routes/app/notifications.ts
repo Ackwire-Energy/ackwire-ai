@@ -39,6 +39,10 @@ const Notification = z
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
       screen: z.enum(SCREEN_KINDS).optional(),
+      agentId: z
+        .string()
+        .optional()
+        .openapi({ description: "`org_standing` to `agent_hold`: the agent held (its name in `label`)." }),
       label: z.string().optional(),
     }),
     latest: z.object({
@@ -70,6 +74,14 @@ const Notification = z
         .array(z.string())
         .optional()
         .openapi({ description: "`join_request`: the first two people who asked, in the order they asked." }),
+      holdKind: z
+        .string()
+        .optional()
+        .openapi({ description: "`org_standing` to `agent_hold`: `network` or `operator`, never the hold's reason." }),
+      cloud: z.boolean().optional().openapi({
+        description:
+          "`org_standing` on agentes.chat Cloud: the apps read `text` as the restriction, with how to contest it.",
+      }),
     }),
     readAt: z.string().nullable(),
     doneAt: z.string().nullable(),
