@@ -893,7 +893,7 @@ describe("Onboarding", () => {
     );
   });
 
-  test("every step starts at one top: Back on the line through the middle of the rail's logo, in the Mac app too", () => {
+  test("every step starts at one top: Back on the rail wordmark's line, clear of the desktop app's drag strip", () => {
     const sheet = (path: string) => readFileSync(join(import.meta.dir, "../src", path), "utf8");
     const css = sheet("pages/onboarding.css");
     const desktop = sheet("desktop.css");
@@ -902,12 +902,12 @@ describe("Onboarding", () => {
     // No room above the step that follows what's in it, centring it or pinned as it opens.
     const rows = css.match(/\.onb__body[^{]*::before \{[^}]*\}/g) ?? [];
     expect(rows.filter((r) => /auto|--onb-lead/.test(r))).toEqual([]);
-    // Back's middle (the column's top padding, its top margin and half its height) on the 22px logo's (the rail's
-    // padding and half its 1.25em mark).
+    // Back's middle (the column's top padding, its top margin and half its height) on the middle of the 22px logo's
+    // lowercase letters, 16px under its top (the rail's padding), where the label reads on the wordmark's line.
     const railTop = px(rule(sheet("layout.css"), "\n.onb__rail"), "padding");
     const top = px(rule(css, "\n.onb__body"), "padding");
     const back = rule(css, "\n.onb__back");
-    expect(Math.abs(top + px(back, "margin") + px(back, "height") / 2 - (railTop + (22 * 1.25) / 2))).toBeLessThan(0.5);
+    expect(top + px(back, "margin") + px(back, "height") / 2).toBe(railTop + 16);
     // The first step has no Back: a row of its height and margins keeps its room. A phone keeps its first step under
     // the step bar.
     const row = rule(css, "@media (min-width: 761px) {\n  .onb__body:not(:has(> .onb__back))::before");

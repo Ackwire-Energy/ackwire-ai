@@ -38,10 +38,11 @@
 }
 /*
  * One calm column per step: the host asks, the answer, one big action. Every step starts at the same top, so nothing
- * a step loads later moves its question. The top is the line through the middle of the rail's logo (the rail's 24px
- * padding and 14px, half the logo's 27.5px), where Back's middle sits (its -16px top margin). The column is as tall
- * as the screen at least, so the step's actions rest at the screen's bottom however short the step is, the room left
- * above them.
+ * a step loads later moves its question. The top is the rail wordmark's line, the middle of its lowercase letters
+ * (16px under the rail's 24px padding, measured at the logo's size 22), where Back's middle sits (its -16px top
+ * margin): Back's label reads on the wordmark's line, its box level with the logo's top. The column is as tall as the
+ * screen at least, so the step's actions rest at the screen's bottom however short the step is, the room left above
+ * them.
  */
 .onb__body {
   --onb-gutter: clamp(16px, 4vw, 32px);
@@ -50,7 +51,7 @@
   gap: 24px;
   width: 100%;
   max-width: 600px;
-  padding: 38px var(--onb-gutter) 0;
+  padding: 40px var(--onb-gutter) 0;
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
 }
