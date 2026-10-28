@@ -1979,7 +1979,9 @@ textarea.ac-input {
 }
 .ac-planmeter__window {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* max-content, not auto: the lines spanning both columns (the note, the reset) never resize the
+     percent's column, so every percent ends on the bar's right edge. */
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: baseline;
   gap: 4px 8px;
   font-size: 13px;
@@ -1989,6 +1991,8 @@ textarea.ac-input {
   height: 6px;
 }
 .ac-planmeter__pct {
+  justify-self: end;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
 }
