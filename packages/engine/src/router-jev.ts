@@ -6,7 +6,8 @@ import { RouterChainEnd, RouterSkip, type RouterStrategy, type RoutingInput, typ
  * one request to `POST https://api.typesafe.ai/v1/systemone` with the
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
- * more candidates, a Choice over the candidates plus "none" to break ties.
+ * more candidates, a Noul for "is it for every agent?" and a Choice over the
+ * candidates plus "none" to break ties.
  * It only scores; policy stays in `selectAgents`. Optional (needs the
  * installation's Jev key, ADR 0073), and the first step of `routeChain`:
  * on an error or a timeout the next step decides.
@@ -109,6 +110,15 @@ export function createJevRouterStrategy(options: {
         };
       }
       if (input.candidates.length >= 2) {
+        questions.for_everyone = {
+          type: "noul",
+          instructions:
+            'Does `latest_message` speak to all the agents (or the whole room: "everyone", "all of you", "gente", "vocês", "agentes") so that each one should give its own answer (its name, its computer, its status)? A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it.',
+          criteria: {
+            true: "Every agent should answer for itself.",
+            false: "One answer is enough: one agent should take it.",
+          },
+        };
         const criteria: Record<string, string> = {};
         for (const c of input.candidates)
           criteria[c.handle] =
@@ -152,6 +162,7 @@ export function createJevRouterStrategy(options: {
         agents: scores,
         needsAgent: clamp(answers.needs_agent?.noul),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
+        ...(answers.for_everyone ? { forEveryone: clamp(answers.for_everyone.noul) } : {}),
         ...(choice
           ? {
               reason:
