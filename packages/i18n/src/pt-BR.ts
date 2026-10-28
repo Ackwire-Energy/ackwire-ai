@@ -2133,6 +2133,7 @@ export const ptBR = {
       fineTune: "O ajuste fino, ferramenta por ferramenta, fica no conector. Aqui é um nível por app.",
     },
     memory: {
+      counts: "O que tem na memória",
       verified_one: "{{count}} verificado",
       verified_other: "{{count}} verificados",
       lessons: "Lições",

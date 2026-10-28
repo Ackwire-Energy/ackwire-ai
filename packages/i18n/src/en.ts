@@ -2108,6 +2108,7 @@ export const en: Translations = {
       fineTune: "Fine-tuning, tool by tool, lives in the connector. Here it's one level per app.",
     },
     memory: {
+      counts: "What's in its memory",
       verified_one: "{{count}} verified",
       verified_other: "{{count}} verified",
       lessons: "Lessons",
