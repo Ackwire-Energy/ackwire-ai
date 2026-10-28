@@ -883,13 +883,6 @@
     box-shadow: none;
   }
 }
-/* Narrow: receipts with words ("Nenhum agente vai responder") get their own line under the name, from
-   its left; the icon alone stays at the end of the name's line. */
-.thread-panel .ac-msg__aside:has(.ac-receipt > span) {
-  flex-basis: 100%;
-  margin-left: 0;
-  line-height: 16px;
-}
 /* The agent's page in the same panel ("Ver perfil" in its DM): it scrolls inside, so its tabs and
    save bar stick to the panel. */
 .thread-panel__page {

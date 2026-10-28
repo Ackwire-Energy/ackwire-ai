@@ -50,6 +50,7 @@ export const ptBR = {
     yesterday: "Ontem",
     loadFailed: "Não foi possível carregar. Confira a conexão e tente de novo.",
     notAllowed: "Você não tem permissão para isso. Peça a um admin da organização.",
+    tooMany: "Muitas tentativas. Tente de novo mais tarde.",
   },
   roles: {
     owner: "Dono",
@@ -222,7 +223,7 @@ export const ptBR = {
       approvedEmail: "Para terminar, abra o convite que mandamos para {{email}}.",
       approvedNoEmail: "Um admin vai mandar um link para você terminar.",
       deniedTitle: "Seu pedido não foi aprovado",
-      deniedText: "Se acha que foi engano, peça a alguém da {{org}} para convidar você por e-mail.",
+      deniedText: "Se acha que foi engano, peça a alguém da {{org}} para convidar você.",
       reason: "Recado: “{{reason}}”",
       reasonSaid: "<b>Recado:</b> “{{reason}}”",
       closedTitle: "Este link não funciona mais",
@@ -517,7 +518,7 @@ export const ptBR = {
         offline: "Sem internet. Confira a conexão e tente de novo.",
         tooBig:
           "É coisa demais para uma importação só (até 32 MB). Traga por partes, um agente ou uma pasta de cada vez.",
-        apply: "Não deu para terminar a importação. O que já chegou fica aqui; tente de novo para trazer o resto.",
+        apply: "Não deu para terminar a importação. O que já chegou fica aqui, e tentar de novo traz o resto.",
         tooMany: "São itens demais para uma vez só. Desmarque uma parte, importe, e depois traga o resto.",
       },
     },
@@ -551,6 +552,10 @@ export const ptBR = {
       leadNoComputer:
         "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
+    jev: {
+      title: "Ajude os agentes a trabalhar em equipe",
+      lead: "O Jev, da TypeSafe, toma decisões rápidas por eles.",
+    },
     budget: {
       title: "Limite de gasto por agente",
       label: "Limite mensal por agente, em dólares",
@@ -575,7 +580,7 @@ export const ptBR = {
     keyFromOther: "É de outro provedor?",
     anthropicWorkspace: "ID do workspace no Claude Console",
     anthropicWorkspaceHelp: "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
-    platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
+    platformKeyDesc: "Sem chave sua: os agentes usam a chave do Claude deste servidor. Você vê o custo de cada agente.",
     computer: {
       title: "Onde a gente vai trabalhar?",
       lead: "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
@@ -583,14 +588,14 @@ export const ptBR = {
       cloudDesc: "Um computador isolado para cada agente, na Daytona.",
       cloudReady: "Sandboxes da Daytona ligadas: cada agente ganha a sua.",
       mine: "Outro computador",
-      mineDesc: "Um Mac ou outro servidor, conectado com um código.",
+      mineDesc: "Um Mac, um PC ou um servidor, conectado com um código.",
       thisMac: "Este {{device}}",
       thisMacDesc: "Só nas pastas que você liberar.",
       thisMacConnecting: "Conectando este {{device}}…",
       thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste {{device}}.",
       thisMacFolders: "Escolher pastas",
       otherComputer: "Conectar outro computador",
-      connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
+      connected: "{{name}} ({{os}}) conectado. Os agentes escolhidos vão usar este computador.",
       hostReady: "Os agentes escolhidos vão trabalhar no computador deste servidor.",
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, sempre ligado.",
@@ -609,7 +614,7 @@ export const ptBR = {
       sent: "convidado",
       roleOf: "Papel de {{email}}",
       link: "Link de convite",
-      linkHint: "Vale 30 dias. Dá para desativar em Membros.",
+      linkHint: "Vale por 30 dias. Dá para desativar em Membros.",
       linkHelp: "Você aprova cada pessoa que pedir.",
       meet: "Vão encontrar no #general:",
     },
@@ -923,7 +928,6 @@ export const ptBR = {
     detailsEmpty: "Ninguém encontrado com “{{q}}”.",
     topicLabel: "Descrição do canal",
     topicPlaceholder: "Sobre o que é este canal?",
-    autoReply: "responde sem menção",
     noTopic: "Sem descrição",
     actions: "Ações da mensagem de {{name}}",
     helpful: "Útil",
@@ -988,6 +992,32 @@ export const ptBR = {
     popoverTitle: "Agentes",
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
+    mentionNeeded: "Nenhum agente vai responder sem @",
+    mentionNeededHint:
+      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.",
+    picking: "Escolhendo quem responde",
+    by: {
+      jev: "Escolhido pelo Jev",
+      model: "Escolhido pelo {{model}}",
+      planYours: "Escolhido pelo seu plano do {{brand}}",
+      planOf: "Escolhido pelo plano do {{brand}} de {{person}}",
+      reply: "Uma resposta {{for}} {{name}}",
+      only_agent: "Só {{article}} {{name}} responde aqui sem menção",
+      follow_up: "Segue a conversa com {{article}} {{name}}",
+    },
+  },
+  routing: {
+    title: "Quem escolhe os agentes",
+    how: "Como os agentes são escolhidos",
+    by: {
+      jev: "O Jev escolhe quem responde cada mensagem sem menção.",
+      model: "O {{model}} escolhe quem responde cada mensagem sem menção.",
+      plans: "Cada plano escolhe só nas mensagens de quem o conectou.",
+      rules: "Os agentes respondem a menções, respostas e continuações.",
+      off: "Os agentes só respondem quando mencionados.",
+      noSmall:
+        "{{provider}} não tem um modelo pequeno para isso. Os agentes respondem a menções, respostas e continuações.",
+    },
   },
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
@@ -1037,7 +1067,7 @@ export const ptBR = {
       saved: "Salva. Todo agente sem plano pensa com ela.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
-      platform: "agentes.chat",
+      platform: "Este servidor",
     },
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
@@ -1266,6 +1296,8 @@ export const ptBR = {
     replyHeading: "Quando responde",
     replyAlone: "Sozinho",
     replyAloneHelp: "Responde quando o assunto pede, sem precisar de @",
+    replyAloneRules: "Também responde a respostas e continuações",
+    replyAloneOff: "Por enquanto, responde só quando mencionado",
     replyMention: "Quando chamado",
     replyMentionHelp: "Só responde se alguém escrever @{{handle}}",
     aloneLine: "Entra na conversa sozinho",
@@ -1332,7 +1364,7 @@ export const ptBR = {
   },
   agentSecrets: {
     title: "Segredos",
-    help: "O que pessoas entregaram para este computador. O valor fica só lá; aqui aparecem os nomes.",
+    help: "O que as pessoas entregaram para este computador. Aqui aparecem só os nomes. Os valores ficam no computador.",
     env: "variável de ambiente",
     file: "arquivo {{path}}",
     by: "{{person}} · {{time}}",
@@ -1599,7 +1631,7 @@ export const ptBR = {
     },
     toast: {
       done: "Marcado como feito",
-      doneQuestion: "{{name}} continua esperando; a pergunta segue na conversa.",
+      doneQuestion: "{{name}} continua esperando. A pergunta segue na conversa.",
       doneApproval: "O pedido continua em Aprovações.",
       undo: "Desfazer",
       readAll_one: "{{count}} marcada como lida",
@@ -1691,7 +1723,7 @@ export const ptBR = {
       failed: "Falhou",
       running: "Executando",
     },
-    expiredLine: "Ninguém decidiu em 24 h; nada foi feito.",
+    expiredLine: "Ninguém decidiu em 24 h, então nada foi feito.",
     canceledLine: "A execução parou antes da decisão.",
     lesson: "{{name}} vai levar em conta: {{reason}}",
     again: "Pedir de novo",
@@ -1758,7 +1790,6 @@ export const ptBR = {
     subtitle: "{{role}} · responde a <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · sem responsável · {{model}} {{key}}",
     withOrgKey: "com a chave da {{org}}",
-    withPlatformKey: "com a chave do agentes",
     openIn: "Abrir no #{{channel}}",
     saveChanges: "Salvar alterações",
     saved: "Salvo",
@@ -1949,7 +1980,7 @@ export const ptBR = {
         commands: "Comandos",
       },
       offlineCloud:
-        "O {{computer}} não está respondendo. {{The}} {{name}} volta a responder quando ele voltar; já estamos cuidando.",
+        "O {{computer}} não está respondendo. Já estamos cuidando. {{The}} {{name}} volta a responder quando ele voltar.",
     },
     tabsLabel: "Seções {{of}} {{name}}",
     tabs: {
@@ -2189,12 +2220,11 @@ export const ptBR = {
       channels: "Canais",
       computer: "Computador",
       danger: "Arquivar",
-      keySafe: "A chave fica cifrada no servidor; ninguém vê.",
+      keySafe: "A chave fica cifrada no servidor. Ninguém vê.",
       spentOf: "gastos em {{month}}, de {{amount}}",
       spentOfDefault: "gastos em {{month}}, de {{amount}} (padrão do workspace)",
       used: "do orçamento do agente usado em {{month}}",
       usedDefault: "do orçamento padrão do workspace usado em {{month}}",
-      budgetStats: "{{runs}} · {{tokens}} · aviso para {{who}} em 80%.",
       budgetAlert: "Aviso para {{who}} em 80%",
       theAdmins: "os admins",
       limit: "Limite por mês",
@@ -2294,7 +2324,7 @@ export const ptBR = {
     waitingAdmin: "Aguardando um admin",
     stale: "Ficou velha",
     staleError: "Esta proposta ficou velha: o texto mudou desde que ela foi feita. A lista foi atualizada.",
-    staleNote: "O texto mudou depois desta proposta; ela não pode mais ser aceita.",
+    staleNote: "O texto mudou depois desta proposta, então ela não pode mais ser aceita.",
     accepted: "Aceita",
     refused: "Recusada",
     acceptedBy: "Aceita por {{name}} · {{when}}",
@@ -2372,7 +2402,7 @@ export const ptBR = {
         agent: "Ada",
         desc: "Programa, revisa PRs e investiga bugs.",
         instructions:
-          "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que encontrou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos; em mudanças grandes, abre o PR como rascunho e explica o plano nele.\nNunca faz merge sozinho: pede revisão de uma pessoa.",
+          "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que encontrou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos. Em mudanças grandes, abre o PR como rascunho e explica o plano nele.\nNunca faz merge sozinho: pede revisão de uma pessoa.",
       },
       ops: {
         name: "Ops",
@@ -2386,7 +2416,7 @@ export const ptBR = {
         agent: "Iris",
         desc: "Testa fluxos e reproduz bugs relatados.",
         instructions:
-          "Reproduz cada bug relatado antes de abrir uma tarefa. Escreve passos claros e anexa evidências.\nSe não conseguir reproduzir, olha primeiro os erros, as mudanças recentes e as tarefas relacionadas; só pergunta o ambiente e a versão se não estiverem lá.\nPrioriza o que bloqueia cliente.",
+          "Reproduz cada bug relatado antes de abrir uma tarefa. Escreve passos claros e anexa evidências.\nSe não conseguir reproduzir, olha primeiro os erros, as mudanças recentes e as tarefas relacionadas. Só pergunta o ambiente e a versão se não estiverem lá.\nPrioriza o que bloqueia cliente.",
       },
       pm: {
         name: "PM",
@@ -2400,49 +2430,49 @@ export const ptBR = {
         agent: "Nina",
         desc: "Responde clientes e encaminha o que precisa de alguém.",
         instructions:
-          "Antes de responder, procura o histórico do cliente, as conversas anteriores e a base de ajuda, e volta com uma resposta pronta e de onde tirou.\nSe for um problema do produto, abre uma tarefa com os passos e avisa o time; não promete prazo nem solução que não existe.\nEnviar mensagem ao cliente, reembolso e desconto só com aprovação.",
+          "Antes de responder, procura o histórico do cliente, as conversas anteriores e a base de ajuda, e volta com uma resposta pronta e de onde tirou.\nSe for um problema do produto, abre uma tarefa com os passos e avisa o time. Não promete prazo nem solução que não existe.\nEnviar mensagem ao cliente, reembolso e desconto só com aprovação.",
       },
       sales: {
         name: "Vendas",
         agent: "Leo",
         desc: "Prepara propostas e acompanha os interessados.",
         instructions:
-          "Antes de falar com alguém, pesquisa a empresa, o histórico com ela e o que já foi combinado, e volta com um resumo e o próximo passo.\nMantém a lista de interessados em dia e lembra o time do que está parado.\nNunca inventa preço, desconto ou condição: usa só o que está na tabela; enviar proposta ou email ao cliente só com aprovação.",
+          "Antes de falar com alguém, pesquisa a empresa, o histórico com ela e o que já foi combinado, e volta com um resumo e o próximo passo.\nMantém a lista de interessados em dia e lembra o time do que está parado.\nNunca inventa preço, desconto ou condição: usa só o que está na tabela. Envia proposta ou email ao cliente só com aprovação.",
       },
       marketing: {
         name: "Marketing",
         agent: "Mila",
         desc: "Planeja campanhas, posts e páginas do site.",
         instructions:
-          "Começa olhando o que já foi feito, os resultados e o tom da marca antes de sugerir algo novo.\nEscreve rascunhos de campanhas, posts e páginas, com uma ideia principal e para quem é.\nNão inventa números nem depoimentos; publicar no site ou nas redes só com aprovação.",
+          "Começa olhando o que já foi feito, os resultados e o tom da marca antes de sugerir algo novo.\nEscreve rascunhos de campanhas, posts e páginas, com uma ideia principal e para quem é.\nNão inventa números nem depoimentos. Publica no site ou nas redes só com aprovação.",
       },
       content: {
         name: "Conteúdo",
         agent: "Bento",
         desc: "Escreve e revisa textos, artigos e newsletters.",
         instructions:
-          "Antes de escrever, lê o que já existe sobre o assunto (wiki, documentos, conversas) e confirma para quem é o texto.\nEntrega rascunhos claros e curtos, com as fontes no fim; quando revisa, explica o que mudou e por quê.\nNão inventa dados nem citações; publicar ou enviar para fora só com aprovação.",
+          "Antes de escrever, lê o que já existe sobre o assunto (wiki, documentos, conversas) e confirma para quem é o texto.\nEntrega rascunhos claros e curtos, com as fontes no fim. Quando revisa, explica o que mudou e por quê.\nNão inventa dados nem citações. Publica ou envia para fora só com aprovação.",
       },
       data: {
         name: "Dados",
         agent: "Dora",
         desc: "Responde perguntas com números e monta relatórios.",
         instructions:
-          "Busca os números na fonte antes de responder e mostra de onde vieram, o período e como calculou.\nSe os dados não bastam ou parecem errados, diz isso em vez de chutar; nunca inventa um número.\nToda segunda, posta um resumo dos principais números da semana.",
+          "Busca os números na fonte antes de responder e mostra de onde vieram, o período e como calculou.\nSe os dados não bastam ou parecem errados, diz isso em vez de chutar. Nunca inventa um número.\nToda segunda, posta um resumo dos principais números da semana.",
       },
       finance: {
         name: "Financeiro",
         agent: "Otto",
         desc: "Acompanha pagamentos, cobranças e gastos.",
         instructions:
-          "Confere os pagamentos, cobranças e gastos na fonte antes de responder e mostra os valores com a data e a origem.\nAvisa quando algo foge do normal: cobrança falhando, gasto acima do esperado, fatura vencendo.\nPagamento, reembolso e qualquer movimentação de dinheiro só com aprovação; nunca inventa valores.",
+          "Confere os pagamentos, cobranças e gastos na fonte antes de responder e mostra os valores com a data e a origem.\nAvisa quando algo foge do normal: cobrança falhando, gasto acima do esperado, fatura vencendo.\nPagamento, reembolso e qualquer movimentação de dinheiro só com aprovação. Nunca inventa valores.",
       },
       people: {
         name: "Pessoas",
         agent: "Clara",
         desc: "Ajuda com contratação, boas-vindas e dúvidas do time.",
         instructions:
-          "Antes de responder, procura nas políticas, na wiki e nos documentos do time, e diz de onde tirou.\nOrganiza vagas, entrevistas e a chegada de quem entra, com checklists claros.\nTrata dados pessoais com cuidado e só compartilha com quem precisa; enviar mensagem a candidatos só com aprovação.",
+          "Antes de responder, procura nas políticas, na wiki e nos documentos do time, e diz de onde tirou.\nOrganiza vagas, entrevistas e a chegada de quem entra, com checklists claros.\nTrata dados pessoais com cuidado e só compartilha com quem precisa. Manda mensagem a candidatos só com aprovação.",
       },
       research: {
         name: "Pesquisa",
@@ -2471,7 +2501,7 @@ export const ptBR = {
     handle: "No chat",
     handlePlaceholder: "iris",
     handleHelp: "Mencione @{{handle}} para chamar.",
-    handleEmpty: "Sai do nome; dá para mudar.",
+    handleEmpty: "Vem do nome. Dá para mudar.",
     look: "Jeito",
     shuffle: "Sortear",
     optional: "opcional",
@@ -2511,7 +2541,7 @@ export const ptBR = {
     approverAdmins: "Quem aprova é um admin.",
     skillsHelp: "Manuais que {{article}} {{name}} abre quando precisa.",
     channels: "Canais",
-    channelsHelp: "Entra agora; dá para chamar em outros depois.",
+    channelsHelp: "Entra agora. Dá para chamar em outros canais depois.",
     noChannels: "Você ainda não está em nenhum canal. Dá para adicionar o agente a um canal depois.",
     owner: "Responsável",
     you: "{{name}} (você)",
@@ -2655,15 +2685,15 @@ export const ptBR = {
     },
     link: {
       title: "Link de convite",
-      help: "Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até {{date}}",
+      help: "Um admin aprova cada pessoa que pedir. Vale até {{date}}.",
       make: "Criar link",
       turnOff: "Desativar",
       turnOffTitle: "Desativar o link?",
       turnOffText_zero: "Ninguém mais consegue pedir com ele.",
       turnOffText_one: "Ninguém mais consegue pedir com ele, e o pedido feito por ele fecha também.",
       turnOffText_other: "Ninguém mais consegue pedir com ele, e os {{count}} pedidos feitos por ele fecham também.",
-      earlier: "Link anterior · criado {{when}} por {{name}} · vale até {{date}}",
-      earlierNoName: "Link anterior · criado {{when}} · vale até {{date}}",
+      earlier: "Link anterior, criado por {{name}} {{when}}. Vale até {{date}}.",
+      earlierNoName: "Link anterior, criado {{when}}. Vale até {{date}}.",
       emailsJoin: "Quem você convida por e-mail entra direto.",
     },
     ownerLine: "Responsável: {{name}}",
@@ -2742,7 +2772,7 @@ export const ptBR = {
     },
     calendar_write: {
       label: "Propor eventos",
-      description: "Sugerir eventos; quem pediu confirma antes de qualquer convite.",
+      description: "Sugerir eventos. Quem pediu confirma antes de qualquer convite.",
     },
     skills_read: {
       label: "Usar skills",
@@ -2767,7 +2797,7 @@ export const ptBR = {
     sandbox_run: {
       label: "Rodar código",
       description:
-        "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina.",
+        "Rodar código e scripts de skills no computador do agente. Os arquivos ficam entre uma conversa e outra.",
     },
     browser_use: {
       label: "Usar um navegador",
@@ -2777,7 +2807,7 @@ export const ptBR = {
     desktop_use: {
       label: "Usar a própria tela",
       description:
-        "Usar qualquer app na tela própria do agente, no computador dele; as pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
+        "Usar qualquer app na tela própria do agente, no computador dele. As pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
     },
     setup_write: {
       label: "Configurar o workspace",
@@ -2787,7 +2817,7 @@ export const ptBR = {
     github_git_read: {
       label: "Clonar repositórios (git)",
       description:
-        "Clonar e atualizar repositórios no computador do agente com git, pelo nosso proxy; o token do GitHub nunca entra na máquina.",
+        "Clonar e atualizar repositórios no computador do agente com git, pelo nosso proxy. O token do GitHub nunca entra na máquina.",
     },
     github_git_write: {
       label: "Enviar branches (git push)",
@@ -2830,7 +2860,7 @@ export const ptBR = {
     movedDetail: "#{{number}} · {{title}}",
     column: "Coluna",
     flowHint:
-      "A tarefa anda sozinha: vai para a primeira coluna de Em andamento quando um agente começa, de Em revisão quando fica pronta para conferir e de Feito quando você aprova.",
+      "A tarefa anda sozinha, para a primeira coluna de cada etapa: Em andamento quando um agente começa, Em revisão quando fica pronta para conferir, Feito quando você aprova.",
     moreOptions: "Mais opções",
     showCanceled: "Mostrar canceladas",
     canceledColumn: "Canceladas",
@@ -2974,7 +3004,7 @@ export const ptBR = {
       "{{The}} {{name}} lê o que precisa, comenta o plano aqui e faz. O que for sensível, como publicar, pede sua aprovação.",
     askButton: "Pedir {{to}} {{name}}",
     askSection: "Pedir a um agente",
-    asked: "Pedido enviado. {{The}} {{name}} comenta o andamento aqui; a conversa com você fica no privado.",
+    asked: "Pedido enviado. {{The}} {{name}} comenta o andamento aqui. A conversa com você fica no privado.",
     activity: "Atividade",
     noActivity: "Nada ainda.",
     comment: "Comentar na tarefa",
@@ -3143,7 +3173,7 @@ export const ptBR = {
       },
       errors: {
         name: "Vigiar erros novos",
-        text: "A cada hora; só fala se houver erro novo.",
+        text: "A cada hora, só se houver erro novo.",
         prompt:
           "Olhe os erros novos do Sentry desde a última execução. Se houver, resuma e diga onde no código acontecem. Se não houver nada novo, não mande mensagem.",
         phrase: "a cada hora",
@@ -3174,7 +3204,7 @@ export const ptBR = {
       save: "Salvar",
       saved: "Rotina salva. {{next}}",
       savedNoNext: "Rotina salva.",
-      utcHint: "Esta rotina está em UTC; quer usar o {{zone}}?",
+      utcHint: "Esta rotina está em UTC. Quer usar o {{zone}}?",
       keepUtc: "Manter em UTC",
       adjust: "Ajustar",
       next: "Próximas",
@@ -3259,7 +3289,7 @@ export const ptBR = {
     access: {
       read: "Só olhar e contar",
       act: "Pode agir",
-      hint: "Só olhar e contar: ela lê e conta o que achou; para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e atualizar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     },
     report: {
       always: "Toda vez",
@@ -3357,13 +3387,13 @@ export const ptBR = {
     byAgent: "{{agent}} no {{computer}}",
     executor: {
       claude: "Claude Code",
-      claudeText: "O Claude Code planeja e programa no computador; {{name}} acompanha e repassa.",
+      claudeText: "O Claude Code planeja e programa no computador. {{name}} acompanha e repassa.",
       codex: "Codex (experimental)",
       codexText: "O Codex programa no computador. Ainda em teste.",
       agent: "{{name}} (o próprio agente)",
       agentText: "{{name}} programa direto no computador, com as ferramentas dele.",
     },
-    readOnlyNote: "Você pode ler; para pedir algo, peça para participar.",
+    readOnlyNote: "Você pode ler. Para pedir algo, peça para participar.",
     items_one: "{{done}} de {{count}} item",
     items_other: "{{done}} de {{count}} itens",
     itemsLabel_one: "{{done}} de {{count}} item pronto",
@@ -3404,7 +3434,6 @@ export const ptBR = {
     },
     actions: {
       pause: "Pausar",
-      pauseHint: "nada novo começa; o que roda segue",
       resume: "Retomar",
       stop: "Parar",
       stopHint: "para as tarefas rodando e pausa",
@@ -3415,8 +3444,8 @@ export const ptBR = {
       start: "Plano começou",
       pause: "Missão pausada: nada novo começa até você retomar.",
       resume: "Missão retomada",
-      stopped_one: "Parado: {{count}} tarefa cancelada; a missão pausou.",
-      stopped_other: "Parado: {{count}} tarefas canceladas; a missão pausou.",
+      stopped_one: "Parado: {{count}} tarefa cancelada. A missão pausou.",
+      stopped_other: "Parado: {{count}} tarefas canceladas. A missão pausou.",
       computer: "A missão agora roda no {{name}}.",
     },
     commands: {
@@ -3616,8 +3645,8 @@ export const ptBR = {
       releasing: "Liberando…",
       releasedResuming_one: "{{count}} comando liberado · retomando a sessão",
       releasedResuming_other: "{{count}} comandos liberados · retomando a sessão",
-      releasedQueued_one: "{{count}} comando liberado · a sessão continua quando puder",
-      releasedQueued_other: "{{count}} comandos liberados · a sessão continua quando puder",
+      releasedQueued_one: "{{count}} comando liberado. A sessão continua quando puder.",
+      releasedQueued_other: "{{count}} comandos liberados. A sessão continua quando puder.",
       releasePaused: "A missão está pausada: retome a missão para a sessão continuar.",
       releaseClosed: "A missão foi fechada: a sessão não continua mais.",
       onlyDeciders: "Só quem decide nesta missão libera comandos.",
@@ -3680,8 +3709,7 @@ export const ptBR = {
       machine_task_failed: "“{{title}}” falhou depois de {{span}} no {{computer}}",
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}",
       machine_task_interrupted: "“{{title}}” foi interrompida no {{computer}} e não retomou sozinha",
-      machine_access_requested:
-        "{{agent}} pediu a pasta {{folder}} no {{computer}} — esperando a resposta no computador",
+      machine_access_requested: "{{agent}} pediu a pasta {{folder}} no {{computer}}. Esperando a resposta lá.",
       machine_access_granted: "Liberado: {{agent}} já pode usar {{folder}} no {{computer}}",
       machine_access_denied: "Recusado: {{agent}} não vai usar {{folder}} no {{computer}}",
       machine_access_expired: "O pedido da pasta {{folder}} no {{computer}} ficou sem resposta",
@@ -3727,7 +3755,7 @@ export const ptBR = {
       decisionsSub: "Decisões aprovadas",
       notesSub: "Anotações do {{executor}}",
       synced: "sincronizado {{when}}",
-      editedKept: "Editado no computador — mantivemos a versão aprovada",
+      editedKept: "Editado no computador. Mantivemos a versão aprovada.",
       showDiff: "Ver diferença",
       hideDiff: "Esconder diferença",
       diffLabel: "O que mudou em {{name}} no computador",
@@ -3828,7 +3856,7 @@ export const ptBR = {
     menu: {
       label: "Ações da missão",
       pause: "Pausar",
-      pauseHint: "Nada novo começa; o que está rodando termina.",
+      pauseHint: "Nada novo começa. O que está rodando termina.",
       resume: "Retomar",
       resumeHint: "As tarefas da fila voltam a andar.",
       stop: "Parar agora",
@@ -3836,7 +3864,7 @@ export const ptBR = {
       share: "Compartilhar…",
       shareHint: "Chamar alguém para ver ou decidir.",
       close: "Fechar missão",
-      closeHint: "Termina a missão; nada mais roda.",
+      closeHint: "Termina a missão. Nada mais roda.",
       settings: "Configurações da missão…",
     },
     settings: {
@@ -3851,8 +3879,8 @@ export const ptBR = {
       autonomy: {
         sub: "Quando a missão para e pergunta a você.",
         ex_always: "Ex.: instalar algo ou rodar os testes espera você.",
-        ex_low_risk_auto: "Ex.: rodar os testes segue sozinho; apagar arquivos fora da pasta da missão pergunta.",
-        ex_never: "Ex.: instala, apaga e organiza sem parar; publicar ainda pede você.",
+        ex_low_risk_auto: "Ex.: rodar os testes segue sozinho, mas apagar arquivos fora da pasta da missão pergunta.",
+        ex_never: "Ex.: instala, apaga e organiza sem parar, mas publicar ainda pede você.",
         alwaysAsks: "Publicar e mexer na versão principal sempre pedem você.",
         stats: "Nesta missão: {{auto}} liberados automaticamente · {{asked}} perguntados · {{blocked}} bloqueados",
       },
@@ -3941,7 +3969,7 @@ export const ptBR = {
     },
     share: {
       title: "Compartilhar missão",
-      text: "Quem lê a conversa vê a missão; aqui você escolhe quem pode decidir ou comentar.",
+      text: "Quem lê a conversa vê a missão. Aqui você escolhe quem pode decidir ou comentar.",
       search: "Buscar pessoas",
       newRole: "Papel de quem entra",
       decide: "Pode decidir",
@@ -3963,9 +3991,9 @@ export const ptBR = {
       done: "Pronto",
       handTitle: "Passar a missão para {{name}}?",
       handText:
-        "O computador não muda de dono: o {{executor}} continua no seu se você emprestar; senão, {{name}} escolhe um computador próprio.",
+        "O computador não muda de dono. Se você emprestar o seu, o {{executor}} continua nele. Se não, {{name}} escolhe um computador próprio.",
       lend: "Continuar usando o {{computer}}",
-      lendText: "{{name}} passa a decidir tudo; o trabalho segue no computador do agente.",
+      lendText: "{{name}} passa a decidir tudo. O trabalho segue no computador do agente.",
       handNote: "Você continua na missão podendo decidir.",
       handConfirm: "Passar para {{name}}",
       handed: "A missão agora é de {{name}}.",
@@ -4026,7 +4054,7 @@ export const ptBR = {
     },
     notes: {
       archivedTitle: "Só leitura.",
-      archived: "Arquivadas não aparecem nas listas nem na busca; desarquive para responder.",
+      archived: "Arquivadas não aparecem nas listas nem na busca. Desarquive para responder.",
       closed: "Uma thread fechada reabre sozinha quando alguém responde.",
     },
     empty: {
@@ -4046,7 +4074,7 @@ export const ptBR = {
       created_one: "Thread criada com {{count}} mensagem",
       created_other: "Thread criada com {{count}} mensagens",
       undone: "Desfeito: a thread foi apagada e o canal ficou como antes.",
-      close: "Thread fechada. Em #{{channel}} vira uma linha; reabre se alguém responder.",
+      close: "Thread fechada. Vira uma linha em #{{channel}} e reabre se alguém responder.",
       closeMany_one: "{{count}} thread fechada",
       closeMany_other: "{{count}} threads fechadas",
       reopen: "Thread reaberta",
@@ -4058,7 +4086,7 @@ export const ptBR = {
       unarchive: "Thread desarquivada",
       unarchiveMany_one: "{{count}} thread desarquivada",
       unarchiveMany_other: "{{count}} threads desarquivadas",
-      move: "Tiradas do canal: as mensagens saíram de #{{channel}}; lá ficou um aviso com o link.",
+      move: "As mensagens saíram de #{{channel}}. Lá fica um aviso com o link.",
       moveMany_one: "{{count}} trecho tirado do canal",
       moveMany_other: "{{count}} trechos tirados do canal",
       return: "Devolvidas ao canal: as mensagens voltaram para #{{channel}}.",
@@ -4181,7 +4209,7 @@ export const ptBR = {
       fromRange_other: "{{count}} mensagens de {{where}}",
       fromMessage: "Mensagem de {{name}} em {{where}}",
       seeInChannel: "Ver no canal",
-      movedHint: "Tiradas do canal; lá ficou um aviso",
+      movedHint: "Tiradas do canal, com um aviso deixado lá",
       peopleTitle: "Participantes",
       people_one: "Participantes · {{count}}",
       people_other: "Participantes · {{count}}",
@@ -4266,7 +4294,6 @@ export const ptBR = {
     upcoming: "Próximas",
     phrase: "Ou escreva",
     phrasePlaceholder: "Ex.: a cada 2 semanas, segunda e quarta às 9h",
-    phraseUnknown: "Não entendi essa frase; ajuste no seletor acima.",
     s: {
       once: "Uma vez, em {{date}}",
       minutely_one: "A cada minuto",
@@ -4451,6 +4478,57 @@ export const ptBR = {
     keepEditing: "Continuar editando",
     discard: "Descartar",
   },
+  jev: {
+    title: "Jev",
+    about:
+      "Um modelo rápido da TypeSafe, feito para decisões rápidas. O agentes.chat faz perguntas pequenas a ele, como quem deve responder. Você paga direto à TypeSafe.",
+    lead: "Ajuda os agentes a trabalhar em equipe.",
+    how: "Como o Jev funciona",
+    why: {
+      route: "Escolhe quem responde",
+      routeText: "Mesmo sem @menção.",
+      memory: "Organiza a memória",
+      memoryText: "Percebe repetições ditas de outro jeito.",
+      screen: "Enxerga a tela",
+      screenText: "Os agentes acham botões pela descrição.",
+    },
+    withoutHint:
+      "Sem o Jev, um modelo pequeno numa das suas chaves de API escolhe quem responde. Sem chave, o plano do Claude ou do ChatGPT de cada pessoa escolhe nas mensagens que ela escreve, em alguns segundos. Fora isso, uma resposta ou uma continuação ainda chega ao agente. Mencione um agente para chamá-lo.",
+    setUp: "Configurar o Jev",
+    steps: {
+      account: "Crie uma conta na TypeSafe e adicione crédito",
+      accountHint:
+        "O Jev é pré-pago: US$ {{price}} por milhão de tokens. Escolher quem responde custa cerca de US$ {{call}}.",
+      openSite: "Abrir a TypeSafe",
+      key: "Crie uma chave",
+      openKeys: "Abrir as chaves de API",
+      paste: "Cole aqui",
+      placeholder: "A sua chave da TypeSafe",
+      sealed: "Cifrada neste servidor. Nunca mais aparece.",
+      invalid: "A TypeSafe não aceitou esta chave. Copie de novo na página de chaves.",
+      savedNoCredit: "Salva. Adicione crédito na TypeSafe e o Jev começa sozinho.",
+    },
+    keyName: "Chave da TypeSafe",
+    month_one: "{{count, number}} decisão este mês · {{cost}}",
+    month_other: "{{count, number}} decisões este mês · {{cost}}",
+    state: {
+      off: "Desligado",
+      on: "Ligado",
+      invalid: "Chave recusada",
+      no_credit: "Sem crédito",
+    },
+    line: {
+      invalid: "A TypeSafe não aceitou esta chave. Crie uma nova.",
+      no_credit: "Adicione crédito na TypeSafe. O Jev volta sozinho.",
+      env: "Definida nas configurações deste servidor (TYPESAFE_API_KEY).",
+      envInvalid: "A TypeSafe não aceitou esta chave. Troque nas configurações deste servidor (TYPESAFE_API_KEY).",
+    },
+    checkAgain: "Verificar de novo",
+    remove: {
+      title: "Remover a chave do Jev?",
+      text: "Os agentes continuam trabalhando sem ele.",
+    },
+  },
   aiAccounts: {
     share: {
       switch: "Só responde a você",
@@ -4551,8 +4629,7 @@ export const ptBR = {
       nameLabel: "Nome",
       renamed: "Agora se chama {{label}}.",
       disconnectTitle: "Desconectar {{label}}?",
-      disconnectAgent:
-        "{{agent}} deixa de pensar com ela e volta para a API. O {{computer}} sai da conta e apaga o que guardava.",
+      disconnectAgent: "{{agent}} deixa de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectAgents_one: "{{agents}} deixa de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectAgents_other:
         "{{agents}} deixam de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
@@ -4784,8 +4861,8 @@ export const ptBR = {
       conversation: "Uma conversa",
     },
     track: {
-      label_one: "{{count}} fala de agente; {{rounds}}",
-      label_other: "{{count}} falas de agentes; {{rounds}}",
+      label_one: "{{count}} fala de agente, {{rounds}}",
+      label_other: "{{count}} falas de agentes, {{rounds}}",
       spoke: "Rodada {{round}} · {{name}} · {{stance}}",
       spokeNoStance: "Rodada {{round}} · {{name}}",
       person: "Rodada {{round}} · {{name}} entrou",
@@ -4803,8 +4880,8 @@ export const ptBR = {
       pending: "Rodada {{round}} · vez {{of}} {{name}}",
       round: "Rodada {{n}}",
       roundShort: "R{{n}}",
-      key: "Cada coluna é uma fala, na cor de quem falou; a altura é o tamanho.",
-      keyLive: "O boneco é quem fala agora; os pontos são as vezes que faltam.",
+      key: "Cada coluna é uma fala, na cor de quem falou. A altura é o tamanho da fala.",
+      keyLive: "O boneco é quem fala agora. Os pontos são as vezes que faltam.",
       keyDone: "O bloco largo no fim é a síntese.",
       keyClick: "Clique para ir até a fala.",
     },
@@ -4951,7 +5028,7 @@ export const ptBR = {
       title: "Concluir o tópico?",
       text: "Ninguém mais começa uma vez nova. O que já foi dito vira a síntese.",
       finishes: "{{The}} {{name}} termina a vez {{hers}}",
-      finishesSub: "Está na vez agora; depois ninguém mais fala.",
+      finishesSub: "Está na vez agora. Depois, ninguém mais fala.",
       nobody: "Ninguém está escrevendo agora",
       nobodySub: "A síntese começa em seguida.",
       writes: "{{The}} {{name}} escreve a síntese",
@@ -5093,7 +5170,7 @@ export const ptBR = {
       },
       question: "Pergunta",
       questionPlaceholder: "Ex.: Migrar a fila do outbox para LISTEN/NOTIFY?",
-      origin: "Origem: {{origin}} · o resultado volta para lá",
+      origin: "Veio de {{origin}}. O resultado volta para lá.",
       format: "O que sai daqui",
       goal: "Objetivo",
       goalPlaceholder: "Ex.: uma decisão com os riscos e um plano de rollout.",
@@ -5123,7 +5200,7 @@ export const ptBR = {
       approvals: "Cada vez é uma execução normal: aprovações valem.",
       create: "Abrir tópico",
       open: "Abrir fórum",
-      created: "Tópico aberto. {{name}} fala primeiro; todo mundo da organização pode ler.",
+      created: "Tópico aberto. {{name}} fala primeiro. Todo mundo da organização pode ler.",
     },
     participantsDialog: {
       title: "Participantes",
@@ -5193,7 +5270,7 @@ export const ptBR = {
     label: "Foto",
     change: "Trocar foto",
     title: "Foto do perfil",
-    help: "Arraste para enquadrar; o quadrado é o que aparece.",
+    help: "Arraste para enquadrar. O quadrado é o que aparece.",
     pick: "Escolher imagem",
     drop: "Solte uma imagem aqui",
     dropHelp: "ou clique para escolher (JPG, PNG ou WebP, até 8 MB)",
@@ -5212,7 +5289,7 @@ export const ptBR = {
     add: "Enviar logo",
     change: "Trocar logo",
     title: "Logo do workspace",
-    help: "Arraste para enquadrar; o quadrado é o que aparece. PNG com fundo transparente fica melhor.",
+    help: "Arraste para enquadrar. O quadrado é o que aparece. PNG com fundo transparente fica melhor.",
     remove: "Remover logo",
     saved: "Logo atualizado.",
     removed: "Logo removido.",
@@ -5362,7 +5439,7 @@ export const ptBR = {
     topReadsEmpty: "Quando os agentes usarem a wiki para responder, as páginas mais consultadas aparecem aqui.",
     last7Days: "últimos 7 dias",
     openGraph: "Ver o grafo",
-    graphText: "Cada ponto é uma página; cada linha, um [[link]]. Clique para abrir.",
+    graphText: "Cada ponto é uma página e cada linha, um [[link]]. Clique para abrir.",
     graphAgents: "Escritas por agentes",
     legend: { people: "Pessoas", agents: "Agentes", obsidian: "Obsidian" },
     blankPage: "Página em branco",
@@ -5412,7 +5489,6 @@ export const ptBR = {
       dropText: "Também serve a pasta da vault ou só alguns arquivos .md",
       pickZip: "Escolher .zip ou .md",
       pickFolder: "Escolher pasta",
-      pickFolderShort: "escolha a pasta",
       howTo:
         "Para gerar o .zip: no Finder, clique com o botão direito na pasta da vault → Comprimir. No Windows, Enviar para → Pasta compactada. A pasta .obsidian (plugins e temas) fica de fora.",
       nothingYet: "Nada entra antes de você revisar.",
@@ -5492,7 +5568,7 @@ export const ptBR = {
     },
     save: "Salvar na wiki",
     saveTitle: "Salvar na wiki",
-    saveText: "Escolha a página ou crie uma; o texto entra no fim, com um link para a conversa.",
+    saveText: "Escolha a página ou crie uma. O texto entra no fim, com um link para a conversa.",
     savePick: "Página",
     saveNew: "Criar a página {{title}}",
     savedTo: "Salvo em {{title}}.",
@@ -5620,9 +5696,6 @@ export const ptBR = {
     modelLabel: "Modelo",
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
-    fallback: "Se o computador não estiver disponível, responder pela API",
-    fallbackHint:
-      "Usa o orçamento {{of}} {{name}}. Desligado, {{article}} {{name}} avisa e responde quando o computador voltar.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
     hiddenAdmins: "Só admins escolhem quem pensa.",
     summary: {
@@ -5633,7 +5706,7 @@ export const ptBR = {
     },
     mission: {
       modelLabel: "Modelo",
-      modelHint: "Dá para trocar a qualquer momento; vale para o próximo passo.",
+      modelHint: "Dá para trocar a qualquer momento. Vale a partir do próximo passo.",
       saved: "Modelo: {{model}}",
     },
   },
@@ -5683,7 +5756,7 @@ export const ptBR = {
     target: {
       label: "Computador",
       offlineName: "{{name}} (offline)",
-      offlineText: "Offline agora; o agente avisa até ligarem",
+      offlineText: "Offline agora. O agente avisa até ele voltar",
       connectHint: "Conectar um computador seu",
       none: "Nenhum computador",
       noneText: "Não roda programas nem guarda arquivos",
@@ -5708,7 +5781,7 @@ export const ptBR = {
     enabled: "Os agentes podem usar as sandboxes da Daytona",
     enabledHelp: "Desligado, só quem tem um computador seu consegue rodar código.",
     internet: "Internet",
-    internetHelp: "O que a sandbox acessa lá fora. Libere só os sites necessários (até 100; use *. para subdomínios).",
+    internetHelp: "O que a sandbox acessa lá fora. Libere só os sites necessários, até 100. Use *. para subdomínios.",
     noInternet: "Sem internet.",
     addDomain: "Adicionar site",
     add: "Adicionar",
@@ -5770,14 +5843,14 @@ export const ptBR = {
       },
       drive: { read: "Lê arquivos do Drive.", write: "Lê, cria e edita arquivos do Drive." },
       issues: { read: "Lê tarefas.", write: "Lê, cria e atualiza tarefas." },
-      calendar: { read: "Vê a agenda e horários livres.", write: "Vê a agenda e propõe eventos; quem pediu confirma." },
+      calendar: { read: "Vê a agenda e horários livres.", write: "Vê a agenda e propõe eventos. Quem pediu confirma." },
       wiki: { read: "Busca e lê a wiki.", write: "Lê a wiki e edita quando alguém pede." },
       skills: { read: "Usa as skills ligadas para o agente." },
       schedule: { write: "Cria lembretes e rotinas para quem pediu." },
       forum: { write: "Abre tópicos, lê e posta no fórum." },
-      sandbox: { write: "Roda código no PC do agente; custa tempo de máquina." },
+      sandbox: { write: "Roda código no computador do agente." },
       browser: {
-        write: "Navega em sites com o próprio navegador no computador dele; os logins ficam por agente.",
+        write: "Navega em sites com o próprio navegador, no computador dele. Os logins ficam por agente.",
       },
       setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
       desktop: {
@@ -5798,7 +5871,7 @@ export const ptBR = {
     seeVersions: "Ver versões",
     delete: "Apagar arquivo",
     deleteTitle: "Apagar “{{title}}”?",
-    deleteBody: "Ele vai para a lixeira por 30 dias; mensagens que o citam mostram “Arquivo removido”.",
+    deleteBody: "Ele fica na lixeira por 30 dias. Mensagens que o citam mostram “Arquivo removido”.",
     deleteConfirm: "Apagar",
     deleteForbidden:
       "Só quem criou, quem pediu ao agente, o responsável pelo agente ou um admin pode apagar este arquivo.",
@@ -5811,7 +5884,7 @@ export const ptBR = {
     deletedMany_other: "{{count}} arquivos apagados",
     deleteManyTitle_one: "Apagar {{count}} arquivo?",
     deleteManyTitle_other: "Apagar {{count}} arquivos?",
-    purged: "Passou de 30 dias na lixeira; não dá mais para restaurar.",
+    purged: "Passou de 30 dias na lixeira, então não dá mais para restaurar.",
     removedFile: "Arquivo removido",
     trash: "Lixeira",
     trashTitle: "Lixeira do Drive",
@@ -6062,7 +6135,7 @@ export const ptBR = {
     suspended: "Suspenso no GitHub",
     remove: "Remover",
     removeName: "Remover {{account}}",
-    removed: "{{account}} removido. Continua instalado no GitHub; desinstale lá se quiser.",
+    removed: "{{account}} removido. Continua instalado no GitHub. Desinstale lá se quiser.",
     installed: "App do GitHub instalado.",
   },
   repos: {
@@ -6109,7 +6182,7 @@ export const ptBR = {
     truncated: "Algumas contas têm repositórios demais para listar aqui: busque pelo nome.",
     realTitle: "Os repositórios valem de verdade.",
     realText:
-      "Fora da lista, {{article}} {{name}} não baixa nem envia código e não abre PR; avisa no chat e mostra quem pode liberar.",
+      "Fora da lista, {{article}} {{name}} não baixa nem envia código e não abre PR. Avisa no chat e mostra quem pode liberar.",
     allow: "Liberar {{repo}}",
     deniedRun: "{{repo}} não está entre os repositórios {{of}} {{name}}.",
     added: "{{repo}} entra na lista ao salvar.",
@@ -6118,7 +6191,7 @@ export const ptBR = {
     title: "Conectores",
     add: "Adicionar conector",
     addTitle: "Adicionar conector",
-    catalogText: "Conecte uma vez para a {{org}}; depois escolha o que cada agente pode usar.",
+    catalogText: "Conecte uma vez para a {{org}}. Depois escolha o que cada agente pode usar.",
     catalog: "Conectores disponíveis",
     categories: "Categorias",
     category: {
@@ -6250,7 +6323,7 @@ export const ptBR = {
     toolsName: "Ferramentas de {{name}}",
     connect: "Conectar",
     apiKey: "Chave de API",
-    apiKeyHelp: "Fica cifrada no servidor; ninguém vê depois.",
+    apiKeyHelp: "Fica cifrada no servidor. Ninguém vê depois.",
     apiKeyInvalid: "Cole a chave de API (pelo menos 8 caracteres).",
     serverUrl: "Endereço do servidor MCP",
     serverUrlHelp: "O endereço https do servidor MCP que a {{org}} usa.",
@@ -6260,9 +6333,9 @@ export const ptBR = {
     disconnectName: "Desconectar {{name}}",
     disconnectTitle: "Desconectar {{name}}?",
     disconnectText_one:
-      "{{count}} agente perde o acesso na hora. Para voltar, é só conectar de novo; as permissões não voltam sozinhas.",
+      "{{count}} agente perde o acesso na hora. Dá para conectar de novo depois, mas as permissões não voltam sozinhas.",
     disconnectText_other:
-      "{{count}} agentes perdem o acesso na hora. Para voltar, é só conectar de novo; as permissões não voltam sozinhas.",
+      "{{count}} agentes perdem o acesso na hora. Dá para conectar de novo depois, mas as permissões não voltam sozinhas.",
     disconnectTextNone: "Nenhum agente usa agora. Para voltar, é só conectar de novo.",
     disconnected: "{{name}} desconectado.",
     connectedToast: "{{name}} conectado.",
@@ -6472,7 +6545,7 @@ export const ptBR = {
     acceptAll: "Aceitar as sugestões",
     accepted_one: "{{count}} sugestão aceita",
     accepted_other: "{{count}} sugestões aceitas",
-    suggestion: "Sugestão: <b>{{level}}</b> — {{reason}}",
+    suggestion: "Sugestão: <b>{{level}}</b> ({{reason}})",
     ok: "OK",
     confirm: "Confirmar {{name}}",
     moved: "“{{name}}” foi para {{subject}}",
@@ -6520,7 +6593,7 @@ export const ptBR = {
     sensitive: "Ação sensível: só pode pedir aprovação ou ficar desligada.",
     reason: {
       reads_only: "só consulta números, não muda nada",
-      changes_undoable: "muda coisas, mas não apaga nada nem gasta dinheiro",
+      changes_undoable: "não apaga nada nem gasta dinheiro",
       replaces_data: "troca dados que já existem",
       copies_only: "copia sem apagar nada",
       spends_money: "pode gastar dinheiro",
@@ -6577,7 +6650,7 @@ export const ptBR = {
   },
   database: {
     name: "Banco de dados",
-    cardText: "Postgres: os agentes consultam seus dados para responder, só leitura.",
+    cardText: "Postgres, só leitura: os agentes consultam seus dados.",
     auth: "Endereço e senha",
     connectText:
       "Os agentes leem o seu banco Postgres para responder sobre os seus dados. Eles só leem: nada é alterado.",
@@ -6593,7 +6666,7 @@ export const ptBR = {
     nameHelp: "É como o banco aparece para você e para os agentes.",
     namePlaceholder: "Ex.: Produção",
     url: "Endereço do banco",
-    urlHelp: "Começa com postgres://. Fica cifrado no servidor; ninguém vê depois, nem os agentes.",
+    urlHelp: "Começa com postgres://. Fica cifrado no servidor. Ninguém vê depois, nem os agentes.",
     urlPlaceholder: "postgres://usuario:senha@servidor:5432/banco",
     urlInvalid: "Cole um endereço que comece com postgres://, ou preencha os campos em Avançado.",
     howTitle: "Como criar um usuário só de leitura?",
@@ -6724,7 +6797,7 @@ export const ptBR = {
     addressPlaceholder: "voce@empresa.com.br",
     addressInvalid: "Digite um email válido, como voce@empresa.com.br.",
     password: "Senha de app",
-    passwordHelp: "Fica cifrada no servidor; ninguém vê depois.",
+    passwordHelp: "Fica cifrada no servidor. Ninguém vê depois.",
     passwordInvalid: "Cole a senha de app.",
     whatIs: "O que é uma senha de app?",
     whatIsText:
@@ -6781,7 +6854,7 @@ export const ptBR = {
       search: { name: "Buscar emails", text: "Procura por remetente, assunto ou texto." },
       read: { name: "Ler emails", text: "Abre um email ou uma conversa, sem marcar como lido." },
       folders: { name: "Ver pastas", text: "Lista as pastas da caixa." },
-      draft: { name: "Criar rascunho", text: "Deixa um rascunho na caixa; nunca envia." },
+      draft: { name: "Criar rascunho", text: "Deixa um rascunho na caixa. Nunca envia." },
       organize: { name: "Organizar", text: "Move, marca e arquiva emails." },
       send: { name: "Enviar", text: "Um email novo." },
       reply: { name: "Responder", text: "Responde na mesma conversa." },
@@ -6817,7 +6890,7 @@ export const ptBR = {
       help: "Uma linha por caixa de email da {{org}}.",
       none: "A {{org}} ainda não conectou nenhum email.",
       levelText: {
-        read: "Busca e lê os emails; nada muda na caixa.",
+        read: "Busca e lê os emails. Nada muda na caixa.",
         write: "Lê, cria rascunhos e organiza. Enviar, responder e encaminhar pedem aprovação.",
       },
       canDelete: "Pode apagar emails",
@@ -6853,7 +6926,7 @@ export const ptBR = {
       sendWithoutAskingHelp: "Só para quem está em “Só enviar para”, até o limite do dia.",
       sendWithoutAskingLocked: "Preencha “Só enviar para” antes. Sem essa lista, todo envio pede aprovação.",
       from: "Enviar como",
-      fromHelp: "Automático: responde pelo endereço que recebeu o email; emails novos saem de {{address}}.",
+      fromHelp: "Automático: as respostas saem pelo endereço que recebeu o email. Emails novos saem de {{address}}.",
       fromAuto: "Automático",
     },
     list: {
@@ -6915,11 +6988,11 @@ export const ptBR = {
   errors: {
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
-      full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você por e-mail.",
+      full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você.",
       rateLimited: "Muitos pedidos daqui. Tente de novo daqui a uma hora.",
       linkBusy: "Muita gente pediu por este link na última hora. Tente de novo mais tarde.",
       member: "Você já está neste workspace.",
-      denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você por e-mail.",
+      denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você.",
       answered: "Alguém já respondeu este pedido.",
       expired: "Este pedido expirou: ninguém respondeu em 14 dias.",
       codeWrong: "Código errado. Tente de novo.",
@@ -6962,11 +7035,11 @@ export const ptBR = {
       notYourComputer: "Escolha um computador que você conectou.",
       needsComputer: "A missão precisa de um computador para continuar.",
       unavailable: "Missões não estão disponíveis neste servidor.",
-      machineChanged: "O computador da missão mudou; tente de novo.",
+      machineChanged: "O computador da missão mudou. Tente de novo.",
       executorUnavailable: "Esse jeito de programar não está instalado no computador da missão.",
       executorOutdated: "O Codex nesse computador é antigo demais: atualize-o lá.",
       invalidExecutor: "Escolha quem programa: Claude Code, Codex ou o agente.",
-      rateLimited: "A missão fez coisas demais na última hora; espere um pouco.",
+      rateLimited: "A missão fez coisas demais na última hora. Espere um pouco e tente de novo.",
       pausedStuck: "A missão pausou porque parou de avançar.",
     },
     thread: {
@@ -7123,7 +7196,7 @@ export const ptBR = {
       ownFolder: "Pasta de cada agente",
       ownFolderText: "Sempre. Um agente não vê a do outro.",
       noFolders: "Nenhuma pasta a mais. Cada agente usa só a própria pasta.",
-      noReport: "Este computador ainda não informou o que libera. Atualize o app agentes nele.",
+      noReport: "Este computador ainda não informou o que libera. Atualize o agentes.chat nele.",
       hidden: "Só admins e quem conectou veem as pastas e as ferramentas deste computador.",
       nobody: "Nenhum agente usa ainda",
       usedBy: "Quem usa {{folder}}",
@@ -7233,7 +7306,7 @@ export const ptBR = {
       none: "Nenhum outro computador pode rodar estes agentes agora. Conecte outro computador ou espere este voltar.",
       on: "Ligado",
       cloud: "Sandbox da Daytona",
-      cloudText: "Um computador isolado na Daytona; o repositório vem pelo GitHub",
+      cloudText: "Um computador isolado na Daytona, com o repositório do GitHub",
       has: "Tem o {{brains}}",
       block: {
         offline: "Desconectado agora",
@@ -7385,7 +7458,7 @@ export const ptBR = {
       usage: "{{percent}} do orçamento usado este mês",
       keys_one: "{{count}} chave",
       keys_other: "{{count}} chaves",
-      platformKey: "Usando a chave do agentes.chat",
+      platformKey: "Usando a chave deste servidor",
       noKeys: "Nenhuma chave ainda",
       plans_one: "{{count}} plano",
       plans_other: "{{count}} planos",
@@ -7408,7 +7481,6 @@ export const ptBR = {
       "Ficam cifradas no servidor e nunca aparecem no navegador. Os agentes usam a chave que você escolher.",
     keyEndsIn: "Termina em {{hint}}",
     keyAdded: "Adicionada {{when}}",
-    defaultKey: "Paga o roteador e os resumos",
     makeDefault: "Tornar padrão",
     addKey: "Adicionar chave",
     addKeyTitle: "Adicionar chave de API",
@@ -7428,7 +7500,7 @@ export const ptBR = {
     removeText:
       "A chave some de vez. Se algum agente ainda usa esta chave, o servidor recusa: troque a chave desses agentes antes.",
     noKeys: "Nenhuma chave ainda.",
-    platformAvailable: "A chave do agentes também está disponível neste servidor.",
+    platformAvailable: "A chave do Claude deste servidor também está disponível.",
     usageTitle: "Gastos da API por tipo",
     usageAgentLine: "{{spent}} de {{budget}}",
     usageAgentLineDefault: "{{spent}} de {{budget}} (padrão do workspace)",
@@ -7437,7 +7509,7 @@ export const ptBR = {
     defaultBudgetSaved: "Orçamento padrão salvo.",
     defaultBudget: "Orçamento mensal por agente (US$)",
     defaultBudgetHelp:
-      "Todo agente sem orçamento próprio usa este; o orçamento de cada agente muda na página dele. Só admins veem valores; os membros veem porcentagens.",
+      "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     usageTotal: "{{amount}} no total desde {{since}}",
     kinds: { agent: "Agentes", router: "Roteador", embedding: "Busca", summary: "Resumos", sandbox: "Sandbox" },
     usageCalls_one: "{{count}} chamada",
@@ -7482,7 +7554,7 @@ export const ptBR = {
       sharedWith: "divide com {{names}}",
       part: "Parte {{of}} {{name}}: ≈ {{percent}}",
       estimate:
-        "A parte {{of}} {{name}} é o trecho mais forte de cada barra. O {{brand}} só diz quanto a conta inteira usou; a parte de cada agente é uma estimativa, pelo que cada um gastou.",
+        "A parte {{of}} {{name}} é o trecho mais forte de cada barra. O {{brand}} só diz quanto a conta inteira usou, então a parte de cada agente é uma estimativa pelo que cada um gastou.",
       byAccount: "Por conta, este mês",
       until: "até {{date}}",
       nowTag: "agora",
@@ -7791,7 +7863,7 @@ export const ptBR = {
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
       machine_offline: "{{computer}} ficou offline.",
-      brain_unavailable: "O {{brain}} não está disponível agora; respondo quando ele voltar.",
+      brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       action_connect_ai: "Conectar uma IA",
@@ -7852,7 +7924,7 @@ export const ptBR = {
     },
     propose_instruction_change: {
       label: "Propor mudança de instruções",
-      description: "Sugere mudar as próprias instruções ou o contexto da org; uma pessoa decide.",
+      description: "Sugere mudar as próprias instruções ou o contexto da org. Uma pessoa decide.",
     },
     read_artifact: {
       label: "Ler arquivo",
@@ -7900,7 +7972,7 @@ export const ptBR = {
     },
     propose_event: {
       label: "Propor evento",
-      description: "Sugere um evento; quem pediu confirma.",
+      description: "Sugere um evento. Quem pediu confirma.",
     },
     load_skill: {
       label: "Carregar skill",
@@ -7933,6 +8005,10 @@ export const ptBR = {
     cancel_reminder: {
       label: "Cancelar lembrete",
       description: "Cancela um lembrete de quem pediu.",
+    },
+    suggest_forum_topic: {
+      label: "Sugerir tópico no fórum",
+      description: "Sugere uma discussão entre agentes. Uma pessoa abre.",
     },
     open_forum_topic: {
       label: "Abrir tópico no fórum",
@@ -8012,7 +8088,7 @@ export const ptBR = {
     },
     computer_stop: {
       label: "Desligar o computador",
-      description: "Desliga o computador; os arquivos ficam.",
+      description: "Desliga o computador. Os arquivos ficam.",
     },
     computer_status: {
       label: "Ver o computador",
@@ -8084,7 +8160,7 @@ export const ptBR = {
     },
     browser_close: {
       label: "Fechar o navegador",
-      description: "Fecha o navegador do agente; os logins continuam salvos.",
+      description: "Fecha o navegador do agente. Os logins continuam salvos.",
     },
     desktop_ask_person: {
       label: "Pedir ajuda na tela do computador",
@@ -8128,17 +8204,6 @@ export const ptBR = {
       saveFailed: "Não deu para salvar. Tente de novo.",
       signedIn: "{{The}} {{name}} fica logado nos sites em que entrar, neste computador.",
       cloud: "O navegador funciona num computador conectado. Escolha um acima para ligar.",
-      reason: {
-        no_machine: "Escolha um computador conectado para {{article}} {{name}} usar o navegador.",
-        machine_removed: "O computador {{of}} {{name}} foi removido.",
-        outdated: "<b>Atualize o app agentes no {{machine}}.</b> A versão dele ainda não tem o navegador.",
-        switched_off:
-          "<b>Ligue o navegador no {{machine}}.</b> Só quem está no computador pode ligar: no app agentes desse computador, abra <b>Preferências → Ferramentas</b>. Depois disso, a opção abre aqui.",
-        not_installed:
-          "<b>Este computador ainda não tem o navegador.</b> Ele baixa sozinho na primeira vez; se faltar algo, aparece aqui o que fazer.",
-        not_reported:
-          "<b>O {{machine}} ainda não disse se tem o navegador.</b> Abra o app agentes nele para atualizar.",
-      },
     },
     machine: {
       ready: "Pronto",
@@ -8370,7 +8435,7 @@ export const ptBR = {
     onHold: "Este workspace está em espera: {{reason}}",
     suspendedFor: "Este workspace está suspenso: {{reason}}",
     bannerSub:
-      "Dá para ler e escrever normalmente; os agentes não respondem nem trabalham enquanto ele estiver em espera.",
+      "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     label: "Status do workspace",
     screen: {
       title: "Este workspace está indisponível",
@@ -8381,6 +8446,23 @@ export const ptBR = {
       hold: "O workspace está em espera: os agentes estão pausados",
       suspended: "O workspace foi suspenso",
       active: "O workspace voltou a funcionar",
+      agentHold: "{{name}} está em pausa",
+    },
+    /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
+    cloud: {
+      review:
+        "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
+      blockedAbuse:
+        "Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      blockedLegal:
+        "Esta conta está bloqueada enquanto guardamos os dados dela por uma questão legal. Para perguntar sobre isso, escreva para {{email}}.",
+      agentNetwork:
+        "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      agentOperator:
+        "Este agente está pausado enquanto a nossa equipe analisa a atividade dele (Termos, seção 5). Para contestar, escreva para {{email}}.",
+      createRefused:
+        "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para {{email}}.",
+      contest: "Para contestar, escreva para {{email}}.",
     },
   },
   /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */
@@ -8449,7 +8531,7 @@ export const ptBR = {
       you: "Avisamos você em {{email}} quando ele ficar pronto.",
       here: "Aparece aqui assim que ficar pronto.",
       /** After the capacity wait's line, for owners. */
-      short: "avisamos por e-mail",
+      short: "Avisamos por e-mail.",
     },
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
@@ -8553,7 +8635,7 @@ export const ptBR = {
       you: "Você está usando",
       other: "{{person}} está usando",
       held: "Em pausa por enquanto",
-      unavailable: "A tela não pode ser mostrada agora",
+      unavailable: "Não dá para mostrar agora",
       noScreen: "Não usa tela nem navegador",
       noBrowser: "Não usa navegador",
       preparingPlain: "Sendo preparado",

@@ -190,6 +190,11 @@ export interface FakeState {
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
   jev?: JevKey;
+  /**
+   * What TypeSafe says of a key `system.saveJev` checks: refused (422, nothing kept) or out of credit; else it works.
+   * `rate_limited`: the server's limit answers the first try (429), and the next one goes through.
+   */
+  jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
   /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
@@ -674,7 +679,11 @@ export const CATALOG: ConnectorCatalog = {
     remote("notion", "Notion", "docs", "Páginas e bancos de dados.", "https://mcp.notion.com/mcp", null),
     remote("stripe", "Stripe", "payments", "Clientes e cobranças.", "https://mcp.stripe.com", "#635BFF"),
     remote("zapier", "Zapier", "automation", "Ações do Zapier.", "https://oauth.zapier.example/mcp", "#FF4F00"),
-    remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null, false),
+    // A mark in its maker's colors, from the web app's brands folder.
+    {
+      ...remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null),
+      iconUrl: "/brands/canva.svg",
+    },
     {
       ...remote("slack", "Slack", "support", "Canais e mensagens.", "https://mcp.slack.example/mcp", null, false),
       kind: "catalog",
@@ -764,7 +773,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       saveJev: async (apiKey) => {
         log("system.saveJev", apiKey);
         if (!state.jev) throw new ApiError(404, "not_found", "Not found");
-        state.jev = { ...state.jev, source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        const verdict = state.jevVerdicts?.[apiKey];
+        if (verdict === "invalid") throw new ApiError(422, "jev_key_invalid", "TypeSafe didn't accept this key.");
+        if (verdict === "rate_limited") {
+          delete state.jevVerdicts?.[apiKey];
+          throw new ApiError(429, "rate_limited", "Too many tries. Wait a minute.");
+        }
+        state.jev = { ...state.jev, source: "settings", hint: apiKey.slice(-4), state: verdict ?? "ok" };
         return state.jev;
       },
       checkJev: async () => {

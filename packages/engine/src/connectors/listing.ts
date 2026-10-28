@@ -2,12 +2,13 @@ import { CONNECTOR_CATALOG, type ConnectorCategory } from "./catalog";
 import { MCP_PRESETS } from "./presets";
 
 /**
- * Brand icons the web app serves from `apps/web/public/connectors` (Simple
- * Icons, CC0) and their brand color. No color = the ink (near-black or very
- * light brands). Keyed by icon name; services without one (Canva, PayPal,
- * Square) get a monogram.
+ * Brand icons the web app serves, keyed by icon name. One color, from
+ * `apps/web/public/connectors`: drawn in the brand color, no color = the ink
+ * (near-black or very light brands). `own`: from `apps/web/public/brands`, in
+ * its maker's colors, which one color would flatten (PayPal's three blues,
+ * Canva's gradient).
  */
-export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | null }> = {
+export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | null; own?: true }> = {
   github: { file: "github", color: null },
   linear: { file: "linear", color: "#5E6AD2" },
   sentry: { file: "sentry", color: null },
@@ -21,6 +22,9 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   intercom: { file: "intercom", color: null },
   zapier: { file: "zapier", color: "#FF4F00" },
   webflow: { file: "webflow", color: "#146EF5" },
+  square: { file: "square", color: null },
+  paypal: { file: "paypal", color: null, own: true },
+  canva: { file: "canva", color: null, own: true },
 };
 
 export interface ConnectorListingEntry {
@@ -38,7 +42,7 @@ export interface ConnectorListingEntry {
   needsServerUrl: boolean;
   /** The MCP endpoint of a `remote_mcp` entry. */
   serverUrl: string | null;
-  /** `/connectors/{file}.svg` (served by the web app), or null for a monogram. */
+  /** Served by the web app: `/connectors/{file}.svg` (one color) or `/brands/{file}.svg` (its own colors); null for a monogram. */
   iconUrl: string | null;
   brandColor: string | null;
   scopes: { id: string; label: string; description: string; sensitive: boolean }[];
@@ -47,7 +51,7 @@ export interface ConnectorListingEntry {
 
 const brand = (key: string) => {
   const b = CONNECTOR_BRANDS[key];
-  return { iconUrl: b ? `/connectors/${b.file}.svg` : null, brandColor: b?.color ?? null };
+  return { iconUrl: b ? `/${b.own ? "brands" : "connectors"}/${b.file}.svg` : null, brandColor: b?.color ?? null };
 };
 
 /**

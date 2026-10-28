@@ -153,6 +153,22 @@ describe("Quem pensa (its dialog)", () => {
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
   });
 
+  test("no API key anywhere (the workspace's or the server's): no switch promising an answer through it", async () => {
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [{ agentId: ADA_ID, state: "ready" }],
+        routing: { by: "rules", mine: "rules", model: null, noSmallModel: null },
+        apiKey: false,
+      },
+    });
+    await open(state);
+    const d = await brainDialog();
+    await click(card(d, /^Claude Code/));
+    expect(within(d).queryByRole("switch", { name: /responder pela API/ })).toBeNull();
+    expect(d.textContent).not.toContain("responder pela API");
+  });
+
   test("a saved plan brain changes its model without the warning; back to the organization's model too", async () => {
     const state = seedState();
     const api = createFakeApi(state);

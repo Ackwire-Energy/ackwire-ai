@@ -316,7 +316,7 @@ describe("Configurações da organização", () => {
     expect(keys().textContent).toContain("Claude · Termina em 7f2a");
     expect(keys().textContent).toContain("Padrão do workspace");
     // Platform key not offered by this server: not mentioned.
-    expect(keys().textContent).not.toContain("chave do agentes");
+    expect(keys().textContent).not.toContain("chave do Claude deste servidor");
     const del = within(keys()).getByRole("button", { name: "Apagar" });
     expect(del.hasAttribute("disabled")).toBe(true);
     expect(keys().textContent).toContain("Escolha outra chave padrão antes de apagar esta.");
@@ -389,7 +389,7 @@ describe("Configurações da organização", () => {
     expect(field.value).toBe("50");
     // Who it applies to and who sees amounts: the field's ⓘ, which also describes the field.
     expect(describedBy(field)).toEqual([
-      "Todo agente sem orçamento próprio usa este; o orçamento de cada agente muda na página dele. Só admins veem valores; os membros veem porcentagens.",
+      "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     ]);
     await act(async () => fireEvent.change(field, { target: { value: "80" } }));
     await click(within(fallback).getByRole("button", { name: "Salvar" }));
@@ -397,8 +397,60 @@ describe("Configurações da organização", () => {
     expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
       defaultAgentBudgetUsd: 80,
     });
-    // Jev / the router's own key is internal: never in the UI.
+    // An admin who isn't the server's owner: no Jev anywhere (its key is the owner's, jev.test.tsx).
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
+  });
+
+  test("on the Cloud, Jev is named only in who picks the agents: no card, no TypeSafe", async () => {
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [],
+        routing: { by: "jev", mine: "jev", model: null, noSmallModel: null },
+        apiKey: true,
+      },
+    });
+    await go(state, "settings/keys");
+    const section = screen().getByRole("region", { name: "Quem escolhe os agentes" });
+    expect(section.textContent).toBe(
+      "Quem escolhe os agentesComo os agentes são escolhidosO Jev escolhe quem responde cada mensagem sem menção.",
+    );
+    expect(screen().queryByRole("region", { name: "Jev" })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/typesafe/i);
+    // A workspace with no AI says nothing about who picks.
+    cleanup();
+    state.aiStatus = { ...(state.aiStatus as NonNullable<typeof state.aiStatus>), any: false };
+    await go(state, "settings/keys");
+    expect(screen().queryByRole("region", { name: "Quem escolhe os agentes" })).toBeNull();
+    // Members don't read it.
+    cleanup();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    state.aiStatus = { ...(state.aiStatus as NonNullable<typeof state.aiStatus>), any: true };
+    await go(state, "settings/keys");
+    expect(screen().queryByRole("region", { name: "Quem escolhe os agentes" })).toBeNull();
+  });
+
+  test("who picks, as ai-status says: a small model by its name, Kimi's missing one, the router off", async () => {
+    const routing = (r: Partial<NonNullable<ReturnType<typeof seedState>["aiStatus"]>["routing"]>) =>
+      seedState({
+        aiStatus: {
+          any: true,
+          agents: [],
+          routing: { by: "rules", mine: "rules", model: null, noSmallModel: null, ...r },
+          apiKey: true,
+        },
+      });
+    const line = () => screen().getByRole("region", { name: "Quem escolhe os agentes" }).querySelector(".who-line");
+    await go(routing({ by: "model", mine: "model", model: "claude-haiku-5-5" }), "settings/keys");
+    expect(line()?.textContent).toBe("O Claude Haiku 5.5 escolhe quem responde cada mensagem sem menção.");
+    cleanup();
+    await go(routing({ noSmallModel: "moonshot" }), "settings/keys");
+    expect(line()?.textContent).toBe(
+      "Kimi não tem um modelo pequeno para isso. Os agentes respondem a menções, respostas e continuações.",
+    );
+    cleanup();
+    await go(routing({ by: "off", mine: "off" }), "settings/keys");
+    expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
   test("members see settings read-only, without the workspace's keys or money (their own plans, usage in percentages)", async () => {
@@ -434,7 +486,7 @@ describe("Configurações da organização", () => {
     // A section they can't open falls back to Geral.
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
-    expect(document.querySelector("#sec-storage")).toBeNull();
+    expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {

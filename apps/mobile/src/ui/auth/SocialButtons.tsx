@@ -3,6 +3,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
+import { socialRefusalText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -64,7 +65,7 @@ export function SocialButtons({
     rememberSignIn(provider);
     try {
       const res = await authClient().signIn.social({ provider, callbackURL: "/" });
-      if (res.error) onError(t("mobile.auth.social.failed"));
+      if (res.error) onError(socialRefusalText(t, res.error));
     } catch {
       onError(t("mobile.auth.errors.network"));
     } finally {
@@ -87,7 +88,7 @@ export function SocialButtons({
         provider: "apple",
         idToken: { token: credential.identityToken },
       });
-      if (res.error) onError(t("mobile.auth.social.failed"));
+      if (res.error) onError(socialRefusalText(t, res.error));
     } catch (e) {
       // Closing Apple's sheet is not an error.
       if ((e as { code?: string })?.code !== "ERR_REQUEST_CANCELED") onError(t("mobile.auth.social.failed"));

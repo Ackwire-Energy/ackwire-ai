@@ -5,6 +5,7 @@ import {
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
+  cloudNotice,
   countUsers,
   createInvitation,
   createOrganization,
@@ -307,7 +308,9 @@ export function accountRoutes(deps: AppDeps) {
             name: m.orgName,
             role: m.role,
             logo: m.orgLogo ?? null,
-            ...(m.standing ? { standing: { state: m.standing.state, reason: toldReason(m.standing) } } : {}),
+            ...(m.standing
+              ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
+              : {}),
           })),
         },
         200,

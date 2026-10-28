@@ -841,7 +841,6 @@ export const featureKeysPtBR = {
       "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     hold: "Segure para apagar",
     holding: "Segure…",
-    note: "Os planos são assinados e cancelados no site.",
   },
   files: {
     type: {
@@ -1399,7 +1398,7 @@ export const featureKeysPtBR = {
     agentsLead: "Marque quem mais vem.",
     share: "Compartilhar link de convite",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
-    shareNote: "Quem abrir pede para entrar; você aprova.",
+    shareNote: "Você aprova cada pessoa que pedir.",
     emailsPlaceholder: "nome@empresa.com",
     membersNote: "Entram como membros.",
     invalidEmail: "Confira este e-mail.",

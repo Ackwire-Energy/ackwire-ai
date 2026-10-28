@@ -32,12 +32,16 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
           <Text variant="small" tone="ink2" style={styles.strong}>
             {t("noAi.agent", { name })}
           </Text>
-        ) : (
+        ) : banner.askInChat ? (
           <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">
             <Text variant="small" tone="ink2" style={styles.strong}>
               {t("noAi.banner.org")}
             </Text>
           </InfoHint>
+        ) : (
+          <Text variant="small" tone="ink2" style={styles.strong}>
+            {t("noAi.banner.org")}
+          </Text>
         )}
       </View>
       <Button variant="secondary" size="sm" label={action} onPress={connect} />

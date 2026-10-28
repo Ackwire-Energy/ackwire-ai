@@ -51,7 +51,7 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
     if (!result.success) {
       const message = result.error.issues
         .map((i) => `${i.path.length > 0 ? i.path.join(".") : "body"}: ${i.message}`)
-        .join("; ");
+        .join(". ");
       return apiError(c, 400, "invalid_request", message);
     }
   };

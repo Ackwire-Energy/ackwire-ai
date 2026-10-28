@@ -38,6 +38,7 @@ import {
   sendHelpers,
   typingIn,
   useAddChannelMember,
+  useAiStatus,
   useApproval,
   useApprovals,
   useChannelMembers,
@@ -75,7 +76,7 @@ import {
 } from "@agenteschat/client/lib/chat";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
-import { errorCode, errorText, standingRefusalText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -99,6 +100,7 @@ import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/out
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -2800,7 +2802,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   // Refused by the workspace's standing: its own words, not the server's English.
-  const refusal = liveFailed ? standingRefusalText(t, live?.errorCode, live?.errorParams) : null;
+  const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
@@ -3066,7 +3068,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               }
             : undefined
       }
-      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
+      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
+      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
       stacked={Boolean(card)}
     >
       {live ? (
@@ -3367,6 +3370,8 @@ function ChannelDetails({
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
   const roster = useRoster(org.id, channel.id, open && channel.isMember);
+  // What "on its own" means for my messages: who reads the ones that mention nobody.
+  const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
   // The channel's creator may too, but the API doesn't say who created it yet: admins only.
   const editable = can(org.role, "configure");
@@ -3507,7 +3512,11 @@ function ChannelDetails({
               <span className="list-col">
                 <span style={{ fontWeight: 600 }}>{r.name}</span>
                 <span className="small muted">
-                  {r.autoReply ? t("channelMembers.aloneLine") : t("channelMembers.mentionLine", { handle: r.handle })}
+                  {!r.autoReply
+                    ? t("channelMembers.mentionLine", { handle: r.handle })
+                    : picksForMe(routing)
+                      ? t("channelMembers.aloneLine")
+                      : t(replyAloneKey(routing))}
                 </span>
               </span>
               {editable && (
@@ -3535,7 +3544,7 @@ function ChannelDetails({
                         label: (
                           <>
                             {t("channelMembers.replyAlone")}
-                            <span className="ac-menu__desc">{t("channelMembers.replyAloneHelp")}</span>
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing))}</span>
                           </>
                         ),
                       },

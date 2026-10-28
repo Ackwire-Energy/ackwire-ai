@@ -17,7 +17,7 @@ export const StandingState = z.enum(STANDING_STATES).openapi("OperatorStandingSt
 });
 export const StandingNotice = z.enum(STANDING_NOTICES).openapi("OperatorStandingNotice", {
   description:
-    "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it.",
+    "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it. Use `silent` only when an authority's order forbids telling them.",
 });
 
 export const Standing = z
@@ -32,7 +32,10 @@ export const Standing = z
 
 const StandingInput = z.object({
   state: StandingState,
-  reason: z.string().trim().min(1).max(64).openapi({ description: "Shown to the workspace with the notice `shown`." }),
+  reason: z.string().trim().min(1).max(64).openapi({
+    description:
+      "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on.",
+  }),
   note: z.string().trim().max(2000).optional(),
   notice: StandingNotice,
 });
@@ -106,14 +109,14 @@ export function registerOperatorStanding(api: OpenAPIHono, { db, pubsub, hub }: 
       tags,
       summary: "Hold one agent, or let it go",
       description:
-        "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. At once in this process, within 5 seconds in the others.",
+        "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. On agentes.chat Cloud it reads the hold's kind with how to contest it (`network` for a reason starting with `network.`, else `operator`), and the agent's responsible person and the workspace's owners and admins get a notice, replaced when it is held again for another kind and closed when the agent is let go. At once in this process, within 5 seconds in the others.",
       request: { params: AgentParams, body: body(z.object({ held: z.boolean(), reason: Reason })) },
       responses: { 200: json(AgentHold), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       const { held, reason } = c.req.valid("json");
-      const row = await setAgentHold(db, orgId, agentId, { held, reason: reason ?? null });
+      const row = await setAgentHold(db, orgId, agentId, { held, reason: reason ?? null }, pubsub);
       if (!row) return apiError(c, 404, "not_found", "No agent with this id in this workspace");
       return c.json({ held: row.heldAt !== null, heldAt: iso(row.heldAt), reason: row.reason }, 200);
     },
@@ -126,7 +129,7 @@ export function registerOperatorStanding(api: OpenAPIHono, { db, pubsub, hub }: 
       tags,
       summary: "Block an account, or let it back",
       description:
-        "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces.",
+        "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces. On agentes.chat Cloud the refused sign-in reads the block's kind, never its reason: `abuse` for `abuse.resignup`, `legal` for `legal_hold`, else `other`.",
       request: { params: UserParams, body: body(z.object({ blocked: z.boolean(), reason: Reason })) },
       responses: { 200: json(UserBlock), ...errors },
     }),

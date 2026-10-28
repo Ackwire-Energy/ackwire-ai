@@ -7,8 +7,10 @@ import {
   useAuthConfig,
   useComputerSetup,
   useConfirmDevice,
+  useJevKey,
   useMachines,
   useSandboxSettings,
+  useSaveJevKey,
 } from "@agenteschat/client";
 import {
   computerEdition,
@@ -20,8 +22,9 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { errorText, holdText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import {
   type ComputerKind,
   type ComputerState,
@@ -59,6 +62,7 @@ import {
   Button,
   Card,
   CardHeader,
+  Chip,
   ComputerPortrait,
   Field,
   Icon,
@@ -99,6 +103,7 @@ import {
   type WhoRow,
   WhoThinks,
 } from "@/components/ai/ConnectAiSteps";
+import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { OrgProvider } from "@/components/org-context";
@@ -255,9 +260,10 @@ export function OnboardingPage() {
   // Import: read and planned in its step, applied when the team is kept (a key saved later gives back their models).
   const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
-  // Agents and AI: first who joins (created when that screen is left), then what they think with.
+  // Agents and AI: first who joins (created when that screen is left), then what they think with, then (the server's
+  // owner, once an AI is connected) Jev's key.
   const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
-  const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai">("pick");
+  const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai" | "jev">("pick");
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
   const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
   // The option picked (none: the default), whom a plan is for (an agent, or all of them), and the plans given so
@@ -273,6 +279,10 @@ export function OnboardingPage() {
   const [platform, setPlatform] = useState(false);
   // The monthly budget of every agent (US$, API usage only); null = the workspace default as it is.
   const [budget, setBudget] = useState<string | null>(null);
+  // Jev's key as typed, and the text already answered for: refused, or saved for an account with no credit yet.
+  const [jevDraft, setJevDraft] = useState("");
+  const [jevDone, setJevDone] = useState<{ text: string; saved: boolean } | null>(null);
+  const [jevError, setJevError] = useState<string | null>(null);
   // Computer (before the agents): where they work, and where a plan signs in.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
@@ -335,16 +345,17 @@ export function OnboardingPage() {
     setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
   }, [host, step.id]);
 
-  // Each step's column opens centered, then stays where it opened: what changes in it (the computer's progress,
-  // a toggle) grows or shrinks it downward instead of moving the question and Back under the pointer.
+  // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
+  // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
+  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with.
   const column = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
   useLayoutEffect(() => {
     const el = column.current;
     if (!el) return;
     const place = () => {
-      el.style.marginTop = "";
-      el.style.marginTop = `${el.getBoundingClientRect().top - (el.parentElement?.getBoundingClientRect().top ?? 0)}px`;
+      el.style.removeProperty("--onb-lead");
+      el.style.setProperty("--onb-lead", getComputedStyle(el, "::before").marginTop);
     };
     place();
     window.addEventListener("resize", place);
@@ -544,14 +555,21 @@ export function OnboardingPage() {
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   const aiOpen = step.id === "agents" && agentsPhase === "ai";
+  const jevOpen = step.id === "agents" && agentsPhase === "jev";
+  // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
+  const jevKey = useJevKey();
+  const saveJev = useSaveJevKey();
+  const jevTyped = jevDraft.trim();
+  // A refused key never blocks the setup: once answered for, the same text moves on.
+  const jevSaves = jevTyped !== "" && jevTyped !== jevDone?.text;
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
   const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
-  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
-  const emails = authConfig?.passwordReset !== false;
+  // A server that sends no email invites by link only.
+  const emails = sendsEmail(authConfig);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
@@ -706,8 +724,9 @@ export function OnboardingPage() {
   // Whoever the text mentions first speaks, and gets it; with nobody named, the router picks who answers.
   const mentioned = firstMentioned(askText, crew);
   const speaker = mentioned ?? crew.find((c) => c.key === firstAsk?.asker);
-  // No socket is open here: an agent waiting for its computer is asked about again until it can start.
-  const aiNow = useAiStatus(created?.orgId ?? "", step.id === "done" && speaker !== undefined, (status) =>
+  // No socket is open here: an agent waiting for its computer is asked about again until it can start. Jev's screen
+  // reads it too: its reasons leave out picking who answers where this server's router is off.
+  const aiNow = useAiStatus(created?.orgId ?? "", (step.id === "done" && speaker !== undefined) || jevOpen, (status) =>
     mentioned && aiStateOf(status, mentioned.id) === "waiting" ? COMPUTER_POLL_MS : false,
   );
   const lineState = !asking
@@ -785,7 +804,26 @@ export function OnboardingPage() {
           setAgentsPhase("ai");
           return;
         }
-        if (how !== "keyLater") await finishAi.mutateAsync();
+        if (agentsPhase === "ai" && how !== "keyLater") {
+          await finishAi.mutateAsync();
+          if (jevKey.data?.source === null) {
+            setAgentsPhase("jev");
+            return;
+          }
+        }
+        if (agentsPhase === "jev" && jevSaves) {
+          const saved = await saveJev.mutateAsync(jevTyped).catch((error: unknown) => {
+            // Only TypeSafe's refusal answers for this text: after a limit or an outage, the same key can be tried again.
+            if (errorCode(error) === "jev_key_invalid") setJevDone({ text: jevTyped, saved: false });
+            setJevError(errorText(t, error));
+            return null;
+          });
+          if (!saved) return;
+          if (saved.state === "no_credit") {
+            setJevDone({ text: jevTyped, saved: true });
+            return;
+          }
+        }
       }
       if (step.id === "computer") await saveComputer.mutateAsync(false);
       if (step.id === "team") await sendInvites.mutateAsync();
@@ -811,6 +849,7 @@ export function OnboardingPage() {
     flow.busy !== null ||
     saveComputer.isPending ||
     sendInvites.isPending ||
+    saveJev.isPending ||
     finish.isPending;
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
@@ -819,6 +858,7 @@ export function OnboardingPage() {
     (aiOpen &&
       ((keyPending ? draft.provider === "platform" || !keyLooksValid(draft.provider, draft.apiKey) : !aiDone) ||
         (choice === "key" && !budgetOk))) ||
+    (jevOpen && jevSaves && jevTyped.length < JEV_KEY_MIN) ||
     (step.id === "import" && !flow.planned) ||
     (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
 
@@ -850,8 +890,8 @@ export function OnboardingPage() {
     team: sent.size ? t("onboarding.railValue.invites", { count: sent.size }) : t("onboarding.railValue.later"),
   };
 
-  // The question: the step's, or the AI's on the agents' second screen.
-  const ask =
+  // The question: the step's, the AI's on the agents' second screen, or Jev's on the third.
+  const ask: { title: string; tag?: string; lead: ReactNode } | null =
     step.id === "done"
       ? null
       : aiOpen
@@ -859,22 +899,33 @@ export function OnboardingPage() {
             title: t("onboarding.keyStep.title"),
             lead: t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
           }
-        : {
-            title:
-              step.id === "agents" && importAgents.length
-                ? t("onboarding.agents.importedTitle")
-                : t(`onboarding.${step.id}.title`),
-            lead:
-              step.id === "computer" && workspaceComputer
-                ? t(
-                    workspaceComputer.phase === "paused"
-                      ? "onboarding.computer.leadCloudPaused"
-                      : "onboarding.computer.leadCloud",
-                  )
-                : step.id === "team" && !emails
-                  ? t("onboarding.team.leadLink")
-                  : t(`onboarding.${step.id}.lead`),
-          };
+        : jevOpen
+          ? {
+              title: t("onboarding.jev.title"),
+              tag: t("onboarding.optionalTag"),
+              lead: (
+                <span className="ac-hintline">
+                  <span>{t("onboarding.jev.lead")}</span>
+                  <InfoHint name={t("common.about", { label: t("jev.title") })}>{t("jev.withoutHint")}</InfoHint>
+                </span>
+              ),
+            }
+          : {
+              title:
+                step.id === "agents" && importAgents.length
+                  ? t("onboarding.agents.importedTitle")
+                  : t(`onboarding.${step.id}.title`),
+              lead:
+                step.id === "computer" && workspaceComputer
+                  ? t(
+                      workspaceComputer.phase === "paused"
+                        ? "onboarding.computer.leadCloudPaused"
+                        : "onboarding.computer.leadCloud",
+                    )
+                  : step.id === "team" && !emails
+                    ? t("onboarding.team.leadLink")
+                    : t(`onboarding.${step.id}.lead`),
+            };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
@@ -886,7 +937,7 @@ export function OnboardingPage() {
           : t("onboarding.done.first.sendGeneral")
       : step.id === "agents" && agentsPhase === "pick" && joiningLeft > 0
         ? t("onboarding.actions.create", { count: joiningLeft })
-        : aiOpen && keyPending
+        : (aiOpen && keyPending) || (jevOpen && jevSaves)
           ? t("onboarding.actions.saveAndContinue")
           : step.id === "team" && toSend.length > 0
             ? t("onboarding.actions.invite", { count: toSend.length })
@@ -898,6 +949,7 @@ export function OnboardingPage() {
     step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.id === "done" ? asking : step.optional;
   const back = () => {
     if (aiOpen) setAgentsPhase("pick");
+    else if (jevOpen) setAgentsPhase("ai");
     else go(index - 1);
   };
 
@@ -978,6 +1030,7 @@ export function OnboardingPage() {
               happy={guide.happy}
               intro={intro}
               title={ask.title}
+              tag={ask.tag}
               lead={ask.lead}
             />
           )}
@@ -1253,6 +1306,23 @@ export function OnboardingPage() {
             </div>
           )}
 
+          {jevOpen && (
+            <div className="onb__answer">
+              <JevWhy routing={aiNow.data?.routing?.by} />
+              <Card as="div">
+                <JevSteps
+                  value={jevDraft}
+                  onChange={(value) => {
+                    setJevDraft(value);
+                    setJevError(null);
+                  }}
+                  error={jevError}
+                  saved={jevDone?.saved && jevDone.text === jevTyped ? t("jev.steps.savedNoCredit") : null}
+                />
+              </Card>
+            </div>
+          )}
+
           {step.id === "team" && created && (
             <div className="onb__answer">
               <TeamStep
@@ -1362,6 +1432,7 @@ function HostAsk({
   happy,
   intro,
   title,
+  tag,
   lead,
 }: {
   name: string;
@@ -1373,6 +1444,8 @@ function HostAsk({
   happy: boolean;
   intro: string | null;
   title: string;
+  /** Beside the title: a screen that can be left as it is ("optional"). */
+  tag?: string;
   lead: ReactNode;
 }) {
   return (
@@ -1390,7 +1463,10 @@ function HostAsk({
       </span>
       <div className="onb__bubble">
         {intro && <p className="onb__intro">{intro}</p>}
-        <h1 className="onb__title">{title}</h1>
+        <h1 className="onb__title">
+          {title}
+          {tag && <Chip className="onb__titletag">{tag}</Chip>}
+        </h1>
         <p className="onb__lead">{lead}</p>
       </div>
     </header>

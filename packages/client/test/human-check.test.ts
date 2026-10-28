@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
-import { authErrorText, errorText } from "../src/lib/errors";
+import { authErrorText, errorText, knownErrorText } from "../src/lib/errors";
 import { createHumanCheck, humanCheckHeaders, isHumanCheckRefusal, withHumanCheck } from "../src/lib/human-check";
 
 const t = ((key: string) => key) as unknown as TFunction;
@@ -146,4 +146,14 @@ test("the words: the check's refusals, and Better Auth's by status and code befo
   expect(authErrorText(t, { status: 403, code: "ACCOUNT_BLOCKED", message: "x" })).toBe("auth.accountBlocked");
   expect(authErrorText(t, { status: 400, message: "Password too short" })).toBe("Password too short");
   expect(authErrorText(t, { status: 500, message: "" })).toBe("common.unknownError");
+});
+
+test("a limit with no words of its own reads as too many tries, never the server's English", () => {
+  expect(errorText(t, new ApiError(429, "rate_limited", "Too many photo changes. Try again later."))).toBe(
+    "common.tooMany",
+  );
+  expect(errorText(t, new ApiError(429, "http_429", "Too Many Requests"))).toBe("common.tooMany");
+  expect(knownErrorText(t, new ApiError(409, "rate_limited", "Slow down"))).toBe("common.tooMany");
+  expect(errorText(t, new ApiError(429, "join.code_limit", "x"))).toBe("errors.join.codeLimit");
+  expect(knownErrorText(t, new ApiError(409, "conflict", "Reload and try again."))).toBeNull();
 });

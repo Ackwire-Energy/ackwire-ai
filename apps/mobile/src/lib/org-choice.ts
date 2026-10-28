@@ -15,17 +15,17 @@ export const firstRunMounted = (wasMounted: boolean, firstRun: boolean, onInvite
   firstRun && (wasMounted || !onInvite);
 
 /**
- * The chosen organization when it is suspended (ADR 0056 §8): why, when the workspace is told, and the person's
- * other organizations to go to; null while it isn't (pure).
+ * The chosen organization when it is suspended (ADR 0056 §8): why, when the workspace is told, whether it is on
+ * agentes.chat Cloud (how to contest it), and the person's other organizations to go to; null while it isn't (pure).
  */
-export function suspendedOf<O extends { id: string; standing?: { state: string; reason: string | null } }>(
-  orgs: readonly O[],
-  orgId: string | null,
-): { reason: string | null; others: O[] } | null {
+export function suspendedOf<
+  O extends { id: string; standing?: { state: string; reason: string | null; cloud?: boolean } },
+>(orgs: readonly O[], orgId: string | null): { reason: string | null; cloud: boolean; others: O[] } | null {
   const org = orgs.find((o) => o.id === orgId);
   if (org?.standing?.state !== "suspended") return null;
   return {
     reason: org.standing.reason,
+    cloud: org.standing.cloud === true,
     others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended"),
   };
 }

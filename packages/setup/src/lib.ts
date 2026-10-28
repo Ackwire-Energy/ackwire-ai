@@ -67,6 +67,7 @@ export interface Options {
   computer?: (typeof YES_NO)[number];
   computerCommands?: (typeof YES_NO)[number];
   telemetry?: OnOff;
+  typesafeKey?: string;
   start: boolean;
   tailscaleStatus?: string;
   timeout: number;
@@ -89,6 +90,7 @@ const OPTIONS = {
   computer: { type: "string" },
   "computer-commands": { type: "string" },
   telemetry: { type: "string" },
+  "typesafe-key": { type: "string" },
   "no-start": { type: "boolean" },
   "tailscale-status": { type: "string" },
   timeout: { type: "string" },
@@ -142,6 +144,7 @@ export function parseOptions(
     ["smtp-url", text("smtp-url"), smtpUrlProblem],
     ["email-api-url", text("email-api-url"), httpUrlProblem],
     ["email-from", text("email-from"), emailFromProblem],
+    ["typesafe-key", text("typesafe-key"), jevKeyProblem],
   ];
   for (const [name, value, problem] of checks) {
     const found = value === undefined ? null : problem(value);
@@ -163,6 +166,7 @@ export function parseOptions(
       ...(computer ? { computer } : {}),
       ...(commands ? { computerCommands: commands } : {}),
       ...(telemetry ? { telemetry } : {}),
+      ...optional("typesafeKey", text("typesafe-key")),
       start: !flag("no-start"),
       ...optional("tailscaleStatus", text("tailscale-status")),
       timeout,
@@ -671,6 +675,98 @@ export function decideTelemetry(p: { flag?: OnOff; content: string | null; answe
   return { ask: !p.flag && !now, value, kept: value === now, entries: value === now ? {} : { TELEMETRY: value } };
 }
 
+// ── Jev ─────────────────────────────────────────────────────────────────────
+
+/** TypeSafe's console, and its page where keys are made. */
+export const TYPESAFE_CONSOLE = "https://console.typesafe.ai";
+export const TYPESAFE_KEYS = `${TYPESAFE_CONSOLE}/keys`;
+
+/** A whole key is printable ASCII: a pasted curly quote or space can't go in a request, which would read as no answer. */
+export const jevKeyProblem = (key: string) =>
+  /^[\x21-\x7E]{8,512}$/.test(key) ? null : `that isn't a whole TypeSafe key. Copy it again from ${TYPESAFE_KEYS}.`;
+
+/**
+ * What a TypeSafe answer says about a key, first match first, as the server reads it (`jevStateOf` in
+ * packages/engine/src/jev-key.ts). The setup is standalone, so it keeps this copy: the same fixture table in both
+ * packages' tests keeps the two alike. Null: the request's own fault, which says nothing about the key.
+ */
+export function jevStateOf(status: number, body?: unknown) {
+  if (status >= 200 && status < 300) return "ok" as const;
+  const detail = (body as { detail?: { error_type?: unknown; message?: unknown } | string } | null | undefined)?.detail;
+  const words = typeof detail === "string" ? detail : `${detail?.error_type ?? ""} ${detail?.message ?? ""}`;
+  if (status === 402 || /credit|balance|billing|payment|funds/i.test(words)) return "no_credit" as const;
+  // 403 is TypeSafe's answer to a request without a key.
+  if (status === 401 || status === 403) return "invalid" as const;
+  if (status === 429) return "rate_limited" as const;
+  if (status >= 500) return "down" as const;
+  return null;
+}
+
+export type JevCheck = "ok" | "invalid" | "no_credit" | "unchecked";
+
+/** One tiny call (about 50 tokens), as the server's check: only a real call says a key has no credit. */
+export async function checkJevKey(key: string, fetchFn: typeof fetch = fetch): Promise<JevCheck> {
+  const question = {
+    type: "noul",
+    instructions: "Is the state the word ok?",
+    criteria: { true: "The state is the word ok.", false: "The state is something else." },
+  };
+  try {
+    const res = await fetchFn("https://api.typesafe.ai/v1/systemone", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({ model: "jev-latest", state: "ok", questions: { ok: question } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const state = jevStateOf(res.status, await res.json().catch(() => null));
+    return state === "ok" || state === "invalid" || state === "no_credit" ? state : "unchecked";
+  } catch {
+    return "unchecked";
+  }
+}
+
+export type JevChoice = JevCheck | "kept" | "off";
+
+/**
+ * Jev's key: `--typesafe-key` is checked with TypeSafe (never in a dry run) and goes into .env unless TypeSafe
+ * refuses it, which writes nothing. Without it, or with the key .env already has, .env stays as it is: the app
+ * asks the server's owner after the setup.
+ */
+export async function jevStep(p: {
+  flag?: string;
+  content: string | null;
+  dryRun: boolean;
+  check: (key: string) => Promise<JevCheck>;
+}): Promise<
+  { problem: Problem } | { value: JevChoice; entries: Record<string, string>; said?: { ok: boolean; text: string } }
+> {
+  const now = envValue(p.content, "TYPESAFE_API_KEY");
+  if (!p.flag || p.flag === now) return { value: now ? "kept" : "off", entries: {} };
+  if (p.dryRun) return { value: "unchecked", entries: {} };
+  const state = await p.check(p.flag);
+  if (state === "invalid") {
+    return {
+      problem: {
+        check: "jev",
+        error: "TypeSafe didn't accept --typesafe-key.",
+        fix: `Copy the key again from ${TYPESAFE_KEYS}, or leave the option out and add it later in Settings › AI accounts.`,
+      },
+    };
+  }
+  const said = {
+    ok: { ok: true, text: "Jev: key checked" },
+    no_credit: {
+      ok: false,
+      text: `Jev: the key works but has no credit. Add credit at ${TYPESAFE_CONSOLE} and Jev starts by itself.`,
+    },
+    unchecked: {
+      ok: false,
+      text: "Jev: TypeSafe didn't answer, so the key wasn't checked. agentes.chat checks it when it uses it.",
+    },
+  }[state];
+  return { value: state, entries: { TYPESAFE_API_KEY: p.flag }, said };
+}
+
 // ── The agents' computer ────────────────────────────────────────────────────
 
 /** Beside .env: the service that runs agents here reads HOST_COMPUTER_TOKEN from it, never from its own command line. */
@@ -1060,7 +1156,7 @@ export function theEnd(p: {
   url: string;
   app: { health: Record<string, unknown>; firstRun: boolean } | null;
   keyExpiry: string | null;
-  choices: { computer: ComputerPlan["state"]; telemetry: OnOff } | null;
+  choices: { computer: ComputerPlan["state"]; telemetry: OnOff; jev: JevChoice } | null;
   first?: string[];
   failed: Problem | null;
   ssh: SshTarget;
@@ -1118,6 +1214,8 @@ export interface PlanInput {
   computer: ComputerPlan;
   /** The usage statistics' answer, and whether .env already had it. */
   telemetry: { value: OnOff; kept: boolean };
+  /** Jev's key: `--typesafe-key` to check, kept from .env, or none. */
+  jev: JevChoice;
   compose: string | null;
   start: boolean;
   image: boolean;
@@ -1184,6 +1282,8 @@ export function planSteps(p: PlanInput): string[] {
   );
   steps.push(computerStep(p.computer));
   steps.push(telemetryStep(p.telemetry));
+  if (p.jev === "kept") steps.push("Jev: keep what .env has (TYPESAFE_API_KEY)");
+  else if (p.jev !== "off") steps.push("Jev: TYPESAFE_API_KEY from --typesafe-key, checked when the setup runs");
   steps.push(p.compose ? `compose: use ${p.compose}` : `compose: download docker-compose.yml from ${COMPOSE_URL}`);
   if (p.image || !p.start) {
     steps.push("start: print the commands to run (docker compose up -d) and how to finish");

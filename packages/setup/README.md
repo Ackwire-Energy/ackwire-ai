@@ -60,6 +60,8 @@ address, the app link, health and next steps, or the failed check and its fix), 
 stderr.
 Without a terminal, answers are read from stdin one per line, and an empty line or the end of the
 input takes the default.
+`--typesafe-key` (or `AGENTES_SETUP_TYPESAFE_KEY`) adds your TypeSafe key for Jev after checking
+it. Without it, the app asks the owner after setup.
 
 ```sh
 AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' npx -y @agenteschat/setup --network tailscale --email skip --json

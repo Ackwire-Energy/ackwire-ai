@@ -77,7 +77,10 @@ const CatalogEntry = z
     available: z.boolean().openapi({ description: "Can be connected on this server." }),
     needsServerUrl: z.boolean(),
     serverUrl: z.string().nullable().openapi({ description: "The MCP endpoint (`remote_mcp`)." }),
-    iconUrl: z.string().nullable().openapi({ description: "Brand icon served by the web app; null = a monogram." }),
+    iconUrl: z.string().nullable().openapi({
+      description:
+        "Brand icon served by the web app, null for a monogram: `/connectors/…` has one color, drawn in `brandColor`, and `/brands/…` keeps its maker's colors.",
+    }),
     brandColor: z.string().nullable().openapi({ description: "Tint of the icon; null = the ink." }),
     scopes: z.array(ScopeInfo),
     tools: z.array(z.object({ name: z.string(), scope: z.string(), sensitive: z.boolean() })),

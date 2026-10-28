@@ -98,10 +98,11 @@ const sendText = async (text: string) => {
 
 describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens on Claude's sign-in for the first agent with no AI", async () => {
-    await open(walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID));
+    const jev = { by: "jev", mine: "jev", model: null, noSmallModel: null } as const;
+    await open(walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID));
     const shown = banner();
     // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
-    // line is a whole sentence).
+    // line is a whole sentence). Jev is what understands that ask.
     expect(shownText(shown as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", shown as HTMLElement).text).toBe(
       "Você também pode pedir no chat, como “usar meu plano do Claude”.",
@@ -123,6 +124,15 @@ describe("no AI connected: above the composer", () => {
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
+  });
+
+  test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {
+    for (const routing of [undefined, { by: "rules", mine: "rules", model: null, noSmallModel: null } as const]) {
+      await open(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), ...(routing ? { routing } : {}) } }));
+      expect(shownText(banner() as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+      expect(within(banner() as HTMLElement).queryByRole("button", { name: "Sobre Conectar uma IA" })).toBeNull();
+      cleanup();
+    }
   });
 
   test("the ready email's Connect your AI: the picker on Claude, with the computer said ready first; not from the banner", async () => {
@@ -358,7 +368,7 @@ describe("receipts and the live block", () => {
     expect(document.querySelector(".ac-msg__error")).toBeNull();
     const receipt = receiptOf("e o login?");
     const check = receipt.querySelector(".ac-receipt__check") as HTMLElement;
-    expect(check.getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check.getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
@@ -383,7 +393,7 @@ describe("receipts and the live block", () => {
     const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     // Read as her run started.
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     // She has no AI: her card and her run's end come before the socket is even open, so no event carries them.
     state.messages = state.messages.map((m) =>
       m.id === "m-asked" ? asked([{ agentId: ADA_ID, runId: "r-noai", status: "failed", reason: "no_ai" }]) : m,
@@ -398,7 +408,7 @@ describe("receipts and the live block", () => {
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
       "Ninguém vai responder: falta uma IA ·",
     );
@@ -410,7 +420,7 @@ describe("receipts and the live block", () => {
     const { socket } = await open(state);
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     await click(within(cardRow()).getByRole("button", { name: "Responder agora" }));
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     // The server starts her again on Walter's message, in a new run.
@@ -425,7 +435,7 @@ describe("receipts and the live block", () => {
       socket.push(frame({ type: "agent.run", ...run, status: "running" }));
     });
     await settle(2);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     // Her answer and her run's end arrive together, before the page draws the answer.
     const answer: Message = {
       id: "m-answer",
@@ -448,7 +458,7 @@ describe("receipts and the live block", () => {
       .getAllByRole("article")
       .some((a) => a.textContent?.includes("Os três maiores são a Orbe, a Lumen e a Quadra."));
     expect(shown).toBe(true);
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
   });
 });
 

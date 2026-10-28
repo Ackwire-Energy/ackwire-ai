@@ -3,7 +3,7 @@
 //! inside the tailnet only; never Funnel). The tool is looked up at the places it installs itself, never at a
 //! path from a page.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -25,8 +25,9 @@ const APPROVE_WAIT: Duration = Duration::from_secs(180);
 pub enum Tailnet {
     /// No Tailscale on this computer.
     Missing,
-    /// Installed, signed out or turned off.
-    Off,
+    /// Installed, signed out or turned off. `app`: Tailscale's Mac app is there to open, not only its command-line
+    /// tool (Homebrew's).
+    Off { app: bool },
     /// Connected: this device's own name on the tailnet (`ana-mac.tail1234.ts.net`).
     #[serde(rename_all = "camelCase")]
     On { device: String },
@@ -47,6 +48,9 @@ pub enum ServeError {
     /// Tailscale shares it, but the server didn't answer again at its new address (not Tailscale's doing).
     Start,
 }
+
+/// Tailscale's Mac app, which "Open Tailscale" opens.
+const MAC_APP: &str = "/Applications/Tailscale.app";
 
 /// The tool at the places it installs itself.
 pub fn cli() -> Option<PathBuf> {
@@ -81,10 +85,10 @@ pub fn status_json() -> Option<Value> {
     serde_json::from_str(&out).ok()
 }
 
-/// What `status --json` says about this device.
-pub fn tailnet_of(status: Option<&Value>, installed: bool) -> Tailnet {
+/// What `status --json` says about this device; `app`: whether Tailscale's Mac app is there.
+pub fn tailnet_of(status: Option<&Value>, installed: bool, app: bool) -> Tailnet {
     let Some(status) = status else {
-        return if installed { Tailnet::Off } else { Tailnet::Missing };
+        return if installed { Tailnet::Off { app } } else { Tailnet::Missing };
     };
     let running = status.get("BackendState").and_then(Value::as_str) == Some("Running");
     let device = status
@@ -94,12 +98,12 @@ pub fn tailnet_of(status: Option<&Value>, installed: bool) -> Tailnet {
         .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.'));
     match (running, device) {
         (true, Some(device)) => Tailnet::On { device },
-        _ => Tailnet::Off,
+        _ => Tailnet::Off { app },
     }
 }
 
 pub fn tailnet() -> Tailnet {
-    tailnet_of(status_json().as_ref(), cli().is_some())
+    tailnet_of(status_json().as_ref(), cli().is_some(), cfg!(target_os = "macos") && Path::new(MAC_APP).is_dir())
 }
 
 /// The HTTPS port to share on: 443, unless this device already shares something else there.
@@ -182,15 +186,15 @@ pub fn unserve(public_url: &str) {
 
 #[tauri::command]
 pub async fn tailscale_status(webview: tauri::Webview) -> Result<Tailnet, String> {
-    if !matches!(webview.label(), "welcome" | "prefs") {
+    if !matches!(webview.label(), "welcome" | "prefs" | "main-cover") {
         return Err("only the app's own windows ask this".into());
     }
     tauri::async_runtime::spawn_blocking(tailnet).await.map_err(|e| e.to_string())
 }
 
-/// "Open Tailscale" (its app, on a Mac only: elsewhere it is connected from the terminal), "Get Tailscale" (its
-/// download page), "Turn it on" (the admin page the last `serve` named, or the tailnet's DNS settings, where
-/// HTTPS is turned on).
+/// "Open Tailscale" (its app, on a Mac that has it: elsewhere it is connected from its icon by the clock or the
+/// terminal), "Get Tailscale" (its download page), "Turn it on" (the admin page the last `serve` named, or the
+/// tailnet's DNS settings, where HTTPS is turned on).
 #[tauri::command]
 pub fn tailscale_open(app: tauri::AppHandle, webview: tauri::Webview, page: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
@@ -200,7 +204,7 @@ pub fn tailscale_open(app: tauri::AppHandle, webview: tauri::Webview, page: Stri
     match page.as_str() {
         "app" if cfg!(target_os = "macos") => app
             .opener()
-            .open_path("/Applications/Tailscale.app", None::<&str>)
+            .open_path(MAC_APP, None::<&str>)
             .map_err(|e| e.to_string()),
         "download" => app.opener().open_url("https://tailscale.com/download", None::<&str>).map_err(|e| e.to_string()),
         "https" => {
@@ -220,13 +224,16 @@ mod tests {
     #[test]
     fn this_device_on_the_tailnet() {
         let on = json!({ "BackendState": "Running", "Self": { "DNSName": "Ana-Mac.tail1234.ts.net." } });
-        assert_eq!(tailnet_of(Some(&on), true), Tailnet::On { device: "ana-mac.tail1234.ts.net".into() });
+        assert_eq!(tailnet_of(Some(&on), true, true), Tailnet::On { device: "ana-mac.tail1234.ts.net".into() });
         let off = json!({ "BackendState": "Stopped", "Self": { "DNSName": "ana-mac.tail1234.ts.net." } });
-        assert_eq!(tailnet_of(Some(&off), true), Tailnet::Off);
-        assert_eq!(tailnet_of(None, true), Tailnet::Off);
-        assert_eq!(tailnet_of(None, false), Tailnet::Missing);
+        assert_eq!(tailnet_of(Some(&off), true, true), Tailnet::Off { app: true });
+        assert_eq!(tailnet_of(None, true, true), Tailnet::Off { app: true });
+        // Only the command-line tool (Homebrew's on a Mac): no app to open.
+        assert_eq!(tailnet_of(Some(&off), true, false), Tailnet::Off { app: false });
+        assert_eq!(tailnet_of(None, false, false), Tailnet::Missing);
         let odd = json!({ "BackendState": "Running", "Self": { "DNSName": "evil name/../x." } });
-        assert_eq!(tailnet_of(Some(&odd), true), Tailnet::Off);
+        assert_eq!(tailnet_of(Some(&odd), true, true), Tailnet::Off { app: true });
+        assert_eq!(serde_json::to_value(Tailnet::Off { app: false }).unwrap(), json!({ "state": "off", "app": false }));
     }
 
     #[test]

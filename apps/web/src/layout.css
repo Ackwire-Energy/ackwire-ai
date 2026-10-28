@@ -2971,14 +2971,15 @@ p {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
-/* Hover is a tint; the current page is a raised key (never the same look). */
+/* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
+   and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
-  box-shadow: var(--card-key);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   color: var(--ink);
   font-weight: 600;
 }
@@ -3552,7 +3553,7 @@ p {
   }
 }
 
-/* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
+/* A connector's one-color brand icon as a mask in its color, a mark in its own colors, or a monogram. */
 .connector-icon {
   flex: none;
   width: 36px;
@@ -3585,7 +3586,7 @@ p {
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
 }
-/* A mark in its maker's own colors (PostgreSQL's), which a mask would flatten to one color. */
+/* A mark in its maker's own colors (PostgreSQL's, PayPal's, Canva's), which a mask would flatten to one color. */
 .connector-icon__img {
   width: 58%;
   height: 58%;
@@ -3669,6 +3670,17 @@ p {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
+   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+.cflow__title > :first-child {
+  translate: 0 calc(-1 * var(--cap-mid));
+}
+.cflow__title:has(> .ac-captop) {
+  align-items: flex-start;
+}
+.cflow__title:has(> .ac-captop) > :first-child {
+  translate: none;
 }
 .cflow__steps {
   display: flex;
@@ -6651,13 +6663,13 @@ a.machine-row__name:hover {
 .onb__steps li {
   position: relative;
 }
-/* The thread joining the markers, filled up to where you are. */
+/* The thread joining the markers, filled up to where you are: 4px from each, the markers centred in 52px steps. */
 .onb__steps li:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 21px;
-  top: 40px;
-  bottom: -8px;
+  top: 42px;
+  bottom: -10px;
   width: 2px;
   border-radius: 1px;
   background: var(--line2);
@@ -6749,15 +6761,6 @@ a.machine-row__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A step with its answer under its name: the number stays on the name's 17.5px line, as an `.ac-iconline` lead. */
-@media (min-width: 761px) {
-  .onb__step:has(.onb__step-sub) {
-    align-items: flex-start;
-  }
-  .onb__step:has(.onb__step-sub) > .onb__n {
-    translate: 0 calc(8.75px - var(--cap-mid) - 50%);
-  }
-}
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
   display: flex;
@@ -6832,6 +6835,16 @@ a.machine-row__name:hover {
     min-height: 0;
     padding: 4px;
   }
+  /* The setup's seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current
+     one's ring, reaching past the strip's edges. Criar agente and the landing's card keep the shared strip. */
+  .onb:not(.newag) .onb__steps {
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
+  }
+  .onb:not(.newag) .onb__step {
+    padding: 2px;
+  }
   .onb__step-text {
     position: absolute;
     width: 1px;
@@ -6840,6 +6853,12 @@ a.machine-row__name:hover {
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+}
+/* Narrower, they fit beside the logo's mark alone. */
+@media (max-width: 384px) {
+  .onb__brand .ac-logo > :not(.ac-logo__mark) {
+    display: none;
   }
 }
 
@@ -8140,15 +8159,24 @@ a.machine-row__name:hover {
   }
 }
 /* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
-   many lines follow the title. A touch screen's small button is the ruler's default step. */
+   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
+   spaced. A touch screen's small button is the ruler's default step. */
 @media (min-width: 641px) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-sm);
+    padding-top: calc((var(--control-h-sm) - 20px) / 2);
   }
 }
 @media (min-width: 641px) and (pointer: coarse) {
   .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
     margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
+  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
+    min-height: var(--control-h-md);
+    padding-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
@@ -10039,4 +10067,114 @@ html[data-menu-overlay] .shell {
 .ai-accounts__row .ac-planmeter {
   margin-top: 4px;
   max-width: 320px;
+}
+/* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
+   now, and Jev's key under it for the installation's owner. */
+.who-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.who-head > .ac-link,
+.jev__foot {
+  font-size: 13px;
+  line-height: 18px;
+}
+.who-line,
+.jev__foot {
+  margin: 0;
+}
+.who-line {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.jev {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jev:focus {
+  outline: none;
+}
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state in the row's middle. */
+.jev__head,
+.jev__key {
+  align-items: flex-start;
+}
+.jev__head > .ac-chip,
+.jev__key > .ac-acts {
+  align-self: center;
+}
+/* On a phone the name and its line wrap, so the state stays on their row. */
+.jev__head > .list-col {
+  flex-basis: 0;
+}
+/* A fact breaks between facts, never inside one ("US$ 0,13"). */
+.jev__fact {
+  white-space: nowrap;
+}
+.jev__title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+.jev__body {
+  flex-direction: column;
+  align-items: stretch;
+}
+.jev__body > .ac-btn {
+  align-self: flex-start;
+}
+/* Why Jev helps: an icon, the reason in bold and its few words, a line each. */
+.jev-why {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.jev-why .ac-icon {
+  color: var(--ink2);
+}
+.jev-why b {
+  font-weight: 600;
+}
+/* Under the key's field: where it is kept, or why it wasn't saved. */
+.jev-steps__below {
+  margin: 0;
+}
+/* On a phone the key's field takes its row, so its placeholder fits, and Save and Cancel go under it together. */
+@media (max-width: 640px) {
+  .jev-steps .agp-addacct__paste .ac-input {
+    flex-basis: 100%;
+  }
+}
+/* "Picking who answers": the receipt's clock where its check goes once an agent has seen the message. */
+.ac-receipt__clock {
+  display: inline-flex;
+  padding: 0 2px;
+}
+.ac-receipt__clock .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+/* Leading a receipt's line under its message, the icon's 2px of padding reach out, so the icon starts on the text's
+   edge, as the words do. */
+.ac-msg__foot .ac-receipt > :is(.ac-receipt__check, .ac-receipt__clock):first-child {
+  margin-inline-start: -2px;
+}
+/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
+.who-by {
+  margin-top: 4px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
 }

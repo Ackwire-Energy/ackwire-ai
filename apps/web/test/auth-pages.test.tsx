@@ -193,6 +193,39 @@ describe("Entrar (e-mail primeiro)", () => {
       cleanup();
     }
   });
+
+  test("on agentes.chat Cloud a blocked account reads why by the block's kind, and how to contest it", async () => {
+    const contest = "Para contestar, escreva para legal@agentes.chat.";
+    for (const [block, says] of [
+      [
+        { kind: "abuse", cloud: true },
+        `Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). ${contest}`,
+      ],
+      [
+        { kind: "legal", cloud: true },
+        "Esta conta está bloqueada enquanto guardamos os dados dela por uma questão legal. Para perguntar sobre isso, escreva para legal@agentes.chat.",
+      ],
+      [{ kind: "other", cloud: true }, `Esta conta não pode entrar. ${contest}`],
+      // A self-hosted server: the line it always had.
+      [{}, "Esta conta não pode entrar."],
+    ] as const) {
+      const signIn = {
+        ok: false as const,
+        status: 403,
+        message: "This account can't sign in.",
+        code: "ACCOUNT_BLOCKED",
+        ...block,
+      };
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(screen().getByRole("alert").textContent).toBe(says);
+      cleanup();
+    }
+  });
 });
 
 describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
@@ -714,7 +747,7 @@ describe("Onboarding", () => {
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");
     // The platform key isn't offered by this server.
-    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
+    expect(within(makers).queryByRole("button", { name: "Este servidor" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
@@ -784,6 +817,28 @@ describe("Onboarding", () => {
     await settle(4);
   };
 
+  test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {
+    for (const [cloud, says] of [
+      [
+        true,
+        "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
+      ],
+      [false, "Você não pode criar um workspace agora."],
+    ] as const) {
+      const { api } = await start();
+      api.orgs.create = async () => {
+        throw new ApiError(403, "org.create_refused", "You can't create a workspace right now", {
+          ...(cloud ? { cloud } : {}),
+        });
+      };
+      await type("Nome", "Acme Saúde");
+      await next();
+      expect(document.querySelector(".ac-toast")?.textContent).toContain(says);
+      expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+      cleanup();
+    }
+  });
+
   test("the step's actions: a bar always in view, Continue first, the text button after it, notes above it", async () => {
     sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
     await start();
@@ -808,6 +863,20 @@ describe("Onboarding", () => {
     const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
     expect(rule("\n.onb__actions")).toContain("position: sticky");
     expect(rule("\n.onb__actions")).toContain("bottom: 0");
+    // On a short step too: the column is the screen's height at least (no auto margin centres it any more) and the
+    // bar's own auto top margin takes the room left, so it rests at the bottom, in the same place on every step.
+    expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
+    expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
+    // The room above the step is the one the page pins as the step opens (computer-setup.test.tsx).
+    expect(rule("\n.onb__body::before")).toContain("margin-block: var(--onb-lead, auto) -24px");
+    // A text button that doesn't fit beside Continue goes above it: Continue keeps its place on every step.
+    expect(rule("\n.onb__actions")).toContain("flex-wrap: wrap-reverse");
+    // Its ground spans the column's gutters, and its bottom clears the home bar at every width.
+    expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
+    expect(rule("\n.onb__actions")).toContain(
+      "padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    );
+    expect(rule("\n.onb__actions")).toContain("background: var(--pane)");
     const phone = css.indexOf("@media (max-width: 760px) {\n  .onb__actions");
     expect(phone).toBeGreaterThan(-1);
     expect(rule("  .onb__actions", phone)).toContain("safe-area-inset-bottom");
@@ -877,7 +946,7 @@ describe("Onboarding", () => {
     const hintOf = (name: string) =>
       document.getElementById(button(name).getAttribute("aria-describedby") ?? "")?.textContent;
     expect(hintOf("Sobre E-mails")).toBe("Cada pessoa recebe um convite por e-mail e entra direto.");
-    expect(hintOf("Sobre Link de convite")).toBe("Vale 30 dias. Dá para desativar em Membros.");
+    expect(hintOf("Sobre Link de convite")).toBe("Vale por 30 dias. Dá para desativar em Membros.");
     const emails = screen().getByLabelText("E-mails");
     expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint");
     // What makes sharing the link in a group safe stays in view, under it.
@@ -930,6 +999,130 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
   });
 
+  describe("Jev, for the server's owner, once an AI is connected", () => {
+    const OFF = { source: null, hint: null, state: "off" as const, month: { decisions: 0, costUsd: 0 } };
+    const TEAM = "Quem mais trabalha com você?";
+    const toJev = async (patch: Parameters<typeof start>[0] = {}) => {
+      const r = await start({ jev: OFF, ...patch });
+      await throughAgents(r.state);
+      return r;
+    };
+    const heading = () => screen().getByRole("heading", { level: 1 });
+
+    test("its own screen after the AI: optional, why, the steps; Continue with nothing typed asks nothing", async () => {
+      const { state } = await toJev();
+      expect(heading().textContent).toBe("Ajude os agentes a trabalhar em equipeopcional");
+      expect(document.querySelector(".onb__lead")?.textContent).toContain(
+        "O Jev, da TypeSafe, toma decisões rápidas por eles.",
+      );
+      // What happens without it is behind the lead's ⓘ, never on the screen.
+      const hint = button("Sobre Jev");
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.hidden).toBe(true);
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+        "Sem o Jev, um modelo pequeno numa das suas chaves de API escolhe quem responde.",
+      );
+      expect(document.body.textContent).toContain("Escolhe quem responde Mesmo sem @menção.");
+      expect(screen().getByRole("link", { name: "Abrir a TypeSafe" }).getAttribute("href")).toBe(
+        "https://console.typesafe.ai",
+      );
+      // The big button saves: no button of the field's own.
+      expect(screen().queryByRole("button", { name: "Salvar chave" })).toBeNull();
+      // Its place on the rail is the AI's: Agentes e IA, still.
+      expect(railStep(/^Agentes e IA/).getAttribute("aria-current")).toBe("step");
+      expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+      await next();
+      expect(calls(state, "system.saveJev")).toHaveLength(0);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("with the server's router off, no reason says Jev picks who answers", async () => {
+      const routing = { by: "off", mine: "off", model: null, noSmallModel: null } as const;
+      await toJev({ aiStatus: { any: true, agents: [], routing, apiKey: true } });
+      expect([...document.querySelectorAll(".jev-why b")].map((b) => b.textContent)).toEqual([
+        "Organiza a memória",
+        "Enxerga a tela",
+      ]);
+    });
+
+    test("Save and continue keeps a key TypeSafe accepts, and moves on", async () => {
+      const { state } = await toJev();
+      await type("Cole aqui", "ts_1234");
+      expect(button("Salvar e continuar").hasAttribute("disabled")).toBe(true);
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"]]);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key TypeSafe refuses stays, with why under it; then Continue moves on without asking again", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_wrong_0000: "invalid" } });
+      await type("Cole aqui", "ts_wrong_0000");
+      await click(button("Salvar e continuar"), 8);
+      expect(heading().textContent).toContain("Ajude os agentes a trabalhar em equipe");
+      const field = screen().getByLabelText("Cole aqui");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "A TypeSafe não aceitou esta chave. Copie de novo na página de chaves.",
+      );
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(state.jev?.source).toBeNull();
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a limit is no refusal: its words stay under the field, and the same key is saved on the next try", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_live_9f2c: "rate_limited" } });
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      const field = screen().getByLabelText("Cole aqui");
+      // In the person's language, never the server's English.
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "Muitas tentativas. Tente de novo mais tarde.",
+      );
+      // Never a way past a key that wasn't kept.
+      expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"], ["ts_live_9f2c"]]);
+      expect(state.jev?.source).toBe("settings");
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key with no credit is kept, and the screen says so before moving on", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_empty_5555: "no_credit" } });
+      await type("Cole aqui", "ts_empty_5555");
+      await click(button("Salvar e continuar"), 8);
+      expect(state.jev?.state).toBe("no_credit");
+      expect(document.body.textContent).toContain("Salva. Adicione crédito na TypeSafe e o Jev começa sozinho.");
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("Back goes to the AI; never after Conectar depois, with a key in the server's settings, or for anyone else", async () => {
+      await toJev();
+      await click(button(/Voltar/), 6);
+      expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+      cleanup();
+
+      const later = await start({ jev: OFF });
+      await throughImport(later.state);
+      await skip();
+      await keepOnly("Theo · PM");
+      await click(button(/Criar 1 agente/), 8);
+      await click(button("Conectar depois"), 8);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+      cleanup();
+
+      for (const jev of [{ ...OFF, source: "env" as const, hint: "9f2c", state: "ok" as const }, undefined]) {
+        const { state } = await start({ jev });
+        await throughAgents(state);
+        expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+        expect(document.body.textContent).not.toMatch(/typesafe/i);
+        cleanup();
+      }
+    });
+  });
+
   test("no computer yet: a plan's panel says where it signs in, and goes back to the computer step", async () => {
     const { state } = await start();
     await throughImport(state);
@@ -951,7 +1144,7 @@ describe("Onboarding", () => {
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
     expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
-    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac, um PC ou um servidor, conectado com um código.");
     expect(document.body.textContent).toContain(
       "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
     );
@@ -1137,7 +1330,7 @@ describe("Onboarding", () => {
     await click(button(/Criar 1 agente/), 8);
     const panel = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(panel).getByRole("group", { name: "Provedor" });
-    const ours = within(makers).getByRole("button", { name: "agentes.chat" });
+    const ours = within(makers).getByRole("button", { name: "Este servidor" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
     const PAYS = "Você paga pelo uso, direto ao provedor.";
@@ -1146,7 +1339,7 @@ describe("Onboarding", () => {
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
     // Our key isn't paid to a provider: its own line says what it is.
     expect(panel.textContent).not.toContain(PAYS);
-    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do Claude deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
@@ -1209,7 +1402,7 @@ describe("Onboarding", () => {
     fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
-    expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
+    expect(document.body.textContent).toContain("MacBook do Walter (macOS) conectado.");
     // Choosing a plan asks nothing: only letting others talk to an agent on it does (ADR 0059 §5).
     expect(screen().queryByRole("dialog")).toBeNull();
     await next();

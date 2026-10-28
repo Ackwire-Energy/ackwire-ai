@@ -73,7 +73,8 @@ interface Strings {
   openBody: string;
 }
 
-const STRINGS: Record<PushLocale, Strings> = {
+/** Exported for the test that reads every text as a phone shows it. */
+export const PUSH_STRINGS: Record<PushLocale, Strings> = {
   "pt-BR": {
     someone: "Alguém",
     anAgent: "Um agente",
@@ -145,7 +146,7 @@ const clip = (s: string, max: number) => {
 
 /** Title and body of one push, in the device's language. */
 export function renderPush(locale: PushLocale, input: PushTextInput): { title: string; body: string } {
-  const s = STRINGS[locale];
+  const s = PUSH_STRINGS[locale];
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
   const text = input.text?.trim() || "";
   const what = input.title?.trim() || input.label?.trim() || "";

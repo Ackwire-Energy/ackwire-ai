@@ -259,7 +259,7 @@ test("a refusal in the middle of control stops nothing: the reads go on and the 
   await t.s.ready(control);
   const stopped = new MachineRequestError(
     "desktop_unavailable",
-    "The desktop helper stopped; it starts again on the next use",
+    "The desktop helper stopped. It starts again on the next use.",
   );
   t.machine.answer(SECRET_TEXT, stopped, "after");
   await t.time.advance(3 * SESSION_SEGMENT_MS);

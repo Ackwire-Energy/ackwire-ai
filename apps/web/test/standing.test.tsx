@@ -46,7 +46,7 @@ describe("on hold: a line on top of the work area", () => {
     const banner = () => screen().getByRole("region", { name: STATUS });
     expect(banner().textContent).toContain("Este workspace está em espera: verificação de pagamento");
     expect(banner().textContent).toContain(
-      "Dá para ler e escrever normalmente; os agentes não respondem nem trabalham enquanto ele estiver em espera.",
+      "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     );
     // Where to ask: nobody named on this server, so whoever runs it.
     expect(banner().textContent).toContain("Precisa de ajuda? Fale com quem cuida deste servidor.");
@@ -108,6 +108,63 @@ describe("on hold: a line on top of the work area", () => {
     const alert = screen().getByRole("alert");
     expect(alert.textContent).toBe("Ada não respondeu. Este workspace está em espera: verificação de pagamento");
     expect(document.body.textContent).not.toContain("This workspace is on hold");
+  });
+});
+
+const CONTEST = "Para contestar, escreva para legal@agentes.chat.";
+
+describe("on agentes.chat Cloud: what it is, the Terms section and how to contest it", () => {
+  test("the automatic hold reads the review line, an operator's reason how to contest it, a silent hold neither", async () => {
+    const { set } = await open({ state: "hold", reason: "review", cloud: true }, false, null, true);
+    const banner = () => screen().getByRole("region", { name: STATUS });
+    expect(banner().textContent).toContain(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${CONTEST}`,
+    );
+    expect(banner().textContent).not.toContain("em espera: review");
+
+    await set({ state: "hold", reason: "Termos 5: phishing", cloud: true });
+    expect(banner().textContent).toContain(`Este workspace está em espera: Termos 5: phishing. ${CONTEST}`);
+
+    await set({ state: "hold", reason: null, cloud: true });
+    expect(banner().textContent).toContain("Os agentes deste workspace estão pausados para uma revisão.");
+    expect(banner().textContent).not.toContain("contestar");
+  });
+
+  test("suspended with a reason: why, then how to contest it", async () => {
+    await open({ state: "suspended", reason: "Termos 5: spam", cloud: true }, false, null, true);
+    expect(document.body.textContent).toContain(`Este workspace está suspenso: Termos 5: spam. ${CONTEST}`);
+  });
+
+  test("a run of a held agent says the hold's kind, never its reason", async () => {
+    const { channel } = await open(undefined, false, null, true);
+    const says = {
+      network: `Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). ${CONTEST}`,
+      operator: `Este agente está pausado enquanto a nossa equipe analisa a atividade dele (Termos, seção 5). ${CONTEST}`,
+    };
+    for (const kind of ["network", "operator"] as const) {
+      const run = { threadId: null, runId: `r-${kind}`, agentId: ADA_ID };
+      await channel({ type: "agent.thinking", ...run });
+      await channel({
+        type: "run.finished",
+        ...run,
+        status: "failed",
+        error: `This agent is paused: ${kind}`,
+        errorCode: "run.agent_paused",
+        errorParams: { kind, cloud: "true" },
+      });
+      expect(
+        screen()
+          .getAllByRole("alert")
+          .map((a) => a.textContent),
+      ).toContain(`Ada não respondeu. ${says[kind]}`);
+    }
+  });
+
+  test("a self-hosted server reads what it always read, whatever the reason", async () => {
+    await open({ state: "hold", reason: "review" });
+    const banner = screen().getByRole("region", { name: STATUS });
+    expect(banner.textContent).toContain("Este workspace está em espera: review");
+    expect(banner.textContent).not.toContain("contestar");
   });
 });
 

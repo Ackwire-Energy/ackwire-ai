@@ -836,7 +836,6 @@ export const featureKeysEn: FeatureTranslations = {
       "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
     hold: "Hold to delete",
     holding: "Keep holding…",
-    note: "Plans are bought and canceled on the website.",
   },
   files: {
     type: {
@@ -1393,7 +1392,7 @@ export const featureKeysEn: FeatureTranslations = {
     agentsLead: "Check who else joins.",
     share: "Share an invite link",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
-    shareNote: "Whoever opens it asks to join; you approve.",
+    shareNote: "You approve each person who asks.",
     emailsPlaceholder: "name@company.com",
     membersNote: "They join as members.",
     invalidEmail: "Check this e-mail.",

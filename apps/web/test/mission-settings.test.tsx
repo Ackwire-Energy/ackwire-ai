@@ -92,10 +92,10 @@ describe("the mission's ⋯ menu: actions only", () => {
       "Fechar missão",
       "Configurações da missão…",
     ]);
-    expect(items[0]?.textContent).toContain("Nada novo começa; o que está rodando termina.");
+    expect(items[0]?.textContent).toContain("Nada novo começa. O que está rodando termina.");
     expect(items[1]?.textContent).toContain("Interrompe as tarefas rodando e pausa a missão.");
     expect(items[2]?.textContent).toContain("Chamar alguém para ver ou decidir.");
-    expect(items[3]?.textContent).toContain("Termina a missão; nada mais roda.");
+    expect(items[3]?.textContent).toContain("Termina a missão. Nada mais roda.");
     expect(items[4]?.querySelector(".ac-menu__hint")?.textContent).toBe("Só o que é arriscado");
     // No settings inside the menu any more.
     expect(within(menu).queryAllByRole("menuitemradio")).toHaveLength(0);

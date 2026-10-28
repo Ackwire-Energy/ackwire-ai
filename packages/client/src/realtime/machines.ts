@@ -224,9 +224,13 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     return true;
   }
   if (event.type === "org.standing") {
-    const e = event as { orgId?: unknown; state?: unknown; reason?: unknown };
+    const e = event as { orgId?: unknown; state?: unknown; reason?: unknown; cloud?: unknown };
     const state = e.state === "hold" || e.state === "suspended" ? e.state : "active";
-    const standing: OrgStanding = { state, reason: typeof e.reason === "string" && e.reason ? e.reason : null };
+    const standing: OrgStanding = {
+      state,
+      reason: typeof e.reason === "string" && e.reason ? e.reason : null,
+      ...(e.cloud === true ? { cloud: true } : {}),
+    };
     const target = typeof e.orgId === "string" ? e.orgId : orgId;
     qc.setQueryData<Me>(keys.me, (me) =>
       me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,

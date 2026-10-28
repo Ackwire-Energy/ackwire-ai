@@ -5,13 +5,13 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   "run-on-your-computer": {
     title: "Run agentes.chat on your computer",
     summary:
-      "The agentes.chat app can also run agentes.chat itself, on a Mac or a Linux computer, for you or a small team.",
+      "The agentes.chat app can also run agentes.chat itself, on a Mac, a PC or a Linux computer, for you or a small team.",
     sections: [
       {
         id: "how",
         heading: "How it runs",
         blocks: [
-          "It runs inside the app, with its own database built in, and keeps everything in one folder on this computer, `~/.agentes`. Nothing else to install: no Docker, no database to set up.",
+          "It runs inside the app, with its own database built in, and keeps everything in one folder on this computer, `.agentes` in your home folder. Nothing else to install: no Docker, no database to set up.",
           "It starts with the app and stops when you quit it. Quitting asks first, because nobody can use agentes.chat until the app opens again.",
         ],
       },
@@ -40,7 +40,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "backups",
         heading: "Backups and moving",
         blocks: [
-          "**Back up now**, in **Preferences\u00a0›\u00a0Servers**, saves the database, the files and the settings in `~/.agentes/backups`.",
+          "**Back up now**, in **Preferences\u00a0›\u00a0Servers**, saves the database, the files and the settings in `.agentes/backups`, in your home folder.",
         ],
       },
     ],
@@ -48,13 +48,13 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   computers: {
     title: "Computers for your agents",
     summary:
-      "Agents run code and work with files on computers you connect: a Mac with the agentes.chat app, or a server.",
+      "Agents run code and work with files on computers you connect: a Mac or a PC with the agentes.chat app, or a server.",
     sections: [
       {
         id: "mac",
-        heading: "A Mac, with the app",
+        heading: "A Mac or a PC, with the app",
         blocks: [
-          "The agentes.chat app opens your server in a window of its own, and with one click its agents work on that Mac, in folders of their own. Install the app, open it, choose **Use your own server\u00a0›\u00a0Connect to my server** and type your server's address. Then, signed in, click **Use this Mac** in **Settings\u00a0›\u00a0Computers**.",
+          "The agentes.chat app opens your server in a window of its own, and with one click its agents work on that computer, in folders of their own. Install the app, open it, choose **Use your own server\u00a0›\u00a0Connect to my server** and type your server's address. Then, signed in, click **Use this Mac** (**Use this PC** on Windows, **Use this computer** on Linux) in **Settings\u00a0›\u00a0Computers**.",
         ],
       },
       {
@@ -68,14 +68,14 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "folders",
         heading: "Folders",
         blocks: [
-          "Each agent always has its own folder, in `~/agentes/<organization>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**. Each organization allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing; it only takes the access away.",
+          "Each agent always has its own folder, in `~/agentes/<organization>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**, or with `agentes-runner folders allow` on a server. Each organization allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing. It only takes the access away.",
         ],
       },
       {
         id: "pausing",
         heading: "Pausing",
         blocks: [
-          "Whoever connected a computer can pause its agents on the computer itself, from the app's menu bar. Nothing new starts until they resume; what was running finishes.",
+          "With the app, whoever connected a computer can pause its agents there, from the agentes.chat icon by the clock. Nothing new starts until they resume. What was running finishes.",
         ],
       },
       {
@@ -142,8 +142,8 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "never",
         heading: "What never comes along",
         blocks: [
-          "Keys, passwords, logins and chat history never come along: the agents use the workspace's model and key. Some things have no equivalent here yet, or should never travel in a file; you can recreate them later.",
-          "Files and folders are read in your browser; a GitHub link goes through the workspace's server. Key and login files are never opened, and nothing changes until you confirm.",
+          "Keys, passwords, logins and chat history never come along: the agents think with the workspace's AI. Some things have no equivalent here yet, or should never travel in a file. You can recreate them later.",
+          "Files and folders are read in your browser. A GitHub link goes through the workspace's server. Key and login files are never opened, and nothing changes until you confirm.",
         ],
       },
       {
@@ -263,7 +263,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
       {
         id: "who",
         heading: "Who approves",
-        blocks: ["The agent's owner approves its requests; for an agent without one, the admins do."],
+        blocks: ["The agent's owner approves its requests. For an agent without an owner, the admins do."],
       },
       {
         id: "refusing",
@@ -274,6 +274,142 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "meetings",
         heading: "Meetings",
         blocks: ["Agents only suggest times. Invitations to people always go through whoever asked."],
+      },
+    ],
+  },
+  "who-answers": {
+    title: "Who answers a message",
+    summary: "A mention picks the agent. Without one, agentes.chat picks for you, in this order.",
+    sections: [
+      {
+        id: "order",
+        heading: "How a message finds its agent",
+        blocks: [
+          "A message that @mentions an agent goes to that agent. A message that mentions nobody is read by the first of these the workspace has:",
+          {
+            list: [
+              "**Jev**, a small, fast model made for decisions like this one.",
+              "**A small model on one of the workspace's API keys**, such as Claude Haiku 5.5 or GPT-6 Luna.",
+              "**Your own Claude or ChatGPT plan**, for the messages you write, on a server you run yourself. It reads them on the computer where it's signed in, and takes a few seconds.",
+              "**Simple rules**: a reply to an agent goes to it, and so does a follow-up right after you talked with it, or a message in a channel where you are alone with one agent.",
+            ],
+          },
+          "When none of these fits, no agent answers. Mention an agent to call it.",
+        ],
+      },
+      {
+        id: "jev",
+        heading: "Jev",
+        blocks: [
+          "When agentes.chat hosts your workspace, Jev is included. On a server you run yourself, it uses the owner's TypeSafe key, about US$ 0.0001 a message: [Set up Jev](/help/jev#setup).",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Why your plan picks only for your messages",
+        blocks: ["Claude and ChatGPT plans are personal, so your plan picks only for the messages you write."],
+      },
+      {
+        id: "see",
+        heading: "Seeing who picked",
+        blocks: ["Open the check under a message. Its last line says who picked the agents."],
+      },
+    ],
+  },
+  jev: {
+    title: "Jev",
+    summary:
+      "A fast model by TypeSafe that makes quick decisions for your agents. On your own server it's optional, with a key of your own.",
+    sections: [
+      {
+        id: "what",
+        heading: "What it does",
+        blocks: [
+          {
+            list: [
+              "**Picks who answers.** A message nobody @mentioned goes to the right agent in under a second, even when your agents think with a plan and you have no API key.",
+              "**Keeps memory tidy.** It spots a repeat or a newer fact even in other words: the repeat merges with what the agent knew, and the newer fact replaces the old one. Once a day it tidies the rest.",
+              "**Sees the screen.** On their browser and desktop, agents find buttons and fields from a description, look closer at small ones, and check on the screen's image that a step worked.",
+              "**Reads less.** Each turn loads only the tools the agent will likely need, so your AI reads less and costs less.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "without",
+        heading: "Without it",
+        blocks: [
+          "Everything keeps working, more slowly and with less care.",
+          {
+            list: [
+              "**Who answers:** a small model on one of your API keys picks, such as Claude Haiku 5.5 or GPT-6 Luna. Without a key, each person's own Claude or ChatGPT plan picks for the messages they write, in a few seconds. Otherwise a reply or a follow-up still reaches its agent. Mention an agent to call it. [How agents are picked](/help/who-answers)",
+              "**Memory:** repeats in the same words still merge. Repeats and updates in other words stay apart.",
+              "**Screen:** agents use the numbers shown on the screen and exact names. Nothing is read from images.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "setup",
+        heading: "Set it up",
+        blocks: [
+          {
+            list: [
+              "Open https://console.typesafe.ai and sign in with Google or your email. A new account is made the same way.",
+              "Add credit in the console. Jev is prepaid.",
+              "Open https://console.typesafe.ai/keys, create a key and copy it right away.",
+              "In agentes.chat, open **Settings\u00a0›\u00a0AI accounts** and paste it under **Jev**. Only the person who set up this server sees it.",
+            ],
+          },
+          "On a server you run with Docker, you can put the key in `.env` as `TYPESAFE_API_KEY` instead. That one wins over the one in Settings.",
+        ],
+      },
+      {
+        id: "cost",
+        heading: "What it costs",
+        blocks: [
+          {
+            list: [
+              "US$ 0.042 per million tokens Jev reads. Its answers are free. Picking who answers reads about 2,500 tokens, so about US$ 0.0001. A screenshot is about 3,900 tokens.",
+              "Credits you buy last 12 months. Turn on automatic refills in the console so Jev doesn't run out.",
+              "**Settings\u00a0›\u00a0AI accounts** shows how many decisions Jev made this month, and what they cost.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "data",
+        heading: "Your data",
+        blocks: [
+          "What Jev reads to decide:",
+          {
+            list: [
+              "The channel's name and description, the message and the few before it",
+              "Your agents' names and roles, the start of their instructions and the tools they can use",
+              "The memory items it compares",
+              "An agent's task and the start of its tool results",
+              "A mission's goal and the commands an agent wants to run for it",
+              "The tools a connected app offers",
+              "The page or screen an agent is using, screenshots included",
+            ],
+          },
+          "TypeSafe runs Jev in the United States and doesn't train its models on what you send. It keeps data as long as it needs to run the service. Zero retention is available on its enterprise plans.",
+          "TypeSafe's privacy policy: https://typesafe.ai/legal/privacy-policy. Its data processing agreement: https://typesafe.ai/legal/data-processing.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "When it stops",
+        blocks: [
+          {
+            list: [
+              "**Key not accepted:** create a new key and paste it in **Settings\u00a0›\u00a0AI accounts**.",
+              "**Out of credit:** add credit in the console. Jev tries again within 30 minutes, or click **Check again**.",
+              "**Busy or unreachable:** TypeSafe may limit requests per second, or stop answering for a while. Jev picks up again by itself. Your limits: https://console.typesafe.ai/rate-limits. For higher ones, write to sales@typesafe.ai.",
+            ],
+          },
+          "Meanwhile, agents work as in [Without it](/help/jev#without).",
+        ],
       },
     ],
   },

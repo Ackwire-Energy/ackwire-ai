@@ -159,7 +159,7 @@ describe("the workspace's computer on its way: the notice on top of the work are
     const line = () =>
       screen().getByRole("region", { name: NOTICE }).querySelector(".outage__text > span")?.textContent ?? null;
     await open(`/org/${ORG_ID}/c/${ENG_ID}`, wait);
-    expect(line()).toBe("Esperando um computador disponível · avisamos por e-mail");
+    expect(line()).toBe("Esperando um computador disponível. Avisamos por e-mail.");
     cleanup();
     const member = seedState();
     if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
@@ -235,8 +235,13 @@ describe("the workspace's computer on its way: the notice on top of the work are
 
 describe("no AI yet while the workspace's computer is on its way", () => {
   test("the banner is the one it always is: its line, its ⓘ and Connect, nothing about the computer", async () => {
+    // The Cloud: Jev picks, so asking in the chat is understood (the line's ⓘ).
     const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
+      aiStatus: {
+        any: false,
+        agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }],
+        routing: { by: "jev", mine: "jev", model: null, noSmallModel: null },
+      },
     });
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;
@@ -1036,30 +1041,34 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(note()).toBeFalsy();
   });
 
-  test("a step's column stays where it opened as its content changes; a resize or the next step places it", async () => {
-    // Where the column sits, centered, as the browser lays it out.
-    let top = 120;
-    const real = Element.prototype.getBoundingClientRect;
-    Element.prototype.getBoundingClientRect = function (this: Element) {
-      return this.classList.contains("onb__body") ? ({ top, y: top } as DOMRect) : real.call(this);
-    };
+  test("a step stays where it opened as its content changes; a resize or the next step places it", async () => {
+    // The room above the step as the browser lays it out: the auto margin of the column's empty first row, or the
+    // room pinned on the column.
+    let room = 120;
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      pseudo === "::before" && el instanceof HTMLElement && el.classList.contains("onb__body")
+        ? ({ marginTop: el.style.getPropertyValue("--onb-lead") || `${room}px` } as CSSStyleDeclaration)
+        : real(el, pseudo);
     try {
       const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 330, specs: SPECS });
-      const column = () => document.querySelector(".onb__body") as HTMLElement;
-      expect(column().style.marginTop).toBe("120px");
-      // The computer's progress grows and shrinks it (centered, it would move): the question and Back stay put.
-      top = 60;
+      const lead = () => (document.querySelector(".onb__body") as HTMLElement).style.getPropertyValue("--onb-lead");
+      expect(lead()).toBe("120px");
+      // The computer's progress grows and shrinks the step (left to the browser, the room would change and the step
+      // would move): the question and Back stay put.
+      room = 60;
       await r.reported({ state: "preparing", step: "connecting", secondsLeft: 6, specs: SPECS });
       await r.reported({ state: "ready", machineId: "m-1", specs: SPECS });
-      expect(column().style.marginTop).toBe("120px");
+      expect(lead()).toBe("120px");
       await act(async () => window.dispatchEvent(new Event("resize")));
-      expect(column().style.marginTop).toBe("60px");
-      top = 80;
+      expect(lead()).toBe("60px");
+      room = 80;
       await click(screen().getByRole("button", { name: "Continuar" }));
       expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-      expect(column().style.marginTop).toBe("80px");
+      expect(lead()).toBe("80px");
     } finally {
-      Element.prototype.getBoundingClientRect = real;
+      g.getComputedStyle = real;
     }
   });
 });

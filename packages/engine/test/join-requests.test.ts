@@ -29,7 +29,6 @@ import {
   sha256,
   turnOffInviteLink,
 } from "../src";
-import { BREAK } from "../src/email/inert";
 import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 
 let f: Fixture;
@@ -655,7 +654,7 @@ describe("links", () => {
 });
 
 describe("words", () => {
-  test("the admins' email: our words up top; the typed name inert and cut in the body, with both actions", () => {
+  test("the admins' email: our words up top; the typed name inert and cut in the body; the address copies whole; both actions", () => {
     const name = `<script> ${"Souza ".repeat(20)}`.trim();
     for (const [locale, subject, deny] of [
       ["en", "Someone asks to join your workspace", "Deny"],
@@ -682,7 +681,10 @@ describe("words", () => {
           ?.split(" · ") ?? [];
       expect(shown).toEndWith("…");
       expect(shown.length).toBeLessThanOrEqual(60);
-      expect(address).toBe(`ana@${BREAK}example.${BREAK}com`);
+      // A real link, so no client links it on its own, and no hair spaces to break a copied address.
+      expect(address).toBe("ana@example.com");
+      expect(e.html).toContain('<a class="ln-m" href="mailto:ana@example.com" style="color:#5c5c58;');
+      expect(e.html).toContain(">ana@example.com</a>");
     }
   });
 

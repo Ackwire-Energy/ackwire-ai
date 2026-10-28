@@ -18,6 +18,8 @@ export const HELP_PAGES = {
   wiki: "both",
   memory: "both",
   approvals: "both",
+  "who-answers": "both",
+  jev: "selfhost",
 } as const;
 
 export type HelpSlug = keyof typeof HELP_PAGES;

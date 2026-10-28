@@ -12,6 +12,7 @@ import {
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   joinCode,
+  sendsEmail,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Alert, AvatarStack, Button, Card, Field, Icon, Input, Textarea } from "@agenteschat/ui";
@@ -38,8 +39,7 @@ export function InvitePage({ token }: { token: string }) {
   const navigate = useNavigate();
   const me = useMe();
   const preview = useQuery(invitationQuery(api, token));
-  // Strictly false: an older server says nothing and keeps the button.
-  const emails = useAuthConfig().data?.passwordReset !== false;
+  const emails = sendsEmail(useAuthConfig().data);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -260,8 +260,9 @@ function Outcome({
 }
 
 /**
- * The ask's email with Verify beside it (ADR 0072): a code goes to the address, and typed back here it proves it.
- * Verify, the countdown, Resend and Verified share one slot as wide as the longest, so the field never moves.
+ * The ask's email with Verify beside it, under it at phone width (ADR 0072): a code goes to the address, and typed back
+ * here it proves it. Verify, the countdown, Resend and Verified share one slot as wide as the longest, so the field
+ * never moves. `children` (a typo's suggestion) goes right under the address, before Verify on a phone.
  * A code and a proof belong to the address they were for: editing the email starts over. `onEmail` absent: the
  * signed-in account's own address, read-only.
  */
@@ -354,6 +355,7 @@ function EmailProof({
             readOnly={!onEmail}
             onChange={(e) => onEmail?.(e.target.value)}
           />
+          {children}
           <span className="invite-ask__slot">
             <Button
               style={shown("verify")}
@@ -395,7 +397,6 @@ function EmailProof({
           </span>
         </div>
       </Field>
-      {children}
       {human.slot}
       {showCode && (
         <Field label={t("invite.ask.code")} id="ask-code" error={said && <span role="alert">{said}</span>}>
@@ -448,7 +449,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const [error, setError] = useState<string | null>(null);
   const [proof, setProof] = useState<{ email: string; code: string } | null>(null);
   const noteInput = useRef<HTMLTextAreaElement>(null);
-  const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
+  const emailsGoOut = sent?.emailed ?? sendsEmail(config.data);
   const proofNeeded = emailsGoOut && !user?.emailVerified;
   const typedEmail = user ? user.email : email;
   const proven = proof !== null && proof.email === typedEmail.trim().toLowerCase();
