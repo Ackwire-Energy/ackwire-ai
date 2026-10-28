@@ -118,6 +118,12 @@ describe("RadioCard", () => {
     expect(rule(".ac-option__text:has(> .ac-option__head)")).toContain("flex: 1;");
     expect(rule(".ac-option__head")).toContain("display: flex;");
     expect(rule(".ac-option__aside")).toContain("display: flex;");
+    // On a narrow card (a decision's three options) the chip drops under the title instead of leaving the card: the
+    // row wraps, the title can shrink to its longest word, and the dropped chip starts under it with no gap between.
+    expect(rule(".ac-option__head")).toContain("flex-wrap: wrap;");
+    expect(rule(".ac-option__head")).not.toMatch(/\n\s*(row-)?gap:/);
+    expect(rule(".ac-option__head > .ac-option__title")).toContain("flex: 1 1 0;");
+    expect(rule(".ac-option__aside")).not.toContain("margin-left");
     expect(rule(".ac-option__desc")).toContain("text-wrap: pretty;");
     // An option that can't be picked dims; its "Em breve" stays clear.
     expect(rule(".ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc)")).toContain("opacity: 0.55;");
