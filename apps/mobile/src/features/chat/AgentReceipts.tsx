@@ -142,11 +142,11 @@ function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
   }
 }
 
-/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk. */
+/** The web's icon for what a rule follows: the reply, the one person with the agent, the thread. */
 const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
-  reply: "reply",
+  reply: "replyTo",
   only_agent: "person",
-  follow_up: "chat",
+  follow_up: "reply",
 };
 
 /**
