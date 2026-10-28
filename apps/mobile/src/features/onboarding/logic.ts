@@ -77,6 +77,8 @@ export const HOST: Record<StepId, Preset> = {
 /**
  * A step's question and the one line under it. The phone can't import, so its import step says where to; the
  * agents step has its own (Ada is a row of its own here); the team step has none (the link and the emails say it).
+ * `noComputer`: a self-hosted workspace with no computer yet. No plan can sign in there, so the AI step's lead
+ * names the API key first.
  */
 export function stepText(
   t: TFunction,
@@ -86,7 +88,8 @@ export function stepText(
     chosen,
     aiSaved,
     invited = 0,
-  }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean; invited?: number },
+    noComputer = false,
+  }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean; invited?: number; noComputer?: boolean },
 ): [title: string, lead?: string] {
   switch (step) {
     case "workspace":
@@ -98,7 +101,12 @@ export function stepText(
     case "agents":
       return [t("onboarding.agents.title"), t("mobile.onb.agentsLead")];
     case "ai":
-      return [t("onboarding.keyStep.title"), aiSaved ? t("connectAi.key.saved") : t("onboarding.keyStep.lead")];
+      return [
+        t("onboarding.keyStep.title"),
+        aiSaved
+          ? t("connectAi.key.saved")
+          : t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
+      ];
     case "team":
       return [t("onboarding.team.title")];
     case "done": {

@@ -43,8 +43,8 @@ import { boldParts } from "./links";
  * An invitation's link opened in the app: who invited, the org, the
  * role and who already works there; the e-mail locked. Signed out: Apple, a password, or "Já tenho conta"
  * (the invitation waits and is accepted once the person is in). Signed in: one tap to join. Expired:
- * "Pedir um novo convite" (the person who invited gets the request at once). A workspace's invitation link only
- * lets people ask to join (`AskToJoin`).
+ * "Pedir um novo convite" (the person who invited gets the request at once), or, on a server that sends no
+ * email, whom to ask. A workspace's invitation link only lets people ask to join (`AskToJoin`).
  */
 export function InviteScreen({ token }: { token: string }) {
   const { t } = useTranslation();
@@ -60,6 +60,8 @@ export function InviteScreen({ token }: { token: string }) {
     queryFn: () => api.orgs.previewInvitation(token),
     retry: false,
   });
+  // Asking for a new one is an email to whoever invited. Strictly false: an older server says nothing and keeps it.
+  const emails = useAuthConfig().data?.passwordReset !== false;
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [asked, setAsked] = useState(false);
@@ -75,19 +77,25 @@ export function InviteScreen({ token }: { token: string }) {
   const invitation = preview.data;
   if (!invitation) {
     return (
-      <AuthScaffold title={t("invite.expiredTitle")} subtitle={t("invite.expiredText")} expression="closed">
-        <Button
-          variant="primary"
-          wide
-          label={asked ? t("invite.askedNew") : t("invite.askNew")}
-          disabled={asked}
-          onPress={() =>
-            void api.invites
-              .requestNew(token)
-              .catch(() => undefined)
-              .finally(() => setAsked(true))
-          }
-        />
+      <AuthScaffold
+        title={t("invite.expiredTitle")}
+        subtitle={emails ? t("invite.expiredText") : `${t("invite.expiredText")} ${t("invite.ask.closedText")}`}
+        expression="closed"
+      >
+        {emails ? (
+          <Button
+            variant="primary"
+            wide
+            label={asked ? t("invite.askedNew") : t("invite.askNew")}
+            disabled={asked}
+            onPress={() =>
+              void api.invites
+                .requestNew(token)
+                .catch(() => undefined)
+                .finally(() => setAsked(true))
+            }
+          />
+        ) : null}
         <LeaveButton />
       </AuthScaffold>
     );
