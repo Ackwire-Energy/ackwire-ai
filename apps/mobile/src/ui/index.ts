@@ -53,6 +53,7 @@ export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen
 export { LineIcon, type LineIconProps } from "./LineIcon";
 export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
 export { LogoMark } from "./LogoMark";
+export { PillButton } from "./PillButton";
 export {
   CoverTabStack,
   coverBarOptions,
