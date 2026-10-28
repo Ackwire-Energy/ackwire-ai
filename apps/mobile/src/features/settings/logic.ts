@@ -23,8 +23,8 @@ import type { IconName } from "@/ui";
 
 /*
  * The workspace's settings on the phone, as the web's (`apps/web/src/pages/SettingsPage.tsx`): which sections each
- * role opens, the lines Geral shows for each area, and what the screens decide before they draw. Pure, so it is
- * unit-tested; the screens turn it into views.
+ * role opens, the line the workspace's page shows under each area, and what the screens decide before they draw.
+ * Pure, so it is unit-tested; the screens turn it into views.
  */
 
 // ── Sections ────────────────────────────────────────────────────────────────
@@ -77,9 +77,9 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "agents", "cost
 /** The sections this role opens, in order. */
 export const visibleSections = (role: Role | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(role));
 
-// ── Geral ───────────────────────────────────────────────────────────────────
+// ── The workspace's page and Editar workspace ──────────────────────────────
 
-/** What Geral's "Tudo da organização" knows of each area (absent while it loads: its line stays empty). */
+/** What the workspace's page knows of each area (absent while it loads: its line stays empty). */
 export interface TileFacts {
   overview?: { people: number; agents: number; budgetUsedPercent: number } | undefined;
   /** Invitations waiting (managers only). */
@@ -93,7 +93,7 @@ export interface TileFacts {
   storage?: { kind: "agentes" | "s3"; edition: "cloud" | "selfhost" } | undefined;
 }
 
-/** Each area's line under its name in Geral, as the web's tiles (`settings.tileState.*`). */
+/** Each area's line under its name on the workspace's page, as the web's tiles (`settings.tileState.*`). */
 export function tileStates(t: TFunction, locale: string, f: TileFacts): Partial<Record<SettingsSection, string>> {
   const out: Partial<Record<SettingsSection, string>> = {};
   const pending = f.invitations ?? 0;

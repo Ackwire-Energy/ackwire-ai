@@ -37,7 +37,7 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
         hitSlop={6}
         style={styles.box}
       >
-        <OrgAvatar name={org?.name ?? ""} logo={org?.logo} size={ORG} />
+        <OrgAvatar logo={org?.logo} size={ORG} />
         <View style={[styles.me, { borderColor: c.bg, backgroundColor: c.bg }]}>
           <PersonAvatar name={me.data?.user.name ?? "?"} size={ME} photo={photo} />
         </View>

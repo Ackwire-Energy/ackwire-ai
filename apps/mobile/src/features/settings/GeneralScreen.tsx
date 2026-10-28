@@ -1,23 +1,12 @@
 import type { OrgSettings } from "@agenteschat/client";
 import {
   keys,
-  useAiAccounts,
   useApi,
-  useComputerSetup,
-  useConnections,
-  useCredentials,
-  useInvitations,
-  useMachines,
-  useOverview,
-  usePlatformKey,
   useServerTelemetry,
   useSetServerTelemetry,
   useSettings,
-  useSkills,
-  useStorage,
   useUpdateSettings,
 } from "@agenteschat/client";
-import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
@@ -53,7 +42,7 @@ import { useColors } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack, MONO } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { missingIdeas, nameOnLeave, tileStates, visibleSections, withIdea, zoneLabel } from "./logic";
+import { missingIdeas, nameOnLeave, withIdea, zoneLabel } from "./logic";
 import { chooseAction, Gap, SettingsPage } from "./parts";
 
 /** How long "Salvo" stays under the title after a change saved by itself. */
@@ -83,9 +72,9 @@ function useZonePick(): string | null {
 }
 
 /**
- * Geral, as the web's: the workspace's logo, name and time zone, whether agents check what the team already did, the
- * context every agent reads, then a row per area the person opens with how it is now, and the usage report's switch
- * for the installation's owner. Every change saves by itself (the name when its field is left, the zone when picked,
+ * "Editar workspace" (the web's Geral), from the workspace's settings: its logo, name and time zone, whether agents
+ * check what the team already did, the context every agent reads, and the usage report's switch for the
+ * installation's owner. Every change saves by itself (the name when its field is left, the zone when picked,
  * the context while typing), and "Salvo" shows under the title; who can't change them reads them.
  */
 export function GeneralScreen() {
@@ -266,15 +255,17 @@ export function GeneralScreen() {
   const input = [fieldText("callout"), styles.input, { color: c.ink }];
 
   return (
-    <SettingsPage title={t("settings.section.general")} subtitle={saved ? t("settings.savedShort") : undefined}>
-      <GroupedFooter>{t("settings.sectionText.general")}</GroupedFooter>
+    <SettingsPage
+      title={editable ? t("mobile.settings.edit") : t("settings.section.general")}
+      subtitle={saved ? t("settings.savedShort") : undefined}
+    >
       {!editable ? (
         <View style={styles.note}>
           <Note icon="lock">{t("settings.readOnly")}</Note>
         </View>
       ) : null}
       <View style={styles.logo}>
-        <OrgAvatar name={orgName || "?"} logo={org?.logo} size={84} />
+        <OrgAvatar logo={org?.logo} size={84} />
         {editable ? (
           <Pressable onPress={changeLogo} disabled={uploading} accessibilityRole="button" hitSlop={8}>
             <Text variant="subhead" tone={uploading ? "faint" : "ink2"} style={styles.semibold}>
@@ -361,69 +352,8 @@ export function GeneralScreen() {
         </View>
       ) : null}
 
-      <AreaRows />
       <UsageStatistics />
     </SettingsPage>
-  );
-}
-
-/** "Tudo da organização": a row per area the person opens, with how it is now (the web's tiles). */
-function AreaRows() {
-  const { t, i18n } = useTranslation();
-  const { orgId, org } = useOrg();
-  const role = org?.role;
-  const areas = visibleSections(role).filter((s) => s.id !== "general");
-  const shown = (id: string) => areas.some((s) => s.id === id);
-  const overview = useOverview(orgId);
-  const invitations = useInvitations(orgId, can(role, "manage_members"));
-  const connections = useConnections(orgId);
-  const skills = useSkills(orgId, shown("skills"));
-  const machines = useMachines(orgId, shown("computers"));
-  const managesKeys = can(role, "manage_credentials");
-  const credentials = useCredentials(orgId, managesKeys);
-  const plans = useAiAccounts(orgId, shown("keys") && !managesKeys);
-  const platform = usePlatformKey(orgId);
-  const storage = useStorage(orgId, shown("storage"));
-  const edition = computerEdition(useComputerSetup(orgId, shown("storage")).data);
-  if (areas.length === 0) return null;
-  const states = tileStates(t, i18n.language, {
-    overview: overview.data,
-    invitations: invitations.data?.length,
-    connectors: connections.data?.filter((x) => !x.revokedAt).map((x) => x.label),
-    skills: skills.data?.length,
-    computers: machines.data
-      ? { count: machines.data.length, online: machines.data.filter((m) => m.online).length }
-      : undefined,
-    keys: managesKeys
-      ? credentials.data
-        ? {
-            manages: true,
-            live: credentials.data.filter((k) => !k.revokedAt).length,
-            platform: Boolean(platform.data),
-          }
-        : undefined
-      : plans.data
-        ? { manages: false, plans: plans.data.accounts.length }
-        : undefined,
-    storage: storage.data && edition ? { kind: storage.data.kind, edition } : undefined,
-  });
-  return (
-    <>
-      <GroupedHeader>{t("settings.tilesTitle")}</GroupedHeader>
-      <GroupedList>
-        {areas.map((s) => (
-          <GroupedRow
-            key={s.id}
-            icon={s.icon}
-            label={t(`settings.section.${s.id}`)}
-            {...(states[s.id] ? { sub: states[s.id] } : {})}
-            subLines={2}
-            chevron
-            onPress={() => router.push(s.href as never)}
-          />
-        ))}
-      </GroupedList>
-    </>
   );
 }
 

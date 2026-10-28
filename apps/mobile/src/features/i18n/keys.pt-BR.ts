@@ -1445,6 +1445,7 @@ export const featureKeysPtBR = {
     home: "Ir para as conversas",
   },
   settings: {
+    edit: "Editar workspace",
     access: {
       how: "Toque numa linha para trocar o nível: Sem acesso, Ler, Ler e escrever.",
     },

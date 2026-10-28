@@ -1439,6 +1439,7 @@ export const featureKeysEn: FeatureTranslations = {
     home: "Go to chats",
   },
   settings: {
+    edit: "Edit workspace",
     access: {
       how: "Tap a row to change its level: No access, Read, Read and write.",
     },

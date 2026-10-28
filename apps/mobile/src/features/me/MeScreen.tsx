@@ -3,23 +3,18 @@ import { groupPlans, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-a
 import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
-import { useHeaderHeight } from "expo-router/react-navigation";
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { useSoundChoice } from "@/lib/sounds";
 import { useOrg } from "@/providers/org";
-import { WorkspaceSky } from "@/sky/Sky";
-import { Button, Count, Icon, type IconName, PersonAvatar, ProviderLogo, Text, useTheme, weights } from "@/ui";
-import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
+import { Button, Icon, type IconName, PersonAvatar, ProviderLogo, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
+import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
-import { goBack, PushedHeader, Tile } from "../shared/parts";
+import { goBack, Tile } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import { PlanMeter } from "../usage/parts";
 import { openIssuesWithMe } from "./logic";
@@ -54,10 +49,6 @@ export function MeScreen() {
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
   const c = useColors();
-  const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
-  // The sky lags behind the scroll and stretches on a pull, as on Conversas.
-  const { y, onScroll } = useCoverScroll();
   // Membros, for whoever manages them (the requests to join and the invitation link live there).
   const manager = can(org.org?.role, "manage_members");
   const requests = useJoinRequests(org.orgId, manager);
@@ -140,244 +131,160 @@ export function MeScreen() {
   ];
   return (
     // The page is white like Conversas; its screens sit on the grouped gray, as settings do.
-    <View style={[styles.fill, { backgroundColor: c.bg }]}>
-      <PushedHeader plate solid={false} />
-      <Animated.ScrollView
-        style={styles.fill}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentInsetAdjustmentBehavior="never"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
-      >
-        {/* The workspace's sky, as on Conversas, reaching up behind the clear bar and the status bar. */}
-        <View style={[styles.band, { paddingTop: insets.top + 62 }]}>
-          <CoverParallax y={y} style={StyleSheet.absoluteFill}>
-            <WorkspaceSky fade={0.4} style={StyleSheet.absoluteFill} />
-          </CoverParallax>
-          <View style={styles.meLine}>
-            <View style={[styles.ring, { borderColor: c.bg }]}>
-              <PersonAvatar name={name || "?"} size={68} photo={photo} />
-            </View>
-            <View style={styles.grow}>
-              <Text variant="display2" numberOfLines={2}>
-                {name}
-              </Text>
-              {headline ? (
-                <Text variant="small" tone="muted" numberOfLines={1}>
-                  {headline}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.acts}>
+    <CoverPage
+      face={
+        // A ring in the page's color lifts the photo off the sky.
+        <View style={[styles.ring, { borderColor: c.bg }]}>
+          <PersonAvatar name={name || "?"} size={68} photo={photo} />
+        </View>
+      }
+      title={name}
+      headline={headline}
+      actions={
+        <>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="pen"
+            label={t("mobile.me.editProfile")}
+            onPress={() => open("/me/account")}
+          />
+          {org.orgs.length > 1 ? (
             <Button
               size="sm"
               variant="secondary"
-              icon="pen"
-              label={t("mobile.me.editProfile")}
-              onPress={() => open("/me/account")}
+              label={t("mobile.me.switchWorkspace")}
+              onPress={() => open("/me/workspaces")}
             />
-            {org.orgs.length > 1 ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                label={t("mobile.me.switchWorkspace")}
-                onPress={() => open("/me/workspaces")}
-              />
-            ) : null}
-          </View>
-        </View>
-
-        {myAgents.length > 0 ? (
-          <>
-            <Section title={t("mobile.me.yourAgents")} count={myAgents.length} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crew}>
-              {myAgents.map((a) => (
-                <Pressable
-                  key={a.id}
-                  onPress={() => open(`/agent/${a.id}`)}
-                  accessibilityRole="button"
-                  accessibilityLabel={a.name}
-                  style={styles.crewItem}
-                >
-                  <AgentFace agentId={a.id} size={52} />
-                  <Text variant="caption" tone="ink2" numberOfLines={1}>
-                    {a.name}
-                  </Text>
-                </Pressable>
-              ))}
+          ) : null}
+        </>
+      }
+    >
+      {myAgents.length > 0 ? (
+        <>
+          <PageSection title={t("mobile.me.yourAgents")} count={myAgents.length} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crew}>
+            {myAgents.map((a) => (
               <Pressable
-                onPress={() => open("/new-agent")}
+                key={a.id}
+                onPress={() => open(`/agent/${a.id}`)}
                 accessibilityRole="button"
-                accessibilityLabel={t("mobile.me.newAgent")}
+                accessibilityLabel={a.name}
                 style={styles.crewItem}
               >
-                <View style={[styles.add, { borderColor: c.line2 }]}>
-                  <Icon name="plus" size={22} color={c.faint} />
-                </View>
-                <Text variant="caption" tone="muted" numberOfLines={1}>
-                  {t("mobile.me.newAgent")}
+                <AgentFace agentId={a.id} size={52} />
+                <Text variant="caption" tone="ink2" numberOfLines={1}>
+                  {a.name}
                 </Text>
               </Pressable>
-            </ScrollView>
-          </>
-        ) : null}
+            ))}
+            <Pressable
+              onPress={() => open("/new-agent")}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.me.newAgent")}
+              style={styles.crewItem}
+            >
+              <View style={[styles.add, { borderColor: c.line2 }]}>
+                <Icon name="plus" size={22} color={c.faint} />
+              </View>
+              <Text variant="caption" tone="muted" numberOfLines={1}>
+                {t("mobile.me.newAgent")}
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </>
+      ) : null}
 
-        <Section title={t("mobile.me.thinksWith")} {...(plans > 0 ? { count: plans } : {})} />
-        {own.map((o, i) => (
+      <PageSection title={t("mobile.me.thinksWith")} {...(plans > 0 ? { count: plans } : {})} />
+      {own.map((o, i) => (
+        <PlanRow
+          key={o.key}
+          logo={o.kind}
+          title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+          sub={t("mobile.me.ownOn", { computer: o.computer })}
+          usage={o.usage}
+          divider={i > 0}
+          onPress={() => open("/ai-accounts")}
+        />
+      ))}
+      {accounts.map((a, i) => {
+        const first = a.logins[0];
+        if (!first) return null;
+        return (
           <PlanRow
-            key={o.key}
-            logo={o.kind}
-            title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
-            sub={t("mobile.me.ownOn", { computer: o.computer })}
-            usage={o.usage}
-            divider={i > 0}
+            key={a.key}
+            logo={first.provider ?? first.kind}
+            title={first.label}
+            sub={t("aiAccounts.page.on", { computer: first.computer })}
+            usage={a.usage}
+            divider={own.length + i > 0}
             onPress={() => open("/ai-accounts")}
           />
-        ))}
-        {accounts.map((a, i) => {
-          const first = a.logins[0];
-          if (!first) return null;
-          return (
-            <PlanRow
-              key={a.key}
-              logo={first.provider ?? first.kind}
-              title={first.label}
-              sub={t("aiAccounts.page.on", { computer: first.computer })}
-              usage={a.usage}
-              divider={own.length + i > 0}
-              onPress={() => open("/ai-accounts")}
-            />
-          );
-        })}
-        {plans === 0 ? (
-          <PageRow icon="plus" label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
-        ) : null}
+        );
+      })}
+      {plans === 0 ? (
+        <PageRow icon="plus" label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
+      ) : null}
 
-        <Section title={t("mobile.me.fromWorkspace")} />
-        {/* The workspace itself first: its settings, as the web's (Geral lists every area this role opens). */}
-        {org.org ? (
-          <PageRow
-            leading={<OrgAvatar name={org.org.name} logo={org.org.logo} size={36} />}
-            label={org.org.name}
-            value={t("settings.title")}
-            onPress={() => open("/settings/general")}
-          />
-        ) : null}
-        {workspaceRows.map((r, i) => (
-          <PageRow
-            key={r.href}
-            icon={r.icon}
-            label={r.label}
-            value={r.value}
-            divider={i > 0 || !!org.org}
-            onPress={() => open(r.href)}
-          />
-        ))}
-
-        <Section title={t("mobile.me.preferences")} />
-        {prefRows.map((r, i) => (
-          <PageRow
-            key={r.href}
-            icon={r.icon}
-            label={r.label}
-            value={r.value}
-            divider={i > 0}
-            onPress={() => open(r.href)}
-          />
-        ))}
-
-        <View style={styles.gapBig} />
+      <PageSection title={t("mobile.me.fromWorkspace")} />
+      {/* The workspace itself first: its settings, as the web's sections. */}
+      {org.org ? (
         <PageRow
-          icon="out"
-          label={t("mobile.me.signOut")}
-          danger
-          chevron={false}
-          onPress={() =>
-            Alert.alert(t("mobile.me.signOutConfirm"), t("mobile.me.signOutConfirmText"), [
-              { text: t("mobile.common.cancel"), style: "cancel" },
-              {
-                text: t("mobile.me.signOut"),
-                style: "destructive",
-                onPress: () => {
-                  goBack();
-                  void signOut();
-                },
-              },
-            ])
-          }
+          leading={<OrgAvatar logo={org.org.logo} size={TILE} />}
+          label={org.org.name}
+          value={t("settings.title")}
+          onPress={() => open("/settings")}
         />
-        {version ? (
-          <Text variant="footnote" tone="faint" style={styles.version}>
-            {t("mobile.me.version", { version })}
-          </Text>
-        ) : null}
-      </Animated.ScrollView>
-      {/* What the clear bar becomes once the page scrolls under it, as on Conversas. */}
-      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
-    </View>
-  );
-}
+      ) : null}
+      {workspaceRows.map((r, i) => (
+        <PageRow
+          key={r.href}
+          icon={r.icon}
+          label={r.label}
+          value={r.value}
+          divider={i > 0 || !!org.org}
+          onPress={() => open(r.href)}
+        />
+      ))}
 
-/** A section's head, as Conversas' ("Agentes 4"): the title and its count, faint. */
-function Section({ title, count }: { title: string; count?: number }) {
-  const c = useColors();
-  return (
-    <View style={styles.section}>
-      <Text variant="small" tone="ink" style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>
-        {title}
-      </Text>
-      {count !== undefined ? <Count value={count} size={15} weight={weights.medium} color={c.faint} /> : null}
-    </View>
-  );
-}
+      <PageSection title={t("mobile.me.preferences")} />
+      {prefRows.map((r, i) => (
+        <PageRow
+          key={r.href}
+          icon={r.icon}
+          label={r.label}
+          value={r.value}
+          divider={i > 0}
+          onPress={() => open(r.href)}
+        />
+      ))}
 
-/** A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. */
-function PageRow({
-  icon,
-  leading,
-  label,
-  value,
-  below,
-  onPress,
-  divider = false,
-  danger = false,
-  chevron = true,
-}: {
-  icon?: IconName;
-  leading?: ReactNode;
-  label: string;
-  value?: string | undefined;
-  below?: ReactNode;
-  onPress: () => void;
-  divider?: boolean;
-  danger?: boolean;
-  chevron?: boolean;
-}) {
-  const c = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={value ? `${label}, ${value}` : label}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-    >
-      {divider ? <View style={[styles.rowLine, { backgroundColor: c.line2 }]} /> : null}
-      {leading ?? (icon ? <Tile icon={icon} size={36} /> : null)}
-      <View style={styles.grow}>
-        <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1}>
-          {label}
-        </Text>
-        {below}
-      </View>
-      {value ? (
-        <Text variant="body" tone="faint" numberOfLines={1} style={styles.value}>
-          {value}
+      <View style={styles.gapBig} />
+      <PageRow
+        icon="out"
+        label={t("mobile.me.signOut")}
+        danger
+        chevron={false}
+        onPress={() =>
+          Alert.alert(t("mobile.me.signOutConfirm"), t("mobile.me.signOutConfirmText"), [
+            { text: t("mobile.common.cancel"), style: "cancel" },
+            {
+              text: t("mobile.me.signOut"),
+              style: "destructive",
+              onPress: () => {
+                goBack();
+                void signOut();
+              },
+            },
+          ])
+        }
+      />
+      {version ? (
+        <Text variant="footnote" tone="faint" style={styles.version}>
+          {t("mobile.me.version", { version })}
         </Text>
       ) : null}
-      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
-    </Pressable>
+    </CoverPage>
   );
 }
 
@@ -400,7 +307,7 @@ function PlanRow({
   return (
     <PageRow
       leading={
-        <Tile size={36}>
+        <Tile size={TILE}>
           <ProviderLogo id={logo} size="sm" />
         </Tile>
       }
@@ -424,24 +331,9 @@ function PlanRow({
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  grow: { flex: 1, minWidth: 0 },
   gapBig: { height: 22 },
-  // Not clipped: on a pull the sky grows up into the gap above the content.
-  band: { paddingHorizontal: 20, paddingBottom: 18 },
-  meLine: { flexDirection: "row", alignItems: "center", gap: 14 },
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 40, borderWidth: 3 },
-  acts: { flexDirection: "row", gap: 8, marginTop: 16 },
-  section: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    paddingBottom: 6,
-  },
-  sectionTitle: { fontWeight: "600", flexShrink: 1 },
   crew: { gap: 14, paddingHorizontal: 20, paddingVertical: 4 },
   crewItem: { width: 62, alignItems: "center", gap: 6 },
   add: {
@@ -453,17 +345,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-    minHeight: 56,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  // From the text column: 20 + the 36 tile + 13.
-  rowLine: { position: "absolute", top: 0, right: 0, left: 69, height: StyleSheet.hairlineWidth },
-  value: { maxWidth: "45%" },
   meter: { marginTop: 6, marginBottom: 3 },
   version: { paddingHorizontal: 20, paddingTop: 14 },
 });

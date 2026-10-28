@@ -1,6 +1,6 @@
 import { GeneralScreen } from "@/features/settings/GeneralScreen";
 
-/** Configurações › Geral: the workspace's name, logo and zone, what every agent reads, its areas (as the web). */
+/** "Editar workspace" (the web's Geral): the workspace's logo, name and zone, and what every agent reads. */
 export default function SettingsGeneralRoute() {
   return <GeneralScreen />;
 }

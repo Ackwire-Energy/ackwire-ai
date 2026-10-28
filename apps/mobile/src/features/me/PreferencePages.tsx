@@ -77,7 +77,7 @@ export function WorkspacesPage() {
         {org.orgs.map((o) => (
           <GroupedRow
             key={o.id}
-            leading={<OrgAvatar name={o.name} logo={o.logo} />}
+            leading={<OrgAvatar logo={o.logo} />}
             label={o.name}
             checked={o.id === org.orgId}
             onPress={() => {
