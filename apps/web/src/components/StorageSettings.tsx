@@ -126,24 +126,9 @@ export function StorageSection() {
   const config = edition ? storage.data : undefined;
   const cloud = edition === "cloud";
   const place = t(cloud ? "storage.place.agentes" : "storage.place.server");
-  const title = (
-    <h2 id="sec-storage" className="ac-card__title">
-      {t("storage.title")}
-    </h2>
-  );
   return (
-    <Card aria-labelledby="sec-storage">
-      {/* Beside the title, not under the folder's line: each option is a label, which can't hold a button. */}
-      {!cloud && reveals && config?.platform.folder ? (
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          {title}
-          <Button size="sm" variant="ghost" onClick={() => void thisMac.revealFiles().catch(() => {})}>
-            {t("storage.showFolder")}
-          </Button>
-        </div>
-      ) : (
-        title
-      )}
+    // The page's title names the card: a title of its own would say it twice.
+    <Card aria-label={t("storage.title")}>
       {(storage.isLoading || (storage.data && !edition)) && <LoadingCards count={2} />}
       {config && (
         <>
@@ -170,7 +155,10 @@ export function StorageSection() {
                     <PlatformLine platform={config.platform} />
                   )
                 }
-                aside={config.kind === k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined}
+                aside={
+                  // The radio says which is in use until another is picked: then this says it.
+                  config.kind === k && choice !== k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined
+                }
               />
             ))}
             {(["gdrive", "onedrive"] as const).map((k) => (
@@ -185,6 +173,14 @@ export function StorageSection() {
               />
             ))}
           </RadioGroup>
+          {/* Under the options, not in one: each option is a label, which can't hold a button. */}
+          {!cloud && reveals && config.platform.folder && (
+            <div className="row">
+              <Button size="sm" variant="ghost" onClick={() => void thisMac.revealFiles().catch(() => {})}>
+                {t("storage.showFolder")}
+              </Button>
+            </div>
+          )}
           {config.kind === "s3" && <InUse config={config} place={place} />}
           {choice === "s3" && <BucketForm config={config} />}
         </>

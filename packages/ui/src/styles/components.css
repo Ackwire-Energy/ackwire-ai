@@ -1609,8 +1609,8 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark), with a check in the corner; in dark the other options
-   of the group step back. */
+/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other options of the group step back. A pressed card
+   also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
   background: var(--chosen-bg);
@@ -1631,8 +1631,7 @@ textarea.ac-input {
     0 0 0 1px var(--line2),
     var(--e1);
 }
-.ac-option[aria-pressed="true"]::after,
-.ac-option[data-state="checked"]::after {
+.ac-option[aria-pressed="true"]::after {
   content: "";
   position: absolute;
   top: 10px;
@@ -1646,17 +1645,14 @@ textarea.ac-input {
     center / 12px no-repeat;
 }
 /* Nothing runs under the check: the title, and whatever sits on the right (a chip like "Em uso"). */
-.ac-option[aria-pressed="true"] .ac-option__title,
-.ac-option[data-state="checked"] .ac-option__title {
+.ac-option[aria-pressed="true"] .ac-option__title {
   padding-right: 22px;
 }
-.ac-option[aria-pressed="true"] .ac-option__aside,
-.ac-option[data-state="checked"] .ac-option__aside {
+.ac-option[aria-pressed="true"] .ac-option__aside {
   margin-right: 26px;
 }
 /* Dark: the check's mark takes the page color (ink is light there). */
-[data-theme="dark"] .ac-option[aria-pressed="true"]::after,
-[data-theme="dark"] .ac-option[data-state="checked"]::after {
+[data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
 .ac-option:focus-visible,

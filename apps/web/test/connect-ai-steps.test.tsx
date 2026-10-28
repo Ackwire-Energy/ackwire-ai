@@ -240,7 +240,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
 
   test("a tile's check sits on its name's line; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
     const ui = await stylesheet("../../../packages/ui/src/styles/components.css");
-    const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after,\n.ac-option[data-state="checked"]::after');
+    const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after');
     expect(check).toContain("height: 18px");
     const layout = await stylesheet("../src/layout.css");
     // A one-line tile's in its middle.
