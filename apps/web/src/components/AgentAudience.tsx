@@ -56,12 +56,12 @@ export function OnlyYouNote({ orgId, viewerId }: { orgId: string; viewerId: stri
 }
 
 /** Chip "Pessoal" / "Restrito" next to the agent's name (nothing when everyone can talk to it). */
-export function AudienceChip({ agent, compact }: { agent: Agent; compact?: boolean }) {
+export function AudienceChip({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const label = audienceChip(t, agent);
   if (!label) return null;
   return (
-    <Chip icon="lock" className={compact ? "audience-chip audience-chip--compact" : "audience-chip"}>
+    <Chip icon="lock" className="audience-chip">
       {label}
     </Chip>
   );

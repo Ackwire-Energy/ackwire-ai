@@ -27,6 +27,7 @@ import { useToast } from "@/lib/toast";
 import { filterMemories, KIND_ICON, type MemoryTab as Kind, memorySource, usageLabel } from "@/pages/MemoryPage";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { CardHead, useAgentEdit } from "./context";
+import { Cell } from "./Work";
 
 /** A proposal to change this agent's instructions: why, the diff, and Aceitar / Editar antes / Recusar. */
 function ProposalCard({ proposal }: { proposal: Proposal }) {
@@ -150,32 +151,28 @@ export function MemoryTab() {
   const shown = filterMemories(list, kind, q);
   return (
     <>
-      <div className="agp-tiles">
-        <div className="agp-tile">
-          <small>
-            <Icon name="book" size={14} />
-            {t("memory.tabs.known")}
-          </small>
-          <b>{count("known")}</b>
-          <span>{t("agentPage.memory.verified", { count: list.filter((m) => !m.archived && m.verified).length })}</span>
+      <section className="agp-workcard" aria-label={t("agentPage.memory.counts")}>
+        <div className="agp-cells">
+          <Cell
+            icon={<Icon name="book" size={16} />}
+            label={t("memory.tabs.known")}
+            value={count("known")}
+            sub={t("agentPage.memory.verified", { count: list.filter((m) => !m.archived && m.verified).length })}
+          />
+          <Cell
+            icon={<Icon name="agent" size={16} />}
+            label={t("agentPage.memory.lessons")}
+            value={count("lessons")}
+            sub={t("agentPage.memory.fromTeam")}
+          />
+          <Cell
+            icon={<Icon name="document" size={16} />}
+            label={t("agentPage.memory.proposals")}
+            value={pending.length}
+            sub={pending.length ? t("agentPage.memory.waiting") : t("agentPage.memory.noneWaiting")}
+          />
         </div>
-        <div className="agp-tile">
-          <small>
-            <Icon name="agent" size={14} />
-            {t("agentPage.memory.lessons")}
-          </small>
-          <b>{count("lessons")}</b>
-          <span>{t("agentPage.memory.fromTeam")}</span>
-        </div>
-        <div className="agp-tile">
-          <small>
-            <Icon name="document" size={14} />
-            {t("agentPage.memory.proposals")}
-          </small>
-          <b>{pending.length}</b>
-          <span>{pending.length ? t("agentPage.memory.waiting") : t("agentPage.memory.noneWaiting")}</span>
-        </div>
-      </div>
+      </section>
       <div className="agp-cols">
         <div className="agp-col">
           {pending.map((p) => (
