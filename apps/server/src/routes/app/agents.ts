@@ -14,6 +14,7 @@ import {
   deleteCredential,
   getAgent,
   getAgentBrain,
+  newAgentBrainMachines,
   getTeam,
   listAgents,
   listCredentials,
@@ -52,6 +53,7 @@ import {
   AgentBrain,
   BrainEffortSetting,
   BrainKind,
+  BrainMachine,
   Credential,
   Model,
   ProviderId,
@@ -480,6 +482,23 @@ export function agentRoutes(deps: AppDeps) {
         { usage: rows.map(({ costNanoUsd, ...r }) => ({ ...r, costUsd: nanoUsdToUsd(costNanoUsd) })) },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/brain-machines",
+      tags,
+      security,
+      summary:
+        '"Quem pensa" for an agent still being created: every computer of the workspace with what it offers (Claude Code, Codex). Admins (who create agents).',
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ machines: z.array(BrainMachine) })), ...errors },
+    }),
+    async (c) => {
+      const machines = await newAgentBrainMachines({ db }, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ machines }, 200);
     },
   );
 

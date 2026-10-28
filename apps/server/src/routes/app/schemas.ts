@@ -463,6 +463,11 @@ export const MachineAccount = z
       "An account of a computer brain on a connected computer (ADR 0041, ADR 0059). Metadata only, never a sign-in.",
   });
 
+/** A computer the caller may give an agent, with what it offers. */
+export const BrainMachine = z
+  .object({ machineId: z.uuid(), name: z.string(), online: z.boolean(), options: z.array(BrainOption) })
+  .openapi("BrainMachine");
+
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
@@ -475,7 +480,7 @@ export const AgentBrain = z
     computer: z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
     options: z.array(BrainOption),
     machines: z
-      .array(z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean(), options: z.array(BrainOption) }))
+      .array(BrainMachine)
       .openapi({
         description:
           "Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with what each offers.",

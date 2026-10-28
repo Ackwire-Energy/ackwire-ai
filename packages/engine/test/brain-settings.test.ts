@@ -5,6 +5,7 @@ import {
   ConflictError,
   ForbiddenError,
   getAgentBrain,
+  newAgentBrainMachines,
   releaseAgents,
   setAgentAudience,
   setAgentBrain,
@@ -160,6 +161,17 @@ async function world() {
   const audits = (action: string) => fx.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, action));
   return { fx, deps: { db: fx.db }, machineId, bia, caio, account, row, audits };
 }
+
+describe("Criar agente: what a new agent could think with", () => {
+  test("admins see every computer with what it offers; a member can't create agents", async () => {
+    const { fx, deps, machineId, bia, caio } = await world();
+    const [mine] = await newAgentBrainMachines(deps, caio.id, fx.org.id);
+    expect(mine).toMatchObject({ machineId, name: "mac" });
+    expect(mine?.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
+    expect(mine?.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
+    await expect(newAgentBrainMachines(deps, bia.id, fx.org.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
 
 describe("a plan answers its owner (Só responde a você)", () => {
   test("onto a plan without any terms, only its owner; letting others in needs them once, audited", async () => {

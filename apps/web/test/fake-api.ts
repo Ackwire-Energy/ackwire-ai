@@ -9,6 +9,7 @@ import type {
   AppNotification,
   Approval,
   AuthConfig,
+  BrainMachine,
   Channel,
   ChannelMember,
   Connection,
@@ -186,6 +187,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
+  brainMachines?: BrainMachine[];
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
@@ -1260,6 +1263,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
           throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
         return structuredClone(brainOf(agentId));
+      },
+      brainMachines: async (orgId) => {
+        log("agents.brainMachines", orgId);
+        return structuredClone(state.brainMachines ?? []);
       },
       setBrain: async (orgId, agentId, input) => {
         log("agents.setBrain", orgId, agentId, input);
