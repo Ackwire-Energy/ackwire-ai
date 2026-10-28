@@ -3562,10 +3562,12 @@ a.ac-list__row:focus-visible {
 .ac-btn--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
+/* Off: a faint plate over whatever it sits on, so its shape shows on a page, a card or a well, in both themes (a
+   sunken fill is nearly the dark page's own color). */
 .ac-btn[disabled],
 .ac-btn[aria-disabled="true"] {
   color: var(--faint);
-  background: var(--sunken);
+  background: var(--plate);
   box-shadow: none;
   filter: none;
 }
@@ -4118,6 +4120,7 @@ a.ac-list__row:focus-visible {
   box-sizing: border-box;
   max-width: min(280px, calc(100vw - 32px));
   padding: 8px 12px;
+  text-wrap: pretty;
   border-radius: 12px;
   color: var(--ink2);
   font-size: 13px;

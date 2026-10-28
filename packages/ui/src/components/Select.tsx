@@ -29,6 +29,11 @@ export interface SelectProps<V extends string = string> {
   listLabel?: string;
   /** What the trigger shows for the chosen option (default: its label), e.g. a card with an avatar. */
   renderValue?: (option: SelectOption<V>) => ReactNode;
+  /**
+   * The trigger's edge a list wider than the trigger lines up with: `end` for a select that ends its row, so the
+   * list keeps the row's edge.
+   */
+  align?: "start" | "end";
 }
 
 function renderItem<V extends string>(o: SelectOption<V>) {
@@ -75,6 +80,7 @@ export function Select<V extends string = string>({
   className,
   listLabel,
   renderValue,
+  align = "start",
   ...rest
 }: SelectProps<V>) {
   const wiring = useFieldControl({ id });
@@ -103,6 +109,7 @@ export function Select<V extends string = string>({
             className="ac-menu ac-menu--select"
             position="popper"
             sideOffset={4}
+            align={align}
             aria-label={listLabel ?? rest["aria-label"]}
           >
             <RSelect.Viewport>

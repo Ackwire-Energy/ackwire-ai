@@ -71,6 +71,19 @@ describe("buttons and kbd", () => {
     b.focus();
     expect(document.activeElement).toBe(b);
   });
+
+  test("off, a button is a faint plate over what it sits on, so its shape shows on the dark page too", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const off = css.split('\n.ac-btn[disabled],\n.ac-btn[aria-disabled="true"] {').at(-1)?.split("}")[0] ?? "";
+    expect(off).toContain("background: var(--plate)");
+    expect(off).not.toContain("var(--sunken)");
+  });
+
+  test("a chosen option never moves, so a row of options keeps its words on one line in both themes", async () => {
+    const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
+    const lifts = [...tokens.matchAll(/--chosen-lift: ([^;]+);/g)].map((m) => m[1]);
+    expect(lifts).toEqual(["none", "none"]);
+  });
 });
 
 describe("segmented control", () => {
