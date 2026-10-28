@@ -215,6 +215,17 @@ describe("an invitation link asks to join", () => {
     expect(screen().queryByRole("alert")).toBeNull();
   });
 
+  test("at phone width the email takes its row and Verify's slot goes under it, so the address reads whole", async () => {
+    const css = (await Bun.file(new URL("../src/pages/invite.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("\n@media (max-width: 480px) {")[1]?.split("\n}")[0] ?? "";
+    expect(phone).toMatch(/\.invite-ask__verify \{\s*flex-direction: column;\s*\}/);
+    // `flex: 1` in a column would shrink the field to its text's height: it keeps the control's 40px.
+    expect(phone).toMatch(/\.invite-ask__verify > \.ac-input \{\s*flex: none;\s*\}/);
+  });
+
   test("every refusal of a code is said in both languages, never in the server's English", () => {
     const codes = ["wrong", "expired", "tries", "limit", "wait", "needed"];
     for (const lng of ["pt-BR", "en"] as const) {

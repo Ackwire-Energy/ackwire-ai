@@ -77,4 +77,11 @@
   .ac-card.invite-card:has(.human-check) {
     --card-pad: 20px;
   }
+  /* Beside the slot the field would keep about 180px for the address: it takes the row, and the slot goes under it. */
+  .invite-ask__verify {
+    flex-direction: column;
+  }
+  .invite-ask__verify > .ac-input {
+    flex: none;
+  }
 }
