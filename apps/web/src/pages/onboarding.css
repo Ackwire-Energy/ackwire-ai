@@ -287,11 +287,10 @@ textarea.onb__big.ac-input {
 .onb__actions > .ac-btn--ghost {
   margin-inline: auto;
 }
-/* A step with no bar (the plan offer: its one action is its banner) keeps the bar's auto top margin and its clearance
-   of the home bar in an empty last row: its last line stays the column's gap above the screen's bottom. */
+/* A step with no bar (the plan offer: its one action is its banner) keeps the bar's clearance of the home bar in an
+   empty last row: at the end of the scroll its last line stays the column's gap above the screen's bottom. */
 .onb__body:not(:has(> .onb__actions))::after {
   content: "";
-  margin-top: auto;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 /* A field being typed in stays clear of the bar: the page scrolls it above the bar's tallest (two rows). */
