@@ -42,7 +42,7 @@ export function UsageScreen() {
   for (const a of data?.accounts ?? []) machines.set(a.machineId, [...(machines.get(a.machineId) ?? []), a]);
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("mobile.me.usage")} solid={false} />
+      <PushedHeader title={t("mobile.me.usage")} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}

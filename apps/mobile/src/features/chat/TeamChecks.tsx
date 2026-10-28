@@ -2,8 +2,8 @@ import type { Message, TeamCheck } from "@agenteschat/client";
 import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Text as RNText, StyleSheet, View } from "react-native";
-import { CHROME_MAX_SCALE, Icon, type IconName, PressScale, systemText, Text, useTheme, weights } from "@/ui";
+import { StyleSheet, View } from "react-native";
+import { Icon, type IconName, PillButton, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -37,7 +37,7 @@ export function TeamChecks({ message: m }: { message: Message }) {
 
 function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
   const { t } = useTranslation();
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const match = check.matches[0];
   const target = check.targets[0] ?? "";
   if (!match) return null;
@@ -76,25 +76,14 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
         ) : null}
       </View>
       {channelId ? (
-        <PressScale
-          to={0.95}
-          haptic={false}
+        <PillButton
+          label={t("teamChecks.open")}
+          accessibilityRole="link"
           onPress={() => {
             tapHaptic();
             router.push(chatHref(channelId));
           }}
-          accessibilityRole="link"
-          accessibilityLabel={t("teamChecks.open")}
-          hitSlop={6}
-          style={[styles.u, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
-        >
-          <RNText
-            maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={[systemText("footnote", weights.semibold), styles.uText, { color: colors.ink }]}
-          >
-            {t("teamChecks.open")}
-          </RNText>
-        </PressScale>
+        />
       ) : null}
     </View>
   );
@@ -117,6 +106,4 @@ const styles = StyleSheet.create({
   oneText: { fontSize: 14.5, lineHeight: 19 },
   detail: { marginTop: 2 },
   tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  u: { height: 32, paddingHorizontal: 13, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  uText: { fontSize: 14 },
 });

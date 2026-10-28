@@ -1,10 +1,12 @@
 import {
+  type AccountKind,
   ACCOUNTS_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainEffort,
   isBrainEffort,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
+  type PlanUsage,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
@@ -861,6 +863,19 @@ export interface AiComputer {
   keys: boolean;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
+  /**
+   * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
+   * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
+   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known.
+   */
+  own: Partial<Record<AccountKind, OwnSignIn>>;
+}
+
+/** A computer's own sign-in as the AI accounts page lists it. */
+export interface OwnSignIn {
+  /** The plan the CLI reported (`max`, `pro`…); absent when it didn't say. */
+  plan?: string;
+  usage?: PlanUsage;
 }
 
 export interface AiAccountsView {
@@ -897,7 +912,25 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
         canAdd: mayAddAccounts(m, userId) && m.protocol >= ACCOUNTS_PROTOCOL,
         keys: m.protocol >= PLAN_KEYS_PROTOCOL,
         brains: { claude_code: can("claude_code"), codex: can("codex") },
+        own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };
     }),
   };
+}
+
+/** The CLIs' own sign-ins a computer reported (see `AiComputer.own`). */
+function ownSignIns(
+  executors: schema.MachineExecutors | null | undefined,
+  can: (kind: BrainKind) => boolean,
+): Partial<Record<AccountKind, OwnSignIn>> {
+  const usage: OwnPlanUsage = executors?.ownUsage ?? {};
+  const out: Partial<Record<AccountKind, OwnSignIn>> = {};
+  const claude = executors?.claude;
+  if (can("claude_code") && (claude?.loggedIn === true || usage.claude_code))
+    out.claude_code = {
+      ...(claude?.plan ? { plan: claude.plan } : {}),
+      ...(usage.claude_code ? { usage: usage.claude_code } : {}),
+    };
+  if (can("codex") && usage.codex) out.codex = { usage: usage.codex };
+  return out;
 }

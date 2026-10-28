@@ -40,11 +40,11 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, type LayoutChangeEvent, Platform, StyleSheet, View } from "react-native";
+import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -116,6 +116,8 @@ import {
   HOLD_FINISHED_RUN_MS,
   landsOnDivider,
   lastSeenKey,
+  type Place,
+  placeCorrection,
   runsToShow,
   type ScrollRow,
   STICK_TO_END_THRESHOLD,
@@ -149,8 +151,18 @@ type Row =
   | { kind: "unseen"; key: string; fading: boolean };
 
 const rowKey = (r: Row) => r.key;
-/** An agent's block and its saved reply share a key and a type: the reply takes the block's row in place. */
-const rowType = (r: Row) => (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-")) ? "turn" : r.kind);
+/**
+ * A row's type for the list, which keeps sizes per type: an agent's block and its saved reply share one (the reply
+ * takes the block's row in place); other messages by how long they are and whether they carry a card (as Expensify
+ * buckets them), so a row not measured yet is guessed close to its size and older pages land without a jump.
+ */
+const rowType = (r: Row) => {
+  if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
+  if (r.kind !== "message") return r.kind;
+  const n = r.message.body.length;
+  const size = n < 80 ? "s" : n < 320 ? "m" : n < 1200 ? "l" : "xl";
+  return r.message.meta && Object.keys(r.message.meta).length > 0 ? `message-${size}-card` : `message-${size}`;
+};
 const DIVIDER_KEY = "unseen-divider";
 /** The "Novas" line stays this long after the person reached it, then fades (~0.6 s). */
 const DIVIDER_FADE_MS = 3500;
@@ -164,6 +176,12 @@ const FRESH_MS = 800;
 /** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
+/** How long the conversation is held in place after something opens over it and after it closes (ms). */
+const HOLD_MS = 900;
+/** How long the list keeps ignoring the keyboard after what covered it closed (its closing animation, ms). */
+const FREEZE_AFTER_MS = 450;
+/** The list shows by itself after this even if it never said it was placed (ms). */
+const SHOW_LIST_MS = 700;
 
 /**
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
@@ -467,6 +485,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
   // marks the first of it, and the pill lands there when it is far.
   const listRef = useRef<LegendListRef>(null);
+  // The person dragging the list, a new hold on their place (see "Keeping the place") and the app moving it on
+  // purpose (sending, the pill, a pin): each lets go of a held place.
+  const dragging = useRef(false);
+  const holding = useRef(0);
+  const aimed = useRef(0);
+  const letGo = useCallback(() => {
+    holding.current++;
+    aimed.current++;
+  }, []);
   const scrollRows = useMemo<ScrollRow[]>(
     () =>
       rows.map((r) => ({
@@ -520,15 +547,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return [...rows.slice(0, at), { kind: "unseen", key: DIVIDER_KEY, fading: divider.fading }, ...rows.slice(at)];
   }, [rows, divider]);
   const toEnd = useCallback(() => {
+    letGo();
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
-  }, []);
+  }, [letGo]);
   // The pill: to the "Novas" line when it is far, else to the end.
   const toUnseen = useCallback(() => {
     const state = listRef.current?.getState();
     const index = shownRows.findIndex((r) => r.key === DIVIDER_KEY);
     const far = state && landsOnDivider(state.contentLength, state.positionByKey(DIVIDER_KEY), state.scrollLength);
     if (far && index >= 0) {
+      letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: 12 });
       // What is new is in view now: the pill goes, the line fades after a while.
       setSeenKey(latestSeen);
@@ -536,7 +565,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       return;
     }
     toEnd();
-  }, [shownRows, latestSeen, toEnd]);
+  }, [shownRows, latestSeen, toEnd, letGo]);
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);
@@ -566,13 +595,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // The list asks for older rows on a layout change too, not only a scroll (Legend List 3.7): one page at a
+  // time, whatever the state says this render.
+  const fetchingOlder = useRef(false);
   const loadOlder = useCallback(() => {
-    if (isThread || olderDone || loadingOlder || !top.data) return;
+    if (isThread || olderDone || loadingOlder || fetchingOlder.current || !top.data) return;
     const oldest = older[0] ?? top.data[0];
     if (!oldest || top.data.length < MESSAGES_PAGE) {
       setOlderDone(true);
       return;
     }
+    fetchingOlder.current = true;
     setLoadingOlder(true);
     api.chat
       .messages(orgId, channelId, { before: oldest.createdAt, limit: MESSAGES_PAGE })
@@ -581,7 +614,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         if (page.length < MESSAGES_PAGE) setOlderDone(true);
       })
       .catch(() => setOlderDone(true))
-      .finally(() => setLoadingOlder(false));
+      .finally(() => {
+        fetchingOlder.current = false;
+        setLoadingOlder(false);
+      });
   }, [api, orgId, channelId, isThread, olderDone, loadingOlder, top.data, older]);
 
   // ── Sending ──
@@ -806,6 +842,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const rowsRef = useRef<Row[]>([]);
   const goToPin = (pin: MessagePin) => {
     sheet.close();
+    // The pin is where the list goes now, not where it was under the sheet.
+    letGo();
     const shown = rowsRef.current;
     const target = pinTarget(pin, new Set(shown.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))));
     if (target.kind === "scroll") {
@@ -877,20 +915,96 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
-  // Opening a sheet must not move the conversation: on iOS it jumped to its top when the options opened
-  // (the cause sits between the modal and the list's insets). For a moment after, the list is held where it was.
-  const holdPlace = () => {
-    const from = listRef.current?.getState().scroll;
-    if (from == null) return;
-    const until = Date.now() + 900;
+  // ── Keeping the place ──
+  // Something opening over the conversation must not move it: on iOS it jumped when a header button opened a sheet
+  // or the agent's computer. Where the person was (the end, or a row on screen) is taken before it opens, and given
+  // back for a moment after it opens and after it closes, whichever way the list moved, unless they drag it or
+  // the app scrolls it on purpose (sending, the pill, a pin).
+  const placeNow = useCallback((): Place | null => {
+    const list = listRef.current;
+    const state = list?.getState();
+    if (!list || !state) return null;
+    if (state.isFollowingEnd) return { end: true };
+    const anchor = list.anchorVisibleContent({ hold: false });
+    const position = anchor ? state.positionByKey(anchor.key) : undefined;
+    return { end: false, scroll: state.scroll, key: anchor?.key ?? null, position: position ?? null };
+  }, []);
+  const holdPlace = useCallback((place: Place | null) => {
+    if (!place) return;
+    const hold = ++holding.current;
+    dragging.current = false;
+    const until = Date.now() + HOLD_MS;
     const check = () => {
-      const now = listRef.current?.getState().scroll;
-      if (now != null && from - now > 40) listRef.current?.scrollToOffset({ offset: from, animated: false });
+      if (dragging.current || holding.current !== hold) return;
+      const list = listRef.current;
+      const state = list?.getState();
+      if (list && state) {
+        const fix = placeCorrection(place, {
+          scroll: state.scroll,
+          distanceFromEnd: state.distanceFromEnd,
+          positionOf: state.positionByKey,
+        });
+        if (fix === "end") void list.scrollToEnd({ animated: false });
+        else if (fix !== null) void list.scrollToOffset({ offset: fix, animated: false });
+      }
       if (Date.now() < until) requestAnimationFrame(check);
     };
     requestAnimationFrame(check);
-  };
-  const showOptions = () =>
+  }, []);
+  // While something covers the conversation (a sheet, the agent's computer) the list ignores the keyboard: it
+  // leaving under the cover, or coming back, must not move it (Bluesky and Mattermost freeze or dismiss first too).
+  const freeze = useSharedValue(false);
+  const covered = useRef(false);
+  const cover = useCallback(() => {
+    covered.current = true;
+    freeze.value = true;
+  }, [freeze]);
+  const uncover = useCallback(() => {
+    covered.current = false;
+    setTimeout(() => {
+      if (!covered.current) freeze.value = false;
+    }, FREEZE_AFTER_MS);
+  }, [freeze]);
+  // Every sheet of this screen says when it opens (before the keyboard leaves) and closes: one place for all of
+  // them (the header's, a message's, the composer's).
+  useEffect(() => {
+    let place: Place | null = null;
+    let aimedAt = 0;
+    return sheet.subscribe((open) => {
+      if (open) {
+        // A sheet opened from another keeps the place taken by the first.
+        if (!covered.current) {
+          place = placeNow();
+          aimedAt = aimed.current;
+        }
+        cover();
+        holdPlace(place);
+        return;
+      }
+      uncover();
+      // Unless the app moved the list on purpose meanwhile (a message sent from the sheet).
+      if (aimed.current === aimedAt) holdPlace(place);
+    });
+  }, [sheet, cover, uncover, placeNow, holdPlace]);
+  // The agent's computer opens full screen: where the conversation was is kept, and given back on return.
+  const away = useRef<Place | null>(null);
+  const left = useRef(false);
+  const leavePlace = useCallback(() => {
+    away.current = placeNow();
+    left.current = true;
+    holdPlace(away.current);
+    cover();
+    Keyboard.dismiss();
+  }, [placeNow, holdPlace, cover]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!left.current) return;
+      left.current = false;
+      holdPlace(away.current);
+      uncover();
+    }, [holdPlace, uncover]),
+  );
+  const openOptions = () =>
     info && isThread
       ? sheet.open(
           <ThreadOptions
@@ -913,10 +1027,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onMembers={channel && !dm ? openMembers : undefined}
           />,
         );
-  const openOptions = () => {
-    holdPlace();
-    showOptions();
-  };
   const pill =
     isThread && info ? (
       <HeaderPill
@@ -975,10 +1085,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </View>
           ) : undefined
         }
-        onPress={() => {
-          holdPlace();
-          openMembers();
-        }}
+        onPress={openMembers}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
@@ -986,7 +1093,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const right =
     (isThread && info) || dm || channel ? (
       <>
-        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} /> : null}
+        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} onOpen={leavePlace} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;
@@ -1170,13 +1277,33 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     setComposerHeight(e.nativeEvent.layout.height);
   };
   const bottomPad = Math.max(insets.bottom, 10);
-  // iOS draws the header over the conversation (glass on iOS 26, a blur before); Android keeps it opaque.
+  // The header floats over the conversation (glass on iOS 26, a blur before; round plates on Android), which
+  // fades under it.
   const headerHeight = useHeaderHeight();
-  const barOver = Platform.OS === "ios";
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
+  // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
+  // is one, already holds that room). iOS's automatic inset made keyboard moves land short at the end.
+  const hasPin = pinned !== null;
+  const listPad = useMemo(
+    () => (hasPin ? styles.listPad : [styles.listPad, { paddingTop: headerHeight + 8 }]),
+    [hasPin, headerHeight],
+  );
+  // The list shows once it sits at the end (no frame of it placing itself), as Bluesky's and Expensify's do; from
+  // a little opacity, not none, so the glass inside rows keeps drawing.
+  const listShown = useSharedValue(0.05);
+  const listFade = useAnimatedStyle(() => ({ opacity: listShown.value }));
+  const revealList = useCallback(() => {
+    listShown.value = withTiming(1, { duration: 160 });
+  }, [listShown]);
+  useEffect(() => {
+    if (!showList) return;
+    const timer = setTimeout(revealList, SHOW_LIST_MS);
+    return () => clearTimeout(timer);
+  }, [showList, revealList]);
 
-  // Whether the person is near the end (what the list follows): the "new messages" button shows otherwise.
+  // Whether the list follows the end (its own intent: kept through a drag's momentum and while a scroll to the end
+  // lands, released by reading up, rearmed back near the end): the "new messages" button shows otherwise.
   useEffect(() => {
     if (!showList) return;
     const state = listRef.current?.getState();
@@ -1184,25 +1311,26 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     // A new list opens at the end (initialScrollAtEnd); only changes count from here, so the button never
     // flashes on open.
     setAtEnd(true);
-    return state.listen("isWithinMaintainScrollAtEndThreshold", setAtEnd);
+    return state.listen("isFollowingEnd", setAtEnd);
   }, [showList]);
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
           system's scroll edge never makes one look different from another. */}
-      <PushedHeader title={pill ?? title} plate={barOver} solid={false} right={right} />
+      <PushedHeader title={pill ?? title} plate solid={false} right={right} />
       {pinned ? (
-        // The bar is see-through on iOS (the conversation runs under it): the pinned card starts below it.
-        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: barOver ? headerHeight : 0 }]}>
+        // The bar is see-through (the conversation runs under it): the pinned card starts below it.
+        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: headerHeight }]}>
           <MissionCardView mission={pinned} pinned />
         </View>
       ) : null}
+      {/* No `textInputNativeID`: with it the composer could stay down while the keyboard was up (iOS 26; Bluesky
+          drops it too). The offset is whole points: a fractional one made the overscroll glitch. */}
       <KeyboardGestureArea
         style={styles.grow}
         interpolator="ios"
-        textInputNativeID={COMPOSER_INPUT_ID}
-        offset={Math.max(0, composerHeight - lift)}
+        offset={Math.round(Math.max(0, composerHeight - lift))}
       >
         {loading ? (
           <View style={[styles.center, { paddingBottom: composerHeight }]}>
@@ -1219,36 +1347,47 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </View>
           )
         ) : (
-          <KeyboardAwareLegendList
-            ref={listRef}
-            style={styles.grow}
-            data={shownRows}
-            keyExtractor={rowKey}
-            getItemType={rowType}
-            renderItem={renderItem}
-            // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-            // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-            extraData={renderItem}
-            estimatedItemSize={72}
-            // Opens at the latest message, short conversations sit at the bottom like any chat.
-            initialScrollAtEnd
-            alignItemsAtEnd
-            // New messages, a reply growing word by word and the working line keep the end in view, but
-            // only while the person is near it.
-            maintainScrollAtEnd
-            maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-            // Older pages above and rows changing size keep what is on screen still.
-            maintainVisibleContentPosition
-            // Under the glass header on iOS: the system insets the top by the bar (and draws its scroll edge).
-            contentInsetAdjustmentBehavior="automatic"
-            onStartReached={loadOlder}
-            onStartReachedThreshold={0.5}
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            keyboardOffset={lift}
-            contentInsetEndAdjustment={contentInsetEndAdjustment}
-            contentContainerStyle={styles.listPad}
-          />
+          <Animated.View style={[styles.grow, listFade]}>
+            <KeyboardAwareLegendList
+              ref={listRef}
+              style={styles.grow}
+              data={shownRows}
+              keyExtractor={rowKey}
+              getItemType={rowType}
+              renderItem={renderItem}
+              // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+              // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+              extraData={renderItem}
+              estimatedItemSize={72}
+              // Opens at the latest message, short conversations sit at the bottom like any chat.
+              initialScrollAtEnd
+              alignItemsAtEnd
+              // New messages, a reply growing word by word and the working line keep the end in view, but
+              // only while the person is near it.
+              maintainScrollAtEnd
+              maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+              // Older pages above and rows changing size keep what is on screen still.
+              maintainVisibleContentPosition
+              // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
+              // is the content's top padding, the indicator kept below the bar.
+              contentInsetAdjustmentBehavior="never"
+              automaticallyAdjustContentInsets={false}
+              scrollIndicatorInsets={{ top: headerHeight }}
+              // Still while a sheet or the agent's computer covers the conversation.
+              freeze={freeze}
+              onReady={revealList}
+              onStartReached={loadOlder}
+              onScrollBeginDrag={() => {
+                dragging.current = true;
+              }}
+              onStartReachedThreshold={0.5}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              keyboardOffset={lift}
+              contentInsetEndAdjustment={contentInsetEndAdjustment}
+              contentContainerStyle={listPad}
+            />
+          </Animated.View>
         )}
         <KeyboardStickyView
           offset={{ opened: lift }}
@@ -1263,8 +1402,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             )
           ) : null}
         </KeyboardStickyView>
-        {barOver && !pinned ? (
-          // The conversation fades under the glass header, as it does under the box.
+        {!pinned ? (
+          // The conversation fades under the floating header, as it does under the box.
           <LinearGradient
             pointerEvents="none"
             colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}

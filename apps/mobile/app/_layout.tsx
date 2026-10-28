@@ -11,6 +11,7 @@ import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
+import { keepLastCrash } from "@/lib/last-crash";
 import { firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
@@ -21,6 +22,7 @@ import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+keepLastCrash();
 
 /** Root: the providers, then the session gate. */
 export default function RootLayout() {

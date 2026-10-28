@@ -1,6 +1,7 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { needsHeaderBlur } from "@/lib/nav";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Glass, PressScale, Text, useTheme } from "@/ui";
@@ -36,7 +37,7 @@ export function HeaderPill({
   /** Bar buttons beside "…" (an agent's computer): the centered pill gives up twice their 40 points each. */
   extraActions?: number;
 }) {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
   return (
     <PressScale
@@ -45,7 +46,13 @@ export function HeaderPill({
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : "header"}
       accessibilityLabel={label}
-      style={[styles.press, { maxWidth: Math.max(160, width - 136 - extraActions * 80) }]}
+      style={[
+        styles.press,
+        { maxWidth: Math.max(160, width - 136 - extraActions * 80) },
+        // Android's pill is opaque: a short shadow floats it over the conversation, as the glass does on iOS.
+        Platform.OS === "android" && { borderRadius: 22, boxShadow: shadows.e1 },
+        LIQUID && styles.liquidNudge,
+      ]}
     >
       {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
       <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
@@ -75,8 +82,14 @@ export function HeaderPill({
   );
 }
 
+/** iOS 26's bar: its glass buttons sit lower than a title view's center. */
+const LIQUID = Platform.OS === "ios" && !needsHeaderBlur(Platform.OS, Platform.Version);
+
 const styles = StyleSheet.create({
   press: { minWidth: 0 },
+  // Level with the back and "…" circles beside it (they sat about 5 points lower); `top` moves it without
+  // changing the size the bar lays out.
+  liquidNudge: { top: 5 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

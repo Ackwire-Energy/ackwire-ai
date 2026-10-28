@@ -1,11 +1,11 @@
-import type { AiStatus, AppNotification, DirectMessage } from "@agenteschat/client";
+import type { AiStatus, AppNotification } from "@agenteschat/client";
 import { ROUTINE_TROUBLE } from "@agenteschat/client/lib/notifications";
 import { isSafeId } from "../shared/logic";
 
 /**
  * Where things open in the app (Expo Router paths). Deep links
- * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `activity`, `threads`, `join-requests`),
- * push payloads (ADR 0035 §4) and inbox items all end up here.
+ * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `routines/<id>`, `activity`, `threads`,
+ * `join-requests`), push payloads (ADR 0035 §4) and inbox items all end up here.
  */
 
 export type AppHref =
@@ -18,6 +18,8 @@ export type AppHref =
   | `/agent/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`
+  | `/routines/${string}`
+  | "/routines"
   | "/activity"
   | "/threads"
   | "/join-requests"
@@ -26,6 +28,10 @@ export type AppHref =
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
+
+/** A routine's screen, or Rotinas when the id isn't one. */
+export const routineHref = (routineId: unknown): AppHref =>
+  isSafeId(routineId) ? `/routines/${routineId}` : "/routines";
 
 /**
  * An agent's request for help in its browser opens in its conversation, with its card in control:
@@ -109,6 +115,8 @@ export function hrefFromUrl(url: string): AppHref | null {
       return isSafeId(id) ? `/agent/${id}` : null;
     case "handoff":
       return isSafeId(id) ? `/handoff/${id}` : null;
+    case "routines":
+      return id === undefined ? "/routines" : isSafeId(id) ? `/routines/${id}` : null;
     default:
       return null;
   }
@@ -131,31 +139,21 @@ function queryParam(query: string, name: string): string | undefined {
   return undefined;
 }
 
-/** The DM with an agent among the conversations loaded (`useDms`), for `notificationHref`'s `dmOf`. */
-export const agentDmOf =
-  (dms: readonly Pick<DirectMessage, "channelId" | "with">[] | undefined) =>
-  (agentId: string): string | null =>
-    dms?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId ?? null;
-
 /**
  * Where an inbox item opens in the app; null when the app has no screen for it (issues, forum). What a
  * routine found opens the agent's message in its conversation; a routine's trouble (failed, paused,
- * waiting for its computer) opens the agent's DM (`dmOf`, its known DM), else the agent: the phone has
- * no Rotinas screen yet. The computer being ready: `computerReadyHref` with the workspace's AI status (`ai`).
+ * waiting for its computer), or what it found without a message, opens the routine, where its state says
+ * what happened and how to fix it (as on the web). The computer being ready: `computerReadyHref` with the
+ * workspace's AI status (`ai`).
  */
 export function notificationHref(
-  n: Pick<AppNotification, "kind" | "source" | "actors">,
-  dmOf: (agentId: string) => string | null = () => null,
+  n: Pick<AppNotification, "kind" | "source">,
   ai?: Pick<AiStatus, "any" | "agents">,
 ): AppHref | null {
   const s = n.source;
   if (n.kind === "computer_ready") return computerReadyHref(ai);
-  if (ROUTINE_TROUBLE.has(n.kind)) {
-    const agent = n.actors.find((a) => a.type === "agent");
-    if (!agent || !isSafeId(agent.id)) return null;
-    const dm = dmOf(agent.id);
-    return isSafeId(dm) ? chatHref(dm) : `/agent/${agent.id}`;
-  }
+  if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
+    return routineHref(s.routineId);
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   if (n.kind === "join_request") return "/join-requests";
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.

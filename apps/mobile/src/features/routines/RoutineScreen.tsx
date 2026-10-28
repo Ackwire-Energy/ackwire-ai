@@ -1,0 +1,517 @@
+import { type Routine, type RoutineRun, useRoutineRuns, useRoutines, useRuleDescribe } from "@agenteschat/client";
+import { formatTokensShort, formatUsd, whenAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
+import {
+  busyOnComputer,
+  healthWords,
+  isRunAtWork,
+  pausedFix,
+  routineChannelOf,
+  runMessageLink,
+  runOutcome,
+  runPixelStatus,
+  runPixels,
+  runsPerDay,
+  usageParts,
+  whereItRuns,
+} from "@agenteschat/client/lib/routine-view";
+import { router } from "expo-router";
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrg } from "@/providers/org";
+import {
+  Button,
+  Chip,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  IconButton,
+  type IconName,
+  InfoHint,
+  Text,
+} from "@/ui";
+import { chatHref } from "../links/logic";
+import { openSwitchComputer } from "../outages/OutageNotice";
+import { useMachineOutages } from "../outages/queries";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import { FocusLive, goBack, PushedHeader } from "../shared/parts";
+import { SheetHostProvider } from "../shared/SheetHost";
+import {
+  editRoutineHref,
+  useNextText,
+  useRoutineControls,
+  useRoutineMenu,
+  useRunWords,
+  useSay,
+  useTargetLabel,
+  useWhenText,
+} from "./hooks";
+import { hasFired, isDoneOnce, isPaused, isReminder, isRunning, mailTrouble, routineTitle, targetIcon } from "./logic";
+import { FixButton, StateChip } from "./parts";
+import { RunStrip } from "./RunPixels";
+import { nextLabel } from "./rule";
+
+/** At most this many runs on the screen (the web's details show as many). */
+const RUNS_SHOWN = 30;
+
+/**
+ * One routine (`/routines/<id>`), the web's details on a screen of its own: the agent, the title and its state;
+ * Editar, Rodar agora or Parar, Pausar or Retomar (and the one-tap fix, "Trocar computador" while its run waits
+ * for an offline computer) for whoever may change it; then the week, what it does, when, where it delivers, where
+ * it runs, what it may do on its own, when it speaks, and its runs, each opening the agent's message (or the
+ * approval it waits for). "…" in the bar: Editar, Duplicar, Copiar URL do webhook, Apagar. The routine comes from
+ * the list (there is no single-routine endpoint).
+ */
+export function RoutineScreen({ id }: { id: string }) {
+  return (
+    <SheetHostProvider>
+      <RoutineView id={id} />
+    </SheetHostProvider>
+  );
+}
+
+function RoutineView({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const routines = useRoutines(useOrgId());
+  const r = routines.data?.find((x) => x.id === id);
+  if (r) return <Details routine={r} refetch={routines.refetch} />;
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("routines.panel.eyebrow")} solid={false} grouped />
+      <View style={styles.center}>
+        {routines.isLoading ? (
+          <ActivityIndicator color={c.muted} />
+        ) : routines.isError && !routines.data ? (
+          <>
+            <Text tone="muted" style={styles.centerText}>
+              {t("mobile.routines.loadFailed")}
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mobile.common.retry")}
+              onPress={() => void routines.refetch()}
+            />
+          </>
+        ) : (
+          <>
+            <Text variant="callout" style={styles.bold}>
+              {t("mobile.notFound.title")}
+            </Text>
+            <Text tone="muted" style={styles.centerText}>
+              {t("mobile.notFound.subtitle")}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Promise<unknown> }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const insets = useSafeAreaInsets();
+  const orgId = useOrgId();
+  const { org } = useOrg();
+  const dir = useDirectory();
+  const say = useSay();
+  const controls = useRoutineControls(r);
+  const menu = useRoutineMenu(r, "screen", goBack);
+  const runs = useRoutineRuns(orgId, r.id);
+  const targetLabel = useTargetLabel();
+  const whenText = useWhenText();
+  const nextText = useNextText();
+  const words = useRunWords();
+  const at = new Date(useNow(60_000));
+  const outages = useMachineOutages();
+  const pull = usePullRefresh(() => Promise.all([refetch(), runs.refetch()]));
+  const agentName = dir.nameOf({ type: "agent", id: r.agentId });
+  const title = routineTitle(r);
+  const done = isDoneOnce(r);
+  const fired = hasFired(r);
+  const running = isRunning(r);
+  const reminder = isReminder(r);
+  const trouble = mailTrouble(r);
+  const described = useRuleDescribe(
+    orgId,
+    r.active && r.trigger.type === "schedule" && r.trigger.rule ? r.trigger.rule : null,
+  );
+  const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
+  const fix = r.canManage ? pausedFix(r) : null;
+  // "Trocar computador": the outage its run waits on, for whoever can move agents.
+  const outage =
+    r.state === "waiting_computer" && r.waitingFor && can(org?.role, "manage_agents")
+      ? outages.outages.find((o) => o.machineId === r.waitingFor?.machineId)
+      : undefined;
+  const health = healthWords(r.health);
+  const usage = usageParts(r.usage, can(org?.role, "view_usage"));
+  const usageText = usage
+    ? [
+        t("routines.usage.runs", { count: usage.runs }),
+        usage.tokens !== null
+          ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
+          : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+  const perDay = r.trigger.type === "schedule" ? runsPerDay(r.trigger.rule ?? null, r.trigger.cron) : 0;
+  const busy = r.active ? busyOnComputer(r.brain, perDay) : null;
+  const whereHint =
+    r.target.type === "conversation"
+      ? r.target.threadId
+        ? "thread"
+        : "channel"
+      : r.target.type === "dm"
+        ? "dm"
+        : r.target.type;
+  // Where it delivers opens when it is a conversation the phone has (a channel, a thread).
+  const whereChannel = routineChannelOf(r.target);
+  const whereHref = whereChannel
+    ? chatHref(whereChannel, r.target.type === "conversation" ? r.target.threadId : null)
+    : null;
+  const list = runs.data ?? r.recentRuns;
+  const next = done ? "" : nextText(r, at);
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader
+        title={t("routines.panel.eyebrow")}
+        solid={false}
+        grouped
+        right={menu.any ? <IconButton icon="more" label={menu.label} onPress={menu.open} /> : undefined}
+      />
+      <FocusLive>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+          contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 28 }]}
+        >
+          <View style={styles.head}>
+            <AgentFace agentId={r.agentId} size={56} mode={running ? "run" : isPaused(r) ? "rest" : "idle"} />
+            <View style={styles.grow}>
+              <Text variant="title2" accessibilityRole="header">
+                {title}
+              </Text>
+              <Text variant="subhead" tone="muted" numberOfLines={1}>
+                {agentName}
+              </Text>
+              <View style={styles.chips}>
+                {done ? <Chip icon="check" label={t("routines.panel.state.done")} /> : <StateChip routine={r} />}
+                {reminder ? <Chip icon="bell" label={t("routines.reminder")} /> : null}
+              </View>
+            </View>
+          </View>
+          {r.canManage ? (
+            <View style={styles.actions}>
+              {fix && fix !== "resume" ? <FixButton fix={fix} controls={controls} /> : null}
+              {outage ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon="laptop"
+                  label={t("outage.switch")}
+                  onPress={() => openSwitchComputer(outage.machineId)}
+                />
+              ) : null}
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="pen"
+                label={t("routines.edit")}
+                onPress={() => router.push(editRoutineHref(r.id))}
+              />
+              {/* Parar for a run at work (a paused routine's too); "Rodar agora" while it may run. */}
+              {(running || !fired) && !reminder ? (
+                running ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon="stop"
+                    label={t("routines.stop")}
+                    disabled={controls.action.isPending}
+                    onPress={controls.stop}
+                  />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon="play"
+                    label={t("routines.runNow")}
+                    disabled={controls.action.isPending}
+                    onPress={controls.run}
+                  />
+                )
+              ) : null}
+              {fired ? null : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={r.active ? "pause" : "play"}
+                  label={r.active ? t("routines.panel.pause") : t("routines.resume")}
+                  disabled={controls.action.isPending}
+                  onPress={() => controls.setActive(!r.active)}
+                />
+              )}
+            </View>
+          ) : null}
+
+          <Section title={t("routines.panel.week")}>
+            <Block>
+              <Text variant="body">{health ? health.map(say).join(" · ") : t("routines.health.none")}</Text>
+              {usageText ? (
+                <Text variant="footnote" tone="muted">
+                  {`${t("routines.panel.usage")}: ${usageText}`}
+                </Text>
+              ) : null}
+              <View style={styles.strip}>
+                <RunStrip
+                  runs={runPixels(r.recentRuns)}
+                  color={agentLook(dir.agentById.get(r.agentId)).color}
+                  running={running}
+                  label={words.label(r)}
+                />
+                <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+                  {words.caption(r, at)}
+                </Text>
+              </View>
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.what", agentGrammar(t, agentName))}>
+            <Block>
+              {r.canSeeDetails && r.prompt !== null ? (
+                <Text variant="body" selectable>
+                  {r.prompt}
+                </Text>
+              ) : (
+                <Text variant="footnote" tone="muted">
+                  {t("routines.detailsHidden")}
+                </Text>
+              )}
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.when")}>
+            <Block>
+              <Text variant="body">{whenText(r)}</Text>
+              {trouble ? (
+                <Chip
+                  icon="mail"
+                  label={trouble === "error" ? t("mail.routine.error") : t("mail.routine.needsReconnect")}
+                />
+              ) : null}
+              {r.trigger.type === "email" ? (
+                <Text variant="footnote" tone="muted">
+                  {t("mail.routine.every")}
+                </Text>
+              ) : r.trigger.type === "event" ? (
+                <Text variant="footnote" tone="muted">
+                  {t("routines.panel.eventEvery")}
+                </Text>
+              ) : nexts.length > 0 && !done ? (
+                <View style={styles.nexts}>
+                  {nexts.map((iso) => (
+                    <View key={iso} style={[styles.next, { backgroundColor: c.sunken }]}>
+                      <Text variant="footnote" tone="ink2">
+                        {nextLabel(i18n.language, iso)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {next ? (
+                <Text variant="footnote" tone={running ? "ink2" : "muted"}>
+                  {next}
+                </Text>
+              ) : null}
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.where")}>
+            <GroupedRow
+              icon={targetIcon(r.target)}
+              label={targetLabel(r.target)}
+              sub={t(`routines.panel.whereHint.${whereHint}`)}
+              subLines={2}
+              chevron={Boolean(whereHref)}
+              {...(whereHref ? { onPress: () => router.push(whereHref) } : {})}
+            />
+          </Section>
+
+          <Section title={t("routines.panel.runsOn")}>
+            <Block>
+              <Text variant="body">{say(whereItRuns(r.brain))}</Text>
+              {busy ? (
+                <View style={styles.note}>
+                  <Icon name="laptop" size={14} color={c.muted} />
+                  <Text variant="footnote" tone="muted" style={styles.shrink}>
+                    {say(busy)}
+                  </Text>
+                </View>
+              ) : null}
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.access")}>
+            <Block>
+              <InfoHint
+                name={t("common.about", { label: t("routines.panel.access") })}
+                text={t("routines.access.hint")}
+                variant="body"
+              >
+                <Text variant="body">{t(`routines.access.${r.access}`)}</Text>
+              </InfoHint>
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.report")}>
+            <Block>
+              <Text variant="body">{t(`routines.report.${r.report}`)}</Text>
+            </Block>
+          </Section>
+
+          <Section title={t("routines.panel.runs")}>
+            {runs.isLoading && list.length === 0 ? (
+              <Block>
+                <ActivityIndicator color={c.muted} />
+              </Block>
+            ) : list.length > 0 ? (
+              <View style={styles.runs}>
+                {list.slice(0, RUNS_SHOWN).map((x, i, shown) => (
+                  <RunItem key={x.id} run={x} routine={r} last={i === shown.length - 1} />
+                ))}
+              </View>
+            ) : (
+              <Block>
+                <Text variant="footnote" tone="muted">
+                  {nexts[0] && !done
+                    ? `${t("routines.noRuns")} ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`
+                    : t("routines.noRuns")}
+                </Text>
+              </Block>
+            )}
+          </Section>
+        </ScrollView>
+      </FocusLive>
+    </View>
+  );
+}
+
+/** A section of the screen: its header over a grouped card. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <>
+      <GroupedHeader>{title}</GroupedHeader>
+      <GroupedList>{children}</GroupedList>
+    </>
+  );
+}
+
+/** Text inside a section's card. */
+function Block({ children }: { children: ReactNode }) {
+  return <View style={styles.block}>{children}</View>;
+}
+
+/** A run's mark on the timeline, as the web's: done, nothing new (a dash), failed, skipped, at work. */
+function useNode(run: RoutineRun): { bg: string; ink: string; icon: IconName | null } {
+  const c = useColors();
+  const pixel = runPixelStatus(run.status);
+  if (pixel === "ok") return { bg: c.ink, ink: c.bg, icon: "check" };
+  if (pixel === "failed") return { bg: c.danger, ink: "#ffffff", icon: "x" };
+  if (pixel === "skipped") return { bg: c.warn, ink: "#ffffff", icon: "pause" };
+  if (pixel === null && isRunAtWork(run.status)) return { bg: c.agent, ink: "#ffffff", icon: "play" };
+  return { bg: c.sunken, ink: c.ink2, icon: null };
+}
+
+/**
+ * One run: its outcome in plain words ("Contou o que achou", "Pulada: a anterior ainda estava rodando", "Parada
+ * por Ana"), the agent's words when the viewer may read them, and where it goes: the approval it waits for, or
+ * the agent's message ("Abrir na conversa").
+ */
+function RunItem({ run: x, routine: r, last }: { run: RoutineRun; routine: Routine; last: boolean }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const say = useSay();
+  const node = useNode(x);
+  const outcome = say(runOutcome(x, (id) => dir.memberById.get(id)?.name ?? null));
+  const link = runMessageLink(x);
+  const words = r.canSeeDetails && (x.status === "reported" || x.status === "silent") ? x.summary.trim() : "";
+  const approval = x.status === "waiting" && x.approvalId ? x.approvalId : null;
+  const href = approval ? `/approval/${approval}` : link ? chatHref(link.channelId, link.threadId) : null;
+  const when = whenAt(t, i18n.language, x.at);
+  return (
+    <Pressable
+      onPress={href ? () => router.push(href) : undefined}
+      disabled={!href}
+      accessibilityRole={href ? "button" : undefined}
+      accessibilityLabel={[outcome, words, when].filter(Boolean).join(", ")}
+      style={({ pressed }) => [styles.run, pressed && href ? { backgroundColor: c.sunken } : null]}
+    >
+      <View style={styles.rail}>
+        <View style={[styles.node, { backgroundColor: node.bg }]}>
+          {node.icon ? (
+            <Icon name={node.icon} size={12} color={node.ink} />
+          ) : (
+            <View style={[styles.dash, { backgroundColor: node.ink }]} />
+          )}
+        </View>
+        {last ? null : <View style={[styles.stem, { backgroundColor: c.line2 }]} />}
+      </View>
+      <View style={styles.grow}>
+        <Text variant="subhead" style={[styles.bold, approval ? styles.underline : null]}>
+          {outcome}
+        </Text>
+        {words ? (
+          <Text variant="footnote" tone="muted" numberOfLines={6}>
+            {words}
+          </Text>
+        ) : null}
+        {link && !approval ? (
+          <Text variant="footnote" tone="muted" style={styles.open}>
+            {t("routines.openInChat")}
+          </Text>
+        ) : null}
+      </View>
+      <Text variant="caption" tone="faint" style={styles.when}>
+        {when}
+      </Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  in: { paddingHorizontal: 16, paddingTop: 4 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 32 },
+  centerText: { textAlign: "center" },
+  bold: { fontWeight: "600" },
+  grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingTop: 8, paddingHorizontal: 4 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 16, paddingHorizontal: 4 },
+  block: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+  strip: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  nexts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  next: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  runs: { paddingVertical: 6 },
+  run: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  rail: { alignSelf: "stretch", alignItems: "center", width: 18 },
+  node: { width: 18, height: 18, borderRadius: 6, marginTop: 1, alignItems: "center", justifyContent: "center" },
+  dash: { width: 8, height: 1.7, borderRadius: 1 },
+  stem: { flex: 1, width: 1.5, marginTop: 4, marginBottom: -12 },
+  underline: { textDecorationLine: "underline" },
+  open: { marginTop: 2 },
+  when: { paddingTop: 2 },
+});

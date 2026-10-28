@@ -9,12 +9,12 @@ export interface SectionHeaderProps {
   count?: number;
 }
 
-/** The header over a full-width list: 15 semibold faint, the count beside it (medium, faint). */
+/** The header over a full-width list, as Conversas' sections: 15 semibold ink, the count beside it (medium, faint). */
 export function SectionHeader({ title, count }: SectionHeaderProps) {
   const { colors } = useTheme();
   return (
     <View style={styles.h}>
-      <Text variant="small" tone="faint" accessibilityRole="header" style={styles.title}>
+      <Text variant="small" tone="ink" accessibilityRole="header" style={styles.title}>
         {title}
       </Text>
       {count !== undefined ? <Count value={count} size={15} weight={weights.medium} color={colors.faint} /> : null}

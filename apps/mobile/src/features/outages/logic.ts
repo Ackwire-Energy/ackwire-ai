@@ -97,6 +97,16 @@ export function noticeText(t: TFunction, o: OutageLike, cloud = false) {
   };
 }
 
+/** The closed notices kept on the phone (a JSON list of outage keys); anything unreadable is none. */
+export function dismissedOutages(raw: string | null): string[] {
+  try {
+    const v: unknown = JSON.parse(raw ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /** "2 rotinas esperando", "1 conversa esperando", "3 tarefas esperando" (or "Nada esperando"). */
 export function waitingText(t: TFunction, a: Pick<OutageAgentLike, "waiting">): string {
   const p = agentWaitingPhrase(a);

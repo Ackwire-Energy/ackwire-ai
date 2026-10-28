@@ -4616,6 +4616,7 @@ export const ptBR = {
       usedBy_one: "{{agents}} pensa com ela",
       usedBy_other: "{{agents}} pensam com ela",
       noAgent: "Nenhum agente ainda",
+      ownOn: "Login no {{computer}} · os agentes de lá pensam com ela",
       signedOut: "Saiu da conta. Entre de novo para os agentes voltarem a usá-la.",
       signedOutFor_one: "{{agents}} ficou sem login.",
       signedOutFor_other: "{{agents}} ficaram sem login.",

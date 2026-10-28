@@ -88,6 +88,21 @@ export const mobileEn: MobileTranslations = {
   push: {
     channel: "Alerts",
     channelDescription: "What's waiting for you, mentions and conversations.",
+    ask: {
+      title: "Know when an agent needs you",
+      text: "They work while you do something else. We'll tell you when they need your ok, finish what you asked or call you.",
+      on: "Turn on notifications",
+      later: "Not now",
+      done: "Notifications on",
+      failed: "Couldn't turn on notifications. Try again in You › Notifications.",
+      someone: "An agent",
+      examples: "Examples of notifications",
+      now: "now",
+      minutes: "{{n}} min",
+      approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
+      finished: { title: "{{name}} is done", body: "What you asked for is ready." },
+      mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
+    },
   },
   a11y: {
     agent: "{{name}}, agent",
