@@ -847,10 +847,3 @@
     padding-top: 12px;
   }
 }
-
-/* Keyboard shortcuts mean nothing on a touch screen. */
-@media (pointer: coarse) {
-  .cal-page__new .ac-kbd {
-    display: none;
-  }
-}

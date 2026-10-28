@@ -9939,8 +9939,9 @@ html[data-menu-overlay] .shell {
 /*
  * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
  * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
- * mark's. The wait's well and the option cards start their 12px of padding before the text's column, so their words
- * are on it too. A note inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ * mark's. The option cards start their 12px of padding before the text's column, so their words are on it too. The
+ * wait's well spans the panel from the mark's edge to the buttons', its words still on the text's column. A note
+ * inside a step's words is the step's, not the panel's: its icon stays on the step's text.
  */
 .ai-panel--plan {
   --lead: 30px;
@@ -9986,9 +9987,9 @@ html[data-menu-overlay] .shell {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
+/* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
-  margin-left: calc(var(--text-edge) - 12px);
-  padding: 12px;
+  padding: 12px var(--text-edge);
   /* Short lines: wrapped, they break into two of a length. */
   text-wrap: balance;
 }
@@ -10213,12 +10214,15 @@ html[data-menu-overlay] .shell {
 .jev:focus {
   outline: none;
 }
-/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state in the row's middle. */
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state on the tile's middle. */
 .jev__head,
 .jev__key {
   align-items: flex-start;
 }
-.jev__head > .ac-chip,
+/* The tile is 30px, at the row's top. */
+.jev__head > .ac-chip {
+  translate: 0 calc(15px - 50%);
+}
 .jev__key > .ac-acts {
   align-self: center;
 }

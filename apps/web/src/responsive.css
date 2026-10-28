@@ -219,14 +219,16 @@
     height: auto;
     min-height: var(--control-h-md);
   }
-  /* Keyboard shortcuts mean nothing on a touch screen. */
-  .sidebar__jump .ac-kbd {
-    display: none;
-  }
 }
 @media (max-width: 760px), (pointer: coarse) {
   .wiki-editor__text {
     font-size: 16px;
+  }
+  /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). */
+  .sidebar__jump .ac-kbd,
+  .titlebar__search .ac-kbd,
+  .wiki-suggest .ac-kbd {
+    display: none;
   }
 }
 /* Onboarding: clear the notch (viewport-fit=cover); the home bar and the e-mail chips field: pages/onboarding.css. */

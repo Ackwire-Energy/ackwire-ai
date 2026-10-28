@@ -33,11 +33,16 @@ describe("fields are v2 (no black borders)", () => {
       expect(body(selector)).toContain("border: 1px solid var(--field-line)");
     }
     expect(body(".ac-input:focus")).toContain("var(--field-ring)");
-    // Radio cards: chosen takes the shared chosen state (sinks in light, rises in dark), never a thick ring.
+    // Option and radio cards: chosen is held down into the page, the same in both themes, never a thick ring. It keeps
+    // the card's outline and never moves, so the gaps around it stay the same.
     const chosen = rules(css).find(([s]) => s.includes('.ac-option[data-state="checked"]') && !s.includes(":has"))?.[1];
-    expect(chosen).toContain("background: var(--chosen-bg)");
-    expect(chosen).toContain("box-shadow: var(--chosen-shadow)");
+    expect(chosen).toContain("background: var(--sunken)");
+    expect(chosen).toContain("box-shadow: var(--pressed)");
+    expect(chosen).toMatch(/--pressed:\s*0 0 0 1px var\(--line2\),\s*0 0 0 1px var\(--line\),\s*inset /);
     expect(chosen).not.toContain("0 0 0 2px var(--ink)");
+    expect(chosen).not.toMatch(/transform|translate/);
+    // No dark-only look for the chosen card or the others of its group.
+    expect(rules(css).filter(([s]) => s.includes('[data-theme="dark"]') && s.includes(".ac-option:not("))).toEqual([]);
     // Its own radio marks it: the corner check is a pressed card's alone.
     expect(rules(css).filter(([s]) => s.includes("::after") && s.includes('.ac-option[data-state="checked"]'))).toEqual(
       [],
