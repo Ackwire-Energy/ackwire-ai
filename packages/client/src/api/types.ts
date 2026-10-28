@@ -884,7 +884,7 @@ export interface ScopeInfo {
 }
 
 /** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+export type ConnectorCategory = "dev" | "product" | "docs" | "data" | "payments" | "sales" | "support" | "marketing" | "automation";
 
 /** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {

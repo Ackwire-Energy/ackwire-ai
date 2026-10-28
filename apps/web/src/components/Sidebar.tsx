@@ -14,7 +14,7 @@ import {
   usePrefetchRecent,
   useSkills,
 } from "@agenteschat/client";
-import { audienceChip } from "@agenteschat/client/lib/audience";
+import { audienceChip, audienceNotice } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
@@ -84,7 +84,6 @@ import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
 import { AddPasswordDialog } from "./AddPassword";
-import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
@@ -661,6 +660,7 @@ function AgentRow({
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
+  const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const live = useLiveStore();
   const runs = useStopRun();
@@ -739,9 +739,22 @@ function AgentRow({
       ) : busy ? (
         <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
       ) : (
-        (chip ?? a.role) && (
-          <span className="sidebar__item-meta">{chip ? <AudienceChip agent={a} compact /> : a.role}</span>
-        )
+        (chip ?? a.role) &&
+        (chip ? (
+          <span className="sidebar__item-meta sidebar__item-meta--audience">
+            {a.role && <span>{a.role}</span>}
+            <span
+              className="sidebar__lock"
+              role="img"
+              aria-label={chip}
+              title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
+            >
+              <Icon name="lock" size={12} />
+            </span>
+          </span>
+        ) : (
+          <span className="sidebar__item-meta">{a.role}</span>
+        ))
       )}
     </Link>
   );

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import {
+  CONNECTOR_BRANDS,
   type ConnectorDeps,
   completeOAuth,
+  connectorListing,
   createApiKeyConnection,
   MCP_PRESETS,
   mcpPreset,
@@ -25,6 +29,15 @@ describe("one-click MCP connectors", () => {
     expect(mcpPreset("linear")?.serverUrl).toBe("https://mcp.linear.app/mcp");
     expect(presetForServer("https://mcp.linear.app/mcp/")?.id).toBe("linear");
     expect(presetForServer("https://example.com/mcp")).toBeNull();
+  });
+
+  test("every connector in the catalog has a logo the web app serves", () => {
+    const web = resolve(import.meta.dir, "../../../apps/web/public");
+    for (const b of Object.values(CONNECTOR_BRANDS)) {
+      expect(existsSync(`${web}/${b.own ? "brands" : "connectors"}/${b.file}.svg`)).toBe(true);
+    }
+    const missing = connectorListing({}).filter((e) => !e.iconUrl).map((e) => e.id);
+    expect(missing).toEqual([]);
   });
 
   test("a server without protected-resource metadata: OAuth at its own origin when it registers clients", async () => {
