@@ -191,8 +191,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
     : upcomingLabels(i18n.language, d.rule);
   const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
   // Still reading the phrase: saving now would keep the rule from before it.
-  const parsing =
-    schedule && phraseTyped && phrase.trim().length > 0 && (phrase.trim() !== typed || parsed.isFetching);
+  const parsing = schedule && phraseTyped && phrase.trim().length > 0 && (phrase.trim() !== typed || parsed.isFetching);
   // A routine kept as a cron (every N minutes) says so until a phrase replaces it.
   // A phrase read into a rule replaces it; one typed and erased doesn't (the form's rule is still a placeholder).
   const ruleTyped = phraseTyped && phrase.trim().length > 0;

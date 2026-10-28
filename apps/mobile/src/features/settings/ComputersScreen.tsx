@@ -325,8 +325,7 @@ function AgentComputers() {
                 chevron={pick.canPick}
                 {...(pick.canPick
                   ? {
-                      onPress: () =>
-                        router.push({ pathname: "/settings/computers/agent", params: { agentId: a.id } }),
+                      onPress: () => router.push({ pathname: "/settings/computers/agent", params: { agentId: a.id } }),
                     }
                   : {})}
               />

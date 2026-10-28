@@ -1,6 +1,6 @@
 import {
-  type AccountKind,
   ACCOUNTS_PROTOCOL,
+  type AccountKind,
   BRAIN_PROTOCOL,
   type BrainEffort,
   isBrainEffort,

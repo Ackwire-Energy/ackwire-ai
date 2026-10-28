@@ -393,7 +393,12 @@ describe("the form", () => {
   });
 
   test("the mailbox's inbox and the filters that say something", () => {
-    expect(inboxOf([{ id: "Clientes", name: "Clientes" }, { id: "x", name: "Entrada", role: "inbox" }])).toBe("x");
+    expect(
+      inboxOf([
+        { id: "Clientes", name: "Clientes" },
+        { id: "x", name: "Entrada", role: "inbox" },
+      ]),
+    ).toBe("x");
     expect(inboxOf([{ id: "inbox", name: "Inbox" }])).toBe("inbox");
     expect(inboxOf(undefined)).toBe("INBOX");
     expect(cleanFilter({ from: [], subject: "  ", text: " fatura " })).toEqual({ text: "fatura" });
@@ -503,7 +508,10 @@ describe("the rule in words (the web's sentence, on the phone)", () => {
     const nth = fromApiRule({ freq: "monthly", byWeekday: ["2TU"], times: ["09:00"], timezone: SP }, "2026-10-01");
     expect(nth).toMatchObject({ byWeekday: ["TU"], bySetPos: 2, start: "2026-10-01" });
     expect(toApiRule(nth).byWeekday).toEqual(["2TU"]);
-    expect(toApiRule({ ...base, freq: "yearly", start: "2026-03-15" })).toMatchObject({ byMonth: [3], byMonthDay: [15] });
+    expect(toApiRule({ ...base, freq: "yearly", start: "2026-03-15" })).toMatchObject({
+      byMonth: [3],
+      byMonthDay: [15],
+    });
   });
 
   test("the next runs in the rule's zone; a one-off's moment and back", () => {

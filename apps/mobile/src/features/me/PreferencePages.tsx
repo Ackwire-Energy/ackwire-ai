@@ -8,15 +8,7 @@ import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { usePush } from "@/providers/push";
-import {
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  type ThemePreference,
-  useTheme,
-  useToast,
-} from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, type ThemePreference, useTheme, useToast } from "@/ui";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 

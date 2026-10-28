@@ -2,7 +2,7 @@ import { useApi } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { Button, SheetScreen, Text } from "@/ui";
 import { busyAgents } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
