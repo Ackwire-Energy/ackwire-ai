@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { pick } from "./catalog";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -28,13 +29,6 @@ const hintOf = (label: string, inside: HTMLElement = document.body) => {
   if (!button) throw new Error(`no ⓘ for ${label}`);
   const text = document.getElementById(button.getAttribute("aria-describedby") ?? "");
   return { button, text: text?.textContent, hidden: text?.hidden };
-};
-
-/** Picks a service in "Adicionar conector" (its tile) and presses Conectar in its detail pane. */
-const pick = async (dialog: HTMLElement, name: string) => {
-  await click(within(dialog).getByRole("button", { name }));
-  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
-  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
 };
 
 describe("Configurações da organização", () => {

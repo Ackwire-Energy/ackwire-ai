@@ -6,6 +6,7 @@ setupDom();
 import type { MailAccount, RoutineInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
+import { pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeMailOf, ORG_ID, seedState } from "./fake-api";
 import { MAIL_PROVIDERS } from "./fakes/mail";
 import { renderApp, screen, settle } from "./render";
@@ -14,12 +15,6 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-/** Picks a service in "Adicionar conector" (its tile) and presses Conectar in its detail pane. */
-const pick = async (dialog: HTMLElement, name: string) => {
-  await click(within(dialog).getByRole("button", { name }));
-  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
-  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
-};
 const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
 /** Opens a select and picks an option. */
 const choose = async (combobox: HTMLElement, option: string) => {
@@ -67,22 +62,23 @@ describe("Conectores → Email", () => {
   test("the Email group: Gmail, Outlook, iCloud and Outro email, each with how it connects", async () => {
     const { api } = mailApi();
     const dialog = await openCatalog(api);
-    // The categories are a segmented control, each with its count ("Email 4").
+    // The categories, each with its count ("Email 4").
     const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
     await click(within(cats).getByRole("radio", { name: /^Email/ }));
     const names = [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
     expect(names).toEqual(["Gmail", "Outlook", "iCloud", "Outro email", "Não achou?"]);
     const gmail = within(dialog).getByRole("button", { name: "Gmail" });
     expect(gmail.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/gmail.svg");
-    // How it connects lives in the detail pane, not on the card.
+    // How it connects lives in the service's dialog, not on the card.
     await click(gmail);
-    expect(within(dialog).getByRole("complementary", { name: "Sobre Gmail" }).textContent).toContain("Um clique");
+    const google = service("Gmail").textContent;
+    expect(google).toContain("Um clique");
+    await click(within(service("Gmail")).getByRole("button", { name: "Fechar detalhe" }));
     await click(within(dialog).getByRole("button", { name: "iCloud" }));
-    expect(within(dialog).getByRole("complementary", { name: "Sobre iCloud" }).textContent).toContain(
-      "Precisa de uma senha de app",
-    );
+    const apple = service("iCloud").textContent;
+    expect(apple).toContain("Precisa de uma senha de app");
     // No internal names in the copy.
-    expect(dialog.textContent).not.toMatch(/Composio|IMAP/);
+    expect(`${dialog.textContent} ${google} ${apple}`).not.toMatch(/Composio|IMAP/);
   });
 
   test("a server without email shows no Email group", async () => {
