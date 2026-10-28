@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
-import { agentHoldOf } from "@agenteschat/client/lib/notifications";
+import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -331,8 +331,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const href = notificationHref(n, agentDmOf(dms.data), ai);
   const unread = n.readAt === null;
 
-  // An agent held on agentes.chat Cloud: its name heads the notice, and the hold's line is under it.
-  const held = agentHoldOf(n);
+  // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
+  const restriction = restrictionOf(n);
+  const held = restriction?.code === "agent.paused";
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
   const names = held
     ? (n.source.label ?? "")
@@ -352,8 +353,8 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
     return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
   };
-  const sub = held
-    ? restrictionLine(t, "agent.paused", held)
+  const sub = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
     : [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
@@ -449,7 +450,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           }
           time={time}
           sub={sub || null}
-          subLines={held ? 0 : undefined}
+          subLines={restriction ? 0 : undefined}
         />
       </Animated.View>
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}

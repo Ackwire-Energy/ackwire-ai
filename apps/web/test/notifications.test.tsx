@@ -443,12 +443,39 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     expect(row.querySelector(".nt-what")?.textContent).toBe("Ada está em pausa");
     const line = row.querySelector(".nt-snip");
     expect(line?.textContent).toBe(
-      "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 8). Para contestar, escreva para legal@agentes.chat.",
+      "Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). Para contestar, escreva para legal@agentes.chat.",
     );
     // How to contest it is never cut off.
     expect(line?.classList.contains("nt-snip--whole")).toBe(true);
     expect(row.querySelector(".nt-who .nt-sys svg")).toBeTruthy();
     expect(row.getAttribute("aria-label")).toBe("Ada está em pausa, não lida");
+  });
+
+  test("the workspace held or suspended on agentes.chat Cloud reads as the restriction, never 'review'", async () => {
+    const contest = "Para contestar, escreva para legal@agentes.chat.";
+    const standing = (id: string, latest: AppNotification["latest"]) =>
+      notification({ id, kind: "org_standing", latest, updatedAt: ago(2) });
+    await go(
+      seedState({
+        notifications: [
+          standing("n-review", { statusTo: "hold", text: "review", cloud: true }),
+          standing("n-hold", { statusTo: "hold", text: "Termos 5: phishing", cloud: true }),
+          standing("n-suspended", { statusTo: "suspended", text: "Termos 5: spam", cloud: true }),
+          standing("n-self", { statusTo: "hold", text: "review" }),
+        ],
+      }),
+    );
+    const line = (id: string) => document.querySelector(`[data-n="${id}"] .nt-snip`);
+    expect(line("n-review")?.textContent).toBe(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${contest}`,
+    );
+    expect(line("n-hold")?.textContent).toBe(`Este workspace está em espera: Termos 5: phishing. ${contest}`);
+    expect(line("n-suspended")?.textContent).toBe(`Este workspace está suspenso: Termos 5: spam. ${contest}`);
+    for (const id of ["n-review", "n-hold", "n-suspended"])
+      expect(line(id)?.classList.contains("nt-snip--whole")).toBe(true);
+    // A self-hosted server: the reason, as it always read.
+    expect(line("n-self")?.textContent).toBe("review");
+    expect(line("n-self")?.classList.contains("nt-snip--whole")).toBe(false);
   });
 });
 

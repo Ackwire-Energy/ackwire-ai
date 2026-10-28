@@ -281,7 +281,8 @@ export async function setOrgStanding(
       event: { type: "org.standing", orgId, state: after.state, reason: toldReason(after), ...cloudNotice() },
     });
   }
-  if (done.moved && after.notice === "shown") await notifyOrgStanding(deps, orgId, after).catch(() => {});
+  if (done.moved && after.notice === "shown")
+    await notifyOrgStanding(deps, orgId, { ...after, cloud: cloudNotices }).catch(() => {});
   // Every time, not only on the move: setting it again (a retry after a failure) finishes the job.
   if (after.state === "suspended") {
     // Loaded here: the run engine builds on this module.
@@ -296,7 +297,8 @@ export async function setOrgStanding(
  * work, routine slot or bridge call) and the router never picks it, while the rest of the workspace works.
  * What it is doing now stops at its next model, computer or bridge call. At once in this process, within
  * 5 s in the others. On agentes.chat Cloud its responsible person and the workspace's admins are told, with the
- * hold's kind, and letting it go closes that notice. Null when the workspace has no such agent.
+ * hold's kind, and told again when it is held again for another kind. Letting it go closes that notice. Null when the
+ * workspace has no such agent.
  */
 export async function setAgentHold(
   db: Database,
@@ -305,6 +307,11 @@ export async function setAgentHold(
   change: { held: boolean; reason: string | null },
   pubsub?: PubSub,
 ) {
+  const theAgent = and(eq(agents.id, agentId), eq(agents.orgId, orgId));
+  const [before] = await db
+    .select({ heldAt: agents.operatorHoldAt, reason: agents.operatorHoldReason })
+    .from(agents)
+    .where(theAgent);
   const [row] = await db
     .update(agents)
     .set(
@@ -312,17 +319,19 @@ export async function setAgentHold(
         ? { operatorHoldAt: sql`coalesce(${agents.operatorHoldAt}, now())`, operatorHoldReason: change.reason }
         : { operatorHoldAt: null, operatorHoldReason: null },
     )
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .where(theAgent)
     .returning({ heldAt: agents.operatorHoldAt, reason: agents.operatorHoldReason, name: agents.name });
   if (!row) return null;
   caches.standing.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:${agentId}`);
   const { heldAt, reason, name } = row;
-  if (!heldAt) await resolveAgentHold({ db, pubsub }, orgId, agentId).catch(() => {});
-  else if (cloudNotices) {
-    const hold = { orgId, agentId, name, kind: agentHoldKind(reason), heldAt };
-    await notifyAgentHold({ db, pubsub }, hold).catch(() => {});
-  }
+  const deps = { db, pubsub };
+  const kind = agentHoldKind(reason);
+  // The notice says the kind its refusals and runs say: another kind while held replaces it, the same one keeps it.
+  const was = before?.heldAt ? agentHoldKind(before.reason) : null;
+  if (!heldAt || (was && was !== kind)) await resolveAgentHold(deps, orgId, agentId).catch(() => {});
+  if (heldAt && cloudNotices && was !== kind)
+    await notifyAgentHold(deps, { orgId, agentId, name, kind, at: new Date() }).catch(() => {});
   return { heldAt, reason };
 }
 

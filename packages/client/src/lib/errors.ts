@@ -109,6 +109,12 @@ export const LEGAL_EMAIL = "legal@agentes.chat";
 const REVIEW_REASON = "review";
 
 /**
+ * Reasons agentes.chat Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
+ * of its own, and `ended` holds a workspace whose plan ended, a billing matter.
+ */
+const UNCONTESTED: ReadonlySet<string> = new Set([REVIEW_REASON, "ended"]);
+
+/**
  * What the server says of a restriction besides its code: the reason the workspace is told, and on agentes.chat
  * Cloud `cloud` (`"true"` in a run's values, which are text) with a held agent's or a blocked account's kind.
  */
@@ -133,7 +139,8 @@ export function restrictionLine(
   const reason = typeof facts?.reason === "string" ? facts.reason.trim() : "";
   const kind = facts?.kind;
   const email = { email: LEGAL_EMAIL };
-  const contested = (line: string) => (cloud ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line);
+  const contested = (line: string) =>
+    cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
   switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
     case "org.paused":
       if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);

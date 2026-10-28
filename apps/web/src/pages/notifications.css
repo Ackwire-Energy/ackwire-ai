@@ -554,7 +554,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* A held agent's notice: its whole line, how to contest it included. */
+/* A restriction's notice: its whole line, how to contest it included. */
 .nt-snip--whole {
   -webkit-line-clamp: unset;
 }

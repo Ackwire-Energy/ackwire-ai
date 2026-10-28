@@ -8417,15 +8417,15 @@ export const en: Translations = {
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {
       review:
-        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 8). To contest it, write to {{email}}.",
+        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}.",
       blockedAbuse:
-        "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 8). To contest it, write to {{email}}.",
+        "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to {{email}}.",
       blockedLegal:
         "This account is blocked while we keep its data for a legal matter. To ask about it, write to {{email}}.",
       agentNetwork:
-        "This agent is paused. Our network rules saw signs of abuse in its traffic (Terms, section 8). To contest it, write to {{email}}.",
+        "This agent is paused. Our network rules saw signs of abuse in its traffic (Terms, section 5). To contest it, write to {{email}}.",
       agentOperator:
-        "This agent is paused while our team reviews its activity (Terms, section 9). To contest it, write to {{email}}.",
+        "This agent is paused while our team reviews its activity (Terms, section 5). To contest it, write to {{email}}.",
       createRefused:
         "You can't create a workspace while your account or one of your workspaces is restricted. To contest it, write to {{email}}.",
       contest: "To contest it, write to {{email}}.",

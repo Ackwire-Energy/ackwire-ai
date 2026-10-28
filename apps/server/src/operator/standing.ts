@@ -34,7 +34,7 @@ const StandingInput = z.object({
   state: StandingState,
   reason: z.string().trim().min(1).max(64).openapi({
     description:
-      "Shown to the workspace with the notice `shown`. On agentes.chat Cloud, `review` reads as the automatic review hold's line, and any other reason is followed by how to contest it, so name the Terms section it rests on.",
+      "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on.",
   }),
   note: z.string().trim().max(2000).optional(),
   notice: StandingNotice,
@@ -109,7 +109,7 @@ export function registerOperatorStanding(api: OpenAPIHono, { db, pubsub, hub }: 
       tags,
       summary: "Hold one agent, or let it go",
       description:
-        "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. On agentes.chat Cloud it reads the hold's kind with how to contest it (`network` for a reason starting with `network.`, else `operator`), and the agent's responsible person and the workspace's owners and admins get a notice, closed when the agent is let go. At once in this process, within 5 seconds in the others.",
+        "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. On agentes.chat Cloud it reads the hold's kind with how to contest it (`network` for a reason starting with `network.`, else `operator`), and the agent's responsible person and the workspace's owners and admins get a notice, replaced when it is held again for another kind and closed when the agent is let go. At once in this process, within 5 seconds in the others.",
       request: { params: AgentParams, body: body(z.object({ held: z.boolean(), reason: Reason })) },
       responses: { 200: json(AgentHold), ...errors },
     }),

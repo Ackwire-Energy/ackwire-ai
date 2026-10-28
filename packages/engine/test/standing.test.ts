@@ -592,20 +592,26 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
         latest: { statusTo: "agent_hold", holdKind: "network" },
         doneAt: null,
       });
-    // Held again meanwhile, for another reason: nobody is told twice.
+    // Held again meanwhile for the same kind: nobody is told twice.
+    await hold(true, "network.scan");
+    expect(await standingNotices()).toHaveLength(3);
+    // For another kind, and back: the open notice says what its refusals say.
+    const open = async () => (await standingNotices()).filter((n) => n.doneAt === null);
+    const each = (holdKind: string) => [1, 2, 3].map(() => ({ latest: { statusTo: "agent_hold", holdKind } }));
     await hold(true, "operator");
     await expect(assertCanWork(f.db, f.org.id, f.agent.id)).rejects.toMatchObject({ params: { kind: "operator" } });
-    expect(await standingNotices()).toHaveLength(3);
+    expect(await open()).toMatchObject(each("operator"));
+    await hold(true, "network.smtp");
+    expect(await open()).toMatchObject(each("network"));
+    expect(await standingNotices()).toHaveLength(9);
     // The reasons never reach the workspace.
     expect(JSON.stringify([await runs(), await standingNotices()])).not.toContain("smtp");
 
     await hold(false);
-    expect((await standingNotices()).map((n) => n.doneAt)).toEqual([1, 2, 3].map(() => expect.any(Date)));
+    expect(await open()).toEqual([]);
     await Bun.sleep(5);
     await hold(true, "operator");
-    expect((await standingNotices()).filter((n) => n.doneAt === null)).toMatchObject(
-      [1, 2, 3].map(() => ({ latest: { statusTo: "agent_hold", holdKind: "operator" } })),
-    );
+    expect(await open()).toMatchObject(each("operator"));
   });
 
   test("a blocked account's kind, a refused workspace, the workspace's standing and its runs say cloud", async () => {
@@ -636,6 +642,8 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
       code: "org.paused",
       params: { reason: "review", cloud: true },
     });
+    // Its owners' notice reads as the hold does.
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review", cloud: true }]);
     expect(events).toEqual([
       {
         type: "org.broadcast",
@@ -673,6 +681,8 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
       errorCode: "run.org_paused",
       errorParams: { reason: "review" },
     });
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review" }]);
   });
 });
 

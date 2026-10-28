@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AppNotification } from "../src/api/types";
-import { ACCOUNT_BLOCKED, LEGAL_EMAIL, restrictionLine, suspendedText } from "../src/lib/errors";
-import { agentHoldOf, workspaceHeadline } from "../src/lib/notifications";
+import { ACCOUNT_BLOCKED, holdText, LEGAL_EMAIL, restrictionLine, suspendedText } from "../src/lib/errors";
+import { restrictionOf, workspaceHeadline } from "../src/lib/notifications";
 import { endSentence } from "../src/lib/text";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
@@ -19,15 +19,23 @@ describe("a restriction's line on agentes.chat Cloud, by its kind, never its sto
     expect(restrictionLine(t, "run.org_paused", { reason: "review", cloud: "true" })).toBe(
       `standing.cloud.review ${EMAIL}`,
     );
-    expect(restrictionLine(t, "org.paused", { reason: "Terms 8: phishing", ...cloud })).toBe(
-      `standing.onHold {"reason":"Terms 8: phishing"}. ${CONTEST}`,
+    expect(restrictionLine(t, "org.paused", { reason: "Terms 5: phishing", ...cloud })).toBe(
+      `standing.onHold {"reason":"Terms 5: phishing"}. ${CONTEST}`,
     );
-    expect(restrictionLine(t, "run.org_suspended", { reason: "Terms 8: spam", cloud: "true" })).toBe(
-      `standing.suspendedFor {"reason":"Terms 8: spam"}. ${CONTEST}`,
+    expect(restrictionLine(t, "run.org_suspended", { reason: "Terms 5: spam", cloud: "true" })).toBe(
+      `standing.suspendedFor {"reason":"Terms 5: spam"}. ${CONTEST}`,
     );
     // Silent: only that it is paused, nothing to contest.
     expect(restrictionLine(t, "org.paused", cloud)).toBe("standing.paused");
     expect(restrictionLine(t, "org.suspended", cloud)).toBe("standing.suspended");
+  });
+
+  test("an ended plan's hold is a billing matter: its reason, nothing to contest", () => {
+    expect(restrictionLine(t, "org.paused", { reason: "ended", ...cloud })).toBe('standing.onHold {"reason":"ended"}');
+    expect(restrictionLine(t, "run.org_paused", { reason: "ended", cloud: "true" })).toBe(
+      'standing.onHold {"reason":"ended"}',
+    );
+    expect(holdText(t, { state: "hold", reason: "ended", cloud: true })).toBe('standing.onHold {"reason":"ended"}');
   });
 
   test("a held agent: a network rule's or the team's", () => {
@@ -56,8 +64,8 @@ describe("a restriction's line on agentes.chat Cloud, by its kind, never its sto
 describe("a self-hosted server: the words it always had", () => {
   test("every restriction, whatever kind or reason it carries", () => {
     expect(restrictionLine(t, "org.paused", { reason: "review" })).toBe('standing.onHold {"reason":"review"}');
-    expect(restrictionLine(t, "org.paused", { reason: "Terms 8: phishing" })).toBe(
-      'standing.onHold {"reason":"Terms 8: phishing"}',
+    expect(restrictionLine(t, "org.paused", { reason: "Terms 5: phishing" })).toBe(
+      'standing.onHold {"reason":"Terms 5: phishing"}',
     );
     expect(restrictionLine(t, "org.suspended", { reason: "spam" })).toBe('standing.suspendedFor {"reason":"spam"}');
     expect(restrictionLine(t, "agent.paused", { kind: "network" })).toBe("standing.agentPaused");
@@ -77,21 +85,41 @@ describe("a self-hosted server: the words it always had", () => {
   });
 });
 
-describe("the notice of a held agent", () => {
+describe("a restriction's notice in the inbox reads as the restriction itself", () => {
   const notice = (latest: AppNotification["latest"]) => ({ kind: "org_standing" as const, latest });
+  const line = (latest: AppNotification["latest"]) => {
+    const r = restrictionOf(notice(latest));
+    return r ? restrictionLine(t, r.code, r.facts) : null;
+  };
 
-  test("its headline names the agent, and it reads the hold's line", () => {
+  test("a held agent: its headline names the agent, and it reads the hold's line", () => {
     const held = notice({ statusTo: "agent_hold", holdKind: "network" });
     expect(workspaceHeadline(held)).toBe("standing.notification.agentHold");
-    expect(agentHoldOf(held)).toEqual({ kind: "network", cloud: true });
-    expect(restrictionLine(t, "agent.paused", agentHoldOf(held))).toBe(`standing.cloud.agentNetwork ${EMAIL}`);
-    // The workspace's own standing is no agent's.
-    expect(agentHoldOf(notice({ statusTo: "hold" }))).toBeNull();
+    expect(restrictionOf(held)).toEqual({ code: "agent.paused", facts: { kind: "network", cloud: true } });
+    expect(line(held.latest)).toBe(`standing.cloud.agentNetwork ${EMAIL}`);
     expect(workspaceHeadline(notice({ statusTo: "hold" }))).toBe("standing.notification.hold");
+  });
+
+  test("the workspace on agentes.chat Cloud: the review line, an operator's reason with how to contest it", () => {
+    expect(line({ statusTo: "hold", text: "review", cloud: true })).toBe(`standing.cloud.review ${EMAIL}`);
+    expect(line({ statusTo: "hold", text: "Terms 5: phishing", cloud: true })).toBe(
+      `standing.onHold {"reason":"Terms 5: phishing"}. ${CONTEST}`,
+    );
+    expect(line({ statusTo: "suspended", text: "Terms 5: spam", cloud: true })).toBe(
+      `standing.suspendedFor {"reason":"Terms 5: spam"}. ${CONTEST}`,
+    );
+    // Its own text: back to work, with no reason, or from a self-hosted server.
+    for (const latest of [
+      { statusTo: "active", text: "reactivated", cloud: true },
+      { statusTo: "hold", cloud: true },
+      { statusTo: "hold", text: "review" },
+    ])
+      expect(restrictionOf(notice(latest))).toBeNull();
+    expect(restrictionOf({ kind: "mention", latest: { statusTo: "agent_hold", text: "x", cloud: true } })).toBeNull();
   });
 });
 
 test("a sentence gets its full stop once", () => {
-  expect(endSentence("Terms 8: phishing")).toBe("Terms 8: phishing.");
+  expect(endSentence("Terms 5: phishing")).toBe("Terms 5: phishing.");
   for (const done of ["Paused.", "Why?", "Stop!", "Wait…"]) expect(endSentence(done)).toBe(done);
 });

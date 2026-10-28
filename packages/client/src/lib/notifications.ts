@@ -189,11 +189,17 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
 }
 
 /**
- * An agent held on agentes.chat Cloud (`org_standing` to `agent_hold`): its kind as a refused run carries it, so the
- * notice reads `restrictionLine`'s `agent.paused` line; null for any other notice.
+ * The restriction a notice of agentes.chat Cloud tells, as `restrictionLine` reads it: an agent held (its kind, as a
+ * refused run carries it), or the workspace held or suspended with a reason (`latest.cloud`), so `review` reads as the
+ * review line and an operator's reason with how to contest it. Null for any other notice, which keeps its own text.
  */
-export const agentHoldOf = (n: Pick<AppNotification, "kind" | "latest">) =>
-  n.kind === "org_standing" && n.latest.statusTo === "agent_hold" ? { kind: n.latest.holdKind, cloud: true } : null;
+export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
+  const l = n.latest;
+  if (n.kind !== "org_standing") return null;
+  if (l.statusTo === "agent_hold") return { code: "agent.paused", facts: { kind: l.holdKind, cloud: true } };
+  if (!l.cloud || !l.text || (l.statusTo !== "hold" && l.statusTo !== "suspended")) return null;
+  return { code: l.statusTo === "hold" ? "org.paused" : "org.suspended", facts: { reason: l.text, cloud: true } };
+}
 
 /** Grouped (several replies or comments): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>

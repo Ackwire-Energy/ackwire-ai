@@ -199,7 +199,7 @@ describe("Entrar (e-mail primeiro)", () => {
     for (const [block, says] of [
       [
         { kind: "abuse", cloud: true },
-        `Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 8). ${contest}`,
+        `Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). ${contest}`,
       ],
       [
         { kind: "legal", cloud: true },

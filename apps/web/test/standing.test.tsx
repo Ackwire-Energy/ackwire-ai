@@ -118,12 +118,12 @@ describe("on agentes.chat Cloud: what it is, the Terms section and how to contes
     const { set } = await open({ state: "hold", reason: "review", cloud: true }, false, null, true);
     const banner = () => screen().getByRole("region", { name: STATUS });
     expect(banner().textContent).toContain(
-      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 8). ${CONTEST}`,
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${CONTEST}`,
     );
     expect(banner().textContent).not.toContain("em espera: review");
 
-    await set({ state: "hold", reason: "Termos 8: phishing", cloud: true });
-    expect(banner().textContent).toContain(`Este workspace está em espera: Termos 8: phishing. ${CONTEST}`);
+    await set({ state: "hold", reason: "Termos 5: phishing", cloud: true });
+    expect(banner().textContent).toContain(`Este workspace está em espera: Termos 5: phishing. ${CONTEST}`);
 
     await set({ state: "hold", reason: null, cloud: true });
     expect(banner().textContent).toContain("Os agentes deste workspace estão pausados para uma revisão.");
@@ -131,15 +131,15 @@ describe("on agentes.chat Cloud: what it is, the Terms section and how to contes
   });
 
   test("suspended with a reason: why, then how to contest it", async () => {
-    await open({ state: "suspended", reason: "Termos 8: spam", cloud: true }, false, null, true);
-    expect(document.body.textContent).toContain(`Este workspace está suspenso: Termos 8: spam. ${CONTEST}`);
+    await open({ state: "suspended", reason: "Termos 5: spam", cloud: true }, false, null, true);
+    expect(document.body.textContent).toContain(`Este workspace está suspenso: Termos 5: spam. ${CONTEST}`);
   });
 
   test("a run of a held agent says the hold's kind, never its reason", async () => {
     const { channel } = await open(undefined, false, null, true);
     const says = {
-      network: `Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 8). ${CONTEST}`,
-      operator: `Este agente está pausado enquanto a nossa equipe analisa a atividade dele (Termos, seção 9). ${CONTEST}`,
+      network: `Este agente está pausado. As nossas regras de rede viram sinais de abuso no tráfego dele (Termos, seção 5). ${CONTEST}`,
+      operator: `Este agente está pausado enquanto a nossa equipe analisa a atividade dele (Termos, seção 5). ${CONTEST}`,
     };
     for (const kind of ["network", "operator"] as const) {
       const run = { threadId: null, runId: `r-${kind}`, agentId: ADA_ID };

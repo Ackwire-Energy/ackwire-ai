@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
-import type { AiStatus } from "@agenteschat/client";
+import { type AiStatus, ApiError } from "@agenteschat/client";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
   askLineOf,
@@ -23,6 +23,7 @@ import {
   prevStep,
   progressAt,
   STEPS,
+  stepFailedText,
   stepText,
   zoneCity,
   zoneLabel,
@@ -206,4 +207,16 @@ test("invitations: each is sent once, and the ones that failed are what is left 
   expect(sent).toEqual(["ana@acme.com", "bia@acme", "caio@acme.com"]);
   expect(failed).toEqual(["bia@acme"]);
   expect(await inviteEach(["ana@acme.com"], async () => undefined)).toEqual([]);
+});
+
+test("a step that failed says why the server refused it, else that it didn't save", async () => {
+  const pt = await translator("pt-BR");
+  const refused = (params?: Record<string, unknown>) =>
+    new ApiError(403, "org.create_refused", "You can't create a workspace right now", params);
+  expect(stepFailedText(pt, refused({ cloud: true }))).toBe(
+    "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
+  );
+  expect(stepFailedText(pt, refused())).toBe("Você não pode criar um workspace agora.");
+  expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
+  expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });

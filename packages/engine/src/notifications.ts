@@ -132,6 +132,8 @@ export interface NotificationLatest {
   origin?: ApprovalOrigin;
   /** `org_standing` to `agent_hold`: the hold's kind, `network` or `operator`, never its reason. */
   holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: the apps read `text` as the restriction does, with how to contest it. */
+  cloud?: boolean;
   /**
    * `join_request`: who asked, by name (they aren't members, so no actors), the first `MAX_NAMES` in the order they
    * asked: a merged row names whoever its time is from, and `count` says how many asked in all.

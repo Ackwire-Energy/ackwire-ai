@@ -1,4 +1,5 @@
 import type { AiStatus, Edition } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
 import { isEmail } from "@agenteschat/client/lib/text";
@@ -183,6 +184,9 @@ export function askLineOf(
   const line = t(`onboarding.done.first.${key}`, { name: mentioned?.name, computer });
   return { state, icon: LINE_ICON[state], text: line };
 }
+
+/** A step that failed: what the server's code says (a refused workspace, a restriction), else that it didn't save. */
+export const stepFailedText = (t: TFunction, error: unknown) => knownErrorText(t, error) ?? t("mobile.onb.failed");
 
 /** Sends each invitation in turn; the addresses whose invitation failed, in order. */
 export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {

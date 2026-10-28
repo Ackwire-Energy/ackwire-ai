@@ -73,6 +73,7 @@ import {
   progressAt,
   STEPS,
   type StepId,
+  stepFailedText,
   stepText,
   zoneLabel,
 } from "./logic";
@@ -176,8 +177,8 @@ export function OnboardingFlow() {
     try {
       await work();
       setStep(typeof then === "function" ? then() : then);
-    } catch {
-      setError({ at: step, text: t("mobile.onb.failed") });
+    } catch (e) {
+      setError({ at: step, text: stepFailedText(t, e) });
     } finally {
       setPending(false);
     }
@@ -271,8 +272,8 @@ export function OnboardingFlow() {
     try {
       const { url } = await api.invites.createLink(created.orgId);
       await Share.share({ message: t("mobile.onb.shareMessage", { org: orgName, url }) });
-    } catch {
-      setError({ at: step, text: t("mobile.onb.failed") });
+    } catch (e) {
+      setError({ at: step, text: stepFailedText(t, e) });
     }
   };
 

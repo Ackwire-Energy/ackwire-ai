@@ -13,6 +13,7 @@ import {
   refusalOf,
   refusalText,
   signUpClosed,
+  socialRefusalText,
 } from "../../src/features/auth/human-check";
 import { translator } from "./fixtures";
 
@@ -185,7 +186,7 @@ describe("refusals in the phone's words", () => {
     expect(refusalText(en, { status: 403, code: "ACCOUNT_BLOCKED" })).toBe(en("auth.accountBlocked"));
     // On agentes.chat Cloud: the block's kind and how to contest it, never its reason.
     expect(refusalText(en, { status: 403, code: "ACCOUNT_BLOCKED", kind: "abuse", cloud: true })).toBe(
-      "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 8). To contest it, write to legal@agentes.chat.",
+      "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to legal@agentes.chat.",
     );
     expect(refusalText(en, { status: 403, code: "ACCOUNT_BLOCKED", kind: "legal", cloud: true })).toBe(
       "This account is blocked while we keep its data for a legal matter. To ask about it, write to legal@agentes.chat.",
@@ -193,6 +194,21 @@ describe("refusals in the phone's words", () => {
     expect(refusalText(en, { status: 500, code: "internal" })).toBe("Something went wrong. Try again.");
     expect(failureText(en, new TypeError("Network request failed"))).toBe(en("mobile.auth.errors.network"));
     expect(failureText(en, new ApiError(400, "join.code_wrong", "x"))).toBe("Wrong code. Try again.");
+  });
+
+  test("a social sign-in refused: a blocked account's line, with its kind on agentes.chat Cloud, else it failed", async () => {
+    const en = await translator("en");
+    // Apple's native sign-in gets the server's answer itself.
+    const blocked = "ACCOUNT_BLOCKED";
+    expect(socialRefusalText(en, { code: blocked, kind: "abuse", cloud: true })).toBe(
+      "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to legal@agentes.chat.",
+    );
+    expect(socialRefusalText(en, { code: blocked, kind: "other", cloud: true })).toBe(
+      "This account can't sign in. To contest it, write to legal@agentes.chat.",
+    );
+    expect(socialRefusalText(en, { code: blocked })).toBe(en("auth.accountBlocked"));
+    expect(socialRefusalText(en, { code: "INVALID_TOKEN" })).toBe("Couldn't sign you in right now. Try again.");
+    expect(socialRefusalText(en, {})).toBe(en("mobile.auth.social.failed"));
   });
 
   test("a sign-up's 403 is sign-up closed only when it isn't the bot check's", () => {

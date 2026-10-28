@@ -19,7 +19,6 @@ import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
-  agentHoldOf,
   allItems,
   askersOf,
   channelOf,
@@ -29,6 +28,7 @@ import {
   NOTIFICATION_FILTERS,
   opensConnectAi,
   replyTarget,
+  restrictionOf,
   snoozeTimes,
   sortWaiting,
   stepCells,
@@ -680,8 +680,12 @@ function Row({
   // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
-  const held = agentHoldOf(n);
-  const text = held ? restrictionLine(t, "agent.paused", held) : why ? sayWords(t, why, l.text ?? "") : l.text;
+  const restriction = restrictionOf(n);
+  const text = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
+    : why
+      ? sayWords(t, why, l.text ?? "")
+      : l.text;
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -755,7 +759,7 @@ function Row({
         ) : (
           <>
             {(text || lead) && (
-              <p className={cx("nt-snip", held && "nt-snip--whole")}>
+              <p className={cx("nt-snip", restriction && "nt-snip--whole")}>
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
                 {speaker && <b>{t("notifications.speaker", { name: speaker })} </b>}
                 {text && <Snippet text={text} mine={mine} />}

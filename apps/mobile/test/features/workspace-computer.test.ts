@@ -62,9 +62,9 @@ describe("a suspended organization on the phone", () => {
   test("its line: why, and on agentes.chat Cloud how to contest it", async () => {
     const t = await translator("pt-BR");
     expect(suspendedText(t, suspendedOf(orgs, "a"))).toBe("Este workspace está suspenso: uso fora dos termos");
-    const cloud = [{ id: "e", name: "Eco", standing: { state: "suspended", reason: "Termos 8: spam", cloud: true } }];
+    const cloud = [{ id: "e", name: "Eco", standing: { state: "suspended", reason: "Termos 5: spam", cloud: true } }];
     expect(suspendedText(t, suspendedOf(cloud, "e"))).toBe(
-      "Este workspace está suspenso: Termos 8: spam. Para contestar, escreva para legal@agentes.chat.",
+      "Este workspace está suspenso: Termos 5: spam. Para contestar, escreva para legal@agentes.chat.",
     );
     expect(suspendedText(t, suspendedOf(orgs, "d"))).toBe(
       "As conversas e os agentes dele estão fechados por enquanto.",

@@ -4006,6 +4006,8 @@ export interface NotificationLatest {
   origin?: ApprovalOrigin;
   /** `org_standing` to `agent_hold` (agentes.chat Cloud): `network` or `operator`, never the hold's reason. */
   holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: `text` is the reason a restriction reads with (`restrictionOf`). */
+  cloud?: boolean;
   /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
   names?: string[];
 }
