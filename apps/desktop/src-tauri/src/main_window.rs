@@ -214,11 +214,12 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             }
         })
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
-        // browser, the device's name in its words), that `this_mac` takes `servers` (older apps refuse
-        // it, so the site's sign-in offers another server only where this says so), and that a connector's
-        // sign-in comes back here (`deep_link.rs`, older apps don't take it); nothing else.
+        // browser, the device's name in its words), that `this_mac` takes `servers` and `files` (older apps
+        // refuse them, so the sign-in's other server and Storage's "Show the folder" show only where this says
+        // so), and that a connector's sign-in comes back here (`deep_link.rs`, older apps don't take it);
+        // nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, connectorReturn: true }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
@@ -449,7 +450,7 @@ fn front(app: &AppHandle) -> Result<(), String> {
 /// notification while the app is in the background (`notify`), the first run's window to pick another server
 /// (`servers`: the sign-in page's way out, the same window as Servers › Add a server…) and, on the server
 /// here, signing its owner in (`signIn`: the app spends its owner key on a one-time sign-in, which the window
-/// trades itself). Rust checks
+/// trades itself) and the folder of its files (`files`: Storage's "Show the folder"). Rust checks
 /// each request, rebuilds it from the keys it may have, adds the asking page's own `origin`, whether agents may
 /// work here for it and whether it is the server here (`local`), and relays it: the popover's code owns the
 /// runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The machine's token
@@ -504,6 +505,8 @@ fn checked(request: &Value) -> Result<Value, String> {
         Some("requests") => Ok(json!({ "kind": "requests" })),
         Some("signIn") => Ok(json!({ "kind": "signIn" })),
         Some("servers") => Ok(json!({ "kind": "servers" })),
+        // The folder is the app's to know: the page names none.
+        Some("files") => Ok(json!({ "kind": "files" })),
         Some("connect") => {
             let mut out = json!({ "kind": "connect", "orgId": org()? });
             if let Some(name) = display_name(request.get("orgName")) {
@@ -557,6 +560,18 @@ fn checked(request: &Value) -> Result<Value, String> {
         }
         _ => Err("unknown request".into()),
     }
+}
+
+/// `files` reaches the popover only from the server here's own page, marked `local`: the folder it shows is this
+/// computer's.
+fn files_gate(mut request: Value, server_here: bool) -> Result<Value, String> {
+    if request["kind"] == "files" {
+        if !server_here {
+            return Err("not_here".into());
+        }
+        request["local"] = json!(true);
+    }
+    Ok(request)
 }
 
 /// The site's notifications: at most one every 3 seconds and 60 an hour, only while the window isn't in
@@ -744,6 +759,7 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             }
         }
     }
+    request = files_gate(request, server_here)?;
     if request["kind"] == "connect" {
         if !here {
             return Err("not_here".into());
@@ -926,7 +942,20 @@ mod tests {
             checked(&json!({ "kind": "servers", "url": "https://evil.example" })),
             Ok(json!({ "kind": "servers" }))
         );
+        // The page can't name a folder, or say it is the server here (Rust adds `local` itself).
+        assert_eq!(
+            checked(&json!({ "kind": "files", "path": "/etc", "local": true })),
+            Ok(json!({ "kind": "files" }))
+        );
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
+    }
+
+    #[test]
+    fn files_only_for_the_server_here() {
+        let files = checked(&json!({ "kind": "files", "local": true })).unwrap();
+        assert_eq!(files_gate(files.clone(), false), Err("not_here".to_string()));
+        assert_eq!(files_gate(files, true), Ok(json!({ "kind": "files", "local": true })));
+        assert_eq!(files_gate(json!({ "kind": "status" }), false), Ok(json!({ "kind": "status" })));
     }
 
     #[test]

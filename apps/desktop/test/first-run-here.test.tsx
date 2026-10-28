@@ -211,6 +211,39 @@ describe("Run agentes.chat on this Mac", () => {
       },
       { here: { tailscale: "off" } },
     );
+    // A Mac with only Tailscale's command-line tool (Homebrew's): no app to open, the terminal connects it.
+    await firstRun(
+      "first",
+      async ({ el, press, until }) => {
+        await press("Use your own server");
+        await press("Run agentes.chat on this Mac");
+        await until(() => switchRows(el)[0]?.line?.startsWith("Tailscale"));
+        const row = el.querySelector(".dk-card > .dk-crow");
+        expect(row?.querySelector("small")?.textContent?.trim()).toBe(
+          "Tailscale isn't connected. Connect it in the terminal: sudo tailscale up",
+        );
+        expect(row?.querySelector("small code")?.textContent).toBe("sudo tailscale up");
+        expect(el.textContent).not.toContain("Open Tailscale");
+      },
+      {
+        host: (host) => {
+          host.tailscale = async () => ({ state: "off", app: false });
+        },
+      },
+    );
+    // Windows: no sudo and no app for this one to open, Tailscale's icon by the clock connects it (signed out or not).
+    await firstRun(
+      "windows",
+      async ({ el, press, until }) => {
+        await press("Use your own server");
+        await press("Run agentes.chat on this PC");
+        await until(() => switchRows(el)[0]?.line?.startsWith("Tailscale"));
+        const line = el.querySelector(".dk-card > .dk-crow small");
+        expect(line?.textContent).toBe("Tailscale isn't connected. Connect it from its icon by the clock.");
+        expect(line?.querySelector("code, button")).toBeNull();
+      },
+      { here: { tailscale: "off" } },
+    );
   });
 });
 

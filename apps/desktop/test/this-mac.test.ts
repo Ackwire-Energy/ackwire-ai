@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test";
 import type { ControlEvent, ControlStatus } from "@agenteschat/adapters/runner-control";
+import { filesFolder } from "../src/control/local-server";
 import { DesktopStore, type Home } from "../src/control/store";
 import { answerThisMac, toolsHere } from "../src/control/this-mac";
 import type { Host } from "../src/host/types";
 
 /**
- * The site in the main window asking this computer: status, connect, reconnect, Preferences, each about the
- * asking page's own server only (Rust adds `origin` and `agentsHere` to every request).
+ * The site in the main window asking this computer: status, connect, reconnect, Preferences, the server here's
+ * files, each about the asking page's own server only (Rust adds `origin`, `agentsHere` and `local`).
  */
 
 const SERVER = "https://agentes.tail1234.ts.net";
@@ -70,13 +71,21 @@ function setup(statuses: Record<string, ControlStatus>, others = false) {
   const store = new DesktopStore(host, { idPrefix: "t" });
   const event = (homeId: string, e: ControlEvent) => onLine(homeId, JSON.stringify({ type: "event", event: e }));
   const prefs: string[] = [];
+  // The folders of this computer, and the ones shown in Finder.
+  const folders = new Set<string>();
+  const revealed: string[] = [];
   const deps = {
     store,
     openPrefs: async (tab: "folders" | "tools" | "updates") => void prefs.push(tab),
     showRequests: async () => void prefs.push("requests"),
+    localDir: async () => "/Users/ana/.agentes",
+    revealFolder: async (path: string) => {
+      if (!folders.has(path)) throw new Error("not a folder");
+      revealed.push(path);
+    },
     codeTimeoutMs: 500,
   };
-  return { store, sent, event, deps, prefs };
+  return { store, sent, event, deps, prefs, folders, revealed };
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 10));
@@ -231,4 +240,18 @@ test("reconnect: the organization's own runner on that server; anywhere else rej
     "not_connected",
   );
   await expect(answerThisMac(deps, { kind: "reconnect", orgId: "o1", origin: OTHER })).rejects.toThrow("not_connected");
+});
+
+test("files: the server here's files in Finder, only for its own page; its folder until the first upload", async () => {
+  const { deps, folders, revealed } = setup({});
+  folders.add("/Users/ana/.agentes");
+  // Another server's page: Rust adds `local` only for the server here's own.
+  await expect(answerThisMac(deps, { kind: "files" })).rejects.toThrow("not_here");
+  expect(revealed).toEqual([]);
+  // Nothing uploaded yet, so no `files` in it: the server's own folder.
+  expect(await answerThisMac(deps, { kind: "files", local: true })).toEqual({});
+  folders.add("/Users/ana/.agentes/files");
+  expect(await answerThisMac(deps, { kind: "files", local: true })).toEqual({});
+  expect(revealed).toEqual(["/Users/ana/.agentes", "/Users/ana/.agentes/files"]);
+  expect(filesFolder("C:\\Users\\ana\\.agentes")).toBe("C:\\Users\\ana\\.agentes\\files");
 });

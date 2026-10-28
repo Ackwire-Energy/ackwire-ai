@@ -7,13 +7,13 @@ import { Button, Icon, type IconName, PixelSpinner, Switch } from "@agenteschat/
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
-import { REASON_TEXT, type ReachStage, type ServeProblem, type Tailnet } from "../control/local-server";
+import { REASON_TEXT, type ReachStage, type ServeProblem, type Tailnet, tailscaleFrom } from "../control/local-server";
 import type { ServerKind } from "../control/server";
 import { CommandCopy } from "./bits";
 import { hintFor, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
-/** Connecting Tailscale where it has no app of its own to open (Linux). */
+/** Connecting Tailscale where it has no app or icon of its own to open (Linux, a Mac with only its command line). */
 const TAILSCALE_UP = "sudo tailscale up";
 /** What lets this computer's user change what Tailscale shares (Linux). */
 const TAILSCALE_OPERATOR = "sudo tailscale set --operator=$USER";
@@ -66,8 +66,8 @@ export function ReachRow({
   const host = useHost();
   const usable = tailnet?.state === "on" || on;
   const missing = tailnet?.state === "missing";
-  // Not connected, and no Tailscale app to open: it connects from the terminal.
-  const fromTerminal = !usable && !missing && host.platform !== "mac";
+  const from = tailscaleFrom(host.platform, tailnet);
+  const fromTerminal = !usable && !missing && from === "terminal";
   let line: ReactNode = null;
   if (!tailnet && !on)
     line = (
@@ -76,6 +76,7 @@ export function ReachRow({
         <span className="dk-shimmer">{t("desktop.here.reachChecking")}</span>
       </span>
     );
+  else if (tailnet && !usable && !missing && from === "tray") line = t("desktop.here.reachTray");
   else if (tailnet && !usable)
     line = (
       <span>

@@ -203,7 +203,9 @@ export function Popover() {
         await host.showWindow("prefs");
       };
       const showRequests = () => host.showWindow("popover");
-      answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
+      const localDir = () => host.localServer().then((s) => s.dir);
+      const revealFolder = (path: string) => host.revealFolder(path);
+      answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder }, request)
         .then(
           (data) => host.thisMacReply(id, true, data ?? null),
           (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
