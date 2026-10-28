@@ -443,11 +443,10 @@
 .cmp-prep > :last-child {
   margin-bottom: auto;
 }
-.cmp-prep__title {
-  font-size: 16px;
-}
+/* Its lines start on one edge, as wide as the widest (the steps' bar spans them), centred under the portrait. */
 .cmp-prep .setup-wait {
-  width: min(560px, 100%);
+  width: fit-content;
+  max-width: min(560px, 100%);
 }
 
 /*

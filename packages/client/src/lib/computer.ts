@@ -252,6 +252,13 @@ export function setupPortrait(view: SetupView, online: boolean): ComputerState {
   return view.phase === "problem" ? "offline" : "paused";
 }
 
+/**
+ * Its one-line status (no step yet) only restates its chip: in line, or being prepared before a step. A problem or a
+ * hold says more than its chip (what happens, why).
+ */
+export const statusRestatesChip = (view: SetupView) =>
+  view.step === null && (view.phase === "waiting" || view.phase === "preparing");
+
 /** On its way: the notice, the waiting agents and the onboarding's progress show. */
 export const setupPending = (view: SetupView | null): view is SetupView =>
   view !== null && view.phase !== "ready" && view.phase !== "paused";

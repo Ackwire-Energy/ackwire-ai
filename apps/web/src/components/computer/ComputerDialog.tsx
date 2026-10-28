@@ -351,13 +351,13 @@ function ComputerStage({
       </>
     );
   } else if (surface === "preparing" && f.setup) {
+    // The head names it and says where it is; the card says only the rest.
     body = (
       <>
         <DialogHead sub={t(f.setup.chipKey)} />
         <div className="cmp-prep">
           <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="paused" size={96} />
-          <b className="cmp-prep__title">{t("computerSetup.notice.title", { org: org.name })}</b>
-          <SetupWait view={f.setup} reader={reader} />
+          <SetupWait view={f.setup} reader={reader} said />
         </div>
       </>
     );

@@ -15,6 +15,7 @@ import {
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
   WORKSPACE_COMPUTER_KIND,
 } from "../src/lib/computer";
 import { errorText, holdText, restrictionLine, supportLineOf } from "../src/lib/errors";
@@ -160,6 +161,17 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupPending(at("waiting"))).toBe(true);
     expect(setupPending(at("ready"))).toBe(false);
     expect(setupPending(null)).toBe(false);
+  });
+
+  test("beside its chip, its one-line status says nothing more while in line or before a step", () => {
+    const at = (patch: Partial<ComputerSetup>) =>
+      setupView(external(patch)) as NonNullable<ReturnType<typeof setupView>>;
+    expect(statusRestatesChip(at({ state: "waiting", reason: "capacity" }))).toBe(true);
+    expect(statusRestatesChip(at({ state: "preparing" }))).toBe(true);
+    // The steps' bar, what went wrong and why it waits say more than the chip.
+    expect(statusRestatesChip(at({ state: "preparing", step: "installing" }))).toBe(false);
+    expect(statusRestatesChip(at({ state: "problem" }))).toBe(false);
+    expect(statusRestatesChip(at({ state: null }))).toBe(false);
   });
 
   test("who waits for it: the agents no computer lists", () => {

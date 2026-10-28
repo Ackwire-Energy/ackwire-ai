@@ -169,7 +169,9 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     expect(sub()).toBe("Sendo preparado");
     const text = box().textContent ?? "";
-    expect(text).toContain("Preparando o computador da Acme");
+    // One name and one status: the head's. The card says neither again.
+    expect(text).not.toContain("Computador da Acme");
+    expect(text).not.toMatch(/Preparando/);
     expect(text).toContain("Passo 3 de 4 · Instalando os programas");
     expect(text).toContain("Faltam uns 6 min");
     expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
@@ -184,23 +186,29 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 
-  test("its header says where the wait is, as the chip does: being prepared, in line, a problem", async () => {
+  test("its header says where the wait is, as the chip does: being prepared, in line, a problem; the card never again", async () => {
     const heads: (string | null)[] = [];
     for (const setup of [
       { step: "installing" },
       { state: "waiting", reason: "capacity", notifyByEmail: true },
+      { state: "preparing" },
       { state: "problem" },
     ] as const) {
       await dialog({ setup, machine: null, desktop: { available: false, reason: "no_computer" } });
       heads.push(sub());
-      // Waiting for a computer: the line, and the owner's email in place of a time.
+      const card = box().querySelector(".cmp-prep")?.textContent ?? "";
+      // In line: the owner's email in place of a time, and no line saying it waits (the head says "Na fila").
       if (setup.state === "waiting") {
-        expect(box().textContent).toContain("Esperando um computador disponível");
-        expect(box().textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+        expect(card).not.toContain("Esperando um computador disponível");
+        expect(card).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
       }
+      // Before its first step, nothing says it's being prepared but the head.
+      if (setup.state === "preparing") expect(card).not.toContain("Preparando o computador.");
+      // A problem says what happens next.
+      if (setup.state === "problem") expect(card).toContain("Algo deu errado ao preparar o computador");
       cleanup();
     }
-    expect(heads).toEqual(["Sendo preparado", "Na fila", "Com problema"]);
+    expect(heads).toEqual(["Sendo preparado", "Na fila", "Sendo preparado", "Com problema"]);
   });
 
   test("ready: it flashes Pronto, then opens with nothing to click", async () => {

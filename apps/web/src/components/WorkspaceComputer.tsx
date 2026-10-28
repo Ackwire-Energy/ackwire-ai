@@ -13,6 +13,7 @@ import {
   setupPending,
   setupPortrait,
   setupView,
+  statusRestatesChip,
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
@@ -30,7 +31,7 @@ import {
   Spinner,
   Steps,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -89,8 +90,11 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   paused: "pause",
 };
 
-/** While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. */
-export function SetupProgress({ view }: { view: SetupView }) {
+/**
+ * While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. `said`: a
+ * chip or the window's head beside it says where it is, so a line that would only say it again stays out.
+ */
+export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
     return (
@@ -103,6 +107,7 @@ export function SetupProgress({ view }: { view: SetupView }) {
       </div>
     );
   }
+  if (said && statusRestatesChip(view)) return null;
   // The lines under it lead with 14px too, so every line's words start in one column.
   return (
     <p className="setup-progress setup-progress--line ac-iconline" role="status">
@@ -164,12 +169,12 @@ export function ComputerTitle({ children, name }: { children: ReactNode; name: s
 
 /**
  * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left, who
- * hears when it's ready, then the size.
+ * hears when it's ready, then the size. `said` as `SetupProgress`'s.
  */
-export function SetupWait({ view, reader }: { view: SetupView; reader: WaitReader }) {
+export function SetupWait({ view, reader, said }: { view: SetupView; reader: WaitReader; said?: boolean }) {
   return (
     <div className="setup-wait">
-      <SetupProgress view={view} />
+      <SetupProgress view={view} said={said} />
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
     </div>
@@ -231,7 +236,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           </span>
         </span>
       </div>
-      {view.phase !== "ready" && <SetupProgress view={view} />}
+      {view.phase !== "ready" && <SetupProgress view={view} said />}
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (
@@ -259,11 +264,16 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
  * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), or the
  * wait for a computer, with "Avisamos por e-mail." after it for owners, and the faces of the agents that wait for it,
- * each named by its label. Everyone sees it; closed, it stays closed until the state (or the step) changes.
+ * each named by its label. Everyone sees it, except on Settings › Computers, where its See leads and the card says it;
+ * closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const there = useMatchRoute()({
+    to: "/org/$orgId/settings/$section",
+    params: { orgId: org.id, section: "computers" },
+  });
   const reader = useWaitReader();
   const view = useSetupView(org.id);
   const pending = setupPending(view);
@@ -271,7 +281,7 @@ export function ComputerSetupNotice() {
   const machines = useMachines(org.id, pending);
   const { eta, email } = useSetupWait(view, reader.held);
   const [hidden, setHidden] = useState(() => storage.get(STORAGE_KEYS.setupNoticeHidden));
-  if (!pending) return null;
+  if (!pending || there) return null;
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
