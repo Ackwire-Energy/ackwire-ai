@@ -68,6 +68,7 @@ import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
@@ -97,6 +98,8 @@ export function SettingsPage({
   const current = visible.some((s) => s.id === section) ? section : "general";
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
+  const strip = useRef<HTMLDivElement>(null);
+  useCentreCurrent(strip, current);
 
   return (
     <div className="settings">
@@ -108,7 +111,7 @@ export function SettingsPage({
             <span>{org.name}</span>
           </span>
         </div>
-        <div className="settings__groups">
+        <div className="settings__groups" ref={strip}>
           {SETTINGS_GROUPS.map((g) => {
             const items = visible.filter((s) => s.group === g);
             if (items.length === 0) return null;

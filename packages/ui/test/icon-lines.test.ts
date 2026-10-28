@@ -152,7 +152,7 @@ describe("an icon before text sits on the text's first line", () => {
     expect(lines.map((e) => `${e.where} ${e.classes.join(" ")}`)).toEqual([]);
   });
 
-  test("a lead and an ⓘ sit on the first line's capitals' middle (--cap-mid), a 22px-line fallback first", async () => {
+  test("a lead and an ⓘ sit on their line's capitals' middle (--cap-mid), a 22px-line fallback first", async () => {
     const rules = await allRules();
     const body = (selector: string) =>
       rules

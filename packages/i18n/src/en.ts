@@ -596,7 +596,7 @@ export const en: Translations = {
       lead: "Invite them by email, or share the link.",
       leadLink: "Share the invitation link with them.",
       emails: "Emails",
-      placeholder: "name@company.com, other@company.com",
+      placeholder: "name@company.com",
       more: "More emails…",
       emailsHint: "Each person gets an invitation by email and joins directly.",
       invalid: "check",
@@ -2600,7 +2600,7 @@ export const en: Translations = {
     subtitle_other: "Who's part of {{org}}: {{people}} people and {{agents}} agents.",
     inviteTitle: "Invite people",
     emails: "Emails, separated by commas",
-    emailsPlaceholder: "name@company.com, other@company.com",
+    emailsPlaceholder: "name@company.com",
     role: "Role",
     invite: "Invite",
     invalidEmails: "No valid email. Use something like name@company.com.",
@@ -6714,7 +6714,7 @@ export const en: Translations = {
     namePlaceholder: "E.g.: Production",
     url: "Database address",
     urlHelp: "Starts with postgres://. Stored encrypted on the server. Nobody sees it again, not even the agents.",
-    urlPlaceholder: "postgres://user:password@server:5432/database",
+    urlPlaceholder: "postgres://user:password@host/db",
     urlInvalid: "Paste an address that starts with postgres://, or fill in the fields under Advanced.",
     howTitle: "How do I create a read-only user?",
     howText: "Agents only run queries, but a user that can only read makes sure of it in the database itself.",
@@ -8512,7 +8512,8 @@ export const en: Translations = {
     },
     title: "{{org}}'s computer",
     users: "One user per agent: each one has its own folder.",
-    specs: "{{cpus}} CPUs · {{memoryGb}} GB of memory · {{diskGb}} GB of disk",
+    specs:
+      "{{cpus}}\u00a0CPUs\u00a0· {{memoryGb}}\u00a0GB\u00a0of\u00a0memory\u00a0· {{diskGb}}\u00a0GB\u00a0of\u00a0disk",
     chip: {
       preparing: "Being prepared",
       capacity: "In line",
@@ -8539,7 +8540,7 @@ export const en: Translations = {
     status: {
       preparing: "Getting the computer ready.",
       capacity: "Waiting for an available computer",
-      problem: "Something went wrong while preparing it. We're on it.",
+      problem: "Something went wrong while preparing it. We're\u00a0on\u00a0it.",
       ready: "Ready.",
       paused: "Not being prepared while the workspace is on hold.",
     },
@@ -8560,7 +8561,7 @@ export const en: Translations = {
       late: "Taking a little longer than expected",
     },
     email: {
-      you: "We'll email you at {{email}} when it's ready.",
+      you: "We'll\u00a0email\u00a0you\u00a0at {{email}} when\u00a0it's\u00a0ready.",
       here: "It shows here as soon as it's ready.",
       /** After the capacity wait's line, for owners. */
       short: "We'll email you.",

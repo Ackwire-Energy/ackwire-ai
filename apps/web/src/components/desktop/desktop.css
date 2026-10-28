@@ -51,10 +51,10 @@
   font-size: 16px;
 }
 /*
- * In control, in the steps' line's place under the screen and as tall (13px text on a 22px line): the keys, and
- * what programs there can see. A phone's Keyboard button leads it with no baseline to share (a button's is its
- * icon's bottom edge, about 4 px under its label's), so the words' first line is centred on the button, a touch
- * control as tall as `--control-h-md`.
+ * In control, in the steps' line's place under the screen and as tall (13px text on a 22px line): what programs
+ * there can see, and the keys. A phone's Keyboard button leads it with no baseline to share (a button's is its icon's
+ * bottom edge, about 4 px under its label's), so the words' first line is centred on the button, a touch control as
+ * tall as `--control-h-md`.
  */
 .dsk-line {
   flex: none;
@@ -67,6 +67,30 @@
 }
 .dsk-line > .ac-btn ~ * {
   margin-top: calc((var(--control-h-md) - 22px) / 2);
+}
+/*
+ * The window keeps one line's room for it (the phone's sheet and full screen don't, and let it wrap): its words stay
+ * one line, the first sentence cut short only in a window too small for it, and the keys after it only where they fit
+ * whole (they wrap to a second row it never shows).
+ */
+@media (min-width: 721px) {
+  .cmp-dialog:not(.is-screen-only) .dsk-words {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 4px;
+    min-width: 0;
+    height: 22px;
+    overflow: hidden;
+  }
+  .cmp-dialog:not(.is-screen-only) .dsk-words > * {
+    min-width: 0;
+  }
+  .cmp-dialog:not(.is-screen-only) .dsk-words .muted {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 /* What the clipboard just did, for a moment in the line's words' place, as a toast would say it. */
 .dsk-said {

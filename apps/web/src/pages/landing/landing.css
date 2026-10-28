@@ -276,8 +276,8 @@
   padding: 0 10px 0 18px;
   border-radius: 20px;
   background: var(--glass);
-  backdrop-filter: blur(20px) saturate(1.6);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
   box-shadow: var(--e3), var(--top);
   transition: transform 0.35s var(--out);
 }
@@ -392,8 +392,8 @@
   padding: 0 14px 0 8px;
   border-radius: 999px;
   background: rgba(4, 24, 48, 0.86);
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
@@ -516,8 +516,8 @@
   padding: 6px;
   border-radius: 20px;
   background: var(--sky-glass);
-  backdrop-filter: blur(16px) saturate(1.4);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
   box-shadow:
     0 0 0 1px var(--sky-line),
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
@@ -602,8 +602,8 @@
   padding: 14px 18px 14px 14px;
   border-radius: 20px;
   background: var(--sky-glass);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   box-shadow:
     0 0 0 1px var(--sky-line),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
