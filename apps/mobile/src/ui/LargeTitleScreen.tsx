@@ -5,7 +5,7 @@ import { Platform, type RefreshControlProps, StyleSheet, View } from "react-nati
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
-import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
+import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
@@ -102,7 +102,12 @@ export function LargeTitleScreen({
         >
           {/* The art reaches up behind the clear bar and the status bar on both platforms (no band above it). */}
           <View style={backdrop ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
-            {backdrop ? <View style={StyleSheet.absoluteFill}>{backdrop}</View> : null}
+            {/* As the agent's cover: it lags behind the list, and stretches into the gap a pull-down opens. */}
+            {backdrop ? (
+              <CoverParallax y={y} style={StyleSheet.absoluteFill}>
+                {backdrop}
+              </CoverParallax>
+            ) : null}
             <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
               <Text variant="display" accessibilityRole="header" numberOfLines={1}>
                 {title}

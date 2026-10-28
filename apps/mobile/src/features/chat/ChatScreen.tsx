@@ -40,7 +40,7 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -164,6 +164,8 @@ const FRESH_MS = 800;
 /** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
+/** How long the conversation is held in place after something opens over it or closes (ms). */
+const HOLD_MS = 900;
 
 /**
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
@@ -467,6 +469,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
   // marks the first of it, and the pill lands there when it is far.
   const listRef = useRef<LegendListRef>(null);
+  // The person is dragging the list (a hold on its place lets go).
+  const dragging = useRef(false);
   const scrollRows = useMemo<ScrollRow[]>(
     () =>
       rows.map((r) => ({
@@ -877,19 +881,34 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
-  // Opening a sheet must not move the conversation: on iOS it jumped to its top when the options opened
-  // (the cause sits between the modal and the list's insets). For a moment after, the list is held where it was.
-  const holdPlace = () => {
-    const from = listRef.current?.getState().scroll;
+  // Something opening over the conversation must not move it: on iOS it jumped toward its top when a header
+  // button opened a sheet or the agent's computer (the cause sits between the modal and the list's insets). For
+  // a moment after it opens and after it closes, the list is held where it was, unless the person drags it.
+  const holdPlace = useCallback((at?: number) => {
+    const from = at ?? listRef.current?.getState().scroll;
     if (from == null) return;
-    const until = Date.now() + 900;
+    dragging.current = false;
+    const until = Date.now() + HOLD_MS;
     const check = () => {
+      if (dragging.current) return;
       const now = listRef.current?.getState().scroll;
       if (now != null && from - now > 40) listRef.current?.scrollToOffset({ offset: from, animated: false });
       if (Date.now() < until) requestAnimationFrame(check);
     };
     requestAnimationFrame(check);
-  };
+  }, []);
+  // The agent's computer opens full screen: where the conversation was is kept, and given back on return.
+  const away = useRef<number | null>(null);
+  const leavePlace = useCallback(() => {
+    away.current = listRef.current?.getState().scroll ?? null;
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const at = away.current;
+      away.current = null;
+      if (at != null) holdPlace(at);
+    }, [holdPlace]),
+  );
   const showOptions = () =>
     info && isThread
       ? sheet.open(
@@ -899,6 +918,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onMission={() => openNewMission("", info.id)}
             onPins={openPins}
           />,
+          { onClose: () => holdPlace() },
         )
       : sheet.open(
           <ChannelOptions
@@ -912,6 +932,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
           />,
+          { onClose: () => holdPlace() },
         );
   const openOptions = () => {
     holdPlace();
@@ -986,7 +1007,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const right =
     (isThread && info) || dm || channel ? (
       <>
-        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} /> : null}
+        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} onOpen={leavePlace} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;
@@ -1246,6 +1267,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             // Under the glass header on iOS: the system insets the top by the bar (and draws its scroll edge).
             contentInsetAdjustmentBehavior="automatic"
             onStartReached={loadOlder}
+            onScrollBeginDrag={() => {
+              dragging.current = true;
+            }}
             onStartReachedThreshold={0.5}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
