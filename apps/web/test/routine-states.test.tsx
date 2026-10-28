@@ -176,6 +176,16 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(card("Avaliações").textContent).toContain("A cada 30 minutos");
     expect(card("Avaliações").textContent).not.toContain("Every");
   });
+
+  test("the strip's last runs read as sentences: each after the first starts with a capital", async () => {
+    const now = routineRun({ at: ago(0.5), status: "reported" });
+    const yesterday = routineRun({ at: ago(24 * 60), status: "silent" });
+    await open([routine({ id: "rt-runs", name: "Erros do Sentry", lastRun: now, recentRuns: [now, yesterday] })]);
+    const strip = within(card("Erros do Sentry")).getByRole("img", { name: /^Últimas execuções/ });
+    expect(strip.getAttribute("aria-label")).toMatch(
+      /^Últimas execuções: agora: respondeu\. Ontem \d{1,2}:\d{2}: nada novo, ficou em silêncio$/,
+    );
+  });
 });
 
 describe("Rotinas: a routine's details", () => {

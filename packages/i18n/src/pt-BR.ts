@@ -6545,7 +6545,7 @@ export const ptBR = {
     acceptAll: "Aceitar as sugestões",
     accepted_one: "{{count}} sugestão aceita",
     accepted_other: "{{count}} sugestões aceitas",
-    suggestion: "Sugestão: <b>{{level}}</b>, porque {{reason}}",
+    suggestion: "Sugestão: <b>{{level}}</b> ({{reason}})",
     ok: "OK",
     confirm: "Confirmar {{name}}",
     moved: "“{{name}}” foi para {{subject}}",
@@ -6593,7 +6593,7 @@ export const ptBR = {
     sensitive: "Ação sensível: só pode pedir aprovação ou ficar desligada.",
     reason: {
       reads_only: "só consulta números, não muda nada",
-      changes_undoable: "muda coisas, mas não apaga nada nem gasta dinheiro",
+      changes_undoable: "não apaga nada nem gasta dinheiro",
       replaces_data: "troca dados que já existem",
       copies_only: "copia sem apagar nada",
       spends_money: "pode gastar dinheiro",

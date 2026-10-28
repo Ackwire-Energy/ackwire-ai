@@ -63,7 +63,7 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 export const daysBetween = (iso: string, now: Date) =>
   Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
 
 /** A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). */
 export const lowerFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleLowerCase(locale) + s.slice(1) : s);

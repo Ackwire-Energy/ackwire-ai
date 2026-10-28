@@ -6511,7 +6511,7 @@ export const en: Translations = {
     acceptAll: "Accept the suggestions",
     accepted_one: "{{count}} suggestion accepted",
     accepted_other: "{{count}} suggestions accepted",
-    suggestion: "Suggestion: <b>{{level}}</b>, because {{reason}}",
+    suggestion: "Suggestion: <b>{{level}}</b> ({{reason}})",
     ok: "OK",
     confirm: "Confirm {{name}}",
     moved: "“{{name}}” moved to {{subject}}",
@@ -6559,7 +6559,7 @@ export const en: Translations = {
     sensitive: "Sensitive action: it can only ask for approval or be off.",
     reason: {
       reads_only: "it only looks at numbers, changes nothing",
-      changes_undoable: "it changes things, but deletes nothing and spends no money",
+      changes_undoable: "it deletes nothing and spends no money",
       replaces_data: "it replaces data that already exists",
       copies_only: "it copies without deleting anything",
       spends_money: "it can spend money",
