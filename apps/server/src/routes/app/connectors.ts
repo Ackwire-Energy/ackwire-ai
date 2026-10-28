@@ -69,7 +69,7 @@ const CatalogEntry = z
       description:
         "`catalog`: our connector with its own scopes; `remote_mcp`: a vendor's official MCP server (one click).",
     }),
-    category: z.enum(["dev", "product", "docs", "payments", "support", "marketing", "automation"]),
+    category: z.enum(["dev", "product", "docs", "data", "payments", "sales", "support", "marketing", "automation"]),
     auth: z.array(z.enum(["oauth", "api_key"])),
     oauthConfigured: z
       .boolean()
