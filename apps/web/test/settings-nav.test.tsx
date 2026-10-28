@@ -151,18 +151,20 @@ describe("the current section in the nav", () => {
 
 describe("the sections' strip on a phone", () => {
   /**
-   * A 390px strip of 120px keys 4px apart from x = 16, moved by its own sideways scroll; each scroll it's asked for is
-   * kept. Patched on Element.prototype, where the methods live, and put back there.
+   * A 390px strip (`across`) of 120px keys (`wide`) 4px apart from x = 16, moved by its own sideways scroll; each
+   * scroll it's asked for is kept. Patched on Element.prototype, where the methods live, and put back there.
    */
   const real = { rect: Element.prototype.getBoundingClientRect, scrollTo: Element.prototype.scrollTo };
   const asked: (ScrollBehavior | undefined)[] = [];
   const box = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 40, width, height: 40 });
   let wide = 120;
+  let across = 390;
   function phone() {
     asked.length = 0;
     wide = 120;
+    across = 390;
     Element.prototype.getBoundingClientRect = function (this: Element) {
-      if (this.classList.contains("settings__groups")) return box(0, 390) as DOMRect;
+      if (this.classList.contains("settings__groups")) return box(0, across) as DOMRect;
       const strip = this.closest(".settings__groups");
       if (!strip || !this.classList.contains("settings__link")) return real.rect.call(this);
       const i = [...strip.querySelectorAll(".settings__link")].indexOf(this);
@@ -195,15 +197,56 @@ describe("the sections' strip on a phone", () => {
 
   test("a web font that arrives after it opened, changing every key's width, puts the key back in the middle", async () => {
     phone();
-    const fonts = new EventTarget();
+    let arrive = () => {};
+    const ready = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    // As WebKit does: `ready` settles, and no `loadingdone` comes.
+    const fonts = Object.assign(new EventTarget(), { status: "loading", ready });
     Object.defineProperty(document, "fonts", { value: fonts, configurable: true });
     await go("settings/storage");
     expect(middle()).toBe(195);
     wide = 108;
     expect(middle()).not.toBe(195);
-    await act(async () => fonts.dispatchEvent(new Event("loadingdone")));
+    await act(async () => arrive());
     expect(middle()).toBe(195);
     expect(asked).toEqual(["instant", "instant"]);
+  });
+
+  test("the strip's width changing (a phone turned, a window narrowed to a strip) puts the key back in the middle", async () => {
+    phone();
+    const g = globalThis as unknown as { ResizeObserver: unknown };
+    const saved = g.ResizeObserver;
+    const reports: (() => void)[] = [];
+    g.ResizeObserver = class {
+      report: () => void;
+      constructor(report: () => void) {
+        this.report = report;
+      }
+      observe(target: Element) {
+        if (target.classList.contains("settings__groups")) reports.push(this.report);
+      }
+      unobserve() {}
+      disconnect() {}
+    };
+    const report = () =>
+      act(async () => {
+        for (const r of reports) r();
+      });
+    try {
+      across = 844;
+      await go("settings/storage");
+      expect(middle()).toBe(422);
+      // The first report, at the width it opened with, moves nothing: a glide under way goes on.
+      await report();
+      expect(asked).toEqual(["instant"]);
+      across = 390;
+      await report();
+      expect(middle()).toBe(195);
+      expect(asked).toEqual(["instant", "instant"]);
+    } finally {
+      g.ResizeObserver = saved;
+    }
   });
 
   test("another section glides its key to the middle; with reduced motion it moves at once", async () => {
