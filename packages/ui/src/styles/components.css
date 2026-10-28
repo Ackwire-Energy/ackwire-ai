@@ -1805,9 +1805,16 @@ textarea.ac-input {
   align-self: flex-start;
   translate: 0 calc(12px - var(--cap-mid) - 50%);
 }
-/* The head's actions and its close, in one `.ac-acts` row: the close's icon on the head's padding line. */
+/*
+ * The head's actions and its close, in one `.ac-acts` row. The close's × spans 9.6 of its icon's 20 units, so it reaches
+ * out by the 5.2 units of air on each side too: its ink ends on the head's padding line, as far from the edge as the
+ * face starts, and stands as far from the shape before it as the row's gap.
+ */
 .ac-dialog__acts {
   flex: none;
+}
+.ac-dialog__acts > .ac-btn--icon:last-child {
+  margin-inline: calc(-1 * (var(--ghost-plate) + var(--control-icon-sm) * 5.2 / 20));
 }
 .ac-dialog__title {
   margin: 0;

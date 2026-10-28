@@ -440,7 +440,7 @@ export function DesktopView({
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
         >
-          {t("desktop.takeover")}
+          <span className="cmp-act-label">{t("desktop.takeover")}</span>
         </Button>
       )}
     </>
@@ -463,7 +463,7 @@ export function DesktopView({
             setHandingBack(true);
           }}
         >
-          {handBackLabel}
+          <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
     </>

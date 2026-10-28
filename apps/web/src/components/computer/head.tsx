@@ -53,6 +53,7 @@ export function FullScreenButton({ full, onToggle }: { full: boolean; onToggle: 
       variant="ghost"
       iconOnly
       icon={full ? "shrink" : "expand"}
+      className="cmp-full"
       aria-label={label}
       title={label}
       onClick={onToggle}

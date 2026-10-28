@@ -764,7 +764,7 @@ export function BrowserCard({
     !blocker &&
     canTakeOver && (
       <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
-        {t("desktop.takeover")}
+        <span className="cmp-act-label">{t("desktop.takeover")}</span>
       </Button>
     )
   ) : confirmStop ? (
@@ -827,7 +827,7 @@ export function BrowserCard({
             setHandingBack(true);
           }}
         >
-          {handBackLabel}
+          <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
     </>
