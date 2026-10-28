@@ -8,8 +8,8 @@
 
 /**
  * The list follows new content only while the person is this close to the end, as a fraction of the
- * visible height (Legend List's `maintainScrollAtEndThreshold`). Farther up, they are reading: nothing
- * moves and the pill counts what arrived.
+ * visible height (Legend List's `maintainScrollAtEndThreshold`, measured from the physical end since 3.7:
+ * about Bluesky's 100 points). Farther up, they are reading: nothing moves and the pill counts what arrived.
  */
 export const STICK_TO_END_THRESHOLD = 0.15;
 

@@ -149,8 +149,18 @@ type Row =
   | { kind: "unseen"; key: string; fading: boolean };
 
 const rowKey = (r: Row) => r.key;
-/** An agent's block and its saved reply share a key and a type: the reply takes the block's row in place. */
-const rowType = (r: Row) => (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-")) ? "turn" : r.kind);
+/**
+ * A row's type for the list, which keeps sizes per type: an agent's block and its saved reply share one (the reply
+ * takes the block's row in place); other messages by how long they are and whether they carry a card (as Expensify
+ * buckets them), so a row not measured yet is guessed close to its size and older pages land without a jump.
+ */
+const rowType = (r: Row) => {
+  if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
+  if (r.kind !== "message") return r.kind;
+  const n = r.message.body.length;
+  const size = n < 80 ? "s" : n < 320 ? "m" : n < 1200 ? "l" : "xl";
+  return r.message.meta && Object.keys(r.message.meta).length > 0 ? `message-${size}-card` : `message-${size}`;
+};
 const DIVIDER_KEY = "unseen-divider";
 /** The "Novas" line stays this long after the person reached it, then fades (~0.6 s). */
 const DIVIDER_FADE_MS = 3500;
@@ -574,13 +584,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // The list asks for older rows on a layout change too, not only a scroll (Legend List 3.7): one page at a
+  // time, whatever the state says this render.
+  const fetchingOlder = useRef(false);
   const loadOlder = useCallback(() => {
-    if (isThread || olderDone || loadingOlder || !top.data) return;
+    if (isThread || olderDone || loadingOlder || fetchingOlder.current || !top.data) return;
     const oldest = older[0] ?? top.data[0];
     if (!oldest || top.data.length < MESSAGES_PAGE) {
       setOlderDone(true);
       return;
     }
+    fetchingOlder.current = true;
     setLoadingOlder(true);
     api.chat
       .messages(orgId, channelId, { before: oldest.createdAt, limit: MESSAGES_PAGE })
@@ -589,7 +603,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         if (page.length < MESSAGES_PAGE) setOlderDone(true);
       })
       .catch(() => setOlderDone(true))
-      .finally(() => setLoadingOlder(false));
+      .finally(() => {
+        fetchingOlder.current = false;
+        setLoadingOlder(false);
+      });
   }, [api, orgId, channelId, isThread, olderDone, loadingOlder, top.data, older]);
 
   // ── Sending ──
@@ -1236,7 +1253,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return () => clearTimeout(timer);
   }, [showList, revealList]);
 
-  // Whether the person is near the end (what the list follows): the "new messages" button shows otherwise.
+  // Whether the list follows the end (its own intent: kept through a drag's momentum and while a scroll to the end
+  // lands, released by reading up, rearmed back near the end): the "new messages" button shows otherwise.
   useEffect(() => {
     if (!showList) return;
     const state = listRef.current?.getState();
@@ -1244,7 +1262,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     // A new list opens at the end (initialScrollAtEnd); only changes count from here, so the button never
     // flashes on open.
     setAtEnd(true);
-    return state.listen("isWithinMaintainScrollAtEndThreshold", setAtEnd);
+    return state.listen("isFollowingEnd", setAtEnd);
   }, [showList]);
 
   return (

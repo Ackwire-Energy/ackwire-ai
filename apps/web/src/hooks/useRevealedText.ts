@@ -22,9 +22,10 @@ export function usePrefersReducedMotion() {
 
 /**
  * The part of a streaming `text` to show now: whole words, one step per
- * animation frame (`lib/reveal.ts`). With reduced motion, the whole text.
+ * animation frame (`lib/reveal.ts`), Markdown pieces whole while it is still
+ * `writing`. With reduced motion, the whole text.
  */
-export function useRevealedText(text: string) {
+export function useRevealedText(text: string, writing = true) {
   const reduced = usePrefersReducedMotion();
   const instant = reduced || typeof requestAnimationFrame !== "function";
   const [shown, setShown] = useState(() => initialReveal(text));
@@ -46,7 +47,7 @@ export function useRevealedText(text: string) {
     let last = performance.now();
     const tick = (now: number) => {
       // Frames pause in a background tab: the first one back catches up at once.
-      const next = revealStep(shownRef.current, text, now - last);
+      const next = revealStep(shownRef.current, text, now - last, writing);
       last = now;
       shownRef.current = next;
       setShown(next);
@@ -54,7 +55,7 @@ export function useRevealedText(text: string) {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [text, instant]);
+  }, [text, instant, writing]);
 
   return instant ? text : text.slice(0, Math.min(shown, text.length));
 }
