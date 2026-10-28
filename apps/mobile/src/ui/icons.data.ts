@@ -152,6 +152,10 @@ export const ICONS = {
     c(9.6, 8.4, 3.4),
     p("M3.6 19.2c.7-3.1 3-4.8 6-4.8s5.3 1.7 6 4.8M16.2 5.4a3.1 3.1 0 0 1 0 6M18 14.8c1.3.7 2.2 2.3 2.4 4.4"),
   ],
+  // The web's person on this grid: the one person in a channel with an agent.
+  person: [c(12, 8.4, 3.8), p("M5 20.4c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5")],
+  // The web's reply arrow on this grid. `reply` here is the web's thread drawing.
+  replyTo: [p("M9.6 6 4.8 10.8l4.8 4.8M4.8 10.8h8.4a6 6 0 0 1 6 6v1.8")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

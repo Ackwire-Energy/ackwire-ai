@@ -1027,6 +1027,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         receiptNow.blocked ?? null,
         receiptNow.referenced ?? null,
         receiptNow.mentioned ?? null,
+        receiptNow.picking ?? null,
+        receiptNow.mentionNeeded ?? null,
+        receiptNow.decidedBy ?? null,
       ])
     : "";
   // biome-ignore lint/correctness/useExhaustiveDependencies: `receiptKey` stands for the receipt

@@ -835,7 +835,6 @@ export const featureKeysPtBR = {
       "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     hold: "Segure para apagar",
     holding: "Segure…",
-    note: "Os planos são assinados e cancelados no site.",
   },
   files: {
     type: {

@@ -830,7 +830,6 @@ export const featureKeysEn: FeatureTranslations = {
       "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
     hold: "Hold to delete",
     holding: "Keep holding…",
-    note: "Plans are bought and canceled on the website.",
   },
   files: {
     type: {

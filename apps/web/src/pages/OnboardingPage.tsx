@@ -24,6 +24,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import {
   type ComputerKind,
   type ComputerState,
@@ -566,8 +567,8 @@ export function OnboardingPage() {
   const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
-  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
-  const emails = authConfig?.passwordReset !== false;
+  // A server that sends no email invites by link only.
+  const emails = sendsEmail(authConfig);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);

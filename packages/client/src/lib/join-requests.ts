@@ -1,6 +1,12 @@
 import type { TFunction } from "i18next";
-import type { InvitationPreview, JoinApproval } from "../api/types";
+import type { AuthConfig, InvitationPreview, JoinApproval } from "../api/types";
 import { daysBetween, formatShortDate, relativeTime } from "./format";
+
+/**
+ * Whether this server sends email (`auth-config`'s `passwordReset`), so invitations and their requests can go by
+ * email. Strictly false: until `auth-config` answers, and on an older server that doesn't say, yes.
+ */
+export const sendsEmail = (config: Pick<AuthConfig, "passwordReset"> | undefined) => config?.passwordReset !== false;
 
 /** The server's limits on what a person types (mirrors packages/engine/src/invite-requests.ts). */
 export const JOIN_NAME_MAX = 80;
