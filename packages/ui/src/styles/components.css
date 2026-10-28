@@ -1642,15 +1642,12 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen: held down into the page, the same in both themes as a pressed button is, inside the card's own outline (its
-   line2 ring and e1's line), so neither the card nor the gaps around it move. A pressed card also takes a check in the
-   corner, while a radio card's own radio already marks it. */
+/* Chosen (--chosen-*), inside the card's own outline (its line2 ring and e1's line), so neither the card nor the gaps
+   around it move. A pressed card also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
-  --pressed:
-    0 0 0 1px var(--line2), 0 0 0 1px var(--line), inset 0 2px 5px rgba(0, 0, 0, 0.16),
-    inset 0 1px 1.5px rgba(0, 0, 0, 0.12);
-  background: var(--sunken);
+  --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
+  background: var(--chosen-bg);
   box-shadow: var(--pressed);
 }
 .ac-option[aria-pressed="true"]::after {
@@ -1700,7 +1697,6 @@ textarea.ac-input {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
-  /* Never a word alone on its last line. */
   text-wrap: pretty;
 }
 .ac-option__aside {
@@ -1837,9 +1833,10 @@ textarea.ac-input {
   --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
 }
 /* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does (a title with a line under
-   it keeps them on the pair's middle). */
+   it keeps them on the pair's middle). An app measures that middle for its title's face (`--title-cap-mid`): --cap-mid
+   here would resolve in the actions' own font. */
 .ac-dialog__title + .ac-dialog__acts {
-  translate: 0 calc(-1 * var(--cap-mid));
+  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
 }
 .ac-dialog__title {
   margin: 0;
@@ -6635,7 +6632,6 @@ button.ac-tools__row:focus-visible {
     inset 0 0 0 1px var(--line2),
     var(--field-ring);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other rows step back to a flat hairline. */
 .ac-optrow[data-state="checked"] {
   box-shadow: var(--chosen-shadow);
   background: var(--chosen-bg);
@@ -6643,14 +6639,6 @@ button.ac-tools__row:focus-visible {
 }
 .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
 }
 .ac-optrow__dot {
   width: 18px;

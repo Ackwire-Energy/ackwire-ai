@@ -17,6 +17,9 @@
   --font-display-weight: 600;
   /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15. */
   --font-size-adjust: 0.52;
+  /* A dialog title's capitals' middle above its line's middle (18px on 24px), measured in this face: its baseline lands
+     on a whole pixel, so it is 1.19px where --cap-mid says 0.37. A title in another type measures its own. */
+  --title-cap-mid: 1.19px;
   /* The wordmark (and the landing headings), and its dot-matrix ".chat". */
   --font-brand: "Funnel Display", var(--font-sans);
   --font-dot: "Doto", var(--font-mono);

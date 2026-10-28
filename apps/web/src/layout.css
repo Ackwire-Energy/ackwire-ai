@@ -3215,6 +3215,8 @@ p {
 }
 .catalog .ac-dialog__head {
   padding: 24px 28px 14px;
+  /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
+  --title-cap-mid: 0.88px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
@@ -3507,6 +3509,8 @@ p {
   position: absolute;
   top: 12px;
   right: 12px;
+  /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
+  translate: none;
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
   width: 64px;
@@ -3611,6 +3615,7 @@ p {
   }
   .catalog .ac-dialog__head {
     padding: 20px 16px 12px;
+    --title-cap-mid: 0.51px;
   }
   .catalog .ac-dialog__title {
     font-size: 24px;
@@ -3749,10 +3754,10 @@ p {
   gap: 12px;
   min-width: 0;
 }
-/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
-   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+/* The tile, centred on the title's line, rises to its capitals' middle, as the dialog's close does. A title that wraps
+   takes `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
 .cflow__title > :first-child {
-  translate: 0 calc(-1 * var(--cap-mid));
+  translate: 0 calc(-1 * var(--title-cap-mid));
 }
 .cflow__title:has(> .ac-captop) {
   align-items: flex-start;
