@@ -291,6 +291,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    follow_lights(app);
     fit_page(app);
     front(app)
 }
@@ -352,11 +354,188 @@ const LIGHTS_AGAIN: Duration = Duration::from_millis(300);
 
 #[cfg(target_os = "macos")]
 fn place_now(app: &AppHandle) {
-    if let Some(window) = app.get_window(LABEL) {
-        if !window.is_fullscreen().unwrap_or(false) {
-            place_lights(&window);
+    // A move made while placing (AppKit moves the next button from inside our own notice) is answered by
+    // placing once more, not dropped. A few rounds at most.
+    if PLACING.with(|p| p.replace(true)) {
+        AGAIN.with(|a| a.set(true));
+        return;
+    }
+    for _ in 0..3 {
+        AGAIN.with(|a| a.set(false));
+        if let Some(window) = app.get_window(LABEL) {
+            if window.is_fullscreen().unwrap_or(false) {
+                LIGHTS_AT.with(|a| a.borrow_mut().clear());
+            } else {
+                place_lights(&window);
+            }
+        }
+        if !AGAIN.with(|a| a.get()) {
+            break;
         }
     }
+    PLACING.with(|p| p.set(false));
+}
+
+/// Keeps the buttons where `place_lights` puts them. A new title (every chat switched to) lays the title bar
+/// out on the next display pass, after `keep_lights` has already placed them, and they showed at the bar's top
+/// until the later pass (a visible jump). So: their frames are watched and placed again inside that same
+/// layout pass, and each button re-applies its place after its own layout (`follow_layout`), which puts its
+/// layer back where AppKit draws it natively without touching its frame. The gap between them is read here,
+/// once, from AppKit's own layout: read later it is whatever the last placement left.
+#[cfg(target_os = "macos")]
+fn follow_lights(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_window(LABEL) {
+            watch_lights(&handle, &window);
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn watch_lights(app: &AppHandle, window: &tauri::Window) {
+    use crate::notch::native::CGRect;
+    use block2::RcBlock;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use std::ptr::NonNull;
+
+    let Ok(ns) = window.ns_window() else { return };
+    let ns = ns as *mut AnyObject;
+    if ns.is_null() {
+        return;
+    }
+    // SAFETY: `ns` is this window's live NSWindow, on the main thread; the views watched are its own buttons,
+    // their row and its container, which live as long as the window.
+    unsafe {
+        let buttons: [*mut AnyObject; 3] = [
+            msg_send![ns, standardWindowButton: 0usize],
+            msg_send![ns, standardWindowButton: 1usize],
+            msg_send![ns, standardWindowButton: 2usize],
+        ];
+        if buttons.iter().any(|b| b.is_null()) {
+            return;
+        }
+        let first: CGRect = msg_send![buttons[0], frame];
+        let second: CGRect = msg_send![buttons[1], frame];
+        let step = second.origin.x - first.origin.x;
+        if step > first.size.width {
+            LIGHTS_STEP.with(|s| s.set(Some(step)));
+        }
+        for button in buttons {
+            follow_layout(button);
+        }
+        let row: *mut AnyObject = msg_send![buttons[0], superview];
+        let container: *mut AnyObject = if row.is_null() { row } else { msg_send![row, superview] };
+        let center: *mut AnyObject = msg_send![class!(NSNotificationCenter), defaultCenter];
+        let name: *mut AnyObject =
+            msg_send![class!(NSString), stringWithUTF8String: c"NSViewFrameDidChangeNotification".as_ptr()];
+        let handle = app.clone();
+        let block = RcBlock::new(move |_: NonNull<AnyObject>| place_now(&handle));
+        for view in buttons.into_iter().chain([row, container]).filter(|v| !v.is_null()) {
+            let _: () = msg_send![view, setPostsFrameChangedNotifications: true];
+            let nil: *mut AnyObject = std::ptr::null_mut();
+            let _: *mut AnyObject =
+                msg_send![center, addObserverForName: name, object: view, queue: nil, usingBlock: &*block];
+        }
+    }
+}
+
+/// Gives a window button a subclass of its own class that keeps it where it was placed. On a new title AppKit
+/// moves each button back to its own spot (`-[NSThemeFrame _updateButtonPositions]` calls
+/// `setFrameOrigin:ignoreRentry:`), the last one from inside our own frame notice, so it stayed there until the
+/// later placement: the subclass answers that call with the placed spot instead (outside full screen, where the
+/// buttons are AppKit's). Its `layout` also places it again afterwards (the layer laid out natively with the
+/// frame unchanged).
+///
+/// SAFETY: `button` is a live window button, on the main thread. The subclass adds no ivars and overrides
+/// `layout` and `setFrameOrigin:ignoreRentry:` (only if its class has it), calling its superclass's.
+#[cfg(target_os = "macos")]
+unsafe fn follow_layout(button: *mut objc2::runtime::AnyObject) {
+    use crate::notch::native::CGPoint;
+    use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
+    use objc2::{msg_send, sel};
+    use std::ffi::CString;
+
+    unsafe extern "C-unwind" fn layout(this: *mut AnyObject, _: Sel) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
+        let Some(superclass) = this.class().superclass() else { return };
+        let _: () = unsafe { msg_send![super(this, superclass), layout] };
+        if let Some(origin) = placed_at(this) {
+            let _: () = unsafe { msg_send![this, setFrameOrigin: origin] };
+        }
+    }
+
+    unsafe extern "C-unwind" fn set_origin(this: *mut AnyObject, _: Sel, origin: CGPoint, ignore: Bool) {
+        let Some(this) = (unsafe { this.as_ref() }) else { return };
+        let Some(superclass) = this.class().superclass() else { return };
+        let origin = placed_at(this).filter(|_| !unsafe { full_screen(this) }).unwrap_or(origin);
+        let _: () = unsafe { msg_send![super(this, superclass), setFrameOrigin: origin, ignoreRentry: ignore] };
+    }
+
+    let class = unsafe { &*button }.class();
+    let class_name = class.name().to_string_lossy();
+    if class_name.starts_with(FOLLOWING) {
+        return;
+    }
+    let Ok(name) = CString::new(format!("{FOLLOWING}{class_name}")) else { return };
+    let sub = match AnyClass::get(&name) {
+        Some(sub) => sub,
+        None => {
+            let Some(mut builder) = ClassBuilder::new(&name, class) else { return };
+            unsafe {
+                builder.add_method(sel!(layout), layout as unsafe extern "C-unwind" fn(*mut AnyObject, Sel));
+                let moved = sel!(setFrameOrigin:ignoreRentry:);
+                if class.instance_method(moved).is_some() {
+                    builder.add_method(
+                        moved,
+                        set_origin as unsafe extern "C-unwind" fn(*mut AnyObject, Sel, CGPoint, Bool),
+                    );
+                }
+            }
+            builder.register()
+        }
+    };
+    unsafe { AnyObject::set_class(&*button, sub) };
+}
+
+/// Where `place_lights` last put this button, if anywhere.
+#[cfg(target_os = "macos")]
+fn placed_at(button: &objc2::runtime::AnyObject) -> Option<crate::notch::native::CGPoint> {
+    let key = button as *const objc2::runtime::AnyObject as usize;
+    LIGHTS_AT.with(|at| at.borrow().iter().find(|(b, _)| *b == key).map(|(_, o)| *o))
+}
+
+/// Whether the button's window is full screen (NSWindowStyleMaskFullScreen), or it has none.
+///
+/// SAFETY: `button` is a live view, on the main thread.
+#[cfg(target_os = "macos")]
+unsafe fn full_screen(button: &objc2::runtime::AnyObject) -> bool {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    let window: *mut AnyObject = unsafe { msg_send![button, window] };
+    if window.is_null() {
+        return true;
+    }
+    let mask: usize = unsafe { msg_send![window, styleMask] };
+    mask & (1 << 14) != 0
+}
+
+/// The prefix of the buttons' own subclasses (`follow_layout`).
+#[cfg(target_os = "macos")]
+const FOLLOWING: &str = "AgentesFollowing";
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    /// Placing the buttons moves them too: their own frame notices don't start another placement.
+    static PLACING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A button moved while placing: placed once more.
+    static AGAIN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// From one button's left edge to the next's, as AppKit lays them out.
+    static LIGHTS_STEP: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
+    /// Where each button was placed last (by its address), for `follow_layout`.
+    static LIGHTS_AT: std::cell::RefCell<Vec<(usize, crate::notch::native::CGPoint)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// The site's title bar (apps/web desktop.css), in points.
@@ -402,20 +581,25 @@ fn place_lights(window: &tauri::Window) {
         }
         let window_frame: CGRect = msg_send![ns, frame];
         let first: CGRect = msg_send![buttons[0], frame];
-        let second: CGRect = msg_send![buttons[1], frame];
-        let spacing = second.origin.x - (first.origin.x + first.size.width);
+        let step = LIGHTS_STEP.with(|s| s.get()).unwrap_or_else(|| {
+            let second: CGRect = msg_send![buttons[1], frame];
+            second.origin.x - first.origin.x
+        });
         let mut bar: CGRect = msg_send![container, frame];
         bar.size.height = TITLE_BAR;
         bar.origin.y = window_frame.size.height - TITLE_BAR;
         let _: () = msg_send![container, setFrame: bar];
+        let mut at = Vec::with_capacity(3);
         for (i, button) in buttons.into_iter().enumerate() {
             let frame: CGRect = msg_send![button, frame];
             let origin = CGPoint {
-                x: LIGHTS_LEFT + i as f64 * (frame.size.width + spacing),
+                x: LIGHTS_LEFT + i as f64 * step,
                 y: (TITLE_BAR - frame.size.height) / 2.0,
             };
+            at.push((button as usize, origin));
             let _: () = msg_send![button, setFrameOrigin: origin];
         }
+        LIGHTS_AT.with(|a| *a.borrow_mut() = at);
     }
 }
 

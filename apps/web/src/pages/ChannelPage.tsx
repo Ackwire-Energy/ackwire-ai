@@ -3187,7 +3187,8 @@ export const TimelineMessage = memo(function TimelineMessage({
           {local === "failed" && (
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
-              <span>{t("channel.notSent")} ·</span>
+              <span>{t("channel.notSent")}</span>
+              <span aria-hidden="true">·</span>
               <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
                 {t("channel.retrySend")}
               </button>
