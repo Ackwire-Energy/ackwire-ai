@@ -863,6 +863,16 @@ describe("Onboarding", () => {
     const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
     expect(rule("\n.onb__actions")).toContain("position: sticky");
     expect(rule("\n.onb__actions")).toContain("bottom: 0");
+    // On a short step too: the column is the screen's height at least (no auto margin centres it any more) and the
+    // bar's own auto top margin takes the room left, so it rests at the bottom, in the same place on every step.
+    expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
+    expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
+    // Its ground spans the column's gutters, and its bottom clears the home bar at every width.
+    expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
+    expect(rule("\n.onb__actions")).toContain(
+      "padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    );
+    expect(rule("\n.onb__actions")).toContain("background: var(--pane)");
     const phone = css.indexOf("@media (max-width: 760px) {\n  .onb__actions");
     expect(phone).toBeGreaterThan(-1);
     expect(rule("  .onb__actions", phone)).toContain("safe-area-inset-bottom");

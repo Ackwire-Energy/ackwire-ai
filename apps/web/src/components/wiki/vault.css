@@ -31,6 +31,10 @@
     background 0.15s,
     border-color 0.15s;
 }
+/* The setup's card: "Choose a folder" under the area as the import step has it (`.imp-drop`). */
+.vault-drop[data-compact] {
+  gap: 6px;
+}
 .vault-drop[data-compact] .vault-drop__area {
   padding: 22px 16px;
 }
@@ -63,17 +67,6 @@
   gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
-}
-.vault-drop__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-}
-.vault-drop > p {
-  margin: 0;
-  align-self: flex-start;
 }
 .vault-notice {
   gap: 10px;

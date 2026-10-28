@@ -3,6 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { type RailStep, StepRail } from "@/components/StepRail";
 
@@ -10,9 +12,9 @@ const NAMES = ["Workspace", "Contexto", "Seus agentes", "Computador", "Agentes e
 const steps: RailStep[] = NAMES.map((name, i) => ({ id: `s${i}`, name, done: i < 6, disabled: false }));
 
 /**
- * The step bar as a phone lays it out (the rail's CSS at 390px): a 231px strip from x = 16 and the steps' 32px
- * pills 4px apart, moved by the strip's own sideways scroll. Patched on Element.prototype, where the method lives:
- * put back there, no copy is left on HTMLElement.prototype to hide later test files' own patches.
+ * A step bar narrower than its steps (a phone zoomed in): a 231px strip from x = 16 and 32px pills 4px apart, moved
+ * by the strip's own sideways scroll. Patched on Element.prototype, where the method lives: put back there, no copy
+ * is left on HTMLElement.prototype to hide later test files' own patches.
  */
 const real = Element.prototype.getBoundingClientRect;
 const box = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 32, width, height: 32 });
@@ -78,5 +80,21 @@ describe("the step bar on a phone", () => {
     cleanup();
     const desktop = render(rail(6));
     expect((desktop.container.querySelector(".onb__steps") as HTMLElement).scrollLeft).toBe(0);
+  });
+});
+
+describe("the step bar on a phone fits its seven steps", () => {
+  test("beside the whole logo at 390px (a 219px strip), beside its mark alone below 385px", () => {
+    const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
+    const phone = css.slice(css.indexOf("/* Phone: the rail is a compact step bar"));
+    const rule = (selector: string) => phone.slice(phone.indexOf(`  ${selector} {`)).split("}")[0] ?? "";
+    const px = (body: string, prop: string) => Number(new RegExp(`\\n\\s*${prop}:\\s*(\\d+)px`).exec(body)?.[1]);
+    const step = 24 + 2 * px(rule(".onb__step"), "padding");
+    const gap = px(rule(".onb__steps"), "gap");
+    expect(7 * step + 6 * gap).toBeLessThanOrEqual(219);
+    // The current step's 4px ring shows whole: room around the steps, inside the strip that scrolls.
+    expect(px(rule(".onb__steps"), "padding") + px(rule(".onb__step"), "padding")).toBe(4);
+    const narrow = phone.slice(phone.indexOf("@media (max-width: 384px)"));
+    expect(narrow.split("}")[0]).toContain(".onb__brand .ac-logo > :not(.ac-logo__mark) {\n    display: none;");
   });
 });

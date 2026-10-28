@@ -6812,16 +6812,20 @@ a.machine-row__name:hover {
   .onb__steps li::after {
     display: none;
   }
+  /* All seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current one's ring,
+     reaching past the strip's edges. */
   .onb__steps {
     flex-direction: row;
-    gap: 4px;
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
     overflow-x: auto;
     overflow-y: hidden;
   }
   .onb__step {
     width: auto;
     min-height: 0;
-    padding: 4px;
+    padding: 2px;
   }
   .onb__step-text {
     position: absolute;
@@ -6831,6 +6835,12 @@ a.machine-row__name:hover {
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+}
+/* Narrower, they fit beside the logo's mark alone. */
+@media (max-width: 384px) {
+  .onb__brand .ac-logo > :not(.ac-logo__mark) {
+    display: none;
   }
 }
 
