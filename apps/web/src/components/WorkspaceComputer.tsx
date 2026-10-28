@@ -96,28 +96,34 @@ const LINE_MS = 3500;
 
 /**
  * While it's prepared, the team's lines about what it's doing (`setupLines`), one at a time, crossfading every 3.5 s;
- * with reduced motion the first stays until the step changes. Only for sighted readers: the step under it is what's
- * announced. With no line for this team, the plain chip.
+ * with reduced motion the one shown stays until the step changes. Followed by its key, so a line that comes meanwhile
+ * (its memory, once the size is known) waits for its turn instead of taking the shown one's place. Only for sighted
+ * readers: the step under it is what's announced. With no line for this team, the plain chip where it stands for the
+ * card's own (`chip`), else nothing.
  */
-function SetupSays({ view }: { view: SetupView }) {
+function SetupSays({ view, chip }: { view: SetupView; chip: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const lines = setupLines(view, useAgents(org.id).data ?? []);
   const still = usePrefersReducedMotion();
-  const [shown, setShown] = useState(0);
+  const [shown, setShown] = useState<string>();
+  const on = lines.find((l) => l.key === shown) ?? lines[0];
+  if (on && on.key !== shown) setShown(on.key);
+  const said = lines.map((l) => l.key).join(" ");
   useEffect(() => {
-    if (still || lines.length < 2) return;
-    const timer = setInterval(() => setShown((n) => n + 1), LINE_MS);
+    const keys = said.split(" ");
+    if (still || keys.length < 2) return;
+    const timer = setInterval(() => setShown((key) => keys[(keys.indexOf(key ?? "") + 1) % keys.length]), LINE_MS);
     return () => clearInterval(timer);
-  }, [still, lines.length]);
-  if (lines.length === 0) return <Chip icon={PHASE_ICON[view.phase]}>{t(view.chipKey)}</Chip>;
+  }, [still, said]);
+  if (!on) return chip ? <Chip icon={PHASE_ICON[view.phase]}>{t(view.chipKey)}</Chip> : null;
   return (
     <span className="setup-says" aria-hidden="true">
-      {lines.map(({ key, agent }, i) => (
+      {lines.map(({ key, agent }) => (
         <Chip
           key={key}
           className="setup-say"
-          data-on={i === shown % lines.length || undefined}
+          data-on={key === on.key || undefined}
           lead={<AgentAvatar agentId={agent.id} name={agent.name} size="xs" framed />}
         >
           {t(key, { ...agentGrammar(t, agent.name), gb: view.specs?.memoryGb })}
@@ -129,14 +135,14 @@ function SetupSays({ view }: { view: SetupView }) {
 
 /**
  * While it's on its way: the team's line, then the four steps as bars ("Passo 2 de 4 · Iniciando"); or why it waits,
- * in one line.
+ * in one line. `chip`: the team's line stands for the card's own chip.
  */
-export function SetupProgress({ view }: { view: SetupView }) {
+export function SetupProgress({ view, chip = false }: { view: SetupView; chip?: boolean }) {
   const { t } = useTranslation();
   if (view.step) {
     return (
       <div className="setup-progress setup-progress--steps">
-        <SetupSays key={view.textKey} view={view} />
+        <SetupSays key={view.textKey} view={view} chip={chip} />
         <div role="status">
           <Steps
             current={view.stepNumber}
@@ -278,7 +284,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           )}
         </span>
       </div>
-      {view.phase !== "ready" && <SetupProgress view={view} />}
+      {view.phase !== "ready" && <SetupProgress view={view} chip />}
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (

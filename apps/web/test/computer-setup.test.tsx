@@ -455,7 +455,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(screen().getByRole("region", { name: "Computador da Acme" }).textContent).toContain("Na fila");
   });
 
-  test("the team's lines while it's prepared: one every 3.5 s, held with reduced motion until the step moves, the plain chip with nobody they name", async () => {
+  test("the team's lines while it's prepared: one every 3.5 s, held with reduced motion until the step moves, the card's plain chip with nobody they name", async () => {
     const card = () => screen().getByRole("region", { name: "Computador da Acme" });
     const shown = () => card().querySelector(".setup-say[data-on]")?.textContent;
     // Reduced motion (the screen tests' own): the first line holds, and the next stage brings its own.
@@ -464,6 +464,19 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(card().querySelector(".setup-says")?.getAttribute("aria-hidden")).toBe("true");
     await push({ step: "installing", stage: "booting" });
     expect(shown()).toBe("A Ada está contando os 8 GB de memória");
+    cleanup();
+
+    // Its size said only now, within the same stage: the line shown stays, and the memory's waits for its turn.
+    const sized = await open(`/org/${ORG_ID}/settings/computers`, {
+      state: "preparing",
+      step: "reserving",
+      stage: "ordering",
+      specs: null,
+    });
+    expect(shown()).toBe("O Atlas encomendou um novinho");
+    await sized.push({ step: "reserving", stage: "ordering" });
+    expect(card().textContent).toContain("A Ada pediu 8 GB de memória");
+    expect(shown()).toBe("O Atlas encomendou um novinho");
     cleanup();
 
     // Motion allowed: the next line every 3.5 s, round again.
@@ -493,6 +506,13 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     await open(`/org/${ORG_ID}/settings/computers`, { state: "preparing", step: "starting" }, strangers);
     expect(card().querySelector(".setup-says")).toBeNull();
     expect(card().querySelector(".setup-progress .ac-chip")?.textContent).toBe("Sendo preparado");
+    cleanup();
+
+    // Where no chip stood before (an agent's computer, its window, the AI step's wait), none comes in its place.
+    await open(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { state: "preparing", step: "starting" }, strangers);
+    const pc = document.querySelector(".agp-pc") as HTMLElement;
+    expect(pc.textContent).toContain("Passo 2 de 4 · Iniciando");
+    expect(pc.querySelector(".setup-progress .ac-chip")?.textContent).toBeUndefined();
   });
 });
 
