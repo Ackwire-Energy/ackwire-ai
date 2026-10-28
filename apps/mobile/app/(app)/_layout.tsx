@@ -93,6 +93,22 @@ function AppStack() {
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
+      {/* The workspace's settings (the web's sections), each pushed on the grouped gray from Você or from Geral. */}
+      <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/access" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/skills/edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/[machineId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/rename" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/folder" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/computers/agent" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />

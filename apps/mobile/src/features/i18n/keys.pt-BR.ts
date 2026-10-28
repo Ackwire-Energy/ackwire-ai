@@ -1444,6 +1444,24 @@ export const featureKeysPtBR = {
     subtitle: "O link pode ter mudado ou você não tem acesso.",
     home: "Ir para as conversas",
   },
+  settings: {
+    access: {
+      how: "Toque numa linha para trocar o nível: Sem acesso, Ler, Ler e escrever.",
+    },
+    logo: {
+      failed: "Não deu para enviar o logo",
+      tooBig: "Imagem grande demais. Tente outra.",
+    },
+    machine: {
+      toolsHow: "Toque numa ferramenta ligada para desligar. Para ligar de novo, só no próprio computador.",
+    },
+    import: {
+      onComputer:
+        "Trazer agentes, skills e canais de outro app é pelo computador: abra o agentes.chat no navegador, em Configurações\u00a0›\u00a0Importar e exportar.",
+      preparing: "Preparando o arquivo…",
+      failed: "Não deu para baixar o arquivo. Tente de novo.",
+    },
+  },
 };
 
 type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };

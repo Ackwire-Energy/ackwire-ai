@@ -1438,4 +1438,22 @@ export const featureKeysEn: FeatureTranslations = {
     subtitle: "The link may have changed or you can't see it.",
     home: "Go to chats",
   },
+  settings: {
+    access: {
+      how: "Tap a row to change its level: No access, Read, Read and write.",
+    },
+    logo: {
+      failed: "Couldn't upload the logo",
+      tooBig: "That image is too big. Try another one.",
+    },
+    machine: {
+      toolsHow: "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself.",
+    },
+    import: {
+      onComputer:
+        "Bringing agents, skills and channels from another app happens on a computer: open agentes.chat in a browser, in Settings\u00a0›\u00a0Import and export.",
+      preparing: "Preparing the file…",
+      failed: "Couldn't download the file. Try again.",
+    },
+  },
 };

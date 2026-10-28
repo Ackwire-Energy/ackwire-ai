@@ -18,6 +18,7 @@ import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack, PushedHeader, Tile } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import { PlanMeter } from "../usage/parts";
@@ -31,8 +32,9 @@ const open = (href: string) => router.push(href as never);
  * Você, a page pushed from the avatar, in Conversas' language: the workspace's sky with your photo, name, @ and role
  * (the native bar clear over it, the sky lagging behind the scroll), "Editar perfil" and "Trocar workspace"; your
  * agents, alive; what they think with (the plans, the computers' own sign-ins, each with its usage in pixels);
- * "Do workspace" and the preferences as loose rows; Sair and the version. Each row pushes its screen (Conta,
- * Workspaces, Membros, Notificações, Sons, Aparência, Idioma: `app/(app)/me/*`) or one of the app's.
+ * "Do workspace" (the workspace itself first, opening its settings: `app/(app)/settings/*`) and the preferences
+ * as loose rows; Sair and the version. Each row pushes its screen (Conta, Workspaces, Membros, Notificações, Sons,
+ * Aparência, Idioma: `app/(app)/me/*`) or one of the app's.
  */
 export function MeScreen() {
   const { t, i18n } = useTranslation();
@@ -254,13 +256,22 @@ export function MeScreen() {
         ) : null}
 
         <Section title={t("mobile.me.fromWorkspace")} />
+        {/* The workspace itself first: its settings, as the web's (Geral lists every area this role opens). */}
+        {org.org ? (
+          <PageRow
+            leading={<OrgAvatar name={org.org.name} logo={org.org.logo} size={36} />}
+            label={org.org.name}
+            value={t("settings.title")}
+            onPress={() => open("/settings/general")}
+          />
+        ) : null}
         {workspaceRows.map((r, i) => (
           <PageRow
             key={r.href}
             icon={r.icon}
             label={r.label}
             value={r.value}
-            divider={i > 0}
+            divider={i > 0 || !!org.org}
             onPress={() => open(r.href)}
           />
         ))}
