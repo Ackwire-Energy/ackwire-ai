@@ -735,12 +735,14 @@ textarea.ac-input {
   margin-left: 0;
 }
 
-/* Message: a fixed avatar column at the top, the text column beside it. */
+/* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
+   `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
+  --msg-inline: var(--space-4);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 6px var(--space-4);
+  padding: 6px var(--msg-inline);
 }
 .ac-msg--grouped {
   padding-top: 2px;
@@ -2862,6 +2864,11 @@ a.ac-list__row:focus-visible {
 .ac-msg__foot > .ac-receipt {
   margin-top: 2px;
 }
+/* A receipt part with nothing to show (a message no agent was asked about) takes no room, in a stacked body too. */
+.ac-msg__aside:empty,
+.ac-msg__foot:empty {
+  display: none;
+}
 
 /* Date picker (our month grid in a popover; never the native input) */
 .ac-date__trigger .ac-icon {
@@ -4320,12 +4327,17 @@ a.ac-list__row:focus-visible {
 .ac-msg:hover {
   background: var(--plate-soft);
 }
-/* A raised bar of 32px ghost icon buttons over the row's top-right corner: react, reply, more. Hidden at rest,
-   shown on hover and on keyboard focus inside the row. It stands on the row's top edge, over the 2px of a grouped
-   row's top padding at most, so it never covers the row's own name, receipt or text, whatever its height. */
+/*
+ * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
+ * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
+ * check's is, and it stands left of the check. So it only reaches into the room between rows: never over the row
+ * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
+ */
 .ac-msg__actions {
-  bottom: calc(100% - 2px);
+  /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
+  top: calc(6px + var(--cap-top) - var(--cap-mid));
   right: 10px;
+  translate: 0 -50%;
   z-index: var(--z-sticky);
   padding: 3px;
   border: 0;
@@ -4342,6 +4354,19 @@ a.ac-list__row:focus-visible {
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: none;
+}
+/* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
+.ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
+  top: calc(4px + 13.175px - var(--cap-mid));
+}
+/* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
+   last one (6px up) is shorter than the bar on touch (46px), so the bar takes that room's middle. */
+.ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  top: 13.175px;
+}
+/* Left of the check (20px wide), 8px from it, past the row's side padding. */
+.ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
   min-width: 32px;

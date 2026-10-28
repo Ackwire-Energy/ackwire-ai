@@ -161,9 +161,8 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
   }
   .channel__messages .ac-msg {
+    --msg-inline: 12px;
     gap: 10px;
-    padding-right: 12px;
-    padding-left: 12px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);

@@ -103,7 +103,7 @@ describe("message action bars", () => {
     ).toBe("true");
   });
 
-  test("the bar never covers a receipt: a check ends the first line, words go under the text, the bar stands above", async () => {
+  test("the bar never covers a receipt: a check ends the first line and the bar stands left of it, words go under the text", async () => {
     const state = seedState({
       aiStatus: {
         any: false,
@@ -149,24 +149,35 @@ describe("message action bars", () => {
     // A check alone: at the end of the name's line, or of a grouped message's first line; nothing under the text.
     expect(row("j1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check")).not.toBeNull();
     expect(row("j2").querySelector(".ac-msg__aside--floating .ac-receipt__check")).not.toBeNull();
-    for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.textContent).toBe("");
-    // The bar stands on the row's top edge (the kit's rule, components.test.tsx): no stylesheet of the app moves
-    // it back down onto the row.
+    // The part a message doesn't use is left empty, which the kit hides and reads: the bar stands left of a check
+    // only where there is one, and a grouped row with a line under its text centres the bar above that line.
+    for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
+    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length).toBe(0);
+    // The bar's place is the kit's (components.test.tsx): no stylesheet of the app moves it, and a row's side padding
+    // is set through `--msg-inline`, which the bar reads to stand left of the check.
     const src = join(import.meta.dir, "../src");
     const sheets = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.isDirectory() ? sheets(join(dir, e.name)) : e.name.endsWith(".css") ? [join(dir, e.name)] : [],
       );
-    const moved = sheets(src).flatMap((file) =>
+    const rules = sheets(src).flatMap((file) =>
       [
         ...readFileSync(file, "utf8")
           .replace(/\/\*[\s\S]*?\*\//g, "")
           .matchAll(/([^{}]+)\{([^{}]*)\}/g),
-      ]
-        .filter((m) => (m[1] ?? "").includes("ac-msg__actions") && /(^|;)\s*(top|bottom|inset)\s*:/.test(m[2] ?? ""))
-        .map((m) => `${file.slice(src.length)} ${(m[1] ?? "").trim()}`),
+      ].map((m) => ({
+        at: `${file.slice(src.length)} ${(m[1] ?? "").trim()}`,
+        selector: m[1] ?? "",
+        body: m[2] ?? "",
+      })),
     );
-    expect(moved).toEqual([]);
+    const moved = rules.filter(
+      (r) => r.selector.includes("ac-msg__actions") && /(^|;)\s*(top|bottom|inset)\s*:/.test(r.body),
+    );
+    expect(moved.map((r) => r.at)).toEqual([]);
+    const rows = rules.filter((r) => /\.channel__messages[^,]*\.ac-msg\s*$/.test(r.selector));
+    expect(rows.filter((r) => /(^|;)\s*padding(-left|-right|-inline)?\s*:/.test(r.body)).map((r) => r.at)).toEqual([]);
+    expect(rows.some((r) => /--msg-inline:\s*12px/.test(r.body))).toBe(true);
   });
 
   test("a thread opened with Responder: the channel keeps what came before, one line opens the rest", async () => {
