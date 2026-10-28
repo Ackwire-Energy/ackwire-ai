@@ -252,7 +252,10 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   );
 }
 
-/** What the stage shows, by `surfaceOf`, with the banners over a live one. */
+/**
+ * What the stage shows, by `surfaceOf`, with the banners over a live one. The head's sub-line says only what a cover or
+ * a banner doesn't: the window says each thing once.
+ */
 function ComputerStage({
   agent,
   view,
@@ -290,9 +293,7 @@ function ComputerStage({
   const paused = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
   const waiting = waitingFor && isWaitingHandoff(waitingFor, now) ? waitingFor : null;
   const mine = controlledBy(f?.handoff, me.user.id);
-  const watching = f
-    ? liveSubLine(t, f, { name: agent.name, computer, person, nowMs: now })
-    : t("agentComputer.sub.watching");
+  const watching = f ? liveSubLine(t, f, { name: agent.name, person, nowMs: now }) : t("agentComputer.sub.watching");
   const head: DialogHeadSlots = { ...slots, watching };
   const refused = (err: unknown) =>
     slots.say((err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"));
@@ -312,7 +313,7 @@ function ComputerStage({
   if (!f || !view.ready) {
     body = (
       <>
-        <DialogHead sub={t("agentComputer.sub.opening")} />
+        <DialogHead sub="" />
         <Stage>
           <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />
         </Stage>
@@ -330,7 +331,7 @@ function ComputerStage({
   } else if (flashing) {
     body = (
       <>
-        <DialogHead sub={t("agentComputer.state.ready")} />
+        <DialogHead sub="" />
         <Stage>
           <Cover color={color} sky icon="check" text={t("agentComputer.state.ready")} />
         </Stage>
@@ -339,7 +340,7 @@ function ComputerStage({
   } else if (surface === "held") {
     body = (
       <>
-        <DialogHead sub={t("agentComputer.sub.held")} />
+        <DialogHead sub="" />
         <Stage>
           <Cover
             color={color}
@@ -351,13 +352,13 @@ function ComputerStage({
       </>
     );
   } else if (surface === "preparing" && f.setup) {
+    // The head names it and says where it is; the card says only the rest.
     body = (
       <>
         <DialogHead sub={t(f.setup.chipKey)} />
         <div className="cmp-prep">
           <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="paused" size={96} />
-          <b className="cmp-prep__title">{t("computerSetup.notice.title", { org: org.name })}</b>
-          <SetupWait view={f.setup} reader={reader} />
+          <SetupWait view={f.setup} reader={reader} said />
         </div>
       </>
     );
@@ -440,12 +441,8 @@ function ComputerStage({
             <Cover
               color={color}
               art={<ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="offline" size={96} />}
-              text={t("agentComputer.state.notAnswering", { computer })}
-              help={
-                <>
-                  {t("agentComputer.state.notAnsweringHelp")} <span>{t("desktop.state.retrying")}</span>
-                </>
-              }
+              text={t("agentComputer.state.notAnsweringHelp")}
+              help={t("desktop.state.retrying")}
             />
           </Stage>
         </>
@@ -479,7 +476,7 @@ function ComputerStage({
     // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
     body = (
       <>
-        <DialogHead sub={t("agentComputer.sub.opening")} />
+        <DialogHead sub="" />
         <Stage>
           <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />
         </Stage>

@@ -6365,6 +6365,13 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
+/* The workspace's computer on its cards (here and on the setup's Computer step): its drawing, not its box, takes its
+   row, so the drawing starts on the card's padding line, as far from the card's top as its words from the other edges,
+   and the words beside it centre on the drawing. */
+.setup-card .computers-card__head > .ac-computer,
+.onb__workspace-computer .ac-computer {
+  margin-block: calc(-1 * var(--art-top)) calc(-1 * var(--art-bottom));
+}
 /* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
 .setup-progress {
   margin: 0;
@@ -9970,16 +9977,23 @@ html[data-menu-overlay] .shell {
   border-bottom: 1px solid var(--line);
   line-height: 20px;
 }
-.ai-panel__wait {
+/* The computer's wait in a well, sunk into its card in both themes: here, and on the setup's Computer step. */
+.ai-panel__wait,
+.onb__wait {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-left: calc(var(--text-edge) - 12px);
-  padding: 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
+}
+.ai-panel__wait {
+  margin-left: calc(var(--text-edge) - 12px);
+  padding: 12px;
   /* Short lines: wrapped, they break into two of a length. */
   text-wrap: balance;
+}
+.onb__wait {
+  padding: 12px 14px;
 }
 /*
  * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
@@ -10007,6 +10021,10 @@ html[data-menu-overlay] .shell {
   .ai-panel--plan > .ac-setnote {
     margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
+}
+/* The Computer step's lines are the well's own, at its gap. */
+.onb__wait > .setup-wait {
+  display: contents;
 }
 /* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
    face and mark centre on it. */

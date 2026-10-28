@@ -364,12 +364,14 @@ html:has(.onb) {
   display: block;
   margin-bottom: 4px;
 }
+/* The computer chosen or connected: a well sunk into what holds it in both themes, as the computer's wait is. */
 .onb__status {
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 .onb__emails {

@@ -8261,7 +8261,6 @@ export const ptBR = {
       askedIn: "{{name}} pediu · {{where}}",
       watching: "Assistindo {{article}} {{name}}",
       inControl: "Você está no controle",
-      otherInControl: "{{name}} está no controle",
       otherInControlHelp: "Só assistindo. {{name}} está fazendo o pedido.",
       watchOnly: "Ao vivo",
       takeover: "Assumir",
@@ -8539,7 +8538,7 @@ export const ptBR = {
     sub: {
       control: "Você no controle · {{article}} {{name}} espera",
       controlAsked: "Você no controle · {{article}} {{name}} pediu",
-      hidden: "{{person}} no controle · tela oculta",
+      hidden: "{{person}} no controle",
     },
     state: {
       busy: "Muita gente assistindo agora.",
@@ -8567,7 +8566,7 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
+      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
@@ -8649,13 +8648,8 @@ export const ptBR = {
     },
     screen: "Tela {{of}} {{name}}, ao vivo",
     sub: {
-      opening: "Abrindo…",
       watching: "Ao vivo · você está assistindo",
       working: "Ao vivo · {{article}} {{name}} está trabalhando",
-      needsYou: "Ao vivo · {{article}} {{name}} precisa de você",
-      askedOther: "Ao vivo · {{article}} {{name}} pediu para {{person}}",
-      held: "Em pausa por enquanto · dá para assistir",
-      paused: "Pausado no {{computer}} · dá para assistir",
       notAnswering: "Sem resposta",
       offline: "Offline desde {{time}}",
     },
@@ -8670,7 +8664,6 @@ export const ptBR = {
       heldHelp: "Ninguém assume o controle até a pausa acabar.",
       paused: "O {{computer}} está pausado até {{time}}",
       pausedPlain: "O {{computer}} está pausado",
-      notAnswering: "O {{computer}} não está respondendo",
       notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando.",
       offline: "O {{computer}} está offline",
       offlineHelpPlain: "{{The}} {{name}} espera o computador voltar.",

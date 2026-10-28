@@ -8212,7 +8212,6 @@ export const en: Translations = {
       askedIn: "{{name}} asked · {{where}}",
       watching: "Watching {{name}}",
       inControl: "You're in control",
-      otherInControl: "{{name}} is in control",
       otherInControlHelp: "Just watching. {{name}} is doing what was asked.",
       watchOnly: "Live",
       takeover: "Take over",
@@ -8488,7 +8487,7 @@ export const en: Translations = {
     sub: {
       control: "You're in control · {{name}} waits",
       controlAsked: "You're in control · {{name}} asked",
-      hidden: "{{person}} is in control · screen hidden",
+      hidden: "{{person}} is in control",
     },
     state: {
       busy: "Too many people are watching right now.",
@@ -8516,7 +8515,7 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{key}} C, {{key}} V.",
+      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
@@ -8598,13 +8597,8 @@ export const en: Translations = {
     },
     screen: "{{name}}'s screen, live",
     sub: {
-      opening: "Opening…",
       watching: "Live · you're watching",
       working: "Live · {{name}} is working",
-      needsYou: "Live · {{name}} needs you",
-      askedOther: "Live · {{name}} asked {{person}}",
-      held: "Paused for now · you can watch",
-      paused: "Paused on {{computer}} · you can watch",
       notAnswering: "Not answering",
       offline: "Offline since {{time}}",
     },
@@ -8619,7 +8613,6 @@ export const en: Translations = {
       heldHelp: "Nobody takes control until the pause ends.",
       paused: "{{computer}} is paused until {{time}}",
       pausedPlain: "{{computer}} is paused",
-      notAnswering: "{{computer}} isn't answering",
       notAnsweringHelp: "It usually comes back within a few minutes. We're on it.",
       offline: "{{computer}} is offline",
       offlineHelpPlain: "{{name}} waits for the computer to come back.",
