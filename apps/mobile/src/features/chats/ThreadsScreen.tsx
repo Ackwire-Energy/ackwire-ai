@@ -46,7 +46,7 @@ export function ThreadsScreen() {
           {t("mobile.common.loading")}
         </Text>
       ) : rows.length === 0 ? (
-        <EmptyState title={t("mobile.threads.empty")} subtitle={t("mobile.threads.emptyHint")} />
+        <EmptyState icon="reply" title={t("mobile.threads.empty")} subtitle={t("mobile.threads.emptyHint")} />
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);

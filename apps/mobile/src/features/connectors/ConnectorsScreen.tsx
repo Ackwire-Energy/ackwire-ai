@@ -170,7 +170,7 @@ function Gallery() {
             </View>
           ) : null}
           {rest.length === 0 ? (
-            <EmptyState title={t("mobile.connectors.noResults")} />
+            <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
               {rest.map((d) => (

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button, EmptyState, Filters, Icon, IconButton, SearchField, SectionHeader, Segmented, Text } from "@/ui";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useWhenText } from "./hooks";
@@ -19,9 +20,10 @@ const WORKING_POLL_MS = 15_000;
 
 /**
  * Rotinas, pushed from Você (the web's page on the phone): what the agents do on their own, "Nova rotina" as the
- * bar's "+" (as Tarefas; with none yet, the empty state's own button), the next hours as a horizon, then the search, the status (Todas, Ativas, Pausadas, Por evento, with
- * counts) and the agent; "No ar" and "Pausadas" in the server's order, the one-offs that already ran folded under
- * "Concluídos". A row opens its routine; "…" (or a long press) its actions.
+ * bar's "+" (as Tarefas; with none yet, the empty state's own button), the next hours as a horizon, then the
+ * search, the status (Todas, Ativas, Pausadas, Por evento, with counts) and the agent; "No ar" and "Pausadas" in
+ * the server's order, the one-offs that already ran folded under "Concluídos". A row opens its routine; "…" (or a
+ * long press) its actions.
  */
 export function RoutinesScreen() {
   return (
@@ -89,6 +91,7 @@ function RoutineList() {
       ) : list.length === 0 ? (
         <EmptyState
           sky
+          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
           title={t("routines.emptyTitle")}
           action={<Button variant="primary" size="sm" icon="plus" label={t("routines.new")} onPress={openNew} />}
         />
@@ -147,7 +150,7 @@ function RoutineList() {
             </>
           ) : null}
           {sections.live.length === 0 && sections.paused.length === 0 && sections.filtered ? (
-            <EmptyState title={t("routines.noResults")} />
+            <EmptyState icon="search" title={t("routines.noResults")} />
           ) : null}
           {sections.done.length > 0 && status === "all" ? (
             <>
