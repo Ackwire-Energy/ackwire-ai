@@ -90,6 +90,8 @@ export async function createTestServer(
     jevFetch?: typeof fetch;
     /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
     humanCheck?: HumanCheck;
+    /** The server's own file store's kind (`disk`, `postgres`, `s3`); it keeps files in memory either way. */
+    platformKind?: string;
     /** Browser push (ADR 0071); absent = a fake that records, null = off. */
     webPush?: WebPushSender | null;
   } = {},
@@ -104,7 +106,7 @@ export async function createTestServer(
   const email = createFakeEmailSender();
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
-  const platformBlobs = createMemoryBlobStore();
+  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),

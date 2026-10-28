@@ -142,6 +142,26 @@
   margin-top: 4px;
   font-size: 14px;
 }
+/*
+ * "optional" after a step's title, on the line where the title ends: its middle on the title's capitals, as an
+ * icon's. The chip has a smaller type of its own, so the title hands it where its capitals sit, as a length.
+ */
+@property --onb-title-caps {
+  syntax: "<length>";
+  inherits: true;
+  /* Browsers without the lh unit: the 21px title's line. */
+  initial-value: 14px;
+}
+@supports (top: 1lh) {
+  .onb__ask .onb__title {
+    --onb-title-caps: calc(0.5lh - var(--cap-mid));
+  }
+}
+.onb__titletag {
+  margin-left: 8px;
+  vertical-align: top;
+  translate: 0 calc(var(--onb-title-caps) - 50%);
+}
 .onb__answer {
   display: flex;
   flex-direction: column;

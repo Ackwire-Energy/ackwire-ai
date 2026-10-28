@@ -11,6 +11,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
+import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -531,10 +532,40 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
   await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
   await settle(6);
   const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
-  expect(notice.getAttribute("aria-label")).toBe(`${name} pede para entrar`);
-  const headline = notice.querySelector(".nt-meta b");
+  expect(notice.getAttribute("aria-label")).toBe(`${name} pede para entrar, não lida`);
+  const headline = notice.querySelector(".nt-what b");
   expect(headline?.textContent).toBe(name);
   expect(headline?.children.length).toBe(0);
+});
+
+describe("Members › Invite people", () => {
+  test("says no agent answers someone invited now, as the Team step does, while every agent with an AI is only yours", async () => {
+    const note = async (audience: "owner" | "everyone") => {
+      cleanup();
+      const state = seedState({ joinRequests: [] });
+      for (const a of state.agents) {
+        a.ownerUserId = state.me?.user.id ?? null;
+        a.audience = { mode: "owner", userIds: [] };
+      }
+      const first = state.agents[0];
+      if (first) first.audience = { mode: audience, userIds: [] };
+      await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
+      await settle(6);
+      const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+      return { invite, line: within(invite).queryByText("Seus agentes só respondem a você.")?.closest(".setup-line") };
+    };
+    const { invite, line } = await note("owner");
+    expect(line).toBeTruthy();
+    expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
+      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+    );
+    // Under the card's title, before the invitations it's about.
+    const emails = within(invite).getByLabelText("E-mails, separados por vírgula");
+    expect((line as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(invite.querySelector(".ac-card__title + .setup-line")).toBe(line as Element);
+    // One agent that answers everyone: someone invited gets an answer, so nothing to say.
+    expect((await note("everyone")).line).toBeFalsy();
+  });
 });
 
 describe("Members › Invitation link", () => {
@@ -622,30 +653,39 @@ describe("Members › Invitation link", () => {
   });
 });
 
-test("the admins' notice: who asks, a Members chip, and it opens Members", async () => {
-  const state = seedState({
-    notifications: [
-      notification({
-        id: "n-join",
-        kind: "join_request",
-        waiting: true,
-        count: 2,
-        source: { label: "Acme" },
-        latest: { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] },
-      }),
-    ],
-  });
-  const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
-  await settle(6);
-  const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
+test("the admins' notice: who asks, a Members chip, and it opens Members, from Abrir or the row itself", async () => {
+  const notice = async () => {
+    const state = seedState({
+      notifications: [
+        notification({
+          id: "n-join",
+          kind: "join_request",
+          waiting: true,
+          count: 2,
+          source: { label: "Acme" },
+          latest: { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] },
+        }),
+      ],
+    });
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+    await settle(6);
+    return { router, row: document.querySelector('[data-n="n-join"]') as HTMLElement };
+  };
+  const { router, row } = await notice();
   // Two people: both by name, the first to ask first, as the notice's face and time are hers.
-  expect(notice.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar");
-  expect(notice.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
-  expect(notice.querySelector(".nt-face")?.textContent).toBe("AS");
-  expect(notice.querySelector(".ac-chip")?.textContent).toBe("Membros");
-  await click(within(notice).getByRole("button", { name: "Abrir" }));
+  expect(row.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar, não lida");
+  expect(row.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
+  expect(row.querySelector(".nt-face")?.textContent).toBe("AS");
+  expect(row.querySelector(".ac-chip")?.textContent).toBe("Membros");
+  await click(within(row).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
+  cleanup();
+
+  const again = await notice();
+  await click(again.row.querySelector(".nt-what") as HTMLElement);
+  await settle(6);
+  expect(again.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
 });
 
 test("the admins' notice names the first two who asked and counts the rest", async () => {
@@ -667,8 +707,8 @@ test("the admins' notice names the first two who asked and counts the rest", asy
     await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
     await settle(6);
     const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
-    expect(notice.getAttribute("aria-label")).toBe(said);
-    expect(notice.querySelector(".nt-meta")?.textContent).toContain(said);
+    expect(notice.getAttribute("aria-label")).toBe(`${said}, não lida`);
+    expect(notice.querySelector(".nt-wr__l1")?.textContent).toContain(said);
     cleanup();
   }
 });

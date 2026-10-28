@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createFakeS3 } from "@agenteschat/adapters";
+import { storagePlatform } from "../src/routes/app/storage";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 const SECRET = "secret-test-key-123456";
@@ -34,7 +35,8 @@ test("storage API: masked settings, test before switching, migrate", async () =>
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
 
-  expect(await (await api("/storage")).json()).toEqual({ kind: "agentes", s3: null, migration: null });
+  const disk = { kind: "disk", folder: null };
+  expect(await (await api("/storage")).json()).toEqual({ kind: "agentes", s3: null, migration: null, platform: disk });
   const refused = await api("/storage", { method: "PUT", json: { kind: "s3", s3: settings } });
   expect(refused.status).toBe(400);
   const tested = (await (await api("/storage/test", { json: settings })).json()) as { ok: boolean };
@@ -43,7 +45,12 @@ test("storage API: masked settings, test before switching, migrate", async () =>
   expect(saved.status).toBe(200);
   const body = await saved.text();
   expect(body).not.toContain(SECRET);
-  expect(JSON.parse(body)).toMatchObject({ kind: "s3", s3: { bucket: "acme", secretHint: "••••3456" } });
+  // The app keeps what a switch answers: where this server keeps files comes along.
+  expect(JSON.parse(body)).toMatchObject({
+    kind: "s3",
+    s3: { bucket: "acme", secretHint: "••••3456" },
+    platform: disk,
+  });
 
   const migration = await api("/storage/migrate", { json: {} });
   expect(await migration.json()).toMatchObject({ status: "running", total: 0 });
@@ -55,6 +62,31 @@ test("storage API: masked settings, test before switching, migrate", async () =>
   ).json()) as { ok: boolean; steps: { error: string | null }[] };
   expect(ssrf.ok).toBe(false);
   expect(ssrf.steps[0]?.error).toContain("internal network");
+});
+
+test("storage API: where this server keeps files, with the folder only outside a container", async () => {
+  const folder = "/home/walter/.agentes/files";
+  const desktop = await createTestServer({ platformKind: "disk", env: { FILES_DIR: folder, INSTALL_MODE: "desktop" } });
+  try {
+    const owner = browser(desktop);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const read = await owner(`/api/app/organizations/${orgId}/storage`);
+    expect(((await read.json()) as { platform: unknown }).platform).toEqual({ kind: "disk", folder });
+  } finally {
+    await desktop.close();
+  }
+  const config = { FILES_DIR: "/data/files" };
+  expect(storagePlatform("disk", { ...config, INSTALL_MODE: "native" })).toEqual({
+    kind: "disk",
+    folder: "/data/files",
+  });
+  // Inside Docker the path is the container's: said or guessed, it never shows.
+  expect(storagePlatform("disk", { ...config, INSTALL_MODE: "docker" })).toEqual({ kind: "disk", folder: null });
+  expect(storagePlatform("disk", config, true)).toEqual({ kind: "disk", folder: null });
+  expect(storagePlatform("disk", config, false)).toEqual({ kind: "disk", folder: "/data/files" });
+  expect(storagePlatform("postgres", { INSTALL_MODE: "native" })).toEqual({ kind: "database", folder: null });
+  expect(storagePlatform("s3", { ...config, INSTALL_MODE: "native" })).toEqual({ kind: "bucket", folder: null });
 });
 
 test("Drive API: create, new version, versions, download link, file, delete", async () => {

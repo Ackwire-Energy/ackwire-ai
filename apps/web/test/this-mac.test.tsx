@@ -48,7 +48,7 @@ describe("Configurações → Computadores, in the app", () => {
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
     const card = screen().getByRole("region", { name: "Conectar outro computador" });
-    expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
+    expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
 
     // The runner picks its token up right after the site confirms.
     const connected: ThisMacStatus = { orgs: [{ orgId: ORG_ID, machineId: "m-this", connection: "online" }] };

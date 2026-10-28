@@ -192,7 +192,15 @@ function Snippet({ text, mine }: { text: string; mine: string | null }) {
 }
 
 /** Where it happened, as a chip. */
-function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: string) => string }) {
+function SourceChip({
+  n,
+  channelName,
+  className,
+}: {
+  n: AppNotification;
+  channelName: (id: string) => string;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const s = n.source;
   const channel = channelOf(n);
@@ -222,7 +230,25 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
     ];
   } else if (channel) [icon, label] = ["channel", t("notifications.source.channel", { name: channelName(channel) })];
   if (!label) return null;
-  return <Chip icon={icon}>{label}</Chip>;
+  return (
+    <Chip icon={icon} className={className}>
+      {label}
+    </Chip>
+  );
+}
+
+/** How long is left to answer, as a chip that turns to attention in the last hours. */
+function LeftChip({ n, className }: { n: AppNotification; className?: string }) {
+  const { t } = useTranslation();
+  const at = n.latest.expiresAt;
+  const left = at ? timeLeft(t, at) : null;
+  if (!at || !left) return null;
+  const urgent = new Date(at).getTime() - Date.now() <= URGENT_MS;
+  return (
+    <Chip icon="clock" tone={urgent ? "waiting" : "neutral"} className={className}>
+      {urgent ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
+    </Chip>
+  );
 }
 
 type WhatKey =
@@ -950,7 +976,7 @@ function ApprovalActs({
   if (a?.canDecide && a.status === "pending") {
     if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
     return (
-      <div className="nt-wacts">
+      <div className="nt-wacts ac-acts">
         <ApproveButton approval={a} />
         <Button
           size="sm"
@@ -961,8 +987,6 @@ function ApprovalActs({
         >
           {t("approval.refuse")}
         </Button>
-        <span className="nt-grow" />
-        {tail}
         <Button
           variant="ghost"
           size="sm"
@@ -973,11 +997,12 @@ function ApprovalActs({
         >
           {t("notifications.wait.openApprovals")}
         </Button>
+        {tail}
       </div>
     );
   }
   return (
-    <div className="nt-wacts">
+    <div className="nt-wacts ac-acts">
       <Button
         variant="primary"
         size="sm"
@@ -989,13 +1014,12 @@ function ApprovalActs({
       >
         {t("notifications.wait.decide")}
       </Button>
-      <span className="nt-grow" />
       {tail}
     </div>
   );
 }
 
-/** A card in "Esperando você": an agent's question, my turn at the table, an approval. */
+/** An item in "Esperando você": a card for an agent's question, my turn at the table or an approval, else a row. */
 function WaitCard({
   n,
   s,
@@ -1028,7 +1052,7 @@ function WaitCard({
   const waitedMs = Date.now() - new Date(n.createdAt).getTime();
   const agent = first?.type === "agent" ? dir.agentById.get(first.id) : undefined;
   const tail = (
-    <>
+    <span className="nt-tail ac-acts">
       <SnoozeMenu
         onPick={(c) => h.onSnooze(n, c)}
         trigger={
@@ -1054,8 +1078,29 @@ function WaitCard({
           h.onDone(n);
         }}
       />
-    </>
+    </span>
   );
+  const label = !asked
+    ? [name, l.title ?? l.text].filter(Boolean).join(": ")
+    : asked.total > 1
+      ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
+      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+  const face = first ? (
+    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
+  ) : (
+    <SystemFace n={n} className="nt-av40" />
+  );
+  const fuse = n.kind === "approval" && l.expiresAt && (
+    <ExpiryFuse left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS} color={colorOf(agent)} />
+  );
+  const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
+  // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.
+  if (n.kind !== "agent_question" && n.kind !== "forum_turn" && !approvalId)
+    return (
+      <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
+        {fuse}
+      </WaitRow>
+    );
   let meta: ReactNode;
   let head: ReactNode;
   let body: ReactNode;
@@ -1119,7 +1164,7 @@ function WaitCard({
             ))}
           </div>
         )}
-        <div className="nt-wacts">
+        <div className="nt-wacts ac-acts">
           <Button
             variant="primary"
             size="sm"
@@ -1141,7 +1186,6 @@ function WaitCard({
           >
             {t("notifications.wait.openThread")}
           </Button>
-          <span className="nt-grow" />
           {tail}
         </div>
       </>
@@ -1186,7 +1230,7 @@ function WaitCard({
             onCancel={h.onCancel}
           />
         ) : (
-          <div className="nt-wacts">
+          <div className="nt-wacts ac-acts">
             <Button
               variant="primary"
               size="sm"
@@ -1210,76 +1254,31 @@ function WaitCard({
             >
               {t("notifications.wait.pass")}
             </Button>
-            <span className="nt-grow" />
             {tail}
           </div>
         )}
       </>
     );
-  } else {
-    const leftMs = l.expiresAt ? new Date(l.expiresAt).getTime() - Date.now() : null;
-    const left = l.expiresAt ? timeLeft(t, l.expiresAt) : null;
+  } else if (approvalId) {
     // An approval says who asked while nobody watched, then the agent's why (ADR 0053 §8).
-    const origin = n.kind === "approval" ? approvalOriginWords({ origin: l.origin }) : null;
-    const why = n.kind === "approval" && l.title ? l.text : undefined;
+    const origin = approvalOriginWords({ origin: l.origin });
+    const why = l.title ? l.text : undefined;
     // An approval (AprovacaoConector B): the sentence says who and what; decided right here.
-    const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
-    const leftChip = left && leftMs !== null && (
-      <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
-        {leftMs <= URGENT_MS ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
-      </Chip>
-    );
-    const open = () => h.onOpen(n);
-    if (approvalId) {
-      meta = (
-        <>
-          <span>{whenText(t, i18n.language, n.createdAt)}</span>
-          {origin && (
-            <span className="nt-origin">
-              <Icon name="routines" size={14} />
-              {sayWords(t, origin)}
-            </span>
-          )}
-          <span className="nt-grow" />
-          {leftChip}
-        </>
-      );
-      head = (
-        <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />
-      );
-      body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={open} tail={tail} />;
-    } else {
-      meta = (
-        <>
-          <span>
-            <Headline n={n} dir={dir} channelName={channelName} />
+    meta = (
+      <>
+        <span>{whenText(t, i18n.language, n.createdAt)}</span>
+        {origin && (
+          <span className="nt-origin">
+            <Icon name="routines" size={14} />
+            {sayWords(t, origin)}
           </span>
-          <SourceChip n={n} channelName={channelName} />
-          <span>{whenText(t, i18n.language, n.createdAt)}</span>
-          <span className="nt-grow" />
-          {leftChip}
-        </>
-      );
-      // A request to join: the line above says who; it is answered in Members.
-      head = n.kind === "join_request" ? null : <h3>{l.title ?? l.text ?? ""}</h3>;
-      body = (
-        <div className="nt-wacts">
-          <Button
-            variant="primary"
-            size="sm"
-            icon="external"
-            onClick={(e) => {
-              e.stopPropagation();
-              open();
-            }}
-          >
-            {t("notifications.open")}
-          </Button>
-          <span className="nt-grow" />
-          {tail}
-        </div>
-      );
-    }
+        )}
+        <span className="nt-grow" />
+        <LeftChip n={n} />
+      </>
+    );
+    head = <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />;
+    body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={() => h.onOpen(n)} tail={tail} />;
   }
   return (
     <article
@@ -1289,32 +1288,96 @@ function WaitCard({
       data-n={n.id}
       data-wait=""
       data-burst=""
-      aria-label={
-        !asked
-          ? [name, l.title ?? l.text].filter(Boolean).join(": ")
-          : asked.total > 1
-            ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
-            : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] })
-      }
+      aria-label={label}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);
       }}
       onKeyDown={() => {}}
     >
-      <span className="nt-face">
-        {first ? (
-          <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
-        ) : (
-          <SystemFace n={n} className="nt-av40" />
-        )}
-      </span>
+      <span className="nt-face">{face}</span>
       <div className="nt-meta">{meta}</div>
       <div>{head}</div>
       <div className="nt-body">{body}</div>
-      {n.kind === "approval" && l.expiresAt && (
-        <ExpiryFuse left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS} color={colorOf(agent)} />
+      {fuse}
+    </article>
+  );
+}
+
+/**
+ * A waiting item that only points somewhere, on one line: its face, its words, Open, Remind me later and Done. A click
+ * anywhere on it opens it, as Open does.
+ */
+function WaitRow({
+  n,
+  s,
+  h,
+  dir,
+  channelName,
+  label,
+  face,
+  tail,
+  children,
+}: {
+  n: AppNotification;
+  s: RowState;
+  h: RowHandlers;
+  dir: Dir;
+  channelName: (id: string) => string;
+  label: string;
+  face: ReactNode;
+  tail: ReactNode;
+  children?: ReactNode;
+}) {
+  const { t, i18n } = useTranslation();
+  const unread = n.readAt === null;
+  // A request to join says it all in its headline; an agent's hand and an approval add what they are about.
+  const sub = n.kind === "join_request" ? null : (n.latest.title ?? n.latest.text);
+  return (
+    <article
+      className={cx(
+        "nt-wi nt-wr",
+        unread && "is-unread",
+        s.cur && "is-cur",
+        s.fresh && "is-new",
+        s.leaving && "is-leaving",
       )}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a focusable item (J/K, E, Enter) with its own actions inside
+      tabIndex={0}
+      data-n={n.id}
+      data-wait=""
+      data-burst=""
+      aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
+      onClick={(e) => {
+        const target = e.target as Element;
+        // The Remind menu renders in a portal, and React still bubbles its clicks up to here.
+        if (!e.currentTarget.contains(target) || target.closest("button, a")) return;
+        if (window.getSelection()?.type === "Range") return;
+        h.onOpen(n);
+      }}
+      onKeyDown={() => {}}
+    >
+      <span className="nt-face">{face}</span>
+      <div className="nt-wr__main">
+        <div className="nt-wr__text">
+          <div className="nt-wr__l1 ac-captop">
+            <span className="nt-what">
+              <Headline n={n} dir={dir} channelName={channelName} />
+            </span>{" "}
+            <SourceChip n={n} channelName={channelName} className="nt-wr__src" />{" "}
+            <span className="nt-wr__tm">{whenText(t, i18n.language, n.createdAt)}</span>{" "}
+            <LeftChip n={n} className="nt-wr__left" />
+          </div>
+          {sub && <p className="nt-wr__sub">{sub}</p>}
+        </div>
+        <div className="nt-wr__acts ac-acts">
+          <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
+            {t("notifications.open")}
+          </Button>
+          {tail}
+        </div>
+      </div>
+      {children}
     </article>
   );
 }

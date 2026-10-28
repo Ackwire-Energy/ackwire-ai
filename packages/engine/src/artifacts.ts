@@ -563,7 +563,7 @@ async function insertVersion(
       })
       .where(and(eq(artifacts.id, artifactId), eq(artifacts.currentVersion, current.currentVersion)))
       .returning();
-    if (!a) throw new ConflictError("Someone saved a newer version; reload and try again");
+    if (!a) throw new ConflictError("Someone saved a newer version. Reload and try again.");
     await tx.insert(artifactVersions).values({
       orgId,
       artifactId,
@@ -641,7 +641,7 @@ export async function updateArtifact(
     throw new ForbiddenError("Only documents and tables can be edited here");
   }
   if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
-    throw new ConflictError("Someone saved a newer version; reload and try again");
+    throw new ConflictError("Someone saved a newer version. Reload and try again.");
   }
   const { artifact, version } = await insertVersion(deps, actor, orgId, current, {
     stored: encode(content),
@@ -715,7 +715,7 @@ export async function addFileVersion(
     throw new ValidationError(`this artifact is a ${current.kind}, not an uploaded file`);
   }
   if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
-    throw new ConflictError("Someone saved a newer version; reload and try again");
+    throw new ConflictError("Someone saved a newer version. Reload and try again.");
   }
   const file = fileInput(input);
   const { artifact, blob, version } = await insertVersion(deps, actor, orgId, current, {

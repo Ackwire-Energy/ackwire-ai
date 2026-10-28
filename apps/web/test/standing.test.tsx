@@ -23,9 +23,10 @@ async function open(
     role = "owner",
     billingUrl = null,
     state = seedState(),
-  }: { role?: Role; billingUrl?: string | null; state?: ReturnType<typeof seedState> } = {},
+    cloud = false,
+  }: { role?: Role; billingUrl?: string | null; state?: ReturnType<typeof seedState>; cloud?: boolean } = {},
 ) {
-  state.authConfig = { ...state.authConfig, supportEmail, billingUrl };
+  state.authConfig = { ...state.authConfig, supportEmail, billingUrl, ...(cloud ? { workspaceComputer: true } : {}) };
   if (state.me) {
     state.me.organizations = [
       { id: ORG_ID, name: "Acme", role, ...(standing ? { standing } : {}) },
@@ -77,6 +78,21 @@ describe("on hold: a line on top of the work area", () => {
     expect(within(banner).getByRole("link", { name: "ajuda@acme.test" }).getAttribute("href")).toBe(
       "mailto:ajuda@acme.test",
     );
+  });
+
+  test("on the Cloud with no address: no line, since nobody else runs that server; with one, where to write", async () => {
+    await open({ state: "hold", reason: null }, false, null, { cloud: true });
+    const banner = () => screen().getByRole("region", { name: STATUS });
+    expect(banner().textContent).toContain("Os agentes deste workspace estão pausados para uma revisão.");
+    expect(banner().textContent).not.toContain("Precisa de ajuda");
+    expect(banner().querySelector(".support-line")).toBeNull();
+    cleanup();
+    await open({ state: "suspended", reason: null }, false, null, { cloud: true });
+    expect(document.body.textContent).toContain("As conversas e os agentes dele estão fechados por enquanto.");
+    expect(document.body.textContent).not.toContain("Precisa de ajuda");
+    cleanup();
+    await open({ state: "hold", reason: null }, false, "suporte@agentes.chat", { cloud: true });
+    expect(banner().textContent).toContain("Precisa de ajuda? Escreva para suporte@agentes.chat.");
   });
 
   test("an active workspace shows nothing", async () => {

@@ -136,8 +136,8 @@ export function Message({
           )}
           {aside && !grouped && <span className="ac-msg__aside">{aside}</span>}
         </div>
-        {aside && grouped && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
         {children}
+        {aside && grouped && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
       </div>
     </article>
   );

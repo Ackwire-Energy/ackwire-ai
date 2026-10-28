@@ -121,9 +121,15 @@ describe("the agent page's one entry: its status line", () => {
   });
 
   test("why nothing shows: uses neither, can't show; and no computer yet, with a picker", async () => {
-    expect(line(await entryOf({ desktop: { available: false, reason: "no_desktop" } }))).toBe(
+    const neither = { desktop: { available: false, reason: "no_desktop" } };
+    const screens = { available: true, reason: null };
+    expect(line(await entryOf({ ...neither, machine: { os: "linux", desktopUse: screens } }))).toBe(
       "Não usa tela nem navegador",
     );
+    cleanup();
+    // A Mac or a PC has no screens for agents: only a browser it doesn't use.
+    const none = { available: false, reason: "Agents use desktops only on Linux" };
+    expect(line(await entryOf({ ...neither, machine: { desktopUse: none } }))).toBe("Não usa navegador");
     cleanup();
     const row = await entryOf({ machine: null, desktop: { available: false, reason: "no_computer" } });
     expect(line(row)).toBe("Sem computador ainda");

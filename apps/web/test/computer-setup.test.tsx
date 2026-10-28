@@ -236,8 +236,13 @@ describe("the workspace's computer on its way: the notice on top of the work are
 
 describe("no AI yet while the workspace's computer is on its way", () => {
   test("the banner is the one it always is: its line, its ⓘ and Connect, nothing about the computer", async () => {
+    // The Cloud: Jev picks, so asking in the chat is understood (the line's ⓘ).
     const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
+      aiStatus: {
+        any: false,
+        agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }],
+        routing: { by: "jev", mine: "jev", model: null, noSmallModel: null },
+      },
     });
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;
@@ -511,19 +516,19 @@ describe("a computer connected in system mode (each agent its own user)", () => 
     expect(system).not.toContain("/root/agentes");
     expect(system).toContain("Liberar é no próprio computador, no Terminal dele, como administrador:");
     expect(system).toContain("sudo agentes-runner folders allow <pasta> --agent <agente>");
-    expect(system).not.toContain("app agentes no Mac");
+    expect(system).not.toContain("app do agentes.chat");
 
     // One user for every agent: the folder it was connected from is theirs, and the Terminal needs no sudo.
     const single = await page(laptop.id);
     expect(single).toContain("Pasta: /home/ana/agentes");
     expect(single).toContain("Liberar é no próprio computador, no Terminal dele:");
     expect(single).not.toContain("sudo");
-    expect(single).not.toContain("app agentes no Mac");
+    expect(single).not.toContain("app do agentes.chat");
 
-    // A Mac keeps the app first, the Terminal as the way without it.
+    // A Mac keeps the app first, the terminal as the way without it.
     const onMac = await page(mac.id);
-    expect(onMac).toContain("abra o app agentes no Mac");
-    expect(onMac).toContain("Sem o app? No Terminal do computador:");
+    expect(onMac).toContain("abra o app do agentes.chat nele (Preferências → Pastas).");
+    expect(onMac).toContain("Sem o app? No terminal do computador:");
   });
 });
 

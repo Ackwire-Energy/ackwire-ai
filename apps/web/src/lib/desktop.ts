@@ -214,11 +214,17 @@ export const thisMac = {
   signIn: () => invoke<unknown>({ kind: "signIn" }),
   /** The app's own window to pick another server (its first run), from the sign-in page. */
   otherServer: () => invoke<unknown>({ kind: "servers" }),
+  /** The folder where the server the app runs here keeps its files, in Finder or the file manager. */
+  revealFiles: () => invoke<unknown>({ kind: "files" }),
 };
 
 /** The app takes `otherServer` (`servers` in `window.__agentesDesktop`); older apps refuse it. */
 export const desktopPicksServer = () =>
   inDesktopApp() && (window as { __agentesDesktop?: { servers?: unknown } }).__agentesDesktop?.servers === true;
+
+/** The app takes `revealFiles` (`files` in `window.__agentesDesktop`); older apps refuse it. */
+export const desktopRevealsFiles = () =>
+  inDesktopApp() && (window as { __agentesDesktop?: { files?: unknown } }).__agentesDesktop?.files === true;
 
 /**
  * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"

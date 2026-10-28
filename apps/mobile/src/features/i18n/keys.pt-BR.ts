@@ -1345,6 +1345,10 @@ export const featureKeysPtBR = {
     rolesHint:
       "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
   },
+  humanCheck: {
+    title: "Verificação rápida",
+    blocked: "A verificação não carregou. Tente outra rede.",
+  },
   members: {
     waiting_one: "{{count}} esperando",
     waiting_other: "{{count}} esperando",

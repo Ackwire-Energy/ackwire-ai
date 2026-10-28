@@ -273,7 +273,7 @@ export async function stopRun(
       for (const r of closedSecrets) await publishSecret(deps.pubsub, r, "secret.updated");
       break;
     }
-    if (attempt >= 3) throw new ConflictError("This task changed state; try again", "run.state_changed");
+    if (attempt >= 3) throw new ConflictError("This task changed state. Try again.", "run.state_changed");
     const [fresh] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
     if (!fresh) throw new NotFoundError("Run not found");
     run = fresh;

@@ -389,6 +389,17 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("button", { name: "Pedido enviado" }).hasAttribute("disabled")).toBe(true);
   });
 
+  test("expired, on a server that sends no email: whom to ask, and no button for a request nobody would get", async () => {
+    const state = seedState({ me: null, authConfig: { passwordReset: false } });
+    await renderApp("/invite/expired", { api: createFakeApi(state) });
+    expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe(
+      "Convites valem por 7 dias. Peça um novo a quem mandou.",
+    );
+    expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
+    expect(state.calls.some((c) => c.method === "invites.requestNew")).toBe(false);
+  });
+
   test("signed in with another email: explains and offers to sign out", async () => {
     await renderApp("/invite/valid", { api: createFakeApi() });
     expect(screen().getByRole("status").textContent).toContain("Este convite foi enviado para marina@acme.com.br");
@@ -582,7 +593,7 @@ describe("Onboarding", () => {
     const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
-    state.authConfig = { workspaceComputer: false, billingUrl };
+    state.authConfig = { workspaceComputer: false, billingUrl, ...patch.authConfig };
     const api = createFakeApi(state);
     // Each agent's view as the server makes it: the computer it was given (none until then), and that computer's
     // own sign-in where whoever connected it owns the agent (this server's own computer has nobody).
@@ -925,6 +936,24 @@ describe("Onboarding", () => {
     expect(left).toEqual(["https://billing.example.com/link?t=new_workspace"]);
   });
 
+  test("team on a server that sends no email: the link alone, and Done promises no email", async () => {
+    const { state } = await start({ authConfig: { passwordReset: false } });
+    await throughAgents(state);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Compartilhe o link de convite com eles.");
+    // No emails to type: an invitation by email would never arrive.
+    expect(screen().queryByLabelText("E-mails")).toBeNull();
+    expect((screen().getByLabelText("Link de convite") as HTMLInputElement).value).toMatch(
+      /^http:\/\/localhost:3000\/invite\/link-/,
+    );
+    expect(document.getElementById("invite-link-help")?.textContent).toBe("Você aprova cada pessoa que pedir.");
+    expect(button("Continuar")).toBeTruthy();
+    await next();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
+    expect(welcome()).not.toMatch(/Mandamos|e-mail/);
+    expect(calls(state, "orgs.invite")).toHaveLength(0);
+  });
+
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
     await throughImport(state);
@@ -940,6 +969,129 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.create")).toHaveLength(2);
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+  });
+
+  describe("Jev, for the server's owner, once an AI is connected", () => {
+    const OFF = { source: null, hint: null, state: "off" as const, month: { decisions: 0, costUsd: 0 } };
+    const TEAM = "Quem mais trabalha com você?";
+    const toJev = async (patch: Parameters<typeof start>[0] = {}) => {
+      const r = await start({ jev: OFF, ...patch });
+      await throughAgents(r.state);
+      return r;
+    };
+    const heading = () => screen().getByRole("heading", { level: 1 });
+
+    test("its own screen after the AI: optional, why, the steps; Continue with nothing typed asks nothing", async () => {
+      const { state } = await toJev();
+      expect(heading().textContent).toBe("Ajude os agentes a trabalhar em equipeopcional");
+      expect(document.querySelector(".onb__lead")?.textContent).toContain(
+        "O Jev, da TypeSafe, toma decisões rápidas por eles.",
+      );
+      // What happens without it is behind the lead's ⓘ, never on the screen.
+      const hint = button("Sobre Jev");
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.hidden).toBe(true);
+      expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+        "Sem o Jev, um modelo pequeno numa das suas chaves de API escolhe quem responde.",
+      );
+      expect(document.body.textContent).toContain("Escolhe quem responde Mesmo sem @menção.");
+      expect(screen().getByRole("link", { name: "Abrir a TypeSafe" }).getAttribute("href")).toBe(
+        "https://console.typesafe.ai",
+      );
+      // The big button saves: no button of the field's own.
+      expect(screen().queryByRole("button", { name: "Salvar chave" })).toBeNull();
+      // Its place on the rail is the AI's: Agentes e IA, still.
+      expect(railStep(/^Agentes e IA/).getAttribute("aria-current")).toBe("step");
+      expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+      await next();
+      expect(calls(state, "system.saveJev")).toHaveLength(0);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("with the server's router off, no reason says Jev picks who answers", async () => {
+      const routing = { by: "off", mine: "off", model: null, noSmallModel: null } as const;
+      await toJev({ aiStatus: { any: true, agents: [], routing, apiKey: true } });
+      expect([...document.querySelectorAll(".jev-why b")].map((b) => b.textContent)).toEqual([
+        "Organiza a memória",
+        "Enxerga a tela",
+      ]);
+    });
+
+    test("Save and continue keeps a key TypeSafe accepts, and moves on", async () => {
+      const { state } = await toJev();
+      await type("Cole aqui", "ts_1234");
+      expect(button("Salvar e continuar").hasAttribute("disabled")).toBe(true);
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"]]);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key TypeSafe refuses stays, with why under it; then Continue moves on without asking again", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_wrong_0000: "invalid" } });
+      await type("Cole aqui", "ts_wrong_0000");
+      await click(button("Salvar e continuar"), 8);
+      expect(heading().textContent).toContain("Ajude os agentes a trabalhar em equipe");
+      const field = screen().getByLabelText("Cole aqui");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "A TypeSafe não aceitou esta chave. Copie de novo na página de chaves.",
+      );
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(state.jev?.source).toBeNull();
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a limit is no refusal: its words stay under the field, and the same key is saved on the next try", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_live_9f2c: "rate_limited" } });
+      await type("Cole aqui", "ts_live_9f2c");
+      await click(button("Salvar e continuar"), 8);
+      const field = screen().getByLabelText("Cole aqui");
+      expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "Too many tries. Wait a minute.",
+      );
+      // Never a way past a key that wasn't kept.
+      expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
+      await click(button("Salvar e continuar"), 8);
+      expect(calls(state, "system.saveJev").map((c) => c.args)).toEqual([["ts_live_9f2c"], ["ts_live_9f2c"]]);
+      expect(state.jev?.source).toBe("settings");
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("a key with no credit is kept, and the screen says so before moving on", async () => {
+      const { state } = await toJev({ jevVerdicts: { ts_empty_5555: "no_credit" } });
+      await type("Cole aqui", "ts_empty_5555");
+      await click(button("Salvar e continuar"), 8);
+      expect(state.jev?.state).toBe("no_credit");
+      expect(document.body.textContent).toContain("Salva. Adicione crédito na TypeSafe e o Jev começa sozinho.");
+      await click(button("Continuar"), 8);
+      expect(calls(state, "system.saveJev")).toHaveLength(1);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+    });
+
+    test("Back goes to the AI; never after Conectar depois, with a key in the server's settings, or for anyone else", async () => {
+      await toJev();
+      await click(button(/Voltar/), 6);
+      expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+      cleanup();
+
+      const later = await start({ jev: OFF });
+      await throughImport(later.state);
+      await skip();
+      await keepOnly("Theo · PM");
+      await click(button(/Criar 1 agente/), 8);
+      await click(button("Conectar depois"), 8);
+      expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+      cleanup();
+
+      for (const jev of [{ ...OFF, source: "env" as const, hint: "9f2c", state: "ok" as const }, undefined]) {
+        const { state } = await start({ jev });
+        await throughAgents(state);
+        expect(screen().getByRole("heading", { name: TEAM })).toBeTruthy();
+        expect(document.body.textContent).not.toMatch(/typesafe/i);
+        cleanup();
+      }
+    });
   });
 
   test("no computer yet: a plan's panel says where it signs in, and goes back to the computer step", async () => {
@@ -1210,7 +1362,7 @@ describe("Onboarding", () => {
     await click(button(/Outro computador/), 8);
     // No code made on the site anymore: the computer makes it and the person confirms on /conectar.
     expect(calls(state, "machines.createPairing")).toHaveLength(0);
-    expect(document.body.textContent).toContain("O app para Mac ainda não está disponível.");
+    expect(document.body.textContent).toContain("O app ainda não está disponível. Por enquanto, use o comando abaixo.");
     await click(button("Outras formas: servidor ou Linux"), 2);
     expect(document.querySelector(".machine-command__code")?.textContent).toBe(
       "curl -fsSL http://localhost:3000/api/machines/install.sh | sh",

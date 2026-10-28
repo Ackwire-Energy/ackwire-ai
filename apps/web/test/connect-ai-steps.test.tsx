@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, AgentBrainLine, AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
+import type {
+  AgentBrain,
+  AgentBrainLine,
+  AiComputer,
+  ComputerSetup,
+  Machine,
+  MachineAccount,
+} from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { LOGIN_PER_AGENT } from "@agenteschat/client/lib/plans";
 import { icons } from "@agenteschat/ui";
@@ -8,7 +15,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -66,12 +73,14 @@ async function withPopup(run: () => Promise<void>) {
 
 /**
  * Settings › AI accounts with Ada (Walter's) on the MacBook, a computer someone else connected for the workspace
- * (`brain`: Ada's view), and "Conectar uma IA" opened. `setup`: the workspace gets its own computer, this far.
+ * (`brain`: Ada's view; `machine`: over its row), and "Conectar uma IA" opened. `setup`: the workspace gets its own
+ * computer, this far.
  */
 async function connect({
   computers = [MAC],
   setup,
   brain = {},
+  machine = {},
   mine = [ADA_ID],
   crew = false,
   path = `/org/${ORG_ID}/settings/keys`,
@@ -79,6 +88,7 @@ async function connect({
   computers?: AiComputer[];
   setup?: Partial<ComputerSetup>;
   brain?: Partial<AgentBrain>;
+  machine?: Partial<Machine>;
   /** Walter's agents (a plan thinks only for its owner's). */
   mine?: string[];
   /** Ada, Atlas and Lia, all Walter's, all on the MacBook, none with an AI yet. */
@@ -104,6 +114,7 @@ async function connect({
       agents: state.agents
         .filter((a) => a.id === ADA_ID || (crew && mine.includes(a.id)))
         .map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
+      ...machine,
     });
   machines?.setAiAccounts({ accounts: [], computers });
   const viewOf = api.agents.brain;
@@ -181,7 +192,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Kimi Code",
       "MiniMax",
       "OpenCode Go",
-      "Chave de APIClaude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
+      "Chave de APIClaude, OpenAI, Gemini e outros",
     ]);
     // Each by its maker's mark; the key row by four of them, overlapped.
     expect(
@@ -191,8 +202,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
       "openai",
+      "gemini",
       "deepseek",
-      "kimi",
     ]);
     expect(dialog.textContent).toContain("Ou pague pelo uso");
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
@@ -456,6 +467,27 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(tile("Chave de API").getAttribute("aria-pressed")).toBe("true");
   });
 
+  test("a plan whose tool is off on its computer: the app's Preferences on a Mac, the command too on Linux", async () => {
+    const reason = async (os: string, name: string) => {
+      cleanup();
+      const options = fakeAgentBrain(ADA_ID).options.map((o) =>
+        o.kind === "codex" ? { ...o, available: false, reason: "tool_off" as const } : o,
+      );
+      const { dialog, tile } = await connect({
+        machine: { os, name, mode: "system" },
+        brain: { computer: { machineId: "machine_1", name, online: true }, options },
+      });
+      await click(tile("ChatGPT"));
+      return dialog.textContent;
+    };
+    expect(await reason("linux", "Servidor")).toContain(
+      "Desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable codex.",
+    );
+    expect(await reason("darwin", "MacBook")).toContain(
+      "Desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+    );
+  });
+
   test("self-host with no computer for the agent: plans dim, the key comes first, and a plan's panel says to connect one", async () => {
     const { dialog, tile, router } = await connect({ computers: [], brain: { computer: null, machines: [] } });
     expect(tile("Chave de API").getAttribute("aria-pressed")).toBe("true");
@@ -569,12 +601,34 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);
     expect(shownText(panel)).toContain("Todo agente sem plano pensa com ela.");
+    // Every maker as a tile, Gemini third.
+    const makers = within(panel).getByRole("group", { name: "Provedor" });
+    expect([...makers.querySelectorAll(".ac-option__title")].map((el) => el.textContent)).toEqual([
+      "Claude",
+      "OpenAI",
+      "Gemini",
+      "DeepSeek",
+      "Kimi",
+      "Z.ai",
+      "MiniMax",
+    ]);
     // A maker with coding plans: where a plan's key goes is the first step's ⓘ, with no line under it.
     await click(within(panel).getByRole("button", { name: "Kimi" }));
     expect(hintOf("Crie a sua chave de API da Kimi", panel).text).toBe(
       "A chave de um plano de código vai na opção dele, acima.",
     );
     expect(shownText(panel)).not.toContain("plano de código");
+    // Gemini: its free tier may use what the agents send, so the first step's ⓘ says to turn on billing.
+    await click(within(panel).getByRole("button", { name: "Gemini" }));
+    expect(hintOf("Crie a sua chave de API do Gemini", panel)).toMatchObject({
+      text: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
+      hidden: true,
+    });
+    expect(shownText(panel)).not.toContain("faturamento");
+    expect(within(panel).getByRole("link", { name: "Abrir aistudio.google.com" }).getAttribute("href")).toBe(
+      "https://aistudio.google.com/api-keys",
+    );
+    expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("AQ.…");
     // A maker that publishes no prefix for its keys: no example in the field, never a bare "…".
     await click(within(panel).getByRole("button", { name: "Z.ai" }));
     expect(within(panel).getByLabelText("Cole aqui").hasAttribute("placeholder")).toBe(false);

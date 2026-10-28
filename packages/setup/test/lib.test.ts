@@ -7,6 +7,7 @@ import {
   appLink,
   appOnThisMachine,
   COMPOSE_FILES,
+  checkJevKey,
   computerCommand,
   computerInstall,
   computerOf,
@@ -29,6 +30,9 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  type JevCheck,
+  jevStateOf,
+  jevStep,
   lastLine,
   networkOf,
   nextSteps,
@@ -154,6 +158,11 @@ describe("options", () => {
     expect(parse(["--tailscale-tag", "agentes"])).toMatchObject({ error: expect.stringMatching(/^--tailscale-tag: /) });
     expect(parse(["--smtp-url", "smtp.example.com"])).toMatchObject({ error: expect.stringMatching(/^--smtp-url: /) });
     expect(parse(["--email-from", "ola"])).toMatchObject({ error: expect.stringMatching(/^--email-from: /) });
+    // A key cut short, or pasted with a curly quote, a space or a zero-width space: never sent, never written.
+    for (const key of ["ts_123", "ts_live 9f2c", "“ts_live_9f2c”", "ts_live_\u200b9f2c"])
+      expect(parse(["--typesafe-key", key])).toEqual({
+        error: "--typesafe-key: that isn't a whole TypeSafe key. Copy it again from https://console.typesafe.ai/keys.",
+      });
     expect(parse(["--frobnicate"])).toMatchObject({ error: expect.stringContaining("--help") });
   });
 
@@ -163,6 +172,109 @@ describe("options", () => {
     expect(resolveChoice(" Local ", values)).toBe("local");
     expect(resolveChoice("4", values)).toBeNull();
     expect(resolveChoice("vpn", values)).toBeNull();
+  });
+});
+
+describe("Jev's key (--typesafe-key)", () => {
+  test("a flag, or AGENTES_SETUP_TYPESAFE_KEY", () => {
+    expect(parseOptions(["--typesafe-key", "ts_live_9f2c"], {})).toMatchObject({
+      options: { typesafeKey: "ts_live_9f2c" },
+    });
+    expect(parseOptions([], { AGENTES_SETUP_TYPESAFE_KEY: " ts_live_9f2c " })).toMatchObject({
+      options: { typesafeKey: "ts_live_9f2c" },
+    });
+    // In --help, after --telemetry, in the options' column.
+    expect(readFileSync(join(import.meta.dir, "../src/cli.ts"), "utf8")).toMatch(
+      /--telemetry <on\|off> {16}.*\n {2}--typesafe-key <key> {16}TypeSafe key for Jev, optional \(\$\{TYPESAFE_KEYS\}\)\n/,
+    );
+  });
+
+  test("what TypeSafe's answer says about a key, as the server reads it (packages/engine/test/jev-key.test.ts)", () => {
+    const credit = { detail: { error_type: "billing_error", message: "Insufficient credits" } };
+    const table: [number, unknown, ReturnType<typeof jevStateOf>][] = [
+      [200, undefined, "ok"],
+      [401, undefined, "invalid"],
+      [402, undefined, "no_credit"],
+      [403, { detail: { error_type: "authentication_error", message: "Must supply an API key!" } }, "invalid"],
+      [403, credit, "no_credit"],
+      [400, { detail: { message: "Your balance is too low" } }, "no_credit"],
+      [400, { detail: "out of funds" }, "no_credit"],
+      [400, undefined, null],
+      [413, undefined, null],
+      [415, undefined, null],
+      [422, { detail: { message: "The image must be 280 to 1568 px a side" } }, null],
+      [429, undefined, "rate_limited"],
+      [500, undefined, "down"],
+      [529, { detail: { error_type: "overloaded_error" } }, "down"],
+    ];
+    for (const [status, body, state] of table)
+      expect({ status, state: jevStateOf(status, body) }).toEqual({ status, state });
+  });
+
+  test("the check: one call to TypeSafe with the key; no answer, a limit or an outage leave it unchecked", async () => {
+    const seen: { url: string; auth: string | null }[] = [];
+    const answer = (status: number | "offline", body: unknown = {}) =>
+      (async (url: string | URL | Request, init?: RequestInit) => {
+        seen.push({ url: String(url), auth: new Headers(init?.headers).get("authorization") });
+        if (status === "offline") throw new TypeError("fetch failed");
+        return new Response(JSON.stringify(body), { status });
+      }) as typeof fetch;
+    expect(await checkJevKey("ts_live_9f2c", answer(200))).toBe("ok");
+    expect(seen).toEqual([{ url: "https://api.typesafe.ai/v1/systemone", auth: "Bearer ts_live_9f2c" }]);
+    expect(await checkJevKey("ts_live_9f2c", answer(401))).toBe("invalid");
+    expect(await checkJevKey("ts_live_9f2c", answer(402))).toBe("no_credit");
+    for (const status of [429, 529, 422, "offline"] as const)
+      expect([status, await checkJevKey("ts_live_9f2c", answer(status))]).toEqual([status, "unchecked"]);
+  });
+
+  test("checked before .env is written: refused writes nothing, the others write it and say how it went", async () => {
+    const asked: string[] = [];
+    const typesafe = (state: JevCheck) => async (key: string) => {
+      asked.push(key);
+      return state;
+    };
+    const step = (state: JevCheck, flag?: string, content: string | null = null, dryRun = false) =>
+      jevStep({ ...(flag ? { flag } : {}), content, dryRun, check: typesafe(state) });
+
+    expect(await step("ok", "ts_live_9f2c")).toEqual({
+      value: "ok",
+      entries: { TYPESAFE_API_KEY: "ts_live_9f2c" },
+      said: { ok: true, text: "Jev: key checked" },
+    });
+    expect(await step("invalid", "ts_wrong_0000")).toEqual({
+      problem: {
+        check: "jev",
+        error: "TypeSafe didn't accept --typesafe-key.",
+        fix: "Copy the key again from https://console.typesafe.ai/keys, or leave the option out and add it later in Settings › AI accounts.",
+      },
+    });
+    expect(await step("no_credit", "ts_empty_5555")).toEqual({
+      value: "no_credit",
+      entries: { TYPESAFE_API_KEY: "ts_empty_5555" },
+      said: {
+        ok: false,
+        text: "Jev: the key works but has no credit. Add credit at https://console.typesafe.ai and Jev starts by itself.",
+      },
+    });
+    expect(await step("unchecked", "ts_live_9f2c")).toEqual({
+      value: "unchecked",
+      entries: { TYPESAFE_API_KEY: "ts_live_9f2c" },
+      said: {
+        ok: false,
+        text: "Jev: TypeSafe didn't answer, so the key wasn't checked. agentes.chat checks it when it uses it.",
+      },
+    });
+    expect(asked).toEqual(["ts_live_9f2c", "ts_wrong_0000", "ts_empty_5555", "ts_live_9f2c"]);
+
+    asked.length = 0;
+    const env = "TYPESAFE_API_KEY=ts_live_9f2c\n";
+    // A run again without the flag, or with the key .env has, keeps it as it is; without either, no Jev.
+    expect(await step("ok", undefined, env)).toEqual({ value: "kept", entries: {} });
+    expect(await step("ok", "ts_live_9f2c", env)).toEqual({ value: "kept", entries: {} });
+    expect(await step("ok")).toEqual({ value: "off", entries: {} });
+    // A dry run asks TypeSafe nothing.
+    expect(await step("ok", "ts_new_7777", env, true)).toEqual({ value: "unchecked", entries: {} });
+    expect(asked).toEqual([]);
   });
 });
 
@@ -507,7 +619,7 @@ describe("Docker", () => {
       "Invalid configuration:\n  - AGENTES_SECRET is required\n  - PUBLIC_URL: Invalid URL\n\nCopy .env.example";
     expect(diagnoseAppLogs(logs)).toMatchObject({
       check: "app.config",
-      error: "The app refused its configuration: AGENTES_SECRET is required; PUBLIC_URL: Invalid URL.",
+      error: "The app refused its configuration: AGENTES_SECRET is required. PUBLIC_URL: Invalid URL.",
     });
     expect(diagnoseAppLogs('{"level":"info","msg":"starting agentes.chat"}')).toBeNull();
   });
@@ -536,10 +648,10 @@ describe("the agents' computer", () => {
     expect(computerOffer({ ...server, memory: 2 * GB }, null, false)).toEqual({
       mac: false,
       yes: false,
-      why: "This machine has 2 GB of memory; each agent's screen needs about 0.2 GB and its browser 0.6 GB more.",
+      why: "This machine has 2 GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.",
     });
     expect(computerOffer({ ...server, memory: 1.9 * GB }, null, false)).toMatchObject({
-      why: expect.stringMatching(/^This machine has 1\.9 GB of memory;/),
+      why: expect.stringMatching(/^This machine has 1\.9 GB of memory\./),
     });
     expect(computerOffer({ ...server, apt: false }, null, false)).toEqual({
       mac: false,
@@ -848,7 +960,7 @@ describe("the end", () => {
 
   test("what it shows and returns: the link only for https, the computer's failure with agentes.chat still up", () => {
     const app = { health: { status: "ok", version: "1.4.0" }, firstRun: true };
-    const choices = { computer: "on" as const, telemetry: "on" as const };
+    const choices = { computer: "on" as const, telemetry: "on" as const, jev: "ok" as const };
     const tailnet = theEnd({
       network: "tailscale",
       url: "https://agentes.tail1234.ts.net",
@@ -869,6 +981,7 @@ describe("the end", () => {
       phoneLink: tailnet.link,
       computer: "on",
       telemetry: "on",
+      jev: "ok",
       nextSteps: tailnet.steps,
     });
     // A phone opens no http server, and reaches only its own localhost.
@@ -1023,6 +1136,7 @@ describe("the plan", () => {
     email: "skip",
     computer: { state: "on", mac: false, commands: true, install: linux, kept: false },
     telemetry: { value: "on", kept: false },
+    jev: "off",
     compose: null,
     start: true,
     image: false,
@@ -1092,6 +1206,13 @@ describe("the plan", () => {
     expect(planSteps({ ...base, start: false }).some((s) => s.includes("install.sh"))).toBe(false);
   });
 
+  test("Jev: a key given is checked when the setup runs; one in .env stays; none says nothing", () => {
+    const jev = (value: PlanInput["jev"]) => planSteps({ ...base, jev: value }).filter((l) => l.startsWith("Jev"));
+    expect(jev("unchecked")).toEqual(["Jev: TYPESAFE_API_KEY from --typesafe-key, checked when the setup runs"]);
+    expect(jev("kept")).toEqual(["Jev: keep what .env has (TYPESAFE_API_KEY)"]);
+    expect(jev("off")).toEqual([]);
+  });
+
   test("a second run keeps what's there", () => {
     const again = planSteps({
       ...base,
@@ -1109,7 +1230,7 @@ describe("the plan", () => {
 
   test("a dry run lists the questions the real run asks", () => {
     const steps = planSteps({ ...base, questions: ["how people reach it", "email"] });
-    expect(steps[0]).toBe("asks: how people reach it; email");
+    expect(steps[0]).toBe("asks: how people reach it, email");
   });
 
   test("Docker is in the plan only when it's not fine: the run says it is, once, above the plan", () => {
@@ -1146,7 +1267,7 @@ describe("the plan", () => {
       publicUrl: { now: "https://chat.example.com", next: null },
     });
     expect(proxy).toContain(
-      "network: your own proxy or tunnel at https://chat.example.com; PUBLIC_URL and COMPOSE_PROFILES stay",
+      "network: your own proxy or tunnel at https://chat.example.com (PUBLIC_URL and COMPOSE_PROFILES stay)",
     );
     expect(proxy.some((s) => s.startsWith("PUBLIC_URL:"))).toBe(false);
     expect(proxy.at(-1)).toBe(finishLine);

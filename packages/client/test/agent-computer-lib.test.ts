@@ -282,9 +282,16 @@ describe("the entry's status line, first match wins", () => {
     expect(entryState(facts({ desktop: { available: false, reason: "desktop_unavailable" } }), NOW)).toEqual({
       kind: "available",
     });
-    expect(
-      entryState(facts({ desktop: { available: false, reason: "no_desktop" }, browserGranted: false }), NOW),
-    ).toEqual({ kind: "noScreen" });
+    const neither = { desktop: { available: false, reason: "no_desktop" }, browserGranted: false };
+    expect(entryState(facts(neither), NOW)).toEqual({ kind: "noScreen" });
+    // A computer without screens for agents (a Mac, a PC) only has the browser to leave off.
+    const noScreens = { ...MAC, desktopUse: { available: false, reason: "Only on Linux" } };
+    expect(entryState(facts({ ...neither, machine: noScreens }), NOW)).toEqual({ kind: "noBrowser" });
+    expect(entryState(facts({ ...neither, machine: { ...noScreens, desktopUse: null } }), NOW)).toEqual({
+      kind: "noScreen",
+    });
+    // The Cloud's computer always has screens.
+    expect(entryState(facts({ ...neither, edition: "cloud", machine: noScreens }), NOW)).toEqual({ kind: "noScreen" });
     expect(entryState(facts({ machine: null, desktop: { available: false, reason: "no_computer" } }), NOW)).toEqual({
       kind: "noComputer",
     });
@@ -357,6 +364,7 @@ describe("the entry's status line, first match wins", () => {
       'agentComputer.status.outdated {"computer":"Mac mini"}',
     );
     expect(line({ kind: "noScreen" })).toBe("agentComputer.status.noScreen");
+    expect(line({ kind: "noBrowser" })).toBe("agentComputer.status.noBrowser");
     expect(line({ kind: "noComputer" })).toBe("agentComputer.status.noComputer");
     expect(line({ kind: "available" })).toBe("agentComputer.status.available");
     // A request with no deadline says only what it asks.

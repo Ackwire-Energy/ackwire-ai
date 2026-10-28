@@ -492,7 +492,7 @@ describe("the computer dialog, self-host", () => {
     });
     expect(box().textContent).toContain("O navegador da Ada está desligado no Mac mini");
     expect(box().textContent).toContain(
-      "Só quem está no computador liga: no app agentes, em Preferências → Ferramentas.",
+      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.",
     );
     expect(box().textContent).not.toContain("A tela da Ada não pode ser mostrada agora");
   });

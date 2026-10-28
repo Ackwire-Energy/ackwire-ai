@@ -26,6 +26,7 @@ import {
   COMPUTER_PROBLEMS,
   COMPUTER_WAIT_S,
   type ComputerPlan,
+  checkJevKey,
   computerFiles,
   computerOffer,
   computerUpToDate,
@@ -56,6 +57,8 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  type JevChoice,
+  jevStep,
   lastLine,
   MIN_COMPOSE,
   type Network,
@@ -84,6 +87,7 @@ import {
   TELEMETRY_TEXT,
   type ThisMachine,
   TS,
+  TYPESAFE_KEYS,
   tailscaleKeyEntries,
   tailscaleKeyProblem,
   theEnd,
@@ -117,13 +121,15 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --computer <yes|no>                 This machine as your agents' computer. Default yes on a Mac, and
                                       on Linux as root with systemd, apt-get and 4 GB of memory or more.
   --computer-commands <yes|no>        Whether agents may run commands there (default no on a Mac,
-                                      where they work as you; yes on Linux, each agent its own user)
+                                      where they work as you, and yes on Linux, where each agent is
+                                      its own user)
   --telemetry <on|off>                Send anonymous usage statistics to agentes.chat (default on)
+  --typesafe-key <key>                TypeSafe key for Jev, optional (${TYPESAFE_KEYS})
   --no-start                          Write .env and docker-compose.yml, start nothing
   --timeout <seconds>                 How long each wait may take (default 300)
   --tailscale-status <file|->         Finish from \`tailscale status --json\` (setup inside the image)
   --dry-run                           Print the plan and change nothing
-  --json                              No questions; the result as JSON on stdout, progress on stderr
+  --json                              No questions. The result as JSON on stdout, progress on stderr
   -h, --help
 
 Every option can come from the environment too: AGENTES_SETUP_<OPTION>, like
@@ -713,7 +719,13 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     entries,
   });
   const telemetry = await chooseTelemetry(opts, ui, content, asked, entries);
-  const choices: Choices = { computer, telemetry: telemetry.value };
+  // Checked with TypeSafe before anything is written: a key it refuses stops the setup here.
+  const jev = await jevStep({ flag: opts.typesafeKey, content, dryRun: opts.dryRun, check: (key) => checkJevKey(key) });
+  if ("problem" in jev) throw new SetupError(jev.problem);
+  Object.assign(entries, jev.entries);
+  if (jev.said?.ok) ui.ok(jev.said.text);
+  else if (jev.said) ui.warn(jev.said.text);
+  const choices: Choices = { computer, telemetry: telemetry.value, jev: jev.value };
 
   const plan = planSteps({
     docker: dockerCheck && "problem" in dockerCheck ? `${dockerCheck.problem.error} ${dockerCheck.problem.fix}` : null,
@@ -729,6 +741,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     email,
     computer,
     telemetry,
+    jev: jev.value,
     compose: composeFile,
     start: opts.start,
     image,
@@ -782,9 +795,10 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
 interface Choices {
   computer: ComputerPlan;
   telemetry: OnOff;
+  jev: JevChoice;
 }
 
-const results = (c: Choices) => ({ computer: c.computer.state, telemetry: c.telemetry });
+const results = (c: Choices) => ({ computer: c.computer.state, telemetry: c.telemetry, jev: c.jev });
 
 /** A file readable by its owner only, like .env. */
 function saveSecret(file: string, content: string) {
@@ -1255,7 +1269,7 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
           : {
               check: "domain.https",
               error: `${url} doesn't answer yet (${String(failure)}).`,
-              fix: "Ports 80 and 443 must be open to the internet and the DNS record must point here; docker compose logs caddy says why a certificate failed. Then run the setup again.",
+              fix: "Ports 80 and 443 must be open to the internet, and the DNS record must point here. To see why the certificate failed, run docker compose logs caddy. Then run the setup again.",
             },
       );
     }
@@ -1277,7 +1291,7 @@ async function finishFromStatus(opts: Options, ui: Ui, env: Env): Promise<Result
         : {
             check: "tailscale.join",
             error: "Tailscale isn't on your tailnet yet.",
-            fix: "Wait a minute and run the same command again; docker compose logs tailscale shows what it's doing.",
+            fix: "Wait a minute and run the same command again. To see what it's doing, run docker compose logs tailscale.",
           },
     );
   }
@@ -1405,7 +1419,7 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
     if (state === "off" || state === "refused" || state === "no_token") throw new SetupError(COMPUTER_PROBLEMS[state]);
     if (Date.now() > deadline) {
       const where = files.log ?? `journalctl -u ${HOST_SERVICE}`;
-      ui.warn(`Agents' computer: set up, but it hasn't answered agentes.chat yet; it keeps trying. Its log: ${where}`);
+      ui.warn(`Agents' computer: set up, but it hasn't answered agentes.chat yet. It keeps trying. Its log: ${where}`);
       return;
     }
     await sleep(2000);

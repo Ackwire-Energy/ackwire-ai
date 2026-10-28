@@ -138,14 +138,14 @@ export function computerBrainUnavailable(
   const off = toolOff(status, "codex");
   if (off) return off;
   if (status.protocol < BRAIN_PROTOCOL) {
-    return { code: "runner_outdated", message: `The runner on ${status.name} is too old for Codex agents; update it.` };
+    return { code: "runner_outdated", message: `The runner on ${status.name} is too old for Codex agents. Update it.` };
   }
   const codex = status.executors?.codex;
   if (status.executors?.detectedAt && !codex) {
     return { code: "codex_missing", message: `Codex is not installed on ${status.name}.` };
   }
   if (codex && !codexVersionOk(codex.version)) {
-    return { code: "codex_too_old", message: `Codex on ${status.name} is too old; update it there.` };
+    return { code: "codex_too_old", message: `Codex on ${status.name} is too old. Update it there.` };
   }
   return accountUnavailable(status, account, "codex");
 }

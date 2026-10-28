@@ -103,6 +103,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         heading: "Os seus planos de IA",
         blocks: [
           "Os agentes podem pensar com o seu próprio plano de IA, como Claude, ChatGPT, GLM ou Kimi, com login neste computador: sem chave de API. A conta fica neste computador, e o agentes.chat nunca vê a senha nem o acesso.",
+          "Os planos Google AI Pro e Ultra não funcionam aqui: os termos do Google não permitem usá-los em outros produtos. Uma chave de API do Gemini funciona.",
         ],
       },
       {
@@ -275,6 +276,144 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "meetings",
         heading: "Reuniões",
         blocks: ["Agentes só propõem horários. Convites para pessoas sempre passam por quem pediu."],
+      },
+    ],
+  },
+  "who-answers": {
+    title: "Quem responde uma mensagem",
+    summary: "Uma menção escolhe o agente. Sem ela, o agentes.chat escolhe por você, nesta ordem.",
+    sections: [
+      {
+        id: "order",
+        heading: "Como uma mensagem encontra o seu agente",
+        blocks: [
+          "Uma mensagem que @menciona um agente vai para esse agente. Uma mensagem que não menciona ninguém é lida pelo primeiro destes que o workspace tiver:",
+          {
+            list: [
+              "**Jev**, um modelo pequeno e rápido, feito para decisões como esta.",
+              "**Um modelo pequeno numa das chaves de API do workspace**, como o Claude Haiku 5.5 ou o GPT-6 Luna.",
+              "**O seu próprio plano do Claude ou do ChatGPT**, para as mensagens que você escreve, num servidor que você mesmo roda. Ele as lê no computador onde está conectado e leva alguns segundos.",
+              "**Regras simples**: uma resposta a um agente vai para ele, e também uma continuação logo depois de você falar com ele, ou uma mensagem num canal onde você está sozinho com um agente.",
+            ],
+          },
+          "Quando nada disso serve, nenhum agente responde. Mencione um agente para chamá-lo.",
+        ],
+      },
+      {
+        id: "jev",
+        heading: "Jev",
+        blocks: [
+          "Quando o agentes.chat hospeda o seu workspace, o Jev está incluído. Num servidor que você mesmo roda, ele usa a chave da TypeSafe do dono, cerca de US$ 0,0001 por mensagem: [Configurar o Jev](/help/jev#setup).",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Por que o seu plano só escolhe nas suas mensagens",
+        blocks: [
+          "Os planos do Claude e do ChatGPT são pessoais, então o seu plano só escolhe nas mensagens que você escreve.",
+        ],
+      },
+      {
+        id: "see",
+        heading: "Ver quem escolheu",
+        blocks: ["Abra o visto embaixo de uma mensagem. A última linha diz quem escolheu os agentes."],
+      },
+    ],
+  },
+  jev: {
+    title: "Jev",
+    summary:
+      "Um modelo rápido da TypeSafe que toma decisões rápidas pelos seus agentes. No seu próprio servidor ele é opcional, com uma chave sua.",
+    sections: [
+      {
+        id: "what",
+        heading: "O que ele faz",
+        blocks: [
+          {
+            list: [
+              "**Escolhe quem responde.** Uma mensagem sem @menção vai para o agente certo em menos de um segundo, mesmo quando os agentes pensam com um plano e você não tem chave de API.",
+              "**Organiza a memória.** Ele percebe uma repetição ou um fato novo mesmo com outras palavras: a repetição se junta ao que o agente já sabia, e o fato novo substitui o antigo. Uma vez por dia ele organiza o resto.",
+              "**Enxerga a tela.** No navegador e no desktop, os agentes acham botões e campos pela descrição, olham de perto os pequenos e conferem na imagem da tela se um passo deu certo.",
+              "**Lê menos.** A cada vez, o agente carrega só as ferramentas de que deve precisar. A sua IA lê menos e custa menos.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "without",
+        heading: "Sem ele",
+        blocks: [
+          "Tudo continua funcionando, mais devagar e com menos cuidado.",
+          {
+            list: [
+              "**Quem responde:** um modelo pequeno numa das suas chaves de API escolhe, como o Claude Haiku 5.5 ou o GPT-6 Luna. Sem chave, o plano do Claude ou do ChatGPT de cada pessoa escolhe nas mensagens que ela escreve, em alguns segundos. Fora isso, uma resposta ou uma continuação ainda chega ao agente. Mencione um agente para chamá-lo. [Como os agentes são escolhidos](/help/who-answers)",
+              "**Memória:** repetições com as mesmas palavras ainda se juntam. Repetições e novidades ditas de outro jeito ficam separadas.",
+              "**Tela:** os agentes usam os números mostrados na tela e os nomes exatos. Nada é lido de imagens.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "setup",
+        heading: "Como configurar",
+        blocks: [
+          {
+            list: [
+              "Abra https://console.typesafe.ai e entre com o Google ou o seu e-mail. Uma conta nova é criada do mesmo jeito.",
+              "Adicione crédito no console. O Jev é pré-pago.",
+              "Abra https://console.typesafe.ai/keys, crie uma chave e copie na hora.",
+              "No agentes.chat, abra **Configurações\u00a0›\u00a0Contas de IA** e cole em **Jev**. Só quem configurou este servidor vê essa parte.",
+            ],
+          },
+          "Num servidor que você roda com Docker, dá para colocar a chave no `.env` como `TYPESAFE_API_KEY`. Essa vale mais que a das Configurações.",
+        ],
+      },
+      {
+        id: "cost",
+        heading: "Quanto custa",
+        blocks: [
+          {
+            list: [
+              "US$ 0,042 por milhão de tokens que o Jev lê. As respostas são grátis. Escolher quem responde lê cerca de 2.500 tokens, ou seja, cerca de US$ 0,0001. Uma captura de tela tem cerca de 3.900 tokens.",
+              "O crédito comprado vale por 12 meses. Ligue a recarga automática no console para o Jev não ficar sem crédito.",
+              "**Configurações\u00a0›\u00a0Contas de IA** mostra quantas decisões o Jev tomou no mês e quanto custaram.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "data",
+        heading: "Os seus dados",
+        blocks: [
+          "O que o Jev lê para decidir:",
+          {
+            list: [
+              "O nome e a descrição do canal, a mensagem e as poucas antes dela",
+              "Os nomes e papéis dos agentes, o começo das instruções deles e as ferramentas que eles podem usar",
+              "Os itens de memória que ele compara",
+              "A tarefa de um agente e o começo dos resultados das ferramentas",
+              "O objetivo de uma missão e os comandos que um agente quer rodar nela",
+              "As ferramentas que um app conectado oferece",
+              "A página ou a tela que um agente está usando, inclusive capturas",
+            ],
+          },
+          "A TypeSafe roda o Jev nos Estados Unidos e não treina os modelos dela com o que você envia. Ela guarda os dados pelo tempo necessário para operar o serviço. A TypeSafe oferece retenção zero nos planos enterprise.",
+          "Política de privacidade da TypeSafe: https://typesafe.ai/legal/privacy-policy. Contrato de tratamento de dados: https://typesafe.ai/legal/data-processing.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Quando ele para",
+        blocks: [
+          {
+            list: [
+              "**Chave recusada:** crie uma chave nova e cole em **Configurações\u00a0›\u00a0Contas de IA**.",
+              "**Sem crédito:** adicione crédito no console. O Jev tenta de novo em até 30 minutos, ou clique em **Verificar de novo**.",
+              "**Ocupado ou fora do ar:** a TypeSafe pode limitar os pedidos por segundo, ou parar de responder por um tempo. O Jev volta sozinho. Os seus limites: https://console.typesafe.ai/rate-limits. Para limites maiores, escreva para sales@typesafe.ai.",
+            ],
+          },
+          "Enquanto isso, os agentes trabalham como em [Sem ele](/help/jev#without).",
+        ],
       },
     ],
   },

@@ -7,23 +7,35 @@ import {
   useAuthConfig,
   useMe,
 } from "@agenteschat/client";
-import { invitedErrorText } from "@agenteschat/client/lib/errors";
-import { ANSWER_POLL_MS, askView, JOIN_NAME_MAX, JOIN_NOTE_MAX } from "@agenteschat/client/lib/join-requests";
+import { formatTimeLeft } from "@agenteschat/client/lib/actions";
+import { errorCode, invitedErrorText } from "@agenteschat/client/lib/errors";
+import { type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
+import {
+  ANSWER_POLL_MS,
+  askView,
+  JOIN_CODE_LENGTH,
+  JOIN_NAME_MAX,
+  JOIN_NOTE_MAX,
+  joinCode,
+} from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ComponentRef, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
+import { useNow } from "@/features/shared/hooks";
 import { agentLook, joinNames } from "@/features/shared/logic";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { AgentAvatar, Button, haptics, InfoHint, LineIcon, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, haptics, Icon, InfoHint, LineIcon, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
+import { useHumanCheck } from "./HumanCheck";
+import { CheckCancelled, failureText } from "./human-check";
 import { forgetInvite, rememberInvite } from "./invite";
 import { boldParts } from "./links";
 
@@ -255,14 +267,25 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [proof, setProof] = useState<{ email: string; code: string } | null>(null);
   const emailField = useRef<ComponentRef<typeof AuthField>>(null);
+  const noteField = useRef<ComponentRef<typeof AuthField>>(null);
 
   const org = preview.orgName;
   const address = sent?.email ?? preview.you?.email ?? user?.email ?? "";
   const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
+  // On a server that sends email, an address that isn't a confirmed account's proves itself first (ADR 0072).
+  const proofNeeded = emailsGoOut && !user?.emailVerified;
+  const typedEmail = user ? user.email : email;
+  const proven = proof !== null && proof.email === typedEmail.trim().toLowerCase();
+  const human = useHumanCheck(view.state === "form" && proofNeeded ? "ask-code" : null);
   const fix = user ? null : emailTypoFix(email);
-  const ready = user !== null || (name.trim() !== "" && isEmail(email));
+  const ready = (user !== null || (name.trim() !== "" && isEmail(email))) && (!proofNeeded || proven);
   const refresh = () => qc.invalidateQueries({ queryKey: keys.invitation(token) });
+  const onProven = (code: string) => {
+    setProof({ email: typedEmail.trim().toLowerCase(), code });
+    noteField.current?.focus();
+  };
 
   const ask = async () => {
     if (!ready || asking) return;
@@ -272,17 +295,16 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       const result = await api.invites.ask(token, {
         ...(user ? {} : { name: name.trim(), email: email.trim() }),
         ...(note.trim() ? { note: note.trim() } : {}),
+        ...(proofNeeded && proof ? { code: proof.code } : {}),
       });
       haptics.success();
       setSent(result);
       if (user) await refresh();
     } catch (e) {
       haptics.warning();
-      setError(
-        e instanceof ApiError
-          ? (invitedErrorText(t, e) ?? t("mobile.auth.errors.generic"))
-          : t("mobile.auth.errors.network"),
-      );
+      // The proof ran out (30 minutes) or was used: Verify again.
+      if (errorCode(e)?.startsWith("join.code_")) setProof(null);
+      setError((e instanceof ApiError ? invitedErrorText(t, e) : null) ?? failureText(t, e));
       // A link turned off, or an answer already given, then shows as its own state.
       void refresh();
     } finally {
@@ -361,60 +383,70 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       body = (
         <>
           <AgentsThere agents={preview.agents ?? []} more={preview.moreAgents ?? 0} />
-          {user ? (
+          {user && !proofNeeded ? (
             <View style={styles.as}>
               <Text variant="subhead" tone="muted">
                 {t("invite.ask.as", { email: user.email })}
               </Text>
-              <Pressable onPress={() => void signOut()} accessibilityRole="link" hitSlop={8}>
-                <Text variant="subhead" style={styles.link}>
-                  {t("invite.ask.notYou")}
-                </Text>
-              </Pressable>
+              <NotYou />
             </View>
-          ) : (
-            <>
+          ) : null}
+          {user ? null : (
+            <AuthField
+              value={name}
+              onChangeText={setName}
+              placeholder={t("invite.ask.name")}
+              accessibilityLabel={t("invite.ask.name")}
+              maxLength={JOIN_NAME_MAX}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="next"
+              onSubmitEditing={() => emailField.current?.focus()}
+            />
+          )}
+          {proofNeeded ? (
+            // Signed in, the account's own address, read-only, takes the place of "You'll ask as".
+            <EmailProof
+              token={token}
+              email={typedEmail}
+              onEmail={user ? undefined : setEmail}
+              emailRef={emailField}
+              proven={proven}
+              onProven={onProven}
+              check={human.check}
+            >
+              {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
+              {user ? (
+                <View style={styles.as}>
+                  <NotYou />
+                </View>
+              ) : null}
+            </EmailProof>
+          ) : user ? null : (
+            <View style={styles.field}>
               <AuthField
-                value={name}
-                onChangeText={setName}
-                placeholder={t("invite.ask.name")}
-                accessibilityLabel={t("invite.ask.name")}
-                maxLength={JOIN_NAME_MAX}
-                autoCapitalize="words"
-                autoComplete="name"
-                textContentType="name"
-                returnKeyType="next"
-                onSubmitEditing={() => emailField.current?.focus()}
+                ref={emailField}
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t("invite.ask.email")}
+                accessibilityLabel={t("invite.ask.email")}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="done"
               />
-              <View style={styles.field}>
-                <AuthField
-                  ref={emailField}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t("invite.ask.email")}
-                  accessibilityLabel={t("invite.ask.email")}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                  returnKeyType="done"
-                />
-                {fix ? (
-                  <Pressable onPress={() => setEmail(fix)} accessibilityRole="button" hitSlop={6}>
-                    <Text variant="subhead" style={styles.link}>
-                      {t("auth.flow.didYouMean", { email: fix })}
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </>
+              {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
+            </View>
           )}
           <View style={styles.field}>
             <Text variant="subhead" tone="muted">
               {t("invite.ask.note")}
             </Text>
             <AuthField
+              ref={noteField}
               value={note}
               onChangeText={setNote}
               placeholder={t("invite.ask.noteHelp")}
@@ -461,9 +493,237 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       onBack={leave}
       agentMode={asking ? "run" : "idle"}
       expression={expression}
+      overlay={human.view}
     >
       {body}
     </AuthScaffold>
+  );
+}
+
+/** "Not you? Sign out", for the account the page asks as. */
+function NotYou() {
+  const { t } = useTranslation();
+  return (
+    <Pressable onPress={() => void signOut()} accessibilityRole="link" hitSlop={8}>
+      <Text variant="subhead" style={styles.link}>
+        {t("invite.ask.notYou")}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** "Did you mean …?" under an address with a common typo. */
+function DidYouMean({ fix, onFix }: { fix: string; onFix: (email: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Pressable onPress={() => onFix(fix)} accessibilityRole="button" hitSlop={6}>
+      <Text variant="subhead" style={styles.link}>
+        {t("auth.flow.didYouMean", { email: fix })}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** What the slot inside the email's right edge shows: every one is laid out, so the slot never changes width. */
+const SLOTS = ["verify", "wait", "resend", "verified"] as const;
+type Slot = (typeof SLOTS)[number];
+
+/**
+ * The ask's email with Verify inside its right edge (ADR 0072): a code goes to the address, and typed back here it
+ * proves it. Verify, the countdown, Resend and Verified share one slot as wide as the longest, so the address never
+ * moves. A code and a proof belong to the address they were for: editing the email starts over. `onEmail` absent:
+ * the signed-in account's own address, read-only. `children` go under the email.
+ */
+function EmailProof({
+  token,
+  email,
+  onEmail,
+  emailRef,
+  proven,
+  onProven,
+  check,
+  children,
+}: {
+  token: string;
+  email: string;
+  onEmail?: (email: string) => void;
+  emailRef?: Ref<ComponentRef<typeof AuthField>>;
+  proven: boolean;
+  onProven: (code: string) => void;
+  check: HumanCheck | null;
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { colors: c } = useTheme();
+  const key = email.trim().toLowerCase();
+  const [sent, setSent] = useState<{ email: string; resendAt: number } | null>(null);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<{ email: string; text: string } | null>(null);
+  // Past the address's hourly or daily cap, each press is a sure 429 that still spends the link's shared budget.
+  const [capped, setCapped] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [slotWidth, setSlotWidth] = useState(0);
+  const codeField = useRef<ComponentRef<typeof AuthField>>(null);
+  const out = sent?.email === key;
+  const left = out && sent ? Math.max(0, sent.resendAt - Date.now()) : 0;
+  // A repaint every second while the countdown runs; the time itself is read just above.
+  useNow(left > 0 && !proven ? 1000 : 60_000);
+  const said = error?.email === key ? error.text : null;
+  const body = onEmail ? { email: email.trim() } : {};
+  const showCode = out && !proven;
+  const slot: Slot = proven ? "verified" : !out ? "verify" : left > 0 ? "wait" : "resend";
+
+  // Each code that goes out takes the focus once.
+  useEffect(() => {
+    if (sent) codeField.current?.focus();
+  }, [sent]);
+
+  const codeOut = (to: string, resendIn: number) => {
+    setSent({ email: to, resendAt: Date.now() + resendIn * 1000 });
+    setCode("");
+    setError(null);
+  };
+  const send = async () => {
+    const to = key;
+    setSending(true);
+    try {
+      const r = await withHumanCheck(check, (humanCheck) => api.invites.sendCode(token, body, humanCheck));
+      codeOut(to, r.resendIn);
+    } catch (e) {
+      if (e instanceof CheckCancelled) return;
+      // A code went out a moment ago (another try, another device): that one is still good.
+      const retryIn = e instanceof ApiError && e.code === "join.code_wait" ? Number(e.params?.retryIn) : 0;
+      if (retryIn > 0) codeOut(to, retryIn);
+      else setError({ email: to, text: failureText(t, e) });
+      if (errorCode(e) === "join.code_limit") setCapped(to);
+    } finally {
+      setSending(false);
+    }
+  };
+  const checkCode = async (typed: string) => {
+    const to = key;
+    setChecking(true);
+    try {
+      await api.invites.checkCode(token, { ...body, code: typed });
+      setError(null);
+      haptics.success();
+      AccessibilityInfo.announceForAccessibility(t("invite.ask.verified"));
+      onProven(typed);
+    } catch (e) {
+      haptics.warning();
+      setCode("");
+      setError({ email: to, text: failureText(t, e) });
+      codeField.current?.focus();
+    } finally {
+      setChecking(false);
+    }
+  };
+  const typed = (value: string) => {
+    if (checking) return;
+    const digits = joinCode(value);
+    setCode(digits);
+    if (digits.length === JOIN_CODE_LENGTH) void checkCode(digits);
+  };
+
+  const errorLine = (text: string) => (
+    <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
+      {text}
+    </Text>
+  );
+  return (
+    <>
+      <View style={styles.field}>
+        <View style={styles.inside}>
+          <AuthField
+            ref={emailRef}
+            value={email}
+            onChangeText={onEmail}
+            editable={onEmail !== undefined}
+            placeholder={t("invite.ask.email")}
+            accessibilityLabel={t("invite.ask.email")}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="done"
+            paddingRight={slotWidth + 12}
+          />
+          <View style={styles.slot} onLayout={(e) => setSlotWidth(Math.ceil(e.nativeEvent.layout.width))}>
+            {SLOTS.map((s) => {
+              const shown = s === slot;
+              const press = s === "verify" || s === "resend";
+              const off = capped === key || (s === "verify" && !isEmail(email));
+              return (
+                <Pressable
+                  key={s}
+                  onPress={() => void send()}
+                  disabled={!shown || !press || off || sending}
+                  hitSlop={6}
+                  accessibilityRole={press ? "button" : "text"}
+                  accessibilityLabel={
+                    s === "wait"
+                      ? t("invite.ask.resendIn", { count: Math.ceil(left / 1000) })
+                      : s === "verified"
+                        ? t("invite.ask.verified")
+                        : undefined
+                  }
+                  accessibilityState={press ? { disabled: off || sending, busy: sending } : undefined}
+                  accessibilityElementsHidden={!shown}
+                  importantForAccessibility={shown ? "auto" : "no-hide-descendants"}
+                  style={[styles.slotItem, shown ? null : styles.slotHidden]}
+                >
+                  {s === "verified" ? (
+                    <Icon name="check" size={20} color={c.ok} />
+                  ) : s === "wait" ? (
+                    <Text variant="subhead" tone="muted" style={styles.tabular}>
+                      {formatTimeLeft(left)}
+                    </Text>
+                  ) : (
+                    <>
+                      {/* Sending, the label keeps its width under the spinner. */}
+                      <Text
+                        variant="subhead"
+                        tone={off ? "faint" : "ink"}
+                        style={[styles.link, shown && sending ? styles.ghost : null]}
+                      >
+                        {t(s === "verify" ? "invite.ask.verify" : "invite.ask.resend")}
+                      </Text>
+                      {shown && sending ? <ActivityIndicator color={c.muted} style={StyleSheet.absoluteFill} /> : null}
+                    </>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        {said && !showCode ? errorLine(said) : null}
+        {children}
+      </View>
+      {showCode ? (
+        <View style={styles.field}>
+          <AuthField
+            ref={codeField}
+            code
+            value={code}
+            onChangeText={typed}
+            placeholder={t("invite.ask.code")}
+            accessibilityLabel={t("invite.ask.code")}
+            accessibilityState={{ busy: checking }}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              if (code.length === JOIN_CODE_LENGTH && !checking) void checkCode(code);
+            }}
+          />
+          {said ? errorLine(said) : null}
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -503,4 +763,12 @@ const styles = StyleSheet.create({
   as: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", columnGap: 6, rowGap: 2 },
   link: { fontWeight: "600" },
   said: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
+  // Verify's slot sits inside the email's right edge, as the password's eye does.
+  inside: { justifyContent: "center" },
+  slot: { position: "absolute", right: 4, alignItems: "center" },
+  slotItem: { minHeight: 44, paddingHorizontal: 10, alignItems: "center", justifyContent: "center" },
+  // Laid out for its width, with no height: the slot is as wide as its longest label.
+  slotHidden: { height: 0, minHeight: 0, opacity: 0, overflow: "hidden" },
+  ghost: { opacity: 0 },
+  tabular: { fontVariant: ["tabular-nums"] },
 });

@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
-import type { OrgStanding } from "../api/types";
+import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
 import { limitRefusalText } from "./limits";
@@ -99,6 +99,8 @@ const KNOWN = {
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
+  // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
+  jev_key_invalid: "jev.steps.invalid",
 } as const;
 
 /** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
@@ -131,6 +133,19 @@ export function standingRefusalText(
 export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
   if (standing?.state !== "hold") return null;
   return standingRefusalText(t, "org.paused", { reason: standing.reason });
+}
+
+/**
+ * Where a workspace on hold or suspended asks for help: the server's address (`SUPPORT_EMAIL`), else "ask the
+ * people who run this server" (`support.ask`). On the Cloud nobody else runs it, so without an address, nothing.
+ * Nothing either until `auth-config` answers.
+ */
+export function supportLineOf(
+  config: Pick<AuthConfig, "supportEmail" | "workspaceComputer"> | undefined,
+): { email: string } | "ask" | null {
+  if (!config) return null;
+  if (config.supportEmail) return { email: config.supportEmail };
+  return config.workspaceComputer ? null : "ask";
 }
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */

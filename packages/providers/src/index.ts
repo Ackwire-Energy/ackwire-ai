@@ -1,11 +1,13 @@
 import { createAnthropicProvider } from "./anthropic";
 import { PROVIDERS, type ProviderInfo } from "./catalog";
+import { createGeminiProvider } from "./gemini";
 import { createOpenAIProvider } from "./openai";
 import type { ModelProvider } from "./types";
 
 export * from "./anthropic";
 export * from "./catalog";
 export * from "./embeddings";
+export * from "./gemini";
 export * from "./openai";
 export * from "./types";
 
@@ -16,7 +18,9 @@ export function createModelProviders(): Record<string, ModelProvider> {
       id,
       p.protocol === "openai"
         ? createOpenAIProvider()
-        : createAnthropicProvider({ id, baseURL: p.baseURL, compat: p.compat }),
+        : p.protocol === "gemini"
+          ? createGeminiProvider()
+          : createAnthropicProvider({ id, baseURL: p.baseURL, compat: p.compat }),
     ]),
   );
 }

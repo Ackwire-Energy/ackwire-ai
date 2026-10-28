@@ -3,7 +3,7 @@ import { ApiError } from "@agenteschat/client";
 import { invitedErrorText } from "@agenteschat/client/lib/errors";
 import { joinRequestLine } from "../../src/features/activity/logic";
 import { afterSignIn, boldParts, signInPurpose, storedInvite, storedInviteOf } from "../../src/features/auth/links";
-import { membersByName, requestTimes } from "../../src/features/members/logic";
+import { membersByName, requestChips } from "../../src/features/members/logic";
 import { notification, translator } from "./fixtures";
 
 const TOKEN = "k3J8sQ2xY7pL0vB4nM6cD1eF9gH5jK2a";
@@ -91,16 +91,28 @@ describe("Membros", () => {
 });
 
 describe("a request to join, in the Requests sheet", () => {
-  test("when it was asked and when it closes are a line each, as on the web, never run together", async () => {
-    const now = new Date("2026-10-26T15:00:00.000Z");
-    const r = { createdAt: "2026-10-26T13:00:00.000Z", expiresAt: "2026-11-09T13:00:00.000Z" };
-    const pt = await translator("pt-BR");
-    const [asked, closes] = requestTimes(pt, "pt-BR", r, now);
-    expect(asked).toStartWith("Pediu ");
-    expect(closes).toStartWith("Fecha em ");
-    expect(`${asked}${closes}`).not.toContain(" · ");
+  const now = new Date("2026-10-26T15:00:00.000Z");
+  const createdAt = "2026-10-26T13:00:00.000Z";
+
+  test("'Not verified' only where nobody proved the address, beside when it was asked", async () => {
     const en = await translator("en");
-    expect(requestTimes(en, "en", r, now)[1]).toStartWith("Closes ");
+    const proven = requestChips(en, "en", { createdAt, verified: true, confirmed: false }, now);
+    expect(proven.unverified).toBeNull();
+    expect(proven.asked).toStartWith("Asked ");
+    // A server without email, or a request typed before codes.
+    const typed = { createdAt, verified: false, confirmed: false };
+    expect(requestChips(en, "en", typed, now).unverified).toBe("Not verified");
+    const pt = await translator("pt-BR");
+    expect(requestChips(pt, "pt-BR", typed, now).unverified).toBe("Não verificado");
+    expect(requestChips(pt, "pt-BR", typed, now).asked).toStartWith("Pediu ");
+  });
+
+  test("a server from before codes sends only `confirmed`: a confirmed account asking proved the address", async () => {
+    const en = await translator("en");
+    const old = (confirmed: boolean) =>
+      ({ createdAt, confirmed }) as { createdAt: string; confirmed: boolean; verified: boolean };
+    expect(requestChips(en, "en", old(true), now).unverified).toBeNull();
+    expect(requestChips(en, "en", old(false), now).unverified).toBe("Not verified");
   });
 });
 

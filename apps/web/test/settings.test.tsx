@@ -278,6 +278,38 @@ describe("Configurações do workspace", () => {
     });
   });
 
+  test("a Gemini key pasted while Claude is chosen: only Gemini is offered; its line says where and to turn on billing", async () => {
+    const { state } = await go(seedState(), "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const field = within(add).getByLabelText("Chave da API");
+    const save = () => click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await type(field, "AQ.Ab8RN6LxSampleOnlyKey_0123456789");
+    await save();
+    expect(add.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
+    expect(add.textContent).toContain("É de outro provedor?");
+    for (const name of ["OpenAI", "DeepSeek", "Kimi", "Z.ai", "MiniMax"])
+      expect(within(add).queryByRole("button", { name })).toBeNull();
+    await click(within(add).getByRole("button", { name: "Gemini" }));
+    expect(add.textContent).not.toContain("É de outro provedor?");
+    expect(within(add).getByRole("link", { name: "Crie a chave em aistudio.google.com/api-keys." })).toBeTruthy();
+    expect(add.textContent).toContain(
+      "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
+    );
+    expect(field.getAttribute("placeholder")).toBe("AQ.…");
+    // Gemini chosen, a key that isn't one: its own line.
+    await type(field, "sk-ant-api03-abcdefghijklmnop");
+    expect(add.textContent).toContain("As chaves de API do Gemini começam com AQ. ou AIza. Confira e cole de novo.");
+    await type(field, "AIzaSyD-sample0only1key2for3tests4567");
+    await save();
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "gemini",
+      label: "Gemini",
+    });
+  });
+
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
@@ -366,8 +398,60 @@ describe("Configurações do workspace", () => {
     expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
       defaultAgentBudgetUsd: 80,
     });
-    // Jev / the router's own key is internal: never in the UI.
+    // An admin who isn't the server's owner: no Jev anywhere (its key is the owner's, jev.test.tsx).
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
+  });
+
+  test("on the Cloud, Jev is named only in who picks the agents: no card, no TypeSafe", async () => {
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [],
+        routing: { by: "jev", mine: "jev", model: null, noSmallModel: null },
+        apiKey: true,
+      },
+    });
+    await go(state, "settings/keys");
+    const section = screen().getByRole("region", { name: "Quem escolhe os agentes" });
+    expect(section.textContent).toBe(
+      "Quem escolhe os agentesComo os agentes são escolhidosO Jev escolhe quem responde cada mensagem sem menção.",
+    );
+    expect(screen().queryByRole("region", { name: "Jev" })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/typesafe/i);
+    // A workspace with no AI says nothing about who picks.
+    cleanup();
+    state.aiStatus = { ...(state.aiStatus as NonNullable<typeof state.aiStatus>), any: false };
+    await go(state, "settings/keys");
+    expect(screen().queryByRole("region", { name: "Quem escolhe os agentes" })).toBeNull();
+    // Members don't read it.
+    cleanup();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    state.aiStatus = { ...(state.aiStatus as NonNullable<typeof state.aiStatus>), any: true };
+    await go(state, "settings/keys");
+    expect(screen().queryByRole("region", { name: "Quem escolhe os agentes" })).toBeNull();
+  });
+
+  test("who picks, as ai-status says: a small model by its name, Kimi's missing one, the router off", async () => {
+    const routing = (r: Partial<NonNullable<ReturnType<typeof seedState>["aiStatus"]>["routing"]>) =>
+      seedState({
+        aiStatus: {
+          any: true,
+          agents: [],
+          routing: { by: "rules", mine: "rules", model: null, noSmallModel: null, ...r },
+          apiKey: true,
+        },
+      });
+    const line = () => screen().getByRole("region", { name: "Quem escolhe os agentes" }).querySelector(".who-line");
+    await go(routing({ by: "model", mine: "model", model: "claude-haiku-5-5" }), "settings/keys");
+    expect(line()?.textContent).toBe("O Claude Haiku 5.5 escolhe quem responde cada mensagem sem menção.");
+    cleanup();
+    await go(routing({ noSmallModel: "moonshot" }), "settings/keys");
+    expect(line()?.textContent).toBe(
+      "Kimi não tem um modelo pequeno para isso. Os agentes respondem a menções, respostas e continuações.",
+    );
+    cleanup();
+    await go(routing({ by: "off", mine: "off" }), "settings/keys");
+    expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
   test("members see settings read-only, without the workspace's keys or money (their own plans, usage in percentages)", async () => {

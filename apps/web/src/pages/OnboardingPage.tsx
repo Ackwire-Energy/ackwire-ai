@@ -4,13 +4,14 @@ import {
   keys,
   meQuery,
   newClientId,
-  useAgents,
   useAiStatus,
   useAuthConfig,
   useComputerSetup,
   useConfirmDevice,
+  useJevKey,
   useMachines,
   useSandboxSettings,
+  useSaveJevKey,
 } from "@agenteschat/client";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import {
@@ -42,7 +43,6 @@ import {
   defaultTarget,
   gateDims,
   kindOf,
-  onlyOwnerReplies,
   type PlanChoice,
   planLabel,
 } from "@agenteschat/client/lib/no-ai";
@@ -63,6 +63,7 @@ import {
   Button,
   Card,
   CardHeader,
+  Chip,
   ComputerPortrait,
   Field,
   Icon,
@@ -92,6 +93,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
+import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   AiPicker,
@@ -102,6 +104,7 @@ import {
   type WhoRow,
   WhoThinks,
 } from "@/components/ai/ConnectAiSteps";
+import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { MembersFull } from "@/components/Limits";
@@ -260,9 +263,10 @@ export function OnboardingPage() {
   // Import: read and planned in its step, applied when the team is kept (a key saved later gives back their models).
   const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
-  // Agents and AI: first who joins (created when that screen is left), then what they think with.
+  // Agents and AI: first who joins (created when that screen is left), then what they think with, then (the server's
+  // owner, once an AI is connected) Jev's key.
   const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
-  const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai">("pick");
+  const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai" | "jev">("pick");
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
   const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
   // The option picked (none: the default), whom a plan is for (an agent, or all of them), and the plans given so
@@ -278,6 +282,10 @@ export function OnboardingPage() {
   const [platform, setPlatform] = useState(false);
   // The monthly budget of every agent (US$, API usage only); null = the workspace default as it is.
   const [budget, setBudget] = useState<string | null>(null);
+  // Jev's key as typed, and the text already answered for: refused, or saved for an account with no credit yet.
+  const [jevDraft, setJevDraft] = useState("");
+  const [jevDone, setJevDone] = useState<{ text: string; saved: boolean } | null>(null);
+  const [jevError, setJevError] = useState<string | null>(null);
   // Computer (before the agents): where they work, and where a plan signs in.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
@@ -554,12 +562,21 @@ export function OnboardingPage() {
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   const aiOpen = step.id === "agents" && agentsPhase === "ai";
+  const jevOpen = step.id === "agents" && agentsPhase === "jev";
+  // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
+  const jevKey = useJevKey();
+  const saveJev = useSaveJevKey();
+  const jevTyped = jevDraft.trim();
+  // A refused key never blocks the setup: once answered for, the same text moves on.
+  const jevSaves = jevTyped !== "" && jevTyped !== jevDone?.text;
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
   const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
+  const authConfig = useAuthConfig().data;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
-  const server = useAuthConfig().data;
-  const edition = computerEdition(setup.data, server?.workspaceComputer);
+  const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
+  // A server that sends no email invites by link only. Strictly false: an older server says nothing and keeps both.
+  const emails = authConfig?.passwordReset !== false;
   const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0077): its computer and its invitations come with the plan.
@@ -725,8 +742,9 @@ export function OnboardingPage() {
   // Whoever the text mentions first speaks, and gets it; with nobody named, the router picks who answers.
   const mentioned = firstMentioned(askText, crew);
   const speaker = mentioned ?? crew.find((c) => c.key === firstAsk?.asker);
-  // No socket is open here: an agent waiting for its computer is asked about again until it can start.
-  const aiNow = useAiStatus(created?.orgId ?? "", step.id === "done" && speaker !== undefined, (status) =>
+  // No socket is open here: an agent waiting for its computer is asked about again until it can start. Jev's screen
+  // reads it too: its reasons leave out picking who answers where this server's router is off.
+  const aiNow = useAiStatus(created?.orgId ?? "", (step.id === "done" && speaker !== undefined) || jevOpen, (status) =>
     mentioned && aiStateOf(status, mentioned.id) === "waiting" ? COMPUTER_POLL_MS : false,
   );
   const lineState = !asking
@@ -804,7 +822,26 @@ export function OnboardingPage() {
           setAgentsPhase("ai");
           return;
         }
-        if (how !== "keyLater") await finishAi.mutateAsync();
+        if (agentsPhase === "ai" && how !== "keyLater") {
+          await finishAi.mutateAsync();
+          if (jevKey.data?.source === null) {
+            setAgentsPhase("jev");
+            return;
+          }
+        }
+        if (agentsPhase === "jev" && jevSaves) {
+          const saved = await saveJev.mutateAsync(jevTyped).catch((error: unknown) => {
+            // Only TypeSafe's refusal answers for this text: after a limit or an outage, the same key can be tried again.
+            if (errorCode(error) === "jev_key_invalid") setJevDone({ text: jevTyped, saved: false });
+            setJevError(errorText(t, error));
+            return null;
+          });
+          if (!saved) return;
+          if (saved.state === "no_credit") {
+            setJevDone({ text: jevTyped, saved: true });
+            return;
+          }
+        }
       }
       if (step.id === "computer") await saveComputer.mutateAsync(false);
       if (step.id === "team") await sendInvites.mutateAsync();
@@ -830,6 +867,7 @@ export function OnboardingPage() {
     flow.busy !== null ||
     saveComputer.isPending ||
     sendInvites.isPending ||
+    saveJev.isPending ||
     finish.isPending;
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
@@ -838,6 +876,7 @@ export function OnboardingPage() {
     (aiOpen &&
       ((keyPending ? draft.provider === "platform" || !keyLooksValid(draft.provider, draft.apiKey) : !aiDone) ||
         (choice === "key" && !budgetOk))) ||
+    (jevOpen && jevSaves && jevTyped.length < JEV_KEY_MIN) ||
     (step.id === "import" && !flow.planned) ||
     (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
 
@@ -869,8 +908,8 @@ export function OnboardingPage() {
     team: sent.size ? t("onboarding.railValue.invites", { count: sent.size }) : t("onboarding.railValue.later"),
   };
 
-  // The question: the step's, or the AI's on the agents' second screen.
-  const ask =
+  // The question: the step's, the AI's on the agents' second screen, or Jev's on the third.
+  const ask: { title: string; tag?: string; lead: ReactNode } | null =
     step.id === "done"
       ? null
       : aiOpen
@@ -880,20 +919,33 @@ export function OnboardingPage() {
           }
         : step.id === "computer" && workspaceComputer && unpaid
           ? { title: t("onboarding.computer.payment.title"), lead: t("onboarding.computer.payment.body") }
-          : {
-              title:
-                step.id === "agents" && importAgents.length
-                  ? t("onboarding.agents.importedTitle")
-                  : t(`onboarding.${step.id}.title`),
-              lead:
-                step.id === "computer" && workspaceComputer
-                  ? t(
-                      workspaceComputer.phase === "paused"
-                        ? "onboarding.computer.leadCloudPaused"
-                        : "onboarding.computer.leadCloud",
-                    )
-                  : t(`onboarding.${step.id}.lead`),
-            };
+          : jevOpen
+            ? {
+                title: t("onboarding.jev.title"),
+                tag: t("onboarding.optionalTag"),
+                lead: (
+                  <span className="ac-hintline">
+                    <span>{t("onboarding.jev.lead")}</span>
+                    <InfoHint name={t("common.about", { label: t("jev.title") })}>{t("jev.withoutHint")}</InfoHint>
+                  </span>
+                ),
+              }
+            : {
+                title:
+                  step.id === "agents" && importAgents.length
+                    ? t("onboarding.agents.importedTitle")
+                    : t(`onboarding.${step.id}.title`),
+                lead:
+                  step.id === "computer" && workspaceComputer
+                    ? t(
+                        workspaceComputer.phase === "paused"
+                          ? "onboarding.computer.leadCloudPaused"
+                          : "onboarding.computer.leadCloud",
+                      )
+                    : step.id === "team" && !emails
+                      ? t("onboarding.team.leadLink")
+                      : t(`onboarding.${step.id}.lead`),
+              };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
@@ -905,7 +957,7 @@ export function OnboardingPage() {
           : t("onboarding.done.first.sendGeneral")
       : step.id === "agents" && agentsPhase === "pick" && joiningLeft > 0
         ? t("onboarding.actions.create", { count: joiningLeft })
-        : aiOpen && keyPending
+        : (aiOpen && keyPending) || (jevOpen && jevSaves)
           ? t("onboarding.actions.saveAndContinue")
           : step.id === "team" && toSend.length > 0
             ? t("onboarding.actions.invite", { count: toSend.length })
@@ -917,6 +969,7 @@ export function OnboardingPage() {
     step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.id === "done" ? asking : step.optional;
   const back = () => {
     if (aiOpen) setAgentsPhase("pick");
+    else if (jevOpen) setAgentsPhase("ai");
     else go(index - 1);
   };
 
@@ -997,6 +1050,7 @@ export function OnboardingPage() {
               happy={guide.happy}
               intro={intro}
               title={ask.title}
+              tag={ask.tag}
               lead={ask.lead}
             />
           )}
@@ -1079,7 +1133,7 @@ export function OnboardingPage() {
                     <Icon name="pause" size={14} />
                     <span>{t("standing.createUnpaid")}</span>
                   </p>
-                  {server?.billingUrl && (
+                  {authConfig?.billingUrl && (
                     <div className="row">
                       <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
                         {t("standing.billing.cta.payment")}
@@ -1144,7 +1198,7 @@ export function OnboardingPage() {
                 reader={{ owner: true, email, held: hold !== null }}
                 hold={unpaid ? null : hold}
               />
-              {unpaid && server?.billingUrl && (
+              {unpaid && authConfig?.billingUrl && (
                 <div className="row">
                   <BillingLinkButton orgId={created.orgId} from="onboarding" icon="external">
                     {t("standing.billing.cta.payment")}
@@ -1294,6 +1348,23 @@ export function OnboardingPage() {
             </div>
           )}
 
+          {jevOpen && (
+            <div className="onb__answer">
+              <JevWhy routing={aiNow.data?.routing?.by} />
+              <Card as="div">
+                <JevSteps
+                  value={jevDraft}
+                  onChange={(value) => {
+                    setJevDraft(value);
+                    setJevError(null);
+                  }}
+                  error={jevError}
+                  saved={jevDone?.saved && jevDone.text === jevTyped ? t("jev.steps.savedNoCredit") : null}
+                />
+              </Card>
+            </div>
+          )}
+
           {step.id === "team" && created && (
             <div className="onb__answer">
               {unpaid ? (
@@ -1308,6 +1379,7 @@ export function OnboardingPage() {
                   <TeamStep
                     orgId={created.orgId}
                     viewerId={me.data?.user.id ?? ""}
+                    emails={emails}
                     invites={invites}
                     sent={sent}
                     onChange={setInvites}
@@ -1413,6 +1485,7 @@ function HostAsk({
   happy,
   intro,
   title,
+  tag,
   lead,
 }: {
   name: string;
@@ -1424,6 +1497,8 @@ function HostAsk({
   happy: boolean;
   intro: string | null;
   title: string;
+  /** Beside the title: a screen that can be left as it is ("optional"). */
+  tag?: string;
   lead: ReactNode;
 }) {
   return (
@@ -1441,7 +1516,10 @@ function HostAsk({
       </span>
       <div className="onb__bubble">
         {intro && <p className="onb__intro">{intro}</p>}
-        <h1 className="onb__title">{title}</h1>
+        <h1 className="onb__title">
+          {title}
+          {tag && <Chip className="onb__titletag">{tag}</Chip>}
+        </h1>
         <p className="onb__lead">{lead}</p>
       </div>
     </header>
@@ -1768,11 +1846,13 @@ function WorkspaceComputerStep({
 
 /**
  * Who works with you: e-mails as chips (each with a role), and the invite link. While no agent would answer anyone
- * else (each with an AI on its owner's plan), it says so first.
+ * else (each with an AI on its owner's plan), it says so first. On a server that sends no email (`emails` false),
+ * the link alone: an invitation by email would never arrive.
  */
 function TeamStep({
   orgId,
   viewerId,
+  emails,
   invites,
   sent,
   onChange,
@@ -1780,6 +1860,7 @@ function TeamStep({
 }: {
   orgId: string;
   viewerId: string;
+  emails: boolean;
   invites: InviteDraft[];
   sent: Set<string>;
   onChange: (list: InviteDraft[]) => void;
@@ -1797,13 +1878,6 @@ function TeamStep({
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
-  const rows = useAgents(orgId);
-  const status = useAiStatus(orgId);
-  const onlyYou = onlyOwnerReplies(
-    rows.data ?? [],
-    (id) => (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai",
-    viewerId,
-  );
   const roleOptions = [
     { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
     { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
@@ -1840,83 +1914,75 @@ function TeamStep({
   const invalid = invites.some((i) => !i.valid);
   return (
     <>
-      {onlyYou && (
-        <p className="setup-line ac-iconline">
-          <Icon name="audienceOwner" size={14} />
-          <span>
-            {t("members.agentsOnlyYou")}{" "}
-            <InfoHint name={t("common.about", { label: t("members.agentsOnlyYou") })}>
-              {t("members.agentsOnlyYouHint")}
+      <OnlyYouNote orgId={orgId} viewerId={viewerId} />
+      {emails && (
+        <Card as="div">
+          <span className="ac-hintline onb__label">
+            <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
+            <InfoHint id="invite-emails-hint" name={t("common.about", { label: t("onboarding.team.emails") })}>
+              {t("onboarding.team.emailsHint")}
             </InfoHint>
           </span>
-        </p>
-      )}
-      <Card as="div">
-        <span className="ac-hintline onb__label">
-          <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
-          <InfoHint id="invite-emails-hint" name={t("common.about", { label: t("onboarding.team.emails") })}>
-            {t("onboarding.team.emailsHint")}
-          </InfoHint>
-        </span>
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
-        <div
-          className="onb__emails"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) input.current?.focus();
-          }}
-        >
-          {invites.map((i) => (
-            <span key={i.email} className="onb__chip" data-invalid={!i.valid || undefined}>
-              <Avatar name={i.email} initials={i.email.slice(0, 2).toUpperCase()} size="sm" />
-              <span className="onb__chip-email">{i.email}</span>
-              {!i.valid ? (
-                <span className="onb__chip-bad">{t("onboarding.team.invalid")}</span>
-              ) : sent.has(i.email) ? (
-                <span className="small muted">{t("onboarding.team.sent")}</span>
-              ) : (
-                <Select
-                  size="sm"
-                  value={i.role}
-                  aria-label={t("onboarding.team.roleOf", { email: i.email })}
-                  options={roleOptions}
-                  onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
-                />
-              )}
-              {!sent.has(i.email) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  aria-label={t("onboarding.removeInvite", { email: i.email })}
-                  onClick={() => onChange(invites.filter((x) => x.email !== i.email))}
-                />
-              )}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
+          <div
+            className="onb__emails"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) input.current?.focus();
+            }}
+          >
+            {invites.map((i) => (
+              <span key={i.email} className="onb__chip" data-invalid={!i.valid || undefined}>
+                <Avatar name={i.email} initials={i.email.slice(0, 2).toUpperCase()} size="sm" />
+                <span className="onb__chip-email">{i.email}</span>
+                {!i.valid ? (
+                  <span className="onb__chip-bad">{t("onboarding.team.invalid")}</span>
+                ) : sent.has(i.email) ? (
+                  <span className="small muted">{t("onboarding.team.sent")}</span>
+                ) : (
+                  <Select
+                    size="sm"
+                    value={i.role}
+                    aria-label={t("onboarding.team.roleOf", { email: i.email })}
+                    options={roleOptions}
+                    onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
+                  />
+                )}
+                {!sent.has(i.email) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="close"
+                    aria-label={t("onboarding.removeInvite", { email: i.email })}
+                    onClick={() => onChange(invites.filter((x) => x.email !== i.email))}
+                  />
+                )}
+              </span>
+            ))}
+            <input
+              ref={input}
+              id="invite-emails"
+              className="onb__emails-input"
+              type="text"
+              inputMode="email"
+              autoComplete="off"
+              value={draft}
+              placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
+              aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
+              aria-invalid={invalid || undefined}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              onBlur={() => commit(draft)}
+            />
+          </div>
+          {invalid && (
+            <span id="invite-emails-help" className="small onb__error">
+              {t("onboarding.team.invalidHelp")}
             </span>
-          ))}
-          <input
-            ref={input}
-            id="invite-emails"
-            className="onb__emails-input"
-            type="text"
-            inputMode="email"
-            autoComplete="off"
-            value={draft}
-            placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
-            aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
-            aria-invalid={invalid || undefined}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onBlur={() => commit(draft)}
-          />
-        </div>
-        {invalid && (
-          <span id="invite-emails-help" className="small onb__error">
-            {t("onboarding.team.invalidHelp")}
-          </span>
-        )}
-      </Card>
+          )}
+        </Card>
+      )}
       <Card as="div">
         <span className="ac-hintline onb__label">
           <span>{t("onboarding.team.link")}</span>

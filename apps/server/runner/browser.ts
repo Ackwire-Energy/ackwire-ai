@@ -1130,7 +1130,7 @@ export class BrowserManager {
       );
     }
     const got = createHash("sha256").update(bytes).digest("hex");
-    if (got !== want) throw this.fail("The agent browser download didn't match its checksum; it was not used");
+    if (got !== want) throw this.fail("The agent browser download didn't match its checksum, so it was not used");
     await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
     const tmp = `${file}.${process.pid}.tmp`;
     await writeFile(tmp, bytes, { mode: 0o755 });
@@ -1158,11 +1158,12 @@ export class BrowserManager {
     const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
     this.chromePath = find();
     if (this.chromePath) return;
+    const why = firstLine(out.stderr || out.stdout);
     const hint =
       process.platform === "linux"
-        ? `; Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps`
+        ? ` Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps.`
         : "";
-    throw this.fail(`Couldn't install a browser for the agent${hint} (${firstLine(out.stderr || out.stdout)})`);
+    throw this.fail(`Couldn't install a browser for the agent${why ? ` (${why})` : ""}.${hint}`);
   }
 
   private fail(reason: string) {

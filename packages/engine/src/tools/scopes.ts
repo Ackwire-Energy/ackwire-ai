@@ -48,7 +48,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "calendar:read": { label: "View calendar", description: "View events and free time." },
   "calendar:write": {
     label: "Propose events",
-    description: "Suggest events; the person asking confirms before any invitation.",
+    description: "Suggest events. The person asking confirms before any invitation.",
   },
   "issues:write": { label: "Issues", description: "Create and update issues." },
   "skills:read": { label: "Use skills", description: "Load the skills enabled for the agent." },

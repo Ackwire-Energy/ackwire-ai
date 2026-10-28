@@ -1,6 +1,6 @@
 import { type Me, type OrgSummary, useAuthConfig } from "@agenteschat/client";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
-import { holdText } from "@agenteschat/client/lib/errors";
+import { holdText, supportLineOf } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,20 +18,21 @@ import { useOrg } from "@/components/org-context";
  * the way to fix it on the billing service.
  */
 
-/** "Precisa de ajuda? Escreva para …" when the server says where (`SUPPORT_EMAIL`), else to ask who runs it. */
+/** "Precisa de ajuda? Escreva para …", or to ask who runs the server, as `supportLineOf` says. */
 export function SupportLine() {
   const { t } = useTranslation();
-  const email = useAuthConfig().data?.supportEmail;
+  const line = supportLineOf(useAuthConfig().data);
+  if (!line) return null;
   return (
     <span className="support-line">
-      {email ? (
+      {line === "ask" ? (
+        t("support.ask")
+      ) : (
         <>
           {t("support.writeBefore")}
-          <a href={`mailto:${email}`}>{email}</a>
+          <a href={`mailto:${line.email}`}>{line.email}</a>
           {t("support.writeAfter")}
         </>
-      ) : (
-        t("support.ask")
       )}
     </span>
   );

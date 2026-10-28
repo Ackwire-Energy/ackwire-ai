@@ -1,18 +1,22 @@
-import { formatShortDate } from "@agenteschat/client/lib/format";
+import type { JoinRequest } from "@agenteschat/client";
 import { askedLabel } from "@agenteschat/client/lib/join-requests";
 import type { TFunction } from "i18next";
 
-/** A request to join's two times, a line each as on the web: when it was asked, then when it closes unanswered. */
-export function requestTimes(
+/**
+ * A request to join's chips, as on the web: "Not verified" only where nobody proved the address (a server without
+ * email, or a request typed before codes), then when it was asked. A server from before codes sends only
+ * `confirmed`, which meant the same there.
+ */
+export function requestChips(
   t: TFunction,
   locale: string,
-  r: { createdAt: string; expiresAt: string },
+  r: Pick<JoinRequest, "createdAt" | "verified" | "confirmed">,
   now = new Date(),
-): [asked: string, closes: string] {
-  return [
-    askedLabel(t, locale, r.createdAt, now),
-    t("members.requests.via", { date: formatShortDate(locale, r.expiresAt) }),
-  ];
+): { unverified: string | null; asked: string } {
+  return {
+    unverified: (r.verified ?? r.confirmed) ? null : t("members.requests.unverified"),
+    asked: askedLabel(t, locale, r.createdAt, now),
+  };
 }
 
 /** The people of the workspace as Membros lists them: by name, in the person's language's order. */

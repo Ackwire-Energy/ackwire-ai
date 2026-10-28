@@ -2,7 +2,10 @@ import { type ProviderId, providerOf, providersForKey } from "@agenteschat/clien
 import { Button, ProviderLogo } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 
-/** Under a key field: where to create the provider's key and, for one that also sells coding plans, not to use that. */
+/**
+ * Under a key field: where to create the provider's key, then for one that also sells coding plans not to use
+ * that, and for one whose free tier may use what is sent to turn on billing.
+ */
 export function KeySite({ provider }: { provider: ProviderId }) {
   const { t } = useTranslation();
   const p = providerOf(provider);
@@ -13,6 +16,7 @@ export function KeySite({ provider }: { provider: ProviderId }) {
         {t("onboarding.keySite", { site: p.site })}
       </a>
       {p.plans && ` ${t("onboarding.keyNotPlan")}`}
+      {p.billing && ` ${t("connectAi.key.billing")}`}
     </>
   );
 }

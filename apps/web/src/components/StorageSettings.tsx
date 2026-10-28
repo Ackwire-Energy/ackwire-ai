@@ -1,4 +1,4 @@
-import type { S3Input, StorageConfig, StorageTestResult } from "@agenteschat/client";
+import type { S3Input, StorageConfig, StoragePlatform, StorageTestResult } from "@agenteschat/client";
 import {
   useSaveStorage,
   useStartMigration,
@@ -24,11 +24,14 @@ import {
   RadioCard,
   RadioGroup,
 } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Fragment, useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { StorageMeter } from "@/components/Limits";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useRevealsFiles } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 type Choice = "agentes" | "s3";
@@ -81,25 +84,69 @@ export function toS3Input(f: Form): S3Input {
 
 const STEP_ICON: Record<"ok" | "failed" | "skipped", IconName> = { ok: "check", failed: "close", skipped: "info" };
 
-/** Settings → Armazenamento (admins only): our storage or the workspace's own S3-compatible bucket. */
+/** Where this server keeps files, as its admins read it: the folder by its path when the server says it. */
+function PlatformLine({ platform }: { platform: StoragePlatform }) {
+  const { t } = useTranslation();
+  if (platform.kind !== "disk" || !platform.folder) return <>{t(`storage.serverText.${platform.kind}`)}</>;
+  return <Trans i18nKey="storage.serverText.folder" components={{ folder: <PathCode path={platform.folder} /> }} />;
+}
+
+/** A path in code style that wraps after its separators, never inside a folder's name unless it must. */
+function PathCode({ path }: { path: string }) {
+  // After each separator but the root's, so "/Users/" stays whole.
+  const parts = path.split(/(?<=.[\\/])/);
+  return (
+    <code style={{ fontSize: 12.5, overflowWrap: "anywhere" }}>
+      {parts.map((part, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one path, in order
+        <Fragment key={i}>
+          {i > 0 && <wbr />}
+          {part}
+        </Fragment>
+      ))}
+    </code>
+  );
+}
+
+/**
+ * Settings → Armazenamento (admins only): where files stay unless the workspace brings its own S3-compatible
+ * bucket. On the Cloud that is our storage; on a server people run, the server itself, said by where it keeps them.
+ */
 export function StorageSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org.role, "configure");
   const storage = useStorage(org.id, admin);
+  const edition = useComputerEdition(org.id);
+  const reveals = useRevealsFiles();
   const [choice, setChoice] = useState<Choice>("agentes");
   useEffect(() => {
     if (storage.data) setChoice(storage.data.kind);
   }, [storage.data]);
   if (!admin) return null;
-  const config = storage.data;
+  const config = edition ? storage.data : undefined;
+  const cloud = edition === "cloud";
+  const place = t(cloud ? "storage.place.agentes" : "storage.place.server");
+  const title = (
+    <h2 id="sec-storage" className="ac-card__title">
+      {t("storage.title")}
+    </h2>
+  );
   return (
     <Card aria-labelledby="sec-storage">
-      <h2 id="sec-storage" className="ac-card__title">
-        {t("storage.title")}
-      </h2>
+      {/* Beside the title, not under the folder's line: each option is a label, which can't hold a button. */}
+      {!cloud && reveals && config?.platform.folder ? (
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          {title}
+          <Button size="sm" variant="ghost" onClick={() => void thisMac.revealFiles().catch(() => {})}>
+            {t("storage.showFolder")}
+          </Button>
+        </div>
+      ) : (
+        title
+      )}
       <StorageMeter />
-      {storage.isLoading && <LoadingCards count={2} />}
+      {(storage.isLoading || (storage.data && !edition)) && <LoadingCards count={2} />}
       {config && (
         <>
           <RadioGroup
@@ -115,8 +162,16 @@ export function StorageSection() {
                 value={k}
                 id={`storage-${k}`}
                 checked={choice === k}
-                title={t(`storage.${k}`)}
-                description={t(`storage.${k}Text`)}
+                title={t(k === "s3" ? "storage.s3" : cloud ? "storage.agentes" : "storage.server")}
+                description={
+                  k === "s3" ? (
+                    t("storage.s3Text")
+                  ) : cloud ? (
+                    t("storage.agentesText")
+                  ) : (
+                    <PlatformLine platform={config.platform} />
+                  )
+                }
                 aside={config.kind === k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined}
               />
             ))}
@@ -132,7 +187,7 @@ export function StorageSection() {
               />
             ))}
           </RadioGroup>
-          {config.kind === "s3" && <InUse config={config} />}
+          {config.kind === "s3" && <InUse config={config} place={place} />}
           {choice === "s3" && <BucketForm config={config} />}
         </>
       )}
@@ -140,7 +195,7 @@ export function StorageSection() {
   );
 }
 
-function InUse({ config }: { config: StorageConfig }) {
+function InUse({ config, place }: { config: StorageConfig; place: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -152,17 +207,17 @@ function InUse({ config }: { config: StorageConfig }) {
       {config.s3 && (
         <p className="small muted">{t("storage.inUse", { bucket: config.s3.bucket, endpoint: config.s3.endpoint })}</p>
       )}
-      <CopyFiles config={config} />
+      <CopyFiles config={config} place={place} />
       <div className="row">
         <Button variant="ghost" onClick={() => setConfirm(true)}>
-          {t("storage.back")}
+          {t("storage.back", { place })}
         </Button>
       </div>
       <Dialog
         open={confirm}
         onOpenChange={setConfirm}
-        title={t("storage.backTitle")}
-        description={t("storage.backText")}
+        title={t("storage.backTitle", { place })}
+        description={t("storage.backText", { place })}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -178,13 +233,13 @@ function InUse({ config }: { config: StorageConfig }) {
                 {
                   onSuccess: () => {
                     setConfirm(false);
-                    toast.show(t("storage.backDone"));
+                    toast.show(t("storage.backDone", { place }));
                   },
                 },
               )
             }
           >
-            {t("storage.back")}
+            {t("storage.back", { place })}
           </Button>
         </DialogFooter>
       </Dialog>
@@ -192,7 +247,7 @@ function InUse({ config }: { config: StorageConfig }) {
   );
 }
 
-function CopyFiles({ config }: { config: StorageConfig }) {
+function CopyFiles({ config, place }: { config: StorageConfig; place: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const start = useStartMigration(org.id);
@@ -202,7 +257,7 @@ function CopyFiles({ config }: { config: StorageConfig }) {
     return (
       <div className="row" style={{ alignItems: "center", gap: 12 }}>
         <span className="small muted" style={{ flex: "1 1 240px" }}>
-          {t("storage.copyText")}
+          {t("storage.copyText", { place })}
         </span>
         <Button disabled={start.isPending} loading={start.isPending} onClick={() => start.mutate()}>
           {t("storage.copy")}
