@@ -171,7 +171,9 @@ describe("the tools step", () => {
     expect(row("pixel_track")?.textContent).toContain(
       "Sugestão: muda coisas, porque muda coisas, mas não apaga nada nem gasta dinheiro",
     );
-    expect(row("report_task_run")?.textContent).toContain("Sugestão: pede aprovação, porque não deu para saber pelo nome");
+    expect(row("report_task_run")?.textContent).toContain(
+      "Sugestão: pede aprovação, porque não deu para saber pelo nome",
+    );
     // The sparkle sits in the reason; the technical name only on hover.
     expect(row("pixel_track")?.querySelector(".tr-row__why .ac-toolpx-spark")).toBeTruthy();
     expect(row("pixel_track")?.textContent).not.toContain("pixel_track");
