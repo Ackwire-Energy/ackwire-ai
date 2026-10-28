@@ -6651,13 +6651,13 @@ a.machine-row__name:hover {
 .onb__steps li {
   position: relative;
 }
-/* The thread joining the markers, filled up to where you are. */
+/* The thread joining the markers, filled up to where you are: 4px from each, the markers centred in 52px steps. */
 .onb__steps li:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 21px;
-  top: 40px;
-  bottom: -8px;
+  top: 42px;
+  bottom: -10px;
   width: 2px;
   border-radius: 1px;
   background: var(--line2);
@@ -6812,19 +6812,25 @@ a.machine-row__name:hover {
   .onb__steps li::after {
     display: none;
   }
-  /* All seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current one's ring,
-     reaching past the strip's edges. */
   .onb__steps {
     flex-direction: row;
-    gap: 3px;
-    margin-inline: -2px;
-    padding: 2px;
+    gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
   }
   .onb__step {
     width: auto;
     min-height: 0;
+    padding: 4px;
+  }
+  /* The setup's seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current
+     one's ring, reaching past the strip's edges. Criar agente and the landing's card keep the shared strip. */
+  .onb:not(.newag) .onb__steps {
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
+  }
+  .onb:not(.newag) .onb__step {
     padding: 2px;
   }
   .onb__step-text {

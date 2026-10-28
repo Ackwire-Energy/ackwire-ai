@@ -84,17 +84,26 @@ describe("the step bar on a phone", () => {
 });
 
 describe("the step bar on a phone fits its seven steps", () => {
-  test("beside the whole logo at 390px (a 219px strip), beside its mark alone below 385px", () => {
-    const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
-    const phone = css.slice(css.indexOf("/* Phone: the rail is a compact step bar"));
-    const rule = (selector: string) => phone.slice(phone.indexOf(`  ${selector} {`)).split("}")[0] ?? "";
-    const px = (body: string, prop: string) => Number(new RegExp(`\\n\\s*${prop}:\\s*(\\d+)px`).exec(body)?.[1]);
-    const step = 24 + 2 * px(rule(".onb__step"), "padding");
-    const gap = px(rule(".onb__steps"), "gap");
+  const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
+  const phone = css.slice(css.indexOf("/* Phone: the rail is a compact step bar"));
+  const rule = (selector: string) => phone.slice(phone.indexOf(`  ${selector} {`)).split("}")[0] ?? "";
+  const px = (body: string, prop: string) => Number(new RegExp(`\\n\\s*${prop}:\\s*(\\d+)px`).exec(body)?.[1]);
+
+  test("the setup's: beside the whole logo at 390px (a 219px strip), beside its mark alone below 385px", () => {
+    const step = 24 + 2 * px(rule(".onb:not(.newag) .onb__step"), "padding");
+    const gap = px(rule(".onb:not(.newag) .onb__steps"), "gap");
     expect(7 * step + 6 * gap).toBeLessThanOrEqual(219);
     // The current step's 4px ring shows whole: room around the steps, inside the strip that scrolls.
-    expect(px(rule(".onb__steps"), "padding") + px(rule(".onb__step"), "padding")).toBe(4);
+    expect(
+      px(rule(".onb:not(.newag) .onb__steps"), "padding") + px(rule(".onb:not(.newag) .onb__step"), "padding"),
+    ).toBe(4);
     const narrow = phone.slice(phone.indexOf("@media (max-width: 384px)"));
     expect(narrow.split("}")[0]).toContain(".onb__brand .ac-logo > :not(.ac-logo__mark) {\n    display: none;");
+  });
+
+  test("Criar agente's and the landing's keep the shared strip: 32px steps 4px apart, on their page's edge", () => {
+    expect(px(rule(".onb__steps"), "gap")).toBe(4);
+    expect(px(rule(".onb__step"), "padding")).toBe(4);
+    expect(rule(".onb__steps")).not.toMatch(/\n\s*(margin|padding)(-inline)?:/);
   });
 });

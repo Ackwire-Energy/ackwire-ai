@@ -867,6 +867,10 @@ describe("Onboarding", () => {
     // bar's own auto top margin takes the room left, so it rests at the bottom, in the same place on every step.
     expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
     expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
+    // The room above the step is the one the page pins as the step opens (computer-setup.test.tsx).
+    expect(rule("\n.onb__body::before")).toContain("margin-block: var(--onb-lead, auto) -24px");
+    // A text button that doesn't fit beside Continue goes above it: Continue keeps its place on every step.
+    expect(rule("\n.onb__actions")).toContain("flex-wrap: wrap-reverse");
     // Its ground spans the column's gutters, and its bottom clears the home bar at every width.
     expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
     expect(rule("\n.onb__actions")).toContain(

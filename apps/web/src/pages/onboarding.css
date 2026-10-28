@@ -52,10 +52,11 @@
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
 }
-/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. */
+/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. The page pins
+   that room as the step opens (`--onb-lead`), so what changes in the step grows or shrinks it downward. */
 .onb__body::before {
   content: "";
-  margin-block: auto -24px;
+  margin-block: var(--onb-lead, auto) -24px;
 }
 @keyframes onb-in {
   from {
@@ -252,14 +253,14 @@ textarea.onb__big.ac-input {
  * page's ground with a 16px fade above it, so a longer step slides under it. The ground spans the column's gutters
  * too: a card's ring passing under the bar never shows beside it. At the end of the scroll the bar sits under the
  * content's last line, as far below it as the column's gap. Continue first, the step's text button beside it (Skip,
- * I'll do it later, Open #general without sending), centred under it when both don't fit.
+ * I'll do it later, Open #general without sending), centred above it when both don't fit, so Continue keeps its place.
  */
 .onb__actions {
   position: sticky;
   bottom: 0;
   z-index: var(--z-sticky);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
   align-items: center;
   gap: 8px 12px;
   margin: auto calc(-1 * var(--onb-gutter)) 0;
