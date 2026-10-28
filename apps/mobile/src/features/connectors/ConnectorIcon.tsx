@@ -57,7 +57,8 @@ export function ConnectorIcon({
           style={{ width: Math.round(size * 0.58), height: Math.round(size * 0.58) }}
         />
       ) : (
-        <Text variant="body" tone="muted" style={[styles.mono, { fontSize: Math.round(size * 0.36) }]}>
+        // Its line as tall as its letters: the body's taller line, in a small tile, set them low.
+        <Text variant="body" tone="muted" style={[styles.mono, monogramSize(size)]}>
           {monogram(label)}
         </Text>
       )}
@@ -92,9 +93,15 @@ export function IconTile({ name, size = 20 }: { name: IconName; size?: number })
   );
 }
 
+/** A monogram's letters for a tile `size` wide, on a line just as tall, so they sit in the tile's middle. */
+const monogramSize = (size: number) => {
+  const fontSize = Math.round(size * 0.36);
+  return { fontSize, lineHeight: Math.round(fontSize * 1.2) };
+};
+
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
-  mono: { fontWeight: "700" },
+  mono: { fontWeight: "700", textAlign: "center", includeFontPadding: false },
   check: {
     position: "absolute",
     right: -4,
