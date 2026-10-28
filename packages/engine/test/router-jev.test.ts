@@ -109,7 +109,9 @@ describe("routeChain", () => {
 
 /** A fake TypeSafe endpoint: records requests, answers with scripted nouls per handle. */
 function fakeJev(
-  script: (state: Record<string, unknown>) => { nouls: Record<string, number>; needs: number; best?: string } | Error,
+  script: (
+    state: Record<string, unknown>,
+  ) => { nouls: Record<string, number>; needs: number; best?: string; everyone?: number } | Error,
 ) {
   const requests: { headers: Headers; body: Record<string, unknown> }[] = [];
   const fetcher = (async (_url: string, init: RequestInit) => {
@@ -125,6 +127,7 @@ function fakeJev(
       if (key.startsWith("agent_"))
         answers[key] = { type: "noul", noul: r.nouls[q.instructions.agent?.handle ?? ""] ?? 0 };
     }
+    if (body.questions.for_everyone) answers.for_everyone = { type: "noul", noul: r.everyone ?? 0 };
     if (body.questions.best_agent) {
       answers.best_agent = {
         type: "choice",
@@ -167,6 +170,7 @@ describe("Jev strategy end to end", () => {
       "agent_0",
       "agent_1",
       "best_agent",
+      "for_everyone",
       "needs_agent",
     ]);
     expect(JSON.stringify(req?.body.state)).toContain("is the deploy green?");
