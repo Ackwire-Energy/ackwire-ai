@@ -44,7 +44,7 @@ import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, type LayoutChangeEvent, Platform, StyleSheet, View } from "react-native";
+import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -166,6 +166,10 @@ const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
 /** How long the conversation is held in place after something opens over it or closes (ms). */
 const HOLD_MS = 900;
+/** How long the list keeps ignoring the keyboard after what covered it closed (its closing animation, ms). */
+const FREEZE_AFTER_MS = 450;
+/** The list shows by itself after this even if it never said it was placed (ms). */
+const SHOW_LIST_MS = 700;
 
 /**
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
@@ -897,17 +901,36 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     };
     requestAnimationFrame(check);
   }, []);
+  // While something covers the conversation (a sheet, the agent's computer) the list ignores the keyboard: it
+  // leaving under the cover, or coming back, must not move it (Bluesky and Mattermost freeze or dismiss first too).
+  const freeze = useSharedValue(false);
+  const covered = useRef(false);
+  const cover = useCallback(() => {
+    covered.current = true;
+    freeze.value = true;
+  }, [freeze]);
+  const uncover = useCallback(() => {
+    covered.current = false;
+    setTimeout(() => {
+      if (!covered.current) freeze.value = false;
+    }, FREEZE_AFTER_MS);
+  }, [freeze]);
+  useEffect(() => sheet.subscribe((open) => (open ? cover() : uncover())), [sheet, cover, uncover]);
   // The agent's computer opens full screen: where the conversation was is kept, and given back on return.
   const away = useRef<number | null>(null);
   const leavePlace = useCallback(() => {
     away.current = listRef.current?.getState().scroll ?? null;
-  }, []);
+    cover();
+    Keyboard.dismiss();
+  }, [cover]);
   useFocusEffect(
     useCallback(() => {
       const at = away.current;
       away.current = null;
-      if (at != null) holdPlace(at);
-    }, [holdPlace]),
+      if (at == null) return;
+      holdPlace(at);
+      uncover();
+    }, [holdPlace, uncover]),
   );
   const showOptions = () =>
     info && isThread
@@ -1193,13 +1216,25 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const headerHeight = useHeaderHeight();
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
-  // Android has no automatic inset under the clear bar: the conversation starts below it by padding (the
-  // pinned card, when there is one, already holds that room).
+  // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
+  // is one, already holds that room). iOS's automatic inset made keyboard moves land short at the end.
   const hasPin = pinned !== null;
   const listPad = useMemo(
-    () => (Platform.OS === "android" && !hasPin ? [styles.listPad, { paddingTop: headerHeight + 8 }] : styles.listPad),
+    () => (hasPin ? styles.listPad : [styles.listPad, { paddingTop: headerHeight + 8 }]),
     [hasPin, headerHeight],
   );
+  // The list shows once it sits at the end (no frame of it placing itself), as Bluesky's and Expensify's do; from
+  // a little opacity, not none, so the glass inside rows keeps drawing.
+  const listShown = useSharedValue(0.05);
+  const listFade = useAnimatedStyle(() => ({ opacity: listShown.value }));
+  const revealList = useCallback(() => {
+    listShown.value = withTiming(1, { duration: 160 });
+  }, [listShown]);
+  useEffect(() => {
+    if (!showList) return;
+    const timer = setTimeout(revealList, SHOW_LIST_MS);
+    return () => clearTimeout(timer);
+  }, [showList, revealList]);
 
   // Whether the person is near the end (what the list follows): the "new messages" button shows otherwise.
   useEffect(() => {
@@ -1223,11 +1258,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <MissionCardView mission={pinned} pinned />
         </View>
       ) : null}
+      {/* No `textInputNativeID`: with it the composer could stay down while the keyboard was up (iOS 26; Bluesky
+          drops it too). The offset is whole points: a fractional one made the overscroll glitch. */}
       <KeyboardGestureArea
         style={styles.grow}
         interpolator="ios"
-        textInputNativeID={COMPOSER_INPUT_ID}
-        offset={Math.max(0, composerHeight - lift)}
+        offset={Math.round(Math.max(0, composerHeight - lift))}
       >
         {loading ? (
           <View style={[styles.center, { paddingBottom: composerHeight }]}>
@@ -1244,39 +1280,47 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </View>
           )
         ) : (
-          <KeyboardAwareLegendList
-            ref={listRef}
-            style={styles.grow}
-            data={shownRows}
-            keyExtractor={rowKey}
-            getItemType={rowType}
-            renderItem={renderItem}
-            // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-            // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-            extraData={renderItem}
-            estimatedItemSize={72}
-            // Opens at the latest message, short conversations sit at the bottom like any chat.
-            initialScrollAtEnd
-            alignItemsAtEnd
-            // New messages, a reply growing word by word and the working line keep the end in view, but
-            // only while the person is near it.
-            maintainScrollAtEnd
-            maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-            // Older pages above and rows changing size keep what is on screen still.
-            maintainVisibleContentPosition
-            // Under the glass header on iOS: the system insets the top by the bar (and draws its scroll edge).
-            contentInsetAdjustmentBehavior="automatic"
-            onStartReached={loadOlder}
-            onScrollBeginDrag={() => {
-              dragging.current = true;
-            }}
-            onStartReachedThreshold={0.5}
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            keyboardOffset={lift}
-            contentInsetEndAdjustment={contentInsetEndAdjustment}
-            contentContainerStyle={listPad}
-          />
+          <Animated.View style={[styles.grow, listFade]}>
+            <KeyboardAwareLegendList
+              ref={listRef}
+              style={styles.grow}
+              data={shownRows}
+              keyExtractor={rowKey}
+              getItemType={rowType}
+              renderItem={renderItem}
+              // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+              // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+              extraData={renderItem}
+              estimatedItemSize={72}
+              // Opens at the latest message, short conversations sit at the bottom like any chat.
+              initialScrollAtEnd
+              alignItemsAtEnd
+              // New messages, a reply growing word by word and the working line keep the end in view, but
+              // only while the person is near it.
+              maintainScrollAtEnd
+              maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+              // Older pages above and rows changing size keep what is on screen still.
+              maintainVisibleContentPosition
+              // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
+              // is the content's top padding, the indicator kept below the bar.
+              contentInsetAdjustmentBehavior="never"
+              automaticallyAdjustContentInsets={false}
+              scrollIndicatorInsets={{ top: headerHeight }}
+              // Still while a sheet or the agent's computer covers the conversation.
+              freeze={freeze}
+              onReady={revealList}
+              onStartReached={loadOlder}
+              onScrollBeginDrag={() => {
+                dragging.current = true;
+              }}
+              onStartReachedThreshold={0.5}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              keyboardOffset={lift}
+              contentInsetEndAdjustment={contentInsetEndAdjustment}
+              contentContainerStyle={listPad}
+            />
+          </Animated.View>
         )}
         <KeyboardStickyView
           offset={{ opened: lift }}
