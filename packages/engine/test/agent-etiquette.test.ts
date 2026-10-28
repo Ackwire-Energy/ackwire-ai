@@ -148,7 +148,7 @@ describe("an agent's @mention of another agent", () => {
 });
 
 describe("short follow-ups without a mention", () => {
-  /** A router that hears "vocês" as for every agent, and anything else as for Dev only. */
+  /** A router that hears "vocês" as for every agent and says so (`forEveryone`), and anything else as for Dev only. */
   const scoreAll: RouterStrategy = {
     name: "fixed",
     async decide(input) {
@@ -159,6 +159,7 @@ describe("short follow-ups without a mention", () => {
           score: everyone || c.handle === "dev" ? 0.9 : 0.2,
         })),
         needsAgent: 0.9,
+        forEveryone: everyone ? 0.9 : 0.1,
         reason: "t",
       };
     },

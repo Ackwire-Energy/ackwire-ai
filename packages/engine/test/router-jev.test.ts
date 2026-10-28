@@ -4,6 +4,7 @@ import {
   createAgent,
   createJevJudge,
   createJevKey,
+  createJevRouterStrategy,
   createJobHandlers,
   createLlmJudge,
   drainOutbox,
@@ -143,6 +144,27 @@ function fakeJev(
 
 const post = (fx: Fixture, body: string, threadId?: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body, threadId });
+
+describe("Jev's questions", () => {
+  test("name a message to the room in both languages, for every agent and for each one", async () => {
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0.9 }));
+    await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "e agora, vocês dois?" },
+      thread: [],
+      candidates: [cand("dev"), cand("qa")],
+    });
+    const questions = jev.requests[0]?.body.questions as {
+      for_everyone: { instructions: string };
+      agent_0: { instructions: { question: string } };
+    };
+    for (const phrase of ["everyone", "all of you", "gente", "vocês", "agentes"]) {
+      expect(questions.for_everyone.instructions).toContain(`"${phrase}"`);
+      expect(questions.agent_0.instructions.question).toContain(`"${phrase}"`);
+    }
+  });
+});
 
 describe("Jev strategy end to end", () => {
   test("one request with a Noul per agent, a need Noul and a tie-break Choice; usage billed to the platform", async () => {
