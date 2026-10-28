@@ -1,12 +1,7 @@
-import { MeSheet } from "@/features/me/MeSheet";
+import { MeScreen } from "@/features/me/MeScreen";
 import { goBack } from "@/features/shared/parts";
-import { SheetSurface } from "@/ui";
 
-/** Você, as a native form sheet over whatever is on screen (presentation set in `_layout`). */
+/** Você, a page pushed from the avatar (its own back button and bar; presentation set in `_layout`). */
 export default function MeRoute() {
-  return (
-    <SheetSurface>
-      <MeSheet onClose={goBack} />
-    </SheetSurface>
-  );
+  return <MeScreen onClose={goBack} />;
 }

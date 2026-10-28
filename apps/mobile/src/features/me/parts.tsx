@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconButton, Text } from "@/ui";
 
-/** One screen of the sheet: the bar (back, title, an action) over a scrolling body. */
+/** One screen inside Você: the bar (back, title, an action) over a scrolling body. */
 export function Page({
   title,
   onBack,
@@ -25,7 +25,10 @@ export function Page({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.body, { paddingTop: title ? 4 : 24, paddingBottom: 24 + insets.bottom }]}
+        contentContainerStyle={[
+          styles.body,
+          { paddingTop: title ? 4 : insets.top + 24, paddingBottom: 24 + insets.bottom },
+        ]}
       >
         {children}
       </ScrollView>
@@ -33,11 +36,15 @@ export function Page({
   );
 }
 
-/** The bar of a screen inside the sheet: the round glass back button, the title centered, an action (or room). */
+/**
+ * The bar of a screen inside Você (a full page, so under the status bar): the round glass back button, the title
+ * centered, an action (or room).
+ */
 export function SheetBar({ title, onBack, right }: { title: string; onBack?: () => void; right?: ReactNode }) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingTop: insets.top + 6 }]}>
       <View style={styles.side}>
         {onBack ? <IconButton icon="back" label={t("mobile.common.back")} plate onPress={onBack} /> : null}
       </View>
