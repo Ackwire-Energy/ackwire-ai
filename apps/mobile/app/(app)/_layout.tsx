@@ -50,7 +50,7 @@ function AppStack() {
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
-  const pushSheet = useFormSheetOptions([0.74, 1]);
+  const pushSheet = useFormSheetOptions("fitToContents");
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -67,6 +67,8 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />

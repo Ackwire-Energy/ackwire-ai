@@ -951,6 +951,14 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't load the Drive.",
     more: "Show more",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Write the first page on your computer; it shows up here to read.",
+    missing: "This page no longer exists or was renamed.",
+    blank: "Blank page.",
+    links: "Links on this page",
+    notYet: "doesn't exist yet",
+  },
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Couldn't load the routines.",

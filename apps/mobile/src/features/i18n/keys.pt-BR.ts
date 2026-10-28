@@ -956,6 +956,14 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar o Drive.",
     more: "Mostrar mais",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Escreva a primeira página no computador; ela aparece aqui para ler.",
+    missing: "Esta página não existe mais ou mudou de nome.",
+    blank: "Página em branco.",
+    links: "Links nesta página",
+    notYet: "ainda não existe",
+  },
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Não deu para carregar as rotinas.",
