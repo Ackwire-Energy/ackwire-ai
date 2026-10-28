@@ -90,6 +90,21 @@ describe("a workspace's limits (ADR 0077)", () => {
     expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
   });
 
+  test("a new plan while this tab was away: the reconnect asks for the limits again, and Convidar is back", async () => {
+    const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
+    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    await act(async () => sockets.last().open());
+    // The socket drops; meanwhile the plan changes, and its `org.limits` never reaches this tab.
+    await act(async () => sockets.last().drop());
+    state.limits = limits({ members: { used: 1, limit: 10 } });
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => sockets.last().open());
+    await settle(6);
+    expect(invite().textContent).not.toContain("cabe 1 pessoa");
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+  });
+
   test("Armazenamento: the meter, near the limit with the plan's options; on its own bucket, no limit from us", async () => {
     await go("settings/storage", { storage: { usedBytes: 10 * GB, limitBytes: 50 * GB, ownStorage: false } });
     const quiet = screen().getByRole("region", { name: "Armazenamento" });

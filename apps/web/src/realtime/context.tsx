@@ -417,12 +417,13 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
-      // (one back online, a pause) and the agents' screens.
+      // The workspace's computer on its way, its standing and its limits (a new plan) may have moved meanwhile, and so
+      // may the computers (one back online, a pause) and the agents' screens.
       void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
