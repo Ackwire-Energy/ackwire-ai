@@ -7,19 +7,25 @@ import { readdirSync } from "node:fs";
 import { PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import { cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { DatabaseIcon } from "@/components/DatabaseConnect";
 import { POSTGRES_MARK } from "@/lib/brands";
 
 afterEach(() => cleanup());
 
-const BRANDS = new URL("../public/brands/", import.meta.url).pathname;
+const PUBLIC = new URL("../public/", import.meta.url).pathname;
 
 describe("the brand files the app serves", () => {
   test("every SVG is a drawing on the 24×24 grid that runs nothing and loads nothing", async () => {
-    const svgs = readdirSync(BRANDS).filter((name) => name.endsWith(".svg"));
-    expect(svgs).toContain("postgresql.svg");
+    const svgs = ["brands/", "connectors/"].flatMap((dir) =>
+      readdirSync(PUBLIC + dir)
+        .filter((name) => name.endsWith(".svg"))
+        .map((name) => dir + name),
+    );
+    expect(svgs).toContain("brands/postgresql.svg");
+    expect(svgs).toContain("connectors/square.svg");
     for (const name of svgs) {
-      const svg = await Bun.file(BRANDS + name).text();
+      const svg = await Bun.file(PUBLIC + name).text();
       expect([name, /<svg\b[^>]*\sviewBox="0 0 24 24"/.test(svg)]).toEqual([name, true]);
       expect([name, svg.match(/<script|<style|<foreignObject|\sstyle\s*=|\son[a-z]+\s*=/gi)]).toEqual([name, null]);
       // Links only to the file's own ids (`href="#a"`, `url(#a)`), never out.
@@ -47,5 +53,17 @@ describe("the brand files the app serves", () => {
       "",
     ]);
     expect(POSTGRES_MARK).toBe("/brands/postgresql.svg");
+  });
+
+  test("a connector's one-color mark is a mask in its brand color; one in its maker's colors is drawn as it is", () => {
+    const icon = (iconUrl: string) =>
+      render(createElement(ConnectorIcon, { def: { iconUrl, brandColor: null }, label: "PayPal" })).container
+        .firstElementChild as HTMLElement;
+    const square = icon("/connectors/square.svg").querySelector<HTMLElement>(".connector-icon__mark");
+    expect(square?.style.getPropertyValue("--connector-icon")).toBe('url("/connectors/square.svg")');
+    const paypal = icon("/brands/paypal.svg").querySelector("img");
+    expect([paypal?.className, paypal?.getAttribute("src")]).toEqual(["connector-icon__img", "/brands/paypal.svg"]);
+    // Only a file of ours, by its name.
+    expect(icon("/brands/../paypal.svg").textContent).toBe("P");
   });
 });

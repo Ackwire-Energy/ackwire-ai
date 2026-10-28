@@ -249,12 +249,14 @@ test("catalog: one list of our connectors and the one-click MCP servers, one ent
   // Ours: GitHub (API key at least) and Drive (asks for the server address).
   expect(byId("github")).toMatchObject({ kind: "catalog", category: "dev", available: true });
   expect(byId("drive")).toMatchObject({ kind: "catalog", iconUrl: "/connectors/googledrive.svg" });
-  // No icon in Simple Icons: a monogram.
-  expect(byId("canva")?.iconUrl).toBeNull();
-  // Every icon the catalog names exists in the web app.
+  // A one-color mark (Square's black) and two in their makers' colors.
+  expect(byId("square")).toMatchObject({ iconUrl: "/connectors/square.svg", brandColor: null });
+  expect(byId("paypal")).toMatchObject({ iconUrl: "/brands/paypal.svg", brandColor: null });
+  expect(byId("canva")).toMatchObject({ iconUrl: "/brands/canva.svg", brandColor: null });
+  // Every connector in the catalog has its mark, a file in the web app: none is left a monogram.
   const publicDir = new URL("../../web/public", import.meta.url).pathname;
   for (const c of connectors) {
-    if (c.iconUrl) expect(existsSync(`${publicDir}${c.iconUrl}`)).toBe(true);
+    expect([c.id, c.iconUrl !== null && existsSync(`${publicDir}${c.iconUrl}`)]).toEqual([c.id, true]);
   }
 });
 
