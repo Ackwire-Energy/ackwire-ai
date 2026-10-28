@@ -1020,9 +1020,11 @@ body[data-window="popover"] {
   align-items: center;
   padding-bottom: 16px;
 }
-/* Centered by auto margins, not justify-content: a block taller than the window scrolls from its top. */
+/* Centered by auto margins, not justify-content: a block taller than the window scrolls from its top. The room above
+   is pinned as the setup opens (`--dk-setup-lead`, FirstRun.tsx), so what a step adds grows the block downward, and
+   shrinks only by what would run past the window. */
 .dk-fr__setup > :first-child {
-  margin-top: auto;
+  margin-top: var(--dk-setup-lead, auto);
 }
 .dk-fr__setup > :last-child {
   margin-bottom: auto;

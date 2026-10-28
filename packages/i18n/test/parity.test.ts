@@ -35,6 +35,16 @@ describe("menu paths", () => {
   });
 });
 
+describe("examples in one-line fields", () => {
+  test("fit a 360px phone's field: one email address, a short database address", () => {
+    for (const tree of [ptBR, en]) {
+      for (const s of [tree.onboarding.team.placeholder, tree.members.emailsPlaceholder]) expect(s).not.toContain(",");
+      // The database field holds about 38 characters of its 16px text at 360px.
+      expect(tree.database.urlPlaceholder.length).toBeLessThanOrEqual(36);
+    }
+  });
+});
+
 describe("resources", () => {
   test("one i18next namespace per locale", () => {
     expect(Object.keys(resources)).toEqual(["pt-BR", "en"]);
