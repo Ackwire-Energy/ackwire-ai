@@ -10,11 +10,12 @@ import Animated, { SlideInLeft, SlideInRight } from "react-native-reanimated";
 import { signOut } from "@/features/account";
 import { appHeaders, lastCookie } from "@/lib/auth";
 import { photoSource } from "@/lib/photo";
-import { pushPermission, registerForPush, unregisterPush } from "@/lib/push";
+import { pushPermission, unregisterPush } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
 import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
+import { usePush } from "@/providers/push";
 import {
   GroupedFooter,
   GroupedHeader,
@@ -71,6 +72,7 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const org = useOrg();
   const theme = useTheme();
   const toast = useToast();
+  const { ask: askPush } = usePush();
   const dir = useDirectory();
   const issues = useIssues(org.orgId);
   const admin = can(org.org?.role, "manage_credentials");
@@ -107,7 +109,8 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const setNotifications = async (on: boolean) => {
     setPush(on);
     if (on) {
-      const ok = await registerForPush({ ask: true, locale: i18n.language });
+      // Through the provider, so Conversas knows the phone was asked (our sheet won't open after this).
+      const ok = await askPush();
       setPush(ok);
       if (!ok) toast({ title: t("mobile.me.pushOff"), subtitle: t("mobile.me.pushOffSub"), icon: "bell" });
     } else await unregisterPush();

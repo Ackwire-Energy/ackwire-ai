@@ -44,6 +44,7 @@ function AppStack() {
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
+  const pushSheet = useFormSheetOptions([0.74, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -71,6 +72,7 @@ function AppStack() {
       <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="connect-ai" options={formSheet} />
       <Stack.Screen name="me" options={meSheet} />
+      <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />

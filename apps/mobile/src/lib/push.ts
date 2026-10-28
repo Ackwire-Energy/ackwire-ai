@@ -8,8 +8,9 @@ import { serverUrl } from "./server";
 import { readValue, STORED, writeValue } from "./storage";
 
 /**
- * Push notifications (ADR 0035 §4). The app asks for permission after sign-in at a calm moment (never on
- * the first screen), registers the Expo push token with the server, and removes it on sign-out.
+ * Push notifications (ADR 0035 §4). The system's prompt comes only after our sheet on Conversas
+ * (`features/push`, `lib/push-offer.ts`) or the switch in Você; the app registers the Expo push token with the
+ * server, and removes it on sign-out.
  */
 
 /** The conversation on screen (the chat screen holds it while focused). */
@@ -81,9 +82,6 @@ export async function registerForPush({ ask, locale }: { ask: boolean; locale: s
   await writeValue(STORED.pushOff, null);
   return true;
 }
-
-/** Whether the app already asked for permission once (so it never nags). */
-export const alreadyAskedForPush = async () => (await readValue(STORED.pushAsked)) === "1";
 
 /** Whether the person turned notifications off in the app. */
 export const pushTurnedOff = async () => (await readValue(STORED.pushOff)) === "1";
