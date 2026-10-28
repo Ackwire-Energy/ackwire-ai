@@ -958,12 +958,29 @@ export const featureKeysPtBR = {
   },
   // Wiki (the rest of its words are the web's, `wiki.*`).
   wiki: {
-    empty: "Escreva a primeira página no computador; ela aparece aqui para ler.",
+    empty: "Toque em Nova página para escrever a primeira.",
     missing: "Esta página não existe mais ou mudou de nome.",
     blank: "Página em branco.",
-    links: "Links nesta página",
-    notYet: "ainda não existe",
+    folderGone: "Esta pasta não tem mais páginas.",
+    reads_one: "{{count}} vez",
+    reads_other: "{{count}} vezes",
+    taskConflict: "A página mudou. Atualizei; marque de novo.",
+    view: "Ver",
+    notSaved: "Prévia · ainda não salva",
+    placeholder: "Escreva aqui. [[ liga outra página.",
+    hideKeyboard: "Esconder o teclado",
+    createLink: "Criar “{{title}}”",
+    discardTitle: "Sair sem salvar?",
+    discardText: "O que você escreveu aqui se perde.",
+    discard: "Descartar",
+    keepWriting: "Continuar escrevendo",
+    conflictText: "A versão salva agora é a v{{version}}. Veja a diferença e escolha qual fica.",
+    conflictDiff: "Diferença: salva → sua",
+    createAndWrite: "Criar e escrever",
+    exists: "Já existe uma página com esse título.",
+    openExisting: "Abrir a página",
   },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Não deu para carregar as rotinas.",

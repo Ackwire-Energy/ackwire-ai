@@ -1,5 +1,6 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { WikiPageScreen, wikiSlugOf } from "@/features/wiki/WikiScreen";
+import { wikiSlugOf } from "@/features/wiki/logic";
+import { WikiPageScreen } from "@/features/wiki/WikiScreen";
 
 /** One page of the wiki (`/wiki/<slug>`): from the wiki's home or a link on another page. */
 export default function WikiPageRoute() {

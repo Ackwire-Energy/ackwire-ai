@@ -51,6 +51,7 @@ function AppStack() {
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
   const pushSheet = useFormSheetOptions("fitToContents");
+  const wikiSheet = useFormSheetOptions([0.55, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -69,6 +70,9 @@ function AppStack() {
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
@@ -113,6 +117,7 @@ function AppStack() {
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
+      <Stack.Screen name="wiki-new" options={wikiSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />

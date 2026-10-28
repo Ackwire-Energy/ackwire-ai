@@ -953,12 +953,29 @@ export const featureKeysEn: FeatureTranslations = {
   },
   // Wiki (the rest of its words are the web's, `wiki.*`).
   wiki: {
-    empty: "Write the first page on your computer; it shows up here to read.",
+    empty: "Tap New page to write the first one.",
     missing: "This page no longer exists or was renamed.",
     blank: "Blank page.",
-    links: "Links on this page",
-    notYet: "doesn't exist yet",
+    folderGone: "This folder has no pages any more.",
+    reads_one: "{{count}} time",
+    reads_other: "{{count}} times",
+    taskConflict: "The page changed. It's updated; check it again.",
+    view: "View",
+    notSaved: "Preview · not saved yet",
+    placeholder: "Write here. [[ links another page.",
+    hideKeyboard: "Hide the keyboard",
+    createLink: "Create “{{title}}”",
+    discardTitle: "Leave without saving?",
+    discardText: "What you wrote here will be lost.",
+    discard: "Discard",
+    keepWriting: "Keep writing",
+    conflictText: "The saved version is now v{{version}}. See the difference and choose which one stays.",
+    conflictDiff: "Difference: saved → yours",
+    createAndWrite: "Create and write",
+    exists: "A page with this title already exists.",
+    openExisting: "Open the page",
   },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Couldn't load the routines.",
