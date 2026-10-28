@@ -3233,20 +3233,80 @@ p {
 .catalog__search {
   max-width: 360px;
 }
-/* The categories: one line that scrolls sideways (never wraps). */
-.catalog__filters {
-  align-self: flex-start;
-}
 .catalog__body {
   position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
   border-top: 1px solid var(--line);
 }
-.catalog__body[data-pane] {
-  grid-template-columns: minmax(0, 1fr) 340px;
+/* The categories beside the grid: one per line, the count at the end; a rule under "Conectados". */
+.catalog__cats {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--line);
+}
+.catalog__cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px 10px 10px 3px;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.catalog__cat:hover {
+  background: var(--plate-soft);
+}
+.catalog__cat:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.catalog__cat[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+  font-weight: 600;
+}
+.catalog__cat[data-rule] {
+  position: relative;
+  margin-bottom: 13px;
+}
+.catalog__cat[data-rule]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -8px;
+  height: 1px;
+  background: var(--line);
+}
+.catalog__cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog__cat-count {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* The row of categories is for phones only. */
+.catalog__filters {
+  display: none;
 }
 .catalog__list {
   min-height: 0;
@@ -3317,12 +3377,6 @@ p {
 .catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-}
-.catalog-feat__card[aria-pressed="true"],
-.catalog-tile[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--top);
 }
 .catalog-feat__card {
   position: relative;
@@ -3427,113 +3481,128 @@ p {
   height: 12px;
   stroke-width: 2.4;
 }
-/* The detail pane. */
-.catalog-detail {
-  position: relative;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
+/*
+ * A service over the catalog (ServiceDialog): the brand's pixel sky on top, the icon on its edge, the name in the
+ * display face; what agents could do on a sunken plate; how it connects beside Conectar at the foot.
+ */
+.ac-dialog.catalog-svc {
+  overflow: hidden;
+}
+/* Behind the head (z-index -1 inside the dialog's own stacking context): the head's icon overlaps its edge. */
+.catalog-svc .catalog-feat__sky {
+  order: -1;
+  z-index: -1;
+  flex: none;
+  height: 112px;
+  margin: 0;
+}
+.catalog-svc .ac-dialog__head {
   flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  background: var(--side, var(--surface-sunken));
-  border-left: 1px solid var(--line);
-  animation: catalog-pane 0.24s var(--out);
+  gap: 14px;
+  margin-top: -36px;
+  padding: 0 24px 4px;
 }
-.catalog-detail:focus {
-  outline: none;
-}
-@keyframes catalog-pane {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-.catalog-detail__close {
+.catalog-svc .ac-dialog__acts {
   position: absolute;
   top: 12px;
   right: 12px;
 }
-.catalog-detail .connector-icon--lg {
-  width: 56px;
-  height: 56px;
-  border-radius: 17px;
-  font-size: 20px;
+.catalog-svc .ac-dialog__lead .connector-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 19px 19px 19px 5px;
+  font-size: 22px;
+  background: var(--raised);
+  box-shadow:
+    0 0 0 4px var(--surface-raised),
+    inset 0 0 0 1px var(--line2),
+    var(--e1);
 }
-.catalog-detail__name {
-  margin: 0;
+.catalog-svc .ac-dialog__title {
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
   font-size: 28px;
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: -0.025em;
 }
-.catalog-detail__desc,
-.catalog-detail__text {
-  margin: 4px 0 0;
-  color: var(--ink-muted);
-  font-size: 14px;
+.catalog-svc .ac-dialog__desc {
+  padding: 0 24px;
+  color: var(--ink2);
 }
-.catalog-detail__text {
-  margin: 0;
-  font-size: 13px;
+.catalog-svc__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 24px;
 }
-.catalog-detail__part {
-  align-self: stretch;
+.catalog-svc__part {
+  padding: 14px 16px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.catalog-detail__h {
+.catalog-svc__h {
   margin: 0 0 8px;
   font-size: 12.5px;
   font-weight: 650;
   color: var(--ink-muted);
 }
-.catalog-detail__caps {
+.catalog-svc__caps {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.catalog-detail__caps li {
-  font-size: 13.5px;
-  color: var(--ink2);
-}
-.catalog-detail__caps .ac-icon {
-  color: var(--ink-muted);
-}
-.catalog-detail__act {
-  align-self: stretch;
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
-.catalog-detail__how {
+.catalog-svc__caps li {
+  font-size: 14px;
+  color: var(--ink);
+}
+.catalog-svc__caps .ac-icon {
+  color: var(--ok);
+}
+.catalog-svc__caps li[data-asks] .ac-icon {
+  color: var(--warn);
+}
+.catalog-svc__text {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13.5px;
+}
+.catalog-svc__act {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-size: 12.5px;
-  color: var(--faint);
-  text-align: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+}
+.catalog-svc__how {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.catalog-svc__how[data-ok] .ac-icon {
+  color: var(--ok);
 }
 @media (max-width: 760px) {
-  .catalog__body[data-pane] {
+  .catalog__body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .catalog-detail {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    max-height: 75%;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 20px 20px 0 0;
-    box-shadow: var(--e3);
-    animation-name: catalog-sheet;
+  .catalog__cats {
+    display: none;
+  }
+  .catalog__filters {
+    display: flex;
+    align-self: flex-start;
+    max-width: 100%;
   }
   .catalog__tools,
   .catalog__list {
@@ -3549,15 +3618,12 @@ p {
   .catalog__search {
     max-width: none;
   }
-}
-@keyframes catalog-sheet {
-  from {
-    transform: translateY(24px);
-    opacity: 0;
+  .catalog-svc__act {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .catalog-detail,
   .catalog-feat__card,
   .catalog-tile {
     animation: none;

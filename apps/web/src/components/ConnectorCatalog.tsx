@@ -4,7 +4,7 @@ import type { MailChoice } from "@agenteschat/client/lib/mail";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { Button, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DatabaseIcon } from "@/components/DatabaseConnect";
 import { LoadingCards } from "@/components/Loading";
@@ -128,10 +128,10 @@ const SUGGESTED = ["github", "database", "linear", "notion", "mail-gmail", "driv
 const OTHER = "other";
 
 /**
- * "Adicionar conector": a gallery with search and one line of
- * category filters, three suggestions on top, then every service as an even tile (no tags: a check on
- * the icon when connected). A tile opens the detail beside it (what agents could do, how it connects,
- * Conectar); "Não achou?" connects any service by its address.
+ * "Adicionar conector": a gallery with search and the
+ * category list beside the grid (a row on phones), three suggestions on top, then every service as an even
+ * tile (no tags: a check on the icon when connected). A tile opens the service over the catalog (what agents
+ * could do, how it connects, Conectar); "Não achou?" connects any service by its address.
  */
 export function ConnectorCatalogDialog({
   open,
@@ -164,7 +164,6 @@ export function ConnectorCatalogDialog({
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<ConnectorCategory | "email" | "all" | "connected">("all");
   const [selected, setSelected] = useState<string | null>(null);
-  const paneRef = useRef<HTMLElement>(null);
   const exists = (key: string) => i18n.exists(key);
 
   const entries: Entry[] = [
@@ -245,13 +244,7 @@ export function ConnectorCatalogDialog({
     : [];
   const shown = entries.filter((e) => inCategory(e) && matches(e) && !suggested.includes(e));
   const current = selected === OTHER ? null : (entries.find((e) => e.key === selected) ?? null);
-  const paneOpen = selected === OTHER || !!current;
 
-  const toggle = (key: string) => {
-    setSelected((s) => (s === key ? null : key));
-    // The pane takes focus once it renders (its heading), so keyboard people land in it.
-    requestAnimationFrame(() => paneRef.current?.focus());
-  };
   const close = (next: boolean) => {
     if (!next) {
       setSelected(null);
@@ -260,6 +253,16 @@ export function ConnectorCatalogDialog({
     }
     onOpenChange(next);
   };
+  // "Todos" and "Conectados" first, then the categories by name in the app's language.
+  const filters = [
+    "all",
+    "connected",
+    ...[...present].sort((a, b) =>
+      t(`connectors.category.${a}`).localeCompare(t(`connectors.category.${b}`), i18n.language),
+    ),
+  ] as const;
+  const filterLabel = (c: (typeof filters)[number]) =>
+    c === "connected" ? t("connectors.connectedFilter") : t(`connectors.category.${c}`);
 
   return (
     <Dialog
@@ -269,13 +272,6 @@ export function ConnectorCatalogDialog({
       closeLabel={t("common.close")}
       width={1080}
       className="catalog"
-      onEscapeKeyDown={(e) => {
-        // Esc closes the detail first, then the dialog.
-        if (paneOpen) {
-          e.preventDefault();
-          setSelected(null);
-        }
-      }}
     >
       <div className="catalog__tools">
         <SearchField
@@ -288,20 +284,32 @@ export function ConnectorCatalogDialog({
           onClear={() => setQ("")}
           clearLabel={t("filters.clearSearch")}
         />
+        {/* Phones: the categories as one row that scrolls sideways (no room for the list beside the grid). */}
         <Segmented
           size="sm"
           className="catalog__filters"
           label={t("connectors.categories")}
           value={category}
           onValueChange={setCategory}
-          options={(["all", "connected", ...present] as const).map((c) => ({
-            value: c,
-            label: c === "connected" ? t("connectors.connectedFilter") : t(`connectors.category.${c}`),
-            count: countOf(c),
-          }))}
+          options={filters.map((c) => ({ value: c, label: filterLabel(c), count: countOf(c) }))}
         />
       </div>
-      <div className="catalog__body" data-pane={paneOpen || undefined}>
+      <div className="catalog__body">
+        <nav className="catalog__cats" aria-label={t("connectors.categories")}>
+          {filters.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="catalog__cat"
+              data-rule={c === "connected" || undefined}
+              aria-pressed={category === c}
+              onClick={() => setCategory(c)}
+            >
+              <span className="catalog__cat-name">{filterLabel(c)}</span>
+              <span className="catalog__cat-count">{countOf(c)}</span>
+            </button>
+          ))}
+        </nav>
         {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
         <div className="catalog__list" role="region" aria-label={t("connectors.catalog")}>
           {loading ? (
@@ -320,8 +328,8 @@ export function ConnectorCatalogDialog({
                           type="button"
                           className="catalog-feat__card"
                           aria-label={e.name}
-                          aria-pressed={selected === e.key}
-                          onClick={() => toggle(e.key)}
+                          aria-haspopup="dialog"
+                          onClick={() => setSelected(e.key)}
                         >
                           <ConnectorSky brand={e.brandColor} />
                           <span className="catalog-feat__icon">{e.icon("lg")}</span>
@@ -345,10 +353,10 @@ export function ConnectorCatalogDialog({
                       <button
                         type="button"
                         className="catalog-tile"
-                        aria-pressed={selected === e.key}
+                        aria-haspopup="dialog"
                         aria-label={e.connected ? t("connectors.tileConnected", { name: e.name }) : e.name}
                         data-soon={!e.available || undefined}
-                        onClick={() => toggle(e.key)}
+                        onClick={() => setSelected(e.key)}
                       >
                         <span className="catalog-tile__head">
                           <TileIcon entry={e} size="md" />
@@ -369,8 +377,8 @@ export function ConnectorCatalogDialog({
                     <button
                       type="button"
                       className="catalog-tile catalog-tile--other"
-                      aria-pressed={selected === OTHER}
-                      onClick={() => toggle(OTHER)}
+                      aria-haspopup="dialog"
+                      onClick={() => setSelected(OTHER)}
                     >
                       <span className="catalog-tile__head">
                         <span className="connector-icon connector-icon--mono" aria-hidden="true">
@@ -386,41 +394,17 @@ export function ConnectorCatalogDialog({
             </>
           )}
         </div>
-        {paneOpen && (
-          <aside
-            ref={paneRef}
-            className="catalog-detail"
-            tabIndex={-1}
-            aria-label={t("connectors.detail.label", { name: current?.name ?? t("connectors.otherTitle") })}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              icon="close"
-              className="catalog-detail__close"
-              aria-label={t("connectors.detail.close")}
-              onClick={() => setSelected(null)}
-            />
-            {current ? (
-              <Detail
-                entry={current}
-                onConnect={() => {
-                  setSelected(null);
-                  current.pick();
-                }}
-              />
-            ) : (
-              <OtherDetail
-                onConnect={() => {
-                  setSelected(null);
-                  onOther();
-                }}
-              />
-            )}
-          </aside>
-        )}
       </div>
+      <ServiceDialog
+        entry={current}
+        other={selected === OTHER}
+        onClose={() => setSelected(null)}
+        onConnect={() => {
+          setSelected(null);
+          if (current) current.pick();
+          else onOther();
+        }}
+      />
     </Dialog>
   );
 }
@@ -447,35 +431,79 @@ const HOW_ICON: Record<HowKind, IconName> = {
   addressPassword: "lock",
 };
 
-/** The pane for one service: what agents could do, then how it connects and the button. */
+/**
+ * A service, over the catalog: the brand's pixel sky on top, its icon on the sky's edge, the name and what it
+ * is; then what agents could do, how it connects and Conectar. Esc or × goes back to the catalog.
+ */
+function ServiceDialog({
+  entry,
+  other,
+  onClose,
+  onConnect,
+}: {
+  entry: Entry | null;
+  /** "Não achou?": any service by its address. */
+  other: boolean;
+  onClose: () => void;
+  onConnect: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      open={other || !!entry}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      width={480}
+      className="catalog-svc"
+      title={entry ? entry.name : t("connectors.otherTitle")}
+      description={entry ? entry.description : t("connectors.otherDetail")}
+      leading={
+        entry ? (
+          <TileIcon entry={entry} size="lg" />
+        ) : (
+          <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
+            <Icon name="link" />
+          </span>
+        )
+      }
+      closeLabel={t("connectors.detail.close")}
+    >
+      <ConnectorSky brand={entry?.brandColor ?? null} />
+      {entry ? <Detail entry={entry} onConnect={onConnect} /> : <OtherDetail onConnect={onConnect} />}
+    </Dialog>
+  );
+}
+
+/** What agents could do there, then how it connects and the button. */
 function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
   const { t } = useTranslation();
   return (
     <>
-      <TileIcon entry={entry} size="lg" />
-      <div className="catalog-detail__intro">
-        <h3 className="catalog-detail__name">{entry.name}</h3>
-        <p className="catalog-detail__desc">{entry.description}</p>
+      <div className="catalog-svc__body">
+        {entry.can.length > 0 && (
+          <div className="catalog-svc__part">
+            <h4 className="catalog-svc__h">{t("connectors.detail.can")}</h4>
+            <ul className="catalog-svc__caps">
+              {entry.can.map((c) => (
+                <li key={c.text} className="ac-iconline" data-asks={c.asks || undefined}>
+                  <Icon name={c.asks ? "shield" : "check"} size={14} />
+                  <span>{c.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="catalog-svc__text">{t("connectors.detail.afterText")}</p>
       </div>
-      {entry.can.length > 0 && (
-        <div className="catalog-detail__part">
-          <h4 className="catalog-detail__h">{t("connectors.detail.can")}</h4>
-          <ul className="catalog-detail__caps">
-            {entry.can.map((c) => (
-              <li key={c.text} className="ac-iconline" data-asks={c.asks || undefined}>
-                <Icon name={c.asks ? "shield" : "check"} size={14} />
-                <span>{c.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <p className="catalog-detail__text">{t("connectors.detail.afterText")}</p>
-      <div className="catalog-detail__act">
+      <div className="catalog-svc__act">
+        <span className="catalog-svc__how ac-iconline" data-ok={entry.connected || undefined}>
+          <Icon name={entry.connected ? "check" : HOW_ICON[entry.how]} size={14} />
+          <span>{entry.connected ? t("connectors.detail.connected") : t(`connectors.how.${entry.how}`)}</span>
+        </span>
         {entry.available ? (
           <Button
             variant="primary"
-            block
             aria-label={t(entry.connected ? "connectors.reconnectName" : "connectors.connectName", {
               name: entry.name,
             })}
@@ -484,14 +512,10 @@ function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
             {entry.connected ? t("connectors.detail.again") : t("connectors.connectName", { name: entry.name })}
           </Button>
         ) : (
-          <Button variant="primary" block disabled>
+          <Button variant="primary" disabled>
             {t("connectors.soon")}
           </Button>
         )}
-        <span className="catalog-detail__how">
-          <Icon name={entry.connected ? "check" : HOW_ICON[entry.how]} size={14} />
-          {entry.connected ? t("connectors.detail.connected") : t(`connectors.how.${entry.how}`)}
-        </span>
       </div>
     </>
   );
@@ -502,30 +526,25 @@ function OtherDetail({ onConnect }: { onConnect: () => void }) {
   const { t } = useTranslation();
   return (
     <>
-      <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
-        <Icon name="link" />
-      </span>
-      <div className="catalog-detail__intro">
-        <h3 className="catalog-detail__name">{t("connectors.otherTitle")}</h3>
-        <p className="catalog-detail__desc">{t("connectors.otherDetail")}</p>
-      </div>
-      <div className="catalog-detail__part">
-        <h4 className="catalog-detail__h">{t("connectors.detail.how")}</h4>
-        <ul className="catalog-detail__caps">
-          {(["1", "2"] as const).map((n) => (
-            <li key={n} className="ac-iconline">
-              <Icon name="check" size={14} />
-              <span>{t(`connectors.otherSteps.${n}`)}</span>
+      <div className="catalog-svc__body">
+        <div className="catalog-svc__part">
+          <h4 className="catalog-svc__h">{t("connectors.detail.how")}</h4>
+          <ul className="catalog-svc__caps">
+            {(["1", "2"] as const).map((n) => (
+              <li key={n} className="ac-iconline">
+                <Icon name="check" size={14} />
+                <span>{t(`connectors.otherSteps.${n}`)}</span>
+              </li>
+            ))}
+            <li className="ac-iconline" data-asks>
+              <Icon name="shield" size={14} />
+              <span>{t("connectors.otherSteps.ask")}</span>
             </li>
-          ))}
-          <li className="ac-iconline" data-asks>
-            <Icon name="shield" size={14} />
-            <span>{t("connectors.otherSteps.ask")}</span>
-          </li>
-        </ul>
+          </ul>
+        </div>
       </div>
-      <div className="catalog-detail__act">
-        <Button variant="primary" block onClick={onConnect}>
+      <div className="catalog-svc__act">
+        <Button variant="primary" onClick={onConnect}>
           {t("connectors.otherConnect")}
         </Button>
       </div>
