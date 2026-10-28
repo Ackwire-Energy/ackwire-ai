@@ -77,6 +77,8 @@ const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
  * it three times as often while it is.
  */
 export const BROWSER_LEASE_MS = 90_000;
+/** What a request or a click still waiting on a worker hears once the runner stops. */
+export const STOPPING = "The runner is stopping. Try again in a minute.";
 /** A worker's `browser.traffic` larger than this (bytes, either way) isn't believed. */
 const TRAFFIC_DELTA_MAX = 1e12;
 /** How many of its processes a worker may have moved a minute (`scope.enter`). */
@@ -291,7 +293,7 @@ export class Supervisor {
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping. Try again in a minute.");
+    if (this.closed) throw new RunnerError("internal", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -400,7 +402,7 @@ export class Supervisor {
    * brings the agent's Chrome there, and gets the desktop from root meanwhile (`desktop.ensure`).
    */
   async showBrowser(agent: AgentScope, installing: () => void): Promise<void> {
-    if (this.closed) throw new RunnerError("internal", "The runner is stopping. Try again in a minute.");
+    if (this.closed) throw new RunnerError("internal", STOPPING);
     const w = this.entry(this.opts.user(agent));
     await this.ready(w, new AbortController().signal);
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
@@ -442,11 +444,10 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      const stopping = "The runner is stopping. Try again in a minute.";
-      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", stopping));
+      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", STOPPING));
       w.ready = false;
-      this.endSession(w, stopping);
-      this.endShows(w, stopping);
+      this.endSession(w, STOPPING);
+      this.endShows(w, STOPPING);
       if (!w.proc) continue;
       w.proc.stdin.end();
       exits.push(w.proc.exited);

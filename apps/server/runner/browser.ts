@@ -544,7 +544,7 @@ function missingLibraries(exe: string, output: string): string[] {
 }
 
 /** For people: the missing libraries, the first few by name when there are many. */
-function missingLibrariesText(missing: string[]): string {
+export function missingLibrariesText(missing: string[]): string {
   const names =
     missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
   return `the agent's computer is missing system libraries Chrome needs (${names}). Install them on it, then try again.`;

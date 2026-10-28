@@ -377,7 +377,7 @@ async function doList(
   return { entries };
 }
 
-const PAUSED = "The owner paused this computer. Nothing new starts here until it's resumed.";
+export const PAUSED = "The owner paused this computer. Nothing new starts here until it's resumed.";
 
 /** Protocol 18: a stream that is new work (control of a desktop, a terminal); watching one that runs isn't. */
 const workStream = (req: MachineRequest) =>
@@ -475,7 +475,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       // The runner's own git in the agent's folder (like `git.sync`). Making a folder is new work; removing one isn't.
       if (!req.agent) throw new RunnerError("bad_request", "A mission's folder belongs to an agent");
       if (req.action === "ensure" && ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer. Nothing new starts here until it's resumed.");
+        throw new RunnerError("paused", PAUSED);
       }
       return missionWorktree(ctx.workspaceReal, req);
     case "exec":
@@ -665,7 +665,7 @@ async function handleAccount(
   switch (req.action) {
     case "begin":
       if (ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer. Nothing new starts here until it's resumed.");
+        throw new RunnerError("paused", PAUSED);
       }
       return accounts.begin(
         req.kind,
