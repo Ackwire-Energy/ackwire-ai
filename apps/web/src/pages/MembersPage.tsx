@@ -219,7 +219,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                 <span className="small muted" style={{ flex: "0 0 72px" }}>
                   {t(`roles.${inv.role}`)}
                 </span>
-                <span className="small muted" style={{ flex: "0 1 180px" }}>
+                <span className="small muted" style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}>
                   {resent[inv.email] ? t("members.resentNow") : invitationStatus(t, i18n.language, inv)}
                 </span>
                 <div className="row" style={{ gap: 4 }}>
