@@ -512,7 +512,10 @@ export async function onConsultedRunFinished(
   status: "done" | "failed" | "canceled" | "waiting_approval" | "waiting_input",
   error?: string,
 ) {
-  if (status === "waiting_approval" || status === "waiting_input") return [];
+  if (status === "waiting_approval" || status === "waiting_input") {
+    await announceWaiting(deps, run).catch(() => {});
+    return [];
+  }
   // Several questions may have reached the same run (it read the later ones at its next step).
   const rows = await deps.db
     .select()
@@ -641,6 +644,121 @@ export async function openConsultationsIn(
     threadId: replyThreadOf(r),
     since: r.since,
   }));
+}
+
+/** What the consulted agent waits on before it can answer: an approval, or a person's answer or secret. */
+export type ConsultationWait = "approval" | "input";
+
+/**
+ * One question an agent asked from a conversation, as the people there see it inside the asking reply ("Perguntou
+ * a 3 colegas"): who, the question, where it is and, once closed, the answer. The same words the `consult_reply`
+ * notice already shows in that conversation; nothing of the agents' private DM beyond them.
+ */
+export interface RunConsultation {
+  id: string;
+  /** The asking run: the reply that asked carries it (`messages.agent_run_id`). */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  status: "open" | "answered" | "expired" | "failed";
+  /** Open and the consulted agent's run is held on a person. */
+  waiting: ConsultationWait | null;
+  question: string;
+  /** The answer once `answered`; the reason once `failed`; null otherwise. */
+  answer: string | null;
+  createdAt: Date;
+  answeredAt: Date | null;
+  expiresAt: Date;
+}
+
+/** The questions of the latest asking runs here: older replies keep the `consult_reply` cards they had. */
+const LIST_LIMIT = 200;
+
+/**
+ * The questions agents asked from this conversation, latest first, at most `LIST_LIMIT`: the app draws them inside
+ * the reply of the run that asked, each with its state, and folds the `consult_reply` notices of the ones it shows.
+ */
+export async function consultationsIn(db: Executor, orgId: string, channelId: string): Promise<RunConsultation[]> {
+  const target = schema.agentRuns;
+  const rows = await db
+    .select({
+      id: agentConsultations.id,
+      runId: agentConsultations.askerRunId,
+      agentId: agentConsultations.askerAgentId,
+      consultedAgentId: agentConsultations.targetAgentId,
+      status: agentConsultations.status,
+      question: agentConsultations.question,
+      answer: agentConsultations.answer,
+      createdAt: agentConsultations.createdAt,
+      answeredAt: agentConsultations.answeredAt,
+      expiresAt: agentConsultations.expiresAt,
+      targetStatus: sql<
+        string | null
+      >`(select ${target.status} from ${target} where ${target.id} = ${agentConsultations.targetRunId} and ${target.orgId} = ${agentConsultations.orgId})`,
+    })
+    .from(agentConsultations)
+    .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+    .where(and(eq(agentConsultations.orgId, orgId), eq(agentRuns.orgId, orgId), eq(agentRuns.channelId, channelId)))
+    .orderBy(desc(agentConsultations.createdAt))
+    .limit(LIST_LIMIT);
+  return rows.map((r) => {
+    const status = r.status as RunConsultation["status"];
+    const open = status === "open";
+    return {
+      id: r.id,
+      runId: r.runId,
+      agentId: r.agentId,
+      consultedAgentId: r.consultedAgentId,
+      status,
+      waiting: !open
+        ? null
+        : r.targetStatus === "waiting_approval"
+          ? "approval"
+          : r.targetStatus === "waiting_input"
+            ? "input"
+            : null,
+      question: r.question.slice(0, NOTICE_QUESTION_MAX),
+      // An expired question has no answer; a failed one keeps its reason (the asking agent read it too).
+      answer: open || status === "expired" ? null : (r.answer?.slice(0, NOTICE_ANSWER_MAX) ?? null),
+      createdAt: r.createdAt,
+      answeredAt: r.answeredAt,
+      expiresAt: r.expiresAt,
+    };
+  });
+}
+
+/**
+ * The consulted agent's run stopped on a person (an approval, a question, a secret): the conversations that
+ * asked it hear so (`agent.consultation`) and draw that question as waiting.
+ */
+async function announceWaiting(deps: { db: Database; pubsub?: PubSub }, run: { id: string; orgId: string }) {
+  if (!deps.pubsub) return;
+  const rows = await deps.db
+    .select({
+      id: agentConsultations.id,
+      runId: agentConsultations.askerRunId,
+      channelId: agentRuns.channelId,
+      threadRootId: agentRuns.threadRootId,
+      triggerMessageId: agentRuns.triggerMessageId,
+    })
+    .from(agentConsultations)
+    .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, run.orgId),
+        eq(agentConsultations.targetRunId, run.id),
+        eq(agentConsultations.status, "open"),
+      ),
+    );
+  for (const r of rows) {
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.consultation",
+      channelId: r.channelId,
+      threadId: replyThreadOf(r),
+      runId: r.runId,
+      consultationId: r.id,
+    }).catch(() => {});
+  }
 }
 
 /** Closes consultations past their deadline and resumes the asking runs (worker, every minute). */

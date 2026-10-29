@@ -39,6 +39,7 @@ import type {
   ReactionCount,
   Role,
   Run,
+  RunConsultation,
   ScopeGrant,
   SearchHit,
   SecretRequest,
@@ -156,6 +157,8 @@ export interface FakeState {
   runs: Run[];
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
   activeRuns?: Record<string, ActiveRun[]>;
+  /** `GET …/channels/{id}/consultations`, by channel; unset = none. */
+  consultations?: Record<string, RunConsultation[]>;
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
@@ -1337,6 +1340,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       activeRuns: async (_orgId, channelId) => {
         log("agents.activeRuns", channelId);
         return state.activeRuns ? (state.activeRuns[channelId] ?? []) : null;
+      },
+      consultations: async (_orgId, channelId) => {
+        log("agents.consultations", channelId);
+        return state.consultations?.[channelId] ?? [];
       },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);

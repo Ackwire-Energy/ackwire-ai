@@ -2,6 +2,7 @@ import {
   activeRunsIn,
   addChannelMember,
   answerNow,
+  consultationsIn,
   createChannel,
   joinChannel,
   listChannelMembers,
@@ -287,6 +288,60 @@ export function chatRoutes(deps: AppDeps) {
             status: r.status as "queued" | "running" | "waiting_approval" | "waiting_input",
           })),
           consults: consults.map((q) => ({ ...q, since: q.since.toISOString() })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations",
+      tags,
+      security,
+      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            consultations: z.array(
+              z.object({
+                id: z.uuid(),
+                runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
+                agentId: z.uuid(),
+                consultedAgentId: z.uuid(),
+                status: z.enum(["open", "answered", "expired", "failed"]),
+                waiting: z.enum(["approval", "input"]).nullable().openapi({
+                  description: "Open, and the consulted agent waits on a person (an approval; an answer or a secret).",
+                }),
+                question: z.string(),
+                answer: z
+                  .string()
+                  .nullable()
+                  .openapi({ description: "The answer once answered; why it couldn't once failed." }),
+                createdAt: z.string(),
+                answeredAt: z.string().nullable(),
+                expiresAt: z.string(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const list = await consultationsIn(db, orgId, channelId);
+      return c.json(
+        {
+          consultations: list.map((q) => ({
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          })),
         },
         200,
       );

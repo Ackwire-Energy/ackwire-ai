@@ -156,6 +156,7 @@ import type {
   RoutineRun,
   RuleInfo,
   Run,
+  RunConsultation,
   RunStep,
   S3Input,
   SandboxSettings,
@@ -365,6 +366,8 @@ export interface ApiClient {
     continueRun(orgId: string, runId: string): Promise<{ runId: string }>;
     /** Runs still active in a channel (reconciles the live rows); `null` while the server lacks the endpoint. */
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
+    /** The questions agents asked other agents from a conversation, latest first; `[]` while the server lacks it. */
+    consultations(orgId: string, channelId: string): Promise<RunConsultation[]>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };

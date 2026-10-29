@@ -7778,6 +7778,16 @@ export const ptBR = {
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
     },
+    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    consultGroup: {
+      asked_one: "Perguntou a {{count}} colega",
+      asked_other: "Perguntou a {{count}} colegas",
+      progress: "{{done}} de {{total}}",
+      label: "Perguntas {{of}} {{name}} a outros agentes",
+      working: "{{name}} está trabalhando",
+      waitingApproval: "{{The}} {{name}} espera uma aprovação",
+      waitingInput: "{{The}} {{name}} espera uma resposta",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",

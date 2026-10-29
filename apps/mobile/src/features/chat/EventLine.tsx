@@ -1,10 +1,10 @@
-import type { Message } from "@agenteschat/client";
+import { type Message, useConsultations } from "@agenteschat/client";
 import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
-import { useColors, useDirectory, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { ConsultationCard } from "./cards";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
@@ -21,6 +21,7 @@ export function EventLine({ message }: { message: Message }) {
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
+  const shown = useConsultations(useOrgId(), message.channelId);
   // An answer from another agent that carries the consultation (who asked whom, the question and the
   // answer apart): the same card as a reply that waited for it, not the text written for the agent.
   const consulted = consultationOfNotice(message.meta);
@@ -28,6 +29,8 @@ export function EventLine({ message }: { message: Message }) {
     author: dir.nameOf(message.author) || t("channel.unknownAgent"),
     agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
   });
+  // The reply that asked already shows it with its answer (`ConsultGroup`): not drawn twice.
+  if (consulted && shown.data?.some((q) => q.id === consulted.consultation.consultationId)) return null;
   if (consulted)
     return (
       <View style={styles.line}>

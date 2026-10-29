@@ -7728,6 +7728,16 @@ export const en: Translations = {
       couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
       private: "A talk only between {{from}} and {{to}}",
     },
+    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    consultGroup: {
+      asked_one: "Asked {{count}} teammate",
+      asked_other: "Asked {{count}} teammates",
+      progress: "{{done}} of {{total}}",
+      label: "{{name}}'s questions to other agents",
+      working: "{{name}} is working",
+      waitingApproval: "{{name}} is waiting for an approval",
+      waitingInput: "{{name}} is waiting for an answer",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",

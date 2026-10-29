@@ -4,6 +4,7 @@ import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   CONSULTATION_TTL_MS,
+  consultationsIn,
   createAgent,
   drainOutbox,
   expireConsultations,
@@ -168,6 +169,82 @@ describe("ask_agent", () => {
     expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
     expect(github.executed).toHaveLength(0);
     expect((await consultations())[0]?.status).toBe("open");
+  });
+
+  test("the conversation's list: each question by the run that asked, waiting on a person while held", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      toolSources: [github.source],
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Merged.")
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
+      ),
+    });
+    const infra = await addInfra();
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const events = f.listen(f.general.id);
+    await post("@dev deploy the fix");
+    await drainOutbox(f.db, f.handlers);
+
+    const [row] = await consultations();
+    const list = await consultationsIn(f.db, f.org.id, f.general.id);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      id: row?.id,
+      runId: row?.askerRunId,
+      agentId: f.agent.id,
+      consultedAgentId: infra.id,
+      status: "open",
+      waiting: "approval",
+      question: "How is staging deployed?",
+      answer: null,
+    });
+    // The asking reply carries the run the list is grouped by.
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.some((m) => m.agentRunId === row?.askerRunId)).toBe(true);
+    await Bun.sleep(5);
+    // The conversation that asked hears the question is held on a person.
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "agent.consultation", runId: row?.askerRunId, consultationId: row?.id }),
+    );
+    // Another conversation's list doesn't have it.
+    const other = await f.db.select().from(schema.channels).where(eq(schema.channels.id, row?.channelId ?? ""));
+    expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
+  });
+
+  test("answered and expired questions in the list: the answer once answered, none once expired", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("Staging deploys with deploy.sh")) });
+    await addInfra();
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+    const [answered] = await consultationsIn(f.db, f.org.id, f.general.id);
+    expect(answered).toMatchObject({
+      status: "answered",
+      waiting: null,
+      answer: "Staging deploys with deploy.sh",
+    });
+    expect(answered?.answeredAt).toBeInstanceOf(Date);
+
+    await f.db
+      .update(schema.agentConsultations)
+      .set({ status: "expired", answer: "leftover" })
+      .where(eq(schema.agentConsultations.id, answered?.id ?? ""));
+    const [expired] = await consultationsIn(f.db, f.org.id, f.general.id);
+    expect(expired).toMatchObject({ status: "expired", answer: null });
   });
 
   test("no cycles: the consulted agent can't ask back the one asking it", async () => {

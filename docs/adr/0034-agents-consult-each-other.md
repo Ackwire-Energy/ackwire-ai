@@ -62,3 +62,15 @@ Incident (#tech): "@atlas, when an error comes in ask @ada to analyze it and wri
 
 Evals: `ops-addressee-routine-mentions-other-agent`, `ops-consulted-on-behalf-edits-routine`, `dev-reads-other-agent-routine` (`packages/engine/eval/behavior-cases.json`; the harness now seeds other agents, routines and consultations).
 
+
+## Addendum (2026-10-29): the questions inside the reply that asked
+
+An agent that asks several agents in one turn (`ask_agent` is async) showed one "asking…" line at a time: the live state is kept per asking run, and only the answers that came back were visible, each as its own `consult_reply` card further down.
+
+**1. The list.** `GET /organizations/{orgId}/channels/{channelId}/consultations` (`consultationsIn`) returns the latest 200 questions asked from the conversation, by asking run: who was asked, the question, `status`, `waiting` (`approval` or `input` while the consulted run is held on a person) and, once closed, the answer, or the reason it couldn't answer. The question and the answer are cut to the lengths the `consult_reply` notice already shows in that conversation; nothing else of the agents' DM is exposed, and the same channel access applies.
+
+**2. Events.** `agent.consulting` and `agent.consulted` stay as they were; `agent.consultation` (asking run, consultation id) says an open question changed without closing, when the consulted run stops on a person. The apps reload the list on the three, and every 20 s while a question is out (a held run that resumes sends no event).
+
+**3. The apps.** The reply of the asking run carries the questions as one more step of its work, the same tool block: "Perguntou a 3 colegas · 1 de 3" while answers are out (open), one line per agent (working, waiting for an approval or an answer, answered with the start of the answer, couldn't, didn't in time), each opening to the question and the full answer. A `consult_reply` notice whose question the conversation's list holds folds away; older ones keep their cards. On the web the run's last message shows it, on the phone its first (its rows don't know their neighbours).
+
+Not done: the asker waiting for every answer before it goes on (each answer still wakes it), sending one answer ahead of the others, and asking again from the line.

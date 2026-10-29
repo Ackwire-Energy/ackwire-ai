@@ -125,7 +125,7 @@ function useLogo() {
 
 // ── The block ────────────────────────────────────────────────────────────────
 
-interface BlockLine {
+export interface BlockLine {
   key: string;
   state: ToolState;
   logo: ReactNode;
@@ -145,7 +145,7 @@ interface BlockLine {
   defaultOpen?: boolean;
 }
 
-type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
+export type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
 
 interface BlockHead {
   /** What it does now ("Consultando o banco…"), or "Usou 5 ferramentas" once done. */
@@ -166,13 +166,14 @@ const POP = ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
  * The card: a hairline and the app's cut corner (bottom left small), one line that opens on a tap. `live`:
  * new logos pop in and the line's words come up when they change; a saved block draws still.
  */
-function ToolBlock({
+export function ToolBlock({
   logos,
   head,
   items,
   color,
   label,
   live = false,
+  defaultOpen = false,
   onToggle,
 }: {
   logos: { key: string; node: ReactNode }[];
@@ -182,12 +183,14 @@ function ToolBlock({
   /** The block's name for screen readers ("O que a Ana fez"). */
   label: string;
   live?: boolean;
+  /** Starts open (questions to other agents still out). */
+  defaultOpen?: boolean;
   /** Opened (load the saved steps) or closed. */
   onToggle?: (open: boolean) => void;
 }) {
   const c = useColors();
   const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const moving = live && !reduced;
   return (
     <View style={[styles.block, { backgroundColor: c.raised, borderColor: c.line2 }]}>

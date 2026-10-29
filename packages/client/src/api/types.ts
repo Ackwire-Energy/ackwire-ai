@@ -526,6 +526,30 @@ export interface OpenConsult {
   since: string;
 }
 
+/** What a consulted agent waits on before it can answer: an approval, or a person's answer or secret. */
+export type ConsultationWait = "approval" | "input";
+
+/**
+ * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
+ * the reply of the run that asked ("Perguntou a 3 colegas"), each with where it is and, once closed, the answer.
+ */
+export interface RunConsultation {
+  id: string;
+  /** The asking run: its reply (`agentRunId`) shows the list. */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  status: "open" | ConsultationStatus;
+  /** Open, and the consulted agent waits on a person. */
+  waiting: ConsultationWait | null;
+  question: string;
+  /** The answer once answered; why it couldn't once failed. */
+  answer: string | null;
+  createdAt: string;
+  answeredAt: string | null;
+  expiresAt: string;
+}
+
 export interface ActiveRun {
   runId: string;
   agentId: string;
@@ -643,6 +667,14 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: ConsultationStatus;
+    }
+  /** A question still out changed without closing (the consulted agent waits on a person): reload the list. */
+  | {
+      type: "agent.consultation";
+      channelId: string;
+      threadId: string;
+      runId: string;
+      consultationId: string;
     }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }

@@ -74,6 +74,7 @@ import {
   nearBottom,
   usageLine,
 } from "@agenteschat/client/lib/chat";
+import { foldsNotice } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
@@ -186,6 +187,7 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
+import { ConsultGroup, ConsultGroupsProvider, useConsultGroups } from "@/components/ConsultGroup";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -2021,6 +2023,8 @@ const Timeline = memo(function Timeline({
   // A block slides in once, when it first shows (not the ones already working when the page opened).
   const blockEnters = useRef(new Map<string, boolean>());
   const threadsView = useChannelThreadsView();
+  // Questions the agents asked other agents from here: drawn inside the replies that asked them.
+  const consultGroups = useConsultGroups(channelId);
   // Threads a mission link card already points to (the agent's reply): their start marker stays out.
   const linked = useMemo(
     () =>
@@ -2041,7 +2045,13 @@ const Timeline = memo(function Timeline({
   const threadRow = (key: string, m: MessageType) => {
     // What reached an agent's conversation (a routine's report nobody answered yet, another agent's
     // answer): quiet lines, never a person's or the agent's own voice.
-    if (noticeOf(m.meta)) return <NoticeLine key={key} message={m} />;
+    if (noticeOf(m.meta))
+      // An answer the reply that asked already shows (`ConsultGroup`): not drawn twice.
+      return foldsNotice(m.meta, consultGroups.shown) ? (
+        <Fragment key={key} />
+      ) : (
+        <NoticeLine key={key} message={m} />
+      );
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
@@ -2168,7 +2178,7 @@ const Timeline = memo(function Timeline({
     );
   });
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
-  return <>{rows}</>;
+  return <ConsultGroupsProvider value={consultGroups}>{rows}</ConsultGroupsProvider>;
 });
 
 /**
@@ -3097,6 +3107,9 @@ export const TimelineMessage = memo(function TimelineMessage({
             steerNote={steerNote}
             stopped={liveStopped}
           />
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
@@ -3241,6 +3254,9 @@ export const TimelineMessage = memo(function TimelineMessage({
               name={name}
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
+          )}
+          {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
           )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
             <SavedTools
