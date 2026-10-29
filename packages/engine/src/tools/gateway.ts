@@ -173,8 +173,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     const byName = new Map<string, ToolDefinition>();
     for (const source of deps.sources) {
       for (const tool of await source.tools(ctx)) {
-        if (!TOOL_NAME.test(tool.name) || byName.has(tool.name)) continue;
-        byName.set(tool.name, tool);
+        if (!TOOL_NAME.test(tool.name)) continue;
+        const current = byName.get(tool.name);
+        // A connected MCP server must not shadow one of our own tools just
+        // because its source appears earlier in the list.
+        if (!current || (current.connectionId && !tool.connectionId)) byName.set(tool.name, tool);
       }
     }
     return byName;

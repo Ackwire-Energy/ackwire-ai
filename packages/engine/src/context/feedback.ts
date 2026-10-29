@@ -170,7 +170,8 @@ export async function removeReaction(
   pubsub?: PubSub,
 ) {
   const message = await getMessage(db, orgId, messageId);
-  if (!message) throw new NotFoundError("Message not found");
+  if (!message || message.deletedAt) throw new NotFoundError("Message not found");
+  await requireChannelAccess(db, userId, orgId, message.channelId);
   await db
     .delete(messageReactions)
     .where(
@@ -184,6 +185,14 @@ export async function removeReaction(
   const reactions = await listReactions(db, orgId, messageId);
   await publishChannelEvent(pubsub, { type: "message.reactions", channelId: message.channelId, messageId, reactions });
   return reactions;
+}
+
+/** Reactions visible to a person only while they can read the message's channel. */
+export async function listMessageReactions(db: Database, userId: string, orgId: string, messageId: string) {
+  const message = await getMessage(db, orgId, messageId);
+  if (!message || message.deletedAt) throw new NotFoundError("Message not found");
+  await requireChannelAccess(db, userId, orgId, message.channelId);
+  return listReactions(db, orgId, messageId);
 }
 
 /** Reactions on a message, in the order they were first given, with who reacted (people and agents). */

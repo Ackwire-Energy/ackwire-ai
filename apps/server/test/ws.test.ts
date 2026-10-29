@@ -75,6 +75,35 @@ test("upgrade requires a session, our Origin and org membership", async () => {
   expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: stranger.cookie() })).toBe(403);
 });
 
+test("revoked signed cookies cannot open a new realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies })).toBe(401);
+});
+
+test("a revoked session closes its existing realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  // The ordinary client pings; a revoked socket must close instead of
+  // accepting another frame. The periodic check also bounds idle sockets.
+  await Bun.sleep(2_100);
+  c.send({ type: "ping" });
+  expect(await Promise.race([closed, Bun.sleep(5_000).then(() => -1)])).toBe(4401);
+});
+
 test("subscriptions are limited to channels the person belongs to, in the connection's org", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
