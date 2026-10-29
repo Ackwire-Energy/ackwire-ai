@@ -8228,7 +8228,7 @@ a.machine-row__name:hover {
 }
 /*
  * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
- * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API").
  */
 .agp-brainoff {
   flex: 1;
@@ -8241,11 +8241,42 @@ a.machine-row__name:hover {
 .agp-brainoff b {
   font-weight: 600;
 }
-/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
-.agp-brainshare {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/*
+ * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
+ * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
+ * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
+ * label is in the type of the switches beside it (a plan's panel gives its own).
+ */
+.plan-replies {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 16px;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.plan-replies > :first-child {
+  font-weight: 600;
+}
+.plan-replies > label {
+  cursor: pointer;
+}
+.plan-replies__terms {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.plan-replies > .ac-switch {
+  /* Browsers without the lh unit: the 20px line. */
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .plan-replies > .ac-switch {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 /* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
 .agp-planoffer {
@@ -10187,6 +10218,17 @@ html[data-menu-overlay] .shell {
   .ai-panel--plan > .ai-panel__ready {
     padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
+}
+/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+   words in the panel's type on the text's. */
+.ai-panel__replies {
+  font-size: 14px;
+  line-height: 20px;
+}
+.ai-panel__replies > .plan-replies {
+  flex: 1;
+  min-width: 0;
+  font-size: inherit;
 }
 /* The Computer step's lines are the well's own, at its gap. */
 .onb__wait > .setup-wait {

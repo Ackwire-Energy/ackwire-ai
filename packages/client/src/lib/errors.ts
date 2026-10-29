@@ -76,8 +76,6 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
-  "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
-  "plan.personal": "aiAccounts.errors.planPersonal",
   // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
   "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",

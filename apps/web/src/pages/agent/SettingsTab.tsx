@@ -1,8 +1,7 @@
 import { type AgentAudience, useAgentDetail, useSettings, useUsage } from "@agenteschat/client";
-import { answersOthers, audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
+import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
-import { planOf } from "@agenteschat/client/lib/plans";
 import {
   type AgentAppearance,
   Avatar,
@@ -26,7 +25,6 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerPanel, CLOUD } from "@/components/AgentComputer";
 import { BudgetField, LookRows, NO_OWNER, OwnerSelect, usd } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
-import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
@@ -121,18 +119,12 @@ export function SettingsTab({
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
   const look = draft.look;
-  // On a personal plan (ADR 0059 §5) only its owner lets more people in, and accepts the provider's terms once.
-  const plan = engineOfBrain(agent.brain?.kind);
-  // A coding plan's account: its maker's own words in the warning.
-  const maker = agent.brain?.kind === "claude_code" ? planOf(agent.brain.provider)?.maker : undefined;
-  const [asking, setAsking] = useState<AgentAudience | null>(null);
+  // On a plan (ADR 0059 §5) only its owner lets more people in.
+  const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
   const [blocked, setBlocked] = useState(false);
   const chooseAudience = (next: AgentAudience) => {
-    if (plan !== "agent" && audienceWidens(saved.audience, next, agent.ownerUserId)) {
-      if (agent.ownerUserId !== me.user.id) return setBlocked(true);
-      if (!answersOthers(saved.audience, agent.ownerUserId) && !answersOthers(draft.audience, agent.ownerUserId))
-        return setAsking(next);
-    }
+    if (onPlan && agent.ownerUserId !== me.user.id && audienceWidens(saved.audience, next, agent.ownerUserId))
+      return setBlocked(true);
     setBlocked(false);
     set("audience", next);
   };
@@ -361,19 +353,6 @@ export function SettingsTab({
                   <SettingNote icon="lock" live>
                     {t("aiAccounts.share.ownerOnly", { ...g, owner: ownerFirst ?? "" })}
                   </SettingNote>
-                )}
-                {asking && plan !== "agent" && (
-                  <SharePlanDialog
-                    agentName={agent.name}
-                    brain={plan}
-                    {...(maker ? { maker } : {})}
-                    everyone={asking.mode === "everyone"}
-                    onAccept={() => {
-                      set("audience", asking);
-                      setAsking(null);
-                    }}
-                    onKeep={() => setAsking(null)}
-                  />
                 )}
                 {errors.audience && (
                   <span className="newag__err" role="alert">

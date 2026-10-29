@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, AudienceMode, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,9 +10,9 @@ import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /*
- * "Só responde a você" (ADR 0059 §5): an agent on its owner's personal plan
- * answers only them until they let others in, after the provider's own words
- * about personal use. Admins only narrow it.
+ * "Responde a todos" (ADR 0059 §5): an agent on its owner's plan replies only to them until they turn it on, with
+ * nothing to accept. Under the switch, a line saying the plan's terms are a gray area there, and behind its ⓘ what
+ * they say. Someone else sees whom it replies to and who decides; admins narrow it in "Quem pode falar".
  */
 
 afterEach(() => cleanup());
@@ -26,24 +26,15 @@ const brainCalls = (state: ReturnType<typeof seedState>) =>
 
 /**
  * Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does).
- * `stored`: whom she answers as stored, where the gate reads otherwise (on the Cloud, a plan answers only its owner).
+ * `ownPlan`: the plan of the MacBook's own sign-in, as its row of the AI accounts says it.
  */
-async function ada(
-  patch: Partial<AgentBrain>,
-  {
-    mine = true,
-    tab = "",
-    provider = "",
-    stored,
-  }: { mine?: boolean; tab?: string; provider?: string; stored?: AudienceMode } = {},
-) {
+async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "", ownPlan = "" } = {}) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
     agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
     agent.audience = { mode: patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
-    agent.audienceMode = stored ?? agent.audience.mode;
   }
   const api = createFakeApi(state);
   fakeMachinesOf.get(api)?.pair({
@@ -54,6 +45,23 @@ async function ada(
     browser: { available: true, version: "1", chrome: null, reason: null },
   });
   await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+  if (ownPlan) {
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_1",
+          name: "MacBook",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: true },
+          own: { claude_code: { plan: ownPlan } },
+        },
+      ],
+    });
+  }
   const view = fakeAgentBrain(ADA_ID, {
     brain: "claude_code",
     effectiveModel: "sonnet",
@@ -71,53 +79,55 @@ const brainDialog = async () => {
   await click(screen().getByRole("button", { name: "Mudar quem pensa" }));
   return screen().getByRole("dialog", { name: "Quem pensa" });
 };
-const shareSwitch = (d: HTMLElement, name = /^Só responde a você/) => within(d).getByRole("switch", { name });
+const replies = (d: HTMLElement) => within(d).getByRole("switch", { name: "Responde a todos" });
+const CLAUDE =
+  "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.";
 
-describe("Só responde a você (Quem pensa)", () => {
-  test("on by default; off shows Claude's terms, Manter keeps it, Responder a todos saves it with the terms", async () => {
+describe("Responde a todos (Quem pensa)", () => {
+  test("off by default; on asks nothing, with Claude's terms a gray area in a line and their words behind its ⓘ", async () => {
     const state = await ada({});
     const d = await brainDialog();
-    const on = shareSwitch(d);
-    expect(on.getAttribute("aria-checked")).toBe("true");
-    // One line, its label and its ⓘ: what it means, the same on or off, describes the switch.
-    const meaning =
-      "Os outros veem que a Ada só responde a você. Sem isso, a Ada responde também a outras pessoas, com o seu plano.";
-    const hint = hintOf("Só responde a você", d);
-    expect(hint.text).toBe(meaning);
-    expect(on.getAttribute("aria-describedby")).toBe(hint.button.getAttribute("aria-describedby"));
-    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
+    const off = replies(d);
+    expect(off.getAttribute("aria-checked")).toBe("false");
+    // Under the switch: a short line, and the details behind its ⓘ, which describe the switch too.
+    const row = off.closest(".plan-replies") as HTMLElement;
+    expect(shownText(row)).toBe("Responde a todosZona cinzenta nos termos do Claude");
+    const hint = hintOf("Zona cinzenta nos termos do Claude", row);
+    expect(hint).toMatchObject({ text: CLAUDE, hidden: true });
+    expect(off.getAttribute("aria-describedby")).toBe(hint.button.getAttribute("aria-describedby"));
+    expect(shownText(d)).not.toMatch(/risco|Manter só comigo|uso próprio/);
 
-    await click(on);
-    let share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
-    expect(share.textContent).toContain(
-      "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-    );
-    await click(within(share).getByRole("button", { name: "Manter só comigo" }));
-    expect(screen().queryByRole("dialog", { name: "Agora a Ada responde a todos" })).toBeNull();
-    expect(shareSwitch(d).getAttribute("aria-checked")).toBe("true");
-    expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
-
-    await click(shareSwitch(d));
-    share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
-    await click(within(share).getByRole("button", { name: "Responder a todos" }));
-    expect(shareSwitch(d).getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Só responde a você", d).text).toBe(meaning);
-    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
+    await click(off);
+    expect(screen().queryAllByRole("dialog")).toHaveLength(1);
+    expect(replies(d).getAttribute("aria-checked")).toBe("true");
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
-    expect(brainCalls(state)).toEqual([
-      { brain: "claude_code", model: null, fallback: true, onlyOwner: false, acceptPlanTerms: true },
-    ]);
+    expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true, onlyOwner: false }]);
     expect(document.body.textContent).toContain("Agora a Ada responde a todos.");
   });
 
-  test("each provider in its own words: ChatGPT's plan, a team seat", async () => {
+  test("on already: off brings back only its owner, with nothing asked", async () => {
+    const state = await ada({ onlyOwner: false });
+    const d = await brainDialog();
+    expect(replies(d).getAttribute("aria-checked")).toBe("true");
+    await click(replies(d));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: null, fallback: true, onlyOwner: true });
+    expect(document.body.textContent).toContain("A Ada agora só responde a você.");
+  });
+
+  test("each plan in its own words: ChatGPT's plan, a team seat (an account or the computer's own), a coding plan's maker", async () => {
+    const terms = async () => {
+      const row = replies(await brainDialog()).closest(".plan-replies") as HTMLElement;
+      const line = row.querySelector(".plan-replies__terms > span")?.textContent ?? "";
+      return { line, text: hintOf(line, row).text };
+    };
     await ada({ brain: "codex", effectiveModel: "gpt-6-sol" });
-    let d = await brainDialog();
-    await click(shareSwitch(d));
-    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "A OpenAI diz que o plano do ChatGPT é para uso pessoal.",
-    );
+    expect(await terms()).toEqual({
+      line: "Zona cinzenta nos termos do ChatGPT",
+      text: "Os termos do ChatGPT dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
+    });
     cleanup();
     const seat: MachineAccount = {
       id: "acct_team",
@@ -134,12 +144,14 @@ describe("Só responde a você (Quem pensa)", () => {
       provider: null,
       keyHint: null,
     };
+    const SEAT =
+      "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.";
     await ada({ account: "acct_team", accounts: [seat] });
-    d = await brainDialog();
-    await click(shareSwitch(d));
-    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "Os termos do Claude dizem que cada assento é de uma pessoa.",
-    );
+    expect((await terms()).text).toBe(SEAT);
+    cleanup();
+    // The computer's own sign-in on a Team seat: the seat's words too, as the plan's panel says them.
+    await ada({ ownSignIn: true }, { ownPlan: "team" });
+    expect((await terms()).text).toBe(SEAT);
     cleanup();
     const glm: MachineAccount = {
       ...seat,
@@ -151,41 +163,37 @@ describe("Só responde a você (Quem pensa)", () => {
       keyHint: "a1b2",
     };
     await ada({ account: "acct_glm", accounts: [glm] });
-    d = await brainDialog();
-    await click(shareSwitch(d));
-    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "Z.ai diz que o plano é só de quem assina.",
-    );
+    expect(await terms()).toEqual({
+      line: "Zona cinzenta nos termos do plano",
+      text: "Z.ai diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
+    });
   });
 
-  test("onto a plan it starts on, and Usar asks nothing", async () => {
+  test("onto a plan it starts off, and Usar asks nothing", async () => {
     const state = await ada({ brain: "model", effectiveModel: null, onlyOwner: false });
     const d = await brainDialog();
     await click(
       within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude Code/ }),
     );
-    expect(shareSwitch(d).getAttribute("aria-checked")).toBe("true");
+    expect(replies(d).getAttribute("aria-checked")).toBe("false");
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true }]);
   });
 
-  test("someone else's agent: whose plan it is, and the switch only narrows", async () => {
+  test("someone else's agent: whom it replies to and who decides, no switch", async () => {
     await ada({}, { mine: false });
     let d = await brainDialog();
-    const locked = shareSwitch(d, /^Só responde a João/);
-    expect(locked.hasAttribute("disabled")).toBe(true);
-    expect(hintOf("Só responde a João", d).text).toBe("Usa o plano de João: só João libera para outras pessoas.");
-    expect(shownText(d)).not.toContain("só João libera");
+    expect(within(d).queryByRole("switch", { name: /^(Só r|R)esponde a / })).toBeNull();
+    const row = d.querySelector(".plan-replies") as HTMLElement;
+    expect(shownText(row)).toBe("Só responde a JoãoUsa o plano de João: só João libera para outras pessoas.");
     cleanup();
-    const state = await ada({ onlyOwner: false }, { mine: false });
+    await ada({ onlyOwner: false }, { mine: false });
     d = await brainDialog();
-    await click(shareSwitch(d, /^Só responde a João/));
-    expect(screen().queryByRole("dialog", { name: /responde a todos/ })).toBeNull();
-    await click(within(d).getByRole("button", { name: "Usar" }));
-    await settle(6);
-    expect(brainCalls(state).at(-1)).toMatchObject({ onlyOwner: true });
-    expect(brainCalls(state).at(-1)).not.toHaveProperty("acceptPlanTerms");
+    expect(shownText(d.querySelector(".plan-replies") as HTMLElement)).toBe(
+      "Responde a todosUsa o plano de João: só João libera para outras pessoas.",
+    );
+    expect(within(d).queryByRole("switch", { name: /^(Só r|R)esponde a / })).toBeNull();
   });
 
   test("back on the API it still answers only its owner: the notice lets everyone in with one click", async () => {
@@ -203,21 +211,6 @@ describe("Só responde a você (Quem pensa)", () => {
     await settle(4);
     expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }, { onlyOwner: false }]);
   });
-
-  test("on the Cloud, one shared before plans were personal answers everyone again on the API: no such notice", async () => {
-    const state = await ada({}, { stored: "everyone" });
-    const d = await brainDialog();
-    await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
-        name: /^Modelo do workspace/,
-      }),
-    );
-    await click(within(d).getByRole("button", { name: "Usar" }));
-    await settle(6);
-    expect(document.body.textContent).not.toContain("ainda só responde a você");
-    expect(screen().queryByRole("button", { name: "Liberar para todos" })).toBeNull();
-    expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }]);
-  });
 });
 
 describe("Quem pode falar, on a plan", () => {
@@ -227,11 +220,10 @@ describe("Quem pode falar, on a plan", () => {
       within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
     );
 
-  test("its owner widens it after the warning, and the save carries the terms", async () => {
+  test("its owner widens it with nothing to accept", async () => {
     const state = await ada({}, { tab: "?tab=settings&sec=audience" });
     await click(within(audience()).getByRole("radio", { name: /^Todos do workspace/ }));
-    const share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
-    await click(within(share).getByRole("button", { name: "Responder a todos" }));
+    expect(screen().queryByRole("dialog")).toBeNull();
     expect(
       within(audience())
         .getByRole("radio", { name: /^Todos do workspace/ })
@@ -241,22 +233,13 @@ describe("Quem pode falar, on a plan", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
       audience: { mode: "everyone", userIds: [] },
-      acceptPlanTerms: true,
     });
-  });
-
-  test("on a coding plan the warning is its maker's", async () => {
-    await ada({}, { tab: "?tab=settings&sec=audience", provider: "kimi" });
-    await click(within(audience()).getByRole("radio", { name: /^Todos do workspace/ }));
-    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "Kimi diz que o plano é só de quem assina.",
-    );
   });
 
   test("an admin who doesn't own it can't let more people in: it says whose plan it is", async () => {
     await ada({}, { mine: false, tab: "?tab=settings&sec=audience" });
     await click(within(audience()).getByRole("radio", { name: /^Todos do workspace/ }));
-    expect(screen().queryByRole("dialog", { name: /responde a todos/ })).toBeNull();
+    expect(screen().queryByRole("dialog")).toBeNull();
     expect(
       within(audience())
         .getByRole("radio", { name: /^Só o responsável/ })

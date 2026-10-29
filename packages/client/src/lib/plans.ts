@@ -17,17 +17,15 @@ export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.sl
 const SEATS = new Set(["team", "enterprise"]);
 
 /**
- * Before an agent answers other people on its owner's plan (ADR 0059 §5), the provider's own words about personal
- * use: a coding plan's maker's (`maker`), a seat's, else the personal plan's. The web's dialog and the phone's alert.
+ * Under "Responde a todos" on a plan (ADR 0059 §5): a line saying the plan's terms are a gray area there, and for its
+ * ⓘ what they say, in a coding plan's maker's words (`maker`), a seat's, else a personal plan's. Web and phone.
  */
-export function sharePlanBody(
-  t: TFunction,
-  brain: "claude_code" | "codex",
-  plan?: string | null,
-  maker?: string,
-): string {
-  if (maker) return t("aiAccounts.share.body.other", { maker });
-  return SEATS.has(plan?.toLowerCase() ?? "")
-    ? t(`aiAccounts.share.body.seat.${brain}`)
-    : t(`aiAccounts.share.body.${brain}`);
+export function planTerms(t: TFunction, brain: "claude_code" | "codex", plan?: string | null, maker?: string) {
+  if (maker) return { line: t("aiAccounts.share.terms.linePlan"), text: t("aiAccounts.share.terms.other", { maker }) };
+  const provider = t(`aiAccounts.connect.${brain}`);
+  const seat = SEATS.has(plan?.toLowerCase() ?? "");
+  return {
+    line: t("aiAccounts.share.terms.line", { provider }),
+    text: t(seat ? "aiAccounts.share.terms.seat" : "aiAccounts.share.terms.own", { provider }),
+  };
 }

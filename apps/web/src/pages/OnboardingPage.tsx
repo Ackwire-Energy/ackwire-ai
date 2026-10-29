@@ -356,6 +356,8 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
+  // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
+  const [replyAll, setReplyAll] = useState(false);
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });
   const [keySaved, setKeySaved] = useState(false);
@@ -611,13 +613,18 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         await api.orgs.updateSettings(orgId, { defaultAgentBudgetUsd: Number(budget) });
       }
       if (!ownChosen) return;
-      // The computer's own sign-in thinks for every agent; each answers only the person (ADR 0059 §5).
+      // The computer's own sign-in thinks for every agent; each replies only to the person unless the panel's switch
+      // says everyone (ADR 0059 §5).
       let failed = false;
       for (const c of crewAgents) {
-        await api.agents.setBrain(orgId, c.id, { brain: kindOf(choice), fallback: true }).catch(() => {
-          failed = true;
-        });
+        await api.agents
+          .setBrain(orgId, c.id, { brain: kindOf(choice), fallback: true, ...(replyAll ? { onlyOwner: false } : {}) })
+          .catch(() => {
+            failed = true;
+          });
       }
+      // The Team step reads whom they reply to from the list the plan's panel loaded before the move.
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       if (failed)
         toast.show(
           t("onboarding.brain.failed", { brand: planLabel(t, choice), computer: machine?.name ?? "" }),
@@ -1441,6 +1448,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                           target={target}
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
+                          replies={{ on: replyAll, onChange: setReplyAll }}
                           hostConnecting={computer === "host"}
                           said={railSaysComputer}
                           onKey={() => pickAi("key")}
