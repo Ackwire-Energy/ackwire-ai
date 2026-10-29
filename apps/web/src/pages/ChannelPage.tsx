@@ -155,7 +155,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox";
+import { browserOffline, outbox, sendWaits, useQueued } from "@/chat/outbox";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
@@ -671,14 +671,14 @@ function ChannelView({
     // A thread archived meanwhile (`thread.archived`): say so in the person's language.
     onFailed: (error) => {
       if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
-      // No connection: the message waits ("sai quando a internet voltar") and goes out when it is back.
-      // The copy turns "failed" right after this callback; pick it up then.
-      const offline = failedOffline(error);
+      // No connection, or the server restarting: the message waits ("sai quando a conexão voltar") and goes
+      // out when it is back. The copy turns "failed" right after this callback; pick it up then.
+      const waits = sendWaits(error);
       queueMicrotask(() => {
         for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
           if (m.local !== "failed" || !m.clientId || seenFailed.current.has(m.clientId)) continue;
           seenFailed.current.add(m.clientId);
-          if (offline) outbox.add(m.clientId);
+          if (waits) outbox.add(m.clientId);
         }
       });
     },
@@ -2531,7 +2531,7 @@ function useAfter(ms: number, on: boolean) {
 }
 
 /**
- * Above the composer when the connection drops: "Sem internet. O que você mandar sai sozinho quando
+ * Above the composer when the connection drops: "Sem conexão. O que você mandar sai sozinho quando
  * voltar." (what is sent meanwhile waits and goes out on its own), then "Conectado de novo" for 1.6 s.
  * A socket that only reconnects for a moment says nothing.
  */

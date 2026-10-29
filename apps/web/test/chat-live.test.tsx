@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -85,6 +86,31 @@ describe("optimistic send", () => {
     expect(state.calls.filter((c) => c.method === "chat.post")).toHaveLength(2);
     expect(rowsWith("vai falhar")).toHaveLength(1);
     expect(rowsWith("vai falhar")[0]?.className).not.toContain("ac-msg--failed");
+  });
+
+  test("the server restarting (the proxy's 502): it waits instead of failing, then goes out by itself with its clientId", async () => {
+    const state = seedState({ failPosts: new ApiError(502, "http_502", "Bad Gateway") });
+    const { sockets } = await open(state);
+    await sendText("durante o deploy");
+    await settle(4);
+    const row = () => rowsWith("durante o deploy")[0] as HTMLElement;
+    expect(row().className).not.toContain("ac-msg--failed");
+    expect(row().textContent).toContain("sai quando a conexão voltar");
+    // The new server is up: the socket drops with the old one and reconnects.
+    state.failPosts = false;
+    await act(async () => sockets.last().drop());
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => sockets.last().open());
+    await settle(4);
+    const clientIds = state.calls
+      .filter((c) => c.method === "chat.post")
+      .map((c) => (c.args[2] as { clientId: string }).clientId);
+    expect(clientIds).toHaveLength(2);
+    expect(clientIds[0]).toBeTruthy();
+    expect(clientIds[1]).toBe(clientIds[0]);
+    expect(rowsWith("durante o deploy")).toHaveLength(1);
+    expect(row().className).not.toContain("ac-msg--pending");
+    expect(row().className).not.toContain("ac-msg--failed");
   });
 });
 

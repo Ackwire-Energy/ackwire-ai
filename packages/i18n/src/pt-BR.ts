@@ -954,9 +954,9 @@ export const ptBR = {
     unreadDivider: "Novas",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Visto",
-    offline: "Sem internet. O que você mandar sai sozinho quando voltar.",
+    offline: "Sem conexão. O que você mandar sai sozinho quando voltar.",
     backOnline: "Conectado de novo",
-    sendingOffline: "sai quando a internet voltar",
+    sendingOffline: "sai quando a conexão voltar",
     endOfReply: "Fim da resposta",
     mentionSuggestions: "Sugestões de menção",
   },

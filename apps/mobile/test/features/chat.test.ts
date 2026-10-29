@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
+import { ApiError, type LiveConsult, type LiveRun, type Message } from "@agenteschat/client";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls } from "@agenteschat/client/lib/work";
 import {
@@ -21,6 +21,7 @@ import {
   reactionEmoji,
   reactionName,
   reactionPills,
+  sendWaits,
   standsAlone,
   stoppableInLine,
   threadFaces,
@@ -71,6 +72,19 @@ describe("timeline", () => {
   test("hidden messages leave no row", () => {
     const rows = buildRows([message({ id: "1" }), message({ id: "2", threadId: "t" })], (m) => m.threadId === "t");
     expect(rows.filter((r) => r.kind === "message")).toHaveLength(1);
+  });
+});
+
+describe("a send that fails", () => {
+  test("no answer at all, or only the proxy's while the server restarts: it waits; the server refusing it fails it", () => {
+    expect(sendWaits(new TypeError("Network request failed"))).toBe(true);
+    for (const status of [502, 503, 504, 520, 521, 522, 523, 524]) {
+      expect(sendWaits(new ApiError(status, `http_${status}`, "Bad Gateway"))).toBe(true);
+    }
+    expect(sendWaits(new ApiError(503, "unavailable", "Try again"))).toBe(false);
+    expect(sendWaits(new ApiError(502, "machine.offline", "The computer is offline"))).toBe(false);
+    expect(sendWaits(new ApiError(500, "http_500", "Internal Server Error"))).toBe(false);
+    expect(sendWaits(new ApiError(409, "thread.archived", "The thread was archived"))).toBe(false);
   });
 });
 

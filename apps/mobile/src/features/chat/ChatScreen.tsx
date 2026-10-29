@@ -1,5 +1,4 @@
 import {
-  ApiError,
   type ArtifactDetail,
   type BrowserHandoff,
   type ConnectionStatus,
@@ -101,6 +100,7 @@ import {
   mergeTimeline,
   parseSlash,
   pinTarget,
+  sendWaits,
   stoppableInLine,
   workingEntries,
 } from "./logic";
@@ -621,8 +621,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [api, orgId, channelId, isThread, olderDone, loadingOlder, top.data, older]);
 
   // ── Sending ──
-  // Without internet a message isn't "failed": it waits with a clock and goes by itself when the connection
-  // is back (or the app comes back to the front).
+  // Without a connection (no internet, or the server restarting) a message isn't "failed": it waits with a
+  // clock and goes by itself when the connection is back (or the app comes back to the front).
   const [waiting, setWaiting] = useState<ReadonlySet<string>>(() => new Set());
   const post = usePostMessage(orgId, channelId, {
     me: { id: meId ?? "" },
@@ -633,12 +633,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
     },
     onFailed: (error, { clientId }) => {
-      if (error instanceof ApiError) {
+      if (!sendWaits(error)) {
         toast({ title: t("mobile.chat.notSent"), icon: "x" });
         return;
       }
-      // No answer at all (no internet): this message (only this one; others the server refused stay
-      // "failed") waits instead.
+      // No answer from the server (no internet, or it is restarting): this message (only this one; others the
+      // server refused stay "failed") waits instead.
       setWaiting((prev) => (prev.has(clientId) ? prev : new Set([...prev, clientId])));
     },
   });
@@ -1572,7 +1572,7 @@ function UnseenLine({ fading }: { fading: boolean }) {
 }
 
 /**
- * The connection, above the composer: "Sem internet. O que você mandar sai sozinho quando
+ * The connection, above the composer: "Sem conexão. O que você mandar sai sozinho quando
  * voltar." while it is down (a quick reconnect says nothing), then "Conectado de novo" for a moment.
  */
 function Connection({ status }: { status: ConnectionStatus }) {

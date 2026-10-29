@@ -1,13 +1,15 @@
-import type {
-  AgentQuestion,
-  LiveConsult,
-  LiveRun,
-  Message,
-  MessageConsultation,
-  MessagePin,
-  ReactionCount,
+import {
+  type AgentQuestion,
+  ApiError,
+  type LiveConsult,
+  type LiveRun,
+  type Message,
+  type MessageConsultation,
+  type MessagePin,
+  type ReactionCount,
 } from "@agenteschat/client";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
+import { serverUnreachable } from "@agenteschat/client/lib/errors";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
@@ -60,6 +62,12 @@ export type ChatRow =
 
 /** A row's key: an optimistic message keeps it when the server copy (same `clientId`) replaces it. */
 export const messageKey = (m: Pick<Message, "id" | "clientId">) => (m.clientId ? `c:${m.clientId}` : m.id);
+
+/**
+ * A failed send with no answer at all (no internet), or none from the server itself (restarting: the proxy in
+ * front answered): it waits and goes out again with its `clientId`. The server refusing it fails it.
+ */
+export const sendWaits = (error: unknown) => !(error instanceof ApiError) || serverUnreachable(error);
 
 /** A message that stands on its own (cards, consultations): nothing groups under it and it never groups. */
 export function standsAlone(m: Message) {

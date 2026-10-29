@@ -182,8 +182,8 @@ export interface FakeState {
   actionErrors?: Record<string, ApiError>;
   /** Set by `createFakeApi`: `chat.post` with `openThread` marks the thread (the threads fake). */
   openThread?: (orgId: string, threadId: string, at: string) => Promise<void>;
-  /** Make `chat.post` fail (optimistic send tests). */
-  failPosts?: boolean;
+  /** Make `chat.post` fail (optimistic send tests): `true` is the server refusing it, or this error. */
+  failPosts?: boolean | ApiError;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -1518,7 +1518,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);
         if (state.holdPosts) await state.holdPosts;
-        if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
+        if (state.failPosts === true) throw new ApiError(503, "unavailable", "Try again");
+        if (state.failPosts) throw state.failPosts;
         // Like the server: a resend (the same person's `clientId`) gets the message already written.
         const resent = input.clientId
           ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))

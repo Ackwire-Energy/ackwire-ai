@@ -252,7 +252,7 @@ export const featureKeysEn: FeatureTranslations = {
     seen: "Seen",
     toLatest: "Go to the latest messages",
     stopAgent: "Stop {{name}}",
-    offlineWait: "Goes out when the internet is back",
+    offlineWait: "Goes out when the connection is back",
     turn: {
       thinking: "thinking",
       working: "working",
@@ -286,7 +286,7 @@ export const featureKeysEn: FeatureTranslations = {
       divider: "New",
     },
     connection: {
-      down: "No internet. What you send goes out on its own when it's back.",
+      down: "No connection. What you send goes out on its own when it's back.",
       back: "Connected again",
     },
     longPressHint: "Hold to react and see more actions",

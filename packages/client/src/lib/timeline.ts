@@ -14,6 +14,16 @@ export function upsertMessage(list: Message[] | undefined, message: Message): Me
 }
 
 /**
+ * A list read again from the server, keeping my messages of the list before that are still on their way or wait
+ * to go out (`local`): the server doesn't have them yet (no message of its with their `clientId`).
+ */
+export function withLocalCopies(read: Message[], before: Message[] | undefined): Message[] {
+  const written = new Set(read.map((m) => m.clientId));
+  const local = (before ?? []).filter((m) => m.local && !written.has(m.clientId));
+  return local.length === 0 ? read : [...read, ...local].sort(byTime);
+}
+
+/**
  * Agents reply inside the thread of the message that called them (the
  * executor posts with `threadId = root`), but the channel lists only
  * top-level messages. The channel view shows the conversation as one

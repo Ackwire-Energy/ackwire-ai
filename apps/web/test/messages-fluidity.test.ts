@@ -4,7 +4,7 @@ import { ApiError } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
-import { failedOffline, outbox } from "@/chat/outbox";
+import { failedOffline, outbox, sendWaits } from "@/chat/outbox";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { createI18n } from "@/i18n";
 import { createStreamsStore } from "@/realtime/context";
@@ -65,6 +65,18 @@ describe("sent while offline", () => {
     // Any other error (a bug, a parse failure) is not the network: it fails, it does not wait.
     expect(failedOffline(new Error("boom"))).toBe(false);
     expect(failedOffline(new SyntaxError("Unexpected token"))).toBe(false);
+  });
+
+  test("a send the proxy answered while the server restarts waits too; one the server itself refused does not", () => {
+    for (const status of [502, 503, 504, 520, 521, 522, 523, 524]) {
+      expect(sendWaits(new ApiError(status, `http_${status}`, "Bad Gateway"))).toBe(true);
+    }
+    expect(sendWaits(new TypeError("Failed to fetch"))).toBe(true);
+    // The server's own errors carry their code: a refusal, or a bug (500), fails.
+    expect(sendWaits(new ApiError(503, "unavailable", "Try again"))).toBe(false);
+    expect(sendWaits(new ApiError(502, "machine.offline", "The computer is offline"))).toBe(false);
+    expect(sendWaits(new ApiError(500, "http_500", "Internal Server Error"))).toBe(false);
+    expect(sendWaits(new Error("boom"))).toBe(false);
   });
 
   test("the outbox keeps what waits, by client id", () => {

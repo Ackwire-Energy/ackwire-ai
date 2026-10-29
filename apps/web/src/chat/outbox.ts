@@ -1,7 +1,8 @@
+import { serverUnreachable } from "@agenteschat/client/lib/errors";
 import { useSyncExternalStore } from "react";
 
 /**
- * Messages that could not go out because the connection was down: they stay "sai quando a internet
+ * Messages that could not go out because the connection was down: they stay "sai quando a conexão
  * voltar" instead of "Não enviada", and go out again on their own when it is back. Keyed by the
  * optimistic copy's `clientId`, for this tab.
  */
@@ -48,3 +49,9 @@ export const browserOffline = () => typeof navigator !== "undefined" && navigato
  * connection instead of failing.
  */
 export const failedOffline = (error: unknown) => browserOffline() || error instanceof TypeError;
+
+/**
+ * A failed send that waits for the connection: the network's fault, or the server restarting (the proxy
+ * in front answered for it). It goes out again with the same `clientId`, which the server writes once.
+ */
+export const sendWaits = (error: unknown) => failedOffline(error) || serverUnreachable(error);

@@ -193,6 +193,16 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
 /**
+ * What the proxy in front answers while the server restarts, is down or too slow: Caddy's 502, 503 and 504, and
+ * Cloudflare's 520 to 524. The server's own errors carry a code of theirs (its 502 for a computer's error does).
+ */
+const UNREACHABLE = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+
+/** No answer from the server itself, only from the proxy in front of it: it may be back in a moment. */
+export const serverUnreachable = (error: unknown) =>
+  error instanceof ApiError && UNREACHABLE.has(error.status) && error.code === `http_${error.status}`;
+
+/**
  * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
  * since the server says those in English. Null for anything else (the caller keeps its own words).
  */

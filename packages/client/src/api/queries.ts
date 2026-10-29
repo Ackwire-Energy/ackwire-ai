@@ -23,7 +23,7 @@ import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
 import { playSound } from "../lib/sounds";
-import { upsertMessage } from "../lib/timeline";
+import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
 import { keys } from "./keys";
@@ -344,12 +344,17 @@ export const THREAD_PAGE = 200;
  * (real-time events keep it current, and what they missed before the
  * channel's subscription was confirmed is added then), so switching back is
  * instant; then it revalidates in the background. Kept 30 min after leaving
- * it, so going back later still shows it at once.
+ * it, so going back later still shows it at once. A read (a reconnect's
+ * included) keeps my messages still sending or waiting for the connection.
  */
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.messages(orgId, channelId),
-    queryFn: () => api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
+    queryFn: async ({ client, queryKey }) =>
+      withLocalCopies(
+        await api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
+        client.getQueryData<Message[]>(queryKey),
+      ),
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });
