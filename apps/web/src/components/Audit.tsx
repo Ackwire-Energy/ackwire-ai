@@ -305,7 +305,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
             </div>
           )}
           {reason && (
-            <div className={`audit-panel__reason audit-panel__reason--${reasonKey}`}>
+            <div className={`audit-panel__reason ac-iconline audit-panel__reason--${reasonKey}`}>
               <Icon name={reasonKey === "refused" ? "block" : reasonKey === "failed" ? "alert" : "info"} size={16} />
               <span>
                 <strong>{t(`audit.panel.reason.${reasonKey}`)}:</strong> {reason}
