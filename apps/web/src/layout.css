@@ -4581,8 +4581,13 @@ p {
  * paint containment, which would clip the floating action bar (it sits above the row), so a row
  * being hovered, focused, tapped open or with a menu open renders normally; so does a reply still
  * streaming. Room at the top so the first row's bar isn't cut by the scroll container.
+ * A skipped row has no content to stop it shrinking, and the list is a column flexbox taller than its
+ * box: without `flex-shrink: 0` it is laid out at its padding, not at the size it remembers. A row
+ * that hover or focus just left stays skipped until the next frame finds it on screen, so the rows
+ * below it would move between a finger going down and lifting, and the tap would miss.
  */
 .channel__messages .ac-msg {
+  flex-shrink: 0;
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
 }
