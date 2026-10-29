@@ -275,6 +275,40 @@ describe("the look", () => {
       "Enviado pelo servidor do agentes.chat em chat.acme.com.",
     );
   });
+
+  test("on a narrow screen the host moves to the next line whole, with the word before it, never split at a hyphen", () => {
+    const box = emailArtAt("https://161-97-103-35.sslip.io");
+    expect(renderEmail(verify, box).html).toContain(
+      'Sent by the agentes.chat server <span style="display:inline-block">at 161-97-103-35.sslip.io.</span></p>',
+    );
+    expect(renderEmail({ ...verify, locale: "pt-BR" }, box).html).toContain(
+      'Enviado pelo servidor do agentes.chat <span style="display:inline-block">em 161-97-103-35.sslip.io.</span></p>',
+    );
+    expect(renderEmail(verify, box).text).toContain("\nSent by the agentes.chat server at 161-97-103-35.sslip.io.\n");
+  });
+
+  test("the card's last block keeps only the room its ink needs: as much under the content as over the headline", () => {
+    for (const [id, sample] of Object.entries(EMAIL_SAMPLES)) {
+      const { html } = renderEmail(sample, art);
+      const card = html.slice(
+        html.indexOf('<td class="card"'),
+        html.indexOf('\n</td></tr>\n<tr><td style="padding:24px 0 0">'),
+      );
+      const last = card.slice(card.lastIndexOf("\n") + 1);
+      // 2 px under a line of text; 6 px under the button for its shadow, 4 in dark, where the shadow doesn't show.
+      expect({ id, last }).toEqual({
+        id,
+        last: expect.stringMatching(
+          /^<p class="mu" style="margin:0 0 2px;|^<table class="end-btn" [^>]*"margin:8px 0 6px">/,
+        ),
+      });
+    }
+    expect(renderEmail(verify, art).html).toContain(".end-btn{margin-bottom:4px!important}");
+    // Between blocks the room stays as it was.
+    expect(renderEmail(EMAIL_SAMPLES["join_request.en"] as EmailTemplate, art).html).toContain(
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px">',
+    );
+  });
 });
 
 describe("the computer ready email's button: its first step", () => {

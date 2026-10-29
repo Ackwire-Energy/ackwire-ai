@@ -9,8 +9,12 @@ import type { EmailLocale, Text } from "./layout";
 type Step = [title: string, text: string];
 
 const en = {
-  /** Who sent it: agentes.chat, or a self-hosted server named by its host. */
-  sentBy: (host: string | null) => (host ? `Sent by the agentes.chat server at ${host}.` : "Sent by agentes.chat."),
+  /**
+   * Who sent it: agentes.chat, or a self-hosted server named by its host. The host keeps the word before it on its
+   * line, so a narrow screen breaks before them both and never leaves the host alone on the last line.
+   */
+  sentBy: (host: string | null): Text =>
+    host ? ["Sent by the agentes.chat server ", { nobr: `at ${host}.` }] : "Sent by agentes.chat.",
   fallback: "Button not working? Copy this address into your browser:",
   role: { owner: "an owner", admin: "an admin", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
@@ -202,7 +206,8 @@ const en = {
 type Words = typeof en;
 
 const ptBR: Words = {
-  sentBy: (host) => (host ? `Enviado pelo servidor do agentes.chat em ${host}.` : "Enviado pelo agentes.chat."),
+  sentBy: (host) =>
+    host ? ["Enviado pelo servidor do agentes.chat ", { nobr: `em ${host}.` }] : "Enviado pelo agentes.chat.",
   fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
   role: { owner: "dono", admin: "admin", member: "membro" },
   anAgent: "Um agente",
