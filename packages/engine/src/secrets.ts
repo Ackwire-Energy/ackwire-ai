@@ -233,6 +233,34 @@ export async function getSecretRequest(db: Database, actorId: string, orgId: str
   return secretRequestView(await loadForRequester(db, actorId, orgId, requestId));
 }
 
+/** Resolve an uncertain or lost delivery commit without deleting another caller's staged box. */
+async function reconcileStagedDelivery(
+  deps: SandboxDeps & { pubsub?: PubSub },
+  row: SecretRequestRow,
+): Promise<SecretRequestView | null> {
+  let current: SecretRequestRow | undefined;
+  try {
+    [current] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+  } catch {
+    // The DB may have committed before its reply was lost. Ciphertext alone is inert;
+    // the durable activation job can still use it when the DB comes back.
+    return null;
+  }
+  if (current?.status === "delivered") {
+    await activateDeliveredSecret(deps, row.orgId, row.id);
+    const [latest] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+    return secretRequestView(latest ?? current);
+  }
+  // Pending can still be won by another in-flight caller. Only a durable
+  // declined/expired/canceled decision makes every activation impossible.
+  if (current && current.status !== "pending") {
+    await onRequestComputer(deps, row, (computer) =>
+      secretOnComputer(computer, { action: "discard", requestId: row.id }),
+    true).catch(() => undefined);
+  }
+  return null;
+}
+
 /**
  * The computer stages only the sealed box while the DB request is pending.
  * Once the DB commits delivery, the computer activates the value, then the
@@ -291,15 +319,13 @@ export async function deliverSecret(
       return updated;
     });
   } catch (error) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw error;
   }
   if (!delivered) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw new ConflictError("This request was already answered or expired");
   }
   try {
