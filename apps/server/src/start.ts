@@ -85,6 +85,17 @@ export interface StartOptions {
 }
 
 /**
+ * The engine's process-wide switches this config sets, every one of them here: `startServer` sets them at boot, and a
+ * test that boots like a given setup (the Cloud) sets them the same way.
+ */
+export function applyBootSwitches(config: Config) {
+  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
+  setRestrictionNotices(config.PUBLIC_URL);
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
+}
+
+/**
  * Boots an agentes.chat server: config → database → migrations → adapters
  * (core defaults, then module overrides) → HTTP + WebSocket → workers.
  * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
@@ -194,11 +205,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
-  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
-  setRestrictionNotices(config.PUBLIC_URL);
-  // The operator API's events feed records only while that API is on (ADR 0056).
+  applyBootSwitches(config);
   if (config.OPERATOR_API_TOKEN) {
-    enableOperatorEvents();
     // Before the API serves a page: a caller restarting after a restore must find these rows first.
     const adopted = await adoptRestoredOperatorEvents(database.db);
     if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });

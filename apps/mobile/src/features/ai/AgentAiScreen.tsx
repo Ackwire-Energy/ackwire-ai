@@ -1,6 +1,6 @@
 import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useApi } from "@agenteschat/client";
-import { ownSignInName } from "@agenteschat/client/lib/ai-accounts";
+import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
+import { ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -61,6 +61,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
 
   const view = brain.data;
   const kind = accountKindOf(view?.brain);
+  // Its computer's row, where the computer's own sign-in's plan is (a seat has its own words).
+  const row = useAiAccounts(orgId, view?.canUsePlans === true && kind !== null).data?.computers.find(
+    (c) => c.machineId === view?.computer?.machineId,
+  );
   const thinks = brainLine(t, agent?.brain, t("brain.model"));
   const refresh = () => {
     for (const key of [
@@ -221,7 +225,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     on={!view.onlyOwner}
                     onChange={replyToEveryone}
                     brain={kind}
-                    plan={current?.plan}
+                    plan={signInPlan(view, row, kind)}
                     maker={planOf(current?.provider)?.maker}
                     disabled={busy}
                   />

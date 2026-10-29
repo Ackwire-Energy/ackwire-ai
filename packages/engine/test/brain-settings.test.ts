@@ -3,6 +3,7 @@ import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, MISSION_PROTOCOL } from "@agentescha
 import { eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
+  canTalkTo,
   ForbiddenError,
   getAgentBrain,
   newAgentBrainMachines,
@@ -120,7 +121,7 @@ describe("brain settings", () => {
 /*
  * ADR 0059 §2–3 and §5: a plan thinks only for its owner's agents, one
  * account per agent, and an agent on a plan answers only its owner until the
- * owner lets others in, accepting the provider's terms once.
+ * owner turns on "Responde a todos".
  */
 let f: Fixture | undefined;
 afterEach(async () => {
@@ -174,7 +175,7 @@ describe("Criar agente: what a new agent could think with", () => {
 
 describe("a plan answers its owner until it replies to everyone (Responde a todos)", () => {
   test("onto a plan it answers only its owner; turning it on asks nothing and is audited as who may talk to it", async () => {
-    const { fx, deps, bia, row, audits } = await world();
+    const { fx, deps, bia, caio, row, audits } = await world();
     await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [bia.id] });
     const onPlan = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
     expect(onPlan).toMatchObject({ brain: "claude_code", onlyOwner: true, canUsePlans: true, ownSignIn: true });
@@ -186,13 +187,14 @@ describe("a plan answers its owner until it replies to everyone (Responde a todo
       to: { mode: "owner", userIds: [] },
     });
 
+    // On, it replies to whoever its "who can talk" list lets in: Bia, not the whole workspace.
     const brainAudits = (await audits("agent.brain")).length;
     const shared = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
     expect(shared.onlyOwner).toBe(false);
-    expect(await row()).toMatchObject({ audienceMode: "everyone", audienceUserIds: [] });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
       from: { mode: "owner", userIds: [bia.id] },
-      to: { mode: "everyone", userIds: [] },
+      to: { mode: "people", userIds: [bia.id] },
     });
     // Nothing about what it thinks with changed: no brain entry for it.
     expect(await audits("agent.brain")).toHaveLength(brainAudits);
@@ -201,15 +203,35 @@ describe("a plan answers its owner until it replies to everyone (Responde a todo
       onlyOwner: false,
     });
     expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
-    expect(await row()).toMatchObject({ audienceMode: "owner" });
+    expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "everyone", userIds: [] },
+      from: { mode: "people", userIds: [bia.id] },
       to: { mode: "owner", userIds: [] },
     });
+    // Off and on again never widens it: still Bia alone.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    const again = await row();
+    expect(again).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
+    expect([canTalkTo(again, bia.id), canTalkTo(again, caio.id)]).toEqual([true, false]);
+  });
+
+  test("moved onto a plan with it on, an agent keeps its list as it was: nothing widens, nothing to record", async () => {
+    const { fx, deps, bia, caio, row, audits } = await world();
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [bia.id] });
+    const changes = (await audits("agent.audience_changed")).length;
+    const moved = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, {
+      brain: "claude_code",
+      onlyOwner: false,
+    });
+    expect(moved).toMatchObject({ brain: "claude_code", onlyOwner: false });
+    const after = await row();
+    expect(after).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
+    expect([canTalkTo(after, bia.id), canTalkTo(after, caio.id)]).toEqual([true, false]);
+    expect(await audits("agent.audience_changed")).toHaveLength(changes);
   });
 
   test("only the plan's owner lets more people in; an admin only narrows; a member can't touch it", async () => {
-    const { fx, deps, bia, caio } = await world();
+    const { fx, deps, bia, caio, row } = await world();
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
     expect(await getAgentBrain(deps, caio.id, fx.org.id, fx.agent.id)).toMatchObject({
       onlyOwner: true,
@@ -220,7 +242,9 @@ describe("a plan answers its owner until it replies to everyone (Responde a todo
     expect(refused.code).toBe("audience.plan_owner_only");
     const member = await setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { onlyOwner: true }).catch((e) => e);
     expect(member).toBeInstanceOf(ForbiddenError);
+    // With no "who can talk" list, on means everyone.
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect(await row()).toMatchObject({ audienceMode: "everyone", audienceUserIds: [] });
     expect((await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
   });
 

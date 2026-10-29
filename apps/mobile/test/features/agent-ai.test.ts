@@ -110,8 +110,12 @@ describe("the agent's AI", () => {
     // Someone who isn't the plan's owner: whom it replies to and who decides, no switch.
     expect(screen).toMatch(/view\.canUsePlans \? \(\s*<PlanReplies[\s\S]*?\) : \(\s*<PlanRepliesOf/);
     // On a plan's page: under its steps or the account cards, and on the page that says it's done.
-    expect(connect).toContain("{steps || ownable ? repliesRow(current) : null}");
-    expect(connect).toContain("repliesRow(done.account)");
+    expect(connect).toContain("{steps || ownable ? repliesRow : null}");
+    expect(connect).toContain("<View style={styles.doneReplies}>{repliesRow}</View>");
+    // Both say the plan of what the agent thinks with, the computer's own sign-in's included (`signInPlan`).
+    expect(screen).toContain("plan={signInPlan(view, row, kind)}");
+    expect(connect).toContain("signInPlan(view, gates.row, kind)");
+    expect(connect).toContain("plan={replies.plan}");
   });
 
   test("Claude's sign-in asks for no address: Claude's page picks the account, an account already there is offered", async () => {

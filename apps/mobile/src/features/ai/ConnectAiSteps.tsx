@@ -1,6 +1,6 @@
-import type { AgentBrain, MachineAccount, MachineAccountKind } from "@agenteschat/client";
+import type { MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
-import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -323,9 +323,9 @@ function InfoCard({
 /**
  * "Responde a todos" for the agent a plan's page is for (ADR 0059 §5): on this plan's brain it is the agent's own,
  * changed at once; before the move it waits, and the move carries it (`move`), else the agent starts on its owner
- * alone.
+ * alone. `plan`: the plan of the sign-in it thinks with there, an account's or the computer's own.
  */
-function useReplies(view: AgentBrain | undefined, agentId: string | undefined, kind: MachineAccountKind) {
+function useReplies(gates: PlanGates, agentId: string | undefined, kind: MachineAccountKind) {
   const { t } = useTranslation();
   const { orgId } = useAiOrg();
   const api = useApi();
@@ -334,6 +334,7 @@ function useReplies(view: AgentBrain | undefined, agentId: string | undefined, k
   // The agent it was switched on for, before its move.
   const [waiting, setWaiting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { view } = gates;
   const live = view !== undefined && view.agentId === agentId && view.brain === kind;
   const on = live ? !view.onlyOwner : waiting !== null && waiting === agentId;
   const change = async (next: boolean) => {
@@ -348,7 +349,8 @@ function useReplies(view: AgentBrain | undefined, agentId: string | undefined, k
       setBusy(false);
     }
   };
-  return { on, change, busy, move: on ? { onlyOwner: false } : {} };
+  const plan = live ? signInPlan(view, gates.row, kind) : null;
+  return { on, change, busy, move: on ? { onlyOwner: false } : {}, plan };
 }
 
 /** One plan's page: its mark, for which agent, then its steps on the agent's computer. */
@@ -364,20 +366,15 @@ function PlanPage(
   const { colors: c } = useTheme();
   const { choice, agents, locked, onView, gates, agentId, onAgent } = props;
   const agent = agents.find((a) => a.id === agentId);
-  const [done, setDone] = useState<{
-    agentId: string;
-    agent: string;
-    label: string;
-    account: MachineAccount | null;
-  } | null>(null);
+  const [done, setDone] = useState<{ agentId: string; agent: string; label: string } | null>(null);
   const kind = kindOf(choice);
-  const replies = useReplies(gates.view, agentId, kind);
-  const repliesRow = (account?: MachineAccount | null) => (
+  const replies = useReplies(gates, agentId, kind);
+  const repliesRow = (
     <PlanReplies
       on={replies.on}
       onChange={(on) => void replies.change(on)}
       brain={kind}
-      plan={account?.plan}
+      plan={replies.plan}
       maker={planOf(choice)?.maker}
       disabled={replies.busy}
     />
@@ -407,7 +404,7 @@ function PlanPage(
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("aiAccounts.done.savedAgent", { agent: done.agent, label: done.label })}
         </Text>
-        <View style={styles.doneReplies}>{repliesRow(done.account)}</View>
+        <View style={styles.doneReplies}>{repliesRow}</View>
       </View>
     );
   }
@@ -445,7 +442,7 @@ function PlanPage(
             onDone={(account) => {
               // The flow stays on that agent; another plan moves on to the next one with no AI.
               onAgent(agent.id);
-              setDone({ agentId: agent.id, agent: agent.name, label: account?.label ?? planLabel(t, choice), account });
+              setDone({ agentId: agent.id, agent: agent.name, label: account?.label ?? planLabel(t, choice) });
               props.onPlanDone(agent.id);
             }}
           />
@@ -476,8 +473,8 @@ function PlanSteps({
   justReady?: boolean;
   /** "Responde a todos" switched on before the move: the move says so. */
   move: { onlyOwner?: boolean };
-  /** Who the agent replies to, under its steps (`PlanReplies`), with the plan of the account it would sign in as. */
-  repliesRow: (account?: MachineAccount | null) => ReactNode;
+  /** Who the agent replies to, under its steps (`PlanReplies`). */
+  repliesRow: ReactNode;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;
@@ -671,7 +668,7 @@ function PlanSteps({
           onUse={(a) => void assign(a)}
         />
       ) : null}
-      {steps || ownable ? repliesRow(current) : null}
+      {steps || ownable ? repliesRow : null}
     </View>
   );
 }

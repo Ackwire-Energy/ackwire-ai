@@ -973,6 +973,18 @@ describe("Responde a todos, in the plan's panel", () => {
       { brain: "claude_code", account: null, onlyOwner: false },
     ]);
   });
+
+  test("an agent on the computer's own sign-in, a Team seat there: the seat's words before anything is chosen", async () => {
+    const { dialog } = await connect({
+      brain: { brain: "claude_code", account: null, ownSignIn: true },
+      computers: [{ ...MAC, own: { claude_code: { plan: "team" } } }],
+      ada: { brain: { kind: "claude_code", model: "Sonnet" } },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(hintOf("Zona cinzenta nos termos do Claude", panel).text).toBe(
+      "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
+    );
+  });
 });
 
 describe("All agents: one plan for the team, a login per agent", () => {

@@ -1,6 +1,7 @@
 import type {
   ActiveRun,
   Agent,
+  AgentAudience,
   AgentBrain,
   AgentQuestion,
   AgentSecret,
@@ -45,6 +46,7 @@ import type {
   StoragePlatform,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -1277,6 +1279,23 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           onlyOwner,
         };
         brains.set(agentId, next);
+        // Its row, as the server keeps it: onto a plan only its owner, its "who can talk" list kept; on, back to that
+        // list, or everyone with none.
+        const row = state.agents.find((a) => a.id === agentId);
+        if (row && (changed || input.onlyOwner !== undefined)) {
+          const was = audienceOf(row);
+          const base: AgentAudience = changed && brain !== "model" ? { mode: "owner", userIds: was.userIds } : was;
+          row.audience =
+            input.onlyOwner === undefined
+              ? base
+              : input.onlyOwner
+                ? { mode: "owner", userIds: was.userIds }
+                : answersOthers(base, row.ownerUserId)
+                  ? base
+                  : was.userIds.length > 0
+                    ? { mode: "people", userIds: was.userIds }
+                    : { mode: "everyone", userIds: [] };
+        }
         return structuredClone(next);
       },
       runs: async (_orgId, filter = {}) =>

@@ -380,10 +380,9 @@ export interface AgentBrainInput {
   fallback?: unknown;
   /**
    * "Responde a todos" turned off (ADR 0059 §5): true, only its owner talks
-   * to it; false, on a plan everyone does, and on the API whoever did before
-   * a plan made it its owner's only. Omitted = keep it; a switch onto a plan
-   * makes it its owner's only, and only the plan's owner lets more people in
-   * (`planSharing`).
+   * to it; false, whoever its "who can talk" list lets in (everyone with no
+   * list). Omitted = keep it; a switch onto a plan makes it its owner's only,
+   * and only the plan's owner lets more people in (`planSharing`).
    */
   onlyOwner?: unknown;
   /**
@@ -408,13 +407,12 @@ function nextAudience(
   changed: boolean,
   onlyOwner: boolean | undefined,
 ): { base: AgentAudience; to: AgentAudience } {
-  const plan = isComputerBrain(brain);
-  const base = changed && plan ? OWNER_ONLY : audienceOf(agent);
+  const base = changed && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
   if (onlyOwner === undefined) return { base, to: base };
   if (onlyOwner) return { base, to: OWNER_ONLY };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
-  // The people a plan kept out come back on the API (their list stays while it is the owner's only).
-  const kept = !plan && agent.audienceUserIds.length > 0;
+  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only.
+  const kept = agent.audienceUserIds.length > 0;
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 

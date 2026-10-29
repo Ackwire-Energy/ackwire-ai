@@ -3587,7 +3587,7 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Responde a todos" turned off: false lets everyone talk to it (on the API, whoever did before a plan). */
+  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
   onlyOwner?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;

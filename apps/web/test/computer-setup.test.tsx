@@ -1126,6 +1126,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     });
     await click(screen().getByRole("button", { name: "Continuar" }));
     await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    // Whoever creates an agent owns it, as the server makes them.
+    for (const a of r.state.agents) a.ownerUserId = "u-walter";
     const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
     // Claude signs in once per account: one agent, the first in the team's order.
     const claude = screen().getByRole("region", { name: "Seu plano do Claude" });
@@ -1166,14 +1168,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel.textContent).toContain("Theo, Ada, Lia e Atlas agora pensam com GLM Coding.");
     // Every agent has an AI: Who thinks has nobody left to offer the key for.
     expect(screen().queryByRole("region", { name: "Quem pensa" })).toBeNull();
-    // On a plan each answers only its owner, as the server sets them.
-    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
-    for (const a of r.state.agents) {
-      a.ownerUserId = "u-walter";
-      a.audience = { mode: "owner", userIds: [] };
-    }
-    // The list asked again, as after a move.
-    await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.agents(orgId) }));
+    // Moved onto the plan, each answers only its owner.
+    expect(r.state.agents.map((a) => a.audience?.mode)).toEqual(["owner", "owner", "owner", "owner"]);
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
     const note = () => screen().queryByText("Seus agentes só respondem a você.")?.closest(".setup-line");
@@ -1185,6 +1181,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const emails = screen().getByLabelText("E-mails");
     expect((note() as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // One agent on the API key answering everyone: someone invited gets an answer, so nothing to say.
+    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
     const first = r.state.agents[0];
     if (first) first.audience = { mode: "everyone", userIds: [] };
     await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.agents(orgId) }));

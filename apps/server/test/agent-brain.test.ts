@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { testConfig } from "@agenteschat/config";
 import { eq, schema } from "@agenteschat/db";
+import { applyBootSwitches } from "../src/start";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -226,21 +228,25 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
 });
 
 test("where the server provisions the computers (the Cloud), an agent on a plan replies to everyone once its owner says so", async () => {
-  const { api, asBia, agentId } = await workspace({
-    MACHINE_PROVISIONING: "external",
-    OPERATOR_API_TOKEN: "o".repeat(40),
-  });
-  // On its owner's plan, as a switch onto one leaves it: only its owner talks to it.
-  await t.db
-    .update(schema.agents)
-    .set({ brain: "claude_code", audienceMode: "owner" })
-    .where(eq(schema.agents.id, agentId));
-  const dm = async () => (await asBia("/dms", { json: { agentId } })).status;
-  expect(await dm()).toBe(403);
-  const on = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
-  expect(on.status).toBe(200);
-  expect(await on.json()).toMatchObject({ brain: "claude_code", onlyOwner: false });
-  expect(await dm()).toBe(200);
+  const cloud = { MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) };
+  // Booted as the Cloud's server boots: the switches `startServer` sets from this config.
+  applyBootSwitches(testConfig(cloud));
+  try {
+    const { api, asBia, agentId } = await workspace(cloud);
+    // On its owner's plan, as a switch onto one leaves it: only its owner talks to it.
+    await t.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "owner" })
+      .where(eq(schema.agents.id, agentId));
+    const dm = async () => (await asBia("/dms", { json: { agentId } })).status;
+    expect(await dm()).toBe(403);
+    const on = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
+    expect(on.status).toBe(200);
+    expect(await on.json()).toMatchObject({ brain: "claude_code", onlyOwner: false });
+    expect(await dm()).toBe(200);
+  } finally {
+    applyBootSwitches(testConfig());
+  }
 });
 
 test("the agent list says who thinks: the brain, its model's label, the computer only for admins and the owner", async () => {

@@ -13,6 +13,7 @@ import {
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
+  useAiAccounts,
   useAiStatus,
   useApi,
   useComputer,
@@ -26,7 +27,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
+import { groupPlans, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -676,6 +677,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ].filter((a) => a.kind === accountKind && (a.mine || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
+  // The row of the computer it thinks on, where its own sign-in's plan is (a seat has its own words).
+  const thinksOn = home?.machineId ?? view.computer?.machineId;
+  const row = useAiAccounts(org.id, view.canUsePlans && accountKind !== null).data?.computers.find(
+    (c) => c.machineId === thinksOn,
+  );
   // On a coding plan Claude Code keeps its aliases, each running the plan's model.
   const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
   // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
@@ -985,7 +991,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             on={!onlyOwner}
             onChange={(on) => setShare({ kind, onlyOwner: !on })}
             brain={accountKind}
-            plan={current?.plan}
+            plan={signInPlan({ account, accounts }, row, accountKind)}
             maker={plan?.maker}
           />
         ) : (

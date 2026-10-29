@@ -24,8 +24,11 @@ const click = async (el: Element) => {
 const brainCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args[2]);
 
-/** Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does). */
-async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "" } = {}) {
+/**
+ * Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does).
+ * `ownPlan`: the plan of the MacBook's own sign-in, as its row of the AI accounts says it.
+ */
+async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "", ownPlan = "" } = {}) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
@@ -42,6 +45,23 @@ async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider
     browser: { available: true, version: "1", chrome: null, reason: null },
   });
   await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+  if (ownPlan) {
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_1",
+          name: "MacBook",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: true },
+          own: { claude_code: { plan: ownPlan } },
+        },
+      ],
+    });
+  }
   const view = fakeAgentBrain(ADA_ID, {
     brain: "claude_code",
     effectiveModel: "sonnet",
@@ -97,7 +117,7 @@ describe("Responde a todos (Quem pensa)", () => {
     expect(document.body.textContent).toContain("A Ada agora só responde a você.");
   });
 
-  test("each plan in its own words: ChatGPT's plan, a team seat, a coding plan's maker", async () => {
+  test("each plan in its own words: ChatGPT's plan, a team seat (an account or the computer's own), a coding plan's maker", async () => {
     const terms = async () => {
       const row = replies(await brainDialog()).closest(".plan-replies") as HTMLElement;
       const line = row.querySelector(".plan-replies__terms > span")?.textContent ?? "";
@@ -124,10 +144,14 @@ describe("Responde a todos (Quem pensa)", () => {
       provider: null,
       keyHint: null,
     };
+    const SEAT =
+      "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.";
     await ada({ account: "acct_team", accounts: [seat] });
-    expect((await terms()).text).toBe(
-      "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
-    );
+    expect((await terms()).text).toBe(SEAT);
+    cleanup();
+    // The computer's own sign-in on a Team seat: the seat's words too, as the plan's panel says them.
+    await ada({ ownSignIn: true }, { ownPlan: "team" });
+    expect((await terms()).text).toBe(SEAT);
     cleanup();
     const glm: MachineAccount = {
       ...seat,

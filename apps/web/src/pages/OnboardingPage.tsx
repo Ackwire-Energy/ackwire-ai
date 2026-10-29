@@ -540,6 +540,8 @@ export function OnboardingPage() {
             failed = true;
           });
       }
+      // The Team step reads whom they reply to from the list the plan's panel loaded before the move.
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       if (failed)
         toast.show(
           t("onboarding.brain.failed", { brand: planLabel(t, choice), computer: machine?.name ?? "" }),

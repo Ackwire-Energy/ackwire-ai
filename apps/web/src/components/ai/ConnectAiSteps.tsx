@@ -1,6 +1,6 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
-import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import {
   computerEdition,
@@ -290,6 +290,9 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
   );
 }
 
+/** The computer's own sign-in as a brain view says it: no account. */
+const OWN_SIGN_IN = { account: null, accounts: [] } as const;
+
 function PlanSteps({
   choice,
   gates,
@@ -430,6 +433,8 @@ function PlanSteps({
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
   );
+  // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
+  const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
   // Who the agents reply to, once for the plan, as its foot: its icon says it, its switch changes it.
   const foot = (
     <div className="ac-card__foot ac-iconline ai-panel__replies">
@@ -439,7 +444,7 @@ function PlanSteps({
         on={replyAll}
         onChange={(on) => void replyToEveryone(on)}
         brain={kind}
-        plan={account?.plan ?? current?.plan ?? (own?.chosen || ownSaved ? gates.row?.own?.[kind]?.plan : null)}
+        plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
         maker={planOf(choice)?.maker}
         disabled={replying}
       />

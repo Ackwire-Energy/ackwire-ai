@@ -1895,7 +1895,6 @@ export const ptBR = {
           /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
             "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
-          /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
@@ -2612,7 +2611,7 @@ export const ptBR = {
     and: " e ",
   },
   members: {
-    /** Before inviting, while every agent with an AI answers only the person (a plan is personal). */
+    /** Before inviting, while every agent with an AI answers only the person. */
     agentsOnlyYou: "Seus agentes só respondem a você.",
     agentsOnlyYouHint: "Num plano, você pode deixar cada um responder a todos na página dele.",
     filters: "Filtrar pessoas",
