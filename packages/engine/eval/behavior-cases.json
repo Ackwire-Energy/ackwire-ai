@@ -274,7 +274,8 @@
       "rubric": [
         "Separates the new error (LUMEN-API-4F2) from the known one (LUMEN-API-3A1) and gives size and since when.",
         "Digs into the new error: its details/stack trace or the link with the 2.14.0 deploy, not only the title.",
-        "Creates an issue for the new error (or references an existing one) and recommends a concrete next step."
+        "Creates an issue for the new error (or references an existing one) and recommends a concrete next step.",
+        "The channel message reads like a colleague telling the team: it opens with the news itself (the new error), not with a verdict on the run ('Rodada tranquila', 'Resumo:') or a word about the routine or the check."
       ]
     }
   },
