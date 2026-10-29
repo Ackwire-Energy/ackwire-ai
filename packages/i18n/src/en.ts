@@ -2338,7 +2338,7 @@ export const en: Translations = {
       where: {
         name: "Where and who",
         title: "Where it works and with whom",
-        lead: "{{name}} joins the channels you check and answers to one person on the team.",
+        lead: "{{name}} joins the channels you check and has an owner on the team.",
       },
       model: {
         name: "Model and budget",
@@ -2533,8 +2533,6 @@ export const en: Translations = {
     noTools: "No tools",
     onlyContext: "Only the workspace context",
     noChannelsReview: "No channels: call it by @ or direct message",
-    answers: "Answers to",
-    talksTo: "talks with {{who}}",
     noOwnerAdmins: "No owner (admins)",
     editSection: "Edit {{section}}",
     hints: {
@@ -2557,7 +2555,6 @@ export const en: Translations = {
       hide: "Hide details",
       uses: "Can use",
       worksIn: "Works in",
-      answers: "Answers to",
       reads: "{{name}} · only looks",
       readsWrites: "{{name}} · looks and changes",
       onlyTalks: "Just talks, for now",

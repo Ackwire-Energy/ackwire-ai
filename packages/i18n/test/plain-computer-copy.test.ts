@@ -307,15 +307,24 @@ describe("computer copy", () => {
     }
   });
 
-  test("'responde a' only says whom an agent replies to: its header names its owner as whose it is", () => {
-    // The header sits over the page with "Responde a todos", where "responde a Lucas" would read as whom it replies to.
+  test("'responde a' only says whom an agent replies to, never whose agent it is", () => {
+    // The pages that say whom an agent replies to ("Responde a todos", "Quem pode falar") also name its owner: there
+    // "responde a Lucas", or "Responde a" over the owner's name, would read as whom it replies to.
     for (const [strings, replies] of [
       [ptBR, /\bresponde a\b/i],
       [en, /\b(answers|replies) to\b/i],
     ] as const) {
-      const headers = [...valuesOf(strings)].filter(([, v]) => v.startsWith("{{role}} ·") && v.includes("{{owner}}"));
+      const values = [...valuesOf(strings)];
+      const headers = values.filter(([, v]) => v.startsWith("{{role}} ·") && v.includes("{{owner}}"));
       expect(headers.map(([k]) => k)).toEqual(["dm.subtitle", "agent.subtitle"]);
-      expect(headers.filter(([, v]) => replies.test(v))).toEqual([]);
+      // The headers, every owner label and line, and on Criar agente the owner step's lead and the labels its review
+      // and its preview would put over the owner.
+      const page = ["newAgent.steps.where.lead", "newAgent.answers", "newAgent.preview.answers"];
+      const naming = values.filter(
+        ([k]) => headers.some(([h]) => h === k) || /(^|\.)owner\w*$/.test(k) || page.includes(k),
+      );
+      expect(naming.length).toBeGreaterThan(20);
+      expect(naming.filter(([, v]) => replies.test(v))).toEqual([]);
     }
   });
 

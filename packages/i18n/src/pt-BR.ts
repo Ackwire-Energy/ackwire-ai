@@ -2360,7 +2360,7 @@ export const ptBR = {
       where: {
         name: "Onde e quem",
         title: "Onde trabalha e com quem",
-        lead: "{{The}} {{name}} entra nos canais que você marcar e responde a uma pessoa do time.",
+        lead: "{{The}} {{name}} entra nos canais que você marcar e tem um responsável no time.",
       },
       model: {
         name: "Modelo e orçamento",
@@ -2559,8 +2559,6 @@ export const ptBR = {
     noTools: "Nenhuma ferramenta",
     onlyContext: "Só o contexto do workspace",
     noChannelsReview: "Nenhum canal: chame por @ ou mensagem direta",
-    answers: "Responde a",
-    talksTo: "fala com {{who}}",
     noOwnerAdmins: "Sem responsável (admins)",
     editSection: "Editar {{section}}",
     hints: {
@@ -2583,7 +2581,6 @@ export const ptBR = {
       hide: "Esconder detalhes",
       uses: "Pode usar",
       worksIn: "Trabalha em",
-      answers: "Responde a",
       reads: "{{name}} · só consulta",
       readsWrites: "{{name}} · consulta e muda",
       onlyTalks: "Só conversa, por enquanto",

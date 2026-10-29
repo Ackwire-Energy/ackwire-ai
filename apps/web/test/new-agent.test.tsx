@@ -485,6 +485,22 @@ describe("Criar agente: what gets created", () => {
     expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
     await proceed(2);
+    // The owner and who can talk each under a label of their own, in the review and the preview: under "Responde a",
+    // next to who can talk, the owner would read as whom the agent replies to.
+    const labelled = (rows: string, label: string, value: string) =>
+      [...document.querySelectorAll(rows)].map((r) => [
+        r.querySelector(label)?.textContent,
+        r.querySelector(value)?.textContent,
+      ]);
+    expect(labelled(".newag__review .newag__rv", ".newag__rv-k", ".newag__rv-v").slice(5, 7)).toEqual([
+      ["Responsável", "João"],
+      ["Quem pode falar", "Walter e João"],
+    ]);
+    expect(labelled(".newag__pv-sec", ".newag__pv-label", ".newag__chips").slice(2, 4)).toEqual([
+      ["Responsável", "João"],
+      ["Quem pode falar", "Walter e João"],
+    ]);
+    expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).not.toContain("Responde a");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({
