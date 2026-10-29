@@ -51,8 +51,8 @@
   font-size: 16px;
 }
 /*
- * In control, in the steps' line's place under the screen and as tall (13px text on a 22px line): what programs
- * there can see, and the keys. A phone's Keyboard button leads it with no baseline to share (a button's is its icon's
+ * Under the live screen, in the steps' line's place and as tall (13px text on a 22px line): what programs there can
+ * see, and in control the keys. A phone's Keyboard button leads it with no baseline to share (a button's is its icon's
  * bottom edge, about 4 px under its label's), so the words' first line is centred on the button, a touch control as
  * tall as `--control-h-md`.
  */
@@ -69,11 +69,21 @@
   margin-top: calc((var(--control-h-md) - 22px) / 2);
 }
 /*
+ * The ⓘ is the first sentence's, 4 px after its last letter as in any hint line; the keys' sentence starts clearly
+ * further on, so the ⓘ never reads as leading it.
+ */
+.dsk-words > .ac-hintline:not(:last-child) {
+  margin-inline-end: 8px;
+}
+/*
  * The window keeps one line's room for it (the phone's sheet and full screen don't, and let it wrap): its words stay
  * one line, the first sentence cut short only in a window too small for it, and the keys after it only where they fit
- * whole (they wrap to a second row it never shows).
+ * whole (they wrap to a second row it never shows). It is as tall as that room, a tablet's 40 px too.
  */
 @media (min-width: 721px) {
+  .cmp-dialog:not(.is-screen-only) .dsk-line {
+    min-height: var(--cmp-line);
+  }
   .cmp-dialog:not(.is-screen-only) .dsk-words {
     display: flex;
     flex-wrap: wrap;

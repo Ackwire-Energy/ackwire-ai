@@ -183,8 +183,8 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
-    // The wait takes the screen's box, the line under it kept empty, so the Pronto and the screen that follow it
-    // open in its place.
+    // The wait takes the screen's box and its line's room (the empty row steps aside, computer.css), as the Pronto and
+    // the opening cover after it do, so each opens in its place.
     const row = box().querySelector(".cmp-body > .cmp-prep + .cmp-steps-row");
     expect(row?.childElementCount).toBe(0);
     expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
@@ -223,7 +223,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     const socket = t.sockets.realtime.last();
     await act(async () => socket.open());
-    // The wait and the Pronto that follows it take one box: the screen's, over the line under it.
+    // The wait and the Pronto that follows it take one box: the screen's, with its line's room.
     expect(box().querySelector(".cmp-body > .cmp-prep + .cmp-steps-row")).toBeTruthy();
     // The computer is made, Ada is on it and its screen shows.
     const m = t.machines.pair({ name: "Computador da Acme", kind: "managed", os: "other" });
@@ -328,14 +328,14 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
-    // A cover takes the screen's frame, the line under it kept empty, as the screen that follows it opens.
+    // A cover takes the screen's frame and its line's room (the empty row steps aside), as the screen's own do.
     expect(box().querySelector(".cmp-stage")).toBeTruthy();
     expect(box().querySelector(".cmp-body > .cmp-steps-row")?.childElementCount).toBe(0);
   });
 });
 
 describe("the computer dialog, live", () => {
-  test("watching while the agent doesn't work: the line under the screen keeps its room, with nothing in it", async () => {
+  test("watching while the agent doesn't work: the steps' row stays empty, for the screen's own line to take its room", async () => {
     await dialog();
     expect(box().querySelector(".dsk")).toBeTruthy();
     const row = box().querySelector(".cmp-body > .cmp-steps-row");
@@ -373,7 +373,8 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row());
     await ev({ type: "agent.run", ...run, status: "done" });
     await settle(4);
-    // The steps go with the run, and their line stays, empty, so the window keeps its size.
+    // The steps go with the run; their row stays, empty, and steps aside for the screen's own line (computer.css), so
+    // the window keeps its size.
     expect(row()?.childElementCount).toBe(0);
   });
 

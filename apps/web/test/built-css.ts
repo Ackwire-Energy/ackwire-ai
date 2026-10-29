@@ -44,6 +44,33 @@ export function topLevel(css: string) {
   return out;
 }
 
+/** A media query as the minifier writes it: `(max-width: 720px)` as `(width<=720px)`, spaces out. */
+const mediaQuery = (query: string) =>
+  query
+    .replace(/\(\s*max-width\s*:\s*([\d.]+px)\s*\)/g, "(width<=$1)")
+    .replace(/\(\s*min-width\s*:\s*([\d.]+px)\s*\)/g, "(width>=$1)")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+/** The rules of every `@media` block whose query is `media`, however it is written, as one sheet. */
+export function atMedia(css: string, media: string) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const wanted = mediaQuery(media);
+  let out = "";
+  for (let at = text.indexOf("@media"); at >= 0; at = text.indexOf("@media", at + 1)) {
+    const open = text.indexOf("{", at);
+    if (mediaQuery(text.slice(at + "@media".length, open)) !== wanted) continue;
+    let depth = 0;
+    let end = open;
+    for (; end < text.length; end++) {
+      if (text[end] === "{") depth++;
+      else if (text[end] === "}" && --depth === 0) break;
+    }
+    out += `${text.slice(open + 1, end)}\n`;
+  }
+  return out;
+}
+
 const normal = (selector: string) =>
   selector
     .replace(/\s*([>+~,()])\s*/g, "$1")

@@ -590,6 +590,14 @@ export function DesktopView({
             )}
           </div>
         ))}
+      {/* Watching, the line says what programs there can see before anyone takes control, so the window's foot is as
+          deep as its sides. The ⓘ (what may be checked in control) and the keys come with control; full screen keeps
+          no line. */}
+      {!inControl && live && !head?.full && (
+        <div className="dsk-line">
+          <span className="dsk-words">{notice}</span>
+        </div>
+      )}
     </div>
   );
 }
