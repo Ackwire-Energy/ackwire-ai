@@ -354,6 +354,7 @@ samp {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
 .ac-field__error {
   font-size: 13px;
@@ -4085,8 +4086,9 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-1px);
 }
-/* Head: a key with the icon, title and an optional quiet line, the action on the right. The key (an
-   `.ac-iconline` lead) stays on the title's line when the quiet line wraps under it; the action stays centred. */
+/* Head: the lead (a key with the icon, the title and an optional quiet line), the action on the right. The key (an
+   `.ac-iconline` lead) stays on the title's first line when the title or the quiet line wraps; the action stays
+   centred. */
 .ac-card__head {
   display: flex;
   align-items: flex-start;
@@ -4094,13 +4096,23 @@ a.ac-list__row:focus-visible {
   min-width: 0;
   line-height: 20px;
 }
-/* A title alone sits in the middle of a taller action, and its key with it: already centred on the title's line, the
-   key only rises to the capitals' middle. */
+.ac-card__lead {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+/* A title alone sits in the middle of a taller action, and its key with it. Its first line keeps the middle of the
+   key's 22px, so the key only rises to the capitals' middle, however many lines follow. */
 .ac-card__head:not(:has(.ac-card__sub)) {
   align-items: center;
 }
-.ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key {
+.ac-card__head:not(:has(.ac-card__sub)) .ac-card__key {
   translate: 0 calc(-1 * var(--cap-mid));
+}
+.ac-card__head:not(:has(.ac-card__sub)) .ac-card__key + .ac-card__heading {
+  padding-block: 1px;
 }
 .ac-card__key {
   display: grid;
@@ -4132,6 +4144,7 @@ a.ac-list__row:focus-visible {
   color: var(--muted);
   font-size: 12.5px;
   line-height: 17px;
+  text-wrap: pretty;
 }
 .ac-card__action {
   display: flex;
@@ -6800,6 +6813,7 @@ button.ac-tools__row:focus-visible {
   font-size: 13px;
   color: var(--muted);
   margin-top: 1px;
+  text-wrap: pretty;
 }
 /* The chosen row's settings: under it, from the row's text edge (padding 16 + dot 18 + gap 12). */
 .ac-optrow__more {

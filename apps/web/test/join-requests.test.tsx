@@ -105,7 +105,7 @@ describe("an invitation link asks to join", () => {
       "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
     );
     const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
-    expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você e quem te convidou");
     expect(note.hasAttribute("aria-describedby")).toBe(false);
     await type(note, "Designer nova da Paula");
     expect(send.hasAttribute("disabled")).toBe(false);

@@ -644,7 +644,7 @@ function NewAgentFlow() {
               <Icon name="plus" />
             </span>
             <span className="newag__role-name">
-              <b>{t("newAgent.roles.custom.name")}</b>
+              <b className="ac-captop">{t("newAgent.roles.custom.name")}</b>
               <span>{t("newAgent.roles.custom.desc")}</span>
             </span>
           </button>

@@ -328,7 +328,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
         );
       }}
     >
-      <div className="grid-fields">
+      <div className="grid-fields grid-fields--wide">
         <Field
           label={t("storage.endpoint")}
           id="st-endpoint"

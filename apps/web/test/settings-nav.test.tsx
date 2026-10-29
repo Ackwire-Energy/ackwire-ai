@@ -132,6 +132,24 @@ describe("finding the settings", () => {
     ]);
     expect(screen().getByText("Perfil salvo.")).toBeTruthy();
   });
+
+  test("Fuso in the account menu says my zone in words under its name, as the selector does, never its id", async () => {
+    for (const [zone, words] of [
+      ["Europe/Lisbon", "Lisboa"],
+      ["Asia/Kathmandu", "Horário do Nepal"],
+    ] as const) {
+      const state = seedState();
+      const me = state.members.find((m) => m.userId === state.me?.user.id);
+      if (me) me.timezone = zone;
+      await go("issues", state);
+      const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
+      const item = within(menu).getByRole("menuitem", { name: /^Fuso horário/ });
+      // On a line of its own, as Perfil's: a long name ("Los Angeles (Pacífico dos EUA)") has the row's width.
+      const line = item.querySelector(".ac-menu__desc")?.textContent;
+      expect({ zone, line }).toEqual({ zone, line: words });
+      cleanup();
+    }
+  });
 });
 
 describe("the current section in the nav", () => {

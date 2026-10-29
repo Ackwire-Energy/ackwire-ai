@@ -150,7 +150,8 @@ export function ReachProgress({ stage }: { stage: ReachStage }) {
 /**
  * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, the command to copy where
  * the terminal does, "Copy details" when the server didn't answer again, and where to get Tailscale when it can't
- * share. Under the setup's step its mark already says it: the alert icon is Preferences' only.
+ * share. Under the setup's step its mark already says it (the alert icon is Preferences' only), and where to try
+ * again comes last, after the fix.
  */
 export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "fail" | "prefs" }) {
   const { t } = useTranslation();
@@ -163,7 +164,7 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
     >
       {text === "prefs" && <Icon name="alert" size={16} />}
       <span>
-        {text === "fail" ? t("desktop.here.fail.reach", { reason }) : t("desktop.server.reachFailed", { reason })}
+        {t("desktop.server.reachFailed", { reason })}
         {problem.reason === "serve" && ` ${t("desktop.here.serveFix")}`}
         {problem.reason === "https" && (
           <>
@@ -188,6 +189,12 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
           <>
             {" "}
             <CopyDetails as="link" />
+          </>
+        )}
+        {text === "fail" && (
+          <>
+            {" "}
+            <span className="dk-fr__retry">{t("desktop.here.fail.retry")}</span>
           </>
         )}
       </span>

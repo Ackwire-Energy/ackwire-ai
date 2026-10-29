@@ -4,8 +4,8 @@ import { build } from "vite";
 const WEB = join(import.meta.dir, "..");
 
 /**
- * A stylesheet as the production build writes it, the app's own unless `input` names another (a component's, from
- * apps/web): Vite's own CSS pipeline (its minifier and targets).
+ * A stylesheet as the production build writes it, the app's own unless `input` names another (a page's or a
+ * component's, from apps/web): Vite's own CSS pipeline (its minifier and targets).
  */
 export async function builtCss(input = "src/styles.css") {
   const out = await build({
