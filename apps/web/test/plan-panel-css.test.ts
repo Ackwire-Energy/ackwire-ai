@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { builtCss, declarations, topLevel } from "./built-css";
+import { join } from "node:path";
+import { builtCss, declarations, rules, topLevel } from "./built-css";
 
 /** A colour's alpha as the minifier writes it (#rgba, #rrggbbaa) or as rgba(). */
 const alphaOf = (color: string) => {
@@ -63,4 +64,38 @@ test("what ships keeps dark's chosen press visible, the ready line apart from th
   // Under the key's steps its note keeps their columns: the icon centred in the 20px numbers', the words on the text's.
   expect(last(".ai-panel > .agp-addacct__step ~ .ac-setnote", "gap")).toBe("12px");
   expect(last(".ai-panel > .agp-addacct__step ~ .ac-setnote > :first-child", "margin-inline")).toBe("3px");
+});
+
+test("what ships rests a chosen control's neighbours on its pressed face, and a chosen card's tile is that face", async () => {
+  // The pages' own sheets with the app's: a control and its chosen state may live in one.
+  const sheets = [...new Bun.Glob("src/{pages,components}/**/*.css").scanSync({ cwd: join(import.meta.dir, "..") })];
+  const css = await builtCss("src/styles.css", ...sheets);
+  const shipped = rules(css);
+  const sets = (r: (typeof shipped)[number], value: string) =>
+    r.declarations.some(([p, v]) => (p === "background" || p === "background-color") && v === value);
+
+  // Light's pressed face is its --sunken, dark's is lighter than its own: a control resting sunken while its chosen
+  // state is the pressed face reads lighter chosen than not, in dark alone. Each rests on the pressed face instead.
+  const STATE =
+    /(\[aria-pressed=true\]|\[data-state=checked\]|\[aria-current=true\]|\[data-checked=true\]|\.is-on|\.is-selected)$/;
+  const chosen = shipped
+    .filter((r) => sets(r, "var(--chosen-bg)"))
+    .flatMap((r) => r.selectors.filter((s) => STATE.test(s)).map((s) => s.replace(STATE, "")));
+  expect(chosen).toEqual(expect.arrayContaining([".ac-recur__day", ".newag__opt", ".cal-chip", ".ac-optrow"]));
+  const sunken = shipped
+    .filter((r) => sets(r, "var(--sunken)") || sets(r, "var(--surface-sunken)"))
+    .flatMap((r) => r.selectors);
+  expect(sunken.length).toBeGreaterThan(0);
+  expect(sunken.filter((s) => chosen.some((base) => s === base || s.startsWith(`${base}[`)))).toEqual([]);
+
+  // A tile resting sunken on an option card is the chosen card's pressed face, as light's sunken is.
+  const background = (selector: string) =>
+    declarations(css, selector)
+      .filter(([p]) => p === "background")
+      .at(-1)?.[1];
+  for (const tile of [".audience-card__icon", ".agp-wdlg__key"])
+    expect([background(tile), background(`.ac-optrow[data-state="checked"] ${tile}`)]).toEqual([
+      "var(--surface-sunken)",
+      "var(--chosen-bg)",
+    ]);
 });

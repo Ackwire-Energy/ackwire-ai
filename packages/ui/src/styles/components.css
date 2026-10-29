@@ -5671,7 +5671,8 @@ button.ac-tools__row:focus-visible {
   height: var(--control-h-sm);
   border: 0;
   border-radius: var(--control-r-sm);
-  background: var(--sunken);
+  /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen day. */
+  background: var(--chosen-bg);
   color: var(--ink2);
   font: inherit;
   font-size: 12.5px;

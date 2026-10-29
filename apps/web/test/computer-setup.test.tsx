@@ -997,6 +997,32 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel().textContent?.split("pronto")).toHaveLength(2);
   });
 
+  test("the account's sign-in on the workspace's computer says the computer, never its name", async () => {
+    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(panel).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    await act(async () =>
+      fireEvent.change(within(panel).getByRole("textbox", { name: "Código do Claude" }), {
+        target: { value: "c0de#st4te" },
+      }),
+    );
+    await click(within(panel).getByRole("button", { name: "Enviar ao computador" }));
+    await settle(4);
+    expect(r.state.calls.filter((c) => c.method === "machines.sendAccountCode")).toHaveLength(1);
+    expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");
+    // Its hints too.
+    expect(panel.querySelector(".agp-addacct")?.textContent).not.toContain("Acme Saúde");
+  });
+
   test("the AI step as it turns ready, the agent's view and the accounts still on their way: ready, its sign-in loading, never a wait", async () => {
     for (const plan of ["Claude", "GLM Coding"] as const) {
       const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });

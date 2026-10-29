@@ -668,7 +668,8 @@ function PlanSteps({
           key={turn?.id}
           machineId={view?.computer?.machineId ?? ""}
           kind={kind}
-          computer={computer}
+          // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
+          computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(coding ? { provider: choice } : {})}
           again={signedOut?.id}
           email={turn && sameAs ? sameAs : signedOut?.email}
