@@ -4,7 +4,7 @@ import { type Config, configSchema, envVars } from "./schema";
 export { connectorOAuthApps, githubAppConfig } from "./connectors";
 export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./schema";
 
-/** agentes.chat's own servers: their legal pages are their own. */
+/** agentes.chat's own servers: their legal pages are their own, and their mail goes out from agentes.chat. */
 const OFFICIAL_HOSTS = new Set(["app.agentes.chat", "agentes.chat", "www.agentes.chat"]);
 
 /** Whether a VAPID public key (an uncompressed P-256 point) belongs to this private key (`d`), both base64url. */
@@ -84,6 +84,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     config.TERMS_URL ??= `${site.origin}/terms`;
     config.PRIVACY_URL ??= `${site.origin}/privacy`;
+    config.EMAIL_FROM ??= "agentes.chat <ola@agentes.chat>";
   }
   return config;
 }
