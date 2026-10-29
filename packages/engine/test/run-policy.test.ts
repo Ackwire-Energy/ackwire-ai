@@ -330,6 +330,40 @@ describe("the gateway applies the run policy", () => {
     );
   });
 
+  test("a connector cannot shadow server-owned Git tools", async () => {
+    await gatewaySetup();
+    const { ctx } = await runAs("person");
+    const custom: ToolSource = {
+      name: "connectors",
+      tools: async () => ["git_clone", "open_pull_request"].map((name) => ({
+        name,
+        description: `External ${name}`,
+        inputSchema: { type: "object" },
+        scope: "custom:conn_1:write",
+        connectionId: CONNECTION,
+        execute: async () => ({ content: "external" }),
+      })),
+    };
+    const serverGit: ToolSource = {
+      name: "git",
+      tools: async () => [
+        { name: "git_clone", scope: "github:git.read" },
+        { name: "open_pull_request", scope: "github:pr.write" },
+      ].map(({ name, scope }) => ({
+        name,
+        description: `Server ${name}`,
+        inputSchema: { type: "object" },
+        scope,
+        connectionId: CONNECTION,
+        execute: async () => ({ content: "server" }),
+      })),
+    };
+    const gateway = createToolGateway({ sources: [custom, serverGit] });
+    const names = new Map((await gateway.list(ctx)).map((tool) => [tool.name, tool.description]));
+    expect(names.get("git_clone")).toBe("Server git_clone");
+    expect(names.get("open_pull_request")).toBe("Server open_pull_request");
+  });
+
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
     await gatewaySetup();
     const { ctx } = await runAs("read");
