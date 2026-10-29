@@ -308,7 +308,7 @@ export const ptBR = {
       lead: "Eles chegam com instruções, skills, rotinas e memória.",
       sourcesLabel: "De onde vêm os agentes",
       otherName: "Outro app",
-      agenteschatName: "Exportação do agentes.chat",
+      agenteschatName: "agentes.chat",
       where: {
         openbotrun:
           "Solte o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância), ou o .zip em que ele veio.",
@@ -1018,16 +1018,16 @@ export const ptBR = {
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
     banner: {
-      org: "Os agentes ainda não têm uma IA.",
+      org: "Os agentes ainda não têm uma\u00a0IA.",
       orgHint: "Você também pode pedir no chat, como “usar meu plano do Claude”.",
       orgAction: "Conectar uma IA",
     },
-    agent: "{{name}} não vai responder porque não tem uma IA conectada.",
+    agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
       answering: "{{name}} está respondendo…",
-      stillMissing: "Ainda falta conectar uma IA para {{name}}.",
+      stillMissing: "Ainda falta conectar uma IA para\u00a0{{name}}.",
     },
     action: "Conectar",
     locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",
@@ -1132,7 +1132,7 @@ export const ptBR = {
     connected: "Conectado",
   },
   dm: {
-    subtitle: "{{role}} · responde a {{owner}}",
+    subtitle: "{{role}} · de {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
     profile: "Ver perfil",
     emptyAgent: "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
@@ -1775,7 +1775,7 @@ export const ptBR = {
     builtinName: "agentes",
     builtinNote: "permissões embutidas",
     connectHint: "Conectar serviços",
-    subtitle: "{{role}} · responde a <b>{{owner}}</b> · {{model}} {{key}}",
+    subtitle: "{{role}} · de <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · sem responsável · {{model}} {{key}}",
     withOrgKey: "com a chave da {{org}}",
     openIn: "Abrir no #{{channel}}",
@@ -2360,7 +2360,7 @@ export const ptBR = {
       where: {
         name: "Onde e quem",
         title: "Onde trabalha e com quem",
-        lead: "{{The}} {{name}} entra nos canais que você marcar e responde a uma pessoa do time.",
+        lead: "{{The}} {{name}} entra nos canais que você marcar e tem um responsável no time.",
       },
       model: {
         name: "Modelo e orçamento",
@@ -2559,8 +2559,6 @@ export const ptBR = {
     noTools: "Nenhuma ferramenta",
     onlyContext: "Só o contexto do workspace",
     noChannelsReview: "Nenhum canal: chame por @ ou mensagem direta",
-    answers: "Responde a",
-    talksTo: "fala com {{who}}",
     noOwnerAdmins: "Sem responsável (admins)",
     editSection: "Editar {{section}}",
     hints: {
@@ -2583,7 +2581,6 @@ export const ptBR = {
       hide: "Esconder detalhes",
       uses: "Pode usar",
       worksIn: "Trabalha em",
-      answers: "Responde a",
       reads: "{{name}} · só consulta",
       readsWrites: "{{name}} · consulta e muda",
       onlyTalks: "Só conversa, por enquanto",

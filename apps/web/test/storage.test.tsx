@@ -156,6 +156,11 @@ describe("Configurações → Armazenamento", () => {
         { cloud: true, en: true },
       ),
     ).toEqual(["Your files stay in our storage, kept apart per workspace.", "3.2 GB of files"]);
+    // The Cloud keeps them on its own disk too, which every workspace there shares: its server sends no disk, so the
+    // line is the workspace's files alone.
+    const cloudDisk = { storagePlatform: { kind: "disk", folder: null } as StoragePlatform, storageUsage: held(0) };
+    expect((await lines(cloudDisk, { cloud: true }))[1]).toBe("Nenhum arquivo");
+    expect((await lines(cloudDisk, { cloud: true, en: true }))[1]).toBe("No files");
   });
 
   test("on its own bucket, that option says what the bucket holds; picked and not saved, the line stays put", async () => {

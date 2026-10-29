@@ -3488,15 +3488,21 @@ p {
   margin-top: -36px;
   padding: 0 24px 4px;
 }
+/*
+ * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
+ * air up and down as it does sideways, so the row is its ink. 24px is the sheet's own inset, where its icon and words
+ * start, and keeps the × under the sky's densest top rows, whose lightest pixels in dark come close to its own ink. On
+ * the sky it takes the full ink: the muted one fades into a dark sky.
+ */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 24px;
+  right: 24px;
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
-/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
 .catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  margin-block: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
   color: var(--ink);
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
@@ -6912,6 +6918,8 @@ a.machine-row__name:hover {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
+  /* Criar agente's column doesn't wrap pretty, as the onboarding's does. */
+  text-wrap: pretty;
 }
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
@@ -10105,8 +10113,18 @@ html[data-menu-overlay] .shell {
 /* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
   padding: 12px var(--text-edge);
-  /* Short lines: wrapped, they break into two of a length. */
+}
+/* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
+   The e-mail line then runs the bar's column, so the well isn't empty on its right. */
+.ai-panel__wait:has(> .setup-progress),
+.ai-panel__wait > [role="status"] {
   text-wrap: balance;
+}
+/* Without pretty (Safari before 26) the e-mail line would end on a word alone. */
+@supports not (text-wrap: pretty) {
+  .ai-panel__wait {
+    text-wrap: balance;
+  }
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
    hang in before them. */

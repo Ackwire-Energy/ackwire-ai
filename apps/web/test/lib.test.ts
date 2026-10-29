@@ -163,7 +163,7 @@ describe("grammar", () => {
     const ada = agentGrammar(te, "Ada");
     const theo = agentGrammar(te, "Theo");
     // Her page says "her" in both lines it has for her.
-    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI connected.");
+    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI\u00a0connected.");
     expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
     expect(te("agentPage.work.cell.label", ada)).toBe("How she works");
     expect(te("agentPage.overview.proposes", ada)).toBe("Ada proposes changing her instructions");
@@ -216,7 +216,7 @@ describe("grammar", () => {
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
     for (const name of masculine)
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
-    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI connected.");
+    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
     expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
   });
 

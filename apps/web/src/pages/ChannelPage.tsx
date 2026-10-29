@@ -183,7 +183,7 @@ import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/b
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
-import { ChannelMembersStack } from "@/components/ChannelMembers";
+import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -1616,9 +1616,7 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  <Button size="sm" onClick={() => setDetailsOpen(true)}>
-                    {t("channel.details")}
-                  </Button>
+                  <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>
             )}

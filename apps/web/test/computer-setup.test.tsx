@@ -308,10 +308,10 @@ describe("no AI yet while the workspace's computer is on its way", () => {
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;
     const ask = "Você também pode pedir no chat, como “usar meu plano do Claude”.";
-    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
     await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
-    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
   });
 });

@@ -39,6 +39,19 @@ export function mix(a: string, b: string, k: number): string {
 export const opaque = (color: string, over: string) =>
   mix(over, color, Number(/^rgba\(.*[,/]\s*([\d.]+)\s*\)$/.exec(color.trim())?.[1] ?? 1));
 
+/** WCAG contrast ratio between two opaque colors (1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  const lum = (color: string) => {
+    const [r, g, bl] = parseColor(color).map((v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /** A color as a little-endian RGBA pixel (for a Uint32Array over ImageData). */
 export function pixelOf(color: string): number {
   const [r, g, b] = parseColor(color);

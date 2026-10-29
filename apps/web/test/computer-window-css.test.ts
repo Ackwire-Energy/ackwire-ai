@@ -90,17 +90,17 @@ test("the head's controls ship on the name's capitals, full screen's bar's in it
   expect(await ships(COMPUTER, `src/${COMPUTER}`, '[data-theme="dark"] .cmp-acts > .cmp-back')).toContain(
     "margin-inline:1px",
   );
+  // On the full-screen sheet they stand as far under its edge as its sides are in (20 px, a phone's 16): the head's top
+  // holds the half of them that rises past the name's 24 px line and the capitals' lift.
+  const sheet = ".cmp-dialog:not(.is-screen-only) .ac-dialog__head";
+  const lift = "(var(--cmp-button)-24px)/2+var(--title-cap-mid,var(--cap-mid))";
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, sheet, PHONE)).toContain(`padding-top:calc(20px+${lift})`);
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, sheet, "@media (max-width: 640px)")).toContain(
+    `padding-top:calc(16px+${lift})`,
+  );
 });
 
-/** `(a·cqh − b·cqw) / 2` for a body `w` × `h` px, as written or as the minifier folds it. */
-function half(value: string, w: number, h: number) {
-  const v = value.replace(/\s+/g, "");
-  if (v === "calc((100cqh-100cqw*900/1280)/2)") return (h - (w * 900) / 1280) / 2;
-  const folded = v.match(/^calc\(([\d.]+)cqh-([\d.]+)cqw\)$/);
-  return folded ? (Number(folded[1]) * h - Number(folded[2]) * w) / 100 : Number.NaN;
-}
-
-test("on a phone the screen and its covers ship as one box in the sheet's middle, risen while the keyboard is up", async () => {
+test("on a phone the screen and its covers ship as one box, one block with its line in the sheet's middle that the agent never moves, risen while the keyboard is up", async () => {
   expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog:not(.is-screen-only) > .cmp-body", PHONE)).toContain(
     "container-type:size",
   );
@@ -127,27 +127,45 @@ test("on a phone the screen and its covers ship as one box in the sheet's middle
     const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, PHONE);
     expect(shipped).toEqual(expect.arrayContaining(["position:relative", "place-self:stretch"]));
   }
-  // Over the box, room that gives: at most half of what the box leaves (243 px on a 390 × 844 phone's body, none where
-  // the box fills it), less where what goes under the box would run past the foot. It adds no gap of its own.
-  const over = await ships(
-    COMPUTER,
-    `src/${COMPUTER}`,
-    ".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before",
-    PHONE,
-    ["max-height"],
-  );
+  // Over the block and under it (the box, then what goes under it: its line, the steps, a banner, after which it
+  // comes), the same room that gives, so it sits in the middle, rising where it wouldn't fit. Neither adds a gap of its
+  // own.
+  const body = ".cmp-dialog:not(.is-screen-only) > .cmp-body";
+  const under = await ships(COMPUTER, `src/${COMPUTER}`, `${body}:has(> :is(.dsk, .cmp-stage))::after`, PHONE);
+  expect(under).toEqual(expect.arrayContaining(['content:""', "order:1", "flex:110", "margin-top:-8px"]));
+  expect(
+    await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog:not(.is-screen-only) .cmp-body > .cmp-banner", PHONE),
+  ).toContain("order:1");
+  const over = await ships(COMPUTER, `src/${COMPUTER}`, `${body}:has(> :is(.dsk, .cmp-stage))::before`, PHONE);
   expect(over).toEqual(expect.arrayContaining(['content:""', "flex:110", "margin-bottom:-8px"]));
-  const most = over.find((d) => d.startsWith("max-height:"))?.slice("max-height:".length) ?? "";
-  expect(half(most, 358, 738)).toBeCloseTo((738 - (358 * 900) / 1280) / 2, 1);
-  expect(half(most, 358, 200)).toBeLessThan(0);
-  // The phone's keyboard up: none, the box at the sheet's top; it glides there unless less motion is asked.
+  expect(over.some((d) => d.startsWith("max-height:"))).toBe(false);
+  // Watching, the box holds the place where it and its line's room (`--cmp-line`, two lines on a phone held upright)
+  // sit in the middle, the words' ink 4 px short of the room's foot: the run's steps in the line's place, as close as
+  // the notice's lines, and a banner under it never move the screen, unless they wouldn't fit under it.
+  const watching = `${body}:has(.dsk-line):not(:has(> .dsk.is-control))`;
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, `${watching}::before`, PHONE)).toEqual([
+    "max-height:calc((100cqh-100cqw*900/1280-8px-var(--cmp-line)+4px)/2)",
+  ]);
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, `${watching}::after`, PHONE)).toEqual(["flex-grow:0"]);
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".ac-dialog.cmp-dialog", "@media (max-width: 480px)")).toEqual([
+    "--cmp-line:44px",
+  ]);
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-steps", PHONE)).toContain("gap:08px");
+  // In control the block ends at its line's ink: the Keyboard button's edge, or the words' 4 px under their
+  // descenders, given back where the words reach under the button (a banner after them keeps its gap).
+  const keys = `${body} > .dsk.is-control > .dsk-line`;
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, keys, PHONE)).toEqual(["min-height:0"]);
+  const words = `${body}:not(:has(> .cmp-banner)) > .dsk.is-control > .dsk-line > :last-child`;
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, words, PHONE)).toEqual(["margin-bottom:-4px"]);
+  // The phone's keyboard up: no share of the room over the box, at the sheet's top. The share glides there and back
+  // unless less motion is asked: in control it rests at its share, under any bound a glide could aim at.
   const typing = await ships(
     COMPUTER,
     `src/${COMPUTER}`,
-    ".cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before",
+    `${body}:has(:is(.dsk-keys, .brw-ac__note):focus)::before`,
     "@media (max-width: 720px) and (pointer: coarse)",
   );
-  expect(typing).toContain("max-height:0");
+  expect(typing).toEqual(["flex-grow:0"]);
   const glide = await ships(
     COMPUTER,
     `src/${COMPUTER}`,
@@ -155,7 +173,7 @@ test("on a phone the screen and its covers ship as one box in the sheet's middle
     "@media (max-width: 720px) and (prefers-reduced-motion: no-preference)",
     ["transition"],
   );
-  expect(glide.some((d) => d.startsWith("transition:max-height"))).toBe(true);
+  expect(glide.some((d) => d.startsWith("transition:flex-grow"))).toBe(true);
 });
 
 test("the keys line's ⓘ ships with its first sentence, the keys clearly further on", async () => {
@@ -179,4 +197,22 @@ test("the wait's bar ships as far from the right as from the left: setup's well 
     ":is(.setup-wait, .setup-card) > :is(.setup-progress:not(.ac-iconline), .setup-eta)",
   );
   expect(start).toContain("margin-left:22px");
+});
+
+test("the window's wait with no bar to set its column ships each line in the middle, its icon on its first words' capitals", async () => {
+  const none = ".cmp-prep .setup-wait:not(:has(.ac-steps))";
+  const wait = await ships(COMPUTER, `src/${COMPUTER}`, none);
+  expect(wait).toEqual(expect.arrayContaining(["text-align:center", "padding-inline-end:0"]));
+  // The icon flows with the words, so it leads the first line wherever that line starts once centred.
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, `${none} > .ac-iconline`)).toContain("display:block");
+  const lead = await ships(COMPUTER, `src/${COMPUTER}`, `${none} > .ac-iconline > :first-child`);
+  expect(lead).toEqual(
+    expect.arrayContaining([
+      "margin-inline-end:8px",
+      "translate:none",
+      "vertical-align:calc(var(--cap-top)-var(--cap-mid)-7px)",
+    ]),
+  );
+  // The time left leads with nothing: no column to start in.
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, `${none} > .setup-eta`)).toContain("margin-left:0");
 });

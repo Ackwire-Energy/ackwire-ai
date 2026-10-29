@@ -301,7 +301,7 @@ export const en: Translations = {
       lead: "They come with their instructions, skills, routines and memory.",
       sourcesLabel: "Where the agents come from",
       otherName: "Another app",
-      agenteschatName: "agentes.chat export",
+      agenteschatName: "agentes.chat",
       where: {
         openbotrun:
           "Drop openbot-import.json (from Migrator by OpenBot) or openbot-transfer.json (from the instance transfer), or the .zip it came in.",
@@ -1004,16 +1004,16 @@ export const en: Translations = {
   },
   noAi: {
     banner: {
-      org: "Your agents don't have an AI yet.",
+      org: "Your agents don't have an AI\u00a0yet.",
       orgHint: "You can also ask in the chat, like “use my Claude plan”.",
       orgAction: "Connect an AI",
     },
-    agent: "{{name}} won't reply because {{she}} has no AI connected.",
+    agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
       answering: "{{name}} is answering…",
-      stillMissing: "{{name}} still has no AI connected.",
+      stillMissing: "{{name}} still has no AI\u00a0connected.",
     },
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
@@ -1114,7 +1114,7 @@ export const en: Translations = {
     connected: "Connected",
   },
   dm: {
-    subtitle: "{{role}} · answers to {{owner}}",
+    subtitle: "{{role}} · owned by {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
     profile: "View profile",
     emptyAgent: "Ask {{pronoun}} to remember, forget or work differently.",
@@ -1757,7 +1757,7 @@ export const en: Translations = {
     builtinName: "agentes",
     builtinNote: "built-in permissions",
     connectHint: "Connect services",
-    subtitle: "{{role}} · answers to <b>{{owner}}</b> · {{model}} {{key}}",
+    subtitle: "{{role}} · owned by <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · no owner · {{model}} {{key}}",
     withOrgKey: "with the {{org}} key",
     openIn: "Open in #{{channel}}",
@@ -2338,7 +2338,7 @@ export const en: Translations = {
       where: {
         name: "Where and who",
         title: "Where it works and with whom",
-        lead: "{{name}} joins the channels you check and answers to one person on the team.",
+        lead: "{{name}} joins the channels you check and has an owner on the team.",
       },
       model: {
         name: "Model and budget",
@@ -2533,8 +2533,6 @@ export const en: Translations = {
     noTools: "No tools",
     onlyContext: "Only the workspace context",
     noChannelsReview: "No channels: call it by @ or direct message",
-    answers: "Answers to",
-    talksTo: "talks with {{who}}",
     noOwnerAdmins: "No owner (admins)",
     editSection: "Edit {{section}}",
     hints: {
@@ -2557,7 +2555,6 @@ export const en: Translations = {
       hide: "Hide details",
       uses: "Can use",
       worksIn: "Works in",
-      answers: "Answers to",
       reads: "{{name}} · only looks",
       readsWrites: "{{name}} · looks and changes",
       onlyTalks: "Just talks, for now",
