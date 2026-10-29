@@ -23,10 +23,10 @@ import {
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
 import { AUTO } from "@agenteschat/client/lib/providers";
-import { useNavigation } from "expo-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { usePreventRemove } from "expo-router";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
@@ -54,7 +54,6 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
   const toast = useToast();
   const failed = useFailed();
   const api = useApi();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -67,7 +66,7 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
   const library = useSkills(orgId);
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
 
   const suggested = suggestAgentName(dir.agents.map((a) => a.name));
   const [index, setIndex] = useState(initialWhat ? 1 : 0);
@@ -119,18 +118,13 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
 
   // Leaving with a draft asks first; the header's back leaves the whole flow.
   const dirty = role !== null || name.trim() !== "" || instructions.trim() !== "";
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (e) => {
-        if (created.current || !dirty) return;
-        e.preventDefault();
-        Alert.alert(t("mobile.newAgent.leaveTitle"), t("mobile.newAgent.leaveText"), [
-          { text: t("mobile.newAgent.keepGoing"), style: "cancel" },
-          { text: t("newAgent.leave"), style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
-        ]);
-      }),
-    [navigation, dirty, t],
-  );
+  usePreventRemove(dirty, ({ repeat }) => {
+    if (created.current) return repeat();
+    Alert.alert(t("mobile.newAgent.leaveTitle"), t("mobile.newAgent.leaveText"), [
+      { text: t("mobile.newAgent.keepGoing"), style: "cancel" },
+      { text: t("newAgent.leave"), style: "destructive", onPress: repeat },
+    ]);
+  });
 
   const goTo = (i: number) => {
     setTried(false);

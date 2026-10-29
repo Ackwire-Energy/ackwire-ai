@@ -2529,8 +2529,10 @@ export const en: Translations = {
     price: "US$ {{input}} / {{output}} per million tokens",
     plans: "With a plan, on a computer",
     plansHelp: "Claude Code or Codex with the subscription of whoever connected the computer. No key needed.",
-    planOnlyOwner: "On a plan, {{name}} starts answering only {{owner}}. You can let more people in on {{name}}'s page.",
-    planNotSaved: "{{name}} is ready, but {{brain}} couldn't be set up now. Choose it again in Who thinks, on {{name}}'s page.",
+    planOnlyOwner:
+      "On a plan, {{name}} starts answering only {{owner}}. You can let more people in on {{name}}'s page.",
+    planNotSaved:
+      "{{name}} is ready, but {{brain}} couldn't be set up now. Choose it again in Who thinks, on {{name}}'s page.",
     autoCost: "The cost follows each task",
     noKeyFor: "No {{provider}} key",
     key: "Key",

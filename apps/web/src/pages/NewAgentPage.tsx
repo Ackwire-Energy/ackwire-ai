@@ -59,8 +59,8 @@ import {
   ModelCards,
   NO_OWNER,
   OwnerSelect,
-  type PlanChoice,
   PlanCards,
+  type PlanChoice,
   usd,
 } from "@/components/AgentFields";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";

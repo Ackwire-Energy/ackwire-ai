@@ -32,7 +32,10 @@ describe("an agent's look", () => {
       ),
     ).toBe(false);
     let seed = 1;
-    const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
     for (let i = 0; i < 50; i++) {
       const next = shuffleLook(now, rand);
       expect(sameLook(next, now)).toBe(false);

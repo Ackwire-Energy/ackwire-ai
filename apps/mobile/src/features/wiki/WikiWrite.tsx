@@ -2,8 +2,8 @@ import { ApiError, keys, useApi, useWikiAction, useWikiPage, useWikiTree, type W
 import { prefixLines, wikiQuery, wrapSelection } from "@agenteschat/client/lib/wiki";
 import { diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useNavigation } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router, usePreventRemove } from "expo-router";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  type TextInputInstance,
   type TextInputSelectionChangeEvent,
   View,
 } from "react-native";
@@ -57,7 +58,6 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
   const failed = useFailed();
   const api = useApi();
   const qc = useQueryClient();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
@@ -69,32 +69,27 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
   const [conflict, setConflict] = useState<WikiPage | null>(null);
   const [saving, setSaving] = useState(false);
   const leaving = useRef(false);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
   const dirty = page ? body !== page.body : body.trim() !== "";
   const token = mode === "write" && sel.start === sel.end ? wikiQuery(body, sel.start) : null;
   const suggestions = token ? suggestPages(pages, token.query, 3) : [];
 
   // Leaving with changes asks first (back, the edge swipe, close).
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (e) => {
-        if (leaving.current || !dirty) return;
-        e.preventDefault();
-        Alert.alert(t("mobile.wiki.discardTitle"), t("mobile.wiki.discardText"), [
-          { text: t("mobile.wiki.keepWriting"), style: "cancel" },
-          {
-            text: t("mobile.wiki.discard"),
-            style: "destructive",
-            onPress: () => {
-              leaving.current = true;
-              navigation.dispatch(e.data.action);
-            },
-          },
-        ]);
-      }),
-    [navigation, dirty, t],
-  );
+  usePreventRemove(dirty, ({ repeat }) => {
+    if (leaving.current) return repeat();
+    Alert.alert(t("mobile.wiki.discardTitle"), t("mobile.wiki.discardText"), [
+      { text: t("mobile.wiki.keepWriting"), style: "cancel" },
+      {
+        text: t("mobile.wiki.discard"),
+        style: "destructive",
+        onPress: () => {
+          leaving.current = true;
+          repeat();
+        },
+      },
+    ]);
+  });
 
   const apply = (r: { text: string; start: number; end: number }) => {
     tapHaptic();
@@ -116,8 +111,18 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
       text: "I",
       run: () => apply(wrapSelection(body, sel.start, sel.end, "_", "_", t("wiki.editor.italicText"))),
     },
-    { key: "heading", label: t("wiki.editor.heading"), text: "H", run: () => apply(prefixLines(body, sel.start, sel.end, "## ")) },
-    { key: "list", label: t("wiki.editor.list"), icon: "list", run: () => apply(prefixLines(body, sel.start, sel.end, "- ")) },
+    {
+      key: "heading",
+      label: t("wiki.editor.heading"),
+      text: "H",
+      run: () => apply(prefixLines(body, sel.start, sel.end, "## ")),
+    },
+    {
+      key: "list",
+      label: t("wiki.editor.list"),
+      icon: "list",
+      run: () => apply(prefixLines(body, sel.start, sel.end, "- ")),
+    },
     {
       key: "task",
       label: t("wiki.editor.task"),
@@ -379,7 +384,13 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
  * "Nova página" (a short sheet over the wiki): the title, the folder with the folders in use as shortcuts, and
  * "Criar e escrever", which closes the sheet and opens the writing. Nothing is created until Salvar there.
  */
-export function WikiNewSheet({ title: initialTitle = "", folder: initialFolder = "" }: { title?: string; folder?: string }) {
+export function WikiNewSheet({
+  title: initialTitle = "",
+  folder: initialFolder = "",
+}: {
+  title?: string;
+  folder?: string;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -448,7 +459,13 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: 20, paddingTop: 10, gap: 2 },
   folder: { flexDirection: "row", alignItems: "center", gap: 5 },
   source: { flex: 1, paddingHorizontal: 20, paddingTop: 10, fontFamily: MONO, fontSize: 15, lineHeight: 23 },
-  suggest: { marginHorizontal: 12, marginBottom: 8, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  suggest: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
   suggestRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
   bar: {
     flexDirection: "row",
@@ -458,7 +475,14 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  tool: { minWidth: 38, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  tool: {
+    minWidth: 38,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
   toolText: { fontWeight: "700" },
   italic: { fontStyle: "italic", fontWeight: "500" },
   preview: { paddingHorizontal: 20, paddingTop: 12, gap: 4 },

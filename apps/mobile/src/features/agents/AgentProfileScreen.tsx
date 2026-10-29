@@ -50,6 +50,7 @@ import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { openAgentUsage } from "../usage/UsageScreen";
+import { openAgentEdit } from "./AgentEditScreen";
 import {
   canEditMemories,
   type DidLine,
@@ -61,7 +62,6 @@ import {
   spendOf,
   usesOf,
 } from "./logic";
-import { openAgentEdit } from "./AgentEditScreen";
 import { MonthPixels } from "./MonthPixels";
 import { workTitle } from "./work";
 
