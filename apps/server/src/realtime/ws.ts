@@ -190,7 +190,7 @@ export async function currentSubscriptions(
   channelIds: string[],
 ): Promise<Set<string> | null> {
   const member = await getMembership(db, userId, orgId);
-  if (!member || member.standing.state === "suspended") return null;
+  if (!member || member.standing?.state === "suspended") return null;
   if (channelIds.length === 0) return new Set();
   const rows = await db
     .select({ id: schema.channels.id })
