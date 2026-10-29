@@ -6904,6 +6904,8 @@ a.machine-row__name:hover {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
+  /* Criar agente's column doesn't wrap pretty, as the onboarding's does. */
+  text-wrap: pretty;
 }
 .onb__eyebrow--sky {
   color: var(--sky-ink2);

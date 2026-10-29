@@ -82,6 +82,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
     ".catalog-tile__desc",
     ".newag__role-desc",
     ".newag__role--blank .newag__role-name span",
+    ".onb__lead",
     ".page-sub",
     ".page__header > p",
     ".page__header-text > p",
