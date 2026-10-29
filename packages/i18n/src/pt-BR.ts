@@ -1,4 +1,3 @@
-import { landingPtBR } from "./landing";
 import type { Widen } from "./widen";
 
 /**
@@ -1077,6 +1076,8 @@ export const ptBR = {
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
+    /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
+    theComputer: "computador",
     own: {
       shared: "A conta que os seus agentes dividem",
       one: "Uma conta só {{for}} {{name}}",
@@ -7953,7 +7954,6 @@ export const ptBR = {
         'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
     },
   },
-  landing: landingPtBR,
   builtinTools: {
     ask_user: {
       label: "Perguntar à pessoa",

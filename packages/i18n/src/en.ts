@@ -1,4 +1,3 @@
-import { landingEn } from "./landing";
 import type { Translations } from "./pt-BR";
 
 /** English. Typed against the pt-BR source, so a missing key fails the build. */
@@ -1062,6 +1061,8 @@ export const en: Translations = {
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
+    /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
+    theComputer: "the computer",
     own: {
       shared: "The account your agents share",
       one: "An account just for {{name}}",
@@ -1879,7 +1880,7 @@ export const en: Translations = {
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
           send: "Send to {{computer}}",
-          sent: "Code sent. {{computer}} is finishing the sign-in.",
+          sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
           deviceCodeText: "Type this code on the page that opens.",
@@ -1893,7 +1894,7 @@ export const en: Translations = {
             codex:
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
           },
-          startFailed: "{{computer}} didn't answer. Try again in a moment.",
+          startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
           done: "The {{account}} account is on {{computer}}. Click Use to save.",
         },
@@ -7904,7 +7905,6 @@ export const en: Translations = {
         'The forum "{{title}}" is over. The synthesis is in the file below, with {{count}} suggested issue(s) to approve.',
     },
   },
-  landing: landingEn,
   builtinTools: {
     ask_user: {
       label: "Ask the person",

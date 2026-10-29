@@ -7381,7 +7381,8 @@ a.machine-row__name:hover {
   padding: 4px 4px 7px;
   border: 0;
   border-radius: 14px;
-  background: var(--sunken);
+  /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen one. */
+  background: var(--chosen-bg);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font: inherit;
@@ -9572,6 +9573,11 @@ a.machine-row__name:hover {
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
+}
+/* On a chosen card such a tile is the pressed face's, as light's sunken is: dark's --sunken would be a hole in it. */
+.ac-optrow[data-state="checked"] .audience-card__icon,
+.ac-optrow[data-state="checked"] .agp-wdlg__key {
+  background: var(--chosen-bg);
 }
 
 /* Budget: the month at a glance (spent, the bar with the 80% alert mark) and the numbers as items. */

@@ -147,4 +147,34 @@ describe("the agent's AI", () => {
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
   });
+
+  test("on the Cloud the account's sign-in says the computer, never its name; its being ready is a card of its own", async () => {
+    const connect = await Bun.file(
+      new URL("../../src/features/ai/ConnectAiSteps.tsx", import.meta.url).pathname,
+    ).text();
+    expect(connect).toMatch(/computer=\{edition === "cloud" \? t\("connectAi\.theComputer"\) : computer\}/);
+    // Where the wait's card was: never read as the head of the account choice under it.
+    expect(connect).toMatch(/<InfoCard icon="check" live>\s*\{t\("connectAi\.wait\.ready"\)\}/);
+    const said = {
+      "pt-BR": [
+        "Enviar ao computador",
+        "Pedindo ao computador…",
+        "Código enviado. O computador está terminando de entrar.",
+        "O computador não respondeu. Tente de novo em instantes.",
+      ],
+      en: [
+        "Send to the computer",
+        "Asking the computer…",
+        "Code sent. Finishing the sign-in on the computer.",
+        "No answer from the computer. Try again in a moment.",
+      ],
+    };
+    for (const lang of ["pt-BR", "en"] as const) {
+      const t = await translator(lang);
+      const computer = t("connectAi.theComputer");
+      expect(
+        ["send", "starting", "sent", "startFailed"].map((k) => t(`agentPage.work.brain.add.${k}`, { computer })),
+      ).toEqual(said[lang]);
+    }
+  });
 });

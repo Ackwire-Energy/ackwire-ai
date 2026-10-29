@@ -4,7 +4,7 @@
   "webviews": ["main"],
   "local": false,
   "remote": {
-    "urls": ["https://agentes.chat/*"]
+    "urls": ["https://app.agentes.chat/*"]
   },
   "permissions": [
     "core:window:allow-start-dragging",

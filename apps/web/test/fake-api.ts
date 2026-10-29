@@ -127,7 +127,7 @@ export interface FakeState {
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
   signInOptions?: SignInOptions;
-  /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
+  /** The server `account.phoneSignIn` names (default: https://app.agentes.chat). */
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
@@ -180,10 +180,6 @@ export interface FakeState {
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
-  /** Make `waitlist.join` fail with this error (429, 400…). */
-  waitlistError?: ApiError;
-  /** Make `waitlist.confirm` fail with this error (invalid_token…). */
-  waitlistConfirmError?: ApiError;
   /** `agents.aiStatus`; unset = every agent ready. */
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
@@ -800,22 +796,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return state.jev;
       },
     },
-    waitlist: {
-      join: async (input, humanCheck) => {
-        state.calls.push({ method: "waitlist.join", args: humanCheck === undefined ? [input] : [input, humanCheck] });
-        if (state.waitlistError) throw state.waitlistError;
-      },
-      confirm: async (input) => {
-        log("waitlist.confirm", input);
-        if (state.waitlistConfirmError) throw state.waitlistConfirmError;
-      },
-    },
     account: {
       authConfig: async () => ({
         socialProviders: { google: false, github: true },
         signupOpen: true,
         firstRun: false,
-        landing: true,
         ...state.authConfig,
       }),
       signInOptions: async (input, humanCheck) => {
@@ -834,7 +819,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.phoneSignIn");
         return {
           token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
-          server: state.phoneServer ?? "https://agentes.chat",
+          server: state.phoneServer ?? "https://app.agentes.chat",
           expiresIn: 180,
         };
       },

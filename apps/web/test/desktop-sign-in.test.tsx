@@ -56,7 +56,7 @@ describe("in the Mac app's window", () => {
       expect(document.querySelector(".auth__lead")?.textContent).toBe(
         "A gente volta para cá quando você entrar com GitHub.",
       );
-      const opened = new URL(assign.urls[0] ?? "", "https://agentes.chat");
+      const opened = new URL(assign.urls[0] ?? "", "https://app.agentes.chat");
       expect(opened.pathname).toBe("/desktop/sign-in");
       expect(opened.searchParams.get("provider")).toBe("github");
       expect(opened.searchParams.get("challenge")).toMatch(KEY);

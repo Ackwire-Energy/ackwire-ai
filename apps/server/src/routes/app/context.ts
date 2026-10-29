@@ -32,7 +32,8 @@ export function allowedOrigins(config: Config): Set<string> {
 /**
  * Header the phone app sends instead of an `Origin` (ADR 0035). A browser
  * can't send it cross-site without a CORS preflight, and we never allow one
- * (no CORS headers anywhere), so it can't be forged by a web page.
+ * (the only CORS is the waiting list's, for the landing page, and it allows
+ * `content-type` alone), so it can't be forged by a web page.
  */
 export const APP_CLIENT_HEADER = "x-agentes-client";
 export const MOBILE_CLIENT = "mobile";

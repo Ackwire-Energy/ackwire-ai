@@ -328,7 +328,6 @@ export function authUiConfig(config: Config) {
       github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET),
       apple: appleConfigured(config),
     },
-    landing: config.LANDING_PAGE,
     termsUrl: config.TERMS_URL ?? null,
     privacyUrl: config.PRIVACY_URL ?? null,
     supportEmail: config.SUPPORT_EMAIL ?? null,

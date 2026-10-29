@@ -57,7 +57,7 @@ const defaultTimers: Timers = {
 export const BACKOFF_MS = [500, 1000, 2000, 5000, 10_000];
 const OPEN = 1;
 
-/** Where the server is: the page's location (web) or the server's origin, e.g. "https://agentes.chat" (phone app). */
+/** Where the server is: the page's location (web) or the server's origin, e.g. "https://app.agentes.chat" (phone app). */
 export type SocketBase = string | { protocol: string; host: string };
 
 /** A WebSocket address on the server: `path` with `params` as its query. */
@@ -75,7 +75,7 @@ export function realtimeUrl(base: SocketBase, orgId: string) {
   return socketUrl(base, "/api/ws", { orgId });
 }
 
-/** "https://agentes.chat/x" → { protocol: "https:", host: "agentes.chat" } (no `URL`: React Native's is partial). */
+/** "https://app.agentes.chat/x" → { protocol: "https:", host: "app.agentes.chat" } (no `URL`: React Native's is partial). */
 function originOf(base: string): { protocol: string; host: string } {
   const m = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]+)/i.exec(base.trim());
   if (!m) throw new Error(`socketUrl: not an absolute URL: ${base}`);

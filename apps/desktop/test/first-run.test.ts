@@ -130,7 +130,7 @@ describe("a link to a server", () => {
       button: "connect",
       leave: null,
     });
-    expect(linkView(link(), ok(BOX), "https://agentes.chat")).toMatchObject({ kind: "ask", leave: "agentes.chat" });
+    expect(linkView(link(), ok(BOX), "https://app.agentes.chat")).toMatchObject({ kind: "ask", leave: "agentes.chat" });
     expect(linkView(link(), ok(BOX), BOX)).toEqual({ kind: "front", server: BOX });
   });
 
@@ -146,7 +146,7 @@ describe("a link to a server", () => {
   });
 
   test("a claim: the owner page while the server waits for its owner; ignored once it has one", () => {
-    expect(linkView(link({ claim: CLAIM }), ok(BOX, { ownerClaim: true }), "https://agentes.chat")).toEqual({
+    expect(linkView(link({ claim: CLAIM }), ok(BOX, { ownerClaim: true }), "https://app.agentes.chat")).toEqual({
       kind: "ask",
       server: BOX,
       question: "questionClaim",
