@@ -2,7 +2,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { createApiClient, createSnapshot, meQuery } from "@agenteschat/client";
+import { createApiClient, createSnapshot, meQuery, outbox } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
@@ -20,6 +20,7 @@ import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
 import { installSounds } from "./lib/sounds";
+import { STORAGE_KEYS, sessionStore } from "./lib/storage";
 import { createToastStore } from "./lib/toast";
 import { withWebPushSignOut } from "./lib/web-push";
 import { routeTree } from "./routeTree.gen";
@@ -58,6 +59,11 @@ const queryClient = createQueryClient({
 // The last lists and chats saved on this device show at once; everything revalidates as usual.
 const snapshot = createSnapshot(queryClient, snapshotStore);
 snapshot.start();
+// What waits for the connection survives a reload of this tab: a new version loaded after a deploy, for one.
+outbox.keep(queryClient, {
+  read: () => sessionStore.get(STORAGE_KEYS.outbox),
+  write: (value) => sessionStore.set(STORAGE_KEYS.outbox, value),
+});
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") void snapshot.flush();
 });
@@ -140,6 +146,7 @@ if (!root) throw new Error("#root element missing from index.html");
 const restored = snapshot.restore().then((found) => {
   // The saved `me` let the app open without asking: ask now (no session: sign-in, and the snapshot goes).
   if (!found) return;
+  outbox.show(queryClient);
   void queryClient
     .fetchQuery({ ...meQuery(api), staleTime: 0 })
     .then((me) => {

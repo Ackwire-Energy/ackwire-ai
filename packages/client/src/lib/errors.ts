@@ -203,6 +203,13 @@ export const serverUnreachable = (error: unknown) =>
   error instanceof ApiError && UNREACHABLE.has(error.status) && error.code === `http_${error.status}`;
 
 /**
+ * A message that failed to go out with no answer at all (`fetch` throws a `TypeError`: no network), or only the
+ * proxy's while the server restarts: it waits for the connection instead of failing. The server refusing it, or a
+ * bug, fails it.
+ */
+export const sendWaits = (error: unknown) => error instanceof TypeError || serverUnreachable(error);
+
+/**
  * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
  * since the server says those in English. Null for anything else (the caller keeps its own words).
  */

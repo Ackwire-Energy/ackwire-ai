@@ -43,7 +43,7 @@ import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -100,7 +100,6 @@ import {
   mergeTimeline,
   parseSlash,
   pinTarget,
-  sendWaits,
   stoppableInLine,
   workingEntries,
 } from "./logic";
@@ -622,8 +621,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Sending ──
   // Without a connection (no internet, or the server restarting) a message isn't "failed": it waits with a
-  // clock and goes by itself when the connection is back (or the app comes back to the front).
-  const [waiting, setWaiting] = useState<ReadonlySet<string>>(() => new Set());
+  // clock and goes by itself when the connection is back, from whatever screen is open (`useSendWaiting`).
   const post = usePostMessage(orgId, channelId, {
     me: { id: meId ?? "" },
     // An agent DM: "pensando…" at once, on the message the agent answers. Not when it went into the work
@@ -632,14 +630,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       const steered = Array.isArray(message.meta?.steeredRunIds) && message.meta.steeredRunIds.length > 0;
       if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
     },
-    onFailed: (error, { clientId }) => {
-      if (!sendWaits(error)) {
-        toast({ title: t("mobile.chat.notSent"), icon: "x" });
-        return;
-      }
-      // No answer from the server (no internet, or it is restarting): this message (only this one; others the
-      // server refused stay "failed") waits instead.
-      setWaiting((prev) => (prev.has(clientId) ? prev : new Set([...prev, clientId])));
+    onFailed: (_error, { waits }) => {
+      if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
     },
   });
   const { send, retry } = sendHelpers(post);
@@ -658,23 +650,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [threadId, toEnd],
   );
   const realtime = useRealtime().status;
-  const outboxRef = useRef({ list, waiting });
-  outboxRef.current = { list, waiting };
-  const flushWaiting = useCallback(() => {
-    const { list: shown, waiting: ids } = outboxRef.current;
-    if (ids.size === 0) return;
-    setWaiting(new Set());
-    for (const m of shown) if (m.local === "failed" && m.clientId && ids.has(m.clientId)) retryRef.current(m);
-  }, []);
-  useEffect(() => {
-    if (realtime === "open") flushWaiting();
-  }, [realtime, flushWaiting]);
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") flushWaiting();
-    });
-    return () => sub.remove();
-  }, [flushWaiting]);
   const control = useMissionControl(orgId);
   const createMission = useCreateMission(orgId);
   const channelAgents = (roster.data ?? []).filter((r) => r.type === "agent").map((r) => r.id);
@@ -1213,7 +1188,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
-                offline={Boolean(item.message.clientId && waiting.has(item.message.clientId))}
               />
               {item.message.id === receiptId ? (
                 <AgentReceiptLine
@@ -1246,7 +1220,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       openBrowsers,
       toggleBrowser,
       bodyOf,
-      waiting,
       seenId,
       receiptId,
       receipt,

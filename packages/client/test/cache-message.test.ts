@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import type { ApiClient, Message } from "../src/index";
-import { cacheMessage, cacheReceipts, catchUpChannel, keys, messagesQuery } from "../src/index";
+import { cacheMessage, cacheReceipts, catchUpChannel, keys, messagesQuery, outbox } from "../src/index";
 
 const msg = (over: Partial<Message>): Message => ({
   id: "m",
@@ -28,13 +28,15 @@ test("a reply that starts a thread replaces its 'sending…' copy (which waits i
   expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"))?.map((m) => m.id)).toEqual(["real"]);
 });
 
-test("reading a conversation again (after a reconnect) keeps my messages still sending or waiting to go out", async () => {
+test("reading a conversation again (after a reconnect) keeps my messages still sending or waiting to go out, not one the server refused", async () => {
   const qc = new QueryClient();
   const before = msg({ id: "before", createdAt: "2026-10-16T04:10:00.000Z" });
   const waiting = msg({ id: "local-k1", clientId: "k1", local: "failed", createdAt: "2026-10-16T04:20:00.000Z" });
   const sending = msg({ id: "local-k2", clientId: "k2", local: "pending", createdAt: "2026-10-16T04:25:00.000Z" });
   const landed = msg({ id: "local-k3", clientId: "k3", local: "pending", createdAt: "2026-10-16T04:26:00.000Z" });
-  qc.setQueryData(keys.messages("o1", "c1"), [before, waiting, sending, landed]);
+  const refused = msg({ id: "local-k4", clientId: "k4", local: "failed", createdAt: "2026-10-16T04:27:00.000Z" });
+  qc.setQueryData(keys.messages("o1", "c1"), [before, waiting, sending, landed, refused]);
+  outbox.add("o1", waiting);
   // The server has the third already (its own copy, by `clientId`), and a message written meanwhile.
   const server = [
     before,
@@ -44,6 +46,7 @@ test("reading a conversation again (after a reconnect) keeps my messages still s
   const api = { chat: { messages: async () => structuredClone(server) } } as unknown as ApiClient;
 
   await qc.fetchQuery({ ...messagesQuery(api, "o1", "c1"), staleTime: 0 });
+  outbox.remove("k1");
 
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.map((m) => m.id)).toEqual([
     "before",

@@ -1,5 +1,6 @@
 import {
   type InfiniteData,
+  type QueryClient,
   queryOptions,
   useInfiniteQuery,
   useMutation,
@@ -7,9 +8,10 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
+import { sendWaits } from "../lib/errors";
 import {
   allItems,
   matchesFilter,
@@ -24,9 +26,11 @@ import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
+import type { RealtimeConnection } from "../realtime/connection";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
 import { keys } from "./keys";
+import { keepSending, outbox } from "./outbox";
 import type {
   AgentAction,
   AgentComputer,
@@ -69,6 +73,7 @@ import type {
   MachineAccessReduce,
   MailAccountUpdate,
   MailImapInput,
+  Me,
   Message,
   MessageMemory,
   MoveAgentsInput,
@@ -354,6 +359,7 @@ export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) 
       withLocalCopies(
         await api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
         client.getQueryData<Message[]>(queryKey),
+        outbox.has,
       ),
     staleTime: 30_000,
     gcTime: 30 * 60_000,
@@ -530,9 +536,45 @@ export const newClientId = () =>
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 /**
+ * What `chat.post` gets for a message of mine: the quoted message and the files by id, from which the server
+ * builds the real meta (it checks them).
+ */
+function postBody({ body, clientId, threadId, meta, steer }: PostInput) {
+  const replyTo = replyOf(meta)?.messageId;
+  const attachments = artifactRefs(meta).map((r) => r.id);
+  return {
+    body,
+    clientId,
+    ...(threadId ? { threadId } : {}),
+    ...(replyTo ? { replyTo } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
+    ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
+    ...(steer ? { steer } : {}),
+  };
+}
+
+/** The server's copy of a message I sent, in place of its local one. */
+function cacheSent(qc: QueryClient, orgId: string, message: Message, { clientId, threadId, meta }: PostInput) {
+  // Written in the thread panel: it stays out of the channel while the thread list catches up
+  // (the realtime event may come later, or not at all).
+  const opened = Boolean(threadId) && meta?.[OPEN_THREAD] === true;
+  const echoed = {
+    ...message,
+    clientId: message.clientId ?? clientId,
+    ...(opened ? { meta: { ...message.meta, [OPEN_THREAD]: true } } : {}),
+  };
+  cacheMessage(qc, orgId, echoed);
+  if (opened) {
+    void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+  }
+  return echoed;
+}
+
+/**
  * Sends a message optimistically: it appears at once (`local: "pending"`),
  * is replaced by the server's copy (matched by `clientId`, from the response
  * or the WebSocket, whichever comes first), or turns `failed` with a retry.
+ * One with no answer from the server waits in the `outbox` instead.
  */
 export function usePostMessage(
   orgId: string,
@@ -544,10 +586,10 @@ export function usePostMessage(
     onSent?: (message: Message, local: Message) => void;
     onOptimistic?: (local: Message) => void;
     /**
-     * The server refused it, or no answer came (the message turns "failed" with a retry either way).
-     * `clientId` is the failed message's (its optimistic copy's).
+     * The server refused it, or no answer came (the message turns "failed" either way: with a retry, or waiting in
+     * the `outbox` when `waits`). `clientId` is the failed message's (its optimistic copy's).
      */
-    onFailed?: (error: unknown, failed: { clientId: string }) => void;
+    onFailed?: (error: unknown, failed: { clientId: string; waits: boolean }) => void;
   },
 ) {
   const api = useApi();
@@ -555,20 +597,7 @@ export function usePostMessage(
   const key = keys.messages(orgId, channelId);
   return useMutation({
     meta: { silent: true },
-    mutationFn: ({ body, clientId, threadId, meta, steer }: PostInput) => {
-      // The server builds the real meta from these (it checks the quoted message and the files).
-      const replyTo = replyOf(meta)?.messageId;
-      const attachments = artifactRefs(meta).map((r) => r.id);
-      return api.chat.post(orgId, channelId, {
-        body,
-        clientId,
-        ...(threadId ? { threadId } : {}),
-        ...(replyTo ? { replyTo } : {}),
-        ...(attachments.length > 0 ? { attachments } : {}),
-        ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
-        ...(steer ? { steer } : {}),
-      });
-    },
+    mutationFn: (input: PostInput) => api.chat.post(orgId, channelId, postBody(input)),
     onMutate: ({ body, clientId, threadId, meta }) => {
       const local: Message = {
         id: `local-${clientId}`,
@@ -593,23 +622,17 @@ export function usePostMessage(
       playSound("send");
       return { local };
     },
-    onSuccess: (message, { clientId, threadId, meta }, ctx) => {
-      // Written in the thread panel: it stays out of the channel while the thread list catches up
-      // (the realtime event may come later, or not at all).
-      const opened = Boolean(threadId) && meta?.[OPEN_THREAD] === true;
-      const echoed = {
-        ...message,
-        clientId: message.clientId ?? clientId,
-        ...(opened ? { meta: { ...message.meta, [OPEN_THREAD]: true } } : {}),
-      };
-      cacheMessage(qc, orgId, echoed);
-      if (opened) {
-        void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
-      }
+    onSuccess: (message, input, ctx) => {
+      outbox.remove(input.clientId);
+      const echoed = cacheSent(qc, orgId, message, input);
       if (ctx?.local) options.onSent?.(echoed, ctx.local);
     },
-    onError: (error, { clientId }) => {
-      options.onFailed?.(error, { clientId });
+    onError: (error, { clientId }, ctx) => {
+      // No answer from the server (no internet, or it is restarting): it waits, and goes out again from whatever
+      // screen is open once the connection is back (`useSendWaiting`).
+      const waits = sendWaits(error);
+      if (waits && ctx?.local) outbox.add(orgId, ctx.local);
+      options.onFailed?.(error, { clientId, waits });
       qc.setQueryData<Message[]>(key, (list) =>
         list?.map((m) => (m.local && m.clientId === clientId ? { ...m, local: "failed" as const } : m)),
       );
@@ -668,6 +691,69 @@ export function sendHelpers(mutation: ReturnType<typeof usePostMessage>) {
         meta: local.meta,
       }),
   };
+}
+
+const flushing = new Map<string, Promise<boolean>>();
+
+/**
+ * Sends my messages that wait in the organization (`outbox`), whatever screen is open: in the order they were
+ * written, and one run at a time, so none goes out twice at once. The server's copy takes the waiting one's place.
+ * While the server still doesn't answer, the rest keeps waiting. One it refuses leaves the outbox and turns
+ * "Não enviada" (`onRefused`). True while something still waits.
+ */
+export function flushOutbox(
+  api: ApiClient,
+  qc: QueryClient,
+  orgId: string,
+  onRefused?: (error: unknown) => void,
+): Promise<boolean> {
+  const running = flushing.get(orgId);
+  if (running) return running;
+  const run = (async () => {
+    const me = qc.getQueryData<Me | null>(keys.me)?.user.id;
+    for (const local of outbox.of(orgId)) {
+      if (!me) return true;
+      const clientId = local.clientId ?? "";
+      // Someone else's, from before a sign-in on this device: never sent as me.
+      if (local.author.id !== me) {
+        outbox.remove(clientId);
+        continue;
+      }
+      const input: PostInput = { body: local.body, clientId, threadId: local.threadId, meta: local.meta };
+      try {
+        const message = await api.chat.post(orgId, local.channelId, postBody(input));
+        outbox.remove(clientId);
+        // A conversation the cache let go meanwhile reads it from the server when it opens.
+        if (qc.getQueryData(keys.messages(orgId, local.channelId))) cacheSent(qc, orgId, message, input);
+      } catch (error) {
+        if (sendWaits(error)) return true;
+        outbox.remove(clientId);
+        onRefused?.(error);
+      }
+    }
+    return false;
+  })().finally(() => flushing.delete(orgId));
+  flushing.set(orgId, run);
+  return run;
+}
+
+/**
+ * What I sent while the connection was down goes out when it's back, whatever screen is open (`flushOutbox`), and
+ * again every `OUTBOX_RETRY_MS` while the socket stays open and it still waits. `onRefused`: the server refused one.
+ */
+export function useSendWaiting(
+  orgId: string,
+  connection: RealtimeConnection | null,
+  onRefused: (error: unknown) => void,
+) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const refused = useRef(onRefused);
+  refused.current = onRefused;
+  useEffect(() => {
+    if (!connection) return;
+    return keepSending(connection, () => flushOutbox(api, qc, orgId, (error) => refused.current(error)));
+  }, [api, qc, orgId, connection]);
 }
 
 // ── Approvals ───────────────────────────────────────────────────────────────

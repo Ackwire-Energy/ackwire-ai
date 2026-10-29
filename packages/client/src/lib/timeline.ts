@@ -14,12 +14,19 @@ export function upsertMessage(list: Message[] | undefined, message: Message): Me
 }
 
 /**
- * A list read again from the server, keeping my messages of the list before that are still on their way or wait
- * to go out (`local`): the server doesn't have them yet (no message of its with their `clientId`).
+ * A list read again from the server, keeping my messages of the list before that are still on their way or wait to
+ * go out (`waits`, by `clientId`) while the server doesn't have them (no message of its with their `clientId`). One
+ * the server refused goes with the read.
  */
-export function withLocalCopies(read: Message[], before: Message[] | undefined): Message[] {
+export function withLocalCopies(
+  read: Message[],
+  before: Message[] | undefined,
+  waits: (clientId: string | null | undefined) => boolean,
+): Message[] {
   const written = new Set(read.map((m) => m.clientId));
-  const local = (before ?? []).filter((m) => m.local && !written.has(m.clientId));
+  const local = (before ?? []).filter(
+    (m) => (m.local === "pending" || (m.local === "failed" && waits(m.clientId))) && !written.has(m.clientId),
+  );
   return local.length === 0 ? read : [...read, ...local].sort(byTime);
 }
 

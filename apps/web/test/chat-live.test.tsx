@@ -112,6 +112,36 @@ describe("optimistic send", () => {
     expect(row().className).not.toContain("ac-msg--pending");
     expect(row().className).not.toContain("ac-msg--failed");
   });
+
+  test("a message waiting in one conversation goes out once the server is back, while the person is in another", async () => {
+    const state = seedState({ failPosts: new ApiError(502, "http_502", "Bad Gateway") });
+    const { sockets, router } = await open(state);
+    const go = (channelId: string) =>
+      act(() => router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId } }));
+    await sendText("antes do deploy");
+    await settle(4);
+    expect(rowsWith("antes do deploy")[0]?.textContent).toContain("sai quando a conexão voltar");
+    await go(GENERAL_ID);
+    await settle(4);
+    state.failPosts = false;
+    await act(async () => sockets.last().drop());
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => sockets.last().open());
+    await settle(4);
+    const posts = () =>
+      state.calls
+        .filter((c) => c.method === "chat.post")
+        .map((c) => `${c.args[1]}:${(c.args[2] as { clientId: string }).clientId}`);
+    expect(posts()).toHaveLength(2);
+    expect(posts()[1]).toBe(posts()[0] as string);
+    // Back in that conversation: the message is there, sent, and nothing goes out again.
+    await go(ENG_ID);
+    await settle(4);
+    expect(rowsWith("antes do deploy")).toHaveLength(1);
+    expect(rowsWith("antes do deploy")[0]?.className).not.toContain("ac-msg--failed");
+    expect(rowsWith("antes do deploy")[0]?.className).not.toContain("ac-msg--pending");
+    expect(posts()).toHaveLength(2);
+  });
 });
 
 const typingBar = () => document.querySelector(".ac-typing") as HTMLElement;
