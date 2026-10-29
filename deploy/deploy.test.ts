@@ -67,13 +67,20 @@ case "$*" in
 "image inspect --format "*) id_of "$5" ;;
 "build "*) tag agentes:next sha256:new ;;
 "tag "*) tag "$3" "$(id_of "$2" || echo "$2")" ;;
+"compose exec -T postgres psql "*)
+  left=$(cat "$state/dumping")
+  if ((left > 0)); then echo $((left - 1)) >"$state/dumping" && echo 1; fi ;;
 esac
 `,
     );
+    stub(bin, "sleep", `#!/bin/sh\necho "sleep $*" >>"$STUB_STATE/calls"\n`);
   });
 
-  /** A server's checkout at `at` with this .env, where `agentes:current` is the image `sha256:old`. */
-  function server(at: string, env: string) {
+  /**
+   * A server's checkout at `at` with this .env, where `agentes:current` is the image `sha256:old`, and the next
+   * `dumping` looks at the database find a dump running.
+   */
+  function server(at: string, env: string, dumping = 0) {
     runs += 1;
     const path = join(dir, `server-${runs}`);
     const state = join(dir, `state-${runs}`);
@@ -83,6 +90,7 @@ esac
     mkdirSync(state);
     writeFileSync(join(state, "tags"), "agentes:current sha256:old\n");
     writeFileSync(join(state, "calls"), "");
+    writeFileSync(join(state, "dumping"), String(dumping));
     return {
       head: () => git(path, "rev-parse", "HEAD"),
       deploy(args: string[]) {
@@ -140,6 +148,28 @@ esac
     // A self-hosted server keeps its files where it likes (FILES_DIR or Postgres).
     const selfHosted = server(commits.first, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
     expect(selfHosted.deploy([commits.second]).code).toBe(0);
+  });
+
+  test("a dump in progress holds every table: the migration waits for it to end, and one that outlasts the wait stops the deploy", () => {
+    const env = "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n";
+    const looks = (calls: string[]) =>
+      calls.flatMap((call) =>
+        call.startsWith("docker compose exec -T postgres psql") ? ["look"] : call.startsWith("sleep ") ? [call] : [],
+      );
+
+    const at = server(commits.first, env, 2);
+    const { code, out, calls } = at.deploy([commits.second]);
+    expect({ code, out }).toMatchObject({ code: 0 });
+    const migrate = calls.findIndex((call) => call.includes(" migrate"));
+    expect(looks(calls.slice(0, migrate))).toEqual(["look", "sleep 10", "look", "sleep 10", "look"]);
+    expect(looks(calls.slice(migrate))).toEqual([]);
+
+    const stuck = server(commits.first, env, 1000);
+    const run = stuck.deploy([commits.second]);
+    expect(run.code).toBe(1);
+    expect(run.out).toContain("a dump of the database is still running after 5 minutes");
+    expect(run.calls.filter((call) => call.includes(" migrate") || call.startsWith("docker tag"))).toEqual([]);
+    expect(stuck.head()).toBe(commits.first);
   });
 });
 

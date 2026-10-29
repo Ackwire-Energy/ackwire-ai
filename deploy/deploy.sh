@@ -81,6 +81,19 @@ main() {
     docker build --quiet --tag agentes-backup:current deploy/backup
   fi
 
+  # A dump in progress (the backup service's pg_dump) holds every table until it ends: a migration that
+  # changes one would wait for it, and the running app's requests to that table would wait behind it.
+  local waited=0
+  while [[ $(docker compose exec -T postgres psql -U agentes -d agentes -tAc \
+    "select 1 from pg_stat_activity where application_name = 'pg_dump' and datname = current_database() limit 1" \
+    2>/dev/null) == 1 ]]; do
+    if ((waited >= 300)); then
+      echo "deploy: a dump of the database is still running after 5 minutes, deploy again once it ends" >&2
+      false
+    fi
+    sleep 10
+    waited=$((waited + 10))
+  done
   # Before the swap, so a migration that fails leaves the running app serving.
   AGENTES_IMAGE=agentes:next docker compose run --rm agentes migrate
   local current next
