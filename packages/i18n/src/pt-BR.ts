@@ -7787,6 +7787,8 @@ export const ptBR = {
       working: "{{name}} está trabalhando",
       waitingApproval: "{{The}} {{name}} espera uma aprovação",
       waitingInput: "{{The}} {{name}} espera uma resposta",
+      /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
+      waitingComputer: "{{The}} {{name}} espera o computador voltar",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
       see: "Ver",

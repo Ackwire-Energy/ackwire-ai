@@ -21,7 +21,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { stopBreath } from "@/agent/orbit";
 import {
@@ -165,6 +165,25 @@ interface BlockHead {
 const POP = ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
 
 /**
+ * A block someone was just led to ("Ver" on an answer's line) wears the plate this long, the web's message focus
+ * (`ac-msg--focus`): held, then fading. With reduced motion it stays the whole time and goes at once.
+ */
+const FLASH_MS = 2400;
+const FLASH_HOLD_MS = 960;
+
+/** Whether the plate shows: for `ms` once drawn with `at` (when someone was led here), again when `at` changes. */
+function useFlash(at: number | null, ms: number) {
+  const [on, setOn] = useState(at !== null);
+  useEffect(() => {
+    setOn(at !== null);
+    if (at === null) return;
+    const timer = setTimeout(() => setOn(false), ms);
+    return () => clearTimeout(timer);
+  }, [at, ms]);
+  return on;
+}
+
+/**
  * The card: a hairline and the app's cut corner (bottom left small), one line that opens on a tap. `live`:
  * new logos pop in and the line's words come up when they change; a saved block draws still.
  */
@@ -176,6 +195,7 @@ export function ToolBlock({
   label,
   live = false,
   defaultOpen = false,
+  flash = null,
   onToggle,
 }: {
   logos: { key: string; node: ReactNode }[];
@@ -187,15 +207,26 @@ export function ToolBlock({
   live?: boolean;
   /** Starts open (questions to other agents still out). */
   defaultOpen?: boolean;
+  /** When someone was led here ("Ver" on an answer's line): the card wears a plate a moment, as the web does. */
+  flash?: number | null;
   /** Opened (load the saved steps) or closed. */
   onToggle?: (open: boolean) => void;
 }) {
   const c = useColors();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(defaultOpen);
+  const flashing = useFlash(flash, reduced ? FLASH_MS : FLASH_HOLD_MS);
   const moving = live && !reduced;
   return (
     <View style={[styles.block, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      {/* Under the card's words (drawn first), never over them. */}
+      {flashing ? (
+        <Animated.View
+          pointerEvents="none"
+          exiting={reduced ? undefined : FadeOut.duration(FLASH_MS - FLASH_HOLD_MS)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: c.plate }]}
+        />
+      ) : null}
       <Pressable
         onPress={() => {
           tapHaptic();

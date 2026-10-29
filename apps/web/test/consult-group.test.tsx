@@ -131,6 +131,14 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(group()?.textContent).toContain("espera uma aprovação");
   });
 
+  test("waiting for its computer: says so, still out, not as waiting on a person", async () => {
+    await open(withAsk([consultation({ waiting: "computer" })]));
+    const text = group()?.textContent ?? "";
+    expect(text).toContain("Atlas espera o computador voltar");
+    expect(text).toContain("0 de 1");
+    expect(text).not.toContain("espera uma");
+  });
+
   test("answered: the line opens to the question and the answer, and the notice folds away", async () => {
     await open(withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true));
     const block = group() as HTMLElement;

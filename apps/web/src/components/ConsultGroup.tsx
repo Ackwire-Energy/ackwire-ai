@@ -76,6 +76,8 @@ export function useConsultGroups(
 const BLOCK_STATE: Record<ConsultLineState, ToolBlockState> = {
   working: "run",
   waiting: "run",
+  // Paused until its computer comes back, still out: the same mark as at work.
+  offline: "run",
   answered: "done",
   failed: "fail",
   expired: "fail",
@@ -90,6 +92,8 @@ function lineLabel(t: TFunction, state: ConsultLineState, c: RunConsultation, to
         name: to.name,
         The: to.The,
       });
+    case "offline":
+      return t("chat.consultGroup.waitingComputer", { name: to.name, The: to.The });
     case "answered":
       return t("chat.consultation.answered", { name: to.name });
     case "expired":
@@ -102,7 +106,8 @@ function lineLabel(t: TFunction, state: ConsultLineState, c: RunConsultation, to
 /**
  * The questions the agent asked other agents in this turn (`ask_agent`), inside its reply, as one more step of
  * its work: "Perguntou a 3 colegas · 1 de 3" while answers are out, a line per agent (working, waiting on a
- * person, answered with the start of the answer, couldn't), each opening to the question and the full answer.
+ * person or for its computer, answered with the start of the answer, couldn't), each opening to the question and
+ * the full answer.
  */
 export function ConsultGroup({
   runId,

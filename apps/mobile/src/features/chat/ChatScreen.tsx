@@ -35,6 +35,7 @@ import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import {
   type ConsultNoticeFold,
   consultBlocksNearEnd,
+  consultLineTarget,
   consultNoticeFolds,
   consultsForLine,
   requestConsultBlock,
@@ -495,13 +496,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // draws (hidden under a reply close by, one line to one farther up), and the working line without the questions
   // a reply near the end shows. A turn at work here doesn't show them yet: only saved replies count.
   const consultList = useConsultations(orgId, channelId).data ?? NO_CONSULTATIONS;
-  const foldsNow = useMemo(() => consultNoticeFolds(shownMessages, consultList), [shownMessages, consultList]);
+  const foldsNow = useMemo(
+    () => consultNoticeFolds(shownMessages, consultList, undefined, "first"),
+    [shownMessages, consultList],
+  );
   // The rows redraw when a notice's fold changes, not on every message (the folds are rebuilt on each).
   const foldsKey = [...foldsNow].map(([id, f]) => `${id}:${f.fold === "line" ? f.messageId : f.fold}`).join(" ");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `foldsKey` stands for the folds
   const consultFolds = useMemo(() => foldsNow, [foldsKey]);
   const lineConsults = useMemo(
-    () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList)),
+    () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, undefined, "first")),
     [consults, shownMessages, consultList],
   );
 
@@ -879,13 +883,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
-  // "Ver" on an answer's line: to the reply that asked (as a pin goes to its message), its block opening at that
-  // answer once the row is drawn (`useConsultBlockRequest`).
+  // "Ver" on an answer's line: to the reply that asked (as a pin goes to its message), the one that draws its block
+  // (the run's first), the block opening at that answer and marked a moment once the row is drawn
+  // (`useConsultBlockRequest`).
   const shownRowsRef = useRef<Row[]>([]);
   const seeConsult = useCallback(
     (fold: Extract<ConsultNoticeFold, { fold: "line" }>) => {
       requestConsultBlock(fold.consultation.runId, fold.consultation.id);
-      const index = shownRowsRef.current.findIndex((r) => r.kind === "message" && r.message.id === fold.messageId);
+      const shown = shownRowsRef.current;
+      const target = consultLineTarget(shown.flatMap((r) => (r.kind === "message" ? [r.message] : [])), fold);
+      const index = shown.findIndex((r) => r.kind === "message" && r.message.id === target);
       if (index < 0) return;
       letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });

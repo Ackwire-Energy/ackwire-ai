@@ -5,6 +5,7 @@ import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   answerQuestion,
+  cancelRun,
   CONSULTATION_TTL_MS,
   consultationsIn,
   createAgent,
@@ -572,5 +573,122 @@ describe("ask_agent", () => {
     expect((await consultations())[0]?.status).toBe("failed");
     expect((await runs()).filter((r) => r.agentId === f.agent.id).every((r) => r.status === "done")).toBe(true);
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("No answer: it couldn't");
+  });
+
+  test("a consulted run waiting for its computer waits on no person; stopped there, it closes at once", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const infra = await addInfra();
+    // @infra's job never runs here: its run is then parked the way a run whose computer is offline is.
+    const handlers: JobHandlers = {
+      ...f.handlers,
+      "agent_run.execute": async (job, ctx) => {
+        const [run] = await f.db
+          .select({ agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(eq(schema.agentRuns.id, String(job.payload.runId)));
+        if (run?.agentId === infra.id) return;
+        await f.handlers["agent_run.execute"]?.(job, ctx);
+      },
+    };
+    await post("@dev deploy staging");
+    await drainOutbox(f.db, handlers);
+    const target = (await runs()).find((r) => r.agentId === infra.id);
+    if (!target) throw new Error("no consulted run");
+    const machineId = Bun.randomUUIDv7();
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        waitingMachineId: machineId,
+        transcript: {
+          messages: [],
+          postedUpTo: 0,
+          postedCount: 0,
+          deltaSeq: 0,
+          waitingForBrain: { kind: "claude_code", machineId, code: "machine_offline", waitId: Bun.randomUUIDv7() },
+        },
+      })
+      .where(eq(schema.agentRuns.id, target.id));
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]).toMatchObject({
+      status: "open",
+      waiting: "computer",
+    });
+
+    // Stopped while parked (nobody executes it): the question closes now, not after 15 minutes.
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, target.id);
+    expect((await consultations())[0]).toMatchObject({ status: "failed", answer: "stopped by a person" });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]).toMatchObject({
+      status: "failed",
+      waiting: null,
+    });
+  });
+
+  test("a consulted run stopped while held on an approval: the asker hears it at once, and once", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      toolSources: [github.source],
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Merged.")
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
+      ),
+    });
+    const infra = await addInfra();
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const events = f.listen(f.general.id);
+    await post("@dev deploy the fix");
+    await drainOutbox(f.db, f.handlers);
+    const target = (await runs()).find((r) => r.agentId === infra.id);
+    if (!target) throw new Error("no consulted run");
+    expect(target.status).toBe("waiting_approval");
+    expect((await consultations())[0]?.status).toBe("open");
+    await Bun.sleep(5);
+    const mark = events.length;
+
+    // Stopped from the app while held: no worker executes it, so no run end closes the question.
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, target.id);
+    expect((await consultations())[0]).toMatchObject({ status: "failed", answer: "stopped by a person" });
+    expect((await f.db.select().from(schema.approvals))[0]?.status).toBe("canceled");
+    expect(github.executed).toHaveLength(0);
+    // Where the person asked: the usual answer notice, and the "asking…" line ends.
+    const isReply = (m: { meta: unknown }) =>
+      (m.meta as { notice?: { kind?: string } }).notice?.kind === "consult_reply";
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const meta = timeline.find(isReply)?.meta as { notice?: { refs?: Record<string, string> } } | undefined;
+    expect(meta?.notice?.refs).toMatchObject({
+      askerAgentId: f.agent.id,
+      agentId: infra.id,
+      status: "failed",
+    });
+    await Bun.sleep(5);
+    expect(events.slice(mark)).toContainEqual(
+      expect.objectContaining({
+        type: "agent.consulted",
+        agentId: f.agent.id,
+        consultedAgentId: infra.id,
+        status: "failed",
+      }),
+    );
+
+    // The asker relays it once; the 15-minute sweep finds nothing left to close.
+    await drainOutbox(f.db, f.handlers);
+    expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(0);
+    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(after.filter(isReply)).toHaveLength(1);
+    expect(after.at(-1)?.body).toContain("stopped by a person");
+    expect(github.executed).toHaveLength(0);
   });
 });

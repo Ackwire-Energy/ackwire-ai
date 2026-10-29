@@ -7737,6 +7737,8 @@ export const en: Translations = {
       working: "{{name}} is working",
       waitingApproval: "{{name}} is waiting for an approval",
       waitingInput: "{{name}} is waiting for an answer",
+      /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
+      waitingComputer: "{{name}} is waiting for the computer",
       /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
       answeredFar: "{{to}} answered {{from}}'s question",
       see: "See",

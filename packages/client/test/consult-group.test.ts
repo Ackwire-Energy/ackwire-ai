@@ -5,6 +5,7 @@ import {
   consultBlocksNearEnd,
   consultGroupSummary,
   consultLineState,
+  consultLineTarget,
   consultNoticeFolds,
   consultSeconds,
   consultsForLine,
@@ -40,6 +41,10 @@ describe("consultLineState", () => {
     expect(consultLineState(q(), now)).toBe("working");
     expect(consultLineState(q({ waiting: "approval" }), now)).toBe("waiting");
     expect(consultLineState(q({ waiting: "input" }), now)).toBe("waiting");
+  });
+  test("open, waiting for its computer to come back: still out, not on a person", () => {
+    expect(consultLineState(q({ waiting: "computer" }), now)).toBe("offline");
+    expect(consultLineState(q({ waiting: "computer" }), T0 + 901_000)).toBe("expired");
   });
   test("open past its deadline reads as expired before the worker closes it", () => {
     expect(consultLineState(q(), T0 + 901_000)).toBe("expired");
@@ -80,6 +85,16 @@ describe("consultGroupSummary", () => {
     expect(consultGroupSummary([q({ status: "answered", answer: "A" })], now)).toMatchObject({
       closed: 1,
       open: false,
+      waiting: false,
+    });
+  });
+  test("an agent waiting for its computer keeps the question out, but no one is waited on", () => {
+    const now = T0 + 60_000;
+    expect(consultGroupSummary([q({ waiting: "computer" })], now)).toEqual({
+      total: 1,
+      closed: 0,
+      answered: 0,
+      open: true,
       waiting: false,
     });
   });
@@ -128,6 +143,21 @@ describe("firstOfRun", () => {
   });
 });
 
+describe("consultLineTarget ('Ver' on the phone)", () => {
+  const fold = { fold: "line" as const, consultation: q(), messageId: "m3" };
+  test("the run's first message, which draws its block, not the one nearest the notice", () => {
+    const shown = [
+      { id: "m1", agentRunId: "r1", createdAt: iso(10) },
+      { id: "x", agentRunId: null, createdAt: iso(20) },
+      { id: "m3", agentRunId: "r1", createdAt: iso(30) },
+    ];
+    expect(consultLineTarget(shown, fold)).toBe("m1");
+  });
+  test("none of the run's messages shown: the one the fold names", () => {
+    expect(consultLineTarget([{ id: "x", agentRunId: "r2", createdAt: iso(1) }], fold)).toBe("m3");
+  });
+});
+
 // Rows as the conversation draws them: the reply that asked (run r1), others' messages, the answers' notices.
 const asked = (id = "ask", runId = "r1") => ({ id, agentRunId: runId });
 const said = (id: string) => ({ id, agentRunId: null });
@@ -172,11 +202,23 @@ describe("consultNoticeFolds", () => {
     expect(folds.has("ask")).toBe(false);
   });
 
-  test("the run's nearest message, before or after the notice (it kept working when the answer came)", () => {
+  test("a run that posted several messages: only the one that draws the block counts (web last, phone first)", () => {
     const rows = [asked("first"), said("a"), said("b"), said("c"), said("d"), answerOf("n1")];
+    // The web draws the block on the run's last message: a later one right after the notice is close.
+    expect(consultNoticeFolds([...rows, asked("later")], list).get("n1")).toEqual({ fold: "hide" });
     const after = [...rows, said("e"), said("f"), said("g"), asked("later")];
     expect(consultNoticeFolds(after, list).get("n1")).toMatchObject({ fold: "line", messageId: "later" });
-    expect(consultNoticeFolds([...rows, asked("later")], list).get("n1")).toEqual({ fold: "hide" });
+    // The phone draws it on the first: far up, whatever came later; "Ver" goes to that first message.
+    expect(consultNoticeFolds([...rows, asked("later")], list, undefined, "first").get("n1")).toMatchObject({
+      fold: "line",
+      messageId: "first",
+    });
+  });
+
+  test("the working line: near the end means the message that draws the block", () => {
+    const rows = [asked("first"), said("a"), said("b"), said("c"), asked("later")];
+    expect([...consultBlocksNearEnd(rows, list)]).toEqual(["r1"]);
+    expect(consultBlocksNearEnd(rows, list, undefined, "first").size).toBe(0);
   });
 });
 

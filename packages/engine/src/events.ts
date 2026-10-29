@@ -150,7 +150,8 @@ export type ChannelEvent =
     }
   /**
    * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
-   * question, a secret) or went back to work. The app reloads the conversation's questions (`GET …/consultations`).
+   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
+   * (`GET …/consultations`).
    */
   | {
       type: "agent.consultation";

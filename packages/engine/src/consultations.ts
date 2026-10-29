@@ -554,6 +554,26 @@ export async function onConsultedRunFinished(
 }
 
 /**
+ * A run was stopped while no worker executed it (queued, or held on an approval, a person or its computer:
+ * `stopRun`), so no run end reaches `onConsultedRunFinished`: if it was answering another agent's question,
+ * the asker hears it couldn't now, not when the question expires. Only a run in an agents' DM answers questions
+ * (`target_run_id` has no index). A run stopped because its questions expired (`stopUnwantedRun`) finds none
+ * open: the asker hears it once.
+ */
+export async function onConsultedRunStopped(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string },
+  reason: string,
+) {
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)));
+  if (!channel || !isAgentOnlyDm(channel)) return [];
+  return onConsultedRunFinished(deps, run, "canceled", reason);
+}
+
+/**
  * The reply to a note (`tell_agent`) goes back to the conversation of the
  * run that sent it, as an `agent_note` notice; a bare acknowledgement ("Got
  * it.") doesn't. Returns the notice, if one went.
@@ -646,8 +666,24 @@ export async function openConsultationsIn(
   }));
 }
 
-/** What the consulted agent waits on before it can answer: an approval, or a person's answer or secret. */
-export type ConsultationWait = "approval" | "input";
+/**
+ * What the consulted agent waits on before it can answer: an approval, a person's answer or secret (`input`), or
+ * its computer to come back (`computer`: no person can move it).
+ */
+export type ConsultationWait = "approval" | "input" | "computer";
+
+/**
+ * What a consulted run held now waits on, from its row alone (no transcript read). `waiting_machine_id` is set
+ * only while a run waits for its computer brain to come back and cleared by any move out of `waiting_input`
+ * (`transitionRun`, ADR 0032 §5): that run waits on no person. Any other `waiting_input` of a run in an agents'
+ * DM waits on a person: a question, a secret, help in its browser (it never pauses on another agent: `ask_agent`
+ * doesn't wait).
+ */
+export function consultationWait(run: { status: string; waitingMachineId: string | null }): ConsultationWait | null {
+  if (run.status === "waiting_approval") return "approval";
+  if (run.status !== "waiting_input") return null;
+  return run.waitingMachineId ? "computer" : "input";
+}
 
 /**
  * One question an agent asked from a conversation, as the people there see it inside the asking reply ("Perguntou
@@ -661,7 +697,7 @@ export interface RunConsultation {
   agentId: string;
   consultedAgentId: string;
   status: "open" | "answered" | "expired" | "failed";
-  /** Open and the consulted agent's run is held on a person. */
+  /** Open and the consulted agent's run is held: on a person, or on its computer. */
   waiting: ConsultationWait | null;
   question: string;
   /** The answer once `answered`; the reason once `failed`; null otherwise. */
@@ -701,26 +737,25 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
     .where(and(eq(agentConsultations.orgId, orgId), eq(agentRuns.orgId, orgId), eq(agentRuns.channelId, channelId)))
     .orderBy(desc(agentConsultations.createdAt))
     .limit(LIST_LIMIT);
-  // Where the consulted runs of the open questions are: held on a person, or not.
+  // Where the consulted runs of the open questions are: held on a person, on their computer, or not held.
   const held = rows.flatMap((r) => (r.status === "open" && r.targetRunId ? [r.targetRunId] : []));
   const targets = held.length
     ? await db
-        .select({ id: agentRuns.id, status: agentRuns.status })
+        .select({ id: agentRuns.id, status: agentRuns.status, waitingMachineId: agentRuns.waitingMachineId })
         .from(agentRuns)
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
     : [];
-  const statusOf = new Map(targets.map((t) => [t.id, t.status as string]));
+  const waitOf = new Map(targets.map((t) => [t.id, consultationWait(t)]));
   return rows.map((r) => {
     const status = r.status as RunConsultation["status"];
     const open = status === "open";
-    const target = open && r.targetRunId ? statusOf.get(r.targetRunId) : undefined;
     return {
       id: r.id,
       runId: r.runId,
       agentId: r.agentId,
       consultedAgentId: r.consultedAgentId,
       status,
-      waiting: target === "waiting_approval" ? "approval" : target === "waiting_input" ? "input" : null,
+      waiting: open && r.targetRunId ? (waitOf.get(r.targetRunId) ?? null) : null,
       question: r.question.slice(0, NOTICE_QUESTION_MAX),
       // An expired question has no answer; a failed one keeps its reason (the asking agent read it too).
       answer: open || status === "expired" ? null : (r.answer?.slice(0, NOTICE_ANSWER_MAX) ?? null),
@@ -732,9 +767,9 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
 }
 
 /**
- * The consulted agent's run stopped on a person (an approval, a question, a secret) or went back to work
- * (`executor.ts`, on resume): the conversations that asked it hear so (`agent.consultation`) and draw that
- * question as waiting, or working again. Callers keep it to runs in an agents' DM (only those answer
+ * The consulted agent's run stopped on a person (an approval, a question, a secret) or on its computer, or went
+ * back to work (`executor.ts`, on resume): the conversations that asked it hear so (`agent.consultation`) and draw
+ * that question as waiting, or working again. Callers keep it to runs in an agents' DM (only those answer
  * questions): `target_run_id` has no index, and only open questions are read (they close within
  * `CONSULTATION_TTL_MS`).
  */

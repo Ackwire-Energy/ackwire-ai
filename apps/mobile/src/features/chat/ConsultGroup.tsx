@@ -1,5 +1,6 @@
 import { keys, type Message, type RunConsultation, useConsultations } from "@agenteschat/client";
 import {
+  CONSULT_REQUEST_FRESH_MS,
   type ConsultLineState,
   consultGroupSummary,
   consultLineState,
@@ -26,6 +27,8 @@ import { type BlockItem, ToolBlock } from "./ToolCalls";
 const BLOCK_STATE: Record<ConsultLineState, ToolState> = {
   working: "run",
   waiting: "run",
+  // Paused until its computer comes back, still out: the same mark as at work.
+  offline: "run",
   answered: "done",
   failed: "fail",
   expired: "fail",
@@ -40,6 +43,8 @@ function lineLabel(t: TFunction, state: ConsultLineState, c: RunConsultation, to
         name: to.name,
         The: to.The,
       });
+    case "offline":
+      return t("chat.consultGroup.waitingComputer", { name: to.name, The: to.The });
     case "answered":
       return t("chat.consultation.answered", { name: to.name });
     case "expired":
@@ -156,6 +161,9 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       color={color}
       label={t("chat.consultGroup.label", { name: from.name, of: from.of })}
       defaultOpen={summary.open || asked !== null}
+      // Where "Ver" led, marked a moment (the web marks the message); not again when an answer landing later
+      // draws the block anew.
+      flash={asked && Date.now() - asked.at < CONSULT_REQUEST_FRESH_MS ? asked.at : null}
     />
   );
 }

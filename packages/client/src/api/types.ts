@@ -526,8 +526,11 @@ export interface OpenConsult {
   since: string;
 }
 
-/** What a consulted agent waits on before it can answer: an approval, or a person's answer or secret. */
-export type ConsultationWait = "approval" | "input";
+/**
+ * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
+ * `computer`: its computer coming back (no one to ask).
+ */
+export type ConsultationWait = "approval" | "input" | "computer";
 
 /**
  * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
@@ -540,7 +543,7 @@ export interface RunConsultation {
   agentId: string;
   consultedAgentId: string;
   status: "open" | ConsultationStatus;
-  /** Open, and the consulted agent waits on a person. */
+  /** Open, and the consulted agent waits: on a person, or for its computer to come back. */
   waiting: ConsultationWait | null;
   question: string;
   /** The answer once answered; why it couldn't once failed. */

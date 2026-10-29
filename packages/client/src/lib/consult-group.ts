@@ -9,8 +9,11 @@ import { noticeOf } from "./notices";
  * working line leaves out what such a block already says (`consultsForLine`).
  */
 
-/** Where one question is, for its line. */
-export type ConsultLineState = "working" | "waiting" | "answered" | "failed" | "expired";
+/**
+ * Where one question is, for its line. `waiting`: the consulted agent waits on a person; `offline`: for its
+ * computer to come back (still out, paused, on no one).
+ */
+export type ConsultLineState = "working" | "waiting" | "offline" | "answered" | "failed" | "expired";
 
 /** Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event). */
 export const CONSULT_GROUP_POLL_MS = 20_000;
@@ -21,6 +24,7 @@ export function consultLineState(c: RunConsultation, now: number): ConsultLineSt
   if (c.status === "expired") return "expired";
   // Past its deadline the worker closes it within a minute: show it as it will be.
   if (Date.parse(c.expiresAt) < now) return "expired";
+  if (c.waiting === "computer") return "offline";
   return c.waiting ? "waiting" : "working";
 }
 
@@ -43,7 +47,7 @@ export interface ConsultGroupSummary {
   answered: number;
   /** Some question is still out: the block opens and the count shows. */
   open: boolean;
-  /** Some consulted agent waits on a person. */
+  /** Some consulted agent waits on a person (one waiting for its computer doesn't count). */
   waiting: boolean;
 }
 
@@ -54,7 +58,7 @@ export function consultGroupSummary(group: readonly RunConsultation[], now: numb
   for (const c of group) {
     const s = consultLineState(c, now);
     if (s === "answered") answered++;
-    if (s !== "working" && s !== "waiting") closed++;
+    if (s === "answered" || s === "failed" || s === "expired") closed++;
     if (s === "waiting") waiting = true;
   }
   return { total: group.length, closed, answered, open: closed < group.length, waiting };
@@ -114,7 +118,18 @@ const NO_RUNS: ReadonlySet<string> = new Set();
  * Where each asking run sits among the rows people see. A notice whose answer a reply here shows takes no row
  * (hidden, or one line): answers to several questions in a row don't push their reply away.
  */
-function consultLayout(rows: readonly ConsultRow[], list: readonly RunConsultation[], live: ReadonlySet<string>) {
+/**
+ * Which of a run's messages draws its block: the web draws it on the run's last message, the phone on its first
+ * (its rows don't know their neighbours, `firstOfRun`). Distances and "Ver" go to that one message.
+ */
+export type ConsultAnchor = "first" | "last";
+
+function consultLayout(
+  rows: readonly ConsultRow[],
+  list: readonly RunConsultation[],
+  live: ReadonlySet<string>,
+  anchor: ConsultAnchor,
+) {
   const byId = new Map(list.map((c) => [c.id, c] as const));
   const shown = shownConsultations(list, new Set([...live, ...rows.flatMap((r) => r.agentRunId ?? [])]));
   /** Each run's rows: its place among the rows people see, and the message. */
@@ -137,21 +152,28 @@ function consultLayout(rows: readonly ConsultRow[], list: readonly RunConsultati
     }
     count++;
   }
+  // Only the message that draws the block counts: a run that posted several shows its questions on one of them.
+  for (const [runId, own] of places) {
+    const one = anchor === "first" ? own[0] : own.at(-1);
+    if (one) places.set(runId, [one]);
+  }
   return { count, places, notices };
 }
 
 /**
  * How each answer's notice draws here (every `consult_reply` row, by message id). `rows`: the conversation's
  * messages in order; `live`: the runs drawn as live blocks under them (at the end, where the newest answers land:
- * their notices fold). Close is `CONSULT_NEAR_ROWS` rows at most, on either side.
+ * their notices fold); `anchor`: the run's message that draws its block. Close is `CONSULT_NEAR_ROWS` rows at most,
+ * on either side.
  */
 export function consultNoticeFolds(
   rows: readonly ConsultRow[],
   list: readonly RunConsultation[],
   live: ReadonlySet<string> = NO_RUNS,
+  anchor: ConsultAnchor = "last",
 ): Map<string, ConsultNoticeFold> {
   const out = new Map<string, ConsultNoticeFold>();
-  const { places, notices } = consultLayout(rows, list, live);
+  const { places, notices } = consultLayout(rows, list, live, anchor);
   for (const n of notices) {
     const c = n.consultation;
     if (!c) {
@@ -182,10 +204,11 @@ export function consultBlocksNearEnd(
   rows: readonly ConsultRow[],
   list: readonly RunConsultation[],
   live: ReadonlySet<string> = NO_RUNS,
+  anchor: ConsultAnchor = "last",
 ): Set<string> {
   const asked = new Set(list.map((c) => c.runId));
   const out = new Set([...live].filter((runId) => asked.has(runId)));
-  const { count, places } = consultLayout(rows, list, live);
+  const { count, places } = consultLayout(rows, list, live, anchor);
   for (const [runId, own] of places) {
     const last = own.at(-1);
     if (asked.has(runId) && last && count - last.at <= CONSULT_NEAR_ROWS) out.add(runId);
@@ -273,4 +296,16 @@ export function firstOfRun(
   for (const m of messages)
     if (m.agentRunId === runId && (!first || Date.parse(m.createdAt) < Date.parse(first.createdAt))) first = m;
   return first?.id ?? null;
+}
+
+/**
+ * Where "Ver" on an answer's line goes on the phone: the message that draws the asking run's block (its first,
+ * `firstOfRun`), not the run's message nearest the notice when the run posted several; that one if none of the
+ * run's messages is among `messages`.
+ */
+export function consultLineTarget(
+  messages: readonly { id: string; agentRunId?: string | null; createdAt: string }[],
+  fold: Extract<ConsultNoticeFold, { fold: "line" }>,
+): string {
+  return firstOfRun(messages, fold.consultation.runId) ?? fold.messageId;
 }

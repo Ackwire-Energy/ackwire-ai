@@ -312,8 +312,9 @@ export function chatRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 consultedAgentId: z.uuid(),
                 status: z.enum(["open", "answered", "expired", "failed"]),
-                waiting: z.enum(["approval", "input"]).nullable().openapi({
-                  description: "Open, and the consulted agent waits on a person (an approval; an answer or a secret).",
+                waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+                  description:
+                    "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
                 }),
                 question: z.string(),
                 answer: z
