@@ -15,6 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
+import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
@@ -205,6 +206,20 @@ export async function updateOrganization(
   const before = await requirePermission(db, actorId, orgId, "configure");
   const [row] = await db.update(organizations).set(input).where(eq(organizations.id, orgId)).returning();
   if (row && row.name !== before.orgName) await followWorkspaceName(db, orgId, before.orgName, row.name);
+  if (row) {
+    // The context goes into every agent's prompt: the audit says it changed, not what it says.
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "organization.updated",
+      target: { type: "organization", id: orgId },
+      details: {
+        name: row.name,
+        ...(row.name !== before.orgName ? { from: before.orgName } : {}),
+        ...(input.context !== undefined ? { contextChanged: true } : {}),
+      },
+    });
+  }
   caches.orgs.delete(`${orgId}:`);
   return row;
 }
@@ -520,6 +535,28 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
 export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
 
+/**
+ * A change to who is in the workspace, in the audit log: the person's name and address as they were then
+ * (the row outlives the account).
+ */
+async function auditMember(
+  tx: Executor,
+  orgId: string,
+  actorId: string,
+  action: string,
+  userId: string,
+  details: Record<string, unknown>,
+) {
+  const [person] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId));
+  await recordAudit(tx, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action,
+    target: { type: "person", id: userId },
+    details: { ...(person ? { name: person.name, email: person.email } : {}), ...details },
+  });
+}
+
 /** Changes a member's role. Admins can't touch owners or make owners; nobody can demote the last owner. */
 export async function changeMemberRole(
   db: Database,
@@ -544,6 +581,9 @@ export async function changeMemberRole(
       .update(organizationMembers)
       .set({ role })
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
+    if (target.role !== role) {
+      await auditMember(tx, orgId, actorId, "member.role_changed", targetUserId, { from: target.role, to: role });
+    }
   });
   await announceMembers(options.pubsub, orgId);
 }
@@ -578,6 +618,8 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    const action = actorId === targetUserId ? "member.left" : "member.removed";
+    await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
     return releaseMemberAccounts(tx, targetUserId, orgId);
   });
@@ -782,6 +824,13 @@ export async function sendInvitation(
         .values({ orgId: input.orgId, email, ...fresh })
         .returning();
   if (!invitation) throw new ConflictError("This invitation can't be sent");
+  await recordAudit(db, {
+    orgId: input.orgId,
+    actor: { type: "person", id: input.invitedBy },
+    action: input.resent ? "invitation.resent" : "invitation.sent",
+    target: { type: "invitation", id: invitation.id },
+    details: { email: invitation.email, role: invitation.role, ...(input.fromRequest ? { fromRequest: true } : {}) },
+  });
   await recordOperatorEvent(db, {
     type: "invitation.created",
     orgId: input.orgId,
@@ -840,9 +889,19 @@ export async function listInvitations(db: Database, orgId: string, now = new Dat
 
 export async function revokeInvitation(db: Database, actorId: string, orgId: string, invitationId: string) {
   await requirePermission(db, actorId, orgId, "manage_members");
-  await db
+  const [gone] = await db
     .delete(organizationInvitations)
-    .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
+    .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)))
+    .returning({ email: organizationInvitations.email, role: organizationInvitations.role });
+  if (gone) {
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "invitation.revoked",
+      target: { type: "invitation", id: invitationId },
+      details: { email: gone.email, role: gone.role },
+    });
+  }
 }
 
 /**
@@ -1017,6 +1076,10 @@ export async function acceptInvitation(
     }
     await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role);
+    await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
+      role: invitation.role,
+      invitedBy: invitation.invitedByUserId,
+    });
     await tx
       .update(organizationInvitations)
       .set({ acceptedAt: now })

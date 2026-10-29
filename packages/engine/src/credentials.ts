@@ -1,6 +1,7 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, type ProviderId } from "@agenteschat/providers";
+import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { openSecret, sealSecret } from "./crypto";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
@@ -40,6 +41,23 @@ function cleanWorkspaceId(id: string | null | undefined) {
   if (!v) return null;
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(v)) throw new ValidationError("workspaceId looks invalid");
   return v;
+}
+
+/** A key's change in the audit log: the provider, its name and last four characters, never the key. */
+function auditCredential(
+  db: Executor,
+  orgId: string,
+  actorId: string,
+  action: string,
+  row: { id: string; provider: string; label: string; keyHint: string | null },
+) {
+  return recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action,
+    target: { type: "credential", id: row.id },
+    details: { provider: row.provider, label: row.label, ...(row.keyHint ? { keyHint: row.keyHint } : {}) },
+  });
 }
 
 /** Stores an org's provider API key, encrypted (envelope encryption). */
@@ -84,6 +102,7 @@ export async function createCredential(
       })
       .returning();
     if (input.makeDefault) await setDefault(tx, orgId, input.provider, id);
+    if (r) await auditCredential(tx, orgId, actorId, "credential.added", r);
     return r;
   });
   if (!row) throw new Error("credential insert returned nothing");
@@ -134,6 +153,7 @@ export async function makeDefaultCredential(db: Database, actorId: string, orgId
     );
   if (!row) throw new NotFoundError("Credential not found");
   await setDefault(db, orgId, row.provider, credentialId);
+  await auditCredential(db, orgId, actorId, "credential.default_changed", row);
   invalidateDefaults(orgId);
   return { ...summary(row), isDefault: true };
 }
@@ -194,6 +214,7 @@ export async function revokeCredential(db: Database, actorId: string, orgId: str
     )
     .returning();
   if (!row) throw new NotFoundError("Credential not found");
+  await auditCredential(db, orgId, actorId, "credential.revoked", row);
   caches.credentials.delete(`${orgId}:${credentialId}`);
   invalidateDefaults(orgId);
 }
@@ -290,6 +311,7 @@ export async function rotateCredential(
     )
     .returning();
   if (!row) throw new NotFoundError("Credential not found");
+  await auditCredential(db, orgId, actorId, "credential.key_changed", row);
   caches.credentials.delete(`${orgId}:${credentialId}`);
   invalidateDefaults(orgId);
   return summary(row);
@@ -320,8 +342,14 @@ export async function deleteCredential(db: Database, actorId: string, orgId: str
   const deleted = await db
     .delete(providerCredentials)
     .where(and(eq(providerCredentials.id, credentialId), eq(providerCredentials.orgId, orgId)))
-    .returning({ id: providerCredentials.id });
-  if (deleted.length === 0) throw new NotFoundError("Credential not found");
+    .returning({
+      id: providerCredentials.id,
+      provider: providerCredentials.provider,
+      label: providerCredentials.label,
+      keyHint: providerCredentials.keyHint,
+    });
+  if (!deleted[0]) throw new NotFoundError("Credential not found");
+  await auditCredential(db, orgId, actorId, "credential.deleted", deleted[0]);
   caches.credentials.delete(`${orgId}:${credentialId}`);
   invalidateDefaults(orgId);
 }

@@ -1,5 +1,6 @@
 import { MAIL_PRESETS, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
+import { recordAudit } from "./audit";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
@@ -406,6 +407,7 @@ export async function decideApproval(
       .where(eq(approvals.id, approvalId))
       .returning();
     await enqueueResume(tx, row);
+    if (updated) await auditDecision(tx, updated, expired ? null : actorId);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
@@ -416,6 +418,27 @@ export async function decideApproval(
   return view;
 }
 
+/**
+ * An approval's ending in the audit log: the person who approved or refused it, or the system when it
+ * expired unanswered. The action it then ran is the agent's own row (`tool.call`, agent-audit.ts).
+ */
+function auditDecision(tx: Executor, row: Approval, personId: string | null) {
+  return recordAudit(tx, {
+    orgId: row.orgId,
+    actor: personId ? { type: "person", id: personId } : { type: "system", id: null },
+    action: `approval.${row.status}`,
+    target: { type: "approval", id: row.id },
+    details: {
+      tool: row.tool,
+      agentId: row.agentId,
+      title: row.title,
+      ...(row.reason ? { reason: row.reason } : {}),
+    },
+    runId: row.runId,
+    channelId: row.channelId,
+  });
+}
+
 /** Marks pending approvals past their deadline as expired and resumes their runs (worker, every minute). */
 export async function expireApprovals(deps: { db: Database; pubsub: PubSub }, now = new Date()) {
   const expired = await deps.db.transaction(async (tx) => {
@@ -424,7 +447,10 @@ export async function expireApprovals(deps: { db: Database; pubsub: PubSub }, no
       .set({ status: "expired" })
       .where(and(eq(approvals.status, "pending"), lt(approvals.expiresAt, now)))
       .returning();
-    for (const row of rows) await enqueueResume(tx, row);
+    for (const row of rows) {
+      await enqueueResume(tx, row);
+      await auditDecision(tx, row, null);
+    }
     return rows;
   });
   for (const row of expired) await publishApproval(deps, row, "approval.decided");
