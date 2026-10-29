@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createFakeSandboxProvider, type ExecRequest, type FakePush } from "@agenteschat/adapters";
+import { createHash } from "node:crypto";
 import { eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
@@ -31,15 +31,16 @@ import {
   waitForUpload,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { connectedComputer } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
+  await f?.machineHub?.stop();
   const current = f;
   f = undefined as unknown as Fixture;
   await current?.close();
 });
 
-const SANDBOX = [{ connectionId: null, scope: "sandbox:run" }];
 const DRIVE = ["drive:read", "drive:write"].map((scope) => ({ connectionId: null, scope }));
 const bytesOf = (s: string) => new TextEncoder().encode(s);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
@@ -311,9 +312,9 @@ describe("uploads", () => {
     expect(await uploadRow(up.id)).toMatchObject({ status: "pending" });
     const { artifact } = await receiveMachineUpload(uploadDeps(), { ...input, machineId });
     expect(artifact.content).toMatchObject({ kind: "file", name: "hello.txt", text: "hello" });
-    // And a machine can't complete an upload the server reads.
-    const serverSide = await newUpload();
-    await expect(receiveMachineUpload(uploadDeps(), { ...input, uploadId: serverSide.id, machineId })).rejects.toThrow(
+    // And a machine can't complete an upload made for no machine.
+    const noMachine = await newUpload();
+    await expect(receiveMachineUpload(uploadDeps(), { ...input, uploadId: noMachine.id, machineId })).rejects.toThrow(
       ForbiddenError,
     );
   });
@@ -345,16 +346,33 @@ describe("uploads", () => {
 });
 
 describe("upload_file", () => {
-  test("server fallback: a file as is, with its data for the reply; versions of uploaded files only", async () => {
-    const provider = createFakeSandboxProvider();
-    f = await setup({ sandbox: provider, artifactTools: true, reply: () => ({ chunks: ["ok"] }) });
-    await grantScopes(f.db, f.org.id, f.agent.id, [...SANDBOX, ...DRIVE]);
-    const ctx = await runCtx();
-    await call(ctx, "write_file", { path: "out/notes.md", content: "# notas" });
-    const box = [...provider.boxes.values()][0];
-    box?.files.set("out/chart.png", PNG);
+  /** A connected computer whose runner sends a pushed file to its upload URL as itself, as a real runner does. */
+  async function pushingComputer() {
+    let machineId = "";
+    const computer = await connectedComputer(f, {
+      async push(req, bytes, name) {
+        await receiveMachineUpload(uploadDeps(), {
+          uploadId: req.uploadId,
+          machineId,
+          name,
+          contentType: "",
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          body: bytes,
+        });
+      },
+    });
+    machineId = computer.paired.machineId;
+    return computer;
+  }
 
-    const out = await call(ctx, "upload_file", { path: "/workspace/out/chart.png", title: "Gráfico" });
+  test("a file as is, with its data for the reply; versions of uploaded files only", async () => {
+    f = await setup({ machines: true, artifactTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { paired, runner } = await pushingComputer();
+    await grantScopes(f.db, f.org.id, f.agent.id, DRIVE);
+    const ctx = await runCtx();
+    runner.files.set("out/chart.png", PNG);
+
+    const out = await call(ctx, "upload_file", { path: "out/chart.png", title: "Gráfico" });
     expect(out.isError).toBeFalsy();
     const [a] = await f.db.select().from(schema.artifacts);
     expect(a).toMatchObject({ kind: "file", title: "Gráfico", channelId: f.general.id, untrusted: true });
@@ -364,8 +382,7 @@ describe("upload_file", () => {
     expect(out.data).toEqual({ artifact: { id: a?.id, version: 1 } });
     const [up] = await f.db.select().from(schema.artifactUploads);
     expect(up).toMatchObject({ status: "done", path: "out/chart.png", runId: ctx.runId, artifactId: a?.id });
-    expect(up?.computer).toMatch(/^fake:/);
-    expect(provider.calls.some((c) => c.op === "push")).toBe(false);
+    expect(up?.computer).toBe(`machine:${paired.machineId}`);
 
     const v2 = await call(ctx, "upload_file", { path: "out/chart.png", artifact_id: a?.id, note: "cores" });
     expect(v2.content).toContain("version 2");
@@ -385,71 +402,19 @@ describe("upload_file", () => {
     expect((await call(ctx, "create_artifact", { title: "X", kind: "file" })).isError).toBe(true);
   });
 
-  test("server fallback: a folder is zipped inside the computer, entries relative to it", async () => {
-    const commands: string[] = [];
-    const zipBytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]);
-    const provider = createFakeSandboxProvider({
-      exec(req: ExecRequest, files) {
-        commands.push(req.command);
-        const ok = (stdout: string) => ({ exitCode: 0, stdout, stderr: "", timedOut: false });
-        if (req.command.startsWith("if [ -d ")) {
-          const isDir = req.command.includes("'out/site'") && [...files.keys()].some((p) => p.startsWith("out/site/"));
-          return ok(isDir ? "dir\n" : "none\n");
-        }
-        const zip = /\.agentes\/upload-[0-9a-f-]+\.zip/.exec(req.command)?.[0];
-        if (zip && req.command.includes("python3 -m zipfile")) {
-          files.set(zip, zipBytes);
-          return ok(`${zipBytes.byteLength}\n`);
-        }
-        if (zip && req.command.startsWith("rm -f")) {
-          files.delete(zip);
-          return ok("");
-        }
-        return ok("");
-      },
-    });
-    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
-    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
-    const ctx = await runCtx();
-    await call(ctx, "write_file", { path: "out/site/index.html", content: "<h1>oi</h1>" });
-    const out = await call(ctx, "upload_file", { path: "out/site" });
-    expect(out.isError).toBeFalsy();
-    expect(out.content).toContain('as "site.zip" (file, 7 bytes)');
-    const zipCommand = commands.find((c) => c.includes("python3 -m zipfile"));
-    expect(zipCommand).toContain("cd 'out'");
-    expect(zipCommand).toContain("'site'");
-    const [v] = await f.db.select().from(schema.artifactVersions);
-    expect(v).toMatchObject({ fileName: "site.zip", contentType: "application/zip", size: zipBytes.byteLength });
-    // The temporary zip is gone.
-    const box = [...provider.boxes.values()][0];
-    expect([...(box?.files.keys() ?? [])].some((p) => p.startsWith(".agentes/upload-"))).toBe(false);
-    expect((await call(ctx, "upload_file", { path: "out/nada" })).content).toContain("No file or folder out/nada");
-  });
-
   test("a channel that pushes: the bytes go to the upload URL, never through the tool result", async () => {
-    const pushes: FakePush[] = [];
-    const provider = createFakeSandboxProvider({
-      async push(p) {
-        pushes.push(p);
-        await completeUpload(uploadDeps(), p.target.uploadId, {
-          name: p.name,
-          bytes: p.bytes,
-          contentType: p.contentType,
-          sha256: p.sha256,
-        });
-      },
-    });
-    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
-    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner } = await pushingComputer();
     const ctx = await runCtx();
     await call(ctx, "write_file", { path: "docs/plan.docx", content: "not really a docx" });
     const out = await call(ctx, "upload_file", { path: "docs/plan.docx" });
     expect(out.isError).toBeFalsy();
     const [up] = await f.db.select().from(schema.artifactUploads);
+    const pushes = runner.sent.filter((s) => s.type === "request" && s.op === "push");
     expect(pushes).toHaveLength(1);
-    expect(pushes[0]?.target).toEqual({
-      url: `/api/machines/uploads/${up?.id}`,
-      uploadId: up?.id ?? "",
+    expect(pushes[0]).toMatchObject({
+      url: `http://localhost:3000/api/machines/uploads/${up?.id}`,
+      uploadId: up?.id,
       maxBytes: ARTIFACT_LIMITS.fileBytes,
     });
     expect(up).toMatchObject({ status: "done" });
@@ -459,7 +424,7 @@ describe("upload_file", () => {
       contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
     // No reading or zipping by the server.
-    expect(provider.calls.filter((c) => c.op === "exec" || c.op === "read")).toEqual([]);
+    expect(runner.sent.filter((s) => s.type === "request" && (s.op === "exec" || s.op === "read"))).toEqual([]);
 
     // The machine can't send it: the upload fails and the agent is told.
     const missing = await call(ctx, "upload_file", { path: "docs/nope.pdf" });
@@ -469,9 +434,8 @@ describe("upload_file", () => {
   });
 
   test("import_file copies an uploaded file's bytes under its original name", async () => {
-    const provider = createFakeSandboxProvider();
-    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
-    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner } = await connectedComputer(f);
     const a = await createFileArtifact(f.artifactDeps, person(), f.org.id, {
       title: "Planilha",
       name: "vendas 2026.xlsx",
@@ -480,9 +444,8 @@ describe("upload_file", () => {
     const ctx = await runCtx();
     const out = await call(ctx, "import_file", { artifact_id: a.id });
     expect(out.content).toContain("imports/vendas 2026.xlsx");
-    const box = [...provider.boxes.values()][0];
-    expect(box?.files.get("imports/vendas 2026.xlsx")).toEqual(PNG);
+    expect(runner.files.get("imports/vendas 2026.xlsx")).toEqual(PNG);
     await call(ctx, "import_file", { artifact_id: a.id, path: "data/v.xlsx" });
-    expect(box?.files.get("data/v.xlsx")).toEqual(PNG);
+    expect(runner.files.get("data/v.xlsx")).toEqual(PNG);
   });
 });

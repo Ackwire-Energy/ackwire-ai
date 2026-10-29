@@ -36,10 +36,10 @@
   --e3: 0 28px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.5);
-  /* On --sunken's near-black a black shadow barely shows and the card reads as a hole: the press sinks a face that
-     isn't black, as far under --raised in lightness as light's is under white, and shadows it deeper. */
-  --chosen-bg: #141413;
-  --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px rgba(0, 0, 0, 0.5);
+  /* A black press shows only on a face it can darken: dark's chosen face sits lighter than a card, as light as the
+     faint words on it allow (4.5:1), under light's shadow made deeper. */
+  --chosen-bg: #282827;
+  --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.9), inset 0 1px 1.5px rgba(0, 0, 0, 0.7);
 }
 :root, [data-theme] {
   /* Names from v1, kept so every component keeps working (they follow the theme). */

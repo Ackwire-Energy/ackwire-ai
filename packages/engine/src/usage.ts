@@ -35,7 +35,7 @@ export async function effectiveAgentBudget(
   return agent.monthlyBudgetNanoUsd ?? (await orgDefaultAgentBudget(db, agent.orgId));
 }
 
-/** The agent row with its effective budget in `monthlyBudgetNanoUsd` (gateway, sandbox). */
+/** The agent row with its effective budget in `monthlyBudgetNanoUsd` (gateway). */
 export async function withEffectiveBudget<A extends { orgId: string; monthlyBudgetNanoUsd: number | null }>(
   db: Database,
   agent: A,

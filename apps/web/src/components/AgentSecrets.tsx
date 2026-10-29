@@ -49,7 +49,7 @@ export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: 
         <span className="small muted">{t("agentSecrets.help")}</span>
         <ul className="agent-secrets">
           {secrets.map((s) => (
-            <li key={`${s.machineId ?? "cloud"}:${s.name}`} className="agent-secrets__row">
+            <li key={`${s.machineId ?? "none"}:${s.name}`} className="agent-secrets__row">
               <span className="agent-secrets__name">
                 <code>{s.name}</code>
                 <span className="small muted">

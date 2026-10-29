@@ -217,26 +217,23 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(computerName(t, "Oficina", { kind: "host", name: "" })).toBe("machines.host.label");
   });
 
-  test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {
+  test("drawn as a server before and after it exists", () => {
     expect(WORKSPACE_COMPUTER_KIND).toBe("linux");
   });
 
-  test('"no computer" in the pickers: a Daytona sandbox, the workspace\'s computer on its way, or plainly none', () => {
+  test('"no computer" in the pickers: the workspace\'s computer on its way, or plainly none', () => {
     const at = (state: ComputerSetup["state"]) => setupView(external({ state }));
-    // People connect their own computers: Daytona's sandbox only where the server has them, never "the cloud".
-    expect(noComputerChoice(null, true, false)).toBe("cloud");
-    expect(noComputerChoice(null, false, false)).toBeNull();
-    expect(noComputerChoice(null, false, true)).toBe("none");
+    // People connect their own computers: never offered, only shown for an agent that has none.
+    expect(noComputerChoice(null, false)).toBeNull();
+    expect(noComputerChoice(null, true)).toBe("none");
     // On its way: the agents with no computer get it, so that's what the choice is.
     for (const state of ["preparing", "waiting", "problem"] as const) {
-      expect(noComputerChoice(at(state), false, false)).toBe("workspace");
+      expect(noComputerChoice(at(state), false)).toBe("workspace");
     }
-    // Ready, or on hold with none on its way, on a server with no cloud computer: never offered, only shown for an
-    // agent that has none.
+    // Ready, or on hold with none on its way: never offered, only shown for an agent that has none.
     for (const state of ["ready", null] as const) {
-      expect(noComputerChoice(at(state), false, false)).toBeNull();
-      expect(noComputerChoice(at(state), false, true)).toBe("none");
-      expect(noComputerChoice(at(state), true, false)).toBe("cloud");
+      expect(noComputerChoice(at(state), false)).toBeNull();
+      expect(noComputerChoice(at(state), true)).toBe("none");
     }
   });
 

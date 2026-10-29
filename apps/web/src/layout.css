@@ -3187,37 +3187,6 @@ p {
   }
 }
 
-/* The agent's PC: busy chip, step line, inline error. */
-.computer-progress {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-}
-/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
-.computer-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--ink);
-}
-.computer-error .ac-icon {
-  color: var(--ink-muted);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .computer-chip {
-    animation: computer-chip-in 200ms ease-out;
-  }
-}
-@keyframes computer-chip-in {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /*
  * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
@@ -3519,15 +3488,21 @@ p {
   margin-top: -36px;
   padding: 0 24px 4px;
 }
+/*
+ * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
+ * air up and down as it does sideways, so the row is its ink. 24px is the sheet's own inset, where its icon and words
+ * start, and keeps the × under the sky's densest top rows, whose lightest pixels in dark come close to its own ink. On
+ * the sky it takes the full ink: the muted one fades into a dark sky.
+ */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 24px;
+  right: 24px;
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
-/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
 .catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  margin-block: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
   color: var(--ink);
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
@@ -6457,7 +6432,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the workspace's own computer, the other computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -6566,14 +6541,6 @@ a.machine-row__name:hover {
 }
 .suspended-page__others > h2 {
   flex-basis: 100%;
-}
-.computers-note {
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
-  color: var(--ink-muted);
 }
 .computers-empty {
   display: flex;
@@ -6761,11 +6728,6 @@ a.machine-row__name:hover {
 .computer-machine__name {
   font-weight: 600;
 }
-.computer-target__connect {
-  color: var(--ink-muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 
 /* ---------- Onboarding ----------
  * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
@@ -6948,6 +6910,8 @@ a.machine-row__name:hover {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
+  /* Criar agente's column doesn't wrap pretty, as the onboarding's does. */
+  text-wrap: pretty;
 }
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
@@ -7181,6 +7145,11 @@ a.machine-row__name:hover {
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
+}
+/* Its margin is for the new-agent steps, which have no gap; in a stack spaced by its gap (the agent page's columns,
+   a dialog's body) that gap is its space, as it is the cards' beside it. */
+:is(.agp-col, .ac-dialog__body) > .newag__note {
+  margin: 0;
 }
 .newag__note b {
   color: var(--ink);
@@ -10136,8 +10105,18 @@ html[data-menu-overlay] .shell {
 /* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
   padding: 12px var(--text-edge);
-  /* Short lines: wrapped, they break into two of a length. */
+}
+/* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
+   The e-mail line then runs the bar's column, so the well isn't empty on its right. */
+.ai-panel__wait:has(> .setup-progress),
+.ai-panel__wait > [role="status"] {
   text-wrap: balance;
+}
+/* Without pretty (Safari before 26) the e-mail line would end on a word alone. */
+@supports not (text-wrap: pretty) {
+  .ai-panel__wait {
+    text-wrap: balance;
+  }
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
    hang in before them. */

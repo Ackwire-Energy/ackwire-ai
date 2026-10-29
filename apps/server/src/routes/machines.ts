@@ -150,7 +150,7 @@ export const Machine = z
 
 export const ComputerTarget = z
   .union([
-    z.object({ kind: z.literal("cloud") }),
+    z.object({ kind: z.literal("none") }),
     z.object({ kind: z.literal("machine"), machineId: z.uuid(), name: z.string(), online: z.boolean() }),
   ])
   .openapi("ComputerTarget");
@@ -233,9 +233,9 @@ const DeviceCode = z
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
 const ComputerBrain = z.enum(["claude_code", "codex"]);
-const Platform = z
-  .string()
-  .openapi({ description: "`mac`, `windows`, `linux`, `cloud`, or the runner's `os` as reported." });
+const Platform = z.string().openapi({
+  description: "`mac`, `windows`, `linux`, `other` (the workspace's own computer), or the runner's `os` as reported.",
+});
 
 const MachineOutage = z
   .object({
@@ -262,36 +262,24 @@ const MachineOutage = z
   .openapi("MachineOutage");
 
 const OutageTarget = z
-  .union([
-    z.object({
-      kind: z.literal("machine"),
-      machineId: z.uuid(),
-      name: z.string(),
-      platform: Platform,
-      managed: z
-        .boolean()
-        .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
-      online: z.boolean(),
-      brains: z.array(ComputerBrain).openapi({ description: "Computer brains it can run (`brainOptions`)." }),
-      reasonOff: z
-        .string()
-        .nullable()
-        .openapi({ description: "Why it can't take agents now: `offline`, `paused`; null when it can." }),
-    }),
-    z.object({
-      kind: z.literal("cloud"),
-      available: z.boolean().openapi({ description: "A cloud sandbox provider is configured on this server." }),
-      brains: z
-        .array(ComputerBrain)
-        .openapi({ description: "Always empty: Claude Code and Codex agents need a connected computer." }),
-    }),
-  ])
+  .object({
+    kind: z.literal("machine"),
+    machineId: z.uuid(),
+    name: z.string(),
+    platform: Platform,
+    managed: z
+      .boolean()
+      .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
+    online: z.boolean(),
+    brains: z.array(ComputerBrain).openapi({ description: "Computer brains it can run (`brainOptions`)." }),
+    reasonOff: z
+      .string()
+      .nullable()
+      .openapi({ description: "Why it can't take agents now: `offline`, `paused`; null when it can." }),
+  })
   .openapi("OutageTarget");
 
-const MoveTarget = z.union([
-  z.object({ kind: z.literal("machine"), machineId: z.uuid() }),
-  z.object({ kind: z.literal("cloud") }),
-]);
+const MoveTarget = z.object({ kind: z.literal("machine"), machineId: z.uuid() });
 
 const MoveAgentsResult = z
   .object({
@@ -529,7 +517,7 @@ export function machineAppRoutes(deps: AppDeps) {
     },
   );
 
-  const outageDeps = () => ({ db, pubsub, cloudAvailable: Boolean(deps.extras?.sandbox?.provider) });
+  const outageDeps = () => ({ db, pubsub });
 
   app.openapi(
     createRoute({
@@ -581,7 +569,7 @@ export function machineAppRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Which computer the agent uses: a connected machine, or null for the cloud computer (admins; or the owner with a machine they paired)",
+        "Which computer the agent uses: a connected machine, or null for none (admins; or the owner with a machine they paired)",
       request: { params: AgentParams, body: body(z.object({ machineId: z.uuid().nullable() })) },
       responses: { 200: json(ComputerTarget), ...errors },
     }),
@@ -797,7 +785,6 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
         {
           db,
           pubsub: adapters.pubsub,
-          cloudAvailable: Boolean(deps.extras?.sandbox?.provider),
           hostKey: hostKey(expected),
         },
         c.req.valid("json"),

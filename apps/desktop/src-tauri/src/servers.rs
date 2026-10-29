@@ -14,8 +14,6 @@ use tauri::{AppHandle, Manager, Url};
 
 /// agentes.chat Cloud.
 pub const CLOUD: &str = "https://app.agentes.chat";
-/// The Cloud's address before app.agentes.chat: builds before the move paired their homes with it and saved it.
-pub const OLD_CLOUD: &str = "https://agentes.chat";
 const FILE: &str = "servers.json";
 /// Servers kept in the list; choosing another past this drops the oldest that isn't open.
 const MAX_SERVERS: usize = 20;
@@ -112,19 +110,15 @@ fn path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|d| d.join(FILE))
 }
 
-/// The list on disk; None the first time this version starts (nothing written yet).
-pub fn read(app: &AppHandle) -> Option<ServerFile> {
-    from_json(&fs::read_to_string(path(app)?).ok()?)
-}
-
-fn from_json(text: &str) -> Option<ServerFile> {
-    let mut file: ServerFile = serde_json::from_str(text).ok()?;
+/// The list on disk; None before the first start wrote it, or when it can't be read.
+fn read(app: &AppHandle) -> Option<ServerFile> {
+    let text = fs::read_to_string(path(app)?).ok()?;
+    let mut file: ServerFile = serde_json::from_str(&text).ok()?;
     // Anything that isn't an address the app may open is dropped, whoever wrote it.
     file.servers.retain(|s| origin_of(s).as_deref() == Some(s.as_str()));
     if file.current.as_ref().is_some_and(|c| !file.servers.contains(c)) {
         file.current = None;
     }
-    file.replace(OLD_CLOUD, CLOUD);
     Some(file)
 }
 
@@ -145,8 +139,9 @@ fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, ServerFile> {
     app.state::<Servers>().inner().file.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// At start: the list as it was, or the one the move from the menu bar app made (`runners::migrate`).
-pub fn load(app: &AppHandle, file: ServerFile) {
+/// At start: the list as it was, or none yet (no `servers.json`: the first run).
+pub fn load(app: &AppHandle) {
+    let file = read(app).unwrap_or_default();
     *lock(app) = file.clone();
     write(app, &file);
     for origin in &file.servers {
@@ -326,21 +321,5 @@ mod tests {
         file.current = Some(CLOUD.into());
         file.replace("https://unknown.example.com", tailnet);
         assert_eq!(file.servers, vec![CLOUD.to_string(), here.to_string()], "only a server of the list moves");
-    }
-
-    #[test]
-    fn a_list_saved_before_the_cloud_moved_opens_it_at_its_address() {
-        let tailnet = "https://agentes.tail1234.ts.net";
-        let saved = format!(r#"{{"current":"{OLD_CLOUD}","servers":["{OLD_CLOUD}","{tailnet}","{CLOUD}"]}}"#);
-        assert_eq!(
-            from_json(&saved),
-            Some(ServerFile { current: Some(CLOUD.into()), servers: vec![CLOUD.into(), tailnet.into()] })
-        );
-        let own = format!(r#"{{"current":"{tailnet}","servers":["{tailnet}","{OLD_CLOUD}"]}}"#);
-        assert_eq!(
-            from_json(&own),
-            Some(ServerFile { current: Some(tailnet.into()), servers: vec![tailnet.into(), CLOUD.into()] })
-        );
-        assert_eq!(from_json("not json"), None);
     }
 }

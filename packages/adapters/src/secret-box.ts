@@ -3,8 +3,8 @@
  * makes a key pair per request and keeps the private key; the browser seals
  * the value to the public key; our server only relays the box. WebCrypto
  * only (browsers, Node 20+, Bun), so this file imports nothing: the runner
- * bundles it, the cloud computer's helper repeats it, and the web app has its
- * own copy of `sealSecret` (apps/web/src/lib/secret-box.ts).
+ * bundles it, and the web app has its own copy of `sealSecret`
+ * (apps/web/src/lib/secret-box.ts).
  *
  * ECDH P-256 (an ephemeral key from the sender) → HKDF-SHA256 → AES-256-GCM,
  * with the request bound in as additional data.

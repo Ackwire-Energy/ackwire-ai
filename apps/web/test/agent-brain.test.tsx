@@ -60,12 +60,11 @@ const pairMac = (api: ReturnType<typeof createFakeApi>, browser: boolean) =>
 describe("Como trabalha under the name", () => {
   test("where, who thinks and the browser, in three cells (where first); each opens its dialog", async () => {
     await open();
-    // This server has Daytona's sandboxes: the agent with no computer of its own works on one, by name.
-    expect(sentence().textContent).toContain("Trabalha naSandbox da Daytona");
+    expect(sentence().textContent).toContain("ComputadorNenhum computador");
     expect(sentence().textContent).toContain("Pensa com");
     expect(sentence().textContent).toContain("o modelo da organização");
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
-    expect(sentence().textContent?.indexOf("Trabalha na")).toBeLessThan(
+    expect(sentence().textContent?.indexOf("Computador")).toBeLessThan(
       sentence().textContent?.indexOf("Pensa com") ?? 0,
     );
     for (const word of ["Mudar quem pensa", "Mudar onde trabalha", "Mudar o navegador"])
@@ -111,7 +110,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows[0]?.querySelector("canvas.ac-brain")?.getAttribute("data-kind")).toBe("agent");
     expect(rows[1]?.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     expect(rows[2]?.querySelector(".ac-brand[data-mark='openai']")).not.toBeNull();
-    // The agent is on the cloud: a plan brain says where it will go, before it is chosen.
+    // The agent has no computer: a plan brain says where it will go, before it is chosen.
     expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent)).toEqual([
       undefined,
       "Vai para o MacBook",
@@ -665,10 +664,12 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const mac = within(d).getByRole("radio", { name: /^MacBook/ });
     expect(mac.textContent).toContain("Ligado · Claude Code · Codex · Navegador");
     // Portraits are as wide as their drawings: each sits in the same column, so the names line up, and the drawing
-    // starts at the row's edge like any other lead.
+    // starts at the row's edge like any other lead. "Nenhum computador" leads with a dash in that column.
     const options = within(d).getAllByRole("radio");
     expect(options.length).toBeGreaterThan(1);
-    for (const option of options)
+    const none = within(d).getByRole("radio", { name: /^Nenhum computador/ });
+    expect(none.querySelector(".ac-optrow__lead > .machine-row__pic > svg.ac-icon")).toBeTruthy();
+    for (const option of options.filter((o) => !o.textContent?.startsWith("Nenhum computador")))
       expect(option.querySelector(".ac-optrow__lead > .machine-row__pic > canvas.ac-computer")).toBeTruthy();
     const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
     const column = css.split("\n.machine-row__pic {")[1]?.split("}")[0] ?? "";
@@ -681,21 +682,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     expect(document.body.textContent).toContain("A Ada agora trabalha no MacBook.");
   });
 
-  test("back to a Daytona sandbox: its own words, since a sandbox isn't named like a computer", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    pairMac(api, true);
-    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
-    await open(state, api);
-    const d = await dialog("Mudar onde trabalha", "Onde a Ada trabalha?");
-    await click(within(d).getByRole("radio", { name: /^Sandbox da Daytona/ }));
-    await click(within(d).getByRole("button", { name: "Usar uma sandbox da Daytona" }));
-    await settle(6);
-    expect(state.calls.findLast((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, null]);
-    expect(document.body.textContent).toContain("A Ada agora trabalha numa sandbox da Daytona.");
-  });
-
-  test("the browser on the cloud: the agent moves to the MacBook, and the steps there show before it's allowed", async () => {
+  test("the browser with no computer: the agent moves to the MacBook, and the steps there show before it's allowed", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, false);
@@ -738,7 +725,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
 
   /**
    * Ada's browser on Servidor, a Linux computer (`machine` over it), and the page open. `reason`: what the server says
-   * of her browser there; null: she is still on a sandbox, so turning it on moves her there.
+   * of her browser there; null: she still has no computer, so turning it on moves her there.
    */
   const onServidor = async (
     machine: Partial<Machine>,

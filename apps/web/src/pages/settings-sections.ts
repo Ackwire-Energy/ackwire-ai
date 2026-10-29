@@ -31,7 +31,7 @@ export const SETTINGS_SECTIONS: {
   { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
-  // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
+  // Every member sees the computers and can pair one (ADR 0025).
   { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
   // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
@@ -44,9 +44,6 @@ export const SETTINGS_SECTIONS: {
 export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
-
-/** Old section ids and where they live now ("sandbox" joined Computadores). */
-export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to

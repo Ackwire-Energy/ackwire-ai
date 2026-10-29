@@ -222,7 +222,7 @@ test("rename, delete, target and the computer view; deleting revokes the token",
   expect(cross.status).toBe(403);
 
   expect((await api(`/machines/${machineId}`, { method: "DELETE" })).status).toBe(204);
-  expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({ target: { kind: "cloud" } });
+  expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({ target: { kind: "none" } });
   const upload = await runnerCall(`/api/machines/uploads/${crypto.randomUUID()}`, {
     method: "PUT",
     headers: { authorization: `Bearer ${token}` },

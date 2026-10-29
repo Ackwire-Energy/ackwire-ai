@@ -21,19 +21,7 @@ export function needsHeaderBlur(os: string, version: string | number): boolean {
   return Number.isFinite(major) && major < 26;
 }
 
-/** WCAG contrast ratio between two "#rrggbb" colors (1 to 21). */
-export function contrastRatio(a: string, b: string): number {
-  const lum = (hex: string) => {
-    const n = Number.parseInt(hex.slice(1, 7), 16);
-    const [r, g, bl] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
-      const c = v / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    }) as [number, number, number];
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
+export { contrastRatio } from "@agenteschat/ui/sky/math";
 
 /**
  * The unread badge of the tab bar: a classic red with white text in both themes. iOS always draws badge

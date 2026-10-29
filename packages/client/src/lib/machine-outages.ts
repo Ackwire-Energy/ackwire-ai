@@ -30,24 +30,21 @@ export interface OutageLike {
   waitingRuns: number;
 }
 
-export type OutageTargetLike =
-  | {
-      kind: "machine";
-      machineId: string;
-      name: string;
-      platform: string;
-      /** The workspace's own computer (ADR 0056 §10). */
-      managed?: boolean;
-      online: boolean;
-      brains: readonly ComputerBrain[];
-      /** "offline" | "paused" | null. */
-      reasonOff: string | null;
-    }
-  /** The cloud computer: the brains it runs (none today: it can't run Claude Code or Codex). */
-  | { kind: "cloud"; available: boolean; brains?: readonly ComputerBrain[] };
+export type OutageTargetLike = {
+  kind: "machine";
+  machineId: string;
+  name: string;
+  platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
+  online: boolean;
+  brains: readonly ComputerBrain[];
+  /** "offline" | "paused" | null. */
+  reasonOff: string | null;
+};
 
 /** What `move-agents` takes as `target`. */
-export type MoveTarget = { kind: "machine"; machineId: string } | { kind: "cloud" };
+export type MoveTarget = { kind: "machine"; machineId: string };
 
 export interface MoveResultLike {
   moved: readonly string[];
@@ -122,15 +119,13 @@ export function visibleOutages<T extends Pick<OutageLike, "agents" | "offlineSin
 // ── Where to (the switch's targets) ─────────────────────────────────────────
 
 /** Why a target can't take the agents now. Server reasons (`reasonOff`) pass through as they are. */
-export type TargetOffReason = "offline" | "missing_brain" | "unavailable" | (string & {});
+export type TargetOffReason = "offline" | "missing_brain" | (string & {});
 
 export interface TargetOption {
   key: string;
   target: MoveTarget;
-  kind: "machine" | "cloud";
-  /** The computer's name (null for the cloud computer, which the UI names itself). */
-  name: string | null;
-  platform: string | null;
+  name: string;
+  platform: string;
   /** The workspace's own computer (ADR 0056 §10). */
   managed: boolean;
   online: boolean;
@@ -151,9 +146,7 @@ export function brainsNeeded(o: Pick<OutageLike, "agents">, agentIds: Iterable<s
 
 /**
  * "Para onde", as on the web: every other computer, the usable ones first; one that can't take the chosen
- * agents now stays, disabled, with the reason: offline, a server reason ("paused"), or the brain it lacks. The
- * cloud computer is offered only where the server has it and it runs one of the agents' brains (today it runs
- * none): a row nobody could ever pick only adds words.
+ * agents now stays, disabled, with the reason: offline, a server reason ("paused"), or the brain it lacks.
  */
 export function targetOptions(
   o: Pick<OutageLike, "machineId" | "agents">,
@@ -166,27 +159,6 @@ export function targetOptions(
   const wanted = need.length > 0 ? need : [...all];
   const out: TargetOption[] = [];
   for (const t of targets ?? []) {
-    if (t.kind === "cloud") {
-      const brains = t.brains ? [...t.brains] : null;
-      // Without the list (older servers) only `available` says; with it, it must run the agents' brains.
-      if (!t.available || (brains && !brains.some((b) => all.has(b)))) continue;
-      const missing = brains ? (wanted.find((b) => !brains.includes(b)) ?? null) : null;
-      const reason: TargetOffReason | null = missing ? "missing_brain" : null;
-      out.push({
-        key: "cloud",
-        target: { kind: "cloud" },
-        kind: "cloud",
-        name: null,
-        platform: null,
-        managed: false,
-        online: t.available,
-        brains: brains ?? [],
-        enabled: reason === null,
-        reason,
-        missing,
-      });
-      continue;
-    }
     if (t.machineId === o.machineId) continue;
     const missing = wanted.find((b) => !t.brains.includes(b)) ?? null;
     const reason: TargetOffReason | null = !t.online
@@ -199,7 +171,6 @@ export function targetOptions(
     out.push({
       key: `m:${t.machineId}`,
       target: { kind: "machine", machineId: t.machineId },
-      kind: "machine",
       name: t.name,
       platform: t.platform,
       managed: t.managed === true,
@@ -210,8 +181,8 @@ export function targetOptions(
       missing: reason === "missing_brain" ? missing : null,
     });
   }
-  // Usable first; among them computers before the cloud one (they have the person's folders).
-  const rank = (x: TargetOption) => (x.enabled ? 0 : 2) + (x.kind === "cloud" ? 1 : 0);
+  // Usable first.
+  const rank = (x: TargetOption) => (x.enabled ? 0 : 1);
   return out
     .map((x, i) => ({ x, i }))
     .sort((a, b) => rank(a.x) - rank(b.x) || a.i - b.i)
@@ -337,7 +308,6 @@ export const MOVE_ERRORS = [
   "machine.target_not_found",
   "machine.target_same",
   "machine.target_paused",
-  "machine.target_cloud_unavailable",
   "machine.not_found",
 ] as const;
 export type MoveError = (typeof MOVE_ERRORS)[number];

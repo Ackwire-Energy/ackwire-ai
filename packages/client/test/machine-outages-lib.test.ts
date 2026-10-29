@@ -85,16 +85,15 @@ describe("offline computers", () => {
 
   test("targets: every other computer (as on the web), usable first, the rest with a reason", () => {
     const self: OutageTargetLike = { ...pro, machineId: "air", name: "MacBook Air", online: false };
-    const cloud: OutageTargetLike = { kind: "cloud", available: true, brains: [] };
-    const opts = targetOptions(air, [office, self, codexOnly, cloud, pro], ["ada", "theo"]);
-    // The cloud computer runs neither agent's brain: no row. The Codex-only server stays, saying what it lacks.
+    const opts = targetOptions(air, [office, self, codexOnly, pro], ["ada", "theo"]);
+    // The Codex-only server stays, saying what it lacks.
     expect(opts.map((x) => x.key)).toEqual(["m:pro", "m:office", "m:linux"]);
     expect(opts[0]).toMatchObject({ enabled: true, reason: null, target: { kind: "machine", machineId: "pro" } });
     expect(opts[1]).toMatchObject({ enabled: false, reason: "offline" });
     expect(opts[2]).toMatchObject({ enabled: false, reason: "missing_brain", missing: "claude_code" });
   });
 
-  test("targets: paused, missing one of the chosen brains, the cloud only where it can run them", () => {
+  test("targets: paused, missing one of the chosen brains", () => {
     const mixed: OutageLike = {
       ...air,
       agents: [
@@ -103,7 +102,7 @@ describe("offline computers", () => {
       ],
     };
     const paused: OutageTargetLike = { ...pro, machineId: "p", reasonOff: "paused", brains: ["claude_code", "codex"] };
-    const opts = targetOptions(mixed, [pro, codexOnly, paused, { kind: "cloud", available: false }], ["ada", "lisa"]);
+    const opts = targetOptions(mixed, [pro, codexOnly, paused], ["ada", "lisa"]);
     expect(brainsNeeded(mixed, ["ada", "lisa"])).toEqual(["claude_code", "codex"]);
     expect(opts.find((x) => x.key === "m:pro")).toMatchObject({
       enabled: false,
@@ -112,20 +111,8 @@ describe("offline computers", () => {
     });
     expect(opts.find((x) => x.key === "m:linux")).toMatchObject({ enabled: false, missing: "claude_code" });
     expect(opts.find((x) => x.key === "m:p")).toMatchObject({ enabled: false, reason: "paused" });
-    // A server without the cloud computer: no row for it.
-    expect(opts.find((x) => x.key === "cloud")).toBeUndefined();
     // Only Lisa: the Codex server takes her.
     expect(targetOptions(mixed, [codexOnly], ["lisa"])[0]).toMatchObject({ enabled: true });
-    const able = targetOptions(air, [{ kind: "cloud", available: true, brains: ["claude_code"] }], ["ada"]);
-    expect(able[0]).toMatchObject({ enabled: true, reason: null });
-    // It runs Codex only: shown for Lisa's sake, disabled while Ada (Claude Code) is chosen too.
-    const codexCloud = targetOptions(mixed, [{ kind: "cloud", available: true, brains: ["codex"] }], ["ada", "lisa"]);
-    expect(codexCloud[0]).toMatchObject({
-      key: "cloud",
-      enabled: false,
-      reason: "missing_brain",
-      missing: "claude_code",
-    });
   });
 
   test("the chosen target: kept while usable, else the first usable one", () => {

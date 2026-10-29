@@ -5,14 +5,17 @@ import type { TFunction } from "i18next";
  * 1.240 tokens · US$ 0,004"). Locale-aware; pt-BR uses "," for decimals.
  */
 
-/** US$ with 2 decimals, or more for tiny amounts (US$ 0,004, a few Jev decisions' US$ 0,0003). */
+/**
+ * US$ with 2 decimals, or more for tiny amounts (US$ 0,004, a few Jev decisions' US$ 0,0003); a spend too small for
+ * 4 decimals reads "<US$ 0,0001", like formatPercent's "<1%", never as zero.
+ */
 export function formatUsd(t: TFunction, locale: string, value: number) {
   const abs = Math.abs(value);
   const digits = abs === 0 ? 2 : abs < 0.001 ? 4 : abs < 0.01 ? 3 : 2;
-  const text = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
-    value,
-  );
-  return t("format.usd", { value: text });
+  const fmt = (v: number) =>
+    new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+  if (value > 0 && value < 0.00005) return `<${t("format.usd", { value: fmt(0.0001) })}`;
+  return t("format.usd", { value: fmt(value) });
 }
 
 /** Budget use: "37,5%", "12%", "<1%" (members never see money, only this). */

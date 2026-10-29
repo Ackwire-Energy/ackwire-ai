@@ -141,6 +141,24 @@ test("storage API: what the workspace's files take, and the disk under this serv
       await other.close();
     }
   }
+  // The Cloud keeps files in a folder too, but its disk is every workspace's: only what this one keeps is told.
+  const cloud = await createTestServer({
+    platformKind: "disk",
+    env: { FILES_DIR: dir, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) },
+  });
+  try {
+    const owner = browser(cloud);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+      owner(`/api/app/organizations/${orgId}${path}`, init);
+    await api("/artifacts", { json: { title: "Metas", content: { kind: "document", markdown: "# Metas" } } });
+    const read = (await (await api("/storage")).json()) as { usage: Record<string, unknown> };
+    expect(read.usage).toMatchObject({ ownBucketBytes: 0, disk: null });
+    expect(read.usage.platformBytes).toBeGreaterThan(0);
+  } finally {
+    await cloud.close();
+  }
   await rm(dir, { recursive: true, force: true });
 });
 

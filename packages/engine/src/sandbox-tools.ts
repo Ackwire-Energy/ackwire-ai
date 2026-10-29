@@ -2,7 +2,6 @@ import {
   ACCESS_PROTOCOL,
   type ExecRequest,
   type ExecResult,
-  type NetworkMode,
   type PubSub,
   TASK_EXECUTORS,
   TASKS_PROTOCOL,
@@ -49,22 +48,20 @@ import {
   type ComputerHandle,
   getSandboxSettings,
   NO_COMPUTER_MESSAGE,
-  ownComputerStatus,
   PREPARING_COMPUTER_MESSAGE,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
   type SandboxDeps,
-  stopOwnComputer,
   truncateOutput,
   withSandbox,
 } from "./sandbox";
 import { requestSecretTool } from "./secret-request-tool";
-import { hasCloudSecrets, REQUEST_SECRET_TOOL, secretFilePaths, withSecretsCommand } from "./secrets";
+import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { grantedScopeKeys, grantKey, isAllowed, toolAccess, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
-import { completeUpload, createUpload, failUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
+import { createUpload, failUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -178,10 +175,6 @@ function timeoutOf(input: Record<string, unknown>, fallback: number, max: number
   return Math.max(1, Math.min(max, Math.round(asked)));
 }
 
-/** The longest command on this computer: an hour on a connected one, 10 min on ours. */
-const maxTimeoutOf = (info: ComputerInfo) =>
-  info.kind === "machine" ? SANDBOX_LIMITS.machineMaxTimeoutSeconds : SANDBOX_LIMITS.maxTimeoutSeconds;
-
 /**
  * Claude Code on a connected computer, the way it keeps context: one session
  * per conversation (the thread's id, a UUID), resumed on every follow-up.
@@ -197,35 +190,23 @@ export function claudeCodeSentence(sessionId: string, tasks = false) {
 /** A connected machine that can run background tasks: commands allowed and a runner of protocol 4+. */
 const tasksOn = (info: ComputerInfo) => info.kind === "machine" && info.execAllowed && info.protocol >= TASKS_PROTOCOL;
 
-/** DNS failures and refused or unreachable connections: what blocked network looks like. */
+/** DNS failures and refused or unreachable connections: what a network failure looks like. */
 const NO_NETWORK =
   /temporary failure in name resolution|could not resolve host|name or service not known|getaddrinfo|enotfound|eai_again|connection refused|econnrefused|network is unreachable|enetunreach|failed to establish a new connection|newconnectionerror|no address associated with hostname/i;
-
-export const NO_NETWORK_NOTE =
-  "no internet: this computer can't reach the internet, except the domains allowed in Settings → Sandbox. Tell the person (it isn't a missing permission) and suggest allowing the domain.";
-
-/** With open internet a network failure is the site or the address, not our block. */
-export const OPEN_NETWORK_NOTE =
-  "network failure: this computer has open internet, so the problem is the address or the site (down, DNS, refused the connection). Tell the person; it isn't a block or a permission.";
 
 /** On a connected machine the network is that machine's own: we don't block anything there. */
 export const MACHINE_NETWORK_NOTE =
   "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
 
-type Network = { mode: NetworkMode | "machine"; domains: string[] };
-
 /** Which computer the agent's tools act on (from `agentComputerInfo`). */
 type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
 
 /** One or two sentences the agent reads about its computer, in `run_code`'s description. */
-export function computerSentence(info: ComputerInfo, network: Network) {
+export function computerSentence(info: ComputerInfo) {
   if (info.kind === "removed") {
     return REMOVED_COMPUTER_MESSAGE.replace(/\.$/, " (calls fail until then).");
   }
-  if (info.kind === "cloud") {
-    if (!info.available) return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
-    return `Runs on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)}`;
-  }
+  if (info.kind === "none") return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
   const os = info.os === "darwin" ? "macOS" : info.os === "windows" ? "Windows" : info.os === "linux" ? "Linux" : "";
   return [
     info.managed
@@ -268,25 +249,8 @@ export function toolPath(raw: string, info: ComputerInfo): string {
   return workspacePath(raw);
 }
 
-const networkOf = (mode: string | undefined): Network => ({
-  mode: mode === "open" || mode === "allowlist" ? mode : "blocked",
-  domains: [],
-});
-
-/** One sentence the agent reads about its internet, from the org's setting. */
-export function networkSentence(n: Network) {
-  if (n.mode === "machine") return "It uses that machine's own network.";
-  if (n.mode === "open") return "This computer has open internet access (no secrets inside).";
-  if (n.mode === "allowlist") {
-    return n.domains.length > 0
-      ? `Internet only for these domains: ${n.domains.slice(0, 20).join(", ")}.`
-      : "Internet only for the domains the organization allowed.";
-  }
-  return "No internet access (the organization can allow domains or open it in Settings → Sandbox).";
-}
-
 /** What the model sees from a command: exit code first (it is the line kept in "Recent actions"). */
-function execOutput(label: string, r: ExecResult, seconds: number, timeout: number, network?: Network): ToolOutput {
+function execOutput(label: string, r: ExecResult, seconds: number, timeout: number): ToolOutput {
   const head = r.canceled
     ? `${label}: canceled by a person after ${seconds} s (${r.canceled.killed ? "stopped" : "no longer waited for; it may still finish"})`
     : r.timedOut
@@ -296,15 +260,7 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   if (r.stdout) parts.push(`stdout:\n${truncateOutput(r.stdout, SANDBOX_LIMITS.stdoutChars)}`);
   if (r.stderr) parts.push(`stderr:\n${truncateOutput(r.stderr, SANDBOX_LIMITS.stderrChars)}`);
   if (!r.stdout && !r.stderr) parts.push("(no output)");
-  if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) {
-    parts.push(
-      network?.mode === "machine"
-        ? MACHINE_NETWORK_NOTE
-        : network?.mode === "open"
-          ? OPEN_NETWORK_NOTE
-          : NO_NETWORK_NOTE,
-    );
-  }
+  if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) parts.push(MACHINE_NETWORK_NOTE);
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
@@ -387,9 +343,6 @@ export function formatBytes(n: number) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** The last line of a command's output. */
-const lastLine = (text: string) => text.trim().split("\n").at(-1)?.trim() ?? "";
-
 const slug = (s: string) =>
   s
     .normalize("NFD")
@@ -400,15 +353,11 @@ const slug = (s: string) =>
     .slice(0, 60) || "file";
 
 /**
- * Sandbox tools through the Tool Gateway (scope `sandbox:run`, on by
- * default and not part of "all tools"): `run_code`, `write_file`,
- * `read_file`, `list_files`, `export_file` (text to a native Drive kind),
- * `upload_file` (any file or folder as is, ADR 0025), `import_file` (from
- * the Drive) and `run_skill_script`. One computer per agent, shared
- * by all its conversations, created on first use; no secrets of ours or
- * environment variables ever go in, only what a person seals to it with
- * `request_secret` (ADR 0027).
- * Without a provider the source offers nothing.
+ * Computer tools through the Tool Gateway (scope `sandbox:run`, on by default and not part of "all tools"):
+ * `run_code`, `write_file`, `read_file`, `list_files`, `export_file` (text to a native Drive kind), `upload_file`
+ * (any file or folder as is, ADR 0025), `import_file` (from the Drive), `run_skill_script`, `request_secret` and
+ * `computer_status`, on the agent's connected computer (ADR 0025). Only what a person seals to it with
+ * `request_secret` (ADR 0027) is secret there.
  */
 export function createSandboxToolSource(
   deps: SandboxDeps & { artifacts: ArtifactDeps; skills: Pick<SkillDeps, "blobs">; pubsub?: PubSub },
@@ -418,13 +367,8 @@ export function createSandboxToolSource(
    * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
    */
   const execLive = async (ctx: ToolContext, computer: ComputerHandle, given: ExecRequest) => {
-    // Secrets on a cloud computer: the helper gives commands their env and hides values from the output.
-    const plain =
-      !computer.machineId && (await hasCloudSecrets(ctx.db, ctx.orgId, ctx.agentId))
-        ? { ...given, command: withSecretsCommand(given.command) }
-        : given;
     // Canceling the run stops the command (killed when the provider can).
-    const request: ExecRequest = ctx.signal ? { ...plain, signal: ctx.signal } : plain;
+    const request: ExecRequest = ctx.signal ? { ...given, signal: ctx.signal } : given;
     const { id, provider } = computer;
     if (!provider.execStream || !deps.pubsub || !ctx.toolUseId) return provider.exec(id, request);
     // Where the run's other events go.
@@ -467,32 +411,18 @@ export function createSandboxToolSource(
       await publish();
     }
   };
-  // A recreated computer is told to the agent with the result of the call that found out.
-  const notices = new WeakMap<ToolContext, string>();
-  const run = <T>(ctx: ToolContext, seconds: number, fn: (computer: ComputerHandle) => Promise<T>) =>
-    withSandbox(deps, ctx, seconds, fn, (notice) => notices.set(ctx, notice));
-  const withNotices = (tools: ToolDefinition[]): ToolDefinition[] =>
-    tools.map((t) => ({
-      ...t,
-      async execute(input, ctx) {
-        const out = await t.execute(input, ctx);
-        const notice = notices.get(ctx);
-        notices.delete(ctx);
-        return notice ? { ...out, content: `${notice}\n${out.content}` } : out;
-      },
-    }));
+  const run = <T>(ctx: ToolContext, fn: (computer: ComputerHandle) => Promise<T>) => withSandbox(deps, ctx, fn);
   const skillDeps = (ctx: ToolContext): SkillDeps => ({ db: ctx.db, blobs: deps.skills.blobs });
   /** A file that holds a secret (or a folder with one) never leaves the computer through the file tools. */
   const refuseSecretPath = async (ctx: ToolContext, computer: ComputerHandle, path: string) => {
-    const held = await secretFilePaths(ctx.db, ctx.orgId, ctx.agentId, computer.machineId ?? null);
+    const held = await secretFilePaths(ctx.db, ctx.orgId, ctx.agentId, computer.machineId);
     const hit = held.find((f) => f === path || path === "" || f.startsWith(`${path}/`));
     if (hit) throw new Error(`${path || "The workspace"} holds a secret (${hit}); it stays on the computer.`);
   };
 
   /**
-   * `upload_file` on one computer: it pushes the file itself when its channel
-   * can (`pushFile`, to our upload URL), else the server reads it (a folder
-   * zipped inside the computer first). Both end in `completeUpload`.
+   * `upload_file` on one computer: it sends the file itself (`pushFile`) to our upload URL, and the upload
+   * completes when the bytes arrive (`receiveMachineUpload`).
    */
   const uploadFrom = async (
     ctx: ToolContext,
@@ -507,83 +437,27 @@ export function createSandboxToolSource(
       channelId: ctx.channelId,
       threadId: replyThreadOf(ctx),
       computer: computer.ref,
-      machineId: computer.machineId ?? null,
+      machineId: computer.machineId,
       path,
       ...input,
     });
-    const { provider, id } = computer;
-    if (provider.pushFile) {
-      const base = (deps.publicUrl ?? "").replace(/\/$/, "");
-      try {
-        await provider.pushFile(id, path, {
-          url: `${base}/api/machines/uploads/${upload.id}`,
-          uploadId: upload.id,
-          maxBytes: upload.maxBytes,
-        });
-      } catch (error) {
-        await failUpload(deps, upload.id, error instanceof Error ? error.message : String(error));
-        throw error;
-      }
-      return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
-    }
+    const base = (deps.publicUrl ?? "").replace(/\/$/, "");
     try {
-      const file = await readForUpload(computer, path, upload);
-      return (await completeUpload({ db: deps.db, artifacts: deps.artifacts, pubsub: deps.pubsub }, upload.id, file))
-        .upload;
+      await computer.provider.pushFile(computer.id, path, {
+        url: `${base}/api/machines/uploads/${upload.id}`,
+        uploadId: upload.id,
+        maxBytes: upload.maxBytes,
+      });
     } catch (error) {
       await failUpload(deps, upload.id, error instanceof Error ? error.message : String(error));
       throw error;
     }
-  };
-
-  /** The server side of an upload: the file as is, or a folder zipped in the computer (entries relative to it). */
-  const readForUpload = async (computer: ComputerHandle, path: string, upload: UploadRow) => {
-    const { provider, id } = computer;
-    const q = quote(path);
-    const tooLarge = () => new Error(`${path} is too large (max ${formatBytes(upload.maxBytes)})`);
-    const probe = await provider.exec(id, {
-      command: `if [ -d ${q} ]; then echo dir; elif [ -f ${q} ]; then echo "file $(wc -c < ${q})"; else echo none; fi`,
-      timeoutSeconds: 30,
-    });
-    const [kind, size] = lastLine(probe.stdout).split(/\s+/);
-    if (kind === "none") throw new Error(`No file or folder ${path}.`);
-    const name = path.split("/").at(-1) || path;
-    if (kind !== "dir") {
-      if (kind === "file" && Number(size) > upload.maxBytes) throw tooLarge();
-      const bytes = await provider.readFile(id, path);
-      if (!bytes) throw new Error(`No file ${path}.`);
-      if (bytes.byteLength > upload.maxBytes) throw tooLarge();
-      return { name, bytes };
-    }
-    const zip = `.agentes/upload-${upload.id}.zip`;
-    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    try {
-      const zipped = await provider.exec(id, {
-        command: [
-          `root="$(pwd)" && mkdir -p .agentes`,
-          ...(parent ? [`cd ${quote(parent)}`] : []),
-          `python3 -m zipfile -c "$root/${zip}" ${quote(name)}`,
-          `wc -c < "$root/${zip}"`,
-        ].join(" && "),
-        timeoutSeconds: 300,
-      });
-      if (zipped.exitCode !== 0) {
-        throw new Error(`could not zip ${path}: ${truncateOutput(zipped.stderr || zipped.stdout, 2000)}`);
-      }
-      if (Number(lastLine(zipped.stdout)) > upload.maxBytes) throw tooLarge();
-      const bytes = await provider.readFile(id, zip);
-      if (!bytes) throw new Error(`could not zip ${path}`);
-      if (bytes.byteLength > upload.maxBytes) throw tooLarge();
-      return { name: `${name}.zip`, bytes };
-    } finally {
-      await provider.exec(id, { command: `rm -f ${quote(zip)}`, timeoutSeconds: 30 }).catch(() => undefined);
-    }
+    return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
   };
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
   const auditMachineExec = async (ctx: ToolContext, computer: ComputerHandle, command: string, r: ExecResult) => {
-    if (!computer.machineId) return;
     await recordAudit(deps.db, {
       orgId: ctx.orgId,
       actor: { type: "agent", id: ctx.agentId },
@@ -598,27 +472,20 @@ export function createSandboxToolSource(
     }).catch(() => undefined);
   };
 
-  /**
-   * The command for a script: on cloud computers wrapped in `timeout` (we
-   * kill it there); on connected machines plain (the runner enforces the
-   * timeout, and macOS or Windows have no `timeout`).
-   */
-  const scriptCommand = (computer: ComputerHandle, bin: string, file: string, timeout: number, args = "") =>
-    computer.machineId
-      ? `${bin} ${/^[\w./-]+$/.test(file) ? file : quote(file)}${args ? ` ${args}` : ""}`
-      : `timeout -k 5 ${timeout} ${bin} ${quote(file)}${args ? ` ${args}` : ""}`;
+  /** The command for a script: plain (the runner enforces the timeout, and macOS or Windows have no `timeout`). */
+  const scriptCommand = (bin: string, file: string, args = "") =>
+    `${bin} ${/^[\w./-]+$/.test(file) ? file : quote(file)}${args ? ` ${args}` : ""}`;
 
   const baseTools = (
     requireApproval: boolean,
     execTimeout: number,
-    network: Network = { mode: "blocked", domains: [] },
-    computerInfo: ComputerInfo = { kind: "cloud", available: true },
+    computerInfo: ComputerInfo = { kind: "none", preparing: false },
     sessionId?: string,
-    maxTimeout = maxTimeoutOf(computerInfo),
+    maxTimeout = SANDBOX_LIMITS.machineMaxTimeoutSeconds,
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       inputSchema: {
@@ -640,86 +507,37 @@ export function createSandboxToolSource(
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const file = `.agentes/run-${Date.now()}.${runner.ext}`;
           const started = Date.now();
-          const result = await run(ctx, timeout + 15, async (computer) => {
+          const result = await run(ctx, async (computer) => {
             await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
             const r = await execLive(ctx, computer, {
-              command: scriptCommand(computer, runner.bin, file, timeout),
-              timeoutSeconds: computer.machineId ? timeout : timeout + 10,
+              command: scriptCommand(runner.bin, file),
+              timeoutSeconds: timeout,
             });
             await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r);
             return r;
           });
-          return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout, network);
+          return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
         } catch (error) {
           return failed(error);
         }
       },
     },
-    // Turning a computer on and off is a sandbox's (Daytona): a connected or the workspace's own computer has no switch here.
-    ...(computerInfo.kind === "cloud" && computerInfo.available
-      ? ([
-          {
-            name: "computer_start",
-            description:
-              "Turn your computer on now (it is created the first time). Usually not needed: it starts by itself when you run code. No approval needed.",
-            scope: SANDBOX_SCOPE,
-            inputSchema: { type: "object", properties: {}, additionalProperties: false },
-            async execute(_input, ctx) {
-              try {
-                const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
-                if (target.kind === "machine") {
-                  await run(ctx, 30, async () => undefined);
-                  return { content: `The connected computer "${target.name}" is online.` };
-                }
-                await run(ctx, 30, async () => undefined);
-                const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
-                return {
-                  content: `Your computer is ${s.status}. ${networkSentence(networkOf(s.network))}`,
-                  data: { computer: s },
-                };
-              } catch (error) {
-                return failed(error);
-              }
-            },
-          },
-          {
-            name: "computer_stop",
-            description: "Turn your computer off now (files stay; it starts again when you need it).",
-            scope: SANDBOX_SCOPE,
-            inputSchema: { type: "object", properties: {}, additionalProperties: false },
-            async execute(_input, ctx) {
-              try {
-                const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
-                if (target.kind === "machine") {
-                  return {
-                    content: `You work on the computer "${target.name}", which stays as it is: nothing to stop.`,
-                  };
-                }
-                const s = await stopOwnComputer(deps, ctx.orgId, ctx.agentId);
-                return { content: `Your computer is ${s.status}; files kept.`, data: { computer: s } };
-              } catch (error) {
-                return failed(error);
-              }
-            },
-          },
-        ] satisfies ToolDefinition[])
-      : []),
     requestSecretTool({
       scope: SANDBOX_SCOPE,
       browserOnly: false,
       toolPath: (raw) => toolPath(raw, computerInfo),
-      onComputer: (ctx, fn) => run(ctx, 60, fn),
+      onComputer: (ctx, fn) => run(ctx, fn),
     }),
     {
       name: "computer_status",
-      description: "Is your computer on? Which computer it is, disk used and its internet access.",
+      description: "Which computer you work on and whether it is online.",
       scope: SANDBOX_SCOPE,
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
         try {
           const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
-          if (target.kind !== "cloud") {
-            if (target.kind === "removed") return { content: computerSentence(target, network), isError: true };
+          if (target.kind !== "none") {
+            if (target.kind === "removed") return { content: computerSentence(target), isError: true };
             const os =
               target.os === "darwin"
                 ? "macOS"
@@ -732,7 +550,7 @@ export function createSandboxToolSource(
               ? `You are on "${target.name}", this workspace's own computer (${os}), always on: ${target.online ? "answering now" : "not answering right now (it usually comes back within minutes; tell the people)"}.`
               : `You are on the connected computer "${target.name}" (${os}), ${target.online ? "online" : "offline (ask its owner to start the runner)"}.`;
             return {
-              content: `${where} Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own. No cost to the organization.`,
+              content: `${where} Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own.`,
               data: {
                 computer: {
                   kind: "machine",
@@ -745,14 +563,7 @@ export function createSandboxToolSource(
               },
             };
           }
-          if (!target.available) {
-            return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
-          }
-          const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
-          return {
-            content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; network: ${s.network ?? "none yet"}.`,
-            data: { computer: s },
-          };
+          return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
         } catch (error) {
           return failed(error);
         }
@@ -773,7 +584,7 @@ export function createSandboxToolSource(
           const path = toolPath(str(input.path), computerInfo);
           if (!path) return { content: "path is required", isError: true };
           const data = new TextEncoder().encode(str(input.content));
-          await run(ctx, 30, (c) => c.provider.writeFile(c.id, path, data));
+          await run(ctx, (c) => c.provider.writeFile(c.id, path, data));
           return { content: `Wrote ${path} (${data.byteLength} bytes).` };
         } catch (error) {
           return failed(error);
@@ -793,7 +604,7 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const data = await run(ctx, 30, async (c) => {
+          const data = await run(ctx, async (c) => {
             await refuseSecretPath(ctx, c, path);
             return c.provider.readFile(c.id, path);
           });
@@ -818,7 +629,7 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const files = await run(ctx, 30, (c) => c.provider.listFiles(c.id, path, 3));
+          const files = await run(ctx, (c) => c.provider.listFiles(c.id, path, 3));
           const shown = files.filter((f) => !f.path.startsWith(".agentes/") && f.path !== ".agentes").slice(0, 300);
           if (shown.length === 0) return { content: `${path || "workspace"}: empty.` };
           return {
@@ -850,7 +661,7 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const data = await run(ctx, 30, async (c) => {
+          const data = await run(ctx, async (c) => {
             await refuseSecretPath(ctx, c, path);
             return c.provider.readFile(c.id, path);
           });
@@ -909,7 +720,7 @@ export function createSandboxToolSource(
               };
             }
           }
-          const row = await run(ctx, UPLOAD_TIMEOUT_SECONDS, async (c) => {
+          const row = await run(ctx, async (c) => {
             await refuseSecretPath(ctx, c, path);
             return uploadFrom(ctx, c, path, {
               title: str(input.title) || null,
@@ -950,14 +761,14 @@ export function createSandboxToolSource(
             // An uploaded file: its bytes as they are, under its original name.
             const raw = await readFileArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
             const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
-            await run(ctx, 60, (c) => c.provider.writeFile(c.id, path, raw.bytes));
+            await run(ctx, (c) => c.provider.writeFile(c.id, path, raw.bytes));
             return {
               content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.bytes.byteLength)}).`,
             };
           }
           const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
           const data = new TextEncoder().encode(file.text);
-          await run(ctx, 30, (c) => c.provider.writeFile(c.id, path, data));
+          await run(ctx, (c) => c.provider.writeFile(c.id, path, data));
           return { content: `Copied "${a.title}" (v${a.version}) to ${path} (${data.byteLength} bytes).` };
         } catch (error) {
           return failed(error);
@@ -1001,17 +812,17 @@ export function createSandboxToolSource(
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
           const started = Date.now();
-          const result = await run(ctx, timeout + 30, async (computer) => {
+          const result = await run(ctx, async (computer) => {
             for (const f of files) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             const r = await execLive(ctx, computer, {
-              command: scriptCommand(computer, bin, `${base}/${target.path}`, timeout, args),
-              timeoutSeconds: computer.machineId ? timeout : timeout + 10,
+              command: scriptCommand(bin, `${base}/${target.path}`, args),
+              timeoutSeconds: timeout,
             });
             await auditMachineExec(ctx, computer, `${skill.name}/${target.path} ${args}`.trim(), r);
             return r;
           });
           const seconds = Math.round((Date.now() - started) / 1000);
-          return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout, network);
+          return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
         } catch (error) {
           return failed(error);
         }
@@ -1066,8 +877,7 @@ export function createSandboxToolSource(
           if (executor !== "shell" && !prompt)
             return { content: `A ${executor} task needs \`prompt\`.`, isError: true };
           const hub = hubOf();
-          const row = await run(ctx, 120, async (computer) => {
-            if (!computer.machineId) throw new Error("Background tasks run only on a connected computer.");
+          const row = await run(ctx, async (computer) => {
             const status = await hub.status(computer.machineId);
             const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
             // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
@@ -1310,11 +1120,10 @@ export function createSandboxToolSource(
   const build = (
     requireApproval: boolean,
     execTimeout: number,
-    network: Network = { mode: "blocked", domains: [] },
-    computerInfo: ComputerInfo = { kind: "cloud", available: true },
+    computerInfo: ComputerInfo = { kind: "none", preparing: false },
     sessionId?: string,
   ): ToolDefinition[] => [
-    ...baseTools(requireApproval, execTimeout, network, computerInfo, sessionId),
+    ...baseTools(requireApproval, execTimeout, computerInfo, sessionId),
     ...(computerInfo.kind === "machine" && tasksOn(computerInfo) ? taskTools(requireApproval, computerInfo) : []),
     ...(computerInfo.kind === "machine" && computerInfo.protocol >= ACCESS_PROTOCOL
       ? [folderAccessTool(computerInfo)]
@@ -1337,8 +1146,6 @@ export function createSandboxToolSource(
           "export_file",
           "upload_file",
           "import_file",
-          "computer_start",
-          "computer_stop",
           "computer_status",
           REQUEST_SECRET_TOOL,
           "start_task",
@@ -1351,7 +1158,7 @@ export function createSandboxToolSource(
       const secretsHere = isAllowed(toolAccess(keys, { name: REQUEST_SECRET_TOOL, scope: SANDBOX_SCOPE }));
       const keep = (tools: ToolDefinition[]) =>
         secretsHere ? tools : tools.filter((t) => t.name !== REQUEST_SECRET_TOOL);
-      if (!granted) return keep(withNotices(build(false, 60)));
+      if (!granted) return keep(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
       // A mission's thread: its computer, and its rules (ADR 0029).
@@ -1362,13 +1169,7 @@ export function createSandboxToolSource(
         ctx.agentId,
         mission ? { machineId: mission.machineId } : null,
       );
-      const network: Network =
-        computer.kind === "machine"
-          ? { mode: "machine", domains: [] }
-          : { mode: settings.network, domains: settings.allowDomains };
-      const tools = keep(
-        withNotices(build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId)),
-      );
+      const tools = keep(build(settings.requireApproval, settings.execTimeoutSeconds, computer, ctx.threadRootId));
       if (!mission) return tools;
       return tools.map((t) => ({
         ...t,

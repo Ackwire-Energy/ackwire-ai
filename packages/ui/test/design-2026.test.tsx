@@ -21,6 +21,7 @@ import {
   Toolbar,
   WorkSummary,
 } from "../src";
+import { contrastRatio } from "../src/sky/math";
 
 afterEach(() => cleanup());
 const body = () => within(document.body);
@@ -126,11 +127,15 @@ describe("buttons and kbd", () => {
     expect(light.get("chosen-press")).toBe(
       "inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12)",
     );
-    // Dark's face sits between the page and a card, never on its near-black --sunken, where a black shadow can't
-    // show. Its shadow is light's, deeper.
+    // A black press shows only on a face it can darken: dark's sits lighter than a card, as light as the faint words
+    // on a chosen option allow, as light's face does. Its shadow is light's, deeper.
     const level = (hex = "") => Number.parseInt(hex.slice(1, 3), 16);
-    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("bg")));
-    expect(level(dark.get("chosen-bg"))).toBeLessThan(level(dark.get("raised")));
+    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("raised")));
+    for (const [theme, face] of [
+      [light, light.get("sunken")],
+      [dark, dark.get("chosen-bg")],
+    ] as const)
+      expect(contrastRatio(theme.get("faint") ?? "", face ?? "")).toBeGreaterThanOrEqual(4.5);
     const shape = (press = "") => press.replace(/rgba\([^)]*\)/g, "");
     expect(shape(dark.get("chosen-press"))).toBe(shape(light.get("chosen-press")));
     const alphas = (press = "") => [...press.matchAll(/rgba\(0, 0, 0, ([\d.]+)\)/g)].map(([, a]) => Number(a));
