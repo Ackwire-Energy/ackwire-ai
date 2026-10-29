@@ -87,7 +87,7 @@ export function MessageFeedback({
   );
 }
 
-function CorrectionDialog({
+export function CorrectionDialog({
   open,
   onOpenChange,
   messageId,
