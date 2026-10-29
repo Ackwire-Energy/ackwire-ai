@@ -8,7 +8,10 @@
  * The mock never reaches a bucket. A bucket named with "negado" fails the
  * write step; with "lista" the list step; with "instavel" the copy stops at
  * half once (resume continues). Where the server keeps files itself is
- * `platform` (its disk, no folder, unless a test says otherwise).
+ * `platform` (its disk, no folder, unless a test says otherwise), and what
+ * the workspace's files take is `usage` (none yet, no disk told, unless a
+ * test says otherwise): a finished copy moves what this server held to the
+ * bucket's side.
  */
 import type {
   ApiClient,
@@ -18,6 +21,7 @@ import type {
   StoragePlatform,
   StorageStep,
   StorageTestResult,
+  StorageUsage,
 } from "@agenteschat/client";
 import { clone } from "./context";
 
@@ -26,14 +30,23 @@ const TOTAL = 120;
 const sig = (s: S3Input) => JSON.stringify([s.endpoint, s.region, s.bucket, s.prefix ?? "", s.pathStyle]);
 const hint = (v: string | undefined, prev?: string) => (v ? v.slice(-4) : (prev ?? ""));
 
-export function createMockStorage(platform: () => StoragePlatform | undefined = () => undefined): ApiClient["storage"] {
+export function createMockStorage(
+  platform: () => StoragePlatform | undefined = () => undefined,
+  usage: () => StorageUsage | undefined = () => undefined,
+): ApiClient["storage"] {
   const configs = new Map<string, StorageConfig>();
   const passed = new Map<string, string>();
   const flakyDone = new Set<string>();
   const get = (orgId: string) => {
     let c = configs.get(orgId);
     if (!c) {
-      c = { kind: "agentes", s3: null, migration: null, platform: platform() ?? { kind: "disk", folder: null } };
+      c = {
+        kind: "agentes",
+        s3: null,
+        migration: null,
+        platform: platform() ?? { kind: "disk", folder: null },
+        usage: usage() ?? { platformBytes: 0, ownBucketBytes: 0, disk: null },
+      };
       configs.set(orgId, c);
     }
     return c;
@@ -98,7 +111,11 @@ export function createMockStorage(platform: () => StoragePlatform | undefined = 
           flakyDone.add(orgId);
           m.status = "failed";
           m.error = "A conexão com o bucket caiu. Retome para continuar de onde parou.";
-        } else if (m.copied >= m.total) m.status = "done";
+        } else if (m.copied >= m.total) {
+          m.status = "done";
+          if (c.usage)
+            c.usage = { ...c.usage, platformBytes: 0, ownBucketBytes: c.usage.ownBucketBytes + c.usage.platformBytes };
+        }
       }
       return m ? clone(m) : null;
     },

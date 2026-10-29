@@ -1256,6 +1256,26 @@ describe("the computer's wait in words: one edge for the words, whole phrases, e
     for (const line of led) expect((line.firstElementChild as HTMLElement).style.width).toBe("14px");
   });
 
+  test("the steps' bar ends as far from the right as it starts from the left: setup's well and Settings' card", async () => {
+    const layout = await sheet("../src/layout.css");
+    // Setup's well: its icons hang in its 14 px, the bar and the words start 22 px further in, and end as far from its
+    // right edge, as the AI panel's well keeps its text's column on both sides.
+    const well = layout
+      .split("\n.onb__wait {")
+      .slice(1)
+      .map((block) => block.split("}")[0] ?? "")
+      .find((block) => block.includes("padding"));
+    expect(well).toContain("padding: 12px 36px 12px 14px");
+    expect(rule(layout, ".ai-panel__wait")).toContain("padding: 12px var(--text-edge)");
+    // Settings' card: its padding on both sides, and the 22 px after the wait's lines too.
+    expect(rule(layout, ".setup-card > :is(.setup-progress, .setup-eta, .setup-line)")).toContain("margin-right: 22px");
+    await open(`/org/${ORG_ID}/settings/computers`, preparing);
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    const lines = [...card.querySelectorAll(":scope > :is(.setup-progress, .setup-eta, .setup-line)")];
+    expect(lines.length).toBe(4);
+    expect(card.querySelector(":scope > .setup-progress .ac-steps")).toBeTruthy();
+  });
+
   test("its phrases stay whole: the step's own words where they fit, the email's and the size's by no-break spaces", async () => {
     expect(rule(await sheet("../src/layout.css"), ".setup-progress .ac-eyebrow > span")).toContain(
       "display: inline-block",

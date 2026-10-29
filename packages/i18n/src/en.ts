@@ -199,7 +199,7 @@ export const en: Translations = {
       verified: "Verified",
       code: "Code from the email",
       note: "Anything they should know? (optional)",
-      noteHelp: "Who you are, or who sent you the link",
+      noteHelp: "Who you are and who invited you",
       send: "Ask to join",
       as: "You'll ask as {{email}}.",
       notYou: "Not you? Sign out",
@@ -1021,7 +1021,7 @@ export const en: Translations = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
-    receipt: "Nobody will answer: no AI connected",
+    receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
   connectAi: {
@@ -1293,7 +1293,7 @@ export const en: Translations = {
     presence: "Presence",
     offline: "Hasn't joined yet",
     localTime: "Local time",
-    timeIn: "{{time}} ({{zone}})",
+    timeIn: "{{time}} · {{zone}}",
     dm: "Direct message",
     viewProfile: "View profile",
     agent: "Agent",
@@ -6049,8 +6049,13 @@ export const en: Translations = {
     onedrive: "OneDrive",
     soon: "Coming soon",
     current: "In use",
+    usage: {
+      files: "{{size}}\u00a0of\u00a0files",
+      none: "No\u00a0files",
+      free: "{{files}}\u00a0· {{size}}\u00a0free\u00a0on\u00a0disk",
+    },
     endpoint: "Endpoint",
-    endpointHelp: "For example, https://s3.amazonaws.com or https://<account>.r2.cloudflarestorage.com.",
+    endpointHelp: "For example, https://s3.amazonaws.com.",
     region: "Region",
     bucket: "Bucket",
     prefix: "Prefix (optional)",
@@ -7510,7 +7515,7 @@ export const en: Translations = {
     },
     import: {
       title: "Import",
-      exportTitle: "Export this workspace",
+      exportTitle: "Export",
       download: "Download the file",
       neverLine: "Never includes keys, passwords, logins or conversations.",
       whatsIn: "What's in the file",
@@ -8624,6 +8629,8 @@ export const en: Translations = {
       group: "{{name}}'s screen",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Programs on {{name}}'s computer can see the screen and anything typed or pasted there.",
       step: {
         desktop_open: "Opened {{detail}}",
         desktop_open_plain: "Opened an app",

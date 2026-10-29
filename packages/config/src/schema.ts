@@ -137,14 +137,14 @@ export const envVars = {
   TERMS_URL: {
     schema: z.url().optional(),
     description:
-      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on https://agentes.chat: its /terms page.",
+      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
     section: "Sign-in",
     example: "https://example.com/terms",
   },
   PRIVACY_URL: {
     schema: z.url().optional(),
     description:
-      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on https://agentes.chat: its /privacy page.",
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
     section: "Sign-in",
     example: "https://example.com/privacy",
   },
@@ -513,7 +513,7 @@ export const envVars = {
   EMAIL_FROM: {
     schema: z.string().optional(),
     description:
-      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
+      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`. On agentes.chat Cloud (https://app.agentes.chat): `agentes.chat <ola@agentes.chat>`.",
     section: "Email",
   },
   EMAIL_ART: {

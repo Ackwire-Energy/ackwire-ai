@@ -206,7 +206,7 @@ export const ptBR = {
       verified: "Verificado",
       code: "Código do e-mail",
       note: "Algo que eles devam saber? (opcional)",
-      noteHelp: "Quem é você, ou quem mandou o link",
+      noteHelp: "Quem é você e quem te convidou",
       send: "Pedir para entrar",
       as: "Você vai pedir como {{email}}.",
       notYou: "Não é você? Sair",
@@ -1313,7 +1313,7 @@ export const ptBR = {
     presence: "Presença",
     offline: "Ainda não entrou",
     localTime: "Hora local",
-    timeIn: "{{time}} ({{zone}})",
+    timeIn: "{{time}} · {{zone}}",
     dm: "Mensagem direta",
     viewProfile: "Ver perfil",
     agent: "Agente",
@@ -6082,8 +6082,14 @@ export const ptBR = {
     onedrive: "OneDrive",
     soon: "Em breve",
     current: "Em uso",
+    // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
+    usage: {
+      files: "{{size}}\u00a0de\u00a0arquivos",
+      none: "Nenhum\u00a0arquivo",
+      free: "{{files}}\u00a0· {{size}}\u00a0livres\u00a0no\u00a0disco",
+    },
     endpoint: "Endpoint",
-    endpointHelp: "Por exemplo, https://s3.amazonaws.com ou https://<conta>.r2.cloudflarestorage.com.",
+    endpointHelp: "Por exemplo, https://s3.amazonaws.com.",
     region: "Região",
     bucket: "Bucket",
     prefix: "Prefixo (opcional)",
@@ -7553,7 +7559,7 @@ export const ptBR = {
     },
     import: {
       title: "Importar",
-      exportTitle: "Exportar este workspace",
+      exportTitle: "Exportar",
       download: "Baixar o arquivo",
       neverLine: "Nunca leva chaves, senhas, logins nem conversas.",
       whatsIn: "O que vai no arquivo",
@@ -8675,6 +8681,8 @@ export const ptBR = {
       group: "Tela {{of}} {{name}}",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e tudo o que é digitado ou colado nele.",
       step: {
         desktop_open: "Abriu {{detail}}",
         desktop_open_plain: "Abriu um app",

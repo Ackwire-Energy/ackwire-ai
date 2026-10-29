@@ -21,12 +21,13 @@ const FILE_NAME = /^[\w.-]{1,200}$/;
 
 export interface DesktopRelease {
   version: string;
+  /** The download's path here (`/api/desktop/download/…`); the routes put the origin in front. */
   url: string;
   sha256: string;
   notes: string;
   publishedAt: string;
   minVersion?: string;
-  /** The Tauri updater bundle and its signature; absent on builds made before the updater. */
+  /** The Tauri updater bundle (a path too) and its signature; absent on builds made before the updater. */
   updater?: { url: string; signature: string };
 }
 
@@ -204,8 +205,7 @@ function releaseReader<T, K extends string>(
  * The newest `desktop-v*` release with a platform's download and checksum (and the updater bundle, when
  * signed): a release may lack a platform, which then keeps the newest one that has it.
  */
-export function createDesktopReleases(options: ReleaseSource & { publicUrl: string }) {
-  const base = options.publicUrl.replace(/\/+$/, "");
+export function createDesktopReleases(options: ReleaseSource) {
   return releaseReader<DesktopRelease, DesktopTarget>({
     ...options,
     prefix: DESKTOP_TAG_PREFIX,
@@ -223,13 +223,13 @@ export function createDesktopReleases(options: ReleaseSource & { publicUrl: stri
       const signature = bundle && sigAsset ? (await text(sigAsset)).trim() : "";
       return {
         version,
-        url: `${base}/api/desktop/download/${version}/${file.name}`,
+        url: `/api/desktop/download/${version}/${file.name}`,
         sha256,
         notes,
         publishedAt: release.published_at ?? release.created_at ?? "",
         ...(minVersion ? { minVersion } : {}),
         ...(bundle && signature
-          ? { updater: { url: `${base}/api/desktop/download/${version}/${bundle.name}`, signature } }
+          ? { updater: { url: `/api/desktop/download/${version}/${bundle.name}`, signature } }
           : {}),
       };
     },
@@ -268,6 +268,17 @@ export function createNativeReleases(options: ReleaseSource) {
 
 export type DesktopReleases = ReturnType<typeof createDesktopReleases>;
 export type NativeReleases = ReturnType<typeof createNativeReleases>;
+
+/**
+ * The Cloud's address before app.agentes.chat. Desktop apps up to 0.5.5 check it for updates and take only
+ * download links there, and its `/api` still reaches this server.
+ */
+const OLD_CLOUD = new URL("https://agentes.chat");
+
+/** The origin of an answer's download links: agentes.chat for a request that came in there, else `PUBLIC_URL`. */
+function downloadOrigin(requestUrl: string, publicUrl: string): string {
+  return new URL(requestUrl).hostname === OLD_CLOUD.hostname ? OLD_CLOUD.origin : publicUrl.replace(/\/+$/, "");
+}
 
 /** Light limits: the app checks every 6 hours; downloads are people clicking. */
 const LATEST_LIMIT = { limit: 60, windowMs: 60_000 };
@@ -333,7 +344,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       const release = platform ? await releases.latest(platform).catch(() => null) : null;
       if (!release) return apiError(c, 404, "desktop.no_release", "No desktop build for this computer yet");
       const { updater: _, ...latest } = release;
-      return c.json(latest, 200);
+      return c.json({ ...latest, url: `${downloadOrigin(c.req.url, deps.config.PUBLIC_URL)}${latest.url}` }, 200);
     },
   );
 
@@ -354,7 +365,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
         version: release.version,
         notes: release.notes,
         pub_date: release.publishedAt,
-        url: release.updater.url,
+        url: `${downloadOrigin(c.req.url, deps.config.PUBLIC_URL)}${release.updater.url}`,
         signature: release.updater.signature,
       },
       200,

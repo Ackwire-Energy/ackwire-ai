@@ -9,10 +9,11 @@ export type EmailLocale = "pt-BR" | "en";
 
 /**
  * Plain text; `{ b }` is bold. `{ mail }` is an address as a mailto link: already a link, no client links it on its
- * own, so it needs none of the hair spaces that break copying typed text (`inertText`). The layout escapes every
- * string, so the words never hold HTML.
+ * own, so it needs none of the hair spaces that break copying typed text (`inertText`). `{ nobr }` stays on one line,
+ * moving to the next one whole (a host would break at its hyphens), and breaks inside only when it is longer than a
+ * line, so it never widens the email. The layout escapes every string, so the words never hold HTML.
  */
-export type Inline = string | { b: string } | { mail: string };
+export type Inline = string | { b: string } | { mail: string } | { nobr: string };
 export type Text = Inline | Inline[];
 export type Block =
   | { p: Text }
@@ -39,7 +40,7 @@ export interface EmailDoc {
   headline: string;
   blocks: Block[];
   /** Why this address got it, how often, who sent it. */
-  footer: string[];
+  footer: Text[];
 }
 
 /**
@@ -92,6 +93,15 @@ const D = palette(dark);
 const SANS = "'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /**
+ * The bottom margin of the card's last block, by what its lowest ink is: the room under that ink then matches the
+ * room over the headline's, which is the card's padding plus the 4 px of the headline's line above its ink. A line
+ * of text keeps about 2 px of its line under its descenders or its link's underline, and the button's shadow shows
+ * about 2 px under it in light and none on the dark card (`.end-btn`). Whole pixels: the card's cell rounds its
+ * height up, so half a pixel would count as one.
+ */
+const END = { text: 2, box: 4, button: 6 };
+
+/**
  * The dark design, by class. The media query reaches Apple Mail, the Outlook apps, Samsung and Thunderbird;
  * the same rules under `[data-ogsc]`/`[data-ogsb]` reach Outlook.com and new Outlook, which stamp what
  * they recolour. No rule uses #ffffff: Apple Mail ignores it in dark rules.
@@ -114,6 +124,7 @@ const DARK = [
   `.warn-t{color:${D.warn}!important}`,
   `.ln-d{color:${D.danger}!important;text-decoration-color:${D.border}!important}`,
   `.ln-m{color:${D.muted}!important;text-decoration-color:${D.border}!important}`,
+  `.end-btn{margin-bottom:${END.box}px!important}`,
   ".logo-ink{display:none!important}",
   ".logo-bone{display:block!important}",
 ];
@@ -139,12 +150,14 @@ const html = (t: Text, bold = `font-weight:600;color:${L.ink}`) =>
         ? esc(i)
         : "b" in i
           ? `<b class="ink" style="${bold}">${esc(i.b)}</b>`
-          : `<a class="ln-m" href="mailto:${esc(i.mail)}" style="${LINK_MUTED}">${esc(i.mail)}</a>`,
+          : "mail" in i
+            ? `<a class="ln-m" href="mailto:${esc(i.mail)}" style="${LINK_MUTED}">${esc(i.mail)}</a>`
+            : `<span style="display:inline-block">${esc(i.nobr)}</span>`,
     )
     .join("");
 const plain = (t: Text) =>
   inlines(t)
-    .map((i) => (typeof i === "string" ? i : "b" in i ? i.b : i.mail))
+    .map((i) => (typeof i === "string" ? i : "b" in i ? i.b : "mail" in i ? i.mail : i.nobr))
     .join("");
 
 const T = (style: string) =>
@@ -183,24 +196,27 @@ function pictures(art: EmailArt) {
   return { src, inline };
 }
 
-function block(b: Block, src: (file: string) => string): string {
+function block(b: Block, src: (file: string) => string, last: boolean): string {
+  const gap = (between: number, ink: keyof typeof END = "text") => (last ? END[ink] : between);
+  // In a block of rows, the last block's last row keeps no room of its own: the block's margin is the room under it.
+  const under = (i: number, rows: unknown[], between: number) => (last && i === rows.length - 1 ? 0 : between);
   if ("p" in b)
-    return `<p class="tx" style="margin:0 0 16px;${PW};font-size:16px;line-height:24px;color:${L.text}">${html(b.p)}</p>`;
+    return `<p class="tx" style="margin:0 0 ${gap(16)}px;${PW};font-size:16px;line-height:24px;color:${L.text}">${html(b.p)}</p>`;
   if ("small" in b)
-    return `<p class="mu" style="margin:0 0 12px;${P};font-size:14px;line-height:20px;color:${L.muted}">${html(b.small)}</p>`;
+    return `<p class="mu" style="margin:0 0 ${gap(12)}px;${P};font-size:14px;line-height:20px;color:${L.muted}">${html(b.small)}</p>`;
   if ("h2" in b)
     return `<h2 class="ink" style="margin:24px 0 12px;${P};font-size:16px;line-height:22px;font-weight:600;color:${L.ink}">${esc(b.h2)}</h2>`;
   if ("steps" in b)
-    return `<table width="100%" ${T("margin:0 0 4px")}>${b.steps
+    return `<table width="100%" ${T(`margin:0 0 ${gap(4)}px`)}>${b.steps
       .map(
         ([title, text], i) => `<tr>
-<td width="36" valign="top" style="width:36px;padding:0 0 14px"><table ${T("")}><tr><td class="num" width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;border:1px solid ${L.border};border-radius:7px;background:${L.card};${P};font-size:13px;line-height:22px;font-weight:600;color:${L.muted}">${i + 1}</td></tr></table></td>
-<td valign="top" class="tx" style="padding:0 0 14px;${P};font-size:16px;line-height:24px;color:${L.text}"><b class="ink" style="font-weight:600;color:${L.ink}">${esc(title)}</b> ${esc(text)}</td>
+<td width="36" valign="top" style="width:36px;padding:0 0 ${under(i, b.steps, 14)}px"><table ${T("")}><tr><td class="num" width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;border:1px solid ${L.border};border-radius:7px;background:${L.card};${P};font-size:13px;line-height:22px;font-weight:600;color:${L.muted}">${i + 1}</td></tr></table></td>
+<td valign="top" class="tx" style="padding:0 0 ${under(i, b.steps, 14)}px;${P};font-size:16px;line-height:24px;color:${L.text}"><b class="ink" style="font-weight:600;color:${L.ink}">${esc(title)}</b> ${esc(text)}</td>
 </tr>`,
       )
       .join("")}</table>`;
   if ("facts" in b)
-    return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:12px;margin:0 0 20px`)}><tr><td style="padding:4px 16px">
+    return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:12px;margin:0 0 ${gap(20, "box")}px`)}><tr><td style="padding:4px 16px">
 <table width="100%" ${T("")}>${b.facts
       .map(
         ([label, value], i) => `<tr>
@@ -211,29 +227,29 @@ function block(b: Block, src: (file: string) => string): string {
       .join("")}</table></td></tr></table>`;
   if ("note" in b) {
     const warn = b.tone === "warn";
-    return `<table width="100%" class="${warn ? "warn" : "well"}" ${T(`background:${warn ? L.warnSoft : L.well};border-radius:12px;margin:0 0 16px`)}><tr>
+    return `<table width="100%" class="${warn ? "warn" : "well"}" ${T(`background:${warn ? L.warnSoft : L.well};border-radius:12px;margin:0 0 ${gap(16, "box")}px`)}><tr>
 <td class="${warn ? "warn-t" : "tx"}" style="padding:14px 16px;${PW};font-size:15px;line-height:22px;color:${warn ? L.warn : L.text}">${html(b.note, warn ? "font-weight:700" : `font-weight:600;color:${L.ink}`)}</td></tr></table>`;
   }
   if ("people" in b)
     // The face starts 5 px down, where the name's capitals start on its 15/20 px line (4.5 to 5.7 px across Source
     // Sans 3 and the system fonts): beside a name with a line under it, as the app's `.ac-captop`. Padding, not a
     // negative margin, which classic Outlook ignores.
-    return `<table width="100%" ${T("margin:0 0 8px")}>${b.people
+    return `<table width="100%" ${T(`margin:0 0 ${gap(8)}px`)}>${b.people
       .map(
-        (p) => `<tr>
-<td width="44" valign="top" style="width:44px;padding:5px 0 12px">${
+        (p, i) => `<tr>
+<td width="44" valign="top" style="width:44px;padding:5px 0 ${under(i, b.people, 12)}px">${
           p.agent
             ? `<img src="${esc(src(`agent-${AGENT_FACES.includes(p.agent) ? p.agent : "sky"}.png`))}" width="32" height="32" alt="" style="display:block;border:0;outline:none;width:32px;height:32px">`
             : `<table ${T("")}><tr><td class="avp" width="30" height="30" align="center" valign="middle" style="width:30px;height:30px;border:1px solid ${L.border};border-radius:10px;background:${L.well};color:${L.text};${P};font-size:13px;line-height:30px;font-weight:700">${esc(initialsOf(p.name))}</td></tr></table>`
         }</td>
-<td valign="top" style="padding:0 0 12px">
+<td valign="top" style="padding:0 0 ${under(i, b.people, 12)}px">
 <p class="ink" style="margin:0;${PW};font-size:15px;line-height:20px;font-weight:600;color:${L.ink}">${esc(p.name)}</p><p class="mu" style="margin:0;${PW};font-size:14px;line-height:20px;color:${L.muted}">${html(p.detail)}</p></td>
 </tr>`,
       )
       .join("")}</table>`;
   if ("code" in b)
     // Letter spacing trails the last digit too: 8 px more on the left keeps the digits centred.
-    return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:12px;margin:0 0 20px`)}><tr>
+    return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:12px;margin:0 0 ${gap(20, "box")}px`)}><tr>
 <td class="ink" align="center" style="padding:16px 16px 16px 24px;${P};font-size:32px;line-height:40px;font-weight:700;letter-spacing:8px;font-variant-numeric:tabular-nums;color:${L.ink};text-align:center">${esc(b.code)}</td></tr></table>`;
   if ("button" in b) {
     // A link button, clickable everywhere; classic Outlook gets its own spacers, in em at the 15 px label, and draws
@@ -245,9 +261,9 @@ function block(b: Block, src: (file: string) => string): string {
     const also = b.also
       ? `<span style="display:inline-block;width:16px;font-size:15px;line-height:20px">&nbsp;&nbsp;&nbsp;&nbsp;</span><a class="${b.also.danger ? "ln-d" : "ln"}" href="${esc(b.also.url)}" target="_blank" style="display:inline-block;padding:14px 0;color:${b.also.danger ? L.danger : L.ink};${PB};font-size:15px;line-height:20px;font-weight:600;text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px;text-underline-color:${L.border}"><span style="mso-text-raise:93%">${esc(b.also.label)}</span></a>`
       : "";
-    return `<table ${T("margin:8px 0 20px")}><tr><td>${btn}${also}</td></tr></table>`;
+    return `<table${last ? ' class="end-btn"' : ""} ${T(`margin:8px 0 ${gap(20, "button")}px`)}><tr><td>${btn}${also}</td></tr></table>`;
   }
-  return `<p class="mu" style="margin:0 0 12px;${P};font-size:13px;line-height:19px;color:${L.muted}">${esc(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
+  return `<p class="mu" style="margin:0 0 ${gap(12)}px;${P};font-size:13px;line-height:19px;color:${L.muted}">${esc(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
 }
 
 /** The plain-text part of a block: the same words, a button as `Label: url`. */
@@ -281,14 +297,14 @@ export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: s
   // loads no web font, drops this block alone.
   const fonts = art.base;
   const lang = doc.lang;
-  const body = doc.blocks.map((b) => block(b, src)).join("\n");
+  const body = doc.blocks.map((b, i) => block(b, src, i === doc.blocks.length - 1)).join("\n");
   const logo = (file: string, cls: string, display: string, color: string) =>
     `<img class="${cls}" src="${esc(src(file))}" width="${LOGO.width}" height="${LOGO.height}" alt="${LOGO.alt}" style="display:${display};border:0;outline:none;width:${LOGO.width}px;height:${LOGO.height}px;font-family:${SANS};font-size:20px;font-weight:600;line-height:${LOGO.height}px;color:${color}">`;
   // `light only` keeps the Gmail apps from converting it; `:root{color-scheme:light dark}` keeps Apple Mail
   // applying our dark design. Risky rules sit in blocks of their own, so a client that drops one keeps the rest.
   // The dark button's gradient comes after the flat fill it paints over (the same specificity, so the later wins):
   // a client that rejects it keeps the flat fill.
-  const html = `<!doctype html>
+  const page = `<!doctype html>
 <html lang="${lang}" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
@@ -335,7 +351,7 @@ ${body}
 </td></tr>
 <tr><td style="padding:24px 0 0"><img class="sky" src="${esc(src("sky-band.png"))}" width="${SKY.width}" height="${SKY.height}" alt="" style="display:block;border:0;outline:none;width:${SKY.width}px;max-width:100%;height:auto"></td></tr>
 <tr><td style="padding:16px 0 40px">
-${doc.footer.map((f) => `<p class="fa" style="margin:0 0 6px;${PW};font-size:13px;line-height:19px;color:${L.faint}">${esc(f)}</p>`).join("\n")}
+${doc.footer.map((f) => `<p class="fa" style="margin:0 0 6px;${PW};font-size:13px;line-height:19px;color:${L.faint}">${html(f)}</p>`).join("\n")}
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
@@ -344,6 +360,6 @@ ${doc.footer.map((f) => `<p class="fa" style="margin:0 0 6px;${PW};font-size:13p
 </div>
 </body>
 </html>`;
-  const parts = [doc.headline, ...doc.blocks.map(text).filter(Boolean), doc.footer.join("\n")];
-  return { html, text: `${parts.join("\n\n")}\n`, inline: inline() };
+  const parts = [doc.headline, ...doc.blocks.map(text).filter(Boolean), doc.footer.map(plain).join("\n")];
+  return { html: page, text: `${parts.join("\n\n")}\n`, inline: inline() };
 }

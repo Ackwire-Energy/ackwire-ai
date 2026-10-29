@@ -36,23 +36,25 @@ export function CardHeader({
 }) {
   const heading = <h2 id={id}>{title}</h2>;
   return (
-    <div className={cx("ac-card__head", icon && "ac-iconline")}>
-      {icon && (
-        <span className="ac-card__key" aria-hidden="true">
-          <Icon name={icon} size={16} />
-        </span>
-      )}
-      <div className="ac-card__heading">
-        {/* Beside the h2, never in it: the heading's name stays the title alone. */}
-        {hint ? (
-          <span className="ac-hintline">
-            {heading}
-            <InfoHint name={hint.name}>{hint.text}</InfoHint>
+    <div className="ac-card__head">
+      <div className={cx("ac-card__lead", icon && "ac-iconline")}>
+        {icon && (
+          <span className="ac-card__key" aria-hidden="true">
+            <Icon name={icon} size={16} />
           </span>
-        ) : (
-          heading
         )}
-        {subtitle && <p className="ac-card__sub">{subtitle}</p>}
+        <div className="ac-card__heading">
+          {/* Beside the h2, never in it: the heading's name stays the title alone. */}
+          {hint ? (
+            <span className="ac-hintline">
+              {heading}
+              <InfoHint name={hint.name}>{hint.text}</InfoHint>
+            </span>
+          ) : (
+            heading
+          )}
+          {subtitle && <p className="ac-card__sub">{subtitle}</p>}
+        </div>
       </div>
       {action && <span className="ac-card__action">{action}</span>}
     </div>

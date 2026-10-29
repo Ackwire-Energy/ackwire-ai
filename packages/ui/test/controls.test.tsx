@@ -128,6 +128,27 @@ describe("RadioCard", () => {
     // An option that can't be picked dims; its "Em breve" stays clear.
     expect(rule(".ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc)")).toContain("opacity: 0.55;");
   });
+
+  test("a detail is a line of its own under the description, in the same words' style", () => {
+    render(
+      <RadioGroup value="disk" onValueChange={() => {}} aria-label="Onde ficam os arquivos">
+        <RadioCard
+          value="disk"
+          id="disk"
+          checked
+          title="Este servidor"
+          description="Os arquivos ficam no disco dele."
+          detail="2,4 GB de arquivos · 38 GB livres no disco"
+        />
+      </RadioGroup>,
+    );
+    const text = document.querySelector(".ac-option__text");
+    expect([...(text?.children ?? [])].map((c) => [c.className, c.textContent])).toEqual([
+      ["ac-option__head", "Este servidor"],
+      ["ac-option__desc", "Os arquivos ficam no disco dele."],
+      ["ac-option__desc", "2,4 GB de arquivos · 38 GB livres no disco"],
+    ]);
+  });
 });
 
 describe("Field", () => {

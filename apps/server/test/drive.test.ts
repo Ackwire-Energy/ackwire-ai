@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { statfsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createFakeS3 } from "@agenteschat/adapters";
+import { schema } from "@agenteschat/db";
 import { storagePlatform } from "../src/routes/app/storage";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -36,7 +41,14 @@ test("storage API: masked settings, test before switching, migrate", async () =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
 
   const disk = { kind: "disk", folder: null };
-  expect(await (await api("/storage")).json()).toEqual({ kind: "agentes", s3: null, migration: null, platform: disk });
+  const usage = { platformBytes: 0, ownBucketBytes: 0, disk: null };
+  expect(await (await api("/storage")).json()).toEqual({
+    kind: "agentes",
+    s3: null,
+    migration: null,
+    platform: disk,
+    usage,
+  });
   const refused = await api("/storage", { method: "PUT", json: { kind: "s3", s3: settings } });
   expect(refused.status).toBe(400);
   const tested = (await (await api("/storage/test", { json: settings })).json()) as { ok: boolean };
@@ -45,11 +57,12 @@ test("storage API: masked settings, test before switching, migrate", async () =>
   expect(saved.status).toBe(200);
   const body = await saved.text();
   expect(body).not.toContain(SECRET);
-  // The app keeps what a switch answers: where this server keeps files comes along.
+  // The app keeps what a switch answers: where this server keeps files, and what they take, come along.
   expect(JSON.parse(body)).toMatchObject({
     kind: "s3",
     s3: { bucket: "acme", secretHint: "••••3456" },
     platform: disk,
+    usage,
   });
 
   const migration = await api("/storage/migrate", { json: {} });
@@ -87,6 +100,48 @@ test("storage API: where this server keeps files, with the folder only outside a
   expect(storagePlatform("disk", config, false)).toEqual({ kind: "disk", folder: "/data/files" });
   expect(storagePlatform("postgres", { INSTALL_MODE: "native" })).toEqual({ kind: "database", folder: null });
   expect(storagePlatform("s3", { ...config, INSTALL_MODE: "native" })).toEqual({ kind: "bucket", folder: null });
+});
+
+test("storage API: what the workspace's files take, and the disk under this server's folder", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "agentes-files-"));
+  // In a container: the folder's path stays hidden, its disk is still told.
+  const server = await createTestServer({ platformKind: "disk", env: { FILES_DIR: dir, INSTALL_MODE: "docker" } });
+  try {
+    const owner = browser(server);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+      owner(`/api/app/organizations/${orgId}${path}`, init);
+    await api("/artifacts", { json: { title: "Metas", content: { kind: "document", markdown: "# Metas" } } });
+    const [version] = await server.db.select({ size: schema.artifactVersions.size }).from(schema.artifactVersions);
+    const read = (await (await api("/storage")).json()) as {
+      platform: unknown;
+      usage: { platformBytes: number; ownBucketBytes: number; disk: { sizeBytes: number; freeBytes: number } };
+    };
+    expect(read.platform).toEqual({ kind: "disk", folder: null });
+    expect(read.usage).toMatchObject({ platformBytes: version?.size, ownBucketBytes: 0 });
+    expect(read.usage.platformBytes).toBeGreaterThan(0);
+    const fs = statfsSync(dir);
+    expect(read.usage.disk.sizeBytes).toBe(fs.blocks * fs.bsize);
+    expect(read.usage.disk.freeBytes).toBeGreaterThan(0);
+    expect(read.usage.disk.freeBytes).toBeLessThanOrEqual(read.usage.disk.sizeBytes);
+  } finally {
+    await server.close();
+  }
+  // Files in this server's database or in a bucket: no disk of its own to tell.
+  for (const platformKind of ["postgres", "s3"]) {
+    const other = await createTestServer({ platformKind, env: { FILES_DIR: dir } });
+    try {
+      const owner = browser(other);
+      await signUp(owner, "owner@example.com");
+      const { orgId } = await seedOrg(owner);
+      const read = (await (await owner(`/api/app/organizations/${orgId}/storage`)).json()) as { usage: unknown };
+      expect(read.usage).toEqual({ platformBytes: 0, ownBucketBytes: 0, disk: null });
+    } finally {
+      await other.close();
+    }
+  }
+  await rm(dir, { recursive: true, force: true });
 });
 
 test("Drive API: create, new version, versions, download link, file, delete", async () => {

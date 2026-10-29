@@ -875,7 +875,14 @@ export function BrowserCard({
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
       ref={root}
-      className={["brw-ac", open && "is-open", inControl && "is-control", full && "is-full", surface && "is-surface"]
+      className={[
+        "brw-ac",
+        open && "is-open",
+        inControl && "is-control",
+        full && "is-full",
+        surface && "is-surface",
+        closed && "is-closed",
+      ]
         .filter(Boolean)
         .join(" ")}
       role="group"

@@ -170,7 +170,6 @@ export function createApp(options: AppOptions) {
       createDesktopReleases({
         token: deps.config.DESKTOP_RELEASES_TOKEN,
         repo: deps.config.DESKTOP_RELEASES_REPO,
-        publicUrl: deps.config.PUBLIC_URL,
         fetch: deps.extras?.desktopFetch,
       }),
     );
