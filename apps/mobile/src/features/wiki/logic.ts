@@ -1,5 +1,6 @@
 import type { WikiPageSummary } from "@agenteschat/client";
-import { parseWikiToken, type WikiFolder, wikiTree } from "@agenteschat/client/lib/wiki";
+import { parseWikiToken } from "@agenteschat/client/lib/markdown";
+import { type WikiFolder, wikiTree } from "@agenteschat/client/lib/wiki";
 
 /**
  * The wiki on the phone: the home's parts (Fixadas, Editadas recentemente, Pastas and the
@@ -50,11 +51,7 @@ export function wikiHome(pages: WikiPageSummary[], folder = ""): WikiHome | null
 
 const byTitle = (a: WikiPageSummary, b: WikiPageSummary) => a.title.localeCompare(b.title);
 
-const fold = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /** Pages whose title, folder, tags or opening text have every word typed (case and accents ignored). */
 export function searchWiki(pages: WikiPageSummary[], q: string): WikiPageSummary[] {

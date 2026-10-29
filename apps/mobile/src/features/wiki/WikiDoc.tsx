@@ -91,10 +91,7 @@ function Block({
             hitSlop={10}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: b.done, disabled: !onToggleTask }}
-            style={[
-              styles.box,
-              b.done ? { backgroundColor: c.agent } : { borderWidth: 1.5, borderColor: c.line2 },
-            ]}
+            style={[styles.box, b.done ? { backgroundColor: c.agent } : { borderWidth: 1.5, borderColor: c.line2 }]}
           >
             {b.done ? <Icon name="check" size={13} color="#fff" /> : null}
           </Pressable>
@@ -113,7 +110,11 @@ function Block({
       );
     case "code":
       return (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.code, { backgroundColor: c.sunken }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.code, { backgroundColor: c.sunken }]}
+        >
           <Text selectable style={[styles.mono, { color: c.ink2 }]}>
             {b.text}
           </Text>

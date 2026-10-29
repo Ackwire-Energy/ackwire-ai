@@ -1,7 +1,7 @@
 import { useUpdateAgent } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router, useNavigation } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router, usePreventRemove } from "expo-router";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -26,7 +26,6 @@ export function AgentEditScreen({ id }: { id: string }) {
   const c = useColors();
   const toast = useToast();
   const failed = useFailed();
-  const navigation = useNavigation();
   const dir = useDirectory();
   const meId = useMeId();
   const role = useOrg().org?.role;
@@ -50,22 +49,13 @@ export function AgentEditScreen({ id }: { id: string }) {
   const done = useRef(false);
 
   // Leaving with changes asks first (as writing a wiki page).
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (e) => {
-        if (done.current || !changes) return;
-        e.preventDefault();
-        Alert.alert(t("mobile.agentEdit.discardTitle"), t("mobile.agentEdit.discardText"), [
-          { text: t("mobile.agentEdit.keepEditing"), style: "cancel" },
-          {
-            text: t("mobile.agentEdit.discard"),
-            style: "destructive",
-            onPress: () => navigation.dispatch(e.data.action),
-          },
-        ]);
-      }),
-    [navigation, changes, t],
-  );
+  usePreventRemove(Boolean(changes), ({ repeat }) => {
+    if (done.current) return repeat();
+    Alert.alert(t("mobile.agentEdit.discardTitle"), t("mobile.agentEdit.discardText"), [
+      { text: t("mobile.agentEdit.keepEditing"), style: "cancel" },
+      { text: t("mobile.agentEdit.discard"), style: "destructive", onPress: repeat },
+    ]);
+  });
 
   if (!agent || !draft) {
     return (

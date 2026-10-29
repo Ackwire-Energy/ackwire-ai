@@ -112,7 +112,12 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             <Text tone="muted" style={styles.centerText}>
               {t("common.loadFailed")}
             </Text>
-            <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void tree.refetch()} />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mobile.common.retry")}
+              onPress={() => void tree.refetch()}
+            />
           </View>
         ) : null}
         {tree.isSuccess && pages.length === 0 ? (
@@ -350,7 +355,9 @@ export function WikiPageScreen({ slug }: { slug: string }) {
         label: t("wiki.copyLink"),
         run: () =>
           void copyText(`[[${p.title}]]`).then((ok) =>
-            toast(ok ? { title: t("wiki.linkCopied", { title: p.title }) } : { title: t("mobile.app.failed"), icon: "x" }),
+            toast(
+              ok ? { title: t("wiki.linkCopied", { title: p.title }) } : { title: t("mobile.app.failed"), icon: "x" },
+            ),
           ),
       },
     ];
@@ -440,7 +447,10 @@ export function WikiPageScreen({ slug }: { slug: string }) {
             }
           : {})}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+      >
         {page.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
         {page.isError && !p ? (
           <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />

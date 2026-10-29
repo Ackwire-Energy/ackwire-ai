@@ -479,12 +479,10 @@ export const AgentBrain = z
       .openapi({ description: "When the computer can't answer, answer through the API (agent's budget)." }),
     computer: z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
     options: z.array(BrainOption),
-    machines: z
-      .array(BrainMachine)
-      .openapi({
-        description:
-          "Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with what each offers.",
-      }),
+    machines: z.array(BrainMachine).openapi({
+      description:
+        "Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with what each offers.",
+    }),
     canEdit: z.boolean(),
     account: z
       .uuid()
