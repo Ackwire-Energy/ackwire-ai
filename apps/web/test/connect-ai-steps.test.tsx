@@ -438,11 +438,16 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const well = ruleOf(layout, ".ai-panel__wait");
     expect(well).toContain("padding: 12px var(--text-edge);");
     expect(well).not.toContain("margin");
-    // Under the steps' bar its short lines break into two of a length; without the bar, its words run the bar's
-    // column in the panel's own wrap, so the well isn't empty on their right.
+    // Under the steps' bar its short lines break into two of a length, and so does its status or hold line without
+    // the bar: at 320 px the panel's pretty wrap ends "Esperando um computador disponível" on its last word alone.
+    // Without the bar the e-mail line runs the bar's column in the panel's wrap, so the well isn't empty on its right,
+    // and balances where pretty isn't supported, which would end it on a word alone.
     expect(well).not.toContain("text-wrap");
-    expect(ruleOf(layout, ".ai-panel__wait:has(> .setup-progress)")).toContain("text-wrap: balance");
+    expect(ruleOf(layout, '.ai-panel__wait:has(> .setup-progress),\n.ai-panel__wait > [role="status"]')).toContain(
+      "text-wrap: balance",
+    );
     expect(ruleOf(layout, ".ai-panel")).toContain("text-wrap: pretty");
+    expect(layout).toContain("@supports not (text-wrap: pretty) {\n  .ai-panel__wait {\n    text-wrap: balance;\n");
     expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
       "margin-left: calc(var(--text-edge) - var(--space-3))",
     );
@@ -659,6 +664,21 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado|seu computador/);
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
+  });
+
+  test("on the Cloud waiting for a computer: the well's status line, then the owner's email line", async () => {
+    const { dialog } = await connect({
+      computers: [],
+      brain: { computer: null, machines: [] },
+      setup: { state: "waiting", reason: "capacity", notifyByEmail: true },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
+    // layout.css balances the status line by its role, and lets the email line run the well's width.
+    expect([...well.children].map((p) => [p.textContent, p.getAttribute("role")])).toEqual([
+      ["Esperando um computador disponível", "status"],
+      ["Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.", null],
+    ]);
   });
 
   test("an admin while the Cloud's computer is prepared: no email for them, so the well says when the step turns on", async () => {

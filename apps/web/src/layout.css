@@ -10093,10 +10093,17 @@ html[data-menu-overlay] .shell {
 .ai-panel__wait {
   padding: 12px var(--text-edge);
 }
-/* Under the steps' bar, short lines break into two of a length. Without it, the words run the bar's column, so the
-   well isn't empty on their right. */
-.ai-panel__wait:has(> .setup-progress) {
+/* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
+   The e-mail line then runs the bar's column, so the well isn't empty on its right. */
+.ai-panel__wait:has(> .setup-progress),
+.ai-panel__wait > [role="status"] {
   text-wrap: balance;
+}
+/* Without pretty (Safari before 26) the e-mail line would end on a word alone. */
+@supports not (text-wrap: pretty) {
+  .ai-panel__wait {
+    text-wrap: balance;
+  }
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
    hang in before them. */

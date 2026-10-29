@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { builtCss, declarations, rules, topLevel } from "./built-css";
+import { atRule, builtCss, declarations, rules, topLevel } from "./built-css";
 
 /** A colour's alpha as the minifier writes it (#rgba, #rrggbbaa) or as rgba(). */
 const alphaOf = (color: string) => {
@@ -63,6 +63,16 @@ test("what ships keeps dark's chosen press visible, the ready line apart from th
   // Under the key's steps its note keeps their columns: the icon centred in the 20px numbers', the words on the text's.
   expect(last(".ai-panel > .agp-addacct__step ~ .ac-setnote", "gap")).toBe("12px");
   expect(last(".ai-panel > .agp-addacct__step ~ .ac-setnote > :first-child", "margin-inline")).toBe("3px");
+
+  // The computer's wait: every line under the steps' bar balances, and without it the status or hold line, which the
+  // panel's pretty wrap ends on a word alone at 320 px. The email line takes the panel's wrap, and balances where
+  // pretty isn't supported.
+  const well = ".ai-panel__wait";
+  expect(last(`${well}:has(> .setup-progress)`, "text-wrap")).toBe("balance");
+  expect(last(`${well} > [role="status"]`, "text-wrap")).toBe("balance");
+  expect(last(well, "text-wrap")).toBeUndefined();
+  expect(last(".ai-panel", "text-wrap")).toBe("pretty");
+  expect(declarations(atRule(css, "@supports not (text-wrap: pretty)"), well)).toEqual([["text-wrap", "balance"]]);
 });
 
 test("what ships rests a chosen control's neighbours on its pressed face, and a chosen card's tile is that face", async () => {
