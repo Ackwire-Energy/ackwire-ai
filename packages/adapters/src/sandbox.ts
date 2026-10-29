@@ -63,7 +63,7 @@ export interface ComputerChannel {
   /** The computer sends a file (a folder: zipped) straight to `target`, so the bytes never pass through the model. */
   pushFile(id: string, path: string, target: PushTarget): Promise<PushReceipt>;
   /** Secrets for the agent (ADR 0027), kept by the computer itself. */
-  secret(id: string, request: SecretRequest): Promise<{ publicKey?: string; size?: number }>;
+  secret(id: string, request: SecretRequest): Promise<{ publicKey?: string; size?: number; superseded?: boolean }>;
 }
 
 /** A computer as the tools reach it: its channel and the provider's id (`machine` for connected computers). */
