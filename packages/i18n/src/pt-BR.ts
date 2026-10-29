@@ -2021,8 +2021,7 @@ export const ptBR = {
     readOnly: {
       member: "Você vê como {{article}} {{name}} trabalha. Só admins editam.",
       memberOwner: "Você vê como {{article}} {{name}} trabalha. Quem edita: admins e {{owner}} (responsável).",
-      owner:
-        "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar e o computador. O resto, só admins.",
+      owner: "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar e o computador. O resto, só admins.",
       ownerInstructions: "Só admins editam as instruções. Você, como responsável, aprova as propostas de mudança.",
       ownerAccess: "Só admins dão ou tiram acessos e repositórios.",
     },

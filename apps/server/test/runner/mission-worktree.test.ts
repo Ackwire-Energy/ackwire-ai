@@ -134,9 +134,9 @@ test.skipIf(!posix || !hasGit)(
     // An include (whatever it holds) is refused as such.
     run(repo, "config", "--unset", "filter.evil.clean");
     run(repo, "config", "include.path", "../extra.config");
-    expect(
-      await errorCode(() => ensure(folder, { path: ".worktrees/m-000000cc", branch: "agentes/000000cc/x" })),
-    ).toBe("bad_request");
+    expect(await errorCode(() => ensure(folder, { path: ".worktrees/m-000000cc", branch: "agentes/000000cc/x" }))).toBe(
+      "bad_request",
+    );
     expect(existsSync(marker)).toBe(false);
   },
 );

@@ -192,11 +192,7 @@ async function provenPreviousMachine(db: Database, input: DeviceStartInput): Pro
     .select({ id: machines.id })
     .from(machines)
     .where(
-      and(
-        eq(machines.id, id.toLowerCase()),
-        eq(machines.kind, "connected"),
-        eq(machines.tokenHash, sha256Hex(token)),
-      ),
+      and(eq(machines.id, id.toLowerCase()), eq(machines.kind, "connected"), eq(machines.tokenHash, sha256Hex(token))),
     );
   return machine?.id ?? null;
 }
@@ -351,7 +347,7 @@ async function reconnectTarget(
     .where(and(eq(machines.id, machineId), ...(orgId ? [eq(machines.orgId, orgId)] : [])));
   // Only a computer someone connected: the workspace's own (`managed`, its provisioner's code) and the
   // server's own (`host`, its sync) never come back as someone's computer.
-  if (!machine || machine.kind !== "connected") return null;
+  if (machine?.kind !== "connected") return null;
   const member = await getMembership(db, actorId, machine.orgId);
   if (!member || !can(member.role, "post")) return null;
   if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;

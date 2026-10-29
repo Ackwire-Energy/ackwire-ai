@@ -9,8 +9,8 @@ import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/pr
 import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
-import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { Approval } from "./tools/gateway";
+import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
 const {

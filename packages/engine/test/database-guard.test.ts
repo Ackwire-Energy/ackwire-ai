@@ -71,9 +71,7 @@ test("hidden columns: never read under new names through an alias column list", 
   expect(await reason("select x.c from users x(a, b, c) join orders o on o.user_id = x.a", rules)).toContain(
     "alias list",
   );
-  expect(await reason("select j.c from (users u join orders o on true) as j(a, b, c)", rules)).toContain(
-    "alias list",
-  );
+  expect(await reason("select j.c from (users u join orders o on true) as j(a, b, c)", rules)).toContain("alias list");
   expect(await reason("select n from users u, generate_series(1, 3) g(n)", rules)).toContain("alias list");
   // Without hidden columns in the query, alias lists are fine.
   expect(await reason("select n from orders, generate_series(1, 3) g(n)", rules)).toBeNull();
