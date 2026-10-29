@@ -114,6 +114,7 @@ export const MAX_SUBSCRIPTIONS = 200;
 export const SESSION_RECHECK_MS = 15_000;
 /** Incoming frames recheck at most once this often, to avoid a database query per mouse event. */
 const SESSION_FRAME_RECHECK_MS = 2_000;
+const MEMBERSHIP_CHECK_TIMEOUT_MS = 5_000;
 
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
@@ -396,12 +397,20 @@ export function createRealtime(deps: RealtimeDeps) {
           void (async () => {
             try {
               if (!(await liveSession(ws, true))) return;
-              const allowed = await currentSubscriptions(
-                deps.db,
-                user.id,
-                orgId,
-                [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()],
-              );
+              let timeout: ReturnType<typeof setTimeout> | undefined;
+              const deadline = new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => reject(new Error("membership check timed out")), MEMBERSHIP_CHECK_TIMEOUT_MS);
+                timeout.unref?.();
+              });
+              let allowed: Set<string> | null;
+              try {
+                allowed = await Promise.race([
+                  currentSubscriptions(deps.db, user.id, orgId, [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()]),
+                  deadline,
+                ]);
+              } finally {
+                if (timeout) clearTimeout(timeout);
+              }
               if (ws.readyState !== 1) return;
               if (!allowed) {
                 ws.close(4403, "membership revoked");
