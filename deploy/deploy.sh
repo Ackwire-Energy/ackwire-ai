@@ -15,7 +15,8 @@
 # on a database the newer one may have migrated, which a boot that migrates refuses. With
 # MACHINE_PROVISIONING=external (agentes.chat Cloud), uploaded files must not live on this server's
 # disk alone, so the script refuses to deploy without S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and
-# S3_SECRET_ACCESS_KEY. For the workflow,
+# S3_SECRET_ACCESS_KEY. Set them before the first upload: files already on the disk are not moved to
+# the bucket, and the app stops finding them once it is set. For the workflow,
 # the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
@@ -65,7 +66,7 @@ main() {
       grep -Eq "^${key}=[\"']?[^\"'[:space:]#]" .env || missing+=" $key"
     done
     if [[ -n $missing ]]; then
-      echo "deploy: .env sets MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks${missing} (top of deploy/deploy.sh)" >&2
+      echo "deploy: .env sets MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks${missing} (top of deploy/deploy.sh). Files already on this server's disk are not moved: once the bucket is set, the app stops finding them." >&2
       false
     fi
   fi

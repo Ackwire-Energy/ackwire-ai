@@ -133,6 +133,7 @@ esac
       const { code, out, calls } = at.deploy([commits.second]);
       expect(code).toBe(1);
       expect(out).toContain(`MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks ${lacking}`);
+      expect(out).toContain("Files already on this server's disk are not moved");
       expect(at.head()).toBe(commits.first);
       expect(calls.filter((call) => call.startsWith("docker build") || call.includes(" migrate"))).toEqual([]);
     }

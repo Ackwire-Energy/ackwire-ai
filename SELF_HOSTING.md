@@ -1117,7 +1117,9 @@ anyone who holds both can read those keys.
 Cloudflare R2 or another S3-compatible store, and deletes dumps older than `BACKUP_RETENTION_DAYS`
 (14 by default). To lose less than a day if the server is lost, dump more often:
 `BACKUP_INTERVAL_HOURS=6` dumps at 03:00, 09:00, 15:00 and 21:00 UTC, and `1` every hour. Each dump is
-the whole database, so with hourly dumps a shorter `BACKUP_RETENTION_DAYS` keeps the bucket small.
+the whole database, so with hourly dumps a shorter `BACKUP_RETENTION_DAYS` keeps the bucket small. While
+a dump runs, an upgrade's migration that changes a table waits for it to end, and the app's requests to
+that table wait behind the migration: once a dump takes minutes, upgrade between dumps.
 Create a private bucket for the dumps alone, since they hold every message, and a key that can read,
 write and delete in it. Then add to `.env`:
 
