@@ -44,10 +44,43 @@ export function topLevel(css: string) {
   return out;
 }
 
+/** A block's condition as the minifier writes it: `(max-width: 720px)` as `(width<=720px)`, spaces out. */
+const condition = (query: string) =>
+  query
+    .replace(/\(\s*max-width\s*:\s*([\d.]+px)\s*\)/g, "(width<=$1)")
+    .replace(/\(\s*min-width\s*:\s*([\d.]+px)\s*\)/g, "(width>=$1)")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+/**
+ * The rules of every block opened as `block` (`@media (max-width: 720px)`, `@supports (…)`), however its condition is
+ * written, as one sheet.
+ */
+export function atRule(css: string, block: string) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const name = block.match(/^@[\w-]+/)?.[0] ?? "@media";
+  const wanted = condition(block.slice(name.length));
+  let out = "";
+  for (let at = text.indexOf(name); at >= 0; at = text.indexOf(name, at + 1)) {
+    const open = text.indexOf("{", at);
+    if (condition(text.slice(at + name.length, open)) !== wanted) continue;
+    let depth = 0;
+    let end = open;
+    for (; end < text.length; end++) {
+      if (text[end] === "{") depth++;
+      else if (text[end] === "}" && --depth === 0) break;
+    }
+    out += `${text.slice(open + 1, end)}\n`;
+  }
+  return out;
+}
+
+/** A selector as the minifier writes it: spaces and quotes out, `::before` as `:before`. */
 const normal = (selector: string) =>
   selector
     .replace(/\s*([>+~,()])\s*/g, "$1")
     .replace(/="([^"]*)"/g, "=$1")
+    .replace(/::(before|after)\b/g, ":$1")
     .replace(/\s+/g, " ")
     .trim();
 

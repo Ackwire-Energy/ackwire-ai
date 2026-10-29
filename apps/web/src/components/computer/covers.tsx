@@ -19,6 +19,21 @@ export function Stage({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Watching, the line under the screen: what programs there can see. A cover the screen opens from by itself keeps it
+ * too, so the screen opens where its cover was; a cover that stays until someone acts takes its room.
+ */
+export function ScreenNotice({ name }: { name: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="dsk-line">
+      <span className="dsk-words">
+        <span className="muted">{t("desktop.watch.notice", agentGrammar(t, name))}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
  * The agent's screen can't be shown: on the Cloud only that, and to try again in a moment (nobody there can
  * fix it); on self-host the reason in plain words and, for its admins and whoever paired the computer, the fix
  * to run there. A Mac never gets this: it has no screens, and shows the agent's page instead.

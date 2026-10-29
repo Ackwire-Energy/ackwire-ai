@@ -8622,6 +8622,8 @@ export const en: Translations = {
       group: "{{name}}'s screen",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Programs on {{name}}'s computer can see the screen and anything typed or pasted there.",
       step: {
         desktop_open: "Opened {{detail}}",
         desktop_open_plain: "Opened an app",
