@@ -20,6 +20,7 @@ import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { stepText, useHeldTakeover } from "./BrowserCard";
 import { screenIcon, screenT } from "./screen";
+import { SiteIcon } from "./SiteIcon";
 import "./browser.css";
 
 /** A step in the person's words, from the saved trail. */
@@ -107,10 +108,8 @@ export function BrowserTrailCard({
         title={toggle}
         onClick={() => setOpen((o) => !o)}
       >
-        {site ? (
-          <span className="brw-stile" aria-hidden="true">
-            {site.charAt(0)}
-          </span>
+        {hosts[0] ? (
+          <SiteIcon host={hosts[0]} letterOnly={screen !== "browser"} />
         ) : (
           <Icon name={screenIcon(screen)} size={14} />
         )}

@@ -1516,10 +1516,31 @@
 .brw-mf__site .brw-ac__path {
   color: rgba(255, 255, 255, 0.72);
 }
-.brw-mf__site .brw-stile {
-  background: rgba(255, 255, 255, 0.92);
+/* A site's icon (or its letter): one 18px tile, centered on the line by its box, not by the glyph. */
+.brw-site-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.brw-site-icon img {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+.brw-site-icon--letter {
   color: #111;
-  box-shadow: none;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
 }
 .brw-mf__top canvas {
   filter: brightness(0) invert(1);
@@ -1719,11 +1740,6 @@
 .brw-mf-end__row > .ac-run-strip {
   flex: none;
   align-self: center;
-}
-.brw-mf-end__row > .brw-stile {
-  background: color-mix(in srgb, var(--mf-a) 32%, var(--raised));
-  color: var(--ink);
-  box-shadow: none;
 }
 .brw-mf-end__sum {
   flex: none;

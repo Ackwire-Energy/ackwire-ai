@@ -64,6 +64,7 @@ import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
+import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
@@ -245,9 +246,6 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
   const liveHere = useStreams((s) => Boolean(s.runs[runId]));
   return !liveHere && open.data && isHeldTakeover(open.data, runId) ? open.data : null;
 }
-
-/** The site as people say it: "www.google.com" → "google.com" (its letter is G, not W). */
-const siteName = (host: string) => host.replace(/^(www|web|m)\./, "");
 
 const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
@@ -909,13 +907,7 @@ export function BrowserCard({
         // The frame's top: where it is, and what it does now (its steps on hover), or the person's controls.
         <div className="brw-mf__top">
           <span className="brw-mf__site">
-            {asTitle === "host" ? (
-              <span className="brw-stile" aria-hidden="true">
-                {siteName(host).charAt(0)}
-              </span>
-            ) : (
-              <Icon name="globe" size={14} />
-            )}
+            {asTitle === "host" ? <SiteIcon host={host} /> : <Icon name="globe" size={14} />}
             {titleText}
           </span>
           <span className="brw-grow" />
