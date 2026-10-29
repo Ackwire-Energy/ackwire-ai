@@ -1,4 +1,3 @@
-import { landingEn } from "./landing";
 import type { Translations } from "./pt-BR";
 
 /** English. Typed against the pt-BR source, so a missing key fails the build. */
@@ -6054,7 +6053,7 @@ export const en: Translations = {
       free: "{{files}}\u00a0· {{size}}\u00a0free\u00a0on\u00a0disk",
     },
     endpoint: "Endpoint",
-    endpointHelp: "For example, https://s3.amazonaws.com or https://<account>.r2.cloudflarestorage.com.",
+    endpointHelp: "For example, https://s3.amazonaws.com.",
     region: "Region",
     bucket: "Bucket",
     prefix: "Prefix (optional)",
@@ -7514,7 +7513,7 @@ export const en: Translations = {
     },
     import: {
       title: "Import",
-      exportTitle: "Export this workspace",
+      exportTitle: "Export",
       download: "Download the file",
       neverLine: "Never includes keys, passwords, logins or conversations.",
       whatsIn: "What's in the file",
@@ -7935,7 +7934,6 @@ export const en: Translations = {
         'The forum "{{title}}" is over. The synthesis is in the file below, with {{count}} suggested issue(s) to approve.',
     },
   },
-  landing: landingEn,
   builtinTools: {
     ask_user: {
       label: "Ask the person",

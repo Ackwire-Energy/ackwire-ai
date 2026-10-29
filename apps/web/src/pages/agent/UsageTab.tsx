@@ -202,7 +202,7 @@ function BySource({ data }: { data: AgentPlanUsage }) {
               {s.account ? (
                 <AccountHead account={s.account} extra={when} />
               ) : (
-                <div className="plan-acct">
+                <div className="plan-acct ac-faceline">
                   {s.type === "api" ? (
                     <span className="plan-source__key" aria-hidden="true">
                       <Icon name="key" size={16} />
@@ -211,7 +211,7 @@ function BySource({ data }: { data: AgentPlanUsage }) {
                     <ProviderLogo id={s.kind ?? "claude_code"} size="sm" off />
                   )}
                   <span className="plan-acct__text">
-                    <span className="plan-acct__name">{usageSourceName(t, s)}</span>
+                    <span className="plan-acct__name ac-captop">{usageSourceName(t, s)}</span>
                     <span className="plan-acct__sub">
                       {s.type === "api"
                         ? t(onApi ? "usageViews.agent.apiMain" : "usageViews.agent.apiFallback", g)

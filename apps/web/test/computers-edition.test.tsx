@@ -161,7 +161,7 @@ describe("Configurações → Computadores on self-host", () => {
     // What it all means (pausing, folders, the other ways to connect) is one help page, linked once at the end.
     const how = screen().getByRole("link", { name: "Como os computadores funcionam" });
     const url = new URL(how.getAttribute("href") ?? "");
-    expect(url.origin + url.pathname).toBe("https://agentes.chat/help/computers");
+    expect(url.origin + url.pathname).toBe("https://app.agentes.chat/help/computers");
     expect(url.searchParams.get("lang")).toBe("pt-BR");
     expect(how.className).toBe("ac-link ac-link--muted");
     expect(how.getAttribute("rel")).toBe("noopener noreferrer");

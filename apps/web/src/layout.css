@@ -167,7 +167,7 @@ p {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: var(--space-3);
 }
-/* Wider columns: a hint with a long example (an address) keeps two even lines under its field. */
+/* Wider columns: a hint with an example (an address, a folder) keeps one line under its field. */
 .grid-fields--wide {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
@@ -774,7 +774,8 @@ p {
   flex-direction: column;
   gap: 4px;
 }
-.page__header > p {
+.page__header > p,
+.page__header-text > p {
   text-wrap: pretty;
 }
 .page__header--row {
@@ -10263,11 +10264,14 @@ html[data-menu-overlay] .shell {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* A plan's mark beside its name and facts: the name's capitals at the mark's top, its actions in the row's middle. */
-.ai-accounts__row {
+/* A plan's or a key's mark beside its name and facts: the name's capitals at the mark's top, what follows them (a
+   chip, the actions) in the row's middle. */
+.ai-accounts__row,
+.key-row {
   align-items: flex-start;
 }
-.ai-accounts__row > .ac-acts {
+.ai-accounts__row > .ac-acts,
+.key-row > :not(.ac-brand, .list-col) {
   align-self: center;
 }
 .ai-accounts__name {

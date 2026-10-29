@@ -15,7 +15,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
  */
 const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://app.agentes.chat";
 // Invitation and password reset links on this host open the app (universal links / App Links); the server
 // publishes the matching /.well-known files (apps/server/src/app-links.ts).
 const linkHost = new URL(apiUrl).host;

@@ -60,15 +60,13 @@ describe("requester", () => {
     const { fetch, calls } = fakeFetch({
       "POST /api/app/sign-in-options": { status: 200, body: { account: false } },
       "POST /api/app/invitations/tok/code": { status: 202, body: { email: "a@x.com", resendIn: 60 } },
-      "POST /api/waitlist": { status: 202, body: { ok: true } },
     });
     const api = createHttpApi({ fetch });
     await api.account.signInOptions({ email: "a@x.com" }, "tok-1");
     await api.invites.sendCode("tok", { email: "a@x.com" }, "tok-2");
-    await api.waitlist.join({ email: "a@x.com", locale: "en" }, "tok-3");
     await api.account.signInOptions({ email: "a@x.com" });
     const header = (c: Call) => (c.init.headers as Record<string, string>)["x-captcha-response"];
-    expect(calls.map(header)).toEqual(["tok-1", "tok-2", "tok-3", undefined]);
+    expect(calls.map(header)).toEqual(["tok-1", "tok-2", undefined]);
     // Never in the body.
     expect(calls.every((c) => !String(c.init.body).includes("tok-"))).toBe(true);
   });
@@ -77,16 +75,16 @@ describe("requester", () => {
 describe("transport options (the phone app)", () => {
   test("baseUrl prefixes every path, sends no browser cookie, and merges headers into JSON and file requests", async () => {
     const { fetch, calls } = fakeFetch({
-      "https://agentes.chat/api/app/me": { status: 200, body: { user: { id: "u1" } } },
-      "POST https://agentes.chat/api/app/organizations/o1/artifacts/files": {
+      "https://app.agentes.chat/api/app/me": { status: 200, body: { user: { id: "u1" } } },
+      "POST https://app.agentes.chat/api/app/organizations/o1/artifacts/files": {
         status: 201,
         body: { id: "a1", kind: "file" },
       },
-      "https://agentes.chat/api/app/organizations/o1/artifacts/a1/file": { status: 200, body: { raw: true } },
+      "https://app.agentes.chat/api/app/organizations/o1/artifacts/a1/file": { status: 200, body: { raw: true } },
     });
     let n = 0;
     const api = createHttpApi({
-      baseUrl: "https://agentes.chat/",
+      baseUrl: "https://app.agentes.chat/",
       fetch,
       headers: async () => ({ cookie: `session=${++n}`, "x-agentes-client": "mobile" }),
     });
@@ -94,9 +92,9 @@ describe("transport options (the phone app)", () => {
     await api.artifacts.upload("o1", new File(["x"], "a.txt", { type: "text/plain" }), { title: "a" });
     await api.artifacts.fileBlob("o1", "a1");
     expect(calls.map((c) => c.url)).toEqual([
-      "https://agentes.chat/api/app/me",
-      "https://agentes.chat/api/app/organizations/o1/artifacts/files",
-      "https://agentes.chat/api/app/organizations/o1/artifacts/a1/file",
+      "https://app.agentes.chat/api/app/me",
+      "https://app.agentes.chat/api/app/organizations/o1/artifacts/files",
+      "https://app.agentes.chat/api/app/organizations/o1/artifacts/a1/file",
     ]);
     for (const [i, c] of calls.entries()) {
       expect(c.init.credentials).toBe("omit");
@@ -105,7 +103,7 @@ describe("transport options (the phone app)", () => {
       expect(headers["x-agentes-client"]).toBe("mobile");
     }
     expect(((calls[0] as Call).init.headers as Record<string, string>).accept).toBe("application/json");
-    expect(api.artifacts.fileUrl("o1", "a1")).toBe("https://agentes.chat/api/app/organizations/o1/artifacts/a1/file");
+    expect(api.artifacts.fileUrl("o1", "a1")).toBe("https://app.agentes.chat/api/app/organizations/o1/artifacts/a1/file");
   });
 
   test("without options: same origin and the browser's cookie", async () => {
@@ -402,18 +400,18 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
   test("the desktop app's newest build: the server's own, else agentes.chat's, asked without the cookie", async () => {
     const release = {
       version: "0.6.0",
-      url: "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_x64-setup.exe",
+      url: "https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_x64-setup.exe",
       sha256: "ab",
       publishedAt: "t",
     };
     const { fetch, calls } = fakeFetch({
-      "GET https://agentes.chat/api/desktop/latest?target=windows&arch=x64": { status: 200, body: release },
+      "GET https://app.agentes.chat/api/desktop/latest?target=windows&arch=x64": { status: 200, body: release },
     });
     const api = createHttpApi({ fetch });
     expect(await api.machines.desktopLatest("windows", "x64")).toEqual(release);
     expect(calls.map((c) => [c.url, c.init.credentials])).toEqual([
       ["/api/desktop/latest?target=windows&arch=x64", "same-origin"],
-      ["https://agentes.chat/api/desktop/latest?target=windows&arch=x64", "omit"],
+      ["https://app.agentes.chat/api/desktop/latest?target=windows&arch=x64", "omit"],
     ]);
   });
 

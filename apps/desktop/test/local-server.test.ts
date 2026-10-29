@@ -181,7 +181,7 @@ describe("what the popover, the cover and Preferences say", () => {
     expect(isHereServer(running, LOCAL)).toBe(true);
     expect(isHereServer(reached, TAILNET)).toBe(true);
     expect(isHereServer(reached, LOCAL)).toBe(true);
-    expect(isHereServer(running, "https://agentes.chat")).toBe(false);
+    expect(isHereServer(running, "https://app.agentes.chat")).toBe(false);
     expect(isHereServer({ ...running, run: false }, LOCAL)).toBe(false);
   });
 
@@ -194,7 +194,7 @@ describe("what the popover, the cover and Preferences say", () => {
     expect(coverHere(reached, TAILNET, false)).toBe("tailnetOff");
     expect(coverHere(reached, TAILNET, true)).toBeNull();
     // Another server: the cover's own reachability words, not these.
-    expect(coverHere({ ...running, phase: "stopped" }, "https://agentes.chat", false)).toBeNull();
+    expect(coverHere({ ...running, phase: "stopped" }, "https://app.agentes.chat", false)).toBeNull();
   });
 
   test("Rust's labels for the tray line and the notifications, with {version} left for Rust", () => {

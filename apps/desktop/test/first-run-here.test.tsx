@@ -283,14 +283,14 @@ describe("Your own server", () => {
       expect(el.textContent).toContain("This Mac becomes the server, while it's on.");
       expect(button("Which one to choose?")?.className).toBe("ac-link ac-link--muted dk-link");
       await press("Which one to choose?");
-      expect(opened).toEqual(["https://agentes.chat/help/run-on-your-computer?lang=en#who"]);
+      expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=en#who"]);
     });
     await firstRun(
       "first",
       async ({ press, opened }) => {
         await press("Usar o seu próprio servidor");
         await press("Qual escolher?");
-        expect(opened).toEqual(["https://agentes.chat/help/run-on-your-computer?lang=pt-BR#who"]);
+        expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=pt-BR#who"]);
       },
       { lang: "pt-BR" },
     );
@@ -497,6 +497,36 @@ describe("Setting it up here", () => {
       g.getComputedStyle = real.style;
       g.ResizeObserver = real.observer;
     }
+  });
+
+  test("every reason's end gives its fix first, then where to try again on a line of its own", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    // Under a link or words as under a command: never run on after "Turn it on".
+    expect(css.split("\n.dk-fr__problem .dk-fr__retry {")[1]?.split("}")[0]).toContain("display: block;");
+    for (const [reason, fix] of [
+      ["https", "HTTPS is off on your Tailscale network. Turn it on"],
+      ["serve", "Install Tailscale from tailscale.com."],
+    ] as const)
+      await firstRun(
+        "first",
+        async ({ el, until, button, press }) => {
+          await press("Use your own server");
+          await press("Run agentes.chat on this Mac");
+          await until(() => el.querySelector("#here-reach:not([disabled])"));
+          await act(async () => typeInto(el.querySelector('input[type="email"]'), "ana@example.com"));
+          await act(async () => (el.querySelector("#here-reach") as HTMLElement).click());
+          await press("Start agentes.chat");
+          await until(() => button("Continue"));
+          const problem = el.querySelector(".dk-fr__problem") as HTMLElement;
+          expect({ reason, words: problem.textContent }).toEqual({
+            reason,
+            words: expect.stringContaining(`${fix} Try again in Preferences › Servers.`),
+          });
+          // Last: nothing follows it in the problem's words.
+          expect(problem.querySelector(".dk-fr__retry")?.nextSibling).toBeNull();
+        },
+        { here: { fail: "reach", reason, pace: 10 } },
+      );
   });
 
   test("Cancel stops it, and the form comes back as it was", async () => {

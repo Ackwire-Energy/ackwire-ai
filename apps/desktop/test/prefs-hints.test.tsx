@@ -195,7 +195,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         const link = [...el.querySelectorAll("button")].find((b) => b.textContent === "How folders work");
         expect(link?.className).toBe("ac-link ac-link--muted dk-link");
         await act(async () => link?.click());
-        expect(opened).toEqual(["https://agentes.chat/help/computers?lang=en#folders"]);
+        expect(opened).toEqual(["https://app.agentes.chat/help/computers?lang=en#folders"]);
         expect(el.textContent).not.toContain("Removing deletes nothing");
       },
     ));
@@ -343,7 +343,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
     ));
 
   test("Updates: no lead; Update and reopen alone, and the manual way keeps what stays", async () => {
-    const latest = { version: "9.9.9", url: "https://agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
+    const latest = { version: "9.9.9", url: "https://app.agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
     const update: UpdateCheck = {
       state: { latest, available: true, required: false },
       checkedAt: null,
@@ -369,7 +369,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
   });
 
   test("Updates: the download with its bar and Cancel, which drops it; once whole, Installing… with no Cancel", async () => {
-    const latest = { version: "9.9.9", url: "https://agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
+    const latest = { version: "9.9.9", url: "https://app.agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
     const update: UpdateCheck = {
       state: { latest, available: true, required: false },
       checkedAt: null,

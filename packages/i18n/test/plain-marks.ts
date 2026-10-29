@@ -8,9 +8,6 @@ import { sourceFiles } from "./maker-words";
  */
 export const MARKS = /[;—]/;
 
-/** Code the landing shows as code. */
-const CODE_SAMPLES: ReadonlySet<string> = new Set(["landing.bento.db.read", "landing.bento.db.write"]);
-
 /** Code keeps its marks: `code` spans, help code blocks (`….blocks.N.code`) and HTML entities (`&amp;`). */
 const outsideCode = (text: string) => text.replace(/&#?\w+;/g, "").replace(/`[^`]*`/g, "");
 
@@ -21,7 +18,7 @@ const CODE_BLOCK = /\.blocks\.\d+\.code$/;
 export const unplainLeaves = (tree: unknown) =>
   leaves(tree)
     .filter((leaf): leaf is [string, string] => typeof leaf[1] === "string")
-    .filter(([key, text]) => !CODE_SAMPLES.has(key) && !CODE_BLOCK.test(key) && MARKS.test(outsideCode(text)))
+    .filter(([key, text]) => !CODE_BLOCK.test(key) && MARKS.test(outsideCode(text)))
     .map(([key, text]) => `${key}: ${text}`);
 
 /**

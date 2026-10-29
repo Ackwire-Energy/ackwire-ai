@@ -37,11 +37,11 @@ describe("the servers this app opens", () => {
   });
 
   test("each kind of server, and how it reads", () => {
-    expect(serverKind("https://agentes.chat")).toBe("cloud");
+    expect(serverKind("https://app.agentes.chat")).toBe("cloud");
     expect(serverKind("http://127.0.0.1:4310")).toBe("here");
     expect(serverKind("https://agentes.tail1234.ts.net")).toBe("tailnet");
     expect(serverKind("https://chat.example.com")).toBe("own");
-    expect(serverName("https://agentes.chat")).toBe("agentes.chat");
+    expect(serverName("https://app.agentes.chat")).toBe("agentes.chat");
     expect(serverName("https://chat.example.com:8443")).toBe("chat.example.com:8443");
     expect(serverName("http://127.0.0.1:4310")).toBe("127.0.0.1:4310");
   });
