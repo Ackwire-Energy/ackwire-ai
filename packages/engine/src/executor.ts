@@ -139,7 +139,8 @@ import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentActions, agentRuns, approvals, agentQuestions, messages, routineRuns, secretRequests, users } = schema;
+const { agentActions, agentRuns, approvals, agentQuestions, messages, outbox, routineRuns, secretRequests, users } =
+  schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
 
@@ -263,9 +264,12 @@ export interface Transcript {
   /**
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
-   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
+   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off;
+   * `cause`: `restart` when our server stopped in the middle of the turn, not the computer.
    */
-  interruptedTurn?: { prompt: string; executed: string[]; drops: number };
+  interruptedTurn?: { prompt: string; executed: string[]; drops: number; cause?: "restart" };
+  /** What the computer brain's turn under way was asked: a turn cut by a crash is sent again with it. */
+  turnPrompt?: string;
   /**
    * This run continues one a person stopped ("Continuar"): the line a computer brain reads first
    * (the model brain reads it at the end of `messages`). Taken by the first turn.
@@ -326,8 +330,9 @@ export function interruptedTurnPrompt(
   extra: string | null = null,
 ): string {
   const done = t.executed.length > 0 ? ` Already done in it, do not repeat: ${t.executed.join(", ")}.` : "";
+  const why = t.cause === "restart" ? "the server restarted" : "the computer disconnected";
   return [
-    `Your previous turn was cut off because the computer disconnected.${done} Pick up where you left off and finish it. What you were asked:`,
+    `Your previous turn was cut off because ${why}.${done} Pick up where you left off and finish it. What you were asked:`,
     t.prompt,
     extra,
   ]
@@ -356,9 +361,9 @@ const userFacing = (error: unknown): string | null => {
 /** The result of a call in a step cut by a server restart that never started. */
 const NOT_RUN_BY_RESTART =
   "Interrupted by a server restart before it ran: nothing was done. Call it again if it's still needed.";
-/** Put before what a call stopped partway by a server restart returned. */
+/** Put before the error of a call still running when a server restart began: the restart may be what ended it. */
 const CUT_BY_RESTART =
-  "Interrupted by a server restart while it ran: it may have done part of its work. Check before running it again. What it returned:";
+  "A server restart began while this call ran: it may have stopped partway, after doing part of its work. Check before running it again. What it returned:";
 
 const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
@@ -375,6 +380,12 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
 };
 
 /**
+ * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
+ * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`).
+ */
+type RunJobOptions = { finalAttempt: boolean; wait?: string; jobId?: string; owned?: () => Promise<boolean> };
+
+/**
  * Executes one agent run (job `agent_run.execute`), end to end
  * (docs/adr/0008, 0015): claim the run, build or load the transcript, then
  * loop: call the model through the Model Gateway (deltas go to the channel),
@@ -388,15 +399,7 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  * On the final attempt, or for permanent problems (budget, credential), the
  * run fails.
  */
-export async function executeRun(
-  deps: EngineDeps,
-  runId: string,
-  /**
-   * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
-   * `owned`: whether this worker still holds the job (`JobContext.owned`).
-   */
-  options: { finalAttempt: boolean; wait?: string; owned?: () => Promise<boolean> },
-) {
+export async function executeRun(deps: EngineDeps, runId: string, options: RunJobOptions) {
   const prof = createProfiler();
   // A person can cancel it: the signal aborts the model stream, tools and running code.
   const abort = registerRunAbort(runId);
@@ -420,7 +423,7 @@ export async function executeRun(
 async function executeRunInner(
   deps: EngineDeps,
   runId: string,
-  options: { finalAttempt: boolean; wait?: string; owned?: () => Promise<boolean> },
+  options: RunJobOptions,
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
 ) {
@@ -451,7 +454,7 @@ async function executeRunInner(
     if (isTerminal(run.status) || run.status === "queued") return;
     if (run.status === "running") {
       // Picked up again (handed back at a shutdown, or recovered) with its old beat: a fresh one first, so a
-      // recovery sweep can't take it from this worker. A sweep that took it first took its job back too.
+      // recovery sweep can't take it from this worker. A sweep that took it first ended this job.
       await db
         .update(agentRuns)
         .set({ heartbeatAt: new Date() })
@@ -481,6 +484,14 @@ async function executeRunInner(
       const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
+      // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
+      // run instead of finding it no longer waiting and doing nothing.
+      if (options.wait && options.jobId) {
+        await db
+          .update(outbox)
+          .set({ payload: sql`${outbox.payload} - 'wait'` })
+          .where(eq(outbox.id, options.jobId));
+      }
     }
   }
   // status is `running` here.
@@ -1650,6 +1661,7 @@ async function executeRunInner(
         // A computer brain's turn that can take messages mid-turn (live steering).
         steerable: (steer) => live.steerable(steer),
       };
+      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       // A computer brain's turn: the transcript is saved (the bridge's pauses join it), and the turn's
       // tool token goes in `brain.turn.mcp.token` so the runner bridge maps its calls to this run.
       if (plan.kind !== "model") {
@@ -1660,8 +1672,9 @@ async function executeRunInner(
           machineId: plan.session?.machineId ?? agent.machineId ?? "",
           runId: run.id,
         });
+        transcript.turnPrompt = prompt;
+        await saveTranscript(db, transcript);
       }
-      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       const turnPlan = plan;
       // Where this computer turn's steps start (the bridge records a step per tool it runs).
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;

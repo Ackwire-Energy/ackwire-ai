@@ -11,7 +11,10 @@ export type OutboxJob = typeof outbox.$inferSelect;
  *   change that caused it committed.
  * - Workers claim due rows with `FOR UPDATE SKIP LOCKED` and a lease, renewed
  *   while the handler runs; a worker that dies mid-job stops renewing, loses
- *   the lease and another worker retries it.
+ *   the lease and another worker retries it. Not the job of an agent run
+ *   still running: the stale-run sweep takes that one (`orphanedRunJobSql`).
+ * - Renewing, finishing and failing a job are fenced by its claim (`held`):
+ *   a late worker never overwrites a later claim, its own included.
  * - Failures retry with backoff until `max_attempts`, then the row is `failed`.
  *
  * Handlers must be idempotent: a job can run more than once (lease expiry).
@@ -85,8 +88,9 @@ const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} 
   select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.background)))`;
 
 /**
- * The job of a run still `running` whose lease ran out: its worker died in the middle of it. The stale-run sweep
- * takes it (`recoverStaleRuns`: a tool cut in half fails the run instead of running twice), never a plain retry.
+ * The job of a run still `running`. When its worker stops holding it without handing it back (it died, or a step
+ * outlived the shutdown's drain), the stale-run sweep takes it (`recoverStaleRuns`: a tool cut in half fails the
+ * run instead of running twice), never a plain retry.
  */
 const orphanedRunJobSql = sql`(${outbox.kind} = 'agent_run.execute' and exists (
   select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.status = 'running'))`;
@@ -152,7 +156,19 @@ function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL,
     .returning();
 }
 
-/** Extends a running job's lease, unless another worker took it over. Returns whether it still owns the job. */
+/**
+ * This claim of the job, still held. A worker's id is one per process, so the attempt it was claimed for tells this
+ * claim from a later one by the same worker.
+ */
+const held = (job: OutboxJob) =>
+  and(
+    eq(outbox.id, job.id),
+    eq(outbox.status, "processing"),
+    eq(outbox.lockedBy, job.lockedBy ?? ""),
+    eq(outbox.attempts, job.attempts),
+  );
+
+/** Extends a running job's lease, unless it was taken over. Returns whether it still holds the job. */
 export async function renewLease(
   db: Database,
   job: OutboxJob,
@@ -162,17 +178,17 @@ export async function renewLease(
   const rows = await db
     .update(outbox)
     .set({ lockedUntil: new Date(now.getTime() + leaseMs) })
-    .where(and(eq(outbox.id, job.id), eq(outbox.status, "processing"), eq(outbox.lockedBy, job.lockedBy ?? "")))
+    .where(held(job))
     .returning({ id: outbox.id });
   return rows.length > 0;
 }
 
-/** Marks a job done, unless another worker took it over after our lease expired. */
+/** Marks a job done, unless it was taken over after its lease expired. */
 export async function completeJob(db: Database, job: OutboxJob, now = new Date()): Promise<boolean> {
   const rows = await db
     .update(outbox)
     .set({ status: "done", completedAt: now, lockedUntil: null, lastError: null })
-    .where(and(eq(outbox.id, job.id), eq(outbox.status, "processing"), eq(outbox.lockedBy, job.lockedBy ?? "")))
+    .where(held(job))
     .returning({ id: outbox.id });
   return rows.length > 0;
 }
@@ -205,7 +221,7 @@ export async function failJob(
     await db
       .update(outbox)
       .set({ ...handedBack(now), lastError: message })
-      .where(and(eq(outbox.id, job.id), eq(outbox.lockedBy, job.lockedBy ?? "")));
+      .where(held(job));
     return "retry";
   }
   const final = !options.retryable || job.attempts >= job.maxAttempts;
@@ -221,19 +237,20 @@ export async function failJob(
             nextAttemptAt: new Date(now.getTime() + retryDelayMs(job.attempts)),
           },
     )
-    .where(and(eq(outbox.id, job.id), eq(outbox.lockedBy, job.lockedBy ?? "")));
+    .where(held(job));
   return final ? "failed" : "retry";
 }
 
 /**
  * A stopping worker's jobs still running: back in the queue at once for the next instance instead of waiting out
- * their lease. Returns how many.
+ * their lease. Not a run still `running` (`orphanedRunJobSql`): its step may still be under way, a tool that
+ * ignores the shutdown included, so the sweep decides once its beat stops. Returns how many.
  */
 export async function releaseJobs(db: Database, workerId: string, now = new Date()): Promise<number> {
   const rows = await db
     .update(outbox)
     .set(handedBack(now))
-    .where(and(eq(outbox.status, "processing"), eq(outbox.lockedBy, workerId)))
+    .where(and(eq(outbox.status, "processing"), eq(outbox.lockedBy, workerId), sql`not ${orphanedRunJobSql}`))
     .returning({ id: outbox.id });
   return rows.length;
 }
@@ -249,7 +266,7 @@ export class PermanentJobError extends Error {
 export interface JobContext {
   /** True on the job's last allowed attempt: handlers should give up cleanly instead of rethrowing. */
   finalAttempt: boolean;
-  /** Whether this worker still holds the job: a stale-run recovery may have taken it back since it was claimed. */
+  /** Whether this claim still holds the job: a stale-run recovery may have taken it since. */
   owned?(): Promise<boolean>;
 }
 
@@ -273,17 +290,14 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
   const until = Date.now() + MAX_RENEWED_MS;
   const renew = setInterval(() => {
     if (Date.now() > until) return clearInterval(renew);
-    // Taken over (our lease lapsed, or a stale-run recovery freed it): renewing again can't help.
+    // Taken over (our lease lapsed, or a stale-run recovery ended it): renewing again can't help.
     void renewLease(db, job, leaseMs).then(
       (owned) => owned || clearInterval(renew),
       () => undefined,
     );
   }, leaseMs / 3);
   const owned = async () => {
-    const [row] = await db
-      .select({ id: outbox.id })
-      .from(outbox)
-      .where(and(eq(outbox.id, job.id), eq(outbox.status, "processing"), eq(outbox.lockedBy, job.lockedBy ?? "")));
+    const [row] = await db.select({ id: outbox.id }).from(outbox).where(held(job));
     return Boolean(row);
   };
   try {

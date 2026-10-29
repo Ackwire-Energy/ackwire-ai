@@ -87,6 +87,56 @@ test("a running job's lease is renewed: a handler that outlives the lease is not
   expect([row?.status, row?.lockedBy, row?.attempts]).toEqual(["done", "a", 1]);
 });
 
+test("a claim is fenced by its attempt too: the same worker's later claim of the job isn't its earlier one's", async () => {
+  await enqueue(db, job());
+  const [early] = await claimJobs(db, { workerId: "w" });
+  // Its lease ran out (no renewal got through while the database was away) and the same worker claimed it again.
+  const [later] = await claimJobs(db, { workerId: "w", now: at(DEFAULT_LEASE_MS + 1000) });
+  expect(later?.id).toBe(early?.id ?? "");
+  const stale = early as NonNullable<typeof early>;
+  expect(await renewLease(db, stale)).toBe(false);
+  expect(await completeJob(db, stale)).toBe(false);
+  await failJob(db, stale, new Error("late"), { retryable: true });
+  await failJob(db, stale, Object.assign(new Error("stopping"), { handback: true }), { retryable: true });
+  expect((await rows())[0]).toMatchObject({ status: "processing", lockedBy: "w", attempts: 2, lastError: null });
+  expect(await completeJob(db, later as NonNullable<typeof later>)).toBe(true);
+});
+
+test("a handler's `owned` is about its own claim, not its worker's", async () => {
+  await enqueue(db, job("k"));
+  const owned: { first?: boolean; second?: boolean } = {};
+  const goOn = Promise.withResolvers<void>();
+  const answered = Promise.withResolvers<void>();
+  const first = processOutbox(
+    db,
+    {
+      k: async (_job, ctx) => {
+        await goOn.promise;
+        owned.first = await ctx.owned?.();
+        answered.resolve();
+      },
+    },
+    { workerId: "w" },
+  );
+  while ((await rows())[0]?.status !== "processing") await Bun.sleep(5);
+  // Its lease runs out and the same worker claims the job again while the first handler still runs.
+  await db.update(schema.outbox).set({ lockedUntil: at(-1000) });
+  await processOutbox(
+    db,
+    {
+      k: async (_job, ctx) => {
+        owned.second = await ctx.owned?.();
+        goOn.resolve();
+        await answered.promise;
+      },
+    },
+    { workerId: "w" },
+  );
+  await first;
+  expect(owned).toEqual({ first: false, second: true });
+  expect((await rows())[0]).toMatchObject({ status: "done", attempts: 2 });
+});
+
 test("renewLease does not extend a job another worker took over", async () => {
   await enqueue(db, job());
   const [a] = await claimJobs(db, { workerId: "a" });

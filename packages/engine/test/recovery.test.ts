@@ -1,18 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import type { FakeReply } from "@agenteschat/providers/testing";
 import {
   activeRunsIn,
   addRunStep,
-  claimJobs,
+  createOutboxPump,
   decideApproval,
   drainLocalRuns,
   drainOutbox,
+  enqueue,
   INTERRUPTED_BY_RESTART,
+  type JobHandler,
   listMessages,
-  type OutboxJob,
   postPersonMessage,
+  processOutbox,
+  RUN_STALE_MS,
   recoverStaleRuns,
+  releaseJobs,
   type ToolSource,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -122,6 +126,20 @@ const resultsSent = (call: number) =>
     Array.isArray(m.content) ? m.content.flatMap((b) => (b.type === "tool_result" ? [b] : [])) : [],
   );
 
+const until = async (done: () => boolean) => {
+  const end = Date.now() + 5000;
+  while (!done()) {
+    if (Date.now() > end) throw new Error("timed out");
+    await Bun.sleep(5);
+  }
+};
+
+/** How many times a sweep recovered the run. */
+const recoveries = async (runId: string) =>
+  (await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, runId))).filter(
+    (s) => s.kind === "error" && s.data.reason === "recovered",
+  ).length;
+
 describe("server restarts", () => {
   test("SIGTERM mid-tool: the step is saved and the run handed back at once, without spending an attempt", async () => {
     const { run } = await interruptedRun();
@@ -152,7 +170,7 @@ describe("server restarts", () => {
     expect(timeline.at(-1)?.body).toBe("Pronto.");
   });
 
-  test("a call the shutdown cut short may have done part of its work; one it kept from starting never ran", async () => {
+  test("a call still running when the shutdown began may have stopped partway; one it kept from starting never ran", async () => {
     const { run, ran } = await interruptedRun({
       toolUses: [
         { name: "long_task", input: { fail: true } },
@@ -163,7 +181,10 @@ describe("server restarts", () => {
     expect((await runRow(run.id))?.status).toBe("done");
     const [cut, notRun] = resultsSent(2);
     expect(cut?.isError).toBe(true);
-    expect(cut?.content).toContain("Interrupted by a server restart while it ran: it may have done part of its work");
+    // Its error may be the shutdown's doing or its own: the model is told the restart began, not that it caused it.
+    expect(cut?.content).toStartWith(
+      "A server restart began while this call ran: it may have stopped partway, after doing part of its work.",
+    );
     expect(cut?.content).toEndWith("killed");
     expect(notRun).toMatchObject({ isError: true });
     expect(notRun?.content).toContain("Interrupted by a server restart before it ran: nothing was done");
@@ -193,15 +214,17 @@ describe("server restarts", () => {
     expect(ran.long_task).toBe(1);
   });
 
-  test("a run picked up again with an old beat isn't recovered from under its worker", async () => {
+  test("a run picked up again with an old beat is beaten first, so a sweep doesn't take it from its worker", async () => {
+    let beatAtPickup: Date | null | undefined;
     let swept: Awaited<ReturnType<typeof recoverStaleRuns>> | undefined;
     const { run } = await interruptedRun({
       // While the next instance's worker runs it, a recovery sweep comes by.
       next: () => ({
         chunks: ["Pronto."],
-        hold: recoverStaleRuns({ db: f.db, pubsub: f.pubsub }).then((r) => {
-          swept = r;
-        }),
+        hold: (async () => {
+          [beatAtPickup] = (await f.db.select().from(schema.agentRuns)).map((r) => r.heartbeatAt);
+          swept = await recoverStaleRuns({ db: f.db, pubsub: f.pubsub });
+        })(),
       }),
     });
     // Handed back a while ago: its last beat is minutes old when a worker takes it again.
@@ -210,33 +233,170 @@ describe("server restarts", () => {
       .set({ heartbeatAt: new Date(Date.now() - 10 * 60_000) })
       .where(eq(schema.agentRuns.id, run.id));
     await drainOutbox(f.db, f.handlers);
+    // Fresh before its first model call: a sweep on another instance finds it alive too.
+    expect(Date.now() - (beatAtPickup?.getTime() ?? 0)).toBeLessThan(RUN_STALE_MS);
     expect(swept).toEqual({ resumed: [], failed: [], requeued: [] });
     expect((await runRow(run.id))?.status).toBe("done");
     expect(f.provider.calls).toHaveLength(2);
   });
 
-  test("a worker whose job a sweep took back before it started leaves the run to the next one", async () => {
-    const { run } = await interruptedRun();
-    const claimed = await claimJobs(f.db, { workerId: "slow" });
-    const job = claimed.find((j) => j.kind === "agent_run.execute") as OutboxJob;
-    // Before the slow worker starts it, a sweep sees the run's old beat and hands its job on.
+  test("a run this process executes isn't swept while its beat looks old (the database was away)", async () => {
+    let swept: Awaited<ReturnType<typeof recoverStaleRuns>> | undefined;
+    const { run } = await interruptedRun({
+      next: () => ({
+        chunks: ["Pronto."],
+        // No beat got through for minutes, in the middle of its model call; the database is back and a sweep
+        // comes by.
+        hold: (async () => {
+          await f.db.update(schema.agentRuns).set({ heartbeatAt: new Date(Date.now() - 10 * 60_000) });
+          swept = await recoverStaleRuns({ db: f.db, pubsub: f.pubsub });
+        })(),
+      }),
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(swept).toEqual({ resumed: [], failed: [], requeued: [] });
+    expect((await runRow(run.id))?.status).toBe("done");
+    expect(f.provider.calls).toHaveLength(2);
+    expect(await recoveries(run.id)).toBe(0);
+  });
+
+  test("a worker whose job a sweep took before it started leaves the run to the next job, the same worker's included", async () => {
+    let release!: () => void;
+    const released = new Promise<void>((r) => {
+      release = r;
+    });
+    const { run } = await interruptedRun({ next: () => ({ chunks: ["Pronto."], hold: released }) });
+    // Handed back a while ago: its last beat is minutes old.
     await f.db
       .update(schema.agentRuns)
       .set({ heartbeatAt: new Date(Date.now() - 10 * 60_000) })
       .where(eq(schema.agentRuns.id, run.id));
+    let started = false;
+    let opened!: () => void;
+    const gate = new Promise<void>((r) => {
+      opened = r;
+    });
+    const execute = f.handlers["agent_run.execute"] as JobHandler;
+    // This worker takes the handed-back job; before its handler gets going, a sweep sees the run's old beat.
+    const first = processOutbox(
+      f.db,
+      {
+        ...f.handlers,
+        "agent_run.execute": async (job, ctx) => {
+          started = true;
+          await gate;
+          return execute(job, ctx);
+        },
+      },
+      { workerId: "w" },
+    );
+    await until(() => started);
     expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([run.id]);
-    const owned = async () =>
-      (
-        await f.db
-          .select()
-          .from(schema.outbox)
-          .where(and(eq(schema.outbox.id, job.id), eq(schema.outbox.lockedBy, "slow")))
-      ).length > 0;
-    await f.handlers["agent_run.execute"]?.(job, { finalAttempt: false, owned });
+    // The same worker takes the run's next job, which asks the model.
+    const second = drainOutbox(f.db, f.handlers, { workerId: "w" });
+    await until(() => f.provider.calls.length === 2);
+    // The first handler goes on now: its claim is gone, so it leaves the run alone.
+    opened();
+    await Promise.race([first, Bun.sleep(2000)]);
+    expect(f.provider.calls).toHaveLength(2);
+    release();
+    await Promise.all([first, second]);
+    expect((await runRow(run.id))?.status).toBe("done");
+  });
+
+  test("a tool that ignores the shutdown and outlives the drain keeps its run's job: nothing runs it again meanwhile", async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((r) => {
+      finish = r;
+    });
+    let created = 0;
+    const source: ToolSource = {
+      name: "connector",
+      tools: async () => [
+        {
+          name: "create_issue",
+          description: "A connector call: it doesn't watch the run's abort signal",
+          scope: "",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          async execute() {
+            created++;
+            if (created === 1) {
+              // The shutdown begins while the call is in flight, and its drain ends before the call does.
+              void drainLocalRuns(0, { graceMs: 0 });
+              await finished;
+            }
+            return { content: "created issue #42" };
+          },
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [source],
+      reply: (_req, call) =>
+        call === 1
+          ? { chunks: ["Criando a issue."], toolUses: [{ name: "create_issue", input: {} }] }
+          : { chunks: ["Pronto."] },
+    });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev cria a issue",
+    });
+    const old = createOutboxPump(f.db, f.handlers, { workerId: "old" });
+    await old.pump();
+    await until(() => created === 1);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+
+    // Its jobs go back to the queue: not the run's, whose step is still under way.
+    await releaseJobs(f.db, "old");
+    expect(await jobOf(run.id)).toMatchObject({ status: "processing", lockedBy: "old" });
+    await drainOutbox(f.db, f.handlers, { workerId: "next" });
     expect(f.provider.calls).toHaveLength(1);
+
+    // The call ends before the process does: the step is saved and the run handed back with what it returned.
+    finish();
+    await old.idle();
+    await drainOutbox(f.db, f.handlers, { workerId: "next" });
+    expect((await runRow(run.id))?.status).toBe("done");
+    expect(resultsSent(2)).toEqual([expect.objectContaining({ content: "created issue #42" })]);
+    expect(created).toBe(1);
+  });
+
+  test("a run that crashed with a later wait's job pending is still swept: that job would do nothing to it", async () => {
+    const { run } = await interruptedRun();
+    await orphan(run.id);
+    // The dead worker's lease ran out: the queue leaves the job to the sweep.
+    await f.db
+      .update(schema.outbox)
+      .set({ lockedUntil: new Date(Date.now() - 60_000) })
+      .where(eq(schema.outbox.id, (await jobOf(run.id))?.id ?? ""));
+    // Left from an earlier wait for its computer's plan to reset, due in 3 hours.
+    await enqueue(f.db, {
+      orgId: run.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: run.id, wait: "an-earlier-wait" },
+      dedupeKey: `agent_run.execute:${run.id}:plan_reset:later`,
+      runAt: new Date(Date.now() + 3 * 3600_000),
+      maxAttempts: 4,
+    });
+    expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([run.id]);
     await drainOutbox(f.db, f.handlers);
     expect((await runRow(run.id))?.status).toBe("done");
     expect(f.provider.calls).toHaveLength(2);
+  });
+
+  test("a run that crashed inside a job for one wait for its computer goes on in a new job, recovered once", async () => {
+    const { run } = await interruptedRun();
+    await orphan(run.id);
+    // The job running it was a "computer is back" job: it resumes one wait, and does nothing once the run runs.
+    await f.db
+      .update(schema.outbox)
+      .set({ payload: { runId: run.id, wait: "w-1" } })
+      .where(eq(schema.outbox.id, (await jobOf(run.id))?.id ?? ""));
+    expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([run.id]);
+    await drainOutbox(f.db, f.handlers);
+    expect((await runRow(run.id))?.status).toBe("done");
+    expect(f.provider.calls).toHaveLength(2);
+    expect(await recoveries(run.id)).toBe(1);
   });
 
   test("on boot, an orphan (dead worker still holding the lease) is resumed and finishes", async () => {

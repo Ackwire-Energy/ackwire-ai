@@ -81,7 +81,7 @@ export const envVars = {
   SHUTDOWN_DELAY_MS: {
     schema: z.coerce.number().int().min(0).max(5_000).default(0),
     description:
-      "On SIGTERM, how long the server keeps serving while `/api/health` answers 503, before it stops taking requests. Behind a reverse proxy with an active health check (and a retry window), set it above the check's interval so the proxy stops sending requests here first and holds them for the next instance instead of failing them: agentes.chat Cloud sets 2000 (Caddy checks every second). 0 (default): stop taking requests at once.",
+      "On SIGTERM, how long the server keeps serving while `/api/health` answers 503, before it stops taking requests. Behind a reverse proxy with an active health check (and a retry window), set it above the check's interval so the proxy stops sending requests here first and holds them for the next instance instead of failing them (2000 for a check every second). 0 (default): stop taking requests at once.",
     section: "Server",
   },
   DATABASE_URL: {

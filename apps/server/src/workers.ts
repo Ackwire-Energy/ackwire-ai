@@ -284,11 +284,11 @@ export function startWorkers(deps: WorkerDeps) {
       for (const timer of timers) clearInterval(timer);
     },
     /**
-     * After `stop`: waits up to `ms` for the jobs running here to finish, then hands the rest back to the queue,
-     * due at once for the next instance. Returns how many went back.
+     * After `stop`: waits for the jobs running here to finish, until `until` settles, then hands the rest back to
+     * the queue, due at once for the next instance. Returns how many went back.
      */
-    async drain(ms: number) {
-      await Promise.race([outboxPump.idle(), Bun.sleep(ms)]);
+    async drain(until: Promise<unknown>) {
+      await Promise.race([outboxPump.idle(), until]);
       return releaseJobs(db, workerId);
     },
   };

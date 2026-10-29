@@ -64,6 +64,9 @@ export class RunInterruptedError extends Error {
 /** How many runs this process is executing. */
 export const activeRunCount = () => active.size;
 
+/** Whether this process is executing the run. */
+export const executesHere = (runId: string) => active.has(runId);
+
 /** Graceful shutdown: waits up to `ms` for runs to finish, then interrupts the rest (they resume elsewhere). */
 export async function drainLocalRuns(ms: number, options: { graceMs?: number } = {}) {
   const deadline = Date.now() + ms;
