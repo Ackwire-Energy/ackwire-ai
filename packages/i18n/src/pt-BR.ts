@@ -8679,6 +8679,8 @@ export const ptBR = {
       group: "Tela {{of}} {{name}}",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e tudo o que é digitado ou colado nele.",
       step: {
         desktop_open: "Abriu {{detail}}",
         desktop_open_plain: "Abriu um app",
