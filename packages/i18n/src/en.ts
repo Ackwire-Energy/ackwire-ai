@@ -1057,8 +1057,8 @@ export const en: Translations = {
     wait: {
       signIn: "You sign in here as soon as the computer is ready.",
       key: "You send the key as soon as the computer is ready.",
-      email: "We'll email you when it's ready. You can close this page.",
-      ready: "{{computer}} is ready.",
+      email: "We'll email you when the computer is ready. You can close this page.",
+      ready: "The computer is ready.",
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },

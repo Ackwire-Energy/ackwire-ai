@@ -1072,8 +1072,8 @@ export const ptBR = {
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
       key: "Você envia a chave assim que o computador ficar pronto.",
-      email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
-      ready: "O {{computer}} está pronto.",
+      email: "Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+      ready: "O computador está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },

@@ -164,7 +164,8 @@ describe("no AI connected: above the composer", () => {
     const first = dialog("Conectar uma IA") as HTMLElement;
     expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    // Without the computer's name, in a group of its own over a hairline: never read as part of the account.
+    expect(panel.querySelector(".ai-panel__ready")?.textContent).toBe("O computador está pronto.");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
       false,
     );

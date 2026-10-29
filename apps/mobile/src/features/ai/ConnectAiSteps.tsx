@@ -564,7 +564,7 @@ function PlanSteps({
       {offersKeyNow(gate, hold !== null) ? useKey : null}
       {ready && waited ? (
         <Note icon="check" live>
-          {t("connectAi.wait.ready", { computer })}
+          {t("connectAi.wait.ready")}
         </Note>
       ) : null}
       {ownable ? (

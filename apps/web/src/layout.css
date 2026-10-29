@@ -10003,6 +10003,13 @@ html[data-menu-overlay] .shell {
 .ai-panel > .ac-setnote {
   margin: 0;
 }
+/* Under the key's steps a note keeps their columns: its icon centred in the numbers' 20px, its words on the text's. */
+.ai-panel > .agp-addacct__step ~ .ac-setnote {
+  gap: 12px;
+}
+.ai-panel > .agp-addacct__step ~ .ac-setnote > :first-child {
+  margin-inline: calc((20px - 14px) / 2);
+}
 /*
  * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
  * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
@@ -10093,6 +10100,19 @@ html[data-menu-overlay] .shell {
   }
   .ai-panel--plan > .ac-setnote {
     margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* The computer ready, where nothing beside the panel says so: a group of its own over a hairline edge to edge, as the
+   head is, its baseline 16px over it as the next group's capitals are under it. */
+.ai-panel--plan > .ai-panel__ready {
+  margin-inline: calc(-1 * var(--card-pad));
+  margin-bottom: 0;
+  padding: 0 var(--card-pad) calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 9px);
+  border-bottom: 1px solid var(--line);
+}
+@supports (top: 1lh) {
+  .ai-panel--plan > .ai-panel__ready {
+    padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
 }
 /* The Computer step's lines are the well's own, at its gap. */

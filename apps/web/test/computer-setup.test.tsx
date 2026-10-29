@@ -9,14 +9,39 @@ import { en, ptBR } from "@agenteschat/i18n";
 import { icons } from "@agenteschat/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
+
+/** A phone: only the compact query matches (the rest goes to the real `matchMedia`). */
+let restore: (() => void) | null = null;
+function onPhone() {
+  const real = window.matchMedia.bind(window);
+  window.matchMedia = ((query: string) =>
+    query === COMPACT_QUERY
+      ? ({
+          matches: true,
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        } as unknown as MediaQueryList)
+      : real(query)) as typeof window.matchMedia;
+  restore = () => {
+    window.matchMedia = real;
+  };
+}
 
 afterEach(() => {
   setSystemTime();
   cleanup();
   localStorage.clear();
+  restore?.();
+  restore = null;
 });
 
 const SPECS = { cpus: 4, memoryGb: 8, diskGb: 100 };
@@ -27,6 +52,8 @@ const NOTICE = "O computador do workspace";
 const CLOCKS = [icons.clock, icons.waiting].map((shape) => shape.find(([tag]) => tag === "path")?.[1].d);
 const leadsWithClock = (line: Element) =>
   CLOCKS.includes(line.firstElementChild?.querySelector("path")?.getAttribute("d") ?? undefined);
+/** What a screen reader alone hears in a plan's panel: the status that shows no words. */
+const heardOnly = (panel: Element) => panel.querySelector(".ac-visually-hidden[role='status']")?.textContent ?? null;
 
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
@@ -881,7 +908,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     // the sign-in's step adds no timing of its own.
     const well = panel().querySelector(".ai-panel__wait") as HTMLElement;
     expect(well.textContent).toBe(
-      "Passo 3 de 4 · Instalando os programasFaltam uns 10 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
+      "Passo 3 de 4 · Instalando os programasFaltam uns 10 minAvisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
     );
     expect(panel().textContent?.split("pronto")).toHaveLength(2);
     expect(well.querySelector(".ac-iconline")).toBeNull();
@@ -904,8 +931,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
     expect(screen().getByRole("button", { name: "Conectar depois" })).toBeTruthy();
 
-    // It turns ready while the person watches: said in place, and the sign-in comes on. Still nothing started. The
-    // news comes with the setup's own poll (the rail's): the panel follows it then, not at its view's next poll.
+    // It turns ready while the person watches, and the sign-in comes on. Still nothing started. The news comes with
+    // the setup's own poll (the rail's): the panel follows it then, not at its view's next poll. The rail says it's
+    // ready, so the panel shows no line saying it again: a screen reader still hears it.
     const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
     r.machines.setSetup({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
     r.computer.ready = true;
@@ -913,7 +941,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     await settle(8);
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
-    expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+    expect(panel().querySelector(".ai-panel__ready")).toBeNull();
+    expect(heardOnly(panel())).toBe("O computador está pronto.");
     expect(panel().textContent).not.toContain("assim que o computador ficar pronto");
     expect(panel().querySelector(".ai-panel__wait")).toBeNull();
     expect(signIn().disabled).toBe(false);
@@ -936,12 +965,36 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(r.state.calls.filter((c) => c.method === "machines.cancelAccountLogin").map((c) => c.args)).toEqual([
       [orgId, "m-1", "login_1"],
     ]);
-    // Back to the step (the team, kept as it is, then the AI): the panel still says the computer it waited for is ready.
+    // Back to the step (the team, kept as it is, then the AI): the panel still knows the computer it waited for is
+    // ready, and still leaves saying so to the rail.
     await click(screen().getByRole("button", { name: "Voltar" }));
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     await click(screen().getByRole("button", { name: /^Continuar/ }));
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
-    expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+    expect(panel().querySelector(".ai-panel__ready")).toBeNull();
+    expect(heardOnly(panel())).toBe("O computador está pronto.");
+  });
+
+  test("at phone width the rail shows no words: the panel says the computer waits, then that it's ready, apart from the account", async () => {
+    onPhone();
+    const r = await toComputerStep({ state: "waiting", reason: "capacity", specs: SPECS, notifyByEmail: true });
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    const panel = () => screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect((panel().querySelector(".ai-panel__wait") as HTMLElement).textContent).toBe(
+      "Esperando um computador disponívelAvisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+    );
+    await r.reported({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
+    // Without the computer's name, in a group of its own: the account's words start after its hairline.
+    const ready = panel().querySelector(".ai-panel__ready") as HTMLElement;
+    expect(ready.textContent).toBe("O computador está pronto.");
+    expect(ready.getAttribute("aria-live")).toBe("polite");
+    expect(ready.nextElementSibling?.matches(".agp-addacct")).toBe(true);
+    expect(
+      within(ready.nextElementSibling as HTMLElement).getByRole("button", { name: "Entrar com Claude" }),
+    ).toBeTruthy();
+    expect(heardOnly(panel())).toBeNull();
+    expect(panel().textContent?.split("pronto")).toHaveLength(2);
   });
 
   test("the AI step as it turns ready, the agent's view and the accounts still on their way: ready, its sign-in loading, never a wait", async () => {
@@ -985,11 +1038,11 @@ describe("the onboarding where the workspace gets its own computer", () => {
       r.computer.ready = true;
       await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.computerSetup(orgId) }));
       await settle(8);
-      // Whatever has come back, the panel says what the rail says, and no plan dims.
+      // Whatever has come back, the panel agrees with the rail (a screen reader hears it ready), and no plan dims.
       const saysReady = () => {
         const rail = screen().getByRole("navigation", { name: "Passos para começar" });
         expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
-        expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+        expect(heardOnly(panel())).toBe("O computador está pronto.");
         expect(panel().textContent).not.toContain("assim que ele ficar pronto");
         expect(panel().textContent).not.toContain("Ainda não está pronto");
         expect(document.querySelectorAll(".grid-options--plans .ac-brand--off")).toHaveLength(0);
@@ -1016,12 +1069,18 @@ describe("the onboarding where the workspace gets its own computer", () => {
       await click(screen().getByRole("button", { name: "Continuar" }));
       await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
       const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-      expect(panel.textContent).toContain(
-        setup.state === "problem" ? "Algo deu errado ao preparar o computador" : "Esperando um computador disponível",
-      );
+      // A problem says more than the rail's word for it. In line, the rail's "Na fila" says it all.
+      const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+      if (setup.state === "problem") expect(panel.textContent).toContain("Algo deu errado ao preparar o computador");
+      else {
+        expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Na fila");
+        expect(panel.textContent).not.toContain("Esperando um computador disponível");
+      }
       // No time to give: the owner reads when they'll hear, once.
       const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
-      expect(well.textContent).toContain("Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.");
+      expect(well.textContent).toContain(
+        "Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+      );
       expect(panel.textContent?.split("pronto")).toHaveLength(2);
       expect([...panel.querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
       // A key is the picker's own row, under the panel: no button for it in any wait.

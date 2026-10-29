@@ -128,7 +128,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(router.state.location.search).toEqual({});
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect(panel.textContent).toContain("O computador está pronto.");
   });
 
   test("an account without a password: only the provider it signs in with", async () => {

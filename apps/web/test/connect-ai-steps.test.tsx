@@ -632,7 +632,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // The computer's wait in one well: how far, the time left, and the owner's email line (no address, no clock).
     const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
     expect(shownText(well)).toBe(
-      "Passo 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
+      "Passo 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
     );
     expect(panel.textContent).not.toContain("walter@");
     // "Ready" once, in the well: the sign-in's step says nothing more of when.
