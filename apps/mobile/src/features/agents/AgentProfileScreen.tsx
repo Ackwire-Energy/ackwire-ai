@@ -50,6 +50,7 @@ import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { openAgentUsage } from "../usage/UsageScreen";
+import { openAgentEdit } from "./AgentEditScreen";
 import {
   canEditMemories,
   type DidLine,
@@ -517,7 +518,12 @@ function Profile({ id }: { id: string }) {
         </Section>
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
-        <PushedHeader plate solid={false} />
+        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
+        <PushedHeader
+          plate
+          solid={false}
+          {...(decides && agent ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } } : {})}
+        />
       </View>
     </View>
   );

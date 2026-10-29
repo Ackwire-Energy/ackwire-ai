@@ -1,0 +1,120 @@
+import { describe, expect, test } from "bun:test";
+import type { WikiPageSummary } from "@agenteschat/client";
+import {
+  docBlocks,
+  docRuns,
+  foldersIn,
+  isWikiSlug,
+  RECENT_COUNT,
+  searchWiki,
+  suggestPages,
+  wikiHome,
+  wikiSlugOf,
+} from "../../src/features/wiki/logic";
+
+const page = (title: string, over: Partial<WikiPageSummary> = {}): WikiPageSummary => ({
+  id: title,
+  slug: title.toLowerCase().replace(/\s+/g, "-"),
+  title,
+  folder: "",
+  tags: [],
+  updatedAt: "2026-10-01T10:00:00.000Z",
+  updatedBy: { type: "person", id: "u1" },
+  ...over,
+});
+
+describe("wiki home", () => {
+  const pages = [
+    page("Vendas", { folder: "Processos/Comercial" }),
+    page("Glossário"),
+    page("Deploy", { folder: "Engenharia", pinned: true }),
+    page("Rituais", { folder: "Processos" }),
+  ];
+
+  test("pinned, the top folders with every page under them, then the pages at the root", () => {
+    const home = wikiHome(pages);
+    expect(home?.pinned.map((p) => p.title)).toEqual(["Deploy"]);
+    expect(home?.folders).toEqual([
+      { name: "Engenharia", path: "Engenharia", count: 1 },
+      { name: "Processos", path: "Processos", count: 2 },
+    ]);
+    expect(home?.pages.map((p) => p.title)).toEqual(["Glossário"]);
+  });
+
+  test("a folder: its folders and its own pages, nothing pinned or recent", () => {
+    const f = wikiHome(pages, "Processos");
+    expect(f?.folders).toEqual([{ name: "Comercial", path: "Processos/Comercial", count: 1 }]);
+    expect(f?.pages.map((p) => p.title)).toEqual(["Rituais"]);
+    expect(f?.pinned).toEqual([]);
+    expect(wikiHome(pages, "Sumiu")).toBeNull();
+  });
+
+  test("the latest edits only when the lists don't already show everything", () => {
+    const few = Array.from({ length: RECENT_COUNT }, (_, i) => page(`P${i}`));
+    expect(wikiHome(few)?.recent).toEqual([]);
+    const many = Array.from({ length: RECENT_COUNT + 2 }, (_, i) =>
+      page(`P${i}`, { updatedAt: `2026-10-0${i + 1}T10:00:00.000Z` }),
+    );
+    const recent = wikiHome(many)?.recent ?? [];
+    expect(recent.length).toBe(RECENT_COUNT);
+    expect(recent[0]?.title).toBe(`P${RECENT_COUNT + 1}`);
+  });
+
+  test("folders in use, for the shortcuts", () => {
+    expect(foldersIn(pages)).toEqual(["Engenharia", "Processos", "Processos/Comercial"]);
+  });
+});
+
+describe("wiki search", () => {
+  const pages = [
+    page("Como fazer deploy", { folder: "Engenharia" }),
+    page("Onboarding", { excerpt: "Primeiro dia e o deploy de teste" }),
+    page("Férias", { tags: ["rh"] }),
+  ];
+
+  test("every word, accents and case ignored; title hits first", () => {
+    expect(searchWiki(pages, "DEPLOY").map((p) => p.title)).toEqual(["Como fazer deploy", "Onboarding"]);
+    expect(searchWiki(pages, "ferias").map((p) => p.title)).toEqual(["Férias"]);
+    expect(searchWiki(pages, "rh").map((p) => p.title)).toEqual(["Férias"]);
+    expect(searchWiki(pages, "deploy engenharia").map((p) => p.title)).toEqual(["Como fazer deploy"]);
+    expect(searchWiki(pages, "  ")).toEqual([]);
+  });
+
+  test("the editor's [[ suggestions: titles that start with it, then those that have it", () => {
+    expect(suggestPages(pages, "o").map((p) => p.title)).toEqual(["Onboarding", "Como fazer deploy"]);
+    expect(suggestPages(pages, "fer").map((p) => p.title)).toEqual(["Férias"]);
+  });
+});
+
+describe("wiki text", () => {
+  test("links apart from the words, with their labels; embeds as their names", () => {
+    expect(docRuns("Veja [[Deploy]] e [[Processos/Vendas|vendas]].")).toEqual([
+      { kind: "text", text: "Veja " },
+      { kind: "link", title: "Deploy", label: "Deploy" },
+      { kind: "text", text: " e " },
+      { kind: "link", title: "Processos/Vendas", label: "vendas" },
+      { kind: "text", text: "." },
+    ]);
+    expect(docRuns("Em [[Deploy#Passos]]")).toEqual([
+      { kind: "text", text: "Em " },
+      { kind: "link", title: "Deploy#Passos", label: "Deploy" },
+    ]);
+    expect(docRuns("![[diagrama.png]]")).toEqual([{ kind: "text", text: "_diagrama.png_" }]);
+  });
+
+  test("blocks, with each task's line in the text", () => {
+    const blocks = docBlocks("Intro\n\n## Passos\n- [x] Abrir o PR\n- [ ] Aprovar\n- solto\n```\ncode\n```");
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "heading", "task", "task", "bullet", "code"]);
+    expect(blocks[2]).toMatchObject({ kind: "task", done: true, line: 3 });
+    expect(blocks[3]).toMatchObject({ kind: "task", done: false, line: 4 });
+    expect(blocks[5]).toEqual({ kind: "code", text: "code" });
+  });
+
+  test("slugs from the route", () => {
+    expect(isWikiSlug("processos/onboarding")).toBe(true);
+    expect(isWikiSlug("a b")).toBe(false);
+    expect(wikiSlugOf("processos%2Fonboarding")).toBe("processos/onboarding");
+    expect(wikiSlugOf("%E0")).toBeNull();
+    expect(wikiSlugOf(undefined)).toBeNull();
+  });
+});

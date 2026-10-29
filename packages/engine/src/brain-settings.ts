@@ -368,6 +368,19 @@ export async function getAgentBrain(
   return view(agent, machine, machines, accounts, userId);
 }
 
+/**
+ * `GET …/brain-machines`: what a new agent could think with ("Criar agente"), before it exists: every computer of
+ * the workspace (only admins create agents) with what each offers. The choice is saved on the agent once created.
+ */
+export async function newAgentBrainMachines(
+  deps: BrainDeps,
+  userId: string,
+  orgId: string,
+): Promise<BrainMachineOptions[]> {
+  await requirePermission(deps.db, userId, orgId, "manage_agents");
+  return candidateMachines(deps.db, userId, orgId, true, null);
+}
+
 export interface AgentBrainInput {
   brain?: unknown;
   /** Omitted = keep it (or the default when the brain changes); null = the brain's default. */

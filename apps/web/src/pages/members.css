@@ -36,6 +36,10 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
 }
+.jr-link--alone {
+  padding-top: 0;
+  border-top: 0;
+}
 .jr-copy {
   display: flex;
   gap: var(--space-2);

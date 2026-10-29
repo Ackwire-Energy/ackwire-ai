@@ -76,6 +76,8 @@ export const keys = {
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
   agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  /** Under `machines`: a computer that changes refreshes what a new agent could think with. */
+  brainMachines: (orgId: string) => ["org", orgId, "machines", "brains"] as const,
   /** The server's own computer here (under `machines`: a machines refetch refreshes it too). */
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
