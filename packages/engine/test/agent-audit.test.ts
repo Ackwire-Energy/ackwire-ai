@@ -3,8 +3,8 @@ import { eq, schema } from "@agenteschat/db";
 import {
   archiveAgent,
   auditInput,
-  changeMemberRole,
   auditsCall,
+  changeMemberRole,
   createToolGateway,
   decideApproval,
   ForbiddenError,
@@ -17,10 +17,10 @@ import {
   removeMember,
   revokeConnection,
   rotateCredential,
-  updateAgent,
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
