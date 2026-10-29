@@ -574,6 +574,8 @@ export function OnboardingPage() {
   const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   const authConfig = useAuthConfig().data;
+  // On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078).
+  const inviteOnly = me.data?.user.canCreateWorkspace === false && created === null;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
   // A server that sends no email invites by link only.
@@ -852,7 +854,7 @@ export function OnboardingPage() {
     saveJev.isPending ||
     finish.isPending;
   const blocked =
-    (step.id === "workspace" && !org.trim()) ||
+    (step.id === "workspace" && (!org.trim() || inviteOnly)) ||
     // Continue is what brings a vault into the wiki: it waits for the vault to be read.
     (step.id === "context" && vault.state.step === "reading") ||
     (aiOpen &&
@@ -1369,6 +1371,17 @@ export function OnboardingPage() {
               line={askLine}
               typing={guide.typing}
             />
+          )}
+
+          {step.id === "workspace" && inviteOnly && (
+            <p className="onb__help onb__note ac-iconline" role="status">
+              <Icon name="lock" size={14} />
+              <span>
+                {authConfig?.supportEmail
+                  ? t("onboarding.workspace.inviteOnlyAsk", { email: authConfig.supportEmail })
+                  : t("onboarding.workspace.inviteOnly")}
+              </span>
+            </p>
           )}
 
           {step.id === "workspace" && confirmationSent && (

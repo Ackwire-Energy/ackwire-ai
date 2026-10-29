@@ -108,6 +108,11 @@ export type EmailTemplate =
    * before it existed).
    */
   | { kind: "waitlist_confirm"; locale: EmailLocale; url: string; email?: string }
+  /**
+   * Early access (ADR 0078): `email` may now create an account and its workspace, through `url` (the sign-up page
+   * with the address filled in and the link's token), for `days` days.
+   */
+  | { kind: "early_access"; locale: EmailLocale; email: string; url: string; days: number }
   | {
       kind: "budget";
       locale?: EmailLocale;
@@ -285,6 +290,22 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { p: c.approve },
           { button: c.button, url: t.url },
           { small: c.small },
+          fallback(t.url),
+        ],
+        c.why,
+      );
+    }
+    case "early_access": {
+      const c = w.earlyAccess;
+      return doc(
+        c.subject,
+        c.preheader(t.days),
+        c.headline,
+        [
+          { p: c.body(inertText(t.email)) },
+          { p: c.what },
+          { button: c.button, url: t.url },
+          { small: c.small(t.days) },
           fallback(t.url),
         ],
         c.why,

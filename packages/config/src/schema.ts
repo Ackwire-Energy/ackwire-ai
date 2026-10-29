@@ -113,7 +113,7 @@ export const envVars = {
   ALLOW_SIGNUP: {
     schema: z.stringbool().default(false),
     description:
-      "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
+      "Forces sign-up open: anyone can create an account. When off (default), the **first** account can sign up (it becomes owner of the installation), and after it the operator API's sign-up mode decides, live, with no restart (ADR 0078): by invitation only unless it is set to open, so everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
     section: "Sign-in",
   },
   OWNER_CLAIM_SHA256: {

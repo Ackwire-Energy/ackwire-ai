@@ -34,8 +34,11 @@ export function createFakeAuth(
       calls.push({ method: "sendVerificationEmail", args: [email] });
       return options.verification ?? { ok: true };
     },
-    signInSocial: async (provider, callbackURL) => {
-      calls.push({ method: "signInSocial", args: [provider, callbackURL] });
+    signInSocial: async (provider, callbackURL, earlyAccess) => {
+      calls.push({
+        method: "signInSocial",
+        args: earlyAccess ? [provider, callbackURL, earlyAccess] : [provider, callbackURL],
+      });
       return { ok: true };
     },
     requestPasswordReset: async (input, humanCheck) => {

@@ -87,6 +87,10 @@ export const en: Translations = {
     privacy: "Privacy policy",
     termsAfter: ".",
     signOut: "Sign out",
+    earlyAccess: {
+      otherEmail: "This invitation is for another address. Sign up with the address it was sent to.",
+      unverified: "Your sign-in provider hasn't confirmed this address. Confirm it there, or sign up with a password.",
+    },
     flow: {
       email: "Hi. What's your email?",
       emailLead: "It works to sign in or to create an account.",
@@ -112,6 +116,9 @@ export const en: Translations = {
       newPasswordNamed: "Great, {{name}}. Now a password.",
       closed: "This email has no account yet.",
       closedLead: "Sign-up is closed. Ask whoever manages your organization for an invitation.",
+      expired: "This invitation expired.",
+      expiredLead: "Ask for a new one at {{email}}.",
+      expiredLeadAsk: "Ask whoever invited you for a new one.",
       otherEmail: "Use another email",
       forgot: "I'll send you a link to create a new password.",
       forgotLead: "Check the email:",
@@ -281,6 +288,8 @@ export const en: Translations = {
       namePlaceholder: "E.g. Acme",
       timezone: "Time zone",
       timezoneHelp: "For routines and reminders. Detected from your browser.",
+      inviteOnly: "New workspaces need an invitation for now.",
+      inviteOnlyAsk: "New workspaces need an invitation for now. Ask for one at {{email}}.",
     },
     vault: {
       title: "Already documented in Obsidian?",
@@ -6948,6 +6957,9 @@ export const en: Translations = {
     },
     invitation: {
       askToJoin: "This link goes through an admin now. Open it again to ask to join.",
+    },
+    org: {
+      createInviteOnly: "New workspaces need an invitation for now.",
     },
     humanCheck: "We couldn't confirm you're a person. Try again.",
     humanCheckBlocked: "The check didn't load. Try another browser or network.",

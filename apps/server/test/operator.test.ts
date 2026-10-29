@@ -599,6 +599,168 @@ test("external provisioning: requests, progress, the workspace's computer and it
   expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" })).status).toBe(204);
 });
 
+test("early access: every route needs the token, answers in its shape, and refuses with its codes", async () => {
+  const app = createOperatorApp({ ...deps, emails: true }, TOKEN);
+  const call = (method: string, path: string, json?: unknown, authorization: string | null = BEARER) =>
+    app.request(`/api/operator/v1${path}`, {
+      method,
+      headers: {
+        ...(authorization ? { authorization } : {}),
+        ...(json === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: json === undefined ? undefined : JSON.stringify(json),
+    });
+  const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+  const unknown = crypto.randomUUID();
+  for (const [method, path] of [
+    ["GET", "/signup"],
+    ["PUT", "/signup"],
+    ["GET", "/waitlist"],
+    ["GET", "/waitlist/next"],
+    ["POST", "/waitlist/import"],
+    ["POST", "/early-access/invitations"],
+    ["GET", "/early-access/invitations"],
+    ["POST", `/early-access/invitations/${unknown}/resend`],
+    ["POST", `/early-access/invitations/${unknown}/revoke`],
+  ] as const) {
+    const res = await call(method, path, method === "GET" ? undefined : {}, null);
+    expect({ method, path, status: res.status }).toEqual({ method, path, status: 401 });
+  }
+
+  // This server has ALLOW_SIGNUP=true.
+  expect(await body(await call("GET", "/signup"))).toEqual({
+    mode: "invite",
+    forcedOpen: true,
+    changedAt: null,
+    emails: true,
+  });
+  expect(await code(await call("PUT", "/signup", { mode: "closed" }))).toBe("invalid_request");
+
+  expect(
+    await body(
+      await call("POST", "/waitlist/import", {
+        entries: [
+          { email: "wl-one@acme.test", locale: "en", joinedAt: "2026-01-01T00:00:00Z" },
+          { email: "not an address" },
+          { email: "wl-two@acme.test" },
+        ],
+      }),
+    ),
+  ).toEqual({ added: 2, confirmed: 0, unchanged: 0, invalid: [1] });
+  for (const entries of [[], Array.from({ length: 5001 }, (_, i) => ({ email: `p${i}@acme.test` }))]) {
+    expect(await code(await call("POST", "/waitlist/import", { entries }))).toBe("invalid_request");
+  }
+  expect(await body(await call("GET", "/waitlist"))).toEqual({
+    unconfirmed: 0,
+    confirmed: 2,
+    waiting: 2,
+    invited: 0,
+    signedUp: 0,
+    workspaceCreated: 0,
+  });
+  expect(await body(await call("GET", "/waitlist/next?limit=1"))).toEqual({
+    entries: [{ email: "wl-one@acme.test", locale: "en", joinedAt: "2026-01-01T00:00:00.000Z" }],
+  });
+  for (const limit of [0, 201]) {
+    expect((await call("GET", `/waitlist/next?limit=${limit}`)).status).toBe(400);
+  }
+
+  const invited = await body<{ results: { email: string; outcome: string; invitationId?: string }[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["wl-one@acme.test", "owner@acme.test", "x"] }),
+  );
+  expect(invited.results).toEqual([
+    { email: "wl-one@acme.test", outcome: "invited", invitationId: expect.any(String) },
+    { email: "owner@acme.test", outcome: "has_account" },
+    { email: "x", outcome: "invalid_email" },
+  ]);
+  const id = invited.results[0]?.invitationId ?? "";
+  for (const emails of [[], Array(201).fill("a@acme.test")]) {
+    expect(await code(await call("POST", "/early-access/invitations", { emails }))).toBe("invalid_request");
+  }
+
+  const page = await body<{ invitations: Record<string, unknown>[]; counts: unknown; next: unknown }>(
+    await call("GET", "/early-access/invitations?limit=1"),
+  );
+  expect(page).toEqual({
+    invitations: [
+      {
+        id,
+        email: "wl-one@acme.test",
+        locale: "en",
+        state: "sent",
+        createdAt: expect.any(String),
+        sentAt: expect.any(String),
+        sends: 1,
+        expiresAt: expect.any(String),
+        revokedAt: null,
+        usedAt: null,
+        userId: null,
+        workspaceCreatedAt: null,
+        workspaceId: null,
+      },
+    ],
+    counts: { sent: 1, expired: 0, signedUp: 0, workspaceCreated: 0, revoked: 0 },
+    next: null,
+  });
+  for (const query of ["state=gone", "limit=0", "limit=201", "cursor=nope"]) {
+    expect({ query, status: (await call("GET", `/early-access/invitations?${query}`)).status }).toEqual({
+      query,
+      status: 400,
+    });
+  }
+
+  // Within 2 minutes nothing goes out again.
+  expect(await body(await call("POST", `/early-access/invitations/${id}/resend`))).toMatchObject({
+    sent: false,
+    invitation: { id, sends: 1 },
+  });
+  for (const action of ["resend", "revoke"]) {
+    expect(await code(await call("POST", `/early-access/invitations/${unknown}/${action}`))).toBe("not_found");
+    expect((await call("POST", `/early-access/invitations/nope/${action}`)).status).toBe(400);
+  }
+
+  // Its link makes an account, whose first workspace is recorded on it even here, where sign-up is open.
+  const [queued] = await t.db
+    .select({ payload: schema.outbox.payload })
+    .from(schema.outbox)
+    .where(sql`${schema.outbox.payload}->>'key' like ${`early-access:${id}:%`}`);
+  const link = (queued?.payload as { template?: { url?: string } } | undefined)?.template?.url ?? "";
+  const access = new URL(link).searchParams.get("access");
+  const ana = browser(t);
+  const signedUp = await ana("/api/auth/sign-up/email", {
+    json: { email: "wl-one@acme.test", password: "correct horse battery", name: "Ana" },
+    headers: { "x-early-access": access ?? "" },
+  });
+  expect(signedUp.status).toBe(200);
+  expect(await code(await call("POST", `/early-access/invitations/${id}/resend`))).toBe("early_access.used");
+  expect((await ana("/api/app/organizations", { json: { name: "Ana" } })).status).toBe(201);
+  expect(await code(await call("POST", `/early-access/invitations/${id}/revoke`))).toBe(
+    "early_access.workspace_created",
+  );
+  expect(await body(await call("GET", "/waitlist"))).toMatchObject({ invited: 1, signedUp: 1, workspaceCreated: 1 });
+
+  const other = await body<{ results: { invitationId?: string }[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["wl-two@acme.test"], resend: false }),
+  );
+  const otherId = other.results[0]?.invitationId ?? "";
+  await signUp(browser(t), "wl-two@acme.test");
+  expect(await code(await call("POST", `/early-access/invitations/${otherId}/resend`))).toBe(
+    "early_access.has_account",
+  );
+  const revoked = await body<{ invitation: { state: string; revokedAt: string } }>(
+    await call("POST", `/early-access/invitations/${otherId}/revoke`),
+  );
+  expect(revoked.invitation.state).toBe("revoked");
+  expect(await body(await call("POST", `/early-access/invitations/${otherId}/revoke`))).toEqual(revoked);
+
+  const quiet = createOperatorApp({ ...deps, emails: false }, TOKEN);
+  const refused = await quiet.request(`/api/operator/v1/early-access/invitations/${otherId}/resend`, {
+    method: "POST",
+    headers: { authorization: BEARER },
+  });
+  expect({ status: refused.status, code: await code(refused) }).toEqual({ status: 409, code: "early_access.no_email" });
+});
+
 test("no answer carries a secret or a field named like one", async () => {
   const secrets = [
     "sk-ant-api-secret-9876",
@@ -610,8 +772,22 @@ test("no answer carries a secret or a field named like one", async () => {
       r.password ? [r.password] : [],
     ),
   ];
+  // Early-access links' tokens, in the emails queued above.
+  for (const { payload } of await t.db.select({ payload: schema.outbox.payload }).from(schema.outbox)) {
+    const email = (payload as { template?: { kind?: string; url?: string } }).template;
+    const access = email?.kind === "early_access" && email.url ? new URL(email.url).searchParams.get("access") : null;
+    if (access) secrets.push(access);
+  }
   expect(secrets.length).toBeGreaterThan(10);
-  for (const path of ["/health", "/orgs?limit=200", `/orgs/${acme.orgId}`, `/users/${acme.ownerId}`]) {
+  for (const path of [
+    "/health",
+    "/orgs?limit=200",
+    `/orgs/${acme.orgId}`,
+    `/users/${acme.ownerId}`,
+    "/signup",
+    "/waitlist",
+    "/early-access/invitations?limit=200",
+  ]) {
     const text = await (await op(path)).text();
     for (const secret of secrets) expect(text).not.toContain(secret);
     expect(text).not.toMatch(/"[^"]*(token|password|secret|hash|cipher|key)[^"]*":/i);

@@ -358,6 +358,104 @@ describe("Criar conta (e-mail novo)", () => {
   });
 });
 
+describe("Acesso antecipado (o link do convite)", () => {
+  const ACCESS = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v";
+  const lookups = (state: ReturnType<typeof seedState>) =>
+    state.calls.filter((c) => c.method === "account.signInOptions").map((c) => c.args[0]);
+
+  test("the address filled in and looked up with the link's token; the sign-up and a provider carry it", async () => {
+    const { api, state } = authApi(NEW);
+    const { auth, calls } = createFakeAuth();
+    await renderApp(`/signup?email=ana%40acme.com&access=${ACCESS}`, { api, auth });
+    await settle(6);
+    expect(lookups(state)).toEqual([{ email: "ana@acme.com", access: ACCESS }]);
+    expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
+    await type("Seu nome", "Ana Lima");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    await press(/Criar conta/);
+    expect(calls[0]?.args[0]).toEqual({
+      name: "Ana Lima",
+      email: "ana@acme.com",
+      password: "senha-longa",
+      access: ACCESS,
+    });
+  });
+
+  test("a provider's sign-up from the link carries its token too", async () => {
+    const { api } = authApi(NEW);
+    const { auth, calls } = createFakeAuth();
+    await renderApp(`/signup?email=ana%40acme.com&access=${ACCESS}`, { api, auth });
+    await settle(6);
+    await press("Trocar", 2);
+    await press(/Continuar com GitHub/);
+    expect(calls.at(-1)).toEqual({ method: "signInSocial", args: ["github", "/", ACCESS] });
+  });
+
+  test("a token in any other shape is dropped", async () => {
+    const { api, state } = authApi(NEW);
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/signup?email=ana%40acme.com&access=short", { api, auth });
+    await settle(6);
+    expect(lookups(state)).toEqual([{ email: "ana@acme.com" }]);
+    await press("Trocar", 2);
+    await press(/Continuar com GitHub/);
+    expect(calls.at(-1)).toEqual({ method: "signInSocial", args: ["github", "/"] });
+  });
+
+  test("a link for another address says so in place, never as a closed sign-up", async () => {
+    const { api } = authApi(NEW);
+    const { auth } = createFakeAuth({
+      signUp: {
+        ok: false,
+        status: 403,
+        code: "EARLY_ACCESS_OTHER_EMAIL",
+        message: "This invitation is for another address. Sign up with the address it was sent to.",
+      },
+    });
+    await renderApp(`/signup?email=bia%40acme.com&access=${ACCESS}`, { api, auth });
+    await settle(6);
+    await type("Seu nome", "Bia");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    await press(/Criar conta/);
+    expect(heading()).toBe("Boa, Bia. Agora uma senha.");
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Este convite é para outro endereço. Cadastre-se com o endereço que recebeu o convite.",
+    );
+  });
+
+  test("an expired link: says so, and where to ask for a new one", async () => {
+    for (const [supportEmail, says] of [
+      ["suporte@agentes.chat", "Peça um novo em suporte@agentes.chat."],
+      [null, "Peça um novo a quem convidou você."],
+    ] as const) {
+      const { api } = authApi({ ...NEW, canSignUp: false, accessExpired: true });
+      const config = api.account.authConfig;
+      api.account.authConfig = async () => ({ ...(await config()), supportEmail });
+      await renderApp(`/signup?email=ana%40acme.com&access=${ACCESS}`, { api, auth: createFakeAuth().auth });
+      await settle(6);
+      expect([heading(), lead()]).toEqual(["Este convite expirou.", says]);
+      expect(screen().getByRole("button", { name: "Usar outro e-mail" })).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  test("a provider's sign-up refused comes back with its reason, in the person's words; other codes say nothing", async () => {
+    const { api } = authApi(NEW);
+    await renderApp("/login?error=EARLY_ACCESS_EMAIL_UNVERIFIED&error_description=x", {
+      api,
+      auth: createFakeAuth().auth,
+    });
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Seu provedor de login não confirmou este endereço. Confirme lá, ou cadastre-se com uma senha.",
+    );
+    cleanup();
+    await renderApp("/login?error=state_mismatch", { api, auth: createFakeAuth().auth });
+    expect(screen().queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("Senha nova (link do e-mail)", () => {
   test("saves the new password with the link's token", async () => {
     const { auth, calls } = createFakeAuth();
@@ -831,6 +929,23 @@ describe("Onboarding", () => {
     await act(() => new Promise((r) => setTimeout(r, 700)));
     await settle(4);
   };
+
+  test("where new workspaces take an invitation: says so, with whom to ask, and doesn't continue", async () => {
+    const seeded = seedState();
+    const user = { ...(seeded.me?.user ?? { id: "u", name: "Ana", email: "ana@acme.com", image: null }) };
+    const { state } = await start({
+      me: { user: { ...user, canCreateWorkspace: false }, organizations: [] },
+      authConfig: { supportEmail: "suporte@agentes.chat" },
+    });
+    expect(document.querySelector(".onb__note")?.textContent).toBe(
+      "Novos workspaces precisam de convite por enquanto. Peça um em suporte@agentes.chat.",
+    );
+    await type("Nome", "Acme Saúde");
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await act(async () => fireEvent.keyDown(screen().getByLabelText("Nome"), { key: "Enter" }));
+    await settle(4);
+    expect(calls(state, "orgs.create")).toEqual([]);
+  });
 
   test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {
     for (const [cloud, says] of [

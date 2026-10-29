@@ -95,6 +95,17 @@ const en = {
       "The link works for 48 hours. Wasn't you? Ignore this email. Without the click, the address never joins the list.",
     why: "You got this email because this address was entered on the agentes.chat waiting list.",
   },
+  earlyAccess: {
+    subject: "Your invitation to agentes.chat is here",
+    preheader: (days: number) => `Create your account within ${days} days, with this email address.`,
+    headline: "Your access is ready",
+    body: (email: string): Text => [{ b: email }, " can now create an account and a workspace on agentes.chat."],
+    what: "agentes.chat is where people and AI agents work together.",
+    button: "Create my account",
+    small: (days: number) =>
+      `The link works for ${days} days, for this address only. Sign up with a password, or with Google, GitHub or Apple on this same address.`,
+    why: "You got this email because this address is on the agentes.chat waiting list, or was invited to agentes.chat. Nothing happens until you sign up.",
+  },
   budget: {
     subject: {
       warning: "An agent passed 80% of its monthly budget",
@@ -285,6 +296,17 @@ const ptBR: Words = {
     button: "Confirmar meu e-mail",
     small: "O link vale por 48 horas. Não foi você? Ignore este e-mail. Sem o clique, o endereço não entra na lista.",
     why: "Você recebeu este e-mail porque este endereço foi informado na lista de espera do agentes.chat.",
+  },
+  earlyAccess: {
+    subject: "Seu convite para o agentes.chat chegou",
+    preheader: (days) => `Crie sua conta em até ${days} dias, com este endereço de e-mail.`,
+    headline: "Seu acesso está pronto",
+    body: (email) => [{ b: email }, " já pode criar uma conta e um workspace no agentes.chat."],
+    what: "O agentes.chat é onde pessoas e agentes de IA trabalham juntos.",
+    button: "Criar minha conta",
+    small: (days) =>
+      `O link vale por ${days} dias, só para este endereço. Cadastre-se com uma senha, ou com Google, GitHub ou Apple neste mesmo endereço.`,
+    why: "Você recebeu este e-mail porque este endereço está na lista de espera do agentes.chat, ou foi convidado para o agentes.chat. Nada acontece até você se cadastrar.",
   },
   budget: {
     subject: {

@@ -69,6 +69,8 @@ export interface SignInOptions {
   providers: SignInProvider[];
   /** No account, and this e-mail may create one. */
   canSignUp: boolean;
+  /** The page's early-access link is for this address, and it expired. */
+  accessExpired?: true;
 }
 
 /** `GET /api/instance`: what the phone and desktop apps check before using a server. Public, nothing secret. */
@@ -105,6 +107,8 @@ export interface User {
   hasPassword?: boolean;
   /** Opened the link that confirms the email address. */
   emailVerified?: boolean;
+  /** A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, once theirs exists). */
+  canCreateWorkspace?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

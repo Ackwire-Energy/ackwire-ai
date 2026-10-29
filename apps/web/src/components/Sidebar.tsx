@@ -1097,16 +1097,21 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
             {o.name}
           </MenuOverlayItem>
         ))}
-        <MenuOverlaySeparator />
-        <MenuOverlayItem
-          icon="plus"
-          onSelect={() => {
-            onDone();
-            void navigate({ to: "/onboarding" });
-          }}
-        >
-          {t("shell.newWorkspace")}
-        </MenuOverlayItem>
+        {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
+        {me.user.canCreateWorkspace !== false && (
+          <>
+            <MenuOverlaySeparator />
+            <MenuOverlayItem
+              icon="plus"
+              onSelect={() => {
+                onDone();
+                void navigate({ to: "/onboarding" });
+              }}
+            >
+              {t("shell.newWorkspace")}
+            </MenuOverlayItem>
+          </>
+        )}
       </MenuOverlayGroup>
     </>
   );
