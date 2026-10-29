@@ -1117,7 +1117,7 @@ export const en: Translations = {
     connected: "Connected",
   },
   dm: {
-    subtitle: "{{role}} · answers to {{owner}}",
+    subtitle: "{{role}} · owned by {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
     profile: "View profile",
     emptyAgent: "Ask {{pronoun}} to remember, forget or work differently.",
@@ -1760,7 +1760,7 @@ export const en: Translations = {
     builtinName: "agentes",
     builtinNote: "built-in permissions",
     connectHint: "Connect services",
-    subtitle: "{{role}} · answers to <b>{{owner}}</b> · {{model}} {{key}}",
+    subtitle: "{{role}} · owned by <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · no owner · {{model}} {{key}}",
     withOrgKey: "with the {{org}} key",
     openIn: "Open in #{{channel}}",

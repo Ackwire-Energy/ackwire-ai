@@ -318,6 +318,18 @@ describe("computer copy", () => {
     }
   });
 
+  test("'responde a' only says whom an agent replies to: its header names its owner as whose it is", () => {
+    // The header sits over the page with "Responde a todos", where "responde a Lucas" would read as whom it replies to.
+    for (const [strings, replies] of [
+      [ptBR, /\bresponde a\b/i],
+      [en, /\b(answers|replies) to\b/i],
+    ] as const) {
+      const headers = [...valuesOf(strings)].filter(([, v]) => v.startsWith("{{role}} ·") && v.includes("{{owner}}"));
+      expect(headers.map(([k]) => k)).toEqual(["dm.subtitle", "agent.subtitle"]);
+      expect(headers.filter(([, v]) => replies.test(v))).toEqual([]);
+    }
+  });
+
   test("the storage line says what the files take, and where only for this server's disk, the one place it shows", () => {
     // Every setup shows how much (the Cloud, a server's folder or database, a bucket), and each option's own words say
     // where: only a folder on this server adds what its disk has free.

@@ -516,7 +516,7 @@ describe("direct messages with an agent", () => {
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "MacBook" };
     await open(state, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · responde a João · Claude Code · Sonnet no MacBook");
+    expect(document.body.textContent).toContain("Dev · de João · Claude Code · Sonnet no MacBook");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
     expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
@@ -527,7 +527,7 @@ describe("direct messages with an agent", () => {
     if (codex) codex.brain = { kind: "codex", model: "GPT-6 Sol" };
     await open(member, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · responde a João · Codex · GPT-6 Sol");
+    expect(document.body.textContent).toContain("Dev · de João · Codex · GPT-6 Sol");
   });
 
   test("sidebar agent → DM via POST /dms: header with role, owner and model; empty state; the agent answers without a mention", async () => {
@@ -536,7 +536,7 @@ describe("direct messages with an agent", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "dms.open")?.args).toEqual([ORG_ID, { agentId: ADA_ID }]);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Dev · responde a João · Claude Sonnet 5.5");
+    expect(document.body.textContent).toContain("Dev · de João · Claude Sonnet 5.5");
     // "Ver perfil": the agent's page in the panel beside the conversation (like a thread's), closed by its ×.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver perfil" })));
     await settle(4);

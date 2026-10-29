@@ -1135,7 +1135,7 @@ export const ptBR = {
     connected: "Conectado",
   },
   dm: {
-    subtitle: "{{role}} · responde a {{owner}}",
+    subtitle: "{{role}} · de {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
     profile: "Ver perfil",
     emptyAgent: "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
@@ -1778,7 +1778,7 @@ export const ptBR = {
     builtinName: "agentes",
     builtinNote: "permissões embutidas",
     connectHint: "Conectar serviços",
-    subtitle: "{{role}} · responde a <b>{{owner}}</b> · {{model}} {{key}}",
+    subtitle: "{{role}} · de <b>{{owner}}</b> · {{model}} {{key}}",
     subtitleNoOwner: "{{role}} · sem responsável · {{model}} {{key}}",
     withOrgKey: "com a chave da {{org}}",
     openIn: "Abrir no #{{channel}}",
