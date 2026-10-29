@@ -4,8 +4,9 @@ import type { EmailLocale, Text } from "./layout";
  * Every email's words, in English and pt-BR. Plain text only (bold is `{ b }`): the layout escapes it.
  * Subjects, preheaders, headlines and buttons hold only these words; what people type or agents write
  * goes in the body, made inert by the caller. Plain voice, no em dashes or semicolons.
- * When a card's closing line wraps on a phone, its last words sit in a `{ nobr }`, so its last line is never a word
- * alone and reaches below the baseline, as the card's end margin expects (`END` in the layout).
+ * The layout keeps every text's last two words on one line, so a wrapped one never ends on a word alone. A card's
+ * closing line ends in a `{ nobr }` of its own where those two would leave its last line above the baseline, short
+ * of what the card's end margin expects (`END` in the layout), and a host keeps the word before it.
  */
 
 type Step = [title: string, text: string];

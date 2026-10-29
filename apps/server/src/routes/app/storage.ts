@@ -43,7 +43,8 @@ const StorageUsage = z
     }),
     ownBucketBytes: z.number().int().openapi({ description: "Its files in its own buckets, the trash left out too." }),
     disk: z.object({ sizeBytes: z.number().int(), freeBytes: z.number().int() }).nullable().openapi({
-      description: "The disk holding this server's files folder: its size and what is free. Null without a folder.",
+      description:
+        "The disk holding this server's files folder: its size and what is free. Null without a folder, and with `MACHINE_PROVISIONING=external` (the Cloud), where that disk is every workspace's.",
     }),
   })
   .openapi("StorageUsage", {
@@ -111,8 +112,10 @@ export function storageRoutes(deps: AppDeps) {
     return s;
   };
   const platform = storagePlatform(deps.adapters.platformBlobs.kind, deps.config);
-  // Not `platform.folder`: in a container its path is hidden, but the disk under it is still this server's.
-  const filesDir = platform.kind === "disk" ? deps.config.FILES_DIR : undefined;
+  // Not `platform.folder`: in a container its path is hidden, but the disk under it is still this server's. The
+  // Cloud's disk is every workspace's at once, so no workspace is told its room.
+  const filesDir =
+    platform.kind === "disk" && deps.config.MACHINE_PROVISIONING !== "external" ? deps.config.FILES_DIR : undefined;
   const usage = async (orgId: string) => {
     const [bytes, disk] = await Promise.all([storedBytes(db, orgId), filesDir ? diskSpace(filesDir) : null]);
     return { ...bytes, disk };

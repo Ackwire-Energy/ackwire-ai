@@ -1127,12 +1127,10 @@ function NewAgentFlow() {
             {row(
               "where",
               "members",
-              t("newAgent.answers"),
-              <span>
-                {ownerMember?.name ?? t("newAgent.noOwnerAdmins")}{" "}
-                <span className="muted">· {t("newAgent.talksTo", { who: audienceText() })}</span>
-              </span>,
+              t("newAgent.owner"),
+              <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
             )}
+            {row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
             {row(
               "model",
               "bolt",
@@ -1314,11 +1312,11 @@ function NewAgentFlow() {
                   <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
                 )}
               </PreviewSection>
-              <PreviewSection label={t("newAgent.preview.answers")}>
-                <span className="newag__chips">
-                  {chip("person", ownerFirst ?? t("newAgent.noOwnerOption"), "owner")}
-                  {chip("message", audienceText(), "audience")}
-                </span>
+              <PreviewSection label={t("newAgent.owner")}>
+                <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
+              </PreviewSection>
+              <PreviewSection label={t("audience.section")}>
+                <span className="newag__chips">{chip("message", audienceText())}</span>
               </PreviewSection>
               <PreviewSection label={t("newAgent.modelAndCost")}>
                 <span className="newag__chips">

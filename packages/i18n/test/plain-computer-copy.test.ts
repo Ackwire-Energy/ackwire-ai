@@ -307,6 +307,27 @@ describe("computer copy", () => {
     }
   });
 
+  test("'responde a' only says whom an agent replies to, never whose agent it is", () => {
+    // The pages that say whom an agent replies to ("Responde a todos", "Quem pode falar") also name its owner: there
+    // "responde a Lucas", or "Responde a" over the owner's name, would read as whom it replies to.
+    for (const [strings, replies] of [
+      [ptBR, /\bresponde a\b/i],
+      [en, /\b(answers|replies) to\b/i],
+    ] as const) {
+      const values = [...valuesOf(strings)];
+      const headers = values.filter(([, v]) => v.startsWith("{{role}} ·") && v.includes("{{owner}}"));
+      expect(headers.map(([k]) => k)).toEqual(["dm.subtitle", "agent.subtitle"]);
+      // The headers, every owner label and line, and on Criar agente the owner step's lead and the labels its review
+      // and its preview would put over the owner.
+      const page = ["newAgent.steps.where.lead", "newAgent.answers", "newAgent.preview.answers"];
+      const naming = values.filter(
+        ([k]) => headers.some(([h]) => h === k) || /(^|\.)owner\w*$/.test(k) || page.includes(k),
+      );
+      expect(naming.length).toBeGreaterThan(20);
+      expect(naming.filter(([, v]) => replies.test(v))).toEqual([]);
+    }
+  });
+
   test("the storage line says what the files take, and where only for this server's disk, the one place it shows", () => {
     // Every setup shows how much (the Cloud, a server's folder or database, a bucket), and each option's own words say
     // where: only a folder on this server adds what its disk has free.

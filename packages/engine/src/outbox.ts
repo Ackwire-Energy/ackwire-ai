@@ -232,9 +232,9 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
     await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });
-    await completeJob(db, job);
+    await completeJob(db, job, options.now);
   } catch (error) {
-    const outcome = await failJob(db, job, error, { retryable: isRetryable(error) });
+    const outcome = await failJob(db, job, error, { retryable: isRetryable(error), now: options.now });
     options.onError?.(job, error, outcome);
   } finally {
     clearInterval(renew);
