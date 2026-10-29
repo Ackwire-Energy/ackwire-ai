@@ -700,7 +700,7 @@ mod tests {
             )
         };
         let plan = plan_move(&[
-            home("/h/1", "https://agentes.chat", "acme", "agm_1"),
+            home("/h/1", "https://app.agentes.chat", "acme", "agm_1"),
             home("/h/2", "https://zeta.tail1234.ts.net", "Zeta", "agm_2"),
             home("/h/3", "https://agentes.tail1234.ts.net", "Beta", "agm_3"),
             home("/h/4", "https://agentes.tail1234.ts.net", "Alfa", "agm_4"),

@@ -65,16 +65,17 @@ export const envVars = {
     section: "Server",
     example: "https://chat.example.com",
   },
+  LANDING_URL: {
+    schema: z.url().optional(),
+    description:
+      "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting list: that origin may call it (CORS on `/api/waitlist` only), and the confirmation email links there. Unset: no waiting list.",
+    section: "Server",
+    example: "https://agentes.chat",
+  },
   WEB_DIR: {
     schema: z.string().default("./public"),
     description:
       "Directory containing the built web app (single-page app). Served by this server when it exists; otherwise only the API runs.",
-    section: "Server",
-  },
-  LANDING_PAGE: {
-    schema: z.stringbool().default(false),
-    description:
-      "Show the agentes.chat marketing page, with its waiting list and analytics, to signed-out visitors at `/`. Default: on when `PUBLIC_URL` is https://agentes.chat (the official site), off elsewhere (`/` goes to sign-in).",
     section: "Server",
   },
   DATABASE_URL: {

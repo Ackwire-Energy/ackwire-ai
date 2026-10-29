@@ -1,8 +1,9 @@
 import { confirmWaitlist, joinWaitlist, WAITLIST_LOCALES } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import { cors } from "hono/cors";
 import { requestLimitIp } from "../http/client-ip";
 import { apiError, errorResponse } from "../http/errors";
-import { humanCheckRefusal } from "../http/human-check";
+import { HUMAN_CHECK_HEADER, humanCheckRefusal } from "../http/human-check";
 import { type AppDeps, allowedOrigins } from "./app/context";
 
 /** Joins per address per hour, and in total per hour (each one can send an email). */
@@ -17,7 +18,7 @@ const join = createRoute({
   tags: ["Public"],
   summary: "Join the waiting list",
   description:
-    "Public, from the landing page (our origin only, JSON only). Emails a confirmation link (double opt-in). Answers 202 whether or not the email was already on the list or confirmed. Guarded by the bot check when this server has one.",
+    "Public, from the landing page (`LANDING_URL` or our origin, JSON only). Emails a confirmation link (double opt-in). Answers 202 whether or not the email was already on the list or confirmed. Guarded by the bot check when this server has one.",
   request: {
     body: {
       required: true,
@@ -65,11 +66,26 @@ const confirm = createRoute({
   },
 });
 
-/** `POST /api/waitlist` and `/api/waitlist/confirm`: the landing page's only call to action. */
+/**
+ * `POST /api/waitlist` and `/api/waitlist/confirm`: the landing page's only call to action.
+ * The landing page is its own site (`LANDING_URL`), so these two routes, and only these,
+ * answer it through CORS: JSON only, no cookies.
+ */
 export function registerWaitlist(api: OpenAPIHono, deps: AppDeps) {
   const { config } = deps;
-  const origins = allowedOrigins(config);
+  const landing = config.LANDING_URL ? new URL(config.LANDING_URL).origin : null;
+  const origins = new Set([...allowedOrigins(config), ...(landing ? [landing] : [])]);
   const { rateLimiter, humanCheck } = deps.adapters;
+  if (landing) {
+    const landingCors = cors({
+      origin: landing,
+      allowMethods: ["POST"],
+      allowHeaders: ["content-type", HUMAN_CHECK_HEADER],
+      maxAge: 600,
+    });
+    api.use("/waitlist", landingCors);
+    api.use("/waitlist/confirm", landingCors);
+  }
 
   api.openapi(join, async (c) => {
     const origin = c.req.header("origin");
@@ -83,7 +99,8 @@ export function registerWaitlist(api: OpenAPIHono, deps: AppDeps) {
     const { email, locale } = c.req.valid("json");
     if (!(await rateLimiter.consume("waitlist:all", JOIN_TOTAL)).allowed)
       return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
-    await joinWaitlist(deps.db, { email, locale, publicUrl: config.PUBLIC_URL });
+    // The link opens the landing page, which confirms it.
+    await joinWaitlist(deps.db, { email, locale, publicUrl: config.LANDING_URL ?? config.PUBLIC_URL });
     return c.json({ ok: true as const }, 202);
   });
 
