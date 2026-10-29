@@ -4,17 +4,25 @@ import type { EmailLocale, Text } from "./layout";
  * Every email's words, in English and pt-BR. Plain text only (bold is `{ b }`): the layout escapes it.
  * Subjects, preheaders, headlines and buttons hold only these words; what people type or agents write
  * goes in the body, made inert by the caller. Plain voice, no em dashes or semicolons.
+ * When a card's closing line wraps on a phone, its last words sit in a `{ nobr }`, so its last line is never a word
+ * alone and reaches below the baseline, as the card's end margin expects (`END` in the layout).
  */
 
 type Step = [title: string, text: string];
 
+/**
+ * A self-hosted server's host and the word before it ("at", "em") on one line: a narrow screen moves them down
+ * together, so the host is never split at a hyphen nor alone on the last line. A host over 36 characters moves down
+ * alone: with the word it may not fit a 320 px phone's line (digits run wide), and would then break inside again or
+ * leave the word alone on a line of its own.
+ */
+const atHost = (lead: string, word: string, host: string): Text =>
+  host.length > 36 ? [`${lead} ${word} `, { nobr: `${host}.` }] : [`${lead} `, { nobr: `${word} ${host}.` }];
+
 const en = {
-  /**
-   * Who sent it: agentes.chat, or a self-hosted server named by its host. The host keeps the word before it on its
-   * line, so a narrow screen breaks before them both and never leaves the host alone on the last line.
-   */
+  /** Who sent it: agentes.chat, or a self-hosted server named by its host. */
   sentBy: (host: string | null): Text =>
-    host ? ["Sent by the agentes.chat server ", { nobr: `at ${host}.` }] : "Sent by agentes.chat.",
+    host ? atHost("Sent by the agentes.chat server", "at", host) : "Sent by agentes.chat.",
   fallback: "Button not working? Copy this address into your browser:",
   role: { owner: "an owner", admin: "an admin", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
@@ -157,7 +165,7 @@ const en = {
     note: "Approve only people you expect. They join as a member unless you pick another role on the page.",
     approve: "Approve",
     deny: "Deny",
-    more: "All waiting requests are in Members.",
+    more: "All waiting requests are in Members." as Text,
     why: (org: string) =>
       `You got this email because you're an owner or admin of ${org}. It goes out at most once an hour.`,
   },
@@ -197,7 +205,7 @@ const en = {
     preheader: "Type it on the page to ask to join. It works for 10 minutes.",
     headline: "Your code",
     body: (org: string): Text => ["Type this code on the page to ask to join ", { b: org }, "."],
-    small: "It works for 10 minutes. If you didn't ask, ignore this email.",
+    small: ["It works for 10 minutes. If you didn't ask, ", { nobr: "ignore this email." }] as Text,
     why: (org: string) =>
       `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
   },
@@ -206,8 +214,7 @@ const en = {
 type Words = typeof en;
 
 const ptBR: Words = {
-  sentBy: (host) =>
-    host ? ["Enviado pelo servidor do agentes.chat ", { nobr: `em ${host}.` }] : "Enviado pelo agentes.chat.",
+  sentBy: (host) => (host ? atHost("Enviado pelo servidor do agentes.chat", "em", host) : "Enviado pelo agentes.chat."),
   fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
   role: { owner: "dono", admin: "admin", member: "membro" },
   anAgent: "Um agente",
@@ -348,7 +355,7 @@ const ptBR: Words = {
     note: "Aprove só quem você espera. A pessoa entra como membro, a não ser que você escolha outro papel na página.",
     approve: "Aprovar",
     deny: "Recusar",
-    more: "Todos os pedidos em espera estão em Membros.",
+    more: ["Todos os pedidos ", { nobr: "em espera estão em Membros." }],
     why: (org) => `Você recebeu este e-mail porque é dono ou admin da ${org}. É enviado no máximo uma vez por hora.`,
   },
   joinAnswer: {
@@ -383,7 +390,7 @@ const ptBR: Words = {
     preheader: "Digite na página para pedir para entrar. Vale por 10 minutos.",
     headline: "Seu código",
     body: (org) => ["Digite este código na página para pedir para entrar na ", { b: org }, "."],
-    small: "Vale por 10 minutos. Se não foi você, ignore este e-mail.",
+    small: ["Vale por 10 minutos. Se não foi você, ", { nobr: "ignore este e-mail." }],
     why: (org) =>
       `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
   },

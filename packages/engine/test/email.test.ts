@@ -285,6 +285,34 @@ describe("the look", () => {
       'Enviado pelo servidor do agentes.chat <span style="display:inline-block">em 161-97-103-35.sslip.io.</span></p>',
     );
     expect(renderEmail(verify, box).text).toContain("\nSent by the agentes.chat server at 161-97-103-35.sslip.io.\n");
+    // Too long to share a 320 px line with the word before it, which would split it again or leave the word alone on
+    // a line: it moves down alone.
+    for (const host of ["ec2-203-0-113-25.compute-1.amazonaws.com", "agentes.consultoriaempresarialpaulista.com.br"]) {
+      const far = emailArtAt(`https://${host}`);
+      expect(renderEmail(verify, far).html).toContain(
+        `Sent by the agentes.chat server at <span style="display:inline-block">${host}.</span></p>`,
+      );
+      expect(renderEmail({ ...verify, locale: "pt-BR" }, far).html).toContain(
+        `Enviado pelo servidor do agentes.chat em <span style="display:inline-block">${host}.</span></p>`,
+      );
+      expect(renderEmail(verify, far).text).toContain(`\nSent by the agentes.chat server at ${host}.\n`);
+    }
+  });
+
+  test("a closing line's last words move down together: no word alone on the last line, no e-mail split at its hyphen", () => {
+    const code = EMAIL_SAMPLES["join_code.en"] as EmailTemplate;
+    expect(renderEmail(code, art).html).toContain(
+      'ask, <span style="display:inline-block">ignore this email.</span></p>',
+    );
+    expect(renderEmail({ ...code, locale: "pt-BR" }, art).html).toContain(
+      'você, <span style="display:inline-block">ignore este e-mail.</span></p>',
+    );
+    expect(renderEmail(EMAIL_SAMPLES["join_request.pt-BR"] as EmailTemplate, art).html).toContain(
+      'Todos os pedidos <span style="display:inline-block">em espera estão em Membros.</span></p>',
+    );
+    expect(renderEmail({ ...code, locale: "pt-BR" }, art).text).toContain(
+      "\n\nVale por 10 minutos. Se não foi você, ignore este e-mail.\n\n",
+    );
   });
 
   test("the card's last block keeps only the room its ink needs: as much under the content as over the headline", () => {
