@@ -16,8 +16,8 @@ import { useActiveWork, useConversations, useWorkingNow } from "../shared/querie
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
-import { HomeServerError, HomeServerNotice } from "./HomeServerError";
 import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
+import { HomeServerError, HomeServerNotice } from "./HomeServerError";
 import { homeSections, type ListKind } from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
