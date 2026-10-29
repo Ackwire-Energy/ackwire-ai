@@ -57,14 +57,7 @@ export function StorageScreen() {
   const cloud = edition === "cloud";
   const place = t(cloud ? "storage.place.agentes" : "storage.place.server");
   const usage = config ? storageUsageLine(t, i18n.language, config) : null;
-  const inUse = {
-    value: t("storage.current"),
-    below: usage ? (
-      <Text variant="footnote" tone="faint" numberOfLines={2}>
-        {usage}
-      </Text>
-    ) : undefined,
-  };
+  const inUse = { value: t("storage.current"), belowText: usage ?? undefined };
   return (
     <SettingsPage title={t("storage.title")}>
       <GroupedFooter>{t("settings.sectionText.storage")}</GroupedFooter>

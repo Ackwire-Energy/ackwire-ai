@@ -113,10 +113,10 @@ export function storageRoutes(deps: AppDeps) {
   const platform = storagePlatform(deps.adapters.platformBlobs.kind, deps.config);
   // Not `platform.folder`: in a container its path is hidden, but the disk under it is still this server's.
   const filesDir = platform.kind === "disk" ? deps.config.FILES_DIR : undefined;
-  const usage = async (orgId: string) => ({
-    ...(await storedBytes(db, orgId)),
-    disk: filesDir ? diskSpace(filesDir) : null,
-  });
+  const usage = async (orgId: string) => {
+    const [bytes, disk] = await Promise.all([storedBytes(db, orgId), filesDir ? diskSpace(filesDir) : null]);
+    return { ...bytes, disk };
+  };
 
   app.openapi(
     createRoute({

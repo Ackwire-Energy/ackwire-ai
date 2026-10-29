@@ -83,6 +83,7 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
+  StorageMigration,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -1484,9 +1485,17 @@ export function useSaveStorage(orgId: string) {
 /** Copy status; polls while the copy runs. */
 export const useStorageMigration = (orgId: string, enabled: boolean) => {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: keys.storageMigration(orgId),
-    queryFn: () => api.storage.migration(orgId),
+    queryFn: async () => {
+      const was = qc.getQueryData<StorageMigration | null>(keys.storageMigration(orgId))?.status;
+      const m = await api.storage.migration(orgId);
+      // A copy that stops has moved files from one storage to the other: what each holds (`usage`) is stale.
+      if (was === "running" && m?.status !== "running")
+        void qc.invalidateQueries({ queryKey: keys.storage(orgId), exact: true });
+      return m;
+    },
     enabled,
     refetchInterval: (q) => (q.state.data?.status === "running" ? 1500 : false),
     refetchIntervalInBackground: true,

@@ -5,6 +5,7 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, statfsSync } from "node:fs";
+import { statfs } from "node:fs/promises";
 import os from "node:os";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -49,12 +50,13 @@ export function machineSize(dir: string): MachineSize {
 
 /**
  * The disk holding `dir`, in bytes: its size and what this process may still write there. A folder not made yet is
- * read through the nearest one that is, where it will be made. Null when nothing on the path can be read.
+ * read through the nearest one that is, where it will be made. Null when nothing on the path can be read. Never
+ * blocks the event loop, so a network share that stalls (a Windows `\\server\share`, NFS) holds up only its caller.
  */
-export function diskSpace(dir: string): { sizeBytes: number; freeBytes: number } | null {
+export async function diskSpace(dir: string): Promise<{ sizeBytes: number; freeBytes: number } | null> {
   for (let path = resolve(dir); ; path = dirname(path)) {
     try {
-      const fs = statfsSync(path);
+      const fs = await statfs(path);
       return { sizeBytes: fs.blocks * fs.bsize, freeBytes: fs.bavail * fs.bsize };
     } catch {
       if (dirname(path) === path) return null;

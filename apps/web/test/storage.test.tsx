@@ -65,7 +65,7 @@ describe("Configurações → Armazenamento", () => {
     // The page's title names the card, so the choices come first, and the radio alone says which is in use.
     expect(s.querySelector("h2, h3")).toBeNull();
     expect(s.textContent?.indexOf("Este servidor")).toBe(0);
-    expect(text(server.closest("label"))).toBe("Este servidorOs arquivos ficam no disco dele.Nenhum arquivo ainda");
+    expect(text(server.closest("label"))).toBe("Este servidorOs arquivos ficam no disco dele.Nenhum arquivo");
     // Our storage is the Cloud's: never said where the server is someone's own.
     expect(s.textContent).not.toMatch(/nosso armazenamento|Armazenamento do agentes/);
     for (const name of ["Google Drive", "OneDrive"]) {
@@ -103,7 +103,7 @@ describe("Configurações → Armazenamento", () => {
     const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
     expect(text(ours.closest("label"))).toBe(
-      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo ainda",
+      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
     );
     expect(section().textContent).not.toContain("Este servidor");
   });
@@ -136,7 +136,7 @@ describe("Configurações → Armazenamento", () => {
     const folder: StoragePlatform = { kind: "disk", folder: "/Users/walter/.agentes/files" };
     const empty = { platformBytes: 0, ownBucketBytes: 0, disk: { sizeBytes: 2048 * GB, freeBytes: 1.5 * 1024 * GB } };
     expect((await lines({ storagePlatform: folder, storageUsage: empty }))[1]).toBe(
-      "Nenhum arquivo ainda · 1,5 TB livres no disco",
+      "Nenhum arquivo · 1,5 TB livres no disco",
     );
     // A database or a bucket says what it holds, with no disk of the server's to tell.
     const held = (platformBytes: number) => ({ platformBytes, ownBucketBytes: 0, disk: null });
@@ -295,12 +295,18 @@ describe("Configurações → Armazenamento", () => {
   });
 
   test("copy existing files shows progress, stops, resumes and finishes", async () => {
-    const { r } = await go();
+    const { r } = await go(
+      seedState({
+        storageUsage: { platformBytes: 2 * GB, ownBucketBytes: 0, disk: { sizeBytes: 100 * GB, freeBytes: 40 * GB } },
+      }),
+    );
     await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
     await fillBucket("acme-instavel");
     await testConnection();
     await click(activate());
     await settle(4);
+    const bucket = () => within(section()).getByRole("radio", { name: /Seu próprio bucket/ });
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "Nenhum arquivo"]);
     await click(within(section()).getByRole("button", { name: "Copiar arquivos existentes" }));
     await settle(2);
     expect(within(section()).getByRole("meter", { name: "Progresso da cópia" })).toBeTruthy();
@@ -314,6 +320,9 @@ describe("Configurações → Armazenamento", () => {
     await poll(r, 2);
     expect(section().textContent).toContain("Cópia concluída: 120 arquivos no seu bucket.");
     expect(within(section()).getByRole("meter").getAttribute("aria-valuenow")).toBe("120");
+    // The bucket's card says what the copy took there, without reopening the page.
+    await settle(3);
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "2 GB de arquivos"]);
   });
 
   test("switch back to this server after confirming, or to agentes storage on the Cloud", async () => {

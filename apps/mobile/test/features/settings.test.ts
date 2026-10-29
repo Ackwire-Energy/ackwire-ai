@@ -393,12 +393,23 @@ describe("Armazenamento", () => {
     // In this server's database or bucket, or on the Cloud: what the workspace keeps there.
     const held = (platformBytes: number) => ({ platformBytes, ownBucketBytes: 0, disk: null });
     expect(line(en, "en", { usage: held(300 * 1024 ** 2) })).toBe("300 MB of files");
-    expect(line(pt, "pt-BR", { usage: held(0) })).toBe("Nenhum arquivo ainda");
+    expect(line(pt, "pt-BR", { usage: held(0) })).toBe("Nenhum arquivo");
     expect(line(en, "en", { usage: { ...held(0), disk: { sizeBytes: 4096 * GB, freeBytes: 1536 * GB } } })).toBe(
-      "No files yet · 1.5 TB free on disk",
+      "No files · 1.5 TB free on disk",
     );
+    // A first short document: bytes, plural in both languages.
+    expect(line(en, "en", { usage: held(7) })).toBe("7 bytes of files");
+    expect(line(pt, "pt-BR", { usage: held(820) })).toBe("820 bytes de arquivos");
     // A server from before it says nothing, and no line shows.
     expect(line(pt, "pt-BR", {})).toBeUndefined();
+  });
+
+  test("VoiceOver reads the line with its option: it is part of the row's label", () => {
+    const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
+    expect(src("ui/Grouped.tsx")).toContain(
+      'accessibilityLabel={[label, belowText, value].filter(Boolean).join(", ")}',
+    );
+    expect(src("features/settings/StorageScreen.tsx")).toContain("belowText: usage ?? undefined");
   });
 
   test("the form from the saved bucket, keys blank (kept), and what the server gets", () => {

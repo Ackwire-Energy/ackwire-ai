@@ -6083,7 +6083,7 @@ export const ptBR = {
     // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
     usage: {
       files: "{{size}}\u00a0de\u00a0arquivos",
-      none: "Nenhum\u00a0arquivo\u00a0ainda",
+      none: "Nenhum\u00a0arquivo",
       free: "{{files}}\u00a0· {{size}}\u00a0livres\u00a0no\u00a0disco",
     },
     endpoint: "Endpoint",

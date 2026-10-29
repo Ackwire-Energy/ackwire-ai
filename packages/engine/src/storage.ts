@@ -433,16 +433,9 @@ export interface StoredBytes {
   ownBucketBytes: number;
 }
 
-/**
- * What a workspace's files take, summed from the size each one recorded when it was written: no bucket is listed and
- * no folder walked. It counts every version kept of the Drive's files (uploads, what agents make or bring from their
- * computers, files attached to messages, issues and wiki pages) and every stored file of its skills, deleted skills'
- * included, as their files stay. Left out: the Drive's trash, which goes for good after 30 days; the workspace's
- * logo, connectors' icons and people's photos, small and with no size on record; the old copies a copy between
- * storages (`runMigration`) leaves where the files were.
- */
-export async function storedBytes(db: Executor, orgId: string): Promise<StoredBytes> {
-  const [[files], [skills]] = await Promise.all([
+/** The statements `storedBytes` runs, the Drive's and the skills', exported for the test that reads their plans. */
+export const storedBytesQueries = (db: Executor, orgId: string) =>
+  [
     db
       .select({
         platform: sql<string>`coalesce(sum(${artifactVersions.size}) filter (where ${artifactVersions.storageConfigId} is null), 0)`,
@@ -459,7 +452,18 @@ export async function storedBytes(db: Executor, orgId: string): Promise<StoredBy
       })
       .from(skillFiles)
       .where(and(eq(skillFiles.orgId, orgId), isNotNull(skillFiles.blobKey))),
-  ]);
+  ] as const;
+
+/**
+ * What a workspace's files take, summed from the size each one recorded when it was written: no bucket is listed and
+ * no folder walked. It counts every version kept of the Drive's files (uploads, what agents make or bring from their
+ * computers, files attached to messages, issues and wiki pages) and every stored file of its skills, deleted skills'
+ * included, as their files stay. Left out: the Drive's trash, which goes for good after 30 days; the workspace's
+ * logo, connectors' icons and people's photos, small and with no size on record; the old copies a copy between
+ * storages (`runMigration`) leaves where the files were.
+ */
+export async function storedBytes(db: Executor, orgId: string): Promise<StoredBytes> {
+  const [[files], [skills]] = await Promise.all(storedBytesQueries(db, orgId));
   return {
     platformBytes: Number(files?.platform ?? 0) + Number(skills?.platform ?? 0),
     ownBucketBytes: Number(files?.own ?? 0) + Number(skills?.own ?? 0),

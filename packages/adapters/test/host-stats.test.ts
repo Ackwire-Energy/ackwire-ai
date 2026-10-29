@@ -135,14 +135,14 @@ describe("the load sampler", () => {
     expect(machineSize("/no/such/folder").diskGb).toBe(0);
   });
 
-  test("the disk holding a folder: its size and what is free, through the nearest folder for one not made yet", () => {
+  test("the disk holding a folder: its size and what is free, through the nearest folder for one not made yet", async () => {
     const dir = mkdtempSync(join(tmpdir(), "disk-"));
-    const disk = diskSpace(dir);
+    const disk = await diskSpace(dir);
     const fs = statfsSync(dir);
     expect(disk?.sizeBytes).toBe(fs.blocks * fs.bsize);
     expect(disk?.freeBytes).toBeGreaterThan(0);
     expect(disk?.freeBytes).toBeLessThanOrEqual(disk?.sizeBytes ?? 0);
-    expect(diskSpace(join(dir, "files", "orgs"))?.sizeBytes).toBe(disk?.sizeBytes);
+    expect((await diskSpace(join(dir, "files", "orgs")))?.sizeBytes).toBe(disk?.sizeBytes);
   });
 });
 

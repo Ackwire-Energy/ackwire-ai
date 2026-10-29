@@ -9,7 +9,7 @@ import {
   createS3BlobStore,
   StorageError,
 } from "@agenteschat/adapters";
-import { eq, schema, sql } from "@agenteschat/db";
+import { eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   addFileVersion,
@@ -36,6 +36,7 @@ import {
   saveStorage,
   startMigration,
   storedBytes,
+  storedBytesQueries,
   testStorage,
   ValidationError,
 } from "../src";
@@ -449,16 +450,19 @@ describe("what a workspace's files take", () => {
     expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 100, ownBucketBytes: 8250 });
   });
 
-  test("a big workspace: 100,000 versions summed fast enough for every visit to the page", async () => {
+  test("a small workspace next to a big one: summed through its own rows, never the whole table", async () => {
     f = await setup();
-    const { organization: other } = await createOrganization(f.db, f.owner.id, { name: "Outra" });
-    // 20,000 files of 5 versions each, a tenth of them in the trash, in each of two workspaces.
-    for (const orgId of [f.org.id, other.id]) {
+    const { organization: big } = await createOrganization(f.db, f.owner.id, { name: "Grande" });
+    // Files of 5 versions each, a tenth of them in the trash: 20,000 in the big one, 20 in the small one.
+    for (const [orgId, files] of [
+      [big.id, 20_000],
+      [f.org.id, 20],
+    ] as const) {
       await f.db.execute(sql`insert into artifacts (id, org_id, kind, title, created_by_type, created_by_id,
           updated_by_type, updated_by_id, deleted_at)
         select gen_random_uuid(), ${orgId}, 'file', 'arquivo ' || i, 'person', ${f.owner.id}, 'person', ${f.owner.id},
           case when i % 10 = 0 then now() end
-        from generate_series(1, 20000) i`);
+        from generate_series(1, ${files}) i`);
       await f.db.execute(sql`insert into artifact_versions (id, org_id, artifact_id, version, blob_key, content_type,
           size, sha256, author_type, author_id)
         select gen_random_uuid(), a.org_id, a.id, v, 'k/' || a.id || '/' || v, 'application/pdf', 1000, '',
@@ -468,10 +472,15 @@ describe("what a workspace's files take", () => {
     // The planner's statistics, as autovacuum keeps them on a server.
     await f.db.execute(sql`analyze artifacts`);
     await f.db.execute(sql`analyze artifact_versions`);
-    const started = performance.now();
-    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 18_000 * 5 * 1000, ownBucketBytes: 0 });
-    const ms = performance.now() - started;
-    // Generous, so a slow machine passes: only a plan gone wrong comes near it.
-    expect(ms).toBeLessThan(2000);
+    expect(await storedBytes(f.db, big.id)).toEqual({ platformBytes: 18_000 * 5 * 1000, ownBucketBytes: 0 });
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 18 * 5 * 1000, ownBucketBytes: 0 });
+    // The plan, not a time: here a scan of both tables takes milliseconds too, and on a server of many workspaces
+    // it grows with all of them.
+    const [drive] = storedBytesQueries(f.db, f.org.id);
+    const plan = rowsOf<{ "QUERY PLAN": string }>(await f.db.execute(sql`explain ${drive.getSQL()}`))
+      .map((row) => row["QUERY PLAN"])
+      .join("\n");
+    expect(plan).toContain("Index");
+    expect(plan).not.toMatch(/Seq Scan on artifact/);
   }, 120_000);
 });

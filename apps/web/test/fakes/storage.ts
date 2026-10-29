@@ -10,7 +10,8 @@
  * half once (resume continues). Where the server keeps files itself is
  * `platform` (its disk, no folder, unless a test says otherwise), and what
  * the workspace's files take is `usage` (none yet, no disk told, unless a
- * test says otherwise).
+ * test says otherwise): a finished copy moves what this server held to the
+ * bucket's side.
  */
 import type {
   ApiClient,
@@ -110,7 +111,11 @@ export function createMockStorage(
           flakyDone.add(orgId);
           m.status = "failed";
           m.error = "A conexão com o bucket caiu. Retome para continuar de onde parou.";
-        } else if (m.copied >= m.total) m.status = "done";
+        } else if (m.copied >= m.total) {
+          m.status = "done";
+          if (c.usage)
+            c.usage = { ...c.usage, platformBytes: 0, ownBucketBytes: c.usage.ownBucketBytes + c.usage.platformBytes };
+        }
       }
       return m ? clone(m) : null;
     },
