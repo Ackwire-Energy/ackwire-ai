@@ -438,6 +438,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const well = ruleOf(layout, ".ai-panel__wait");
     expect(well).toContain("padding: 12px var(--text-edge);");
     expect(well).not.toContain("margin");
+    // Under the steps' bar its short lines break into two of a length; without the bar, its words run the bar's
+    // column in the panel's own wrap, so the well isn't empty on their right.
+    expect(well).not.toContain("text-wrap");
+    expect(ruleOf(layout, ".ai-panel__wait:has(> .setup-progress)")).toContain("text-wrap: balance");
+    expect(ruleOf(layout, ".ai-panel")).toContain("text-wrap: pretty");
     expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
       "margin-left: calc(var(--text-edge) - var(--space-3))",
     );

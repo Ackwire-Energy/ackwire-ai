@@ -10136,7 +10136,10 @@ html[data-menu-overlay] .shell {
 /* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
   padding: 12px var(--text-edge);
-  /* Short lines: wrapped, they break into two of a length. */
+}
+/* Under the steps' bar, short lines break into two of a length. Without it, the words run the bar's column, so the
+   well isn't empty on their right. */
+.ai-panel__wait:has(> .setup-progress) {
   text-wrap: balance;
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
