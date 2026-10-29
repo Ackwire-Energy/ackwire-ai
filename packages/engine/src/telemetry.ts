@@ -251,7 +251,7 @@ export async function buildTelemetryReport(
       select provider, model, count(*) as calls,
         sum(input_tokens + cache_read_tokens + cache_write_tokens) as input_tokens, sum(output_tokens) as output_tokens
       from usage_records
-      where created_at >= ${day} and kind <> 'sandbox'
+      where created_at >= ${day}
       group by provider, model`),
   );
   const byModel = new Map<string, TelemetryReport["lastDay"]["models"][number]>();

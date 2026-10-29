@@ -141,7 +141,7 @@ export function describeCapabilities(
     }
     if (names.has("run_code")) {
       lines.push(
-        "- Your computer's internet access is in the description of `run_code` (no internet, only some domains, or open internet). If a command fails because of the network (DNS, connection refused), say exactly what the tool says about it; don't blame permissions.",
+        "- If a command fails because of the network (DNS, connection refused), say exactly what the tool says about it; don't blame permissions.",
       );
     }
     if (names.has("browser_read")) {

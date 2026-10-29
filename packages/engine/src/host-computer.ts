@@ -68,8 +68,6 @@ export interface HostSyncOrg {
 export interface HostDeps {
   db: Database;
   pubsub?: PubSub;
-  /** This server has a cloud computer: agents without a computer keep using it. */
-  cloudAvailable?: boolean;
   /** `hostKey` of `HOST_COMPUTER_TOKEN`: the tokens issued now are under it. */
   hostKey: string;
   now?: () => Date;
@@ -218,13 +216,11 @@ export async function retireHostTokens(db: Database, hostToken: string | undefin
 /** A row's first token (new, or turned back on): the organization's agents with no computer start using it. */
 async function joined(deps: HostDeps, row: MachineRow, now: Date) {
   const { db, pubsub } = deps;
-  const moved = deps.cloudAvailable
-    ? []
-    : await db
-        .update(agents)
-        .set({ machineId: row.id, brainAccountId: null, updatedAt: now })
-        .where(and(eq(agents.orgId, row.orgId), isNull(agents.machineId), isNull(agents.archivedAt)))
-        .returning({ id: agents.id });
+  const moved = await db
+    .update(agents)
+    .set({ machineId: row.id, brainAccountId: null, updatedAt: now })
+    .where(and(eq(agents.orgId, row.orgId), isNull(agents.machineId), isNull(agents.archivedAt)))
+    .returning({ id: agents.id });
   for (const a of moved) caches.agents.delete(`${row.orgId}:${a.id}`);
   await recordAudit(db, {
     orgId: row.orgId,

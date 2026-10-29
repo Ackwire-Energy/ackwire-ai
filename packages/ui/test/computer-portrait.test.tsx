@@ -91,7 +91,7 @@ describe("computer portraits", () => {
     const { container, unmount } = render(
       <div>
         <ComputerPortrait kind="mac" state="online" />
-        <ComputerPortrait kind="cloud" state="paused" size={96} label="Computador na nuvem" />
+        <ComputerPortrait kind="windows" state="paused" size={96} label="Computador do escritório" />
         <ComputerPortrait kind="linux" state="online" size={96} />
         <ComputerIcon kind="windows" />
       </div>,
@@ -103,13 +103,13 @@ describe("computer portraits", () => {
     expect(small?.style.height).toBe("48px");
     expect(small?.getAttribute("aria-hidden")).toBe("true");
     expect(small?.dataset.kind).toBe("mac");
-    expect(big?.style.width).toBe("76px");
+    expect(big?.style.width).toBe("80px");
     expect(big?.style.height).toBe("96px");
     // The tower is narrow: its box no longer leaves half the grid empty around it.
     expect(tower?.width).toBe(25);
     expect(tower?.style.width).toBe("50px");
     expect(big?.dataset.state).toBe("paused");
-    expect(big?.getAttribute("aria-label")).toBe("Computador na nuvem");
+    expect(big?.getAttribute("aria-label")).toBe("Computador do escritório");
     expect(container.querySelector("svg.ac-icon")).not.toBeNull();
     expect(liveComputerCount()).toBe(3);
     unmount();

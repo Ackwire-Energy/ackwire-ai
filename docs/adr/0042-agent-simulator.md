@@ -1,6 +1,6 @@
 # 0042. The agent's phone simulator: Android first, iOS on Macs
 
-- Status: Proposed
+- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the Cloud's computers are no longer Daytona containers, and no computer time is metered or counted against daily minutes
 - Date: 2026-10-20. Revised 2026-10-20: Android first, self-host first (an optional compose profile), Cloud next (KVM hosts only), iOS on Macs (see "Revision")
 - Extends: ADR 0025 (connected computers), ADR 0031 §5 and §13 (computer use: simulator, explorations become tests), ADR 0040 (agent browser: tools, handoff, live view)
 - Out of scope for now: real phones over USB, protected mode (ADR 0030), Cloud iOS for anything but developing and testing the customer's own app (§12)

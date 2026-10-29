@@ -11,8 +11,6 @@
  * Steps: migrate → throwaway user, org, credential, agent and channel → post
  * an @mention → run the real worker loop until the streamed reply is saved →
  * print the reply and its usage record → delete the throwaway org and user.
- * With DAYTONA_API_KEY: also a tiny sandbox (no network) runs
- * `python3 -c "print(1+1)"` and is deleted.
  * With `--desktop-agent <handle>` (or the agent's id), through the server
  * running at PUBLIC_URL: the agent's desktop (started by watching it, if it
  * wasn't running) watched until one framebuffer update, and its terminal's
@@ -22,7 +20,6 @@
 import { parseArgs } from "node:util";
 import {
   channelTopic,
-  createDaytonaSandboxProvider,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
@@ -216,31 +213,6 @@ try {
   await ensureMessagePartitions(database.db);
   if (modelKey) await modelSmoke(database.db);
   else step("model: skipped (no ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY)");
-  if (config.DAYTONA_API_KEY) {
-    step("sandbox: creating (Daytona, no network)");
-    const sandbox = createDaytonaSandboxProvider({
-      apiKey: config.DAYTONA_API_KEY,
-      apiUrl: config.DAYTONA_API_URL,
-      target: config.DAYTONA_TARGET,
-      snapshot: config.SANDBOX_SNAPSHOT,
-    });
-    const box = await sandbox.create({
-      key: `smoke:${userId}`,
-      labels: { "agentes.smoke": "1" },
-      allowDomains: [],
-      autoStopMinutes: 5,
-      autoArchiveMinutes: 60,
-    });
-    try {
-      step(`sandbox ${box.id} started (network: ${box.network}); running python`);
-      const r = await sandbox.exec(box.id, { command: 'python3 -c "print(1+1)"', timeoutSeconds: 30 });
-      console.log(JSON.stringify(r));
-      if (r.exitCode !== 0 || r.stdout.trim() !== "2") throw new Error("sandbox python did not print 2");
-    } finally {
-      await sandbox.destroy(box.id);
-      step("sandbox deleted");
-    }
-  } else step("sandbox: skipped (no DAYTONA_API_KEY)");
   if (desktopAgent) await desktopSmoke(database.db, desktopAgent);
   step("smoke ok");
 } catch (error) {

@@ -22,7 +22,7 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { AgentComputerPanel, CLOUD } from "@/components/AgentComputer";
+import { AgentComputerPanel } from "@/components/AgentComputer";
 import { BudgetField, LookRows, NO_OWNER, OwnerSelect, usd } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
 import { LoadingLine } from "@/components/Loading";
@@ -422,8 +422,6 @@ export function SettingsTab({
             ) : (
               <AgentComputerPanel
                 agent={agent}
-                admin={admin}
-                machine={CLOUD}
                 machineNote={
                   // The Cloud's agents all work on the workspace's own computer: nothing to pick.
                   can("machine") && edition === "selfhost" ? (

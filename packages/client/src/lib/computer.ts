@@ -1,64 +1,10 @@
 import type { TFunction } from "i18next";
 import { useSyncExternalStore } from "react";
-import type { AgentComputer, ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
+import type { ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
 import { type ComputerState, computerKind, machineTitle } from "./machines";
 
-/** What a person asked the agent's PC to do. */
-export type ComputerAction = "start" | "stop" | "remove";
-
-/** What the chip shows: the server's status, or ours while an action runs. */
-export type ComputerDisplay = AgentComputer["status"] | "starting" | "stopping" | "removing";
-
-/** Poll `GET …/computer` this often while an action runs (until the `agent.computer` event says it's done). */
-export const POLL_MS = 2000;
-/** The elapsed seconds appear after this. */
-export const ELAPSED_AFTER_MS = 3000;
-/** "Criando a máquina" → "Preparando o ambiente" after this. */
-export const PREPARE_AFTER_MS = 4000;
 /** "Pronto" stays this long before the step line goes away. */
 export const READY_FLASH_MS = 1500;
-/** Past this, say it's taking too long (and stop waiting). */
-export const GIVE_UP_MS = 180_000;
-
-const TARGET: Record<ComputerAction, AgentComputer["status"][]> = {
-  start: ["running"],
-  stop: ["stopped", "archived"],
-  remove: ["none"],
-};
-
-/** The server reached what the action wanted. */
-export const reached = (action: ComputerAction, status: string | undefined) =>
-  status !== undefined && (TARGET[action] as string[]).includes(status);
-
-export const busyDisplay: Record<ComputerAction, ComputerDisplay> = {
-  start: "starting",
-  stop: "stopping",
-  remove: "removing",
-};
-
-export type StartStep = "creating" | "booting" | "preparing" | "ready";
-
-export interface BusyView {
-  /** Start only: the step line. */
-  step: StartStep | null;
-  /** Whole seconds since the click, once past `ELAPSED_AFTER_MS`. */
-  elapsed: number | null;
-  /** Past `GIVE_UP_MS`. */
-  tooLong: boolean;
-}
-
-/**
- * The progress shown while an action runs, from the click time and now (pure,
- * so tests pass a fake clock). `fresh`: the PC didn't exist yet.
- */
-export function busyView(action: ComputerAction, sinceMs: number, nowMs: number, fresh: boolean): BusyView {
-  const ms = Math.max(0, nowMs - sinceMs);
-  return {
-    step: action === "start" ? (ms < PREPARE_AFTER_MS ? (fresh ? "creating" : "booting") : "preparing") : null,
-    elapsed: ms >= ELAPSED_AFTER_MS ? Math.floor(ms / 1000) : null,
-    tooLong: ms >= GIVE_UP_MS,
-  };
-}
 
 // ── The workspace's own computer (ADR 0056 §10) ─────────────────────────────
 
@@ -283,10 +229,7 @@ export function agentsWaitingForComputer<A extends { id: string }>(
 export const setupNoticeKey = (orgId: string, view: SetupView) =>
   `${orgId}:${view.phase}:${view.step ?? view.reason ?? ""}`;
 
-/**
- * The workspace's own computer's portrait, before and after it exists: a server (its OS reads `other`), never
- * the cloud computer an agent may get of its own.
- */
+/** The workspace's own computer's portrait, before and after it exists: a server (its OS reads `other`). */
 export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 
 /**
@@ -306,16 +249,14 @@ export function computerName(
   return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
 }
 
-export type NoComputer = "cloud" | "workspace" | "none";
+export type NoComputer = "workspace" | "none";
 
 /**
  * What an agent's "no computer" choice (`machineId` null) stands for in a picker: `workspace` while the
- * workspace's own computer is on its way (the agents with none get it); `cloud`, a Daytona sandbox, where this
- * server has them; else `none`, shown only for an agent that has none (picking it would leave an agent with
- * no computer). Null: not offered.
+ * workspace's own computer is on its way (the agents with none get it); else `none`, shown only for an agent that
+ * has none (picking it would leave an agent with no computer). Null: not offered.
  */
-export function noComputerChoice(view: SetupView | null, cloudAvailable: boolean, current: boolean): NoComputer | null {
+export function noComputerChoice(view: SetupView | null, current: boolean): NoComputer | null {
   if (setupPending(view)) return "workspace";
-  if (cloudAvailable) return "cloud";
   return current ? "none" : null;
 }

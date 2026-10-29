@@ -194,15 +194,15 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "git.push_refused")));
     expect(refused).toBeTruthy();
 
-    // A cloud-computer credential naming the machine is not one (no such computer).
-    const cloud = issueGitToken(SECRET, {
+    // A token not issued to a machine (no `kind`) is refused.
+    const noKind = issueGitToken(SECRET, {
       orgId: f.org.id,
       agentId: f.agent.id,
       sandboxId: w.paired.machineId,
       gen: claims?.gen ?? 0,
       exp: Math.floor(Date.now() / 1000) + 600,
     });
-    expect((await call("acme/app.git/info/refs", cloud, { query: "?service=git-upload-pack" })).status).toBe(401);
+    expect((await call("acme/app.git/info/refs", noKind, { query: "?service=git-upload-pack" })).status).toBe(401);
 
     // The agent moved off the machine: revoked at once; back on it, it works again; the machine deleted: revoked.
     const deps = { db: f.db, pubsub: f.pubsub, publicUrl: PUBLIC_URL };

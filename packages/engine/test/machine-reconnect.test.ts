@@ -77,7 +77,7 @@ describe("reconnecting a computer", () => {
     f = await setup();
     const paired = await pairedWithAgent();
     await deleteMachine(deps(), f.owner.id, f.org.id, paired.machineId);
-    expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "cloud" });
+    expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "none" });
     expect((await machineRow(paired.machineId)).previousAgentIds).toEqual([f.agent.id]);
 
     const s = await start(paired.machineId);
@@ -177,9 +177,9 @@ describe("reconnecting a computer", () => {
     const junk = await start("not-a-uuid");
     expect((await confirmDeviceCode(deps(), f.owner.id, f.org.id, junk.userCode, {})).id).not.toBe(paired.machineId);
 
-    // The removed Mac is still removed, @dev still on the cloud.
+    // The removed Mac is still removed, @dev still with no computer.
     expect((await machineRow(paired.machineId)).deletedAt).not.toBeNull();
-    expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "cloud" });
+    expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "none" });
   });
 
   test("the person who paired it may reconnect it without being an admin", async () => {

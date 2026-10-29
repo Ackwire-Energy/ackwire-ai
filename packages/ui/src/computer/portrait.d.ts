@@ -1,6 +1,6 @@
 /** Types for portrait.js (plain JavaScript so plain HTML pages can import it as is). */
 
-export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
+export type ComputerKind = "mac" | "windows" | "linux";
 export type ComputerState = "online" | "paused" | "offline";
 
 /** The 2D context subset the portraits draw with. */
