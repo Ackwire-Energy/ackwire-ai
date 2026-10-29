@@ -3187,37 +3187,6 @@ p {
   }
 }
 
-/* The agent's PC: busy chip, step line, inline error. */
-.computer-progress {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-}
-/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
-.computer-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--ink);
-}
-.computer-error .ac-icon {
-  color: var(--ink-muted);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .computer-chip {
-    animation: computer-chip-in 200ms ease-out;
-  }
-}
-@keyframes computer-chip-in {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /*
  * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
@@ -6462,7 +6431,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the workspace's own computer, the other computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -6571,14 +6540,6 @@ a.machine-row__name:hover {
 }
 .suspended-page__others > h2 {
   flex-basis: 100%;
-}
-.computers-note {
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
-  color: var(--ink-muted);
 }
 .computers-empty {
   display: flex;
@@ -6765,11 +6726,6 @@ a.machine-row__name:hover {
 /* Agent page: which computer. */
 .computer-machine__name {
   font-weight: 600;
-}
-.computer-target__connect {
-  color: var(--ink-muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 /* ---------- Onboarding ----------
@@ -7186,6 +7142,11 @@ a.machine-row__name:hover {
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
+}
+/* Its margin is for the new-agent steps, which have no gap; in a stack spaced by its gap (the agent page's columns,
+   a dialog's body) that gap is its space, as it is the cards' beside it. */
+:is(.agp-col, .ac-dialog__body) > .newag__note {
+  margin: 0;
 }
 .newag__note b {
   color: var(--ink);

@@ -16,9 +16,9 @@ const { artifactUploads, artifacts, artifactVersions } = schema;
 /**
  * Uploads from an agent's computer to the Drive (`upload_file`, ADR 0025).
  * A pending row is bound to the org, agent, run and computer; the bytes
- * arrive either pushed by the machine (`receiveMachineUpload`, from
- * `PUT /api/machines/uploads/{id}`) or read by the server itself, and both
- * end in `completeUpload`. The tool waits with `waitForUpload`.
+ * arrive pushed by the machine (`receiveMachineUpload`, from
+ * `PUT /api/machines/uploads/{id}`), which ends in `completeUpload`. The tool
+ * waits with `waitForUpload`.
  */
 export type UploadRow = typeof artifactUploads.$inferSelect;
 
@@ -46,9 +46,9 @@ export async function createUpload(
     /** The run's channel and thread: completion acts as the agent there. */
     channelId: string;
     threadId?: string | null;
-    /** `daytona:<sandbox row id>` or `machine:<machine id>`. */
+    /** `machine:<machine id>`. */
     computer: string;
-    /** Connected machines: only this one may complete it. */
+    /** Only this machine may complete it. */
     machineId?: string | null;
     path: string;
     title?: string | null;
@@ -208,7 +208,7 @@ export async function completeUpload(
 /**
  * What `PUT /api/machines/uploads/{uploadId}` does once the machine token
  * is checked: the bytes a connected machine pushed, for an upload made for
- * that machine (an upload read by the server can't be completed this way).
+ * that machine.
  */
 export async function receiveMachineUpload(
   deps: UploadDeps,

@@ -1,6 +1,6 @@
 # 0021. One computer per agent: Daytona behind a provider interface
 
-- Status: Accepted
+- Status: Superseded by ADR 0077 (2026-10-28), except **Tools** and **Skill scripts**, which stay on connected computers
 - Date: 2026-10-14
 
 ## Decision

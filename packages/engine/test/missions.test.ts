@@ -878,10 +878,9 @@ describe("missions (ADR 0029)", () => {
     await expect(requestToJoin(md(), zed.id, f.org.id, view.id)).rejects.toMatchObject({ code: "mission.not_found" });
   });
 
-  test("eligible agents: every agent, with a reason when it can't (no computer, cloud, commands off, old runner, audience); offline still eligible", async () => {
+  test("eligible agents: every agent, with a reason when it can't (no computer, commands off, old runner, audience); offline still eligible", async () => {
     f = await setup({ machines: true, missionTools: true });
-    const elig = (userId = f.owner.id, opts: { cloud?: boolean } = {}) =>
-      eligibleMissionAgents(md(), userId, f.org.id, opts);
+    const elig = (userId = f.owner.id) => eligibleMissionAgents(md(), userId, f.org.id);
     expect(await elig()).toEqual([
       {
         agentId: f.agent.id,
@@ -898,8 +897,6 @@ describe("missions (ADR 0029)", () => {
         commandApproval: "low_risk_auto",
       },
     ]);
-    // The server has cloud computers: missions there come later.
-    expect((await elig(f.owner.id, { cloud: true }))[0]?.reason).toBe("cloud_computer");
     const paired = await pairedMachine();
     const runner = missionRunner(f.machineHub as MachineHub);
     await runner.hello(paired.token);
@@ -933,11 +930,11 @@ describe("missions (ADR 0029)", () => {
       ["Ada", true, "MacBook"],
       ["Dev", true, "MacBook"],
     ]);
-    // Ada back on the cloud computer: listed after the eligible ones.
+    // Ada with no computer: listed after the eligible ones.
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, ada.id, null);
-    expect((await elig(f.owner.id, { cloud: true })).map((a) => [a.name, a.reason])).toEqual([
+    expect((await elig()).map((a) => [a.name, a.reason])).toEqual([
       ["Dev", null],
-      ["Ada", "cloud_computer"],
+      ["Ada", "no_computer"],
     ]);
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     expect((await elig(bia.id)).find((a) => a.agentId === f.agent.id)).toMatchObject({

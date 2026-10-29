@@ -165,7 +165,7 @@ export const machines = pgTable(
     resumeTasks: boolean().notNull().default(true),
     /**
      * Agents that used this computer when it was removed (set by the removal,
-     * which points them back to the cloud). Reconnecting the same computer
+     * which leaves them with no computer). Reconnecting the same computer
      * gives it back to those that still have none, then clears this.
      */
     previousAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),

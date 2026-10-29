@@ -1163,7 +1163,7 @@ export interface UsageReport {
   defaultAgentBudgetUsd: number;
   totalUsd: number;
   byKind: {
-    kind: "agent" | "router" | "embedding" | "summary" | "sandbox";
+    kind: "agent" | "router" | "embedding" | "summary";
     calls: number;
     partialCalls: number;
     inputTokens: number;
@@ -1515,7 +1515,7 @@ export interface SecretRequest {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site?: string | null;
-  /** null = the agent's cloud computer. */
+  /** The connected machine that holds it. */
   machineId: string | null;
   /** The computer's key for this request; null once it is closed. */
   publicKey: string | null;
@@ -2222,51 +2222,27 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
 }
 
-// ── PC do agente (sandbox): apps/server/src/routes/app/sandboxes.ts; `…/agents/{id}/computer` expected ──
-
-export type SandboxNetwork = "blocked" | "allowlist" | "open";
+// ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──
 
 export interface SandboxSettings {
-  /** A sandbox provider is configured on this server. */
-  available: boolean;
   enabled: boolean;
-  /** Domains the PCs may reach (`*.` wildcards), used when `network` is `allowlist`. */
-  allowDomains: string[];
-  /** No internet, only the listed domains, or open internet. Absent (older servers): follows the list. */
-  network?: SandboxNetwork;
-  /** After a save: running PCs got it now (`live`) or get it when they next start (`next_start`). */
-  networkApply?: "live" | "next_start";
   execTimeoutSeconds: number;
   maxTimeoutSeconds: number;
-  /** Minutes of PC time per day for the whole workspace. */
-  dailyMinutes: number;
   /** Ask a person before running code. */
   requireApproval: boolean;
 }
 
-export type SandboxSettingsInput = Partial<
-  Pick<
-    SandboxSettings,
-    "enabled" | "allowDomains" | "network" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
-  >
->;
+export type SandboxSettingsInput = Partial<Pick<SandboxSettings, "enabled" | "execTimeoutSeconds" | "requireApproval">>;
 
-/** `GET …/agents/{id}/computer`: the agent's own PC. */
+/** `GET …/agents/{id}/computer`: which computer the agent uses (ADR 0025). */
 export interface AgentComputer {
-  status: "running" | "stopped" | "archived" | "none";
-  diskUsedGib: number;
-  createdAt: string | null;
-  lastUsedAt: string | null;
-  /** `provider-default` when the provider can't apply our domain list (plan limitation). */
-  network?: "blocked" | "allowlist" | "open" | "provider-default";
-  /** Which computer the agent uses (ADR 0025). Absent on older servers: the cloud one. */
-  target?: ComputerTarget;
+  target: ComputerTarget;
 }
 
 // ── Connected computers (ADR 0025; apps/server/src/routes/machines.ts) ──────
 
-/** The agent's cloud computer, or a machine someone connected with the runner. */
-export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: string; name: string; online: boolean };
+/** No computer, or a machine someone connected with the runner. */
+export type ComputerTarget = { kind: "none" } | { kind: "machine"; machineId: string; name: string; online: boolean };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -2457,22 +2433,19 @@ export interface MachineOutage {
   waitingRuns: number;
 }
 
-/** Where waiting agents may move: another connected machine, or the cloud computer. */
-export type OutageTarget =
-  | {
-      kind: "machine";
-      machineId: string;
-      name: string;
-      platform: string;
-      /** The workspace's own computer (ADR 0056 §10). */
-      managed?: boolean;
-      online: boolean;
-      brains: ComputerBrain[];
-      /** Why it can't take them now, or null. */
-      reasonOff: "offline" | "paused" | null;
-    }
-  /** The cloud computer: runs only the brains listed (none of the computer brains today). */
-  | { kind: "cloud"; available: boolean; brains: ComputerBrain[] };
+/** Where waiting agents may move: another connected machine. */
+export type OutageTarget = {
+  kind: "machine";
+  machineId: string;
+  name: string;
+  platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
+  online: boolean;
+  brains: ComputerBrain[];
+  /** Why it can't take them now, or null. */
+  reasonOff: "offline" | "paused" | null;
+};
 
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
@@ -2483,7 +2456,7 @@ export interface MachineOutages {
 /** `POST …/machines/{machineId}/move-agents`. */
 export interface MoveAgentsInput {
   agentIds: string[];
-  target: { kind: "machine"; machineId: string } | { kind: "cloud" };
+  target: { kind: "machine"; machineId: string };
 }
 
 export interface MoveAgentsResult {
@@ -3403,13 +3376,8 @@ export interface MissionJoinRequest {
   createdAt: string;
 }
 
-/** Why an agent can't run a mission for you (`cloud_computer`: missions on cloud computers come later). */
-export type MissionIneligibleReason =
-  | "no_computer"
-  | "cloud_computer"
-  | "exec_off"
-  | "runner_outdated"
-  | "not_in_audience";
+/** Why an agent can't run a mission for you. */
+export type MissionIneligibleReason = "no_computer" | "exec_off" | "runner_outdated" | "not_in_audience";
 
 /** An agent for "Nova missão": whether it can run a mission for you, and why not. */
 export interface MissionEligibleAgent {

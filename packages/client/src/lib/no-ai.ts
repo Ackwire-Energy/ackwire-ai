@@ -92,7 +92,7 @@ export type PlanGate =
   /** The Cloud's computer on its way; `view` null: it said ready and the agent gets it on the next refresh. */
   | { state: "preparing"; view: SetupView | null }
   | { state: "offline" }
-  /** Self-host with no computer for the agent (none connected, or a Daytona sandbox). */
+  /** Self-host with no computer for the agent (none connected). */
   | { state: "missing" }
   | { state: "unsupported"; reason: BrainUnavailable | "keys" }
   /** `owner`: the viewer doesn't own the agent; `computer`: only whoever connected it adds a sign-in there. */

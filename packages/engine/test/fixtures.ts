@@ -8,7 +8,6 @@ import {
   noPlatformCredentials,
   type PlatformCredentials,
   type RealtimeEvent,
-  type SandboxProvider,
 } from "@agenteschat/adapters";
 import { type Database, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -149,9 +148,7 @@ export async function setup(
     scheduleTools?: boolean;
     /** Add the wiki tools (search_wiki, read_wiki_page, create_wiki_page…). */
     wikiTools?: boolean;
-    /** Add the sandbox tools with this (fake) provider. */
-    sandbox?: SandboxProvider;
-    /** Add the sandbox tools with connected machines (a machine hub on this db; with or without `sandbox`). */
+    /** Add the sandbox tools with connected machines (a machine hub on this db). */
     machines?: boolean;
     /** With `machines`: the mission tools (propose_mission and, in a mission thread, its tools). The hub's mission hooks are always set. */
     missionTools?: boolean;
@@ -238,18 +235,9 @@ export async function setup(
   };
   const artifactDeps: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub };
   const machineHub = options.machines ? createMachineHub({ db, pubsub, replicaId: "replica-a" }) : null;
-  const sandboxDeps: SandboxDeps | null =
-    options.sandbox || machineHub
-      ? {
-          db,
-          provider: options.sandbox ?? null,
-          machines: machineHub ? { hub: machineHub } : null,
-          pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
-          autoStopMinutes: 10,
-          archiveAfterDays: 7,
-          ...(machineHub ? { publicUrl: "http://localhost:3000" } : {}),
-        }
-      : null;
+  const sandboxDeps: SandboxDeps | null = machineHub
+    ? { db, machines: { hub: machineHub }, publicUrl: "http://localhost:3000" }
+    : null;
   const missionDeps = {
     pubsub,
     hub: machineHub,

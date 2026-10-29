@@ -209,7 +209,7 @@ describe("import", () => {
       ["build.py", "script"],
       ["templates/relatorio.md", "stored"],
     ]);
-    // Scripts are kept for the sandbox (never shown to the model).
+    // Scripts are kept for the agent's computer (never shown to the model).
     expect(fetched.some((u) => u.endsWith("build.py"))).toBe(true);
 
     await expect(importSkillFromUrl(deps, f.owner.id, f.org.id, "https://example.com/SKILL.md")).rejects.toThrow(

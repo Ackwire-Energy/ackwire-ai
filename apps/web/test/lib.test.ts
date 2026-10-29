@@ -41,6 +41,9 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
     expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
+    // A real spend too small for 4 decimals (a few thousand tokens of a cheap model) never reads as zero.
+    expect(formatUsd(t, "pt-BR", 0.00003)).toBe("<US$ 0,0001");
+    expect(formatUsd(t, "pt-BR", 0.00005)).toBe("US$ 0,0001");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.

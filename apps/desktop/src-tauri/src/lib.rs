@@ -547,21 +547,6 @@ fn migrate_login_item(app: &AppHandle) {
     let _ = app;
 }
 
-/// The servers at start: as they were, or (the first start of an app that keeps a list) from the menu bar
-/// app's homes, whose Cloud ones retire before any runner starts (`runners::migrate`).
-fn starting_servers(app: &AppHandle) -> servers::ServerFile {
-    if let Some(file) = servers::read(app) {
-        return file;
-    }
-    let moved = runners::migrate(app);
-    let mut list = moved.servers;
-    if !moved.retire.is_empty() {
-        list.push(servers::CLOUD.to_string());
-        menus::retired_cloud_homes(app, moved.retired.unwrap_or_else(|| "~/agentes".into()));
-    }
-    servers::ServerFile { current: list.first().cloned(), servers: list }
-}
-
 pub fn run() {
     let builder = tauri::Builder::default()
         // First: a second launch brings the running app's window back; one carrying a link (Windows,
@@ -719,8 +704,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let handle = app.handle().clone();
-            // Before the tray (it lists them) and before any runner (Cloud homes retire first).
-            servers::load(&handle, starting_servers(&handle));
+            // Before the tray (it lists them).
+            servers::load(&handle);
             tray::create(&handle)?;
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.

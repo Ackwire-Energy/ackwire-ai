@@ -130,7 +130,7 @@ async function scene() {
   const routineRun = await waitingRun(f.agent.id, air, { routine: true });
   const editedRun = await waitingRun(f.agent.id, air, { executed: ["Edit"] });
   const qaRun = await waitingRun(qa.id, air, { kind: "codex" });
-  const outageDeps: OutageDeps = { db: f.db, pubsub: f.pubsub, cloudAvailable: false };
+  const outageDeps: OutageDeps = { db: f.db, pubsub: f.pubsub };
   return { air, pro, pc, bia, qa, api, routineRun, editedRun, qaRun, outageDeps };
 }
 
@@ -171,10 +171,7 @@ test("outages: offline computers with computer-brain agents, waiting routines vs
       brains: ["claude_code"],
       reasonOff: "offline",
     },
-    { kind: "cloud", available: false, brains: [] },
   ]);
-  const withCloud = await listMachineOutages({ ...s.outageDeps, cloudAvailable: true }, f.owner.id, f.org.id);
-  expect(withCloud.targets.at(-1)).toEqual({ kind: "cloud", available: true, brains: [] });
 });
 
 test("outages: the workspace's own computer is marked managed, its system never said", async () => {
@@ -258,7 +255,7 @@ test("move: re-points agents that the target can run, resumes runs without execu
   ]);
 });
 
-test("move: offline, unknown or same target is a conflict; the cloud can't run computer brains; members move only their own", async () => {
+test("move: offline, unknown or same target is a conflict; members move only their own", async () => {
   const s = await scene();
   const move = (actorId: string, agentIds: string[], target: Parameters<typeof moveAgentsFromMachine>[4]["target"]) =>
     moveAgentsFromMachine(s.outageDeps, actorId, f.org.id, s.air, { agentIds, target });
@@ -276,18 +273,6 @@ test("move: offline, unknown or same target is a conflict; the cloud can't run c
     "machine.target_not_found",
   );
   await conflict(move(f.owner.id, [f.agent.id], { kind: "machine", machineId: s.air }), "machine.target_same");
-  await conflict(move(f.owner.id, [f.agent.id], { kind: "cloud" }), "machine.target_cloud_unavailable");
-
-  const cloud = await moveAgentsFromMachine({ ...s.outageDeps, cloudAvailable: true }, f.owner.id, f.org.id, s.air, {
-    agentIds: [f.agent.id],
-    target: { kind: "cloud" },
-  });
-  expect(cloud).toEqual({
-    moved: [],
-    skipped: [{ agentId: f.agent.id, reason: "brain_unavailable" }],
-    resumed: 0,
-    stillWaiting: 0,
-  });
 
   // Bia owns QA but not Dev; an agent unrelated to the computer is not found there.
   const byBia = await move(s.bia.id, [f.agent.id, s.qa.id, crypto.randomUUID()], {
@@ -362,7 +347,7 @@ test("end to end: the waiting note names the computer and the agent; after the m
 
   const pro = await pair("MacBook Pro", true);
   onlineIds.add(pro);
-  const result = await moveAgentsFromMachine({ ...deps, cloudAvailable: false }, f.owner.id, f.org.id, air, {
+  const result = await moveAgentsFromMachine(deps, f.owner.id, f.org.id, air, {
     agentIds: [f.agent.id],
     target: { kind: "machine", machineId: pro },
   });

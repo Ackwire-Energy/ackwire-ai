@@ -193,7 +193,7 @@ test("Windows and Linux: each platform's own files, from the newest release that
   expect(await update("target=darwin&arch=aarch64&current=0.2.0")).toBe(204);
 });
 
-test("apps that check agentes.chat, the Cloud's old address, get links there; others get PUBLIC_URL's", async () => {
+test("download links are on PUBLIC_URL, whatever address the request came in on", async () => {
   const signed = release("0.6.0", {
     assets: [
       asset("agentes_0.6.0_universal.dmg"),
@@ -211,15 +211,12 @@ test("apps that check agentes.chat, the Cloud's old address, get links there; ot
     const update = await server().app.request(`${site}/api/desktop/update?target=darwin&arch=aarch64&current=0.5.5`);
     return [((await latest.json()) as { url: string }).url, ((await update.json()) as { url: string }).url];
   };
-  // Apps up to 0.5.5 take only links on agentes.chat, whose /api still reaches the app.
-  expect(await links("https://agentes.chat")).toEqual([
-    "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg",
-    "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.app.tar.gz",
-  ]);
-  expect(await links("https://app.agentes.chat")).toEqual([
+  const onPublicUrl = [
     "https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg",
     "https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.app.tar.gz",
-  ]);
+  ];
+  expect(await links("https://agentes.chat")).toEqual(onPublicUrl);
+  expect(await links("https://app.agentes.chat")).toEqual(onPublicUrl);
 });
 
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {
