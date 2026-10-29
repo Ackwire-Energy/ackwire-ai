@@ -108,9 +108,16 @@ describe("saving", () => {
     );
     // Members read it.
     expect(await getAgentRepositories(f.db, member.id, f.org.id, f.agent.id)).toEqual(["acme/app", "walt/notes"]);
-    // The agent's owner (not an admin) changes it.
+    // The agent's owner (not an admin) only narrows it: more repositories, or every one (empty), is an admin's call.
     await f.db.update(schema.agents).set({ ownerUserId: member.id }).where(eq(schema.agents.id, f.agent.id));
-    expect(await setAgentRepositories(f.db, member.id, f.org.id, f.agent.id, [])).toEqual([]);
+    for (const wider of [[], ["acme/app", "acme/infra"], ["acme/*"]]) {
+      await expect(setAgentRepositories(f.db, member.id, f.org.id, f.agent.id, wider)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+    }
+    expect(await setAgentRepositories(f.db, member.id, f.org.id, f.agent.id, ["ACME/app"])).toEqual(["ACME/app"]);
+    // An admin widens it again.
+    expect(await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, [])).toEqual([]);
     const audits = await f.db
       .select()
       .from(schema.auditLog)
@@ -118,6 +125,7 @@ describe("saving", () => {
     expect(audits.map((a) => a.details)).toEqual([
       { repositories: ["walt/notes", "acme/app"] },
       { repositories: ["acme/app", "walt/notes"] },
+      { repositories: ["ACME/app"] },
       { repositories: [] },
     ]);
   });

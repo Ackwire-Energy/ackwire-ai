@@ -109,6 +109,39 @@ test.skipIf(!posix || !hasGit)(
 );
 
 test.skipIf(!posix || !hasGit)(
+  "the runner's git runs no hook of the repository and refuses config that names a program",
+  async () => {
+    const { ws, folder, repo } = await project();
+    // A hook left in the repository (made while commands were on): `worktree add` would run post-checkout.
+    const marker = path.join(ws, "hook-ran");
+    const hook = path.join(repo, ".git", "hooks", "post-checkout");
+    writeFileSync(hook, `#!/bin/sh\ntouch '${marker}'\n`);
+    chmodSync(hook, 0o755);
+    run(repo, "config", "core.hooksPath", ".git/hooks");
+    expect((await ensure(folder)).created).toBe(true);
+    expect(existsSync(marker)).toBe(false);
+
+    // Config that can run a program (here a filter driver `.gitattributes` would use): refused, nothing runs.
+    run(repo, "config", "filter.evil.clean", `touch '${marker}'`);
+    let message = "";
+    try {
+      await ensure(folder, { path: ".worktrees/m-000000cc", branch: "agentes/000000cc/x" });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain("filter.evil.clean");
+    expect(existsSync(path.join(folder, ".worktrees", "m-000000cc"))).toBe(false);
+    // An include (whatever it holds) is refused as such.
+    run(repo, "config", "--unset", "filter.evil.clean");
+    run(repo, "config", "include.path", "../extra.config");
+    expect(
+      await errorCode(() => ensure(folder, { path: ".worktrees/m-000000cc", branch: "agentes/000000cc/x" })),
+    ).toBe("bad_request");
+    expect(existsSync(marker)).toBe(false);
+  },
+);
+
+test.skipIf(!posix || !hasGit)(
   "agentes.json replaces the copy list and the setup; bad shapes and paths out of the repository are ignored",
   async () => {
     const { folder, repo } = await project();

@@ -29,6 +29,8 @@ export interface StreamInput {
   orgId: string;
   agentId: string;
   request: StreamRequest;
+  /** The person's session behind the viewer socket: the recheck ends the stream once it is gone. */
+  sessionId?: string;
 }
 
 /**
@@ -275,6 +277,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
         orgId: input.orgId,
         agentId: input.agentId,
         request: input.request,
+        sessionId: input.sessionId,
         id: randomBytes(32).toString("base64url"),
         viewer,
         machineId: null,

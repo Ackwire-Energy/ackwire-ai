@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { webUrl } from "@agenteschat/client/lib/guards";
 import { isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -427,7 +428,11 @@ function Linked({ issue: i }: { issue: Issue }) {
       key: `pr:${pr.number}`,
       icon: "code",
       label: t("issues.pr", { number: pr.number }),
-      onPress: () => void Linking.openURL(pr.url).catch(() => undefined),
+      onPress: () => {
+        // Only a web address opens; anything else the issue holds stays inert.
+        const url = webUrl(pr.url);
+        if (url) void Linking.openURL(url).catch(() => undefined);
+      },
     });
   if (rows.length === 0) return null;
   return (

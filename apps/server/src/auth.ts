@@ -1,5 +1,5 @@
 import { randomBytes, sign as signWithKey } from "node:crypto";
-import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
+import type { HumanAction, HumanCheck, PubSub, RateLimiter } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import {
@@ -51,6 +51,8 @@ export function createAuth(deps: {
   rateLimiter: RateLimiter;
   /** The bot check of the email forms (ADR 0075); absent: none. */
   humanCheck?: HumanCheck | null;
+  /** Where an ended session is announced so its sockets close (`sessionTopic`); absent: their periodic check only. */
+  pubsub?: PubSub;
 }) {
   const { db, config, log, rateLimiter } = deps;
   const emailEnabled = deps.emailDelivers === true;
@@ -78,6 +80,7 @@ export function createAuth(deps: {
   // The phone app (ADR 0035); Expo Go and dev builds use `exp://` outside production.
   const appOrigins = [APP_SCHEME, ...(config.NODE_ENV !== "production" ? ["exp://", "exp://**"] : [])];
   const apple = appleSignIn(config);
+  const authorizations = socialAuthorizations(config, apple?.clientId ?? null);
 
   return betterAuth({
     appName: "agentes.chat",
@@ -195,8 +198,8 @@ export function createAuth(deps: {
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 15 * 60, max: 10 },
         "/request-password-reset": { window: 15 * 60, max: 3 },
-        // The app's window asks every 2 s while the browser signs in.
-        "/desktop/redeem": { window: 60, max: 40 },
+        // The app's window redeems once per code the browser hands it (no polling, ADR 0036).
+        "/desktop/redeem": { window: 60, max: 10 },
         "/desktop/handoff": { window: 60, max: 10 },
         "/owner-claim": { window: 60, max: 10 },
         "/owner-key": { window: 60, max: 10 },
@@ -209,6 +212,14 @@ export function createAuth(deps: {
       // Checked before the endpoint runs so the person sees the real reason.
       // The database hook below also guards social sign-in.
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === EXPO_PROXY_PATH) {
+          const target =
+            (ctx.query as { authorizationURL?: unknown } | undefined)?.authorizationURL ??
+            (ctx.request ? new URL(ctx.request.url).searchParams.get("authorizationURL") : undefined);
+          if (!expoProxyAllowed(target, authorizations, ctx.context.baseURL)) {
+            throw new APIError("BAD_REQUEST", { message: "Invalid authorizationURL" });
+          }
+        }
         const action = HUMAN_ACTIONS[ctx.path];
         // Before the sign-up policy: a bot gets the cheap refusal first.
         if (action && ctx.headers) {
@@ -272,6 +283,15 @@ export function createAuth(deps: {
             );
           },
         },
+        // Signing out, "sign out everywhere", a password reset and a deleted user all end here, one row at a
+        // time: the sockets opened with that session close now, on every replica (`realtime/session-watch.ts`).
+        delete: {
+          after: async (session) => {
+            await deps.pubsub
+              ?.publish(sessionTopic(session.userId), { type: SESSION_ENDED, sessionId: session.id })
+              .catch((error) => log.warn("session end not announced", { error: String(error) }));
+          },
+        },
       },
     },
   });
@@ -285,6 +305,75 @@ export type SessionUser = { id: string; name: string; email: string; image?: str
 export async function sessionUser(auth: Auth, headers: Headers): Promise<SessionUser | null> {
   const session = await auth.api.getSession({ headers });
   return session ? (session.user as SessionUser) : null;
+}
+
+/**
+ * The person and their session behind a socket's upgrade. Read from the database, never the signed cookie
+ * cache: a session ended minutes ago must not open a socket that outlives it.
+ */
+export async function socketSession(
+  auth: Auth,
+  headers: Headers,
+): Promise<{ user: SessionUser; sessionId: string } | null> {
+  const found = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
+  return found ? { user: found.user as SessionUser, sessionId: found.session.id } : null;
+}
+
+/** Server-side: one person's sessions that ended (`SESSION_ENDED`, with its id). Never forwarded to clients. */
+export const sessionTopic = (userId: string) => `session:${userId}`;
+export const SESSION_ENDED = "session.ended";
+
+/**
+ * The Expo plugin's `/expo-authorization-proxy` (the phone app's social sign-in, ADR 0035) redirects to any
+ * https address and signs that address's `state` into the visitor's state cookie: an open redirect, and a way
+ * to plant someone else's sign-in on a victim. It only goes on to a configured provider's own authorization
+ * endpoint, for our client id and our callback, so the provider sends the person nowhere but back here.
+ */
+const EXPO_PROXY_PATH = "/expo-authorization-proxy";
+
+export interface SocialAuthorization {
+  id: string;
+  /** Better Auth's authorization endpoint for the provider (origin + path). */
+  endpoint: string;
+  clientId: string;
+}
+
+function socialAuthorizations(config: Config, appleClientId: string | null): SocialAuthorization[] {
+  const list: SocialAuthorization[] = [];
+  if (config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET) {
+    const endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+    list.push({ id: "google", endpoint, clientId: config.GOOGLE_CLIENT_ID });
+  }
+  if (config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) {
+    const endpoint = "https://github.com/login/oauth/authorize";
+    list.push({ id: "github", endpoint, clientId: config.GITHUB_CLIENT_ID });
+  }
+  if (appleClientId) {
+    list.push({ id: "apple", endpoint: "https://appleid.apple.com/auth/authorize", clientId: appleClientId });
+  }
+  return list;
+}
+
+/** Whether the proxy may go on to `target` (`EXPO_PROXY_PATH`). `authBaseURL`: Better Auth's, with its path. */
+export function expoProxyAllowed(target: unknown, allowed: SocialAuthorization[], authBaseURL: string): boolean {
+  if (typeof target !== "string" || target.includes("#")) return false;
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  const one = (name: string) => {
+    const values = url.searchParams.getAll(name);
+    return values.length === 1 ? values[0] : null;
+  };
+  const endpoint = `${url.origin}${url.pathname}`;
+  const base = authBaseURL.replace(/\/$/, "");
+  return allowed.some(
+    (p) =>
+      p.endpoint === endpoint && one("client_id") === p.clientId && one("redirect_uri") === `${base}/callback/${p.id}`,
+  );
 }
 
 /** Better Auth's paths that a bot check guards (ADR 0075), with the action their widget runs. */

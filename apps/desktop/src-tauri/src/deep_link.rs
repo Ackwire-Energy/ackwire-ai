@@ -2,7 +2,9 @@
 //! with the server in large type, and nothing changes before the person confirms there. Rust keeps only the
 //! newest link until the window takes it (`link_take`), and passes nothing it didn't check is one of ours.
 //! A connector's sign-in that the browser hands back (`agenteschat://desktop/connectors/oauth`) goes to the
-//! main window instead, which finishes it with its own session.
+//! main window instead, which finishes it with its own session. So does the window's own Google/GitHub/Apple
+//! sign-in (`agenteschat://desktop/sign-in?code=`, ADR 0036): the browser's one-time code reaches only the app on
+//! this computer, whose window redeems it with the verifier it kept.
 //! On macOS a link reaches the running app as an event; on Windows and Linux as a second launch, which the
 //! single-instance plugin hands to the deep-link plugin.
 
@@ -11,7 +13,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_deep_link::DeepLinkExt;
 
-const SCHEME: &str = "agenteschat";
+pub const SCHEME: &str = "agenteschat";
 /// A connect link is short (a server and a token or a claim); anything longer isn't one.
 const MAX_LINK: usize = 2048;
 
@@ -45,11 +47,31 @@ pub fn connector_page(url: &Url, site: &Url) -> Option<Url> {
     Some(page)
 }
 
+/// The browser's sign-in for the window (apps/server desktop-sign-in.ts `desktop/handoff`).
+fn is_sign_in_return(url: &Url) -> bool {
+    url.host_str() == Some("desktop") && url.path() == "/sign-in"
+}
+
+/// The page of `site` that redeems it (apps/web desktop.signed-in.tsx), with only the code.
+pub fn sign_in_page(url: &Url, site: &Url) -> Option<Url> {
+    if !is_sign_in_return(url) {
+        return None;
+    }
+    let code = url.query_pairs().find(|(key, _)| &**key == "code").map(|(_, value)| value.into_owned())?;
+    let mut page = site.join("/desktop/signed-in").ok()?;
+    page.set_fragment(None);
+    page.set_query(None);
+    page.query_pairs_mut().append_pair("code", &code);
+    Some(page)
+}
+
 fn receive(app: &AppHandle, urls: Vec<Url>) {
     let Some(url) = urls.into_iter().find(accept) else { return };
-    // On the server open now, where the window is signed in: its state is that person's there.
-    if is_connector_return(&url) {
-        if let Some(page) = crate::main_window::site(app).and_then(|site| connector_page(&url, &site)) {
+    // On the server open now, where the window is signed in (or, for its sign-in, kept the verifier).
+    if is_connector_return(&url) || is_sign_in_return(&url) {
+        let page = crate::main_window::site(app)
+            .and_then(|site| connector_page(&url, &site).or_else(|| sign_in_page(&url, &site)));
+        if let Some(page) = page {
             let app = app.clone();
             // Not from inside the link's event: the window may have to be made first.
             std::thread::spawn(move || {
@@ -121,5 +143,18 @@ mod tests {
         assert!(connector_page(&back, &own).unwrap().as_str().starts_with("http://127.0.0.1:4310/desktop/connector?"));
         assert!(connector_page(&"agenteschat://connectors/oauth?state=s&code=c".parse().unwrap(), &site).is_none());
         assert!(connector_page(&"agenteschat://connect?server=x".parse().unwrap(), &site).is_none());
+    }
+
+    #[test]
+    fn the_browser_s_sign_in_goes_to_the_window_with_only_its_code() {
+        let site: Url = "https://app.agentes.chat".parse().unwrap();
+        let back: Url = "agenteschat://desktop/sign-in?code=abc_-1&to=%2Fevil&verifier=x".parse().unwrap();
+        assert_eq!(
+            sign_in_page(&back, &site).unwrap().as_str(),
+            "https://app.agentes.chat/desktop/signed-in?code=abc_-1"
+        );
+        assert!(sign_in_page(&"agenteschat://desktop/sign-in".parse().unwrap(), &site).is_none());
+        assert!(sign_in_page(&"agenteschat://desktop/connectors/oauth?code=c".parse().unwrap(), &site).is_none());
+        assert!(connector_page(&back, &site).is_none());
     }
 }

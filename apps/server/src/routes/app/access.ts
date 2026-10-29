@@ -75,7 +75,7 @@ export function accessRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}/access",
       tags,
       security,
-      summary: "Replace an agent's access (admins or its owner); every change is audited",
+      summary: "Replace an agent's access (admins; its owner may only narrow it); every change is audited",
       request: {
         params: AgentParams,
         body: body(
@@ -126,7 +126,7 @@ export function accessRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}/repositories",
       tags,
       security,
-      summary: "Replace the agent's GitHub repositories (admins or its owner); audited",
+      summary: "Replace the agent's GitHub repositories (admins; its owner may only narrow them); audited",
       request: {
         params: AgentParams,
         body: body(z.object({ repositories: z.array(z.string().max(220)).max(MAX_AGENT_REPOSITORIES) })),

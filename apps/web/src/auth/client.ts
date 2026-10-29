@@ -29,10 +29,13 @@ export interface AuthClient {
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;
-  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (ADR 0036). */
-  desktopHandoff(challenge: string): Promise<AuthResult>;
-  /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
-  desktopRedeem(verifier: string): Promise<boolean>;
+  /**
+   * In the browser, after a fresh sign-in: hands it over for the Mac app's `challenge` (ADR 0036). The one-time
+   * code to give the app on this computer through its own link; null when refused.
+   */
+  desktopHandoff(challenge: string): Promise<string | null>;
+  /** In the Mac app's window: the code its link brought and its own verifier; true once signed in (sets the cookie). */
+  desktopRedeem(code: string, verifier: string): Promise<boolean>;
   /** In the app's window: a one-time sign-in from another device's link, traded once for a session of its own. */
   signInOneTime(token: string): Promise<AuthResult>;
   /** The installation's owner, from the installer's link (`/owner#claim=`): made once, then signed in. */

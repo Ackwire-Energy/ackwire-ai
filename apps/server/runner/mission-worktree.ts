@@ -18,6 +18,7 @@ import type {
   MissionWorktreeRequest,
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
+import { CONFIG_LIST_ARGS, HARDENED_GIT_ARGS, unsafeConfigMessage, unsafeRepoConfig } from "./git-guard";
 import { isInside, normalizeRequestPath, resolveInWorkspace } from "./paths";
 
 /**
@@ -94,6 +95,23 @@ export function git(
   });
 }
 
+/**
+ * The runner's own git in a mission's repository, with `HARDENED_GIT_ARGS` (no hooks, no
+ * fsmonitor: `git-guard.ts`). `git` itself stays as it is for a task's end-of-item commit,
+ * which runs with the "commands" switch and runs the repository's hooks on purpose.
+ */
+const safeGit = (cwd: string, args: string[]) => git(cwd, [...HARDENED_GIT_ARGS, ...args]);
+
+/** Refuses a repository (or worktree) whose own config holds a key that can run a program (`git-guard.ts`). */
+async function refuseUnsafeConfig(dir: string) {
+  const listed = await safeGit(dir, CONFIG_LIST_ARGS);
+  if (listed.code !== 0) {
+    throw new RunnerError("bad_request", gitWhy(listed, "git couldn't read the repository's config"));
+  }
+  const key = unsafeRepoConfig(listed.stdout);
+  if (key) throw new RunnerError("bad_request", unsafeConfigMessage(key));
+}
+
 /** git's last meaningful line, for people. */
 export function gitWhy(run: GitResult, fallback: string) {
   if (run.timedOut) return "git took too long";
@@ -150,7 +168,7 @@ export function setupCommandFor(dir: string, config: ProjectConfig = readProject
 async function checkBranch(cwd: string, branch: unknown): Promise<string> {
   const b = typeof branch === "string" ? branch.trim() : "";
   if (!b || b.length > 200 || b.startsWith("-")) throw new RunnerError("bad_request", `Invalid branch name ${b}`);
-  const r = await git(cwd, ["check-ref-format", "--branch", b]);
+  const r = await safeGit(cwd, ["check-ref-format", "--branch", b]);
   if (r.code !== 0) throw new RunnerError("bad_request", `Invalid branch name ${b}`);
   return b;
 }
@@ -163,7 +181,7 @@ async function checkBranch(cwd: string, branch: unknown): Promise<string> {
 async function repoRoot(folder: string, repo: unknown): Promise<string> {
   const resolved = await resolveInWorkspace(folder, typeof repo === "string" ? repo : "");
   if (!resolved.exists) throw new RunnerError("not_found", `The folder ${String(repo)} doesn't exist`);
-  const top = await git(resolved.abs, ["rev-parse", "--show-toplevel"]);
+  const top = await safeGit(resolved.abs, ["rev-parse", "--show-toplevel"]);
   if (top.code === null && /not installed/.test(top.stderr)) {
     throw new RunnerError("bad_request", "git is not installed on this computer");
   }
@@ -184,6 +202,7 @@ async function repoRoot(folder: string, repo: unknown): Promise<string> {
       `${String(repo) || "The folder"} is inside a git repository that starts outside the agent's folder`,
     );
   }
+  await refuseUnsafeConfig(real);
   return real;
 }
 
@@ -197,13 +216,13 @@ async function worktreeTarget(folder: string, root: string, input: unknown): Pro
 }
 
 const branchExists = async (root: string, branch: string) =>
-  (await git(root, ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
+  (await safeGit(root, ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
 
 /** The branch checked out in `dir` ("" when detached). */
-const currentBranch = async (dir: string) => out(await git(dir, ["symbolic-ref", "--short", "-q", "HEAD"]));
+const currentBranch = async (dir: string) => out(await safeGit(dir, ["symbolic-ref", "--short", "-q", "HEAD"]));
 
 const commonDir = async (dir: string) => {
-  const r = out(await git(dir, ["rev-parse", "--git-common-dir"]));
+  const r = out(await safeGit(dir, ["rev-parse", "--git-common-dir"]));
   try {
     return r ? realpathSync(path.resolve(dir, r)) : "";
   } catch {
@@ -216,7 +235,7 @@ const COPIED_LIST = "agentes-copied";
 
 /** The worktree's own git dir (`.git/worktrees/<name>` for a linked worktree); "" outside git. */
 async function ownGitDir(dir: string) {
-  const r = out(await git(dir, ["rev-parse", "--git-dir"]));
+  const r = out(await safeGit(dir, ["rev-parse", "--git-dir"]));
   return r ? path.resolve(dir, r) : "";
 }
 
@@ -243,9 +262,9 @@ export async function copiedFiles(dir: string): Promise<string[]> {
 export async function commitPathspecs(dir: string): Promise<string[]> {
   const copied = await copiedFiles(dir);
   if (!copied.length) return [];
-  const top = out(await git(dir, ["rev-parse", "--show-toplevel"])) || dir;
+  const top = out(await safeGit(dir, ["rev-parse", "--show-toplevel"])) || dir;
   const ignored = new Set(
-    (await git(top, ["check-ignore", "--", ...copied])).stdout
+    (await safeGit(top, ["check-ignore", "--", ...copied])).stdout
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean),
@@ -285,7 +304,7 @@ async function copyIgnored(root: string, target: string, config: ProjectConfig):
     // By default only what git ignores: an agent's own `git add -A` can't take it either.
     if (wanted.length) {
       const ignored = new Set(
-        (await git(root, ["check-ignore", "--", ...wanted])).stdout
+        (await safeGit(root, ["check-ignore", "--", ...wanted])).stdout
           .split("\n")
           .map((l) => l.trim())
           .filter(Boolean),
@@ -302,7 +321,7 @@ async function copyIgnored(root: string, target: string, config: ProjectConfig):
     } catch {
       continue;
     }
-    if (out(await git(root, ["ls-files", "--", rel]))) continue;
+    if (out(await safeGit(root, ["ls-files", "--", rel]))) continue;
     const dest = path.join(target, ...rel.split("/"));
     if (existsSync(dest)) continue;
     try {
@@ -370,7 +389,7 @@ export async function ensureMissionWorktree(
     if (empty) rmdirSync(target);
   }
   if (existsSync(target)) {
-    const top = out(await git(target, ["rev-parse", "--show-toplevel"]));
+    const top = out(await safeGit(target, ["rev-parse", "--show-toplevel"]));
     let topReal = "";
     try {
       topReal = top ? realpathSync(top) : "";
@@ -384,31 +403,33 @@ export async function ensureMissionWorktree(
     }
   } else if (await branchExists(root, branch)) {
     // The folder is gone, the work is not: add it again from the branch.
-    await git(root, ["worktree", "prune"]);
+    await safeGit(root, ["worktree", "prune"]);
     mkdirSync(path.dirname(target), { recursive: true });
-    const add = await git(root, ["worktree", "add", target, branch]);
+    const add = await safeGit(root, ["worktree", "add", target, branch]);
     if (add.code !== 0) throw new RunnerError("bad_request", `git worktree add failed: ${gitWhy(add, "unknown")}`);
     created = true;
   } else if (baseSha) {
     throw new RunnerError("branch_missing", `Neither ${relPath} nor the branch ${branch} exists any more`);
   } else {
-    const head = out(await git(root, ["rev-parse", "--verify", "-q", "HEAD^{commit}"]));
+    const head = out(await safeGit(root, ["rev-parse", "--verify", "-q", "HEAD^{commit}"]));
     if (!head) throw new RunnerError("bad_request", "The repository has no commits yet");
     mkdirSync(path.dirname(target), { recursive: true });
-    const add = await git(root, ["worktree", "add", "-b", branch, target, head]);
+    const add = await safeGit(root, ["worktree", "add", "-b", branch, target, head]);
     if (add.code !== 0) throw new RunnerError("bad_request", `git worktree add failed: ${gitWhy(add, "unknown")}`);
     created = true;
     newBase = head;
   }
 
+  // A worktree may have config of its own (`extensions.worktreeConfig`): the same check before `status`.
+  await refuseUnsafeConfig(target);
   // The project's own file wins from the branch; the person's copy (not committed yet) otherwise.
   const config = existsSync(path.join(target, "agentes.json")) ? readProjectConfig(target) : readProjectConfig(root);
   const copied = created ? await copyIgnored(root, target, config) : [];
   const specs = await commitPathspecs(target);
-  const dirty = out(await git(target, ["status", "--porcelain", ...(specs.length ? ["--", ...specs] : [])])) !== "";
+  const dirty = out(await safeGit(target, ["status", "--porcelain", ...(specs.length ? ["--", ...specs] : [])])) !== "";
   // An existing branch: the base the server gave, else where it left the repository's branch.
   const reportedBase =
-    newBase ?? baseSha ?? (repoBranch ? out(await git(root, ["merge-base", repoBranch, branch])) : "");
+    newBase ?? baseSha ?? (repoBranch ? out(await safeGit(root, ["merge-base", repoBranch, branch])) : "");
   return {
     path: relPath,
     branch,
@@ -430,13 +451,13 @@ export async function removeMissionWorktree(
   const target = await worktreeTarget(folder, root, req.path);
   let removed = false;
   if (existsSync(target)) {
-    const rm = await git(root, ["worktree", "remove", "--force", target]);
+    const rm = await safeGit(root, ["worktree", "remove", "--force", target]);
     if (rm.code !== 0) throw new RunnerError("bad_request", `git worktree remove failed: ${gitWhy(rm, "unknown")}`);
     removed = true;
   }
-  await git(root, ["worktree", "prune"]);
+  await safeGit(root, ["worktree", "prune"]);
   if (req.deleteBranch === true && (await branchExists(root, branch))) {
-    const del = await git(root, ["branch", "-D", branch]);
+    const del = await safeGit(root, ["branch", "-D", branch]);
     if (del.code !== 0) throw new RunnerError("bad_request", `git branch -D failed: ${gitWhy(del, "unknown")}`);
   }
   return { removed };

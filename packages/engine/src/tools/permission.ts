@@ -59,8 +59,8 @@ export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" |
  * `request_permission`: an agent that lacks something a request needs asks
  * for it instead of failing. Always an approval (the existing card, "Esperando
  * você", push); approving turns it on for the agent (a connector: all its
- * tools, sensitive ones still ask every time). Only the agent's owner and
- * admins decide, the same people who change its access. Always listed (an
+ * tools, sensitive ones still ask every time). Only admins decide
+ * (`adminsDecide` in approvals.ts), the same people who give it access. Always listed (an
  * approved card still finds it once nothing is missing), with what is.
  */
 export function createPermissionToolSource(): ToolSource {
@@ -71,7 +71,7 @@ export function createPermissionToolSource(): ToolSource {
       const labels = new Map(missing.map((m) => [m.id, m.label]));
       const tool: ToolDefinition = {
         name: REQUEST_PERMISSION_TOOL,
-        description: `Ask a person to turn on something you don't have yet, when the request needs it: instead of giving up, working around it or telling the person to do it themselves. A card asks the agent's owner or an admin; your turn pauses until they decide. ${
+        description: `Ask a person to turn on something you don't have yet, when the request needs it: instead of giving up, working around it or telling the person to do it themselves. A card asks an admin; your turn pauses until they decide. ${
           missing.length
             ? `Not yet on for you: ${missing.map((m) => `${m.id} (${m.label})`).join("; ")}.`
             : "Everything you can be given is already on."

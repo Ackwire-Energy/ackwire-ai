@@ -5,6 +5,7 @@ import {
   type Presence,
   type PubSub,
   type RateLimiter,
+  STREAM_CLOSE,
   type Unsubscribe,
   userTopic,
 } from "@agenteschat/adapters";
@@ -20,7 +21,7 @@ import {
   requireChannelAccess,
   touchLastSeen,
 } from "@agenteschat/engine";
-import { type Auth, type SessionUser, sessionUser } from "../auth";
+import { type Auth, type SessionUser, socketSession } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
@@ -30,6 +31,7 @@ import {
   parseBrowserClientFrame,
 } from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
+import { createSessionWatch } from "./session-watch";
 import type { StreamSocketData, StreamSockets } from "./streams";
 
 /**
@@ -53,6 +55,9 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  * - Membership changes take effect at once: leaving (or being removed from) a
  *   channel drops that subscription; leaving the organization closes the
  *   socket with code 4403.
+ * - The socket lives only as long as its session: signing out, "sign out
+ *   everywhere" or a password reset closes it with code 4401
+ *   (`session-watch.ts`).
  */
 export interface RealtimeDeps {
   db: Database;
@@ -75,9 +80,11 @@ export interface BrowserSocketData {
   kind: "browser";
   connectionId: string;
   user: SessionUser;
+  /** The session it was opened with: the socket closes when that session ends. */
+  sessionId: string;
   orgId: string;
   subscriptions: Map<string, Unsubscribe>;
-  /** Org and user topic listeners. */
+  /** Org, user and session topic listeners. */
   system: Unsubscribe[];
   /** Channels being authorized right now; a revocation during the check marks them. */
   pending: Map<string, { revoked: boolean }>;
@@ -103,31 +110,34 @@ export type ClientFrame =
 /** How long a typing indicator lasts without a new `typing` frame. */
 export const TYPING_TTL_MS = 5000;
 
+/** Close code of a person's socket whose session ended (signed out, revoked, expired). */
+export const SESSION_ENDED_CLOSE = 4401;
+
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_SUBSCRIPTIONS = 200;
 
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
  * terminal streams): our Origin, or the phone app without one (cross-site
- * WebSocket hijacking); a session from the cookie; membership of `orgId`.
- * The person, or the refusal.
+ * WebSocket hijacking); a session from the cookie, read from the database;
+ * membership of `orgId`. The person and their session, or the refusal.
  */
 export async function personUpgrade(
   deps: Pick<RealtimeDeps, "auth" | "db">,
   origins: Set<string>,
   req: Request,
   orgId: string,
-): Promise<SessionUser | Response> {
+): Promise<{ user: SessionUser; sessionId: string } | Response> {
   if (!requestOriginAllowed(origins, req.headers)) {
     return new Response("Cross-origin WebSocket refused", { status: 403 });
   }
   if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
-  const user = await sessionUser(deps.auth, req.headers);
-  if (!user) return new Response("Sign in to continue", { status: 401 });
-  if (!(await getMembership(deps.db, user.id, orgId))) {
+  const signedIn = await socketSession(deps.auth, req.headers);
+  if (!signedIn) return new Response("Sign in to continue", { status: 401 });
+  if (!(await getMembership(deps.db, signedIn.user.id, orgId))) {
     return new Response("Not a member of this organization", { status: 403 });
   }
-  return user;
+  return signedIn;
 }
 
 export function parseClientFrame(raw: string | Buffer): ClientFrame | null {
@@ -172,6 +182,7 @@ export async function authorizeSubscription(
 
 export function createRealtime(deps: RealtimeDeps) {
   const origins = allowedOrigins(deps.config);
+  const sessions = createSessionWatch({ db: deps.db, pubsub: deps.pubsub, log: deps.log });
   const send = (ws: BrowserSocket, frame: unknown): void => {
     ws.send(JSON.stringify(frame));
   };
@@ -278,12 +289,13 @@ export function createRealtime(deps: RealtimeDeps) {
 
     async upgrade(req: Request, server: Bun.Server<SocketData>): Promise<Response | undefined> {
       const orgId = new URL(req.url).searchParams.get("orgId") ?? "";
-      const user = await personUpgrade(deps, origins, req, orgId);
-      if (user instanceof Response) return user;
+      const signedIn = await personUpgrade(deps, origins, req, orgId);
+      if (signedIn instanceof Response) return signedIn;
       const data: BrowserSocketData = {
         kind: "browser",
         connectionId: crypto.randomUUID(),
-        user,
+        user: signedIn.user,
+        sessionId: signedIn.sessionId,
         orgId,
         subscriptions: new Map(),
         system: [],
@@ -299,7 +311,15 @@ export function createRealtime(deps: RealtimeDeps) {
       idleTimeout: 120,
       async open(socket: Bun.ServerWebSocket<SocketData>) {
         if (isMachine(socket)) return deps.machines?.open(socket);
-        if (isStream(socket)) return deps.streams?.open(socket);
+        if (isStream(socket)) {
+          const data = socket.data;
+          if (data.kind === "stream.viewer") {
+            data.unwatch = sessions.watch(data.input.userId, data.sessionId, () => {
+              if (socket.readyState === 1) socket.close(STREAM_CLOSE.forbidden, "signed_out");
+            });
+          }
+          return deps.streams?.open(socket);
+        }
         const ws = socket as BrowserSocket;
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
@@ -331,6 +351,11 @@ export function createRealtime(deps: RealtimeDeps) {
           }),
           deps.pubsub.subscribe(userTopic(orgId, user.id), (event) => {
             if (ws.readyState === 1) send(ws, { type: "event", scope: "user", event });
+          }),
+          sessions.watch(user.id, ws.data.sessionId, () => {
+            if (ws.readyState !== 1) return;
+            send(ws, { type: "error", code: "session_ended" });
+            ws.close(SESSION_ENDED_CLOSE, "session ended");
           }),
         );
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
@@ -403,7 +428,10 @@ export function createRealtime(deps: RealtimeDeps) {
       },
       async close(socket: Bun.ServerWebSocket<SocketData>, code: number) {
         if (isMachine(socket)) return deps.machines?.close(socket);
-        if (isStream(socket)) return deps.streams?.close(socket, code);
+        if (isStream(socket)) {
+          if (socket.data.kind === "stream.viewer") socket.data.unwatch?.();
+          return deps.streams?.close(socket, code);
+        }
         const ws = socket as BrowserSocket;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();

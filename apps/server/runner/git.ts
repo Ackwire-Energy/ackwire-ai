@@ -13,6 +13,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
+import { CONFIG_LIST_ARGS, HARDENED_GIT_ARGS, unsafeConfigMessage, unsafeRepoConfig } from "./git-guard";
 import { resolveInWorkspace } from "./paths";
 
 /**
@@ -86,13 +87,16 @@ function checkProxy(proxy: GitSyncRequest["proxy"] | undefined) {
   return { base: proxy.base.endsWith("/") ? proxy.base : `${proxy.base}/`, token: proxy.token };
 }
 
-/** Runs git with an argv (no shell), a deadline and the request's cancel. Never throws on git's own failure. */
+/**
+ * Runs git with an argv (no shell), a deadline and the request's cancel, with `HARDENED_GIT_ARGS`
+ * (no hooks, no fsmonitor: `git-guard.ts`). Never throws on git's own failure.
+ */
 function runGit(ctx: GitContext, args: string[], opts: { cwd: string; deadline: number; progress?: boolean }) {
   return new Promise<GitRun>((resolve) => {
     const ms = Math.max(1000, opts.deadline - Date.now());
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(ctx.gitCommand ?? "git", args, {
+      child = spawn(ctx.gitCommand ?? "git", [...HARDENED_GIT_ARGS, ...args], {
         cwd: opts.cwd,
         env: {
           ...process.env,
@@ -191,6 +195,14 @@ async function configure(
     const r = await set(...s);
     if (r.code !== 0) throw new Error(why(r, "git config failed"));
   }
+}
+
+/** Throws (a per-repository failure) when the checkout's own config holds a key that can run a program. */
+async function refuseUnsafeConfig(ctx: GitContext, cwd: string, deadline: number) {
+  const listed = await runGit(ctx, CONFIG_LIST_ARGS, { cwd, deadline });
+  if (listed.code !== 0) throw new Error(why(listed, "git couldn't read the checkout's config"));
+  const key = unsafeRepoConfig(listed.stdout);
+  if (key) throw new Error(unsafeConfigMessage(key));
 }
 
 const trimOut = (r: GitRun) => r.stdout.trim();
@@ -326,6 +338,8 @@ export async function gitSync(ctx: GitContext, req: GitSyncRequest): Promise<Mac
       if (!statSync(target.abs).isDirectory() || !existsSync(path.join(target.abs, ".git"))) {
         throw new Error(`${target.rel} exists and isn't a git checkout`);
       }
+      // An existing checkout's config may have been changed since it was cloned: only safe keys (`git-guard.ts`).
+      await refuseUnsafeConfig(ctx, target.abs, deadline);
       await configure(ctx, target.abs, { url, helper, author }, deadline);
       let warning: string | undefined;
       let failure: string | undefined;

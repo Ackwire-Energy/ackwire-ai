@@ -1,8 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { decideApproval, drainOutbox, listApprovals, missingPermissions, postPersonMessage } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import {
+  approverIds,
+  decideApproval,
+  drainOutbox,
+  ForbiddenError,
+  listApprovals,
+  missingPermissions,
+  postPersonMessage,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -82,4 +90,31 @@ test("refused: nothing is turned on", async () => {
   });
   await drainOutbox(f.db, f.handlers);
   expect(await scopes()).not.toContain("browser:use");
+});
+
+test("only admins decide it: the agent's owner who isn't one can't give the agent more", async () => {
+  f = await setup({ permissionTools: true, reply });
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev open the site",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  expect(approval).toMatchObject({ tool: "request_permission", ownerUserId: bia.id, canDecide: true });
+  // Bia sees it (her agent's) but may not decide it, and isn't asked.
+  const [hers] = await listApprovals(f.db, bia.id, f.org.id, { status: "pending" });
+  expect(hers).toMatchObject({ id: approval?.id, canDecide: false });
+  expect(await approverIds(f.db, { orgId: f.org.id, ownerUserId: bia.id, tool: "request_permission" })).toEqual([
+    f.owner.id,
+  ]);
+  await expect(
+    decideApproval({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, approval?.id ?? "", { decision: "approve" }),
+  ).rejects.toBeInstanceOf(ForbiddenError);
+  expect(await scopes()).not.toContain("browser:use");
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, f.handlers);
+  expect(await scopes()).toContain("browser:use");
 });

@@ -10,6 +10,8 @@ export function createFakeAuth(
     signUp?: AuthResult;
     reset?: AuthResult;
     redeem?: boolean;
+    /** The code `desktopHandoff` gives; null when refused. */
+    handoffCode?: string | null;
     oneTime?: AuthResult;
     claim?: AuthResult;
     verification?: AuthResult;
@@ -49,10 +51,10 @@ export function createFakeAuth(
     },
     desktopHandoff: async (challenge) => {
       calls.push({ method: "desktopHandoff", args: [challenge] });
-      return { ok: true };
+      return options.handoffCode === undefined ? "k".repeat(43) : options.handoffCode;
     },
-    desktopRedeem: async (verifier) => {
-      calls.push({ method: "desktopRedeem", args: [verifier] });
+    desktopRedeem: async (code, verifier) => {
+      calls.push({ method: "desktopRedeem", args: [code, verifier] });
       return options.redeem ?? false;
     },
     signInOneTime: async (token) => {

@@ -151,6 +151,7 @@ export async function createTestServer(
     emailDelivers: true,
     rateLimiter: adapters.rateLimiter,
     humanCheck: adapters.humanCheck,
+    pubsub: adapters.pubsub,
   });
   const app = createApp({
     edition: "selfhost",

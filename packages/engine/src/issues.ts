@@ -674,6 +674,14 @@ export async function listIssues(
   return views(db, visible);
 }
 
+const isHttpsUrl = (value: string) => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 /** Changes fields; each change is an event in the activity ("changed the status to In review"). */
 export async function updateIssue(
   deps: IssueDeps,
@@ -736,6 +744,9 @@ export async function updateIssue(
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
   if (patch.addPullRequest) {
+    // People open this link from the issue page: only an https address, never javascript:, data: or the like.
+    if (!isHttpsUrl(patch.addPullRequest.url))
+      throw new ValidationError("The pull request URL must be an https:// address");
     const prs = (current.pullRequests as unknown as IssueView["pullRequests"]).filter(
       (p) => p.url !== patch.addPullRequest?.url,
     );

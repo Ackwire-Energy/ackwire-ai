@@ -59,12 +59,17 @@ export function createBetterAuthClient(origin = window.location.origin, language
     signOut: async () => {
       await client.signOut();
     },
-    desktopHandoff: async (challenge) =>
-      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { challenge } })).error),
+    desktopHandoff: async (challenge) => {
+      const res = await client.$fetch<{ code: string }>("/desktop/handoff", { method: "POST", body: { challenge } });
+      return typeof res.data?.code === "string" ? res.data.code : null;
+    },
     signInOneTime: async (token) =>
       toResult((await client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })).error),
-    desktopRedeem: async (verifier) => {
-      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
+    desktopRedeem: async (code, verifier) => {
+      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", {
+        method: "POST",
+        body: { code, verifier },
+      });
       return res.data?.signedIn === true;
     },
     ownerClaim: async (input) => toResult((await client.$fetch("/owner-claim", { method: "POST", body: input })).error),
