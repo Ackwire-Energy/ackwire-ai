@@ -185,3 +185,17 @@ test("kept through a reload and shown again in its conversation; gone with the s
   expect(store.value()).toBe("[]");
   stop();
 });
+
+test("what the device kept that can't be sent is left out, and what's behind it still goes", async () => {
+  const qc = new QueryClient();
+  qc.setQueryData(keys.me, me("u1"));
+  const unreadable = { ...msg("k1"), author: undefined };
+  const store = memory(JSON.stringify([{ orgId: "o1", message: unreadable }, { orgId: "o1", message: msg("k2") }, 7]));
+  const stop = outbox.keep(qc, store);
+  const { api, posts } = fakeApi();
+
+  expect(outbox.of("o1").map((m) => m.clientId)).toEqual(["k2"]);
+  expect(await flushOutbox(api, qc, "o1")).toBe(false);
+  expect(posts.map((p) => p.clientId)).toEqual(["k2"]);
+  stop();
+});

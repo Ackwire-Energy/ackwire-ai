@@ -5,11 +5,6 @@ import type { ConnectionStatus } from "../realtime/connection";
 import { keys } from "./keys";
 import type { Message } from "./types";
 
-/**
- * My messages that wait for the connection (`sendWaits`): "sai quando a conexão voltar" instead of "Não enviada".
- * One outbox for the whole app, each message its local copy as it was sent, so they go out again from whatever
- * screen is open (`flushOutbox`), with the same `clientId`, which the server writes once.
- */
 interface Waiting {
   orgId: string;
   message: Message;
@@ -33,6 +28,11 @@ function set(next: readonly Waiting[]) {
 
 const ME_HASH = hashKey(keys.me);
 
+/**
+ * My messages that wait for the connection (`sendWaits`): "sai quando a conexão voltar" instead of "Não enviada".
+ * One outbox for the whole app, each message its local copy as it was sent, so they go out again from whatever
+ * screen is open (`flushOutbox`), with the same `clientId`, which the server writes once.
+ */
 export const outbox = {
   /** My message (its local copy) waits, in `orgId`. */
   add(orgId: string, message: Message) {
@@ -66,9 +66,16 @@ export const outbox = {
     } catch {
       saved = [];
     }
+    // Only what `flushOutbox` can send: one it can't read would stop every message behind it, and a file saved by
+    // another version of the app may hold anything.
     const kept = (Array.isArray(saved) ? (saved as Partial<Waiting>[]) : []).filter(
       (w): w is Waiting =>
-        typeof w?.orgId === "string" && typeof w.message?.clientId === "string" && !outbox.has(w.message.clientId),
+        typeof w?.orgId === "string" &&
+        typeof w.message?.clientId === "string" &&
+        typeof w.message.channelId === "string" &&
+        typeof w.message.body === "string" &&
+        typeof w.message.author?.id === "string" &&
+        !outbox.has(w.message.clientId),
     );
     storage = store;
     set([...waiting, ...kept]);
