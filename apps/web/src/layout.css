@@ -3512,6 +3512,10 @@ p {
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
+/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
+.catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  color: var(--ink);
+}
 .catalog-svc .ac-dialog__lead .connector-icon {
   width: 64px;
   height: 64px;
@@ -6772,11 +6776,15 @@ a.machine-row__name:hover {
   display: flex;
   padding: 0 6px;
 }
+/*
+ * Under the steps, never behind them: 46% of the rail's height (100dvh) where the steps leave that much room, else the
+ * room they leave (a short window), out to the rail's edges.
+ */
 .onb__horizon {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 46%;
-  z-index: -1;
+  position: relative;
+  flex: 1 1 0;
+  max-height: 46dvh;
+  margin: auto -16px -24px;
   overflow: hidden;
   pointer-events: none;
 }
