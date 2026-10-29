@@ -112,6 +112,11 @@ export const featureKeysPtBR = {
   },
   chats: {
     title: "Conversas",
+    serverError: {
+      offline: "Sem internet no celular.",
+      text: "Ele pode estar fora do ar ou fora da sua rede. Suas conversas aparecem sozinhas quando ele voltar.",
+      kept: "Mostrando o que já estava no app.",
+    },
     section: {
       agents: "Agentes",
       channels: "Canais",
