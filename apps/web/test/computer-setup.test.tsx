@@ -915,9 +915,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect([...panel().querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
     const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
-    // Ada asks which AI they use, so the plan is for her, as the foot says; Theo is the other choice.
+    // Ada asks which AI they use, so the plan is for her; Theo is the other choice. The foot is whom she replies to.
     expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
-    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("a Ada só responde a você");
+    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Responde a todos");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -1126,6 +1126,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     });
     await click(screen().getByRole("button", { name: "Continuar" }));
     await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    // Whoever creates an agent owns it, as the server makes them.
+    for (const a of r.state.agents) a.ownerUserId = "u-walter";
     const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
     // Claude signs in once per account: one agent, the first in the team's order.
     const claude = screen().getByRole("region", { name: "Seu plano do Claude" });
@@ -1166,23 +1168,20 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel.textContent).toContain("Theo, Ada, Lia e Atlas agora pensam com GLM Coding.");
     // Every agent has an AI: Who thinks has nobody left to offer the key for.
     expect(screen().queryByRole("region", { name: "Quem pensa" })).toBeNull();
-    // On a plan each answers only its owner, as the server sets them.
-    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
-    for (const a of r.state.agents) {
-      a.ownerUserId = "u-walter";
-      a.audience = { mode: "owner", userIds: [] };
-    }
+    // Moved onto the plan, each answers only its owner.
+    expect(r.state.agents.map((a) => a.audience?.mode)).toEqual(["owner", "owner", "owner", "owner"]);
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
     const note = () => screen().queryByText("Seus agentes só respondem a você.")?.closest(".setup-line");
     expect(note()).toBeTruthy();
     expect(hintOf("Seus agentes só respondem a você.").text).toBe(
-      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+      "Num plano, você pode deixar cada um responder a todos na página dele.",
     );
     // It comes before the invitations it's about.
     const emails = screen().getByLabelText("E-mails");
     expect((note() as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // One agent on the API key answering everyone: someone invited gets an answer, so nothing to say.
+    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
     const first = r.state.agents[0];
     if (first) first.audience = { mode: "everyone", userIds: [] };
     await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.agents(orgId) }));

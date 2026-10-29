@@ -1,9 +1,22 @@
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { planTerms } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, TextInput, View } from "react-native";
-import { Button, fieldText, Icon, type IconName, InfoHint, Text, useTheme } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GroupedFooter,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  type IconName,
+  InfoHint,
+  Text,
+  useTheme,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -30,6 +43,68 @@ export function Note({
       <Text variant="small" tone={icon === "x" ? "danger" : "muted"} style={styles.grow}>
         {children}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * "Responde a todos" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan replies only to them;
+ * on, to everyone who may talk to it. Under it, a line saying the plan's terms are a gray area there, what they say
+ * behind its ⓘ. A plan's page and the agent's AI draw the same.
+ */
+export function PlanReplies({
+  on,
+  onChange,
+  brain,
+  plan,
+  maker,
+  disabled,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  brain: "claude_code" | "codex";
+  /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
+  plan?: string | null;
+  /** A coding plan's maker, whose own words they are. */
+  maker?: string;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const terms = planTerms(t, brain, plan, maker);
+  return (
+    <View>
+      <GroupedList>
+        <GroupedRow
+          label={t("aiAccounts.share.switch")}
+          labelLines={2}
+          toggle={on}
+          disabled={disabled}
+          onPress={() => onChange(!on)}
+        />
+      </GroupedList>
+      <View style={styles.foot}>
+        <InfoHint name={t("common.about", { label: terms.line })} text={terms.text} variant="footnote">
+          <Text variant="footnote" tone="faint">
+            {terms.line}
+          </Text>
+        </InfoHint>
+      </View>
+    </View>
+  );
+}
+
+/** The same place for someone who isn't the plan's owner: whom the agent replies to, and who decides. */
+export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: string; agentName: string }) {
+  const { t } = useTranslation();
+  return (
+    <View>
+      <GroupedList>
+        <GroupedRow
+          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { name: owner })}
+          labelLines={2}
+        />
+      </GroupedList>
+      <GroupedFooter>{t("aiAccounts.share.onOther", { ...agentGrammar(t, agentName), owner })}</GroupedFooter>
     </View>
   );
 }
@@ -225,6 +300,8 @@ export function Waiting({ label }: { label: string }) {
 
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 4 },
+  // As a group's footer (`GroupedFooter`).
+  foot: { paddingTop: 7, paddingHorizontal: 16 },
   grow: { flex: 1, minWidth: 0 },
   card: { borderRadius: 14, overflow: "hidden" },
   step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },

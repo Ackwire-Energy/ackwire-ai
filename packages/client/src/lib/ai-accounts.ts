@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { AiAccounts, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
+import type { AiAccounts, AiComputer, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -84,3 +84,17 @@ export const planWordOf = (plan: string | null) =>
  */
 export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
   mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });
+
+/**
+ * The plan an agent's sign-in is on, as the CLI said it (`team`, `max`…): its account's, or with none (`account`
+ * null) its computer's own sign-in's, from that computer's row of `GET …/ai-accounts`. A seat has its own words
+ * under "Responde a todos".
+ */
+export function signInPlan(
+  view: { account: string | null; accounts: readonly Pick<MachineAccount, "id" | "plan">[] },
+  row: Pick<AiComputer, "own"> | undefined,
+  kind: MachineAccountKind,
+): string | null {
+  if (view.account === null) return row?.own?.[kind]?.plan ?? null;
+  return view.accounts.find((a) => a.id === view.account)?.plan ?? null;
+}

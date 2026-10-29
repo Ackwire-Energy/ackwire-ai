@@ -1035,7 +1035,6 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
 
   const chosen = await setAgentBrain(deps, f.owner.id, f.org.id, f.agent.id, {
     brain: "claude_code",
-    acceptPlanTerms: true,
     account: CLAUDE_ID,
     effort: "high",
   });
@@ -1129,7 +1128,7 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
   expect(theirs).toBeInstanceOf(ForbiddenError);
 
   // Another brain kind: back to the computer's own sign-in, whoever changes it.
-  const codex = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { brain: "codex", acceptPlanTerms: true });
+  const codex = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { brain: "codex" });
   expect(codex).toMatchObject({ brain: "codex", account: null, effort: "low" });
   expect((await agentRow()).brainAccountId).toBeNull();
 

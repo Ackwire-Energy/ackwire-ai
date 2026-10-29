@@ -1,6 +1,6 @@
-import type { MachineAccount } from "@agenteschat/client";
+import type { MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
-import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -19,7 +19,7 @@ import {
   planMark,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, PLAN_IDS } from "@agenteschat/client/lib/plans";
+import { isPlanId, PLAN_IDS, planOf } from "@agenteschat/client/lib/plans";
 import { keyLooksValid, keyStepHint, PROVIDERS, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
@@ -46,7 +46,7 @@ import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { offersKeyNow, PLAN_POLL_MS, pollsPlan } from "./logic";
 import { useAiOrg } from "./org";
-import { Note, OpenPage, PasteField, Step, StepsCard } from "./parts";
+import { Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
@@ -320,6 +320,39 @@ function InfoCard({
   );
 }
 
+/**
+ * "Responde a todos" for the agent a plan's page is for (ADR 0059 §5): on this plan's brain it is the agent's own,
+ * changed at once; before the move it waits, and the move carries it (`move`), else the agent starts on its owner
+ * alone. `plan`: the plan of the sign-in it thinks with there, an account's or the computer's own.
+ */
+function useReplies(gates: PlanGates, agentId: string | undefined, kind: MachineAccountKind) {
+  const { t } = useTranslation();
+  const { orgId } = useAiOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  // The agent it was switched on for, before its move.
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { view } = gates;
+  const live = view !== undefined && view.agentId === agentId && view.brain === kind;
+  const on = live ? !view.onlyOwner : waiting !== null && waiting === agentId;
+  const change = async (next: boolean) => {
+    if (!agentId) return;
+    if (!live) return setWaiting(next ? agentId : null);
+    setBusy(true);
+    try {
+      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, { onlyOwner: !next }));
+    } catch {
+      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const plan = live ? signInPlan(view, gates.row, kind) : null;
+  return { on, change, busy, move: on ? { onlyOwner: false } : {}, plan };
+}
+
 /** One plan's page: its mark, for which agent, then its steps on the agent's computer. */
 function PlanPage(
   props: ConnectAiFlowProps & {
@@ -334,6 +367,18 @@ function PlanPage(
   const { choice, agents, locked, onView, gates, agentId, onAgent } = props;
   const agent = agents.find((a) => a.id === agentId);
   const [done, setDone] = useState<{ agentId: string; agent: string; label: string } | null>(null);
+  const kind = kindOf(choice);
+  const replies = useReplies(gates, agentId, kind);
+  const repliesRow = (
+    <PlanReplies
+      on={replies.on}
+      onChange={(on) => void replies.change(on)}
+      brain={kind}
+      plan={replies.plan}
+      maker={planOf(choice)?.maker}
+      disabled={replies.busy}
+    />
+  );
   const pick = () => {
     const names = agents.map((a) => a.name);
     const choose = (i: number) => {
@@ -359,9 +404,7 @@ function PlanPage(
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("aiAccounts.done.savedAgent", { agent: done.agent, label: done.label })}
         </Text>
-        <Text variant="subhead" tone="muted" style={styles.center}>
-          {t("connectAi.own.note")}
-        </Text>
+        <View style={styles.doneReplies}>{repliesRow}</View>
       </View>
     );
   }
@@ -394,6 +437,8 @@ function PlanPage(
             justReady={props.justReady}
             onComputer={props.onComputer}
             onKey={() => onView({ page: "key" })}
+            move={replies.move}
+            repliesRow={repliesRow}
             onDone={(account) => {
               // The flow stays on that agent; another plan moves on to the next one with no AI.
               onAgent(agent.id);
@@ -415,6 +460,8 @@ function PlanSteps({
   agentId,
   agentName,
   justReady,
+  move,
+  repliesRow,
   onKey,
   onComputer,
   onDone,
@@ -424,6 +471,10 @@ function PlanSteps({
   agentId: string;
   agentName: string;
   justReady?: boolean;
+  /** "Responde a todos" switched on before the move: the move says so. */
+  move: { onlyOwner?: boolean };
+  /** Who the agent replies to, under its steps (`PlanReplies`). */
+  repliesRow: ReactNode;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;
@@ -462,7 +513,10 @@ function PlanSteps({
     setSaving(true);
     setFailedAccount(null);
     try {
-      await api.agents.setBrain(orgId, agentId, { brain: a.kind, account: a.id });
+      qc.setQueryData(
+        keys.agentBrain(orgId, agentId),
+        await api.agents.setBrain(orgId, agentId, { brain: a.kind, account: a.id, ...move }),
+      );
       refresh();
       onDone(a);
     } catch {
@@ -473,7 +527,10 @@ function PlanSteps({
   };
   const saveOwn = async () => {
     try {
-      await api.agents.setBrain(orgId, agentId, { brain: kind, account: null });
+      qc.setQueryData(
+        keys.agentBrain(orgId, agentId),
+        await api.agents.setBrain(orgId, agentId, { brain: kind, account: null, ...move }),
+      );
       refresh();
       onDone(null);
     } catch {
@@ -582,21 +639,18 @@ function PlanSteps({
         </InfoCard>
       ) : null}
       {ownable ? (
-        <>
-          <GroupedList>
-            <GroupedRow
-              label={t("connectAi.own.shared")}
-              {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
-              onPress={() => void saveOwn()}
-            />
-            <GroupedRow
-              label={t("connectAi.own.one", agentGrammar(t, agentName))}
-              checked={other}
-              onPress={() => setOther(true)}
-            />
-          </GroupedList>
-          <Note icon="lock">{t("connectAi.own.note")}</Note>
-        </>
+        <GroupedList>
+          <GroupedRow
+            label={t("connectAi.own.shared")}
+            {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
+            onPress={() => void saveOwn()}
+          />
+          <GroupedRow
+            label={t("connectAi.own.one", agentGrammar(t, agentName))}
+            checked={other}
+            onPress={() => setOther(true)}
+          />
+        </GroupedList>
       ) : null}
       {steps && (!ownable || other) ? (
         <AddAccount
@@ -610,14 +664,11 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          // Said once: with the cards, their note already says it.
-          note={
-            !coding && !ownable ? <Note icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</Note> : null
-          }
           onAdded={(a) => void assign(a)}
           onUse={(a) => void assign(a)}
         />
       ) : null}
+      {steps || ownable ? repliesRow : null}
     </View>
   );
 }
@@ -757,6 +808,8 @@ const styles = StyleSheet.create({
   backRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 4 },
   hero: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 4 },
   done: { alignItems: "center", gap: 12, paddingVertical: 28, paddingHorizontal: 10 },
+  // The page's lists' width, under the centered words.
+  doneReplies: { alignSelf: "stretch", marginHorizontal: -10, marginTop: 8 },
   info: { borderRadius: 14, padding: 14, gap: 10 },
   keySteps: { marginTop: 16, gap: 10 },
   others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
