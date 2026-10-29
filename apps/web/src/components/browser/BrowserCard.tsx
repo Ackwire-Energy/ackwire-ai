@@ -31,6 +31,7 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import {
+  agentGradient,
   Button,
   FilterToggle,
   Icon,
@@ -43,6 +44,7 @@ import {
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import {
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -345,7 +347,10 @@ export function BrowserCard({
   const agent = dir.agentById.get(agentId);
   const g = agentGrammar(t, name);
   const color = colorOf(agent);
-  const [open, setOpenState] = useState(defaultOpen || surface);
+  // In the conversation (not the dialog, not a computer's page that folds it away) the page is always in
+  // view, framed in the agent's color: no small form to open.
+  const chat = !surface && !onFold;
+  const [open, setOpenState] = useState(defaultOpen || surface || chat);
   const root = useRef<HTMLDivElement>(null);
   // Opening or closing by hand keeps the card where it is on screen: the conversation doesn't jump.
   const anchor = useRef<number | null>(null);
@@ -377,7 +382,8 @@ export function BrowserCard({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const live = useBrowserLive(agentId, open || visible || holding);
+  // Always open in the conversation: it streams while on screen, as the small picture did.
+  const live = useBrowserLive(agentId, chat ? visible || holding : open || visible || holding);
   const [still, setStill] = useState<typeof live.frame>(null);
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
@@ -710,7 +716,9 @@ export function BrowserCard({
   const [host, path] = hostAndPath(closed || hidden ? null : browserSiteUrl(pic?.metadata.url, steps));
   const ask = handoff?.kind === "ask" ? handoff.instructions : null;
   const working = !inControl && !otherInControl;
-  const showLog = open && working && !starting && steps.length > 0 && !surface;
+  // The frame (the conversation, not full screen): the steps are its history on hover, not a column.
+  const framed = chat && !full;
+  const showLog = open && working && !starting && steps.length > 0 && !surface && !framed;
   // A blank page or a closed browser: the person in control gets the address bar without asking.
   const goForced = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
   const goShown = inControl && (goOpen || goForced);
@@ -759,6 +767,8 @@ export function BrowserCard({
           : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
   const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
+  const [frameTop, frameBottom] = agentGradient(color);
+  const frameStyle = { "--mf-a": frameTop, "--mf-b": frameBottom } as CSSProperties;
 
   // Watching: Assumir (a labelled, tactile button) and Parar (quiet, with a confirmation), never a lone red square.
   // A closed browser has nothing to stop: it opens straight into the person's control.
@@ -882,14 +892,61 @@ export function BrowserCard({
         full && "is-full",
         surface && "is-surface",
         closed && "is-closed",
+        framed && "brw-mf",
+        framed && live_ && "is-working",
       ]
         .filter(Boolean)
         .join(" ")}
+      style={framed ? frameStyle : undefined}
       role="group"
       aria-label={t("browser.inCard.group", g)}
     >
-      {!surface && <SkyStrip color={color} muted={inControl} moving={live_} />}
-      {!open ? (
+      {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
+      {framed ? (
+        // The frame's top: where it is, and what it does now (its steps on hover), or the person's controls.
+        <div className="brw-mf__top">
+          <span className="brw-mf__site">
+            {asTitle === "host" ? (
+              <span className="brw-stile" aria-hidden="true">
+                {host.charAt(0)}
+              </span>
+            ) : (
+              <Icon name="globe" size={14} />
+            )}
+            {titleText}
+          </span>
+          <span className="brw-grow" />
+          {inControl ? (
+            <span className="brw-mf__acts">{controlActs}</span>
+          ) : (
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so the steps also open from the keyboard
+            <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
+              {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
+              <span>{sub}</span>
+              {steps.length > 0 && (
+                <span className="brw-mf__hist" role="tooltip">
+                  <ol>
+                    {[...steps].reverse().map((s, i) => {
+                      const now = i === 0 && s.running;
+                      return (
+                        <li key={s.id} className={now ? "is-now" : undefined}>
+                          {now ? (
+                            <PixelSpinner size={14} color={color} />
+                          ) : (
+                            <Icon name={iconOf(s.tool)} size={14} />
+                          )}
+                          <span>{stepText(t, s)}</span>
+                          {s.since && <small>{formatTime(i18n.language, new Date(s.since).toISOString())}</small>}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      ) : !open ? (
         // Closed: the small live picture, the site, what the agent does now; a click opens it right here.
         <div className="brw-ac__compact">
           <button
@@ -1022,6 +1079,22 @@ export function BrowserCard({
                 </div>
               )}
               {cover}
+              {framed && !inControl && !otherInControl && (
+                <span className={confirmStop ? "brw-mf__over is-pinned" : "brw-mf__over"}>
+                  {watchActs}
+                  {!blocker && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconOnly
+                      icon="external"
+                      aria-label={fullLabel}
+                      title={fullLabel}
+                      onClick={() => setFull(true)}
+                    />
+                  )}
+                </span>
+              )}
             </div>
             {showLog && (
               <ol className="brw-log">
