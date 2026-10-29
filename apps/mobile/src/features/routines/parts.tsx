@@ -2,10 +2,10 @@ import type { Routine } from "@agenteschat/client";
 import { whenAt } from "@agenteschat/client/lib/format";
 import { pausedFix, type RoutineFix, routineStateWords, runPixels } from "@agenteschat/client/lib/routine-view";
 import { router } from "expo-router";
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, haptics, Icon, IconButton, PixelOrbit, Text, ToggleSwitch } from "@/ui";
+import { Button, Chip, Icon, PixelOrbit, Text } from "@/ui";
 import { routineHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -21,7 +21,6 @@ import {
 } from "./hooks";
 import {
   FIX_ICON,
-  hasFired,
   isDoneOnce,
   isPaused,
   isReminder,
@@ -66,40 +65,6 @@ export function FixButton({ fix, controls }: { fix: RoutineFix; controls: Return
   );
 }
 
-/**
- * "Ativa": the routine's switch, moved at once (the server's answer takes over when it comes; a refusal puts it
- * back).
- */
-export function ActiveSwitch({
-  routine: r,
-  controls,
-  label,
-}: {
-  routine: Routine;
-  controls: ReturnType<typeof useRoutineControls>;
-  label: string;
-}) {
-  const [want, setWant] = useState<boolean | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the server's answer (a new `active`) takes over
-  useEffect(() => setWant(null), [r.active]);
-  const on = want ?? r.active;
-  return (
-    <Pressable
-      onPress={() => {
-        haptics.selection();
-        setWant(!on);
-        controls.setActive(!on, () => setWant(null));
-      }}
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: on }}
-      hitSlop={8}
-    >
-      <ToggleSwitch value={on} />
-    </Pressable>
-  );
-}
-
 /** A row's measures: the agent's face, the gap after it, the side inset. */
 const AVATAR = 36;
 const GAP = 12;
@@ -107,9 +72,9 @@ const SIDE = 16;
 
 /**
  * One routine in the list (the web's row, laid out for the phone): the agent, the title, where it delivers and
- * its chips (a reminder, a mailbox to reconnect, a state that needs a look, its fix), the switch and "…"; then on
- * lines of their own the "when" with the next run, and the last runs in pixels with a caption. Tapping opens the
- * routine; a long press, its actions.
+ * its chips (a reminder, a mailbox to reconnect, a state that needs a look, its fix); then on lines of their own
+ * the "when" with the next run, and the last runs in pixels with a caption. Tapping opens the routine, where it is
+ * paused and edited; a long press, its actions.
  */
 export const RoutineRow = memo(function RoutineRow({
   routine: r,
@@ -137,7 +102,6 @@ export const RoutineRow = memo(function RoutineRow({
   const title = routineTitle(r);
   const agent = dir.nameOf({ type: "agent", id: r.agentId });
   const done = isDoneOnce(r);
-  const fired = hasFired(r);
   const paused = isPaused(r);
   const running = isRunning(r);
   const trouble = mailTrouble(r);
@@ -150,7 +114,6 @@ export const RoutineRow = memo(function RoutineRow({
       ? t("routines.deliversIn", { agent, place: targetLabel(r.target) })
       : t("routines.deliversTo", { agent, target: targetLabel(r.target) });
   const next = nextText(r, at);
-  const switchLabel = t("routines.activeLabel", { name: title });
   return (
     <Pressable
       onPress={() => router.push(routineHref(r.id))}
@@ -158,14 +121,10 @@ export const RoutineRow = memo(function RoutineRow({
       delayLongPress={380}
       accessibilityRole="button"
       accessibilityLabel={[title, delivery, whenText(r), next].filter(Boolean).join(", ")}
-      // The row is one element to a screen reader: its switch and "…" are its actions.
-      accessibilityActions={[
-        ...(r.canManage && !fired ? [{ name: "toggle", label: switchLabel }] : []),
-        { name: "menu", label: menu.label },
-      ]}
+      // The row is one element to a screen reader: the long press's menu is its action.
+      accessibilityActions={[{ name: "menu", label: menu.label }]}
       onAccessibilityAction={(e) => {
-        if (e.nativeEvent.actionName === "toggle") controls.setActive(!r.active);
-        else if (e.nativeEvent.actionName === "menu") menu.open();
+        if (e.nativeEvent.actionName === "menu") menu.open();
       }}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }, done && styles.done]}
     >
@@ -195,10 +154,6 @@ export const RoutineRow = memo(function RoutineRow({
               {fix && fix !== "resume" ? <FixButton fix={fix} controls={controls} /> : null}
             </View>
           ) : null}
-        </View>
-        <View style={styles.acts}>
-          {r.canManage && !fired ? <ActiveSwitch routine={r} controls={controls} label={switchLabel} /> : null}
-          <IconButton icon="more" label={menu.label} onPress={menu.open} />
         </View>
       </View>
       <View style={styles.below}>
@@ -235,7 +190,7 @@ export const RoutineRow = memo(function RoutineRow({
 });
 
 const styles = StyleSheet.create({
-  row: { paddingVertical: 12, paddingLeft: SIDE, paddingRight: 8, gap: 8 },
+  row: { paddingVertical: 12, paddingHorizontal: SIDE, gap: 8 },
   done: { opacity: 0.7 },
   divider: { position: "absolute", top: 0, right: 0, left: SIDE + AVATAR + GAP, height: StyleSheet.hairlineWidth },
   top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
@@ -245,8 +200,7 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
-  acts: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: -4 },
-  below: { marginLeft: AVATAR + GAP, paddingRight: 8, gap: 8 },
+  below: { marginLeft: AVATAR + GAP, gap: 8 },
   when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
   whenIcon: { paddingTop: 2 },
   runs: { flexDirection: "row", alignItems: "center", gap: 10 },
