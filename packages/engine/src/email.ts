@@ -477,7 +477,14 @@ export function emailsByLocale(recipients: { email: string; locale: EmailLocale 
  */
 export async function queueEmail(
   tx: Executor,
-  input: { orgId: string | null; key: string; to: string[]; template: EmailTemplate; maxAttempts?: number; runAt?: Date },
+  input: {
+    orgId: string | null;
+    key: string;
+    to: string[];
+    template: EmailTemplate;
+    maxAttempts?: number;
+    runAt?: Date;
+  },
 ) {
   await enqueue(tx, {
     orgId: input.orgId,
