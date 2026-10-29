@@ -353,7 +353,7 @@ describe("the agent's no-AI card", () => {
     state.answerNowError = new ApiError(409, "ai.still_missing", "There is still no AI connected");
     await click(within(cardRow()).getByRole("button", { name: "Responder agora" }));
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
-    expect(cardRow().textContent).toContain("Ainda falta conectar uma IA para Ada.");
+    expect(cardRow().textContent).toContain("Ainda falta conectar uma IA para\u00a0Ada.");
     expect(within(cardRow()).getByRole("button", { name: "Conectar" })).toBeTruthy();
   });
 

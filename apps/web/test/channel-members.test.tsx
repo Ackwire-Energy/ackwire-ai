@@ -66,11 +66,11 @@ describe("channel header: who's here", () => {
     expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
   });
 
-  test("on a phone, where the stack is gone, Detalhes do canal folds to its icon and keeps its name", async () => {
+  test("on a phone, Detalhes do canal folds to its icon and keeps its name", async () => {
     const media = spyOn(window, "matchMedia").mockImplementation(
       (query: string) =>
         ({
-          matches: query === "(max-width: 420px)",
+          matches: query === "(max-width: 480px)",
           media: query,
           addEventListener: () => {},
           removeEventListener: () => {},

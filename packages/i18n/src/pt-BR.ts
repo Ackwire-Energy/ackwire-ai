@@ -1030,7 +1030,7 @@ export const ptBR = {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
       answering: "{{name}} está respondendo…",
-      stillMissing: "Ainda falta conectar uma IA para {{name}}.",
+      stillMissing: "Ainda falta conectar uma IA para\u00a0{{name}}.",
     },
     action: "Conectar",
     locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",

@@ -1016,7 +1016,7 @@ export const en: Translations = {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
       answering: "{{name}} is answering…",
-      stillMissing: "{{name}} still has no AI connected.",
+      stillMissing: "{{name}} still has no AI\u00a0connected.",
     },
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",

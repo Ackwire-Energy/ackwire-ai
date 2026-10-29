@@ -15,8 +15,8 @@ export const MEMBERS_OPEN_MS = 150;
 const MEMBERS_CLOSE_MS = 200;
 /** Avatars in the stack before "+N". */
 const STACKED = 3;
-/** Where the channel header drops the stack (responsive.css): the phone's, whose room goes to the channel's name. */
-const PHONE_HEADER = "(max-width: 420px)";
+/** Up to here the details' words and the faces don't both fit beside the channel's name: the words fold. */
+const PHONE_HEADER = "(max-width: 480px)";
 
 /** "Detalhes do canal" in the channel header; folded to its icon on a phone. */
 export function ChannelDetailsButton({ onClick }: { onClick: () => void }) {
