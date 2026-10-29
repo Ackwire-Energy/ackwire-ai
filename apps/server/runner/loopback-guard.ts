@@ -11,8 +11,10 @@ import { type RunCommand, runSync } from "./service";
  * too. Instead the supervisor (the only root process) learns each agent's
  * loopback listeners from `ss`, which gives the listening socket's real owner
  * uid, and guards exactly those ports: each is reachable over `lo` only by its
- * owner's uid and by root (the supervisor, the desktop relay). Any other local
- * user — another agent — is refused.
+ * owner's uid and by root (the supervisor, the desktop relay). If different
+ * agent uids listen on the same port at different loopback addresses, neither
+ * gets an owner exception: the rules match ports, not destination addresses.
+ * Any other local user — another agent — is refused.
  *
  * `table inet agentes_runner` (its own table, separate from the Cloud guard's
  * `inet agentes_guard`; a reject in either base chain wins):
@@ -91,7 +93,15 @@ const elementList = (items: string[]) => (items.length ? `\n\t\telements = { ${i
  * state it was in, without touching any other table (never `flush ruleset`).
  */
 export function renderRuleset(listeners: readonly GuardedListener[], reject: RejectVerb): string {
-  const owner = listeners.map((l) => `${l.port} . ${l.uid}`);
+  const uidsByPort = new Map<number, Set<number>>();
+  for (const { port, uid } of listeners) {
+    const uids = uidsByPort.get(port) ?? new Set<number>();
+    uids.add(uid);
+    uidsByPort.set(port, uids);
+  }
+  // An attacker can bind 127.0.0.2:port while another agent owns 127.0.0.1:port.
+  // Allowing either uid by port alone would also allow it into the other's listener.
+  const owner = listeners.filter((l) => uidsByPort.get(l.port)?.size === 1).map((l) => `${l.port} . ${l.uid}`);
   const ports = [...new Set(listeners.map((l) => l.port))].map(String);
   return [
     `table inet ${RUNNER_NFT_TABLE} {}`,
