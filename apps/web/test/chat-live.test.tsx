@@ -78,7 +78,7 @@ describe("optimistic send", () => {
     await settle(4);
     const row = rowsWith("vai falhar")[0] as HTMLElement;
     expect(row.className).toContain("ac-msg--failed");
-    expect(within(row).getByRole("alert").textContent).toContain("Não enviada ·");
+    expect(within(row).getByRole("alert").textContent).toBe("Não enviada·Tentar de novo");
     state.failPosts = false;
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Tentar de novo" })));
     await settle(4);
@@ -233,13 +233,13 @@ describe("receipts: a check with a popover", () => {
     await settle(4);
     const root = lastPerson(state);
     const check = () => checkOf("e o login?");
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada vai responder");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada vai responder");
     expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
     const run = { threadId: root?.id, runId: "r-rc", agentId: ADA_ID };
     await push(socket, { type: "agent.run", ...run, status: "running" });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     await push(socket, { type: "agent.run", ...run, status: "waiting_approval" });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está esperando aprovação");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está esperando aprovação");
     expect(icon(check())).toBe("M10 6v4l2.6 1.8");
     await push(socket, {
       type: "message.handled",
@@ -248,7 +248,7 @@ describe("receipts: a check with a popover", () => {
       runId: "r-rc",
       status: "done",
     });
-    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
     expect(icon(check())).toBe("m2.5 10.5 3 3 6-7M9 13l.5.5 6-7");
     // Keyboard-openable popover; Esc closes.
     check().focus();
@@ -270,9 +270,9 @@ describe("receipts: a check with a popover", () => {
     const receipt = () => rowsWith("alguém viu o erro?")[0]?.querySelector(".ac-receipt") as HTMLElement;
     await push(socket, { type: "message.routed", messageId: root?.id, seenBy: [ADA_ID, ATLAS_ID], pickedBy: [] });
     expect(checkOf("alguém viu o erro?").getAttribute("aria-label")).toBe(
-      "Vista por Ada e Atlas; Nenhum agente vai responder",
+      "Vista por Ada e Atlas. Nenhum agente vai responder",
     );
-    expect(receipt().textContent).toContain("Nenhum agente vai responder ·");
+    expect(receipt().textContent).toContain("Nenhum agente vai responder·Chamar um agente");
     await act(async () => {
       const call = within(receipt()).getByRole("button", { name: "Chamar um agente" });
       call.focus();
@@ -285,12 +285,132 @@ describe("receipts: a check with a popover", () => {
     await push(socket, { type: "message.claimed", messageId: root?.id, agentId: ATLAS_ID });
     await push(socket, { type: "message.handled", messageId: root?.id, agentId: ATLAS_ID, status: "failed" });
     expect(icon(checkOf("alguém viu o erro?"))).toBe("M10 6.5v4M10 13.5v.01");
-    expect(receipt().textContent).toContain("Não conseguiu responder ·");
+    expect(receipt().textContent).toContain("Não conseguiu responder·Tentar de novo");
     await act(async () => fireEvent.click(within(receipt()).getByRole("button", { name: "Tentar de novo" })));
     await settle(4);
     expect(
       state.calls.filter((c) => c.method === "chat.post").map((c) => (c.args[2] as { body: string }).body),
     ).toEqual(["alguém viu o erro?", "alguém viu o erro?"]);
+  });
+});
+
+describe("receipts: who picked the agents for a message nobody mentioned", () => {
+  const receiptOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt") as HTMLElement;
+  const popoverOf = async (text: string) => {
+    await act(async () => fireEvent.click(receiptOf(text).querySelector(".ac-receipt__check") as HTMLElement));
+    return screen().getByRole("dialog", { name: "Agentes" });
+  };
+  const closePopover = async (pop: HTMLElement) => {
+    await act(async () => fireEvent.keyDown(pop, { key: "Escape" }));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+  };
+
+  test("no step could pick: 'sem @' with why behind its ⓘ and Chamar um agente; the popover says how agents are picked", async () => {
+    const { socket, state } = await open();
+    await sendText("alguém sabe?");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID, ATLAS_ID],
+      pickedBy: [],
+      strategy: "router",
+      reason: "mention_needed",
+    });
+    const receipt = receiptOf("alguém sabe?");
+    expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
+      "Vista por Ada e Atlas. Nenhum agente vai responder sem @",
+    );
+    const hint = within(receipt).getByRole("button", { name: "Sobre Quem escolhe os agentes" });
+    expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.",
+    );
+    expect(within(receipt).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
+    expect(receipt.textContent).toContain("Nenhum agente vai responder sem @");
+    // The dot right after the ⓘ's line, which the kit draws closer (its circle stops inside its box).
+    expect(receipt.querySelector(".ac-hintline + .ac-receipt__dot")?.textContent).toBe("·");
+    const pop = await popoverOf("alguém sabe?");
+    expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
+      "https://agentes.chat/help/who-answers?lang=pt-BR",
+    );
+    // Nobody picked: no line naming who did.
+    expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
+  });
+
+  test("'Escolhendo quem responde' with the clock while the author's plan reads it, then who picked", async () => {
+    const { socket, state } = await open();
+    await sendText("revisa o PR?");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, { type: "message.routing", messageId: root?.id, step: "plan" });
+    const picking = receiptOf("revisa o PR?");
+    expect(picking.textContent).toBe("Escolhendo quem responde·Chamar um agente");
+    expect(picking.querySelector(".ac-receipt__clock path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    expect(picking.querySelector(".ac-receipt__check")).toBeNull();
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID, ATLAS_ID],
+      pickedBy: [ADA_ID],
+      strategy: "router",
+      decidedBy: { step: "plan", brand: "claude", ownerId: "u-walter" },
+    });
+    expect(receiptOf("revisa o PR?").textContent).not.toContain("Escolhendo");
+    const pop = await popoverOf("revisa o PR?");
+    const by = pop.querySelector(".who-by") as HTMLElement;
+    expect(by.textContent).toBe("Escolhido pelo seu plano do Claude");
+    expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");
+    // Under the agents, as the popover's last line.
+    expect(pop.lastElementChild).toBe(by);
+  });
+
+  test("the popover's last line names who picked, with its mark or our icon; a decision for nobody or from before says nothing", async () => {
+    const { socket, state } = await open();
+    const cases: [Record<string, unknown>, string, string | null][] = [
+      [{ step: "jev" }, "Escolhido pelo Jev", "typesafe"],
+      [
+        { step: "model", model: "claude-haiku-5-5", provider: "anthropic" },
+        "Escolhido pelo Claude Haiku 5.5",
+        "claude",
+      ],
+      [{ step: "plan", brand: "chatgpt", ownerId: "u-joao" }, "Escolhido pelo plano do ChatGPT de João", "openai"],
+      [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
+      [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
+      [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
+    ];
+    for (const [i, [decidedBy, words, mark]] of cases.entries()) {
+      const text = `pergunta ${i + 1}`;
+      await sendText(text);
+      await settle(4);
+      await push(socket, {
+        type: "message.routed",
+        messageId: lastPerson(state)?.id,
+        seenBy: [ADA_ID],
+        pickedBy: [ADA_ID],
+        strategy: "router",
+        decidedBy,
+      });
+      const pop = await popoverOf(text);
+      const by = pop.querySelector(".who-by") as HTMLElement;
+      expect([text, by.textContent]).toEqual([text, words]);
+      expect(by.className).toContain("ac-iconline");
+      if (mark) expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe(mark);
+      else expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
+      await closePopover(pop);
+    }
+    for (const [text, routed] of [
+      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
+      ["de antes", { pickedBy: [ADA_ID] }],
+    ] as const) {
+      await sendText(text);
+      await settle(4);
+      await push(socket, { type: "message.routed", messageId: lastPerson(state)?.id, seenBy: [ADA_ID], ...routed });
+      const pop = await popoverOf(text);
+      expect([text, pop.querySelector(".who-by")]).toEqual([text, null]);
+      await closePopover(pop);
+    }
+    expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
   });
 });
 
@@ -342,12 +462,40 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     const receipt = rowsWith("oi").at(-1)?.querySelector(".ac-receipt") as HTMLElement;
     expect(receipt.textContent).toContain("Nenhum agente vai responder");
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada; Nenhum agente vai responder",
+      "Vista por Ada. Nenhum agente vai responder",
     );
     // The first message keeps its own receipt.
     const firstReceipt = rowsWith("oi @Ada")[0]?.querySelector(".ac-receipt__check");
-    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
   });
+});
+
+describe("empty conversations", () => {
+  test("a channel: its greeting and the suggestions; a DM with a person: the greeting alone", async () => {
+    await open(seedState(), `c/${GENERAL_ID}`);
+    await settle(4);
+    const channel = document.querySelector(".ac-empty") as HTMLElement;
+    expect(channel.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
+    expect(channel.querySelector(".ac-empty__text")).toBeNull();
+    cleanup();
+    await open(seedState(), "dm/person/u-joao");
+    await settle(4);
+    const dm = document.querySelector(".ac-empty") as HTMLElement;
+    expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
+    expect(dm.querySelector(".ac-empty__text")).toBeNull();
+  });
+});
+
+test("a DM's head: the name with a line under it rises to the face's top, a person's as an agent's", async () => {
+  await open(seedState(), "dm/person/u-joao");
+  await settle(4);
+  const person = screen().getByRole("heading", { level: 1, name: "João" });
+  expect(person.className).toBe("channel__title ac-captop");
+  expect(person.nextElementSibling?.textContent).toBe("joao@acme.com.br");
+  cleanup();
+  await open(seedState(), `dm/agent/${ADA_ID}`);
+  await settle(4);
+  expect(screen().getByRole("heading", { level: 1, name: "Ada" }).className).toBe("channel__title ac-captop");
 });
 
 describe("direct messages with an agent", () => {
@@ -370,7 +518,7 @@ describe("direct messages with an agent", () => {
     expect(document.body.textContent).toContain("Dev · responde a João · Claude Code · Sonnet no MacBook");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
-    expect(brain.querySelector(".ac-icon")).not.toBeNull();
+    expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     cleanup();
     // Without the computer's name (a member): just the brain and its model.
     const member = seedState();
@@ -394,8 +542,8 @@ describe("direct messages with an agent", () => {
     const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
     await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Fechar" })));
     expect(screen().queryByRole("complementary", { name: "Perfil da Ada" })).toBeNull();
-    expect(document.body.textContent).toContain(
-      "Converse direto com a Ada. Peça para lembrar ou esquecer algo, ou para mudar como ela trabalha.",
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     );
     // The sidebar lists the DM under "Mensagens diretas".
     await settle(4);
@@ -520,5 +668,189 @@ describe("memory changes and proposals in the chat", () => {
       "Só PRs pequenos.",
     ]);
     expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
+  });
+});
+
+describe("caught up once the server confirms the channel's subscription", () => {
+  test("a message written before then is added; one heard live while that read was on its way stays", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // Each read is made when asked; its answer can be held back, as on a slow link.
+    let held: Promise<void> | null = null;
+    const read = api.chat.messages;
+    api.chat.messages = async (orgId, channelId, options) => {
+      const list = await read(orgId, channelId, options);
+      if (held) await held;
+      return list;
+    };
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    // Atlas wrote while the socket opened: no event carries it.
+    state.messages.push({
+      id: "m-before",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Deploy das 9h revertido.",
+      mentionedAgentIds: [],
+      agentRunId: "r-before",
+      createdAt: new Date().toISOString(),
+    });
+    expect(rowsWith("Deploy das 9h revertido.")).toHaveLength(0);
+    let release = () => {};
+    held = new Promise<void>((r) => {
+      release = r;
+    });
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(2);
+    // Ada answers live while that read, made before her answer, is on its way.
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-live",
+      message: {
+        id: "m-live",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Login de volta ao normal.",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 1000).toISOString(),
+      },
+    });
+    await settle();
+    expect(rowsWith("Login de volta ao normal.")).toHaveLength(1);
+    await act(async () => release());
+    await settle(4);
+    expect(rowsWith("Deploy das 9h revertido.")).toHaveLength(1);
+    expect(rowsWith("Login de volta ao normal.")).toHaveLength(1);
+  });
+
+  test("an open thread's replies too", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.threads.create(ORG_ID, {
+      id: "m-1",
+      channelId: ENG_ID,
+      firstMessageId: "m-1",
+      lastMessageId: "m-1",
+      title: "Login com 401",
+    } as Parameters<typeof api.threads.create>[1]);
+    const { sockets } = await renderApp(`/org/${ORG_ID}/threads/m-1`, { api });
+    await settle(8);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    state.messages.push({
+      id: "m-reply",
+      channelId: ENG_ID,
+      threadId: "m-1",
+      author: { type: "agent", id: ADA_ID },
+      body: "Corrigido: o refresh usa segundos agora.",
+      mentionedAgentIds: [],
+      agentRunId: "r-reply",
+      createdAt: new Date().toISOString(),
+    });
+    expect(rowsWith("Corrigido: o refresh usa segundos agora.")).toHaveLength(0);
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(rowsWith("Corrigido: o refresh usa segundos agora.")).toHaveLength(1);
+  });
+
+  /** João's message to Ada, read while her run was at `status`. */
+  const askedAda = (state: ReturnType<typeof seedState>, status: "running" | "waiting_input") => {
+    const m1 = state.messages.find((m) => m.id === "m-1");
+    if (m1)
+      m1.receipts = {
+        seenBy: [ADA_ID],
+        pickedBy: [ADA_ID],
+        handled: [{ agentId: ADA_ID, runId: "r-ada", status }],
+        blocked: [],
+      };
+  };
+  const question = {
+    id: "q1",
+    agentId: ADA_ID,
+    runId: "r-ada",
+    channelId: ENG_ID,
+    threadId: null,
+    messageId: "msg-q",
+    text: "Reverto o deploy das 9h?",
+    choices: ["Sim", "Não"],
+    status: "open",
+    answer: null,
+    answeredByUserId: null,
+  };
+  const questionCard = {
+    id: "msg-q",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent" as const, id: ADA_ID },
+    body: "",
+    mentionedAgentIds: [],
+    agentRunId: "r-ada",
+    meta: { question },
+    createdAt: new Date().toISOString(),
+  };
+  const receiptOfM1 = () =>
+    rowsWith("o login está devolvendo 401")[0]?.querySelector(".ac-receipt__check")?.getAttribute("aria-label");
+  const event = (e: Record<string, unknown>) => ({
+    type: "event",
+    channelId: ENG_ID,
+    event: { channelId: ENG_ID, ...e },
+  });
+
+  test("her question after then: the receipt waits for the answer, and the page seeding its list again keeps that", async () => {
+    const state = seedState();
+    askedAda(state, "running");
+    const { socket } = await open(state);
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está respondendo");
+    // Her card, her question and her run's wait arrive together, before the page draws the card.
+    await act(async () => {
+      socket.push(event({ type: "message.created", messageId: "msg-q", message: questionCard }));
+      socket.push(event({ type: "question.asked", threadId: null, question }));
+      socket.push(
+        event({ type: "agent.run", threadId: null, runId: "r-ada", agentId: ADA_ID, status: "waiting_input" }),
+      );
+    });
+    await settle(4);
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+  });
+
+  test("her question before then: its card and the wait for the answer show, and stay as the list changes", async () => {
+    const state = seedState();
+    askedAda(state, "running");
+    const { socket } = await open(state);
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está respondendo");
+    // She asks while the channel's subscription opens: no event carries it.
+    state.messages.push(questionCard);
+    askedAda(state, "waiting_input");
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-atlas",
+      message: {
+        id: "m-atlas",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ATLAS_ID },
+        body: "Deploy das 9h no ar.",
+        mentionedAgentIds: [],
+        agentRunId: "r-atlas",
+        createdAt: new Date(Date.now() + 1000).toISOString(),
+      },
+    });
+    await settle(4);
+    expect(rowsWith("Deploy das 9h no ar.")).toHaveLength(1);
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
   });
 });

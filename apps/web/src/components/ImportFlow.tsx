@@ -1,0 +1,1286 @@
+import type {
+  BundleTodo,
+  ImportItemKind,
+  ImportItemResult,
+  ImportSkipReason,
+  MigrationBundle,
+} from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHeader,
+  Checkbox,
+  Chip,
+  type ChipTone,
+  CountChip,
+  Field,
+  Icon,
+  type IconName,
+  InfoHint,
+  Input,
+  normalizeAppearance,
+  OptionCard,
+  Spinner,
+  Switch,
+  Textarea,
+} from "@agenteschat/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { failedOffline } from "@/chat/outbox";
+import { AgentAvatar } from "@/components/AgentAvatar";
+import { fileSaver } from "@/components/artifacts/fileSaver";
+import { HelpLink } from "@/components/HelpLink";
+import { useOrg } from "@/components/org-context";
+import {
+  EXPORT_PROMPT,
+  groupLeftOut,
+  IMPORT_ACCEPT,
+  ImportError,
+  type ImportFile,
+  type LeftOutKind,
+  type PickedFile,
+  parseImport,
+  readImportFiles,
+  SOURCE_NAME,
+} from "@/lib/import";
+import { frontmatter } from "@/lib/import/shared";
+import {
+  applyInChunks,
+  blockedItems,
+  bundleOrigin,
+  CARD_MARK,
+  choosable,
+  droppedFiles,
+  EXPORT_PROMPT_APPS,
+  githubRoot,
+  IMPORT_CARDS,
+  type ImportCard,
+  type ImportFailure,
+  isGithubLink,
+  itemId,
+  NOT_GITHUB,
+  picksOf,
+  type RequestCard,
+  retryable,
+} from "@/lib/import-flow";
+import { hasFiles } from "@/lib/obsidian";
+import { useTheme } from "@/lib/theme";
+import "./import-flow.css";
+
+const KINDS: ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
+const KIND_ICON: Record<ImportItemKind, IconName> = {
+  agent: "agent",
+  skill: "bulb",
+  channel: "channel",
+  routine: "routines",
+  note: "book",
+};
+const LEFT_OUT_ICON: Record<LeftOutKind, IconName> = {
+  skill: "bulb",
+  routine: "routines",
+  notes: "book",
+  connection: "plug",
+  messaging: "message",
+  plugin: "bolt",
+  remote: "cloud",
+  model: "settings",
+  task: "issues",
+  team: "members",
+  preset: "agent",
+  picture: "image",
+  secret: "lock",
+  redacted: "lock",
+  file: "file",
+  other: "more",
+};
+const TODO_ICON: Record<BundleTodo["kind"], IconName> = {
+  connection: "plug",
+  app: "plug",
+  secret: "key",
+  model: "settings",
+  file: "file",
+};
+/** The fields the server may cut (`trimmed`), in the person's words. */
+const FIELDS = ["name", "role", "instructions", "handle", "topic", "prompt", "title", "content", "appearance"] as const;
+/** Rows a group shows before "Mostrar mais". */
+const SHOWN = 6;
+
+type ReadInput = { files: PickedFile[] | Promise<PickedFile[]> } | { url: string } | { text: string };
+type Focus = "preview" | "report" | "drop" | null;
+
+/**
+ * Bringing a workspace from another app (ADR 0055), the same in onboarding
+ * and in Configurações → Importar e exportar: read what was dropped, picked,
+ * linked or pasted into a bundle; plan it on the server (dry run); the person
+ * picks; apply. Nothing is written before `apply`.
+ */
+export function useImportFlow(orgId: string | null) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const [card, setCard] = useState<ImportCard | null>(null);
+  const [busy, setBusy] = useState<"reading" | "planning" | null>(null);
+  const [failure, setFailure] = useState<ImportFailure | null>(null);
+  const [planned, setPlanned] = useState<{
+    bundle: MigrationBundle;
+    items: ImportItemResult[];
+    /** Files a GitHub link has past the reader's limits: not read. */
+    skipped: string[];
+  } | null>(null);
+  const [pick, setPick] = useState<Set<string>>(new Set());
+  const [skillsOn, setSkillsOn] = useState<Set<string>>(new Set());
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [report, setReport] = useState<ImportItemResult[] | null>(null);
+  const done = useRef(new Map<string, ImportItemResult>());
+  const run = useRef(0);
+  const last = useRef<ReadInput | null>(null);
+  const focus = useRef<Focus>(null);
+
+  const read = async (input: ReadInput) => {
+    if (!orgId) return;
+    const mine = ++run.current;
+    const current = () => mine === run.current;
+    const from: ImportFailure["from"] = "url" in input ? "link" : "text" in input ? "paste" : "files";
+    let step: ImportFailure["step"] = "read";
+    last.current = input;
+    setFailure(null);
+    setBusy("reading");
+    try {
+      let files: ImportFile[];
+      let root: string | null = null;
+      let skipped: string[] = [];
+      if ("url" in input) {
+        if (!isGithubLink(input.url)) throw NOT_GITHUB;
+        const res = await api.agents.importFromGithub(orgId, input.url);
+        files = res.files.map((f) => ({ name: f.path, text: f.text }));
+        skipped = res.skipped ?? [];
+        root = githubRoot(input.url);
+      } else if ("text" in input) {
+        files = [{ name: "pasted", text: input.text }];
+      } else {
+        ({ files, root } = await readImportFiles(await input.files));
+      }
+      if (!current()) return;
+      step = "plan";
+      const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
+      step = "parse";
+      const bundle = parseImport(files, { models: list.models.map((m) => m.id), root });
+      if (!current()) return;
+      step = "plan";
+      setBusy("planning");
+      const plan = await api.imports.apply(orgId, { bundle, dryRun: true });
+      if (!current()) return;
+      done.current = new Map();
+      focus.current = "preview";
+      setPlanned({ bundle, items: plan.items, skipped });
+      setPick(new Set(plan.items.filter(choosable).map(itemId)));
+      setSkillsOn(new Set());
+      setReport(null);
+      setCard(bundleOrigin(bundle).card);
+    } catch (cause) {
+      if (current()) setFailure({ from, step, cause });
+    } finally {
+      if (current()) setBusy(null);
+    }
+  };
+
+  /**
+   * Applies what is picked (in chunks) and keeps the report. `prepare` changes
+   * the bundle first (onboarding sets the models the chosen key can run).
+   */
+  const apply = async (prepare?: (bundle: MigrationBundle) => MigrationBundle) => {
+    if (!orgId || !planned) return [];
+    const ids = picksOf(planned.items, pick, blockedItems(planned.bundle, planned.items, pick));
+    if (ids.length === 0) return [];
+    const enableSkills = [...skillsOn].filter((id) => pick.has(id));
+    setProgress({ done: 0, total: ids.length });
+    try {
+      const items = await applyInChunks(
+        api,
+        orgId,
+        { bundle: prepare ? prepare(planned.bundle) : planned.bundle, pick: ids, enableSkills },
+        done.current,
+        (n) => setProgress({ done: n, total: ids.length }),
+      );
+      focus.current = "report";
+      setReport(items);
+      return items;
+    } finally {
+      setProgress(null);
+      void qc.invalidateQueries({ queryKey: keys.org(orgId) });
+    }
+  };
+
+  const toggle = (ids: string[], on: boolean, set = setPick) =>
+    set((p) => {
+      const next = new Set(p);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+
+  return {
+    card,
+    setCard,
+    busy,
+    failure,
+    planned,
+    pick,
+    skillsOn,
+    progress,
+    report,
+    focus,
+    read,
+    /** Reads the last input again (after a failure that wasn't about the input itself). */
+    retry: () => (last.current ? read(last.current) : Promise.resolve()),
+    /** Stops waiting for a read: what it finds is dropped. */
+    cancel: () => {
+      run.current++;
+      focus.current = "drop";
+      setBusy(null);
+    },
+    apply,
+    toggle: (ids: string[], on: boolean) => toggle(ids, on),
+    toggleSkill: (id: string, on: boolean) => toggle([id], on, setSkillsOn),
+    reset: () => {
+      run.current++;
+      done.current = new Map();
+      focus.current = "drop";
+      setBusy(null);
+      setFailure(null);
+      setPlanned(null);
+      setReport(null);
+    },
+  };
+}
+
+export type ImportFlowState = ReturnType<typeof useImportFlow>;
+
+/** Moves focus to `el` once, when the flow asked for it (a step that replaced what had focus). */
+function useFocusOn<T extends HTMLElement>(flow: ImportFlowState, target: Exclude<Focus, null>) {
+  const el = useRef<T>(null);
+  useEffect(() => {
+    if (flow.focus.current !== target) return;
+    flow.focus.current = null;
+    el.current?.focus();
+  });
+  return el;
+}
+
+/** What went wrong reading or planning, and what to do next. */
+function failureText(t: TFunction, { from, step, cause }: ImportFailure) {
+  if (cause === NOT_GITHUB) return t("onboarding.import.errors.notGithub");
+  if (cause instanceof ImportError) {
+    return cause.code === "unknown" && from === "paste"
+      ? t("onboarding.import.errors.unknownPasted")
+      : t(`onboarding.import.errors.${cause.code}`);
+  }
+  const network = step === "plan" || (step === "read" && from === "link");
+  if (network && failedOffline(cause)) return t("onboarding.import.errors.offline");
+  if (cause instanceof ApiError && cause.status === 413) return t("onboarding.import.errors.tooBig");
+  if (cause instanceof ApiError && cause.status === 403) return t("common.notAllowed");
+  if (step === "plan" && cause instanceof ApiError && cause.status === 400) {
+    return t("onboarding.import.errors.invalidBundle");
+  }
+  if (step === "plan") return t("onboarding.import.errors.plan");
+  return from === "link" ? t("onboarding.import.errors.link") : t("onboarding.import.errors.read");
+}
+
+function applyErrorText(t: TFunction, error: unknown) {
+  if (failedOffline(error)) return t("onboarding.import.errors.offline");
+  if (error instanceof ApiError && error.status === 413) return t("onboarding.import.errors.tooBig");
+  if (error instanceof ApiError && error.status === 403) return t("common.notAllowed");
+  if (error instanceof ApiError && error.code === "import.too_many_items") return t("onboarding.import.errors.tooMany");
+  return t("onboarding.import.errors.apply");
+}
+
+/** Why an item doesn't come, in plain words (an existing skill or channel says which). */
+function whyText(t: TFunction, kind: ImportItemKind, reason: ImportSkipReason) {
+  if (reason === "exists" && kind === "skill") return t("onboarding.import.whyExists.skill");
+  if (reason === "exists" && kind === "channel") return t("onboarding.import.whyExists.channel");
+  return t(`onboarding.import.why.${reason}`);
+}
+
+/**
+ * The whole flow: the source cards and the drop zone, the plan to pick from,
+ * then the report. `standalone` (Configurações) has its own Importar button;
+ * onboarding applies when its agents step continues. `level` is the
+ * flow's top heading level.
+ */
+export function ImportFlow({
+  flow,
+  orgId,
+  standalone = false,
+  level = 2,
+}: {
+  flow: ImportFlowState;
+  orgId: string;
+  standalone?: boolean;
+  level?: 2 | 3;
+}) {
+  if (flow.planned && flow.report)
+    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} />;
+  if (flow.planned) return <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />;
+  return <Picker flow={flow} />;
+}
+
+function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">) {
+  const Tag = `h${level}` as const;
+  return <Tag {...rest} />;
+}
+
+function SourceMark({ card }: { card: ImportCard }) {
+  // The app's own theme, which can differ from the system's: so not a `<picture>` with a media query.
+  const dark = useTheme().resolved === "dark";
+  if (card === "other") {
+    return (
+      <span className="imp-mark" aria-hidden="true">
+        <Icon name="message" />
+      </span>
+    );
+  }
+  const mark = CARD_MARK[card];
+  return (
+    <span className="imp-mark" aria-hidden="true">
+      <img src={dark && mark.dark ? mark.dark : mark.icon} alt="" className="imp-mark__img" />
+    </span>
+  );
+}
+
+/** Pick the app (for where its file is), then drop, choose, link or paste: the source is recognized either way. */
+function Picker({ flow }: { flow: ImportFlowState }) {
+  const { t } = useTranslation();
+  const filesInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
+  const drop = useFocusOn<HTMLButtonElement>(flow, "drop");
+  const [over, setOver] = useState(false);
+  const [text, setText] = useState("");
+  const busy = flow.busy !== null;
+  const submit = (value: string) => {
+    const v = value.trim();
+    if (!v || busy) return;
+    void flow.read(/^https?:\/\//i.test(v) ? { url: v } : { text: v });
+  };
+  const picked = (list: FileList | null) => {
+    const files = Array.from(list ?? []);
+    if (files.length) void flow.read({ files });
+  };
+  const cardName = (c: ImportCard) => {
+    if (c === "other") return t("onboarding.import.otherName");
+    if (c === "agenteschat") return t("onboarding.import.agenteschatName");
+    if (c === "grok-bot" || c === "chatgpt-dots") return EXPORT_PROMPT_APPS.find((a) => a.app === c)?.name;
+    return SOURCE_NAME[c];
+  };
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the drop zone button and the pickers are the keyboard way
+    <div
+      className="imp-pick"
+      data-over={over || undefined}
+      // A file dropped here is always caught (the browser would open it in place of the flow); while a
+      // read runs it is refused.
+      onDragOver={(e) => {
+        if (!hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = busy ? "none" : "copy";
+        if (!busy) setOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        setOver(false);
+        if (!busy) void flow.read({ files: droppedFiles(e.dataTransfer) });
+      }}
+    >
+      {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+      <div className="imp-sources" role="group" aria-label={t("onboarding.import.sourcesLabel")}>
+        {IMPORT_CARDS.map((c) => (
+          <OptionCard
+            key={c}
+            stacked
+            pressed={flow.card === c}
+            onClick={() => flow.setCard(flow.card === c ? null : c)}
+            className="imp-source"
+          >
+            <SourceMark card={c} />
+            <span className="ac-option__title">{cardName(c)}</span>
+          </OptionCard>
+        ))}
+      </div>
+
+      {flow.card === "grok-bot" || flow.card === "chatgpt-dots" || flow.card === "other" ? (
+        <OtherApp key={flow.card} card={flow.card} />
+      ) : (
+        flow.card && (
+          <p className="imp-tip ac-iconline">
+            <Icon name="info" size={16} />
+            <span>{t(`onboarding.import.where.${flow.card}`)}</span>
+          </p>
+        )
+      )}
+
+      {busy ? (
+        <div className="imp-reading">
+          <span className="imp-reading__text" role="status">
+            <Spinner />
+            {flow.busy === "planning" ? t("onboarding.import.planning") : t("onboarding.import.reading")}
+          </span>
+          <Button size="sm" variant="ghost" onClick={flow.cancel}>
+            {t("common.cancel")}
+          </Button>
+        </div>
+      ) : (
+        <div className="imp-drop">
+          <button ref={drop} type="button" className="imp-drop__area" onClick={() => filesInput.current?.click()}>
+            <Icon name="upload" />
+            <b>{over ? t("onboarding.import.dropping") : t("onboarding.import.drop")}</b>
+            <span>{t("onboarding.import.dropHelp")}</span>
+          </button>
+          <Button size="sm" variant="ghost" icon="drive" onClick={() => folderInput.current?.click()}>
+            {t("onboarding.import.pickFolder")}
+          </Button>
+        </div>
+      )}
+      <input
+        ref={filesInput}
+        type="file"
+        multiple
+        hidden
+        accept={IMPORT_ACCEPT}
+        aria-label={t("onboarding.import.fileLabel")}
+        onChange={(e) => {
+          picked(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={folderInput}
+        type="file"
+        multiple
+        hidden
+        aria-label={t("onboarding.import.folderLabel")}
+        // biome-ignore lint/suspicious/noExplicitAny: non-standard attribute React doesn't type
+        {...({ webkitdirectory: "" } as any)}
+        onChange={(e) => {
+          picked(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      <Field label={t("onboarding.import.paste")} id="import-paste">
+        <div className="imp-paste">
+          <Input
+            value={text}
+            placeholder={t("onboarding.import.pastePlaceholder")}
+            autoComplete="off"
+            spellCheck={false}
+            disabled={busy}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => {
+              // A pasted reply is read right away, line breaks and all (a one-line field would drop them).
+              const pasted = e.clipboardData.getData("text");
+              if (!pasted.trim() || /^\s*https?:\/\//i.test(pasted)) return;
+              e.preventDefault();
+              setText("");
+              submit(pasted);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              submit(text);
+            }}
+          />
+          <Button onClick={() => submit(text)} disabled={!text.trim() || busy}>
+            {t("onboarding.import.readPasted")}
+          </Button>
+        </div>
+      </Field>
+
+      {flow.failure && (
+        <div className="imp-failure">
+          <Alert>{failureText(t, flow.failure)}</Alert>
+          {retryable(flow.failure) && (
+            <Button size="sm" icon="refresh" onClick={() => void flow.retry()}>
+              {t("common.retry")}
+            </Button>
+          )}
+        </div>
+      )}
+      {/* What a person needs before dropping a folder that holds keys: said on the line, the rest in its ⓘ. */}
+      <p className="imp-note ac-iconline">
+        <Icon name="lock" size={16} />
+        <span className="ac-hintline">
+          <span>{t("onboarding.import.privacy")}</span>
+          <InfoHint name={t("common.about", { label: t("onboarding.import.privacyLabel") })}>
+            {t("onboarding.import.privacyMore")}
+          </InfoHint>
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The request to paste in the app, in Grok Bot's or ChatGPT dots' own words on their cards. For any other
+ * app, where each one gives the file back is on the help page.
+ */
+function OtherApp({ card }: { card: RequestCard }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(EXPORT_PROMPT);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+    }
+  };
+  return (
+    <section className="imp-other" aria-labelledby="imp-other-title">
+      <h3 id="imp-other-title" className="imp-other__title">
+        {t(`onboarding.import.request.${card}.title`)}
+      </h3>
+      <ol className="imp-other__steps">
+        <li>{t("onboarding.import.request.copyStep")}</li>
+        <li>{t(`onboarding.import.request.${card}.paste`)}</li>
+        <li>{t(`onboarding.import.request.${card}.back`)}</li>
+      </ol>
+      <Textarea
+        readOnly
+        rows={6}
+        value={EXPORT_PROMPT}
+        aria-label={t("onboarding.import.request.prompt")}
+        className="imp-other__prompt"
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="imp-other__copy">
+        <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
+          {copied === "ok" ? t("common.copied") : t("onboarding.import.request.copy")}
+        </Button>
+        <span role="status" className="small muted">
+          {copied === "ok"
+            ? t(`onboarding.import.request.${card}.copied`)
+            : copied === "failed"
+              ? t("onboarding.import.request.copyFailed")
+              : ""}
+        </span>
+      </div>
+      {card === "other" && (
+        <p className="imp-help">
+          <HelpLink slug="import" section="other-apps">
+            {t("onboarding.import.request.where")}
+          </HelpLink>
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Lookups by key in the bundle, and who comes (picked, or already here). */
+function useBundleIndex(flow: ImportFlowState) {
+  const planned = flow.planned;
+  const index = useMemo(() => {
+    const b = planned?.bundle;
+    return {
+      agents: new Map((b?.agents ?? []).map((a) => [a.key, a])),
+      skills: new Map((b?.skills ?? []).map((s) => [s.key, s])),
+      channels: new Map((b?.channels ?? []).map((c) => [c.key, c])),
+      routines: new Map((b?.routines ?? []).map((r) => [r.key, r])),
+      notes: new Map((b?.notes ?? []).map((n) => [n.key, n])),
+      items: new Map((planned?.items ?? []).map((i) => [itemId(i), i])),
+    };
+  }, [planned]);
+  /** Created or changed by this import (checked). */
+  const picked = (kind: ImportItemKind, key: string) => {
+    const item = index.items.get(`${kind}:${key}`);
+    return !!item && choosable(item) && flow.pick.has(itemId(item));
+  };
+  const coming = (kind: ImportItemKind, key: string) =>
+    index.items.get(`${kind}:${key}`)?.action === "unchanged" || picked(kind, key);
+  const nameOf = (key: string) => index.agents.get(key)?.name ?? key;
+  return { ...index, picked, coming, nameOf };
+}
+
+/** Skipped last, already-here before them; the plan's order otherwise. */
+const RANK: Record<ImportItemResult["action"], number> = { create: 0, update: 0, unchanged: 1, skip: 2 };
+
+/** The dry run, to pick from: groups with a status per row, then what to do after and what stays behind. */
+function Preview({
+  flow,
+  orgId,
+  standalone,
+  level,
+}: {
+  flow: ImportFlowState;
+  orgId: string;
+  standalone: boolean;
+  level: 2 | 3;
+}) {
+  const { t } = useTranslation();
+  const heading = useFocusOn<HTMLHeadingElement>(flow, "preview");
+  const index = useBundleIndex(flow);
+  const planned = flow.planned;
+  const blocked = useMemo(
+    () => (planned ? blockedItems(planned.bundle, planned.items, flow.pick) : new Map<string, ImportSkipReason>()),
+    [planned, flow.pick],
+  );
+  if (!planned) return null;
+  const { bundle, items, skipped } = planned;
+  const origin = bundleOrigin(bundle);
+  const applying = flow.progress !== null;
+  const picks = picksOf(items, flow.pick, blocked);
+  const summary = KINDS.map(
+    (kind) => [kind, items.filter((i) => i.kind === kind && i.action !== "skip").length] as const,
+  )
+    .filter(([, n]) => n > 0)
+    .map(([kind, count]) => t(`onboarding.import.report.kinds.${kind}`, { count }))
+    .join(" · ");
+  const left = groupLeftOut(bundle.leftOut);
+  const sub = (level + 1) as 3 | 4;
+
+  return (
+    <section className="imp-preview" aria-labelledby="imp-preview-title">
+      <header className="imp-head">
+        <SourceMark card={origin.card} />
+        <div className="imp-head__text">
+          <Heading level={level} id="imp-preview-title" ref={heading} tabIndex={-1} className="imp-head__title">
+            {bundle.source.name}
+          </Heading>
+          <p className="imp-head__sub">
+            {[origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther"), summary]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={flow.reset} disabled={applying}>
+          {t("onboarding.import.change")}
+        </Button>
+      </header>
+      {bundle.source.ref === `agenteschat:${orgId}` && (
+        <Alert tone="neutral">{t("onboarding.import.sameWorkspace")}</Alert>
+      )}
+
+      <fieldset className="imp-groups" disabled={applying}>
+        <legend className="ac-visually-hidden">{t("onboarding.import.pickLegend")}</legend>
+        {KINDS.map((kind) => {
+          const rows = items.filter((i) => i.kind === kind).sort((a, b) => RANK[a.action] - RANK[b.action]);
+          return rows.length > 0 ? (
+            <Group key={kind} kind={kind} rows={rows} flow={flow} blocked={blocked} index={index} level={sub} />
+          ) : null;
+        })}
+      </fieldset>
+
+      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab />}
+
+      {(left.length > 0 || skipped.length > 0) && (
+        <section className="imp-block" aria-labelledby="imp-left-title">
+          <Heading level={sub} id="imp-left-title" className="imp-block__title">
+            {t("onboarding.import.leftOutTitle")}
+          </Heading>
+          <ul className="imp-left">
+            {left.map((g) => (
+              <li key={g.kind}>
+                <Chip icon={LEFT_OUT_ICON[g.kind]}>{t(`onboarding.import.leftOut.${g.kind}`)}</Chip>
+                <span className="small">{g.labels.join(", ")}</span>
+              </li>
+            ))}
+            {skipped.length > 0 && (
+              <li>
+                <Chip icon="file">{t("onboarding.import.linkSkipped", { count: skipped.length })}</Chip>
+                <span className="small">
+                  {skipped.join(", ")} · {t("onboarding.import.linkSkippedHelp")}
+                </span>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
+      <p className="imp-note ac-iconline">
+        <Icon name="lock" size={16} />
+        <span>{t("onboarding.import.never")}</span>
+      </p>
+
+      {standalone ? (
+        <ApplyBar flow={flow} count={picks.length} />
+      ) : (
+        <p className="imp-note ac-iconline">
+          <Icon name="info" size={16} />
+          <span>{t("onboarding.import.withTeam")}</span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Importar (Configurações): the count, the progress while it runs, and what to do when it fails. */
+function ApplyBar({ flow, count }: { flow: ImportFlowState; count: number }) {
+  const { t } = useTranslation();
+  const apply = useMutation({ mutationFn: () => flow.apply(), meta: { silent: true } });
+  const items = flow.planned?.items ?? [];
+  const here = items.every((i) => i.action === "unchanged");
+  return (
+    <div className="imp-apply">
+      {apply.isError && <Alert>{applyErrorText(t, apply.error)}</Alert>}
+      {flow.progress && (
+        <p className="imp-apply__progress" role="status">
+          {t("onboarding.import.applying", flow.progress)}
+        </p>
+      )}
+      {items.some(choosable) ? (
+        <Button
+          variant="primary"
+          onClick={() => apply.mutate()}
+          disabled={count === 0 || apply.isPending}
+          loading={apply.isPending}
+        >
+          {t("onboarding.import.go", { count })}
+        </Button>
+      ) : (
+        <p className="imp-apply__none ac-iconline">
+          <Icon name={here ? "check" : "info"} size={16} />
+          {here ? t("onboarding.import.nothingNew") : t("onboarding.import.nothingToBring")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type Index = ReturnType<typeof useBundleIndex>;
+
+/** A group (Agentes, Skills…): pick all, its rows, the first few until "Mostrar mais". */
+function Group({
+  kind,
+  rows,
+  flow,
+  blocked,
+  index,
+  level,
+}: {
+  kind: ImportItemKind;
+  rows: ImportItemResult[];
+  flow: ImportFlowState;
+  blocked: Map<string, ImportSkipReason>;
+  index: Index;
+  level: 3 | 4;
+}) {
+  const { t } = useTranslation();
+  const long = rows.length > SHOWN + 2;
+  const [open, setOpen] = useState(!long);
+  const free = rows.filter((i) => choosable(i) && !blocked.has(itemId(i))).map(itemId);
+  const on = free.filter((id) => flow.pick.has(id)).length;
+  const title = t(`onboarding.import.groups.${kind}`);
+  return (
+    <section className="imp-group" aria-labelledby={`imp-group-${kind}`}>
+      <div className="imp-group__head">
+        {free.length > 0 ? (
+          <Checkbox
+            checked={on === 0 ? false : on === free.length ? true : "indeterminate"}
+            onCheckedChange={(v) => flow.toggle(free, v)}
+            aria-label={t("onboarding.import.bringAll", { group: title })}
+          />
+        ) : (
+          <span className="imp-row__mark" aria-hidden="true" />
+        )}
+        <Heading level={level} id={`imp-group-${kind}`} className="imp-group__title">
+          {title}
+        </Heading>
+        <CountChip size="sm">{rows.length}</CountChip>
+        {/* Only what changes what happens after the import: skills arrive off, routines paused. */}
+        {(kind === "skill" || kind === "routine") && (
+          <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
+        )}
+      </div>
+      <ul className="imp-rows">
+        {(open ? rows : rows.slice(0, SHOWN)).map((item, i) => (
+          <Row
+            key={itemId(item)}
+            rowId={`imp-${kind}-${i}`}
+            item={item}
+            flow={flow}
+            reason={item.action === "skip" ? item.reason : blocked.get(itemId(item))}
+            index={index}
+          />
+        ))}
+      </ul>
+      {long && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="imp-group__more"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? t("onboarding.import.less") : t("onboarding.import.more", { count: rows.length - SHOWN })}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** The chip of a row: what the import does with it. */
+function statusOf(
+  item: ImportItemResult,
+  reason: ImportSkipReason | undefined,
+): {
+  icon: IconName;
+  tone?: ChipTone;
+  key: "create" | "update" | "unchanged" | "skip" | "join";
+} {
+  if (item.action === "skip" || reason) return { icon: "block", key: "skip" };
+  if (item.action === "update" && item.reason === "exists") return { icon: "link", key: "join" };
+  if (item.action === "update") return { icon: "refresh", key: "update" };
+  if (item.action === "unchanged") return { icon: "check", tone: "done", key: "unchanged" };
+  return { icon: "plus", key: "create" };
+}
+
+function Row({
+  rowId,
+  item,
+  flow,
+  reason,
+  index,
+}: {
+  rowId: string;
+  item: ImportItemResult;
+  flow: ImportFlowState;
+  /** Why it won't come: the plan's skip, or something it needs that was unchecked. */
+  reason: ImportSkipReason | undefined;
+  index: Index;
+}) {
+  const { t } = useTranslation();
+  const id = itemId(item);
+  const pickable = choosable(item) && !reason;
+  const checked = pickable && flow.pick.has(id);
+  const status = statusOf(item, reason);
+  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+
+  let title = item.label;
+  let lead: ReactNode = <Icon name={KIND_ICON[item.kind]} size={16} />;
+  const lines: string[] = [];
+  let extra: ReactNode = null;
+  if (item.kind === "agent") {
+    const a = index.agents.get(item.key);
+    if (a) {
+      title = a.role ? `${item.label} · ${a.role}` : item.label;
+      lead = <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />;
+      if (!item.renamedTo) lines.push(`@${a.handle}`);
+    }
+  } else if (item.kind === "skill") {
+    const s = index.skills.get(item.key);
+    const about = s ? frontmatter(s.markdown)?.data.description : undefined;
+    if (typeof about === "string" && about.trim()) lines.push(about.trim());
+    // Only agents this import creates or changes get it turned on (one already here gets it on its own page).
+    const users = [...index.agents.values()].filter((a) => a.skills.includes(item.key) && index.picked("agent", a.key));
+    if (checked && users.length > 0) {
+      extra = (
+        <span className="imp-row__switch">
+          <Switch
+            id={`${rowId}-on`}
+            checked={flow.skillsOn.has(id)}
+            onCheckedChange={(on) => flow.toggleSkill(id, on)}
+          />
+          <label htmlFor={`${rowId}-on`}>
+            {t("onboarding.import.skillOn", { names: names(users.map((a) => a.name)) })}
+          </label>
+        </span>
+      );
+    } else if (pickable && users.length === 0) lines.push(t("onboarding.import.noUsers"));
+  } else if (item.kind === "channel") {
+    const c = index.channels.get(item.key);
+    title = `#${item.label}`;
+    if (c?.topic) lines.push(c.topic);
+    const members = (c?.agents ?? []).filter((m) => index.coming("agent", m.key)).map((m) => index.nameOf(m.key));
+    if (members.length) lines.push(t("onboarding.import.with", { names: names(members) }));
+  } else if (item.kind === "routine") {
+    const r = index.routines.get(item.key);
+    if (r) {
+      const agent = index.nameOf(r.agent);
+      const channel = r.channel ? index.channels.get(r.channel)?.name : undefined;
+      lines.push(
+        channel ? t("onboarding.import.inChannel", { agent, channel }) : t("onboarding.import.inDm", { agent }),
+      );
+    }
+  } else {
+    const n = index.notes.get(item.key);
+    // The label is the note's first line: a Markdown heading or list mark is noise in a row.
+    title = item.label.replace(/^(#+|[-*+]|\d+[.)])\s+/, "");
+    lines.push(
+      n?.agent
+        ? t("onboarding.import.memoryOf", { name: index.nameOf(n.agent) })
+        : t("onboarding.import.memoryWorkspace"),
+    );
+  }
+
+  const notes: string[] = [];
+  if (reason) notes.push(whyText(t, item.kind, reason));
+  // A channel's update only brings agents in: its name and topic stay as people here left them.
+  else if (item.action === "update" && (item.reason === "exists" || item.kind === "channel"))
+    notes.push(t("onboarding.import.joins", { name: item.label }));
+  else {
+    if (item.reason === "model_not_in_catalog") notes.push(t("onboarding.import.why.model_not_in_catalog"));
+    if (item.action === "update") notes.push(t("onboarding.import.updates"));
+  }
+  if (item.renamedTo && !reason) {
+    const wanted = index.agents.get(item.key)?.handle ?? item.key;
+    notes.push(t("onboarding.import.renamed", { handle: item.renamedTo, wanted }));
+  }
+  if (item.trimmed?.length && !reason) {
+    const fields = item.trimmed.map((f) =>
+      FIELDS.some((k) => k === f) ? t(`onboarding.import.fields.${f as (typeof FIELDS)[number]}`) : f,
+    );
+    notes.push(t("onboarding.import.trimmed", { fields: fields.join(", ") }));
+  }
+
+  const text = (
+    <>
+      <span className="imp-row__title">{title}</span>
+      {lines.map((l) => (
+        <span key={l} className="imp-row__line">
+          {l}
+        </span>
+      ))}
+      {notes.map((n) => (
+        <span key={n} className="imp-row__note">
+          {n}
+        </span>
+      ))}
+    </>
+  );
+  return (
+    <li className="imp-row" data-off={(!checked && item.action !== "unchanged") || undefined}>
+      {pickable ? (
+        <Checkbox
+          id={rowId}
+          checked={checked}
+          onCheckedChange={(on) => flow.toggle([id], on)}
+          aria-label={t("onboarding.import.bring", { name: item.label })}
+          aria-describedby={`${rowId}-about ${rowId}-status`}
+        />
+      ) : (
+        <span className="imp-row__mark" aria-hidden="true">
+          <Icon name={item.action === "unchanged" ? "check" : "dash"} size={14} />
+        </span>
+      )}
+      <span className="imp-row__lead" aria-hidden="true">
+        {lead}
+      </span>
+      {pickable ? (
+        <label htmlFor={rowId} id={`${rowId}-about`} className="imp-row__text">
+          {text}
+        </label>
+      ) : (
+        <span className="imp-row__text">{text}</span>
+      )}
+      {extra}
+      <Chip id={`${rowId}-status`} icon={status.icon} tone={status.tone} className="imp-row__chip">
+        {t(`onboarding.import.status.${status.key}`)}
+      </Chip>
+    </li>
+  );
+}
+
+/** Where a to-do is done: Conectores, the team or the Drive. A secret has no page: the agent asks for it in the chat. */
+function TodoLink({ kind, orgId, newTab }: { kind: BundleTodo["kind"]; orgId: string; newTab: boolean }) {
+  const { t } = useTranslation();
+  if (kind === "secret") return null;
+  // Before the import is applied, the page opens in another tab: the plan stays here.
+  const target = newTab ? { target: "_blank", rel: "noopener" } : {};
+  const body = (
+    <>
+      {t(`onboarding.import.todoOpen.${kind}`)}
+      {newTab && <Icon name="external" size={14} />}
+    </>
+  );
+  if (kind === "model") {
+    return (
+      <Link to="/org/$orgId/team" params={{ orgId }} className="ac-link imp-todo__link" {...target}>
+        {body}
+      </Link>
+    );
+  }
+  if (kind === "file") {
+    return (
+      <Link to="/org/$orgId/drive" params={{ orgId }} className="ac-link imp-todo__link" {...target}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      to="/org/$orgId/settings/$section"
+      params={{ orgId, section: "connectors" }}
+      className="ac-link imp-todo__link"
+      {...target}
+    >
+      {body}
+    </Link>
+  );
+}
+
+/** "Depois de importar": what the person sets up by hand (connect an app, choose a model…), with where. */
+function Todos({
+  todo,
+  nameOf,
+  level,
+  orgId,
+  newTab = false,
+}: {
+  todo: BundleTodo[];
+  nameOf: (key: string) => string;
+  level: 3 | 4;
+  orgId: string;
+  newTab?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className="imp-block" aria-labelledby="imp-todo-title">
+      <Heading level={level} id="imp-todo-title" className="imp-block__title">
+        {t("onboarding.import.todoTitle")}
+      </Heading>
+      <ul className="imp-todo">
+        {todo.map((x) => (
+          <li key={`${x.kind}:${x.label}`} className="ac-iconline">
+            <Icon name={TODO_ICON[x.kind]} size={16} />
+            <span className="imp-todo__text">
+              <span>{t(`onboarding.import.todo.${x.kind}`, { label: x.label })}</span>
+              {x.agents.length > 0 && (
+                <span className="imp-todo__for">
+                  {t("onboarding.import.todoFor", { names: joinNames(x.agents.map(nameOf), t("newAgent.and")) })}
+                </span>
+              )}
+            </span>
+            <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * After the apply: what came (with links to it), what didn't and why (with
+ * Tentar de novo: applying again is safe), and what to set up next.
+ */
+export function ImportReport({
+  flow,
+  orgId,
+  level = 2,
+  onRetry,
+  onAnother,
+}: {
+  flow: ImportFlowState;
+  orgId: string;
+  level?: 2 | 3;
+  /** Default: apply again. */
+  onRetry?: () => Promise<unknown>;
+  onAnother?: () => void;
+}) {
+  const { t } = useTranslation();
+  const heading = useFocusOn<HTMLHeadingElement>(flow, "report");
+  const index = useBundleIndex(flow);
+  const retry = useMutation({ mutationFn: () => (onRetry ? onRetry() : flow.apply()), meta: { silent: true } });
+  const report = flow.report;
+  const bundle = flow.planned?.bundle;
+  if (!report || !bundle) return null;
+  const made = report.filter((i) => i.action === "create" || i.action === "update");
+  const missed = report.filter((i) => i.action === "skip");
+  // Already here: what the plan said so (never sent) and what came back unchanged.
+  const sent = new Set(report.map(itemId));
+  const kept = [...(flow.planned?.items ?? []).filter((i) => !sent.has(itemId(i))), ...report].filter(
+    (i) => i.action === "unchanged",
+  ).length;
+  const agentId = new Map(report.filter((i) => i.kind === "agent" && i.targetId).map((i) => [i.key, i.targetId]));
+  const sub = (level + 1) as 3 | 4;
+
+  const links = (kind: ImportItemKind, list: ImportItemResult[]): ReactNode => {
+    if (kind === "agent") {
+      return list.map((i) => {
+        const a = index.agents.get(i.key);
+        return i.targetId ? (
+          <Link
+            key={i.key}
+            to="/org/$orgId/agents/$agentId"
+            params={{ orgId, agentId: i.targetId }}
+            className="imp-link"
+          >
+            {a && <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />}
+            {i.label}
+          </Link>
+        ) : null;
+      });
+    }
+    if (kind === "channel") {
+      return list.map((i) =>
+        i.targetId ? (
+          <Link
+            key={i.key}
+            to="/org/$orgId/c/$channelId"
+            params={{ orgId, channelId: i.targetId }}
+            className="imp-link"
+          >
+            #{i.label}
+          </Link>
+        ) : null,
+      );
+    }
+    if (kind === "skill") {
+      return (
+        <Link to="/org/$orgId/settings/$section" params={{ orgId, section: "skills" }} className="imp-link">
+          {t("onboarding.import.report.openSkills")}
+        </Link>
+      );
+    }
+    if (kind === "routine") {
+      return (
+        <Link to="/org/$orgId/routines" params={{ orgId }} className="imp-link">
+          {t("onboarding.import.report.openRoutines")}
+        </Link>
+      );
+    }
+    const owners = [
+      ...new Set(
+        list.flatMap((i) => {
+          const key = index.notes.get(i.key)?.agent;
+          return key ? [key] : [];
+        }),
+      ),
+    ];
+    return owners.map((key) => {
+      const id = agentId.get(key);
+      return id ? (
+        <Link key={key} to="/org/$orgId/agents/$agentId/memory" params={{ orgId, agentId: id }} className="imp-link">
+          {t("onboarding.import.memoryOf", { name: index.nameOf(key) })}
+        </Link>
+      ) : null;
+    });
+  };
+
+  return (
+    <section className="imp-report" aria-labelledby="imp-report-title">
+      <header className="imp-head">
+        <span className="imp-mark imp-mark--done" aria-hidden="true">
+          <Icon name={missed.length ? "alert" : "check"} />
+        </span>
+        <div className="imp-head__text">
+          <Heading level={level} id="imp-report-title" ref={heading} tabIndex={-1} className="imp-head__title">
+            {missed.length
+              ? t("onboarding.import.report.partial", { done: report.length - missed.length, total: report.length })
+              : t("onboarding.import.report.title")}
+          </Heading>
+          <p className="imp-head__sub">{bundle.source.name}</p>
+        </div>
+      </header>
+
+      <ul className="imp-made">
+        {KINDS.map((kind) => {
+          const list = made.filter((i) => i.kind === kind);
+          if (list.length === 0) return null;
+          return (
+            <li key={kind}>
+              <span className="imp-made__icon" aria-hidden="true">
+                <Icon name={KIND_ICON[kind]} size={16} />
+              </span>
+              <span className="imp-made__text">
+                <b>{t(`onboarding.import.report.kinds.${kind}`, { count: list.length })}</b>
+                {kind === "routine" && <span className="muted">{t("onboarding.import.report.paused")}</span>}
+                {kind === "skill" && <span className="muted">{t("onboarding.import.report.skillsOff")}</span>}
+                <span className="imp-made__links">{links(kind, list)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {kept > 0 && <p className="small muted">{t("onboarding.import.report.kept", { count: kept })}</p>}
+
+      {missed.length > 0 && (
+        <section className="imp-block" aria-labelledby="imp-missed-title">
+          <Heading level={sub} id="imp-missed-title" className="imp-block__title">
+            {t("onboarding.import.report.notCame")}
+          </Heading>
+          <ul className="imp-missed">
+            {missed.map((i) => (
+              <li key={itemId(i)} className="ac-iconline">
+                <Icon name={KIND_ICON[i.kind]} size={16} />
+                <span>
+                  {i.label}
+                  {i.reason && <span className="muted"> · {whyText(t, i.kind, i.reason)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {retry.isError && <Alert>{applyErrorText(t, retry.error)}</Alert>}
+          <div>
+            <Button icon="refresh" onClick={() => retry.mutate()} loading={retry.isPending} disabled={retry.isPending}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} />}
+
+      {onAnother && (
+        <div>
+          <Button variant="ghost" icon="upload" onClick={onAnother}>
+            {t("onboarding.import.report.another")}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
+ * carries (whoever shares the file needs that); the full list is on the help page.
+ */
+export function ImportExportSection() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const flow = useImportFlow(org.id);
+  if (!can(org.role, "manage_agents")) return null;
+  const download = () =>
+    fileSaver.save(api.imports.exportUrl(org.id), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
+  return (
+    <>
+      <Card aria-labelledby="imp-import-title">
+        <CardHeader icon="upload" id="imp-import-title" title={t("settings.import.title")} />
+        <ImportFlow flow={flow} orgId={org.id} standalone level={3} />
+      </Card>
+      <Card aria-labelledby="imp-export-title">
+        <CardHeader
+          icon="download"
+          id="imp-export-title"
+          title={t("settings.import.exportTitle")}
+          action={
+            <Button icon="download" onClick={download}>
+              {t("settings.import.download")}
+            </Button>
+          }
+        />
+        <p className="imp-note ac-iconline">
+          <Icon name="lock" size={16} />
+          <span>{t("settings.import.neverLine")}</span>
+        </p>
+        <p className="imp-help">
+          <HelpLink slug="import" section="export">
+            {t("settings.import.whatsIn")}
+          </HelpLink>
+        </p>
+      </Card>
+    </>
+  );
+}

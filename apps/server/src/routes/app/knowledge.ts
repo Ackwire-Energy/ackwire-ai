@@ -43,7 +43,16 @@ const KINDS = [
   "note",
   "lesson",
 ] as const;
-const SEARCH_KINDS = ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki"] as const;
+const SEARCH_KINDS = [
+  "message",
+  "context_item",
+  "issue",
+  "forum_topic",
+  "forum_reply",
+  "file",
+  "wiki",
+  "action",
+] as const;
 
 const Item = z
   .object({
@@ -119,7 +128,8 @@ export function knowledgeRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/search",
       tags,
       security,
-      summary: "Search what you can read (messages, summaries, facts, issues, forum, files)",
+      summary:
+        "Search what you can read (messages, summaries, facts, issues, forum, files, the team's outside actions)",
       request: {
         params: OrgParams,
         query: z.object({

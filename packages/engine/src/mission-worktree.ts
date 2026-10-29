@@ -2,6 +2,7 @@ import { MISSION_WORKTREE_PROTOCOL, parseMissionWorktreeEnsured } from "@agentes
 import { and, desc, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import { runAuthorityById } from "./authority";
 import { ConflictError } from "./errors";
 import { publishUserEvent } from "./events";
 import { MachineRequestError } from "./machine-hub";
@@ -867,7 +868,7 @@ export async function writeItemLive(db: Executor, missionId: string) {
   return Boolean(row);
 }
 
-type Turn = { orgId: string; agentId: string; threadRootId: string | null };
+type Turn = { orgId: string; agentId: string; threadRootId: string | null; runId?: string };
 
 async function turnMission(db: Executor, turn: Turn) {
   if (!turn.threadRootId) return null;
@@ -880,18 +881,34 @@ const readsOnly = async (db: Executor, mission: MissionRow) =>
   mission.status === "proposed" || (await writeItemLive(db, mission.id));
 
 /**
+ * A run in the mission's thread that isn't the mission's work nor a person's (ADR 0053 §3): one a
+ * routine's report or another agent's note woke there. It only reads, as it would anywhere else.
+ */
+async function wokenByNews(db: Executor, turn: Turn) {
+  if (!turn.runId) return false;
+  const authority = await runAuthorityById(db, turn.orgId, turn.runId);
+  if (authority.kind === "routine") return authority.brief?.access !== "act";
+  return authority.kind === "unattended" && authority.reason !== "agent";
+}
+
+/**
  * A mission run's command policy for a computer brain's turn (`brain.turn`
- * `permissions`): plan before Start, and while a write item of the mission
- * is live (ADR 0044: the item's end-of-item commit takes every change
- * there, so the main session only reads until it ends); work otherwise. Its
- * branches and allowed commands. Null: not a mission run.
+ * `permissions`): plan before Start, while a write item of the mission is
+ * live (ADR 0044: the item's end-of-item commit takes every change there, so
+ * the main session only reads until it ends), and for a run a routine's
+ * report or another agent's note woke in its thread (`wokenByNews`); work
+ * otherwise. Its branches and allowed commands. Null: not a mission run.
  */
 export async function missionTurnPermissions(db: Executor, turn: Turn) {
   const mission = await turnMission(db, turn);
   if (!mission) return null;
-  const [plan, allow] = await Promise.all([readsOnly(db, mission), missionAllowRules(db, mission.id)]);
+  const [plan, allow, news] = await Promise.all([
+    readsOnly(db, mission),
+    missionAllowRules(db, mission.id),
+    wokenByNews(db, turn),
+  ]);
   return {
-    mode: plan ? ("plan" as const) : ("work" as const),
+    mode: plan || news ? ("plan" as const) : ("work" as const),
     branchPrefix: missionBranchPrefix(mission.id),
     allow,
   };

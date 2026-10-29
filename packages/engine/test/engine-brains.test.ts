@@ -38,7 +38,7 @@ import {
   SESSION_MAX_INPUT_TOKENS,
   type ToolSource,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
@@ -105,7 +105,7 @@ function scriptedComputerBrain(script: (n: number, turn: BrainTurn) => AsyncIter
 const post = (fx: Fixture, body: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body });
 
-/** The channel's main timeline: a run asked there answers there (D67). */
+/** The channel's main timeline: a run asked there answers there. */
 const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
 
 test("brainFor: the mission's brain first, then the agent's; unknown values are the model brain", () => {
@@ -200,7 +200,7 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(seen[0]?.model).toBe("sonnet");
   const [run] = await f.db.select().from(schema.agentRuns);
   // A new session for this run, kept on it (a pause resumes the same one). Asked in the channel, its
-  // conversation is the channel's main timeline (D67).
+  // conversation is the channel's main timeline.
   expect(seen[0]?.session).toEqual({
     id: brainSessionId(f.agent.id, `${f.general.id}:${run?.id}`, "claude_code"),
     resume: false,
@@ -217,8 +217,17 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
     .select()
     .from(schema.usageRecords)
     .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  // On the computer's own sign-in: its computer, no account (the usage views, ADR 0063).
   expect(usage).toMatchObject([
-    { provider: "claude_code", billedTo: "plan", costNanoUsd: 0, inputTokens: 40, outputTokens: 9 },
+    {
+      provider: "claude_code",
+      billedTo: "plan",
+      costNanoUsd: 0,
+      inputTokens: 40,
+      outputTokens: 9,
+      machineId,
+      brainAccountId: null,
+    },
   ]);
   // The turn's bridge token died with the run.
   const tokens = await f.db
@@ -296,7 +305,11 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
       const result = await executeToolForRun(
         f.jobDeps,
         { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
-        { id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 42 } },
+        {
+          id: "call-1",
+          name: "github_merge_pr",
+          input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+        },
       );
       yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
       yield { type: "usage", input: 10, output: 2, source: "plan" };
@@ -349,7 +362,14 @@ test("a question asked through the bridge: the text written before it comes firs
     const result = await executeToolForRun(
       f.jobDeps,
       { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
-      { id: "ask-1", name: "ask_user", input: { question: "Quais datas eu coloco?" } },
+      {
+        id: "ask-1",
+        name: "ask_user",
+        input: {
+          why: "I need a person's answer before I go on: this decides what I change next.",
+          question: "Quais datas eu coloco?",
+        },
+      },
     );
     yield { type: "tool_call", id: "ask-1", name: "ask_user", input: {}, executed: result };
     // After the call the brain repeats itself (what the person saw in production).
@@ -426,6 +446,7 @@ test("the agent's account and effort reach its turn; a refused sign-in falls bac
     kind: "claude_code",
     label: "Trabalho",
     status: "active",
+    createdBy: f.owner.id,
   });
   await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
   const { brain, seen } = scriptedComputerBrain(() => [
@@ -465,6 +486,7 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
     kind: "claude_code",
     label: "Trabalho",
     status: "active",
+    createdBy: f.owner.id,
   });
   await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
   const question = await post(f, "@dev oi");
@@ -496,6 +518,56 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
     question.id,
   );
   expect(old.unavailable).toMatchObject({ code: "runner_outdated" });
+});
+
+test("someone else's plan never thinks for the agent: plan_not_owner falls back to the API, or the run waits", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const machineId = await computerAgent(f);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  // Bia owns the agent now; the computer's own sign-in is Ana's.
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pelo plano da Ana." }]);
+  const machines = { status: async (id: string) => statusOf(id) };
+  const handlers = createJobHandlers({ ...f.jobDeps, brains: { claude_code: () => brain }, machines });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toEqual([]);
+  expect((await timeline(f)).at(-1)?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "plan_not_owner" });
+
+  // Her own account on that computer thinks for her agent, while she is in the organization.
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
+  await f.db.insert(schema.machineAccounts).values({
+    id: ACCOUNT,
+    orgId: f.org.id,
+    machineId,
+    kind: "claude_code",
+    label: "Pessoal",
+    status: "active",
+    createdBy: bia.id,
+  });
+  await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!agent || !run) throw new Error("missing rows");
+  const statusAccounts = { status: async (id: string) => statusOf(id, { protocol: ACCOUNTS_PROTOCOL }) };
+  const mine = await resolveBrain({ db: f.db, machines: statusAccounts }, agent, run, f.general.id);
+  expect(mine.unavailable).toBeUndefined();
+  // She left: her account no longer thinks for anyone.
+  await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bia.id));
+  const gone = await resolveBrain({ db: f.db, machines: statusAccounts }, agent, run, f.general.id);
+  expect(gone.unavailable).toMatchObject({ code: "plan_not_owner" });
+
+  // Ana's agent on a computer Bia connected, nothing to stand in: the run waits instead.
+  await f.db.update(schema.agents).set({ ownerUserId: f.owner.id, brainAccountId: null });
+  await f.db.update(schema.machines).set({ pairedByUserId: bia.id }).where(eq(schema.machines.id, machineId));
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  await post(f, "@dev de novo");
+  await drainOutbox(f.db, handlers);
+  const runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.map((r) => r.status).sort()).toEqual(["done", "waiting_input"]);
+  const waiting = runs.find((r) => r.status === "waiting_input")?.transcript as { waitingForBrain?: { code: string } };
+  expect(waiting.waitingForBrain?.code).toBe("plan_not_owner");
+  expect(seen).toEqual([]);
 });
 
 test("with no model credential, an offline computer: the agent says so once and the run waits until it is back", async () => {
@@ -781,7 +853,7 @@ test("the mission engine: one run per agent and notice; a resume answers the cal
     isError: false,
   });
   const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
-  expect(jobs.some((j) => j.dedupeKey === `agent_run.execute:${run?.id}:wait:decision-1`)).toBe(true);
+  expect(jobs.some((j) => j.dedupeKey?.startsWith(`agent_run.execute:${run?.id}:wait:decision-1:`))).toBe(true);
   // Answered once: a second answer finds nothing waiting.
   expect(
     await engine.resumeRun({ run: identity, pause: { kind: "input", id: "decision-1" }, result: { content: "y" } }),
@@ -871,7 +943,11 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
   const out = await invokeToolForRun(
     { db: f.db, pubsub: f.pubsub, tools: f.tools },
     { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId },
-    { id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } },
+    {
+      id: "call-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 1, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    },
   );
   expect(out.result.pause?.kind).toBe("approval");
   const card = (await f.db.select().from(schema.messages)).find((m) => typeof m.meta.approvalId === "string");
@@ -1053,7 +1129,7 @@ test("a computer brain that fails after a bridged pause: the run keeps waiting w
       const result = await executeToolForRun(f.jobDeps, id, {
         id: "call-1",
         name: "github_merge_pr",
-        input: { repo: "acme/app", pr: 42 },
+        input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
       });
       yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
       yield { type: "error", code: "executor_crashed", message: "Claude Code exited", retryable: true };
@@ -1102,8 +1178,16 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const deps = { db: f.db, pubsub: f.pubsub, tools: f.tools };
   const id = { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId };
   const [first, second] = await Promise.all([
-    invokeToolForRun(deps, id, { id: "m-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } }),
-    invokeToolForRun(deps, id, { id: "m-2", name: "github_merge_pr", input: { repo: "acme/app", pr: 2 } }),
+    invokeToolForRun(deps, id, {
+      id: "m-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 1, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    }),
+    invokeToolForRun(deps, id, {
+      id: "m-2",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 2, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    }),
   ]);
   expect(first.result.pause?.kind).toBe("approval");
   expect(second.result.pause?.kind).toBe("approval");
@@ -1120,7 +1204,7 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const late = await invokeToolForRun(deps, id, {
     id: "m-3",
     name: "github_merge_pr",
-    input: { repo: "acme/app", pr: 3 },
+    input: { repo: "acme/app", pr: 3, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
   });
   expect(late).toMatchObject({ code: "bridge.run_not_running", result: { isError: true } });
   expect(late.result.pause).toBeUndefined();

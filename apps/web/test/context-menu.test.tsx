@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,28 +10,29 @@ import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * The desktop app's right click (telas/MenusDesktop.html): one list of choices per thing, drawn as our menu
+ * The desktop app's right click: one list of choices per thing, drawn as our menu
  * (the default) or the system's (`context_menu` in menus.rs); the browser keeps its own menu.
  */
 
-const win = window as {
-  __agentesDesktop?: unknown;
-  __TAURI_INTERNALS__?: unknown;
-  __agentesContextMenu?: (token: string, id: string) => void;
-  __agentesMenu?: (action: string) => void;
-};
+const win = () =>
+  window as {
+    __agentesDesktop?: unknown;
+    __TAURI_INTERNALS__?: unknown;
+    __agentesContextMenu?: (token: string, id: string) => void;
+    __agentesMenu?: (action: string) => void;
+  };
 afterEach(() => {
   cleanup();
   setMenuLook("ours");
-  delete win.__agentesDesktop;
-  delete win.__TAURI_INTERNALS__;
+  delete win().__agentesDesktop;
+  delete win().__TAURI_INTERNALS__;
 });
 
 /** The app around the site: records what the system's menu was asked to draw. */
 function inTheApp() {
   const drawn: { token: number; items: unknown[] }[] = [];
-  win.__agentesDesktop = { version: "0.6.0" };
-  win.__TAURI_INTERNALS__ = {
+  win().__agentesDesktop = { version: "0.6.0" };
+  win().__TAURI_INTERNALS__ = {
     invoke: async (cmd: string, args: { token: number; items: unknown[] }) => {
       if (cmd === "context_menu") drawn.push(args);
       if (cmd === "this_mac") return { orgs: [] };
@@ -42,13 +43,18 @@ function inTheApp() {
 }
 
 const copied: string[] = [];
-Object.defineProperty(navigator, "clipboard", {
-  configurable: true,
-  value: { writeText: async (s: string) => void copied.push(s) },
+// After the DOM is attached (its own navigator).
+beforeAll(() => {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (s: string) => void copied.push(s) },
+  });
 });
 
 const messageOf = (text: string) => {
-  const el = screen().getByText(text).closest("article");
+  const el = screen()
+    .getAllByRole("article")
+    .findLast((a) => a.textContent?.includes(text));
   if (!el) throw new Error(`no message with ${text}`);
   return el;
 };
@@ -120,12 +126,12 @@ describe("right click on a message", () => {
     expect(screen().queryByRole("menu", { name: "Ações" })).toBeNull();
     const asked = drawn.at(-1);
     expect(asked?.items).toContainEqual({ type: "item", id: "copy-text", label: "Copiar texto" });
-    await act(async () => win.__agentesContextMenu?.(String(asked?.token), "copy-text"));
+    await act(async () => win().__agentesContextMenu?.(String(asked?.token), "copy-text"));
     await settle(2);
     expect(copied.at(-1)).toContain("o login está devolvendo 401");
     // An older menu's answer is ignored.
     const before = copied.length;
-    await act(async () => win.__agentesContextMenu?.(String((asked?.token ?? 0) - 1), "copy-text"));
+    await act(async () => win().__agentesContextMenu?.(String((asked?.token ?? 0) - 1), "copy-text"));
     expect(copied.length).toBe(before);
   });
 
@@ -144,7 +150,7 @@ describe("the Mac's menu bar", () => {
     inTheApp();
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
-    await act(async () => win.__agentesMenu?.("goTasks"));
+    await act(async () => win().__agentesMenu?.("goTasks"));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/issues`);
   });

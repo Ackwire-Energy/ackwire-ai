@@ -2,9 +2,9 @@ import type { Role } from "../api/types";
 import { isEmail } from "./text";
 
 /**
- * The onboarding's steps, in order (docs/design/telas/OnboardingV2.html).
- * "import" brings agents from OpenMausBot / OpenBot (lib/agent-import.ts);
- * they arrive chosen in "agents". "computer" comes before "agents": with a
+ * The onboarding's steps, in order.
+ * "import" reads another product's export (apps/web/src/lib/import); its
+ * agents arrive chosen in "agents". "computer" comes before "agents": with a
  * computer connected, the model step can also pick its Claude Code.
  */
 export const ONBOARDING_STEPS = [
@@ -17,6 +17,14 @@ export const ONBOARDING_STEPS = [
   { id: "done", optional: false },
 ] as const;
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
+
+/**
+ * Who offers the first message when the onboarding ends: the first of these on the team. Lia's research needs a
+ * browser, which only a ready computer gives the agents (not one being prepared, nor a Daytona sandbox); Theo's plan
+ * needs nothing. Ada, the guide, is always on the team.
+ */
+export const firstAskOrder = (browser: boolean) =>
+  browser ? (["lia", "theo", "ada"] as const) : (["theo", "lia", "ada"] as const);
 
 /** A person to invite, as a chip: invalid addresses stay (marked) so they can be fixed or removed. */
 export interface InviteDraft {

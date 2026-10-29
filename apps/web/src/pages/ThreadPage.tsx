@@ -11,11 +11,11 @@ import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/compon
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /**
- * A thread (ThreadContexto.html): its header, where it came from and its
+ * A thread: its header, where it came from and its
  * context block on top, then its conversation with the channel's own rows,
  * live runs and composer (ChannelPage in thread mode). Archived: read only.
  * A mission's thread has the mission as its header (plan strip, what runs, sessions).
- * `onClose`: shown in the panel beside its channel (telas/ThreadPainel.html), not as a page.
+ * `onClose`: shown in the panel beside its channel, not as a page.
  */
 export function ThreadPage({
   threadId,

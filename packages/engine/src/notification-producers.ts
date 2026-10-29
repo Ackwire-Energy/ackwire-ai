@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
-import { approvalCardThreads } from "./approvals";
+import { approvalCardThreads, approvalOriginOf } from "./approvals";
+import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import {
   type NotificationActor,
@@ -9,9 +10,10 @@ import {
   notify,
   resolveNotifications,
 } from "./notifications";
+import type { MemberRole } from "./organizations";
 
 /**
- * Where notifications come from (D46): each flow calls one of these after
+ * Where notifications come from: each flow calls one of these after
  * its change committed. They read what they need themselves (no imports of
  * the flows' modules, so no import cycles) and never throw into the flow:
  * callers add `.catch(() => {})`.
@@ -22,7 +24,6 @@ const {
   channels,
   channelMembers,
   threads,
-  agentRuns,
   agents,
   organizationMembers,
   issues,
@@ -62,32 +63,27 @@ async function inChannel(deps: NotificationDeps, channelId: string, userIds: str
   return rows.flatMap((r) => (r.userId ? [r.userId] : []));
 }
 
-/** The person behind a run: the author of its trigger, following agent hand-offs (at most 6 hops). */
+/**
+ * Who hears about a run's requests (questions, browser handoffs): the person accountable for it
+ * (`accountablePerson`: the person behind it, else the routine's creator), or null (the caller falls
+ * back to the agent's owner).
+ */
 async function requesterOfRun(
   deps: Pick<NotificationDeps, "db">,
   orgId: string,
   runId: string | null,
 ): Promise<string | null> {
-  let current = runId;
-  for (let hop = 0; current && hop < 6; hop++) {
-    const [run] = await deps.db
-      .select({ trigger: agentRuns.triggerMessageId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.id, current), eq(agentRuns.orgId, orgId)));
-    if (!run) return null;
-    const [m] = await deps.db
-      .select({ userId: messages.authorUserId, runId: messages.agentRunId })
-      .from(messages)
-      .where(and(eq(messages.orgId, orgId), eq(messages.id, run.trigger)));
-    if (!m) return null;
-    if (m.userId) return m.userId;
-    current = m.runId;
-  }
-  return null;
+  return runId ? accountablePerson(await runAuthorityById(deps.db, orgId, runId)) : null;
 }
 
 /** The person behind a run (who asked for the work, through agents that asked each other), or null. */
-export const humanBehindRun = requesterOfRun;
+export async function humanBehindRun(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+): Promise<string | null> {
+  return runId ? (await runAuthorityById(deps.db, orgId, runId)).personId : null;
+}
 
 async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));
@@ -306,7 +302,10 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
 
 // ── Approvals ─────────────────────────────────────────────────────────────────
 
-/** A sensitive action waits: everyone who may decide it. */
+/**
+ * A sensitive action waits: everyone who may decide it, with the agent's why (short, in `text`) and,
+ * asked while nobody watched, where it came from (`origin`: a routine, or no one): ADR 0053 §8.
+ */
 export async function notifyApproval(deps: NotificationDeps, approval: ApprovalRow, deciders: string[]) {
   const [[channel], cardThreads] = await Promise.all([
     deps.db
@@ -315,7 +314,7 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
       .where(eq(channels.id, approval.channelId)),
     approvalCardThreads(deps.db, [approval]),
   ]);
-  // Where its card is (the main timeline, D67, has no thread).
+  // Where its card is (the main timeline has no thread).
   const threadId = cardThreads.get(approval.id) ?? null;
   await notify(deps, {
     orgId: approval.orgId,
@@ -334,7 +333,8 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     },
     latest: {
       title: notificationSnippet(approval.title, 200),
-      text: notificationSnippet(approval.detail),
+      text: notificationSnippet(approval.why, 200),
+      origin: approvalOriginOf(approval.origin) ?? undefined,
       expiresAt: approval.expiresAt.toISOString(),
     },
   });
@@ -547,51 +547,145 @@ export async function notifyMissionEnded(
   });
 }
 
-// ── Routines ──────────────────────────────────────────────────────────────────
+// ── Routines (ADR 0053) ─────────────────────────────────────────────────────────
 
-/** A routine's run ended (its agent's answer, or a failure): the routine's creator. */
-export async function notifyRoutineRun(
+/** A routine's name, creator and agent, and the agent's owner: who hears about it. */
+async function routineAudience(deps: Pick<NotificationDeps, "db">, orgId: string, routineId: string) {
+  const [r] = await deps.db
+    .select({ name: routines.name, creator: routines.createdByUserId, agentId: routines.agentId })
+    .from(routines)
+    .where(and(eq(routines.id, routineId), eq(routines.orgId, orgId)));
+  if (!r) return null;
+  return { ...r, owner: await agentOwner(deps, r.agentId) };
+}
+
+/**
+ * A routine's run failed after a good one (§6.6): its creator (else the agent's owner) hears it
+ * once per failure streak (`streakKey`: the streak's first failed run), with the run's coded reason
+ * (`latest.reason`: the app says it in the person's language). Resolved by the next good run.
+ */
+export async function notifyRoutineFailed(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; streakKey: string; reason?: string | null },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator ?? r.owner],
+    kind: "routine_failed",
+    groupKey: `routine_failed:${input.routineId}:${input.streakKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, label: r.name },
+    latest: { title: r.name, reason: input.reason ?? undefined },
+  });
+}
+
+/**
+ * A routine paused itself (§6.2, §6.6): its creator and the agent's owner hear it once per pause
+ * (`key`), with the coded reason (`latest.reason`, the app translates it) and its English fallback.
+ */
+export async function notifyRoutinePaused(
   deps: NotificationDeps,
   input: {
     orgId: string;
     routineId: string;
+    name: string;
     agentId: string;
-    ok: boolean;
-    /** Agent run or routine run id: one notification per run. */
-    runKey: string;
-    text?: string | null;
+    creatorUserId: string | null;
+    reason: string;
+    text: string;
+    key: string;
   },
 ) {
-  const [routine] = await deps.db
-    .select({ name: routines.name, creator: routines.createdByUserId })
-    .from(routines)
-    .where(and(eq(routines.id, input.routineId), eq(routines.orgId, input.orgId)));
-  if (!routine?.creator) return;
-  const kind = input.ok ? "routine_finished" : "routine_failed";
   await notify(deps, {
     orgId: input.orgId,
-    userIds: [routine.creator],
-    kind,
-    groupKey: `${kind}:${input.runKey}`,
+    userIds: [input.creatorUserId, await agentOwner(deps, input.agentId)],
+    kind: "routine_paused",
+    groupKey: `routine_paused:${input.routineId}:${input.key}`,
     actor: agent(input.agentId),
-    source: { routineId: input.routineId, label: routine.name },
-    latest: { title: routine.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+    source: { routineId: input.routineId, label: input.name },
+    latest: { title: input.name, reason: input.reason, text: input.text },
   });
 }
 
-/** The routine's answer: the reply message of an agent run, for the card. */
-export async function routineReplyText(deps: NotificationDeps, orgId: string, runId: string) {
-  const [run] = await deps.db
-    .select({ reply: agentRuns.replyMessageId, error: agentRuns.error })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
-  if (!run?.reply) return run?.error ?? null;
-  const [m] = await deps.db
-    .select({ body: messages.body })
-    .from(messages)
-    .where(and(eq(messages.orgId, orgId), eq(messages.id, run.reply)));
-  return m?.body ?? null;
+/**
+ * A routine's run waits for the agent's computer (§6.4): its creator and the agent's owner hear it
+ * once per outage (`outageKey`: the routine's last run that really ran; the next one that does starts a
+ * new outage). Resolved by the next good run.
+ */
+export async function notifyRoutineStalled(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; machineId: string; machineName: string; outageKey: string },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator, r.owner],
+    kind: "routine_stalled",
+    groupKey: `routine_stalled:${input.routineId}:${input.machineId}:${input.outageKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, machineId: input.machineId, label: r.name },
+    latest: { title: r.name, ...(input.machineName ? { text: notificationSnippet(input.machineName) } : {}) },
+  });
 }
+
+/**
+ * The agent told people what a routine found (the message its report woke, §7): its creator hears
+ * it, opening that message, unless they are a member of that conversation (they see it there).
+ */
+export async function notifyRoutineFinished(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    routineId: string;
+    routineRunId: string;
+    messageId: string;
+    channelId: string;
+    threadId: string | null;
+    text?: string | null;
+  },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r?.creator) return;
+  if ((await inChannel(deps, input.channelId, [r.creator])).length > 0) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator],
+    kind: "routine_finished",
+    groupKey: `routine_finished:${input.routineRunId}`,
+    actor: agent(r.agentId),
+    source: {
+      routineId: input.routineId,
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      messageId: input.messageId,
+      label: r.name,
+    },
+    latest: { title: r.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+  });
+}
+
+/** A routine ran well again: its failure streak and computer outage notifications are done. */
+export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: string, routineId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_failed:${routineId}:` });
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_stalled:${routineId}:` });
+}
+
+/** A person resumed or took over a routine: its pause notifications are done. */
+export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string, routineId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
+}
+
+/** The organization's owners and admins (or only the roles given). */
+const adminsOf = async (deps: NotificationDeps, orgId: string, roles: MemberRole[] = ["owner", "admin"]) =>
+  (
+    await deps.db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, roles)))
+  ).map((a) => a.userId);
 
 // ── Connected computers ───────────────────────────────────────────────────────
 
@@ -605,13 +699,9 @@ export async function notifyMachineConnected(
   machine: { id: string; orgId: string; name: string; hostname: string },
   actorId: string,
 ) {
-  const admins = await deps.db
-    .select({ userId: organizationMembers.userId })
-    .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, machine.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: admins.map((a) => a.userId),
+    userIds: await adminsOf(deps, machine.orgId),
     kind: "machine_connected",
     groupKey: `machine_connected:${machine.id}`,
     actor: person(actorId),
@@ -619,6 +709,76 @@ export async function notifyMachineConnected(
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
   });
 }
+
+/**
+ * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
+ * from seconds to an approval hours later. One row each time it gets ready.
+ */
+export async function notifyComputerReady(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  readyAt: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, ["owner"]),
+    kind: "computer_ready",
+    groupKey: `computer_ready:${machine.id}:${readyAt.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: { title: machine.name },
+  });
+}
+
+// ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
+
+/**
+ * The people who run this server held, suspended or restored the workspace, with the notice shown: its
+ * owners and admins hear it, with the reason (`latest.text`), and on agentes.chat Cloud `latest.cloud`, so the apps
+ * read it as the restriction itself reads. One row per change.
+ */
+export async function notifyOrgStanding(
+  deps: NotificationDeps,
+  orgId: string,
+  standing: { state: string; reason: string | null; changedAt: Date | null; cloud?: boolean },
+) {
+  await notify(deps, {
+    orgId,
+    userIds: await adminsOf(deps, orgId),
+    kind: "org_standing",
+    groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
+    source: {},
+    latest: {
+      statusTo: standing.state,
+      ...(standing.reason ? { text: notificationSnippet(standing.reason) } : {}),
+      ...(standing.cloud ? { cloud: true } : {}),
+    },
+  });
+}
+
+const agentHoldGroup = (agentId: string) => `org_standing:agent:${agentId}:`;
+
+/**
+ * An agent was held on agentes.chat Cloud (ADR 0056 §9): its responsible person and the workspace's owners and admins
+ * hear it, with the hold's kind (`latest.holdKind`), never its reason. One row each time they are told (`at`): when
+ * it is held, and when it is held again for another kind.
+ */
+export async function notifyAgentHold(
+  deps: NotificationDeps,
+  hold: { orgId: string; agentId: string; name: string; kind: string; at: Date },
+) {
+  await notify(deps, {
+    orgId: hold.orgId,
+    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId))],
+    kind: "org_standing",
+    groupKey: `${agentHoldGroup(hold.agentId)}${hold.at.getTime()}:${hold.kind}`,
+    source: { agentId: hold.agentId, label: hold.name },
+    latest: { statusTo: "agent_hold", holdKind: hold.kind },
+  });
+}
+
+/** The agent was let go: what its people were told of the hold is done. */
+export const resolveAgentHold = (deps: NotificationDeps, orgId: string, agentId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: agentHoldGroup(agentId), kind: "org_standing" });
 
 // ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
 
@@ -636,15 +796,17 @@ export async function browserHandoffRecipient(
  * An agent needs a person in its browser (`browser_ask_person`): in the
  * "Waiting for you" of whoever asked for the work and of the agent's
  * responsible person, with a push. Either may open it; the first in control
- * does it, the other sees who is helping.
+ * does it, the other sees who is helping. `to`: exactly who instead (a
+ * desktop's request goes only to who may drive its computer).
  */
 export async function notifyBrowserHandoff(
   deps: NotificationDeps,
   h: typeof schema.browserHandoffs.$inferSelect,
   where: { channelId: string; threadId: string | null },
+  to?: string[],
 ) {
   // Who asked for the work and the agent's responsible person (once when it's the same person).
-  const userIds = [...new Set([h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
+  const userIds = [...new Set(to ?? [h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
     (id): id is string => !!id,
   );
   if (userIds.length === 0) return;
@@ -666,6 +828,7 @@ export async function notifyBrowserHandoff(
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
       handoffId: h.id,
+      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
     },
     latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });

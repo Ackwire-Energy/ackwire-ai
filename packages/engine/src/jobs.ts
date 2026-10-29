@@ -1,5 +1,14 @@
-import type { EmailSender, PushSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
+import type {
+  EmailSender,
+  Presence,
+  PushSender,
+  SearchIndexResolver,
+  SearchKind,
+  WebPushSender,
+} from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
+import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
+import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -8,12 +17,15 @@ import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { sendQueuedEmail } from "./email";
-import { publishChannelEvent } from "./events";
+import { type EmailArt, sendQueuedEmail } from "./email";
+import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
+import type { JevKey, JevKeySource } from "./jev-key";
 import { mentionHandoffs } from "./judge";
 import { wakeForAccessDecision } from "./machine-access";
+import type { MachineCaller } from "./machine-hub";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
@@ -22,21 +34,25 @@ import { afterMachineTaskEnded, afterMissionRunEnded } from "./mission-worktree"
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
+import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
+  type RouterDeps,
   type RouterStrategy,
-  resolveRouterModel,
   routeMessage,
+  smallModelFor,
 } from "./router";
-import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
+import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
+import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
-import { runMigration, type StorageDeps } from "./storage";
+import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
+import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
 
@@ -63,8 +79,14 @@ export interface JobDeps extends RunExecutorDeps {
   search?: SearchIndexResolver;
   /** Transactional email (job `email.send`). */
   email?: EmailSender;
+  /** Where emails get their pictures (`emailArtFor`); absent: from each link's own server. */
+  emailArt?: EmailArt;
   /** Push to the phone app (job `push.send`); absent = push off. */
   push?: PushSender | null;
+  /** Web Push to browsers (job `push.send`, ADR 0071); absent = off. */
+  webPush?: WebPushSender | null;
+  /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
+  presence?: Presence | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
   /** Drive (job `forum.advance` saves the forum synthesis). */
@@ -76,17 +98,22 @@ export interface JobDeps extends RunExecutorDeps {
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
-    /** Anthropic cheap model (ROUTER_MODEL); an org may override it in its settings. */
+    /** The small model on a Claude key (ROUTER_MODEL); an org may override it in its settings. */
     model: string;
-    /** Cheap model per other provider (e.g. `{ openai: "gpt-6-luna" }`), used when the org's default key is theirs. */
+    /** The small model on another provider's key (e.g. `{ openai: "gpt-6-luna" }`); else its catalog pick. */
     cheapModels?: Record<string, string>;
     minScore?: number;
     /** Jev probability needed for an agent's @mention of another agent to start it (default 0.6). */
     mentionThreshold?: number;
-    /** Replaces the core LLM strategy (e.g. an optional external classifier). */
+    /** Replaces the core small-model step (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
-    /** TypeSafe Jev as the strategy, with the LLM one as fallback (platform key, never per org). */
-    jev?: { apiKey: string; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
+    /** TypeSafe Jev as the chain's first step (the installation's key, never per org). */
+    jev?: { key: JevKeySource; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
+    /**
+     * The author's own plan as a step (ADR 0074 §3): the computers it picks on, and this server's address. Off
+     * on the Cloud (`isAgentesCloud`), where Jev is ours. Absent: no plan step.
+     */
+    plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
   };
 }
 
@@ -96,20 +123,23 @@ const orgOf = (job: OutboxJob) => {
   return job.orgId;
 };
 
-/** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
-export function createJobHandlers(deps: JobDeps): JobHandlers {
-  const router = deps.router ?? { enabled: false, model: "" };
-  const llm = createLlmRouterStrategy({
-    gateway: deps.gateway,
-    resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model, router.cheapModels),
-  });
+/**
+ * The router of messages nobody mentioned (`message.posted`, and "Responder agora" routing one again): the
+ * chain of ADR 0074 (Jev when configured, the organization's small model, the author's own plan where it is
+ * on, then rules in `routeMessage`), with the organization's AI checked first. Null when routing is off.
+ */
+export function messageRouter(deps: JobDeps): RouterDeps | null {
+  const router = deps.router;
+  if (!router?.enabled) return null;
+  const perProvider = { anthropic: router.model, ...router.cheapModels };
+  const smallModel = (orgId: string) => smallModelFor(deps, orgId, perProvider);
   const jev = router.jev;
-  const strategy =
-    router.strategy ??
-    (jev
-      ? withFallback(
+  const plans = router.plans && !isAgentesCloud(router.plans.publicUrl) ? router.plans.hub : null;
+  const steps = [
+    ...(jev
+      ? [
           createJevRouterStrategy({
-            apiKey: jev.apiKey,
+            key: jev.key,
             timeoutMs: jev.timeoutMs,
             fetch: jev.fetch,
             baseURL: jev.baseURL,
@@ -125,17 +155,37 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
               });
             },
           }),
-          llm,
-        )
-      : llm);
-  const policy = {
-    ...DEFAULT_ROUTER_POLICY,
-    minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
-    maxHops: deps.maxHops,
+        ]
+      : []),
+    router.strategy ?? createLlmRouterStrategy({ gateway: deps.gateway, resolveModel: smallModel }),
+    ...(plans ? [createPlanRouterStrategy({ db: deps.db, hub: plans, pubsub: deps.pubsub })] : []),
+  ];
+  return {
+    db: deps.db,
+    strategy: routeChain(steps, { onTiming: deps.onTiming }),
+    policy: {
+      ...DEFAULT_ROUTER_POLICY,
+      minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
+      maxHops: deps.maxHops,
+    },
+    hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
+    routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
   };
+}
+
+/** Whether Jev picks now: a key its owner sees working (a limit, an outage or a slow answer don't count). */
+async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
+  if (!key) return false;
+  if (typeof key === "string") return true;
+  return "view" in key ? (await (key as JevKey).view()).state === "ok" : (await key.key()) !== null;
+}
+
+/** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
+export function createJobHandlers(deps: JobDeps): JobHandlers {
+  const routing = messageRouter(deps);
 
   // An agent's @mention starts the other agent only when it asks it to act now (the judge decides).
-  const mentionThreshold = router.mentionThreshold ?? 0.6;
+  const mentionThreshold = deps.router?.mentionThreshold ?? 0.6;
   /**
    * Which agents an agent's @mentions actually hand off to: the judge asks,
    * per mentioned agent, "is this asking it to act now?" (any language)
@@ -212,43 +262,35 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   };
 
   return {
-    "message.posted": async (job, ctx) => {
+    "message.posted": async (job) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
-      const routed = async (
+      // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
+      if (message.meta.talker) return;
+      // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
+      if (message.meta.background) return;
+      const routed = (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],
         runs: AgentRun[],
         reason?: string,
-      ) => {
-        // The runs answer where the message is (D67).
-        const threadId = message.threadId;
-        await publishChannelEvent(deps.pubsub, {
-          type: "message.routed",
-          channelId: message.channelId,
-          messageId: message.id,
-          seenBy,
-          pickedBy: runs.map((r) => r.agentId),
-          runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
+        intent?: ConnectIntent,
+        decidedBy?: DecidedBy,
+      ) =>
+        publishRouted(deps.pubsub, message, {
           strategy,
+          seenBy,
+          runs,
           ...(reason ? { reason } : {}),
+          ...(decidedBy ? { decidedBy } : {}),
+          ...intent,
         });
-        for (const run of runs) {
-          await publishChannelEvent(deps.pubsub, {
-            type: "agent.thinking",
-            channelId: message.channelId,
-            threadId,
-            agentId: run.agentId,
-            runId: run.id,
-          });
-        }
-      };
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
-      // The forum moves by its own turns (D33): no mentions, router or DMs there.
+      // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
       if (where?.kind === "forum") return;
       // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
       if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
@@ -263,6 +305,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.authorType !== "person") {
         // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
         if (where && isAgentOnlyDm(where)) return;
+        // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
+        // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
+        if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
@@ -289,13 +334,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           await routed("mention", message.mentionedAgentIds, res.runs, allowed.length ? undefined : "reference_only");
           return;
         }
-        // No mention: another agent may chime in when it clearly should (D5, revised). Only in
+        // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
         // channels, never in a mission's thread (the mission's own turns run it).
-        if (!router.enabled || where?.kind !== "channel") return;
+        if (!routing || where?.kind !== "channel") return;
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
-        const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+        const res = await routeMessage(routing, input);
         // Receipts only when someone answers: an agent's message isn't waiting for anyone.
-        if (res.runs.length > 0) await routed("router", res.seenBy ?? [], res.runs, res.reason);
+        if (res.runs.length > 0)
+          await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
@@ -331,7 +377,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
         return;
       }
-      if (!router.enabled) return routed("none", [], []);
+      if (!routing) return routed("none", [], []);
       // In a mission's thread only its owner and deciders make the agent work (the router included).
       if (message.threadId && message.authorUserId) {
         const mission = await missionOfThread(deps.db, message.orgId, message.threadId);
@@ -340,9 +386,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           if (role !== "owner" && role !== "decide") return routed("none", [], [], "mission_read_only");
         }
       }
-      const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+      const res = await routeMessage(routing, input);
       if (res.skipped === "already_routed") return;
-      await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
+      // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
+      if (res.reason === NO_AI) {
+        const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
+        return routed("none", [], [], NO_AI, intent);
+      }
+      await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
     },
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
@@ -420,9 +471,28 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.storage) throw new PermanentJobError("no storage configured");
       await runMigration(deps.storage, String(job.payload.migrationId));
     },
-    "email.send": async (job) => {
-      if (!deps.email) throw new PermanentJobError("no email sender configured");
-      await sendQueuedEmail(deps.email, job.payload);
+    // A page at a time: a full page enqueues the next run, once even if this one runs twice.
+    [ORG_FILES_PURGE_JOB]: async (job) => {
+      if (!deps.storage) throw new PermanentJobError("no storage configured");
+      const orgId = String(job.payload.orgId);
+      if (!(await purgeOrgFiles(deps.storage, orgId))) return;
+      await enqueue(deps.db, {
+        orgId: null,
+        kind: ORG_FILES_PURGE_JOB,
+        payload: { orgId },
+        dedupeKey: `${ORG_FILES_PURGE_JOB}:${job.id}`,
+        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+      });
+    },
+    "email.send": async (job, ctx) => {
+      try {
+        if (!deps.email) throw new PermanentJobError("no email sender configured");
+        await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
+      } catch (error) {
+        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetJoinCodeEmail(deps.db, job);
+        throw error;
+      }
+      await forgetJoinCodeEmail(deps.db, job);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
@@ -457,13 +527,21 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "machine.tasks_offline": async (job) => {
       await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
     },
-    // In-app notifications of a message (D46): mentions, thread replies, DMs.
+    // A request to join through an invitation link, filed apart from the ask's reply (ADR 0068).
+    [FILE_JOIN_REQUEST_JOB]: async (job) => {
+      await fileJoinRequest({ db: deps.db, pubsub: deps.pubsub }, job.payload);
+    },
+    // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
     },
-    // A notification for a person's phones (ADR 0035): skipped if read, done or snoozed meanwhile.
+    // A notification for a person's phones and browsers (ADR 0035, 0071): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {
-      await deliverPush({ db: deps.db, push: deps.push }, String(job.payload.notificationId));
+      await deliverPush(
+        { db: deps.db, push: deps.push, webPush: deps.webPush, presence: deps.presence },
+        String(job.payload.notificationId),
+        { held: job.payload.held === true },
+      );
     },
     // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
     "push.receipts": async (job) => {

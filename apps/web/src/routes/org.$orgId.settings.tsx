@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
-import { SettingsPage, settingsSearch } from "@/pages/SettingsPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { settingsSearch } from "@/pages/settings-sections";
 
 /**
  * Settings → Geral. Older OAuth returns (`/settings?connected=…`, `?review=1`)

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/signup")({
   }),
   beforeLoad: async ({ context, search }) => {
     const me = await context.queryClient.ensureQueryData(meQuery(context.api));
-    if (me) throw redirect({ to: search.redirect ?? "/" });
+    if (me) throw redirect({ href: search.redirect ?? "/" });
   },
   component: function Signup() {
     return <AuthPage start="up" redirect={Route.useSearch().redirect} />;

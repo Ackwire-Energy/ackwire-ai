@@ -18,7 +18,7 @@ import { useOrg } from "@/components/org-context";
 import { useNow } from "./MissionBits";
 
 /**
- * One row per executor session (ThreadContexto.html, A4): status icon,
+ * One row per executor session: status icon,
  * title, ONE human line (the live last line with the agent's cursor while it
  * runs), time and the PR; opened: "O que mudou · N arquivos" and the output.
  * The sessions don't talk to people: our agent reviews and speaks once.
@@ -177,7 +177,7 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
           : task.lastLine || (live ? t("missions.sessions.working") : "");
   return (
     <>
-      <div className="mi-session">
+      <div className="mi-session ac-iconline">
         <span className="mi-session__icon" data-state={state} title={t(`missions.sessions.state.${state}`)}>
           {state === "running" ? <AgentSpinner agentId={task.agentId} /> : <Icon name={ICON[state]} size={14} />}
         </span>
@@ -283,7 +283,7 @@ function TaskLog({ task, live }: { task: MachineTask; live: boolean }) {
   return (
     <div className="mi-log-wrap">
       {output.data?.source === "saved" && !empty && (
-        <span className="mi-hint">
+        <span className="mi-hint ac-iconline">
           <Icon name="computer" size={14} />
           {t("missions.sessions.savedOutput")}
         </span>

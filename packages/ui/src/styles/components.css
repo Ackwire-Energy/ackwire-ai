@@ -2,8 +2,7 @@
  * agentes component styles. Ported from docs/design/design-system/bundle.css
  * (the reference): same classes and values, adapted to the markup Radix
  * renders (data-state, data-highlighted). Every value comes from tokens.css.
- * Additions beyond bundle.css are taken from the approved screens in
- * docs/design/telas and are marked "from telas/<Screen>".
+ * Additions beyond bundle.css follow the app's screens.
  */
 
 html {
@@ -17,6 +16,8 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 22px;
+  /* Letters as tall as the app's sizes were drawn for, whatever the face (Source Sans 3 draws small). */
+  font-size-adjust: var(--font-size-adjust, none);
   color: var(--ink);
   background: var(--surface);
   font-feature-settings: "ss01", "tnum";
@@ -76,6 +77,127 @@ samp {
   stroke-linejoin: round;
 }
 
+/*
+ * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead's middle sits on the first line's
+ * capitals' middle, where the eye centres a sign beside words (Apple centres SF Symbols on the cap height too),
+ * whatever the text size, the line height or the lead's size, so it stays with the first line when the text wraps.
+ * The row sets the font size and the line height; the lead is its first child. `lh` and `ex` are the lead's own, so
+ * a lead with a font size of its own (a face) needs the row's line height as a length.
+ */
+.ac-iconline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ac-iconline > :first-child {
+  flex: none;
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+/* Behind @supports, not a second `translate` in the rule: a declaration holding var() parses even where lh is
+   unknown, so it would replace the fallback there and then compute to none. */
+@supports (top: 1lh) {
+  .ac-iconline > :first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+/* A face keeps its initials' small type but takes the row's line, so its `lh` is the line it sits on. */
+.ac-iconline > .ac-avatar:first-child {
+  line-height: inherit;
+}
+
+/*
+ * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two or more lines: the first line's
+ * capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes on the box that holds the
+ * first line (block-level, in that line's font size and line height): it rises by the air above its capitals. One
+ * line beside a picture centres on it instead (`.ac-iconline`).
+ */
+.ac-faceline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ac-faceline > :first-child {
+  flex: none;
+}
+/* An option card with a face (an agent to create) is a face line too: its title takes the rise. */
+.ac-captop,
+.ac-option > .ac-avatar:first-child + .ac-option__text > .ac-option__title {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-block-start: calc(var(--cap-top) - 11px);
+}
+@supports (top: 1lh) {
+  .ac-captop,
+  .ac-option > .ac-avatar:first-child + .ac-option__text > .ac-option__title {
+    margin-block-start: calc(var(--cap-top) - 0.5lh);
+  }
+}
+
+/*
+ * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
+ * at a row's edge reaches out by it, so its icon sits on the padding line.
+ */
+:root {
+  --ghost-plate: 8px;
+}
+@media (pointer: coarse) {
+  :root {
+    --ghost-plate: 12px;
+  }
+}
+
+/*
+ * A row of actions: 16px between what the eye sees, 24px on touch. A ghost shows only its icon or words until
+ * hovered, so its plate reaches half into the gap on each side: its icon or words stand as far from the next shape
+ * as two boxes do, and at either end of the row they sit on its edge. The gap is a column gap, so a row that wraps
+ * starts each line on the same edge. A nested `.ac-acts` (a slot another component fills) joins the row.
+ */
+.ac-acts {
+  display: flex;
+  align-items: center;
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.ac-acts > .ac-acts {
+  display: contents;
+}
+.ac-acts > .ac-btn--ghost {
+  margin-inline: calc(-1 * var(--ghost-plate));
+}
+.ac-acts > .ac-btn--ghost:not(.ac-btn--icon) {
+  padding-inline: var(--ghost-plate);
+}
+/*
+ * A ghost whose icon leaves air inside its box (`--glyph-air` on each side, e.g. the ×'s 5.2 of its 20 units) reaches
+ * out by that air too, so the row's gap stands between what shows. Its plate and focus ring keep to the box less that
+ * air: they end where a neighbour's plate starts, under its glyph.
+ */
+.ac-acts > .ac-btn--glyph {
+  margin-inline: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
+}
+.ac-btn--ghost.ac-btn--glyph {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph::before {
+  content: "";
+  position: absolute;
+  inset: 0 var(--glyph-air, 0px);
+  border-radius: inherit;
+  transition: inherit;
+}
+.ac-btn--ghost.ac-btn--glyph > * {
+  position: relative;
+}
+.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+}
+.ac-btn--ghost.ac-btn--glyph:hover::before {
+  background: var(--plate);
+}
+.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+  box-shadow: var(--focus-ring);
+}
+
 /* Button */
 .ac-btn {
   display: inline-flex;
@@ -88,7 +210,10 @@ samp {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 20px;
+  /* The box sets the height and the line is the text's own. A 20 or 22px line around 14px Source Sans 3 (a 21px
+     text box) leaves one pixel that Chrome and Safari put under the text, so the capitals would sit 1px high. Every
+     single-line control takes `normal` for the same reason. */
+  line-height: normal;
   white-space: nowrap;
   text-decoration: none;
   border-radius: var(--radius-sm);
@@ -161,14 +286,44 @@ samp {
   width: 100%;
 }
 
-/* Text link (from telas/Entrar, Cadastro) */
+/* Any link, with or without a class of its own, reads as ours: never the browser's blue. Zero specificity, so
+   every class that styles a link still wins. */
+:where(a) {
+  color: inherit;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+:where(a:hover) {
+  text-decoration-color: currentColor;
+}
+/* A link that opens something here is a button: no box of its own, and the sentence's type. Every font setting
+   inherits, since the browser's own button font drops the page's size adjustment and figures. Before `.ac-link`, so
+   the link's weight and any class that sets a size still win. */
+:where(button).ac-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+}
+/* Text link: an action in a sentence; `--muted` for a help line's link. */
 .ac-link {
   color: var(--ink);
   font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ac-link:hover {
+  text-decoration-color: currentColor;
 }
 .ac-link--muted {
   color: var(--ink-muted);
   font-weight: 400;
+}
+.ac-link--muted:hover {
+  color: var(--ink);
 }
 .ac-link:focus-visible {
   outline: none;
@@ -216,7 +371,7 @@ samp {
   --field-ring: 0 0 0 4px color-mix(in srgb, var(--ink) 10%, transparent);
   --field-ring-danger: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
 }
-/* Light (telas/RefinoUI.html): fields are white with a hairline; gray stays for tracks and chosen states. */
+/* Light: fields are white with a hairline; gray stays for tracks and chosen states. */
 :root:not([data-theme="dark"]),
 [data-theme="light"] {
   --field-bg: #ffffff;
@@ -229,6 +384,7 @@ samp {
   padding: 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -266,13 +422,14 @@ textarea.ac-input {
   line-height: 22px;
   resize: vertical;
 }
-/* Prefixed input, e.g. "agentes.chat/" + slug (from telas/Onboarding) */
+/* Prefixed input, e.g. "agentes.chat/" + slug */
 .ac-input-affix {
   display: flex;
   align-items: center;
   height: var(--control-h-md);
   box-sizing: border-box;
   font-size: var(--control-fs-md);
+  line-height: normal;
   border: 1px solid var(--field-line);
   border-radius: var(--control-r-md);
   background: var(--field-bg);
@@ -304,7 +461,7 @@ textarea.ac-input {
   color: var(--ink);
   background: transparent;
 }
-/* Search input with a leading icon (from telas/Agente dialogs) */
+/* Search input with a leading icon */
 
 /* Composer */
 .ac-composer {
@@ -342,13 +499,13 @@ textarea.ac-input {
 }
 
 /* Avatar: people are circles, agents are rounded squares with one cut corner */
-/* Computer portrait (IconesComputador.html): pixels scaled by whole numbers, no tile. */
+/* Computer portrait: pixels scaled by whole numbers, no tile. */
 .ac-computer {
   display: block;
   flex: none;
   image-rendering: pixelated;
 }
-/* Engine portrait (IconesMotor.html, direction C): pixels scaled by whole numbers, no tile; off fades to gray. */
+/* Engine portrait: pixels scaled by whole numbers, no tile; off fades to gray. */
 .ac-brain {
   display: block;
   flex: none;
@@ -358,14 +515,31 @@ textarea.ac-input {
   filter: grayscale(1);
   opacity: 0.5;
 }
-/* BrainLogo (telas/LogosCerebro.html, A): the maker's official mark on a tile. Claude's orange is the brand's. */
+/* ProviderLogo: a maker's official mark in its brand color (`--brand`, set from brand/marks.ts) on a tile tinted
+   with it; one-color marks and an unknown maker's initial sit on a neutral tile, in ink. */
 .ac-brand {
-  display: grid;
+  display: inline-grid;
   place-items: center;
   flex: none;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--raised));
   box-shadow:
     inset 0 0 0 1px var(--line),
     var(--top);
+}
+.ac-brand--mono {
+  color: var(--ink);
+  background: var(--raised);
+}
+.ac-brand svg {
+  fill: currentColor;
+}
+/* A mark's second color (Kimi's dot, OpenCode's block), as its maker draws it on each theme. */
+.ac-brand__part {
+  fill: var(--part);
+}
+[data-theme="dark"] .ac-brand__part {
+  fill: var(--part-dark);
 }
 .ac-brand--tile {
   width: 48px;
@@ -385,27 +559,65 @@ textarea.ac-input {
   width: 16px;
   height: 16px;
 }
-.ac-brand--claude {
-  background: #f5ede6;
+.ac-brand--chip {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px 7px 7px 3px;
 }
-.ac-brand--claude svg {
-  fill: #d97757;
+.ac-brand--chip svg {
+  width: 12px;
+  height: 12px;
 }
-.ac-brand--openai {
-  background: #fff;
+/* Beside text: the bare mark. A one-color one stays in ink beside muted text too: OpenAI's, for one, may only be
+   black or white. */
+.ac-brand--xs {
+  width: 14px;
+  height: 14px;
+  background: none;
+  box-shadow: none;
 }
-.ac-brand--openai svg {
-  fill: var(--ink);
+.ac-brand--xs svg {
+  width: 14px;
+  height: 14px;
 }
-[data-theme="dark"] .ac-brand--claude {
-  background: #3a2a22;
+.ac-brand--xs:has(.ac-brand__initial) {
+  border-radius: 4px;
+  background: var(--sunken);
 }
-[data-theme="dark"] .ac-brand--openai {
-  background: #0e0e0d;
+.ac-brand__initial {
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-muted);
 }
+.ac-brand--sm .ac-brand__initial {
+  font-size: 13px;
+}
+.ac-brand--chip .ac-brand__initial {
+  font-size: 10px;
+}
+.ac-brand--xs .ac-brand__initial {
+  font-size: 9px;
+}
+/* Dimmed, never recolored: the makers' rules forbid changing a mark's colors. */
 .ac-brand--off {
-  filter: grayscale(1);
   opacity: 0.5;
+}
+/* ProviderStack: several makers' 20 px tiles overlapping, each ringed in the surface under it (`--stack-ring`
+   where that isn't the page's), like `.ac-avatar-stack`. The 2 px overlap and the 2 px ring stay inside the 4 px
+   around each 12 px mark, so no tile covers another's mark: the makers ask for clear space around theirs. */
+.ac-brand-stack {
+  display: inline-flex;
+  flex: none;
+}
+.ac-brand-stack > .ac-brand {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top),
+    0 0 0 2px var(--stack-ring, var(--surface));
+}
+.ac-brand-stack > .ac-brand + .ac-brand {
+  margin-left: -2px;
 }
 /* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
 .ac-icon .ac-brain-cc {
@@ -472,13 +684,18 @@ textarea.ac-input {
   }
 }
 
+/* Its own line height: a taller one inherited (a chip's 22px around an 18px tile) grows the grid's row past the
+   tile from its top, and the initials sit low. */
 .ac-avatar {
   display: inline-grid;
+  /* One row as tall as the face: a photo of any shape fills it instead of growing the row past the face. */
+  grid-template-rows: 100%;
   place-items: center;
   flex: none;
   width: 36px;
   height: 36px;
   font-size: 14px;
+  line-height: 1;
   font-weight: 700;
   background: var(--surface-sunken);
   color: var(--ink);
@@ -533,7 +750,7 @@ textarea.ac-input {
   border-radius: inherit;
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Overlapping avatars (from telas/Main header, Convite) */
+/* Overlapping avatars */
 .ac-avatar-stack {
   display: flex;
   align-items: center;
@@ -544,18 +761,24 @@ textarea.ac-input {
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
+/* Initials fill their tile: the next one starts past it, only its ring overlapping, so no letter is cut. */
+.ac-avatar-stack > .ac-avatar[data-kind="person"]:not(:has(img)) + .ac-avatar {
+  margin-left: 0;
+}
 
-/* Message: a fixed avatar column at the top, the text column beside it. */
+/* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
+   `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
+  --msg-inline: var(--space-4);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 6px var(--space-4);
+  padding: 6px var(--msg-inline);
 }
 .ac-msg--grouped {
   padding-top: 2px;
 }
-/* The face is 32px in the feed (telas/RefinoUI.html, "Nova leitura"). */
+/* The face is 32px in the feed. */
 .ac-msg__avatar,
 .ac-msg__gutter {
   flex: 0 0 32px;
@@ -590,17 +813,26 @@ textarea.ac-input {
   min-width: 0;
   flex: 1;
 }
-/* Name and time on a line as tall as the face; turns are told apart by space, name and face only. */
+/*
+ * Name and time on a 20px line whose capitals start at the face's top, as `.ac-captop` places them (the line's height
+ * is known here, so no lh unit); turns are told apart by space, name and face only. The name's size is the head's, so
+ * the rise is measured in its type.
+ */
 .ac-msg__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  line-height: 32px;
+  font-size: 14.5px;
+  line-height: 20px;
+  margin-block-start: calc(var(--cap-top) - 10px);
 }
 .ac-msg__author {
-  font-size: 14.5px;
   font-weight: 650;
+}
+/* The receipt beside the name never raises its line. */
+.ac-msg__head > .ac-msg__aside {
+  align-self: center;
 }
 .ac-msg__time {
   font-size: 12px;
@@ -711,6 +943,7 @@ textarea.ac-input {
   background: var(--surface-sunken);
   border-radius: var(--radius-sm);
   overflow-x: auto;
+  overflow-y: hidden;
   white-space: pre;
 }
 .ac-msg__text pre code {
@@ -760,7 +993,7 @@ textarea.ac-input {
     opacity: 0;
   }
 }
-/* Day divider (from telas/Main) */
+/* Day divider */
 .ac-divider {
   display: flex;
   align-items: center;
@@ -777,7 +1010,7 @@ textarea.ac-input {
   height: 1px;
   background: var(--line);
 }
-/* Link card attached to a message, e.g. a PR (from telas/Main) */
+/* Link card attached to a message, e.g. a PR */
 .ac-attachment {
   display: inline-flex;
   align-items: center;
@@ -846,12 +1079,37 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
+/* Asked while nobody watched: on the line of who asks, its icon placed from the line's top as an `.ac-iconline` lead. */
+.ac-approval__origin > svg {
+  margin: 0 3px 0 1px;
+  vertical-align: top;
+  /* Browsers without the lh unit: who asks' 18px line. */
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-approval__origin > svg {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+.ac-approval__action {
+  min-width: 0;
+}
+/* Why the agent asks, in its words, after the action. */
+.ac-approval__why {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
 .ac-approval__title {
   margin: 0;
   font-size: 15px;
   line-height: 22px;
   font-weight: 600;
 }
+/* A well in both themes: the page's tone is the light card's own white, which left the text indented in nothing. */
 .ac-approval__detail {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -859,7 +1117,7 @@ textarea.ac-input {
   line-height: 18px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
-  background: var(--surface);
+  background: var(--surface-sunken);
   border-radius: var(--radius-sm);
   overflow-wrap: anywhere;
   /* Long, multi-line details (an email's recipients, subject and body) keep their lines and scroll. */
@@ -867,10 +1125,11 @@ textarea.ac-input {
   max-height: 240px;
   overflow-y: auto;
 }
+/* An `.ac-acts` row that wraps: its lines 8px apart, a one-line choice as tall as a two-line one beside it. */
 .ac-approval__actions {
-  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: stretch;
+  row-gap: var(--space-2);
 }
 /* Choices can be whole sentences: they wrap inside the card instead of running past it. */
 .ac-approval__actions .ac-btn {
@@ -926,7 +1185,7 @@ textarea.ac-input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Small attention note: icon + text, no background (from telas/Agente permissions) */
+/* Small attention note: icon + text, no background */
 .ac-note-attention {
   display: inline-flex;
   align-items: center;
@@ -940,7 +1199,7 @@ textarea.ac-input {
   width: 14px;
   height: 14px;
 }
-/* Counter badge (from telas/Sidebar) */
+/* Counter badge */
 .ac-count {
   min-width: 20px;
   height: 20px;
@@ -960,7 +1219,7 @@ textarea.ac-input {
   align-items: center;
   gap: 0.16em;
   /* Funnel Display light (the landing's headings); the app falls back to its sans. */
-  font-family: var(--font-display, var(--font-sans));
+  font-family: var(--font-brand, var(--font-display, var(--font-sans)));
   font-weight: 300;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -1030,6 +1289,7 @@ textarea.ac-input {
   padding: 0 var(--space-3) 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -1129,6 +1389,11 @@ textarea.ac-input {
 /* The right click (MenuAt): at the pointer at once, like the system's menus. */
 .ac-menu.ac-menu--at[data-state="open"] {
   animation: none;
+}
+/* The text right-clicked stays marked while its menu is open (Menu.tsx, keepSelection). */
+::highlight(ac-kept-selection) {
+  background-color: Highlight;
+  color: HighlightText;
 }
 .ac-menu__reactions {
   display: flex;
@@ -1233,6 +1498,23 @@ textarea.ac-input {
 .ac-menu__leading .ac-icon {
   margin-top: 0;
 }
+/*
+ * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
+ * small face or a stack of them) sits on the first line's capitals, as an `.ac-iconline` lead does. A 30px tile stays
+ * centred on both lines, which starts the first line's capitals at its top.
+ */
+.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+> .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
+  align-self: flex-start;
+  /* Browsers without the lh unit: the option's 20px line. */
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+    > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
 .ac-menu__desc {
   font-size: 13px;
   line-height: 18px;
@@ -1324,7 +1606,7 @@ textarea.ac-input {
   opacity: 0.55;
 }
 
-/* Selectable cards and pills (from telas/Onboarding, NovoAgente) */
+/* Selectable cards and pills */
 .ac-option {
   display: flex;
   gap: var(--space-3);
@@ -1360,30 +1642,15 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark), with a check in the corner; in dark the other options
-   of the group step back. */
+/* Chosen (--chosen-*), inside the card's own outline (its line2 ring and e1's line), so neither the card nor the gaps
+   around it move. A pressed card also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
+  --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
   background: var(--chosen-bg);
-  box-shadow: var(--chosen-shadow);
-  transform: var(--chosen-lift);
+  box-shadow: var(--pressed);
 }
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow:
-    0 0 0 1px var(--line2),
-    var(--e1);
-}
-.ac-option[aria-pressed="true"]::after,
-.ac-option[data-state="checked"]::after {
+.ac-option[aria-pressed="true"]::after {
   content: "";
   position: absolute;
   top: 10px;
@@ -1397,17 +1664,14 @@ textarea.ac-input {
     center / 12px no-repeat;
 }
 /* Nothing runs under the check: the title, and whatever sits on the right (a chip like "Em uso"). */
-.ac-option[aria-pressed="true"] .ac-option__title,
-.ac-option[data-state="checked"] .ac-option__title {
+.ac-option[aria-pressed="true"] .ac-option__title {
   padding-right: 22px;
 }
-.ac-option[aria-pressed="true"] .ac-option__aside,
-.ac-option[data-state="checked"] .ac-option__aside {
+.ac-option[aria-pressed="true"] .ac-option__aside {
   margin-right: 26px;
 }
 /* Dark: the check's mark takes the page color (ink is light there). */
-[data-theme="dark"] .ac-option[aria-pressed="true"]::after,
-[data-theme="dark"] .ac-option[data-state="checked"]::after {
+[data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
 .ac-option:focus-visible,
@@ -1418,13 +1682,30 @@ textarea.ac-input {
 .ac-option[aria-pressed="true"]:has(:focus-visible),
 .ac-option[data-state="checked"]:has(:focus-visible),
 .ac-option[aria-pressed="true"]:focus-visible {
-  box-shadow: var(--chosen-shadow), var(--field-ring);
+  box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+/* A radio card's chip ("Em uso", "Em breve") rides on its title's first line, at the card's end: the description
+   under them takes the card's whole width. Where the title's longest word and the chip can't share a line (a
+   decision's narrow cards), the chip drops under the title, on its edge. */
+.ac-option__text:has(> .ac-option__head) {
+  flex: 1;
+}
+.ac-option__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: var(--space-3);
+}
+/* A zero basis: the line breaks only when the longest word can't sit beside the chip, and the title takes the rest
+   of the line, so the chip ends it. */
+.ac-option__head > .ac-option__title {
+  flex: 1 1 0;
 }
 .ac-option__title {
   font-weight: 600;
@@ -1433,15 +1714,18 @@ textarea.ac-input {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
+/* A flex box, so the chip alone sets its height: on a text line's baseline it would leave the row 2px taller. */
 .ac-option__aside {
-  margin-left: auto;
+  display: flex;
   flex: none;
 }
 .ac-option[data-disabled] {
   cursor: not-allowed;
 }
-.ac-option[data-disabled] .ac-option__text {
+/* The option dims, not the chip that says why ("Em breve"). */
+.ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc) {
   opacity: 0.55;
 }
 .ac-pill {
@@ -1474,7 +1758,7 @@ textarea.ac-input {
   box-shadow: none;
 }
 
-/* Tabs (from telas/Aprovacoes) */
+/* Tabs */
 .ac-tabs {
   display: flex;
   gap: var(--space-1);
@@ -1502,7 +1786,7 @@ textarea.ac-input {
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
-/* Dialog (from telas/Agente): radius-lg, overlay shadow, scrim */
+/* Dialog: radius-lg, overlay shadow, scrim */
 .ac-dialog__scrim {
   position: fixed;
   inset: 0;
@@ -1547,12 +1831,49 @@ textarea.ac-input {
   gap: var(--space-3);
   padding: 20px 20px 12px;
 }
+.ac-dialog__lead {
+  display: flex;
+  flex: none;
+}
+/* Before a title with a line under it, the face sits on the title's 24px line, as an `.ac-iconline` lead does. */
+.ac-dialog__lead:has(+ .ac-dialog__titles) {
+  align-self: flex-start;
+  translate: 0 calc(12px - var(--cap-mid) - 50%);
+}
+/*
+ * The head's actions and its close, in one `.ac-acts` row. The close's × spans 9.6 of its icon's 20 units, so it reaches
+ * out by the 5.2 units of air on each side too (`.ac-btn--glyph`): its ink ends on the head's padding line, as far from
+ * the edge as the face starts, and stands as far from the shape before it as the row's gap.
+ */
+.ac-dialog__acts {
+  flex: none;
+}
+.ac-dialog__acts > .ac-btn--glyph:last-child {
+  --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
+}
+/* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does (a title with a line under
+   it keeps them on the pair's middle). An app measures that middle for its title's face (`--title-cap-mid`): --cap-mid
+   here would resolve in the actions' own font. */
+.ac-dialog__title + .ac-dialog__acts {
+  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
+}
 .ac-dialog__title {
   margin: 0;
   flex: 1;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
+}
+.ac-dialog__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ac-dialog__sub {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
 }
 .ac-dialog__desc {
   margin: 0;
@@ -1580,6 +1901,10 @@ textarea.ac-input {
 }
 .ac-dialog__body > * {
   flex: none;
+}
+/* With no footer under it, the body keeps the dialog's own edge below its last item. */
+.ac-dialog__body:last-child {
+  padding-bottom: 20px;
 }
 .ac-dialog__list {
   flex: 1 1 auto;
@@ -1610,7 +1935,7 @@ textarea.ac-input {
   color: var(--ink-muted);
 }
 
-/* Meter (from telas/Agente budget) */
+/* Meter */
 .ac-meter {
   position: relative;
   height: 8px;
@@ -1632,8 +1957,114 @@ textarea.ac-input {
   background: var(--ink);
   border-radius: var(--radius-full);
 }
+/* One part in full ink over the rest of the use (an agent's share of its plan's window). */
+.ac-meter--parts .ac-meter__bar {
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.ac-meter__part {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--ink);
+  border-radius: var(--radius-full);
+}
 
-/* Cards and sections (from telas/Agente, Membros) */
+/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+.ac-planmeter {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-planmeter__state {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--attention);
+}
+.ac-planmeter__windows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ac-planmeter__window {
+  display: grid;
+  /* max-content, not auto: the lines spanning both columns (the note, the reset) never resize the
+     percent's column, so every percent ends on the bar's right edge. */
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+.ac-planmeter__window .ac-meter {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+.ac-planmeter__pct {
+  justify-self: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+.ac-planmeter__reset,
+.ac-planmeter__note,
+.ac-planmeter__at {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.ac-planmeter--compact {
+  gap: 4px;
+}
+.ac-planmeter--compact .ac-planmeter__window {
+  font-size: 12px;
+}
+
+/* A month day by day (UsageDays.tsx): a column per day stacked by source, in 1-px rows; days ahead dotted. */
+.ac-usage-days {
+  --dot: color-mix(in srgb, var(--line-strong) 45%, transparent);
+  display: grid;
+  grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 150px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.ac-usage-days__day {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  height: 100%;
+}
+.ac-usage-days__day > i {
+  --c: var(--part, var(--ink));
+  display: block;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--c) 0 2px,
+    color-mix(in srgb, var(--c) 60%, var(--raised)) 2px 3px
+  );
+}
+.ac-usage-days__day--ahead {
+  align-self: end;
+  height: 14px;
+  opacity: 0.7;
+  background-image: radial-gradient(circle, var(--dot) 0.7px, transparent 0.85px);
+  background-size: 3px 3px;
+}
+.ac-usage-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--part, var(--ink));
+}
+
+/* Cards and sections */
 .ac-card {
   display: flex;
   flex-direction: column;
@@ -1675,6 +2106,10 @@ textarea.ac-input {
 }
 .ac-list__row + .ac-list__row {
   border-top: 1px solid var(--line);
+}
+/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead. */
+.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child {
+  margin-right: calc(-1 * var(--ghost-plate));
 }
 a.ac-list__row:hover {
   background: var(--surface);
@@ -1736,7 +2171,7 @@ a.ac-list__row:focus-visible {
   white-space: nowrap;
 }
 
-/* Empty state (from telas/Aprovacoes) */
+/* Empty state */
 .ac-empty {
   padding: 40px 24px;
   text-align: center;
@@ -1764,6 +2199,8 @@ a.ac-list__row:focus-visible {
 .ac-empty__text {
   margin: 0 auto;
   max-width: 52ch;
+  /* Centered lines of even length: a short last word never sits on a line of its own. */
+  text-wrap: balance;
 }
 .ac-empty__actions {
   display: flex;
@@ -1772,12 +2209,9 @@ a.ac-list__row:focus-visible {
   margin-top: var(--space-4);
 }
 
-/* Inline alert (from telas/Entrar) */
+/* Inline alert (an `.ac-iconline`) */
 .ac-alert {
   margin: 0;
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1789,7 +2223,6 @@ a.ac-list__row:focus-visible {
 .ac-alert .ac-icon {
   width: 18px;
   height: 18px;
-  margin-top: 1px;
 }
 .ac-alert--neutral {
   color: var(--ink);
@@ -1818,6 +2251,8 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--overlay);
   font-size: 14px;
   line-height: 20px;
+  /* Over a modal dialog too, which turns the page's own off. */
+  pointer-events: auto;
 }
 .ac-toast--error .ac-icon {
   color: var(--danger);
@@ -1827,19 +2262,42 @@ a.ac-list__row:focus-visible {
   min-width: 0;
 }
 
-/* Progress bars (from telas/Onboarding) */
+/* Progress bars */
 .ac-steps {
   display: flex;
   gap: var(--space-1);
 }
 .ac-steps__bar {
+  position: relative;
   flex: 1;
   height: 4px;
+  overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--line);
 }
 .ac-steps__bar[data-done="true"] {
   background: var(--ink);
+}
+/* The step under way: ink travels along its bar, like the top progress bar (half-lit, still, without motion). */
+.ac-steps__bar[data-current]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--ink);
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-steps__bar[data-current]::before {
+    animation: ac-top-progress 1.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-steps__bar[data-current]::before {
+    width: 100%;
+    opacity: 0.35;
+  }
 }
 .ac-eyebrow {
   font-size: 12px;
@@ -1850,7 +2308,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink-muted);
 }
 
-/* Back link (from telas/Memoria, Propostas) */
+/* Back link */
 .ac-back {
   display: inline-flex;
   align-items: center;
@@ -1873,7 +2331,7 @@ a.ac-list__row:focus-visible {
   border-radius: var(--radius-cut);
 }
 
-/* Neutral before/after diff (from telas/Propostas): no green or red. */
+/* Neutral before/after diff: no green or red. */
 .ac-diff {
   display: flex;
   flex-direction: column;
@@ -1960,7 +2418,7 @@ a.ac-list__row:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 16px 0 24px;
+  padding: 16px 24px 0;
 }
 .ac-details__bar {
   display: flex;
@@ -1979,17 +2437,14 @@ a.ac-list__row:focus-visible {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
+/* An `.ac-acts` row: the close's icon on the head's padding line. */
 .ac-details__actions {
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 .ac-details__heading {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding-right: 8px;
 }
 .ac-details__icon {
   flex: none;
@@ -2082,7 +2537,7 @@ a.ac-list__row:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Selectable list item in a side list (from telas/Propostas) */
+/* Selectable list item in a side list */
 .ac-navcard {
   display: flex;
   flex-direction: column;
@@ -2107,7 +2562,7 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-/* A neutral button that creates an agent: default look + the agent's cut corner (from telas/Sidebar "Criar agente") */
+/* A neutral button that creates an agent: default look + the agent's cut corner */
 .ac-btn--cut {
   border-bottom-left-radius: var(--radius-cut);
 }
@@ -2118,7 +2573,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-msg__actions {
   position: absolute;
-  top: -12px;
   right: 16px;
   display: flex;
   gap: 2px;
@@ -2169,6 +2623,14 @@ a.ac-list__row:focus-visible {
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+}
+/* The dot between the words and the action, 4px from each: the line's whole gap on both sides makes it wrap sooner. */
+.ac-receipt__dot {
+  margin-inline: -2px;
+}
+/* After an ⓘ, 1.5px closer: the ⓘ's circle stops 1.54px inside its box. */
+.ac-hintline + .ac-receipt__dot {
+  margin-inline-start: -3.5px;
 }
 .ac-receipt__avatars {
   display: inline-flex;
@@ -2245,7 +2707,7 @@ a.ac-list__row:focus-visible {
   align-items: center;
   flex: none;
 }
-/* The working line (telas/ConversaAgentes.html): stacked mini bodies, each on a plate so overlaps stay readable */
+/* The working line: stacked mini bodies, each on a plate so overlaps stay readable */
 .ac-typing__tok {
   display: inline-flex;
   padding: 1.5px;
@@ -2313,7 +2775,7 @@ a.ac-list__row:focus-visible {
     animation-delay: 0.3s;
   }
 }
-/* The bar's phrase turns (telas/CardTrabalhando.html, A): the old one leaves upward, the new one comes
+/* The bar's phrase turns: the old one leaves upward, the new one comes
    from below, in the same cell. Reduced motion: a plain swap. */
 .ac-turn {
   display: inline-grid;
@@ -2433,13 +2895,37 @@ a.ac-list__row:focus-visible {
   line-height: 16px;
   color: var(--ink-muted);
 }
+/*
+ * A grouped message's check ends its first line, its middle on the line's capitals as an `.ac-iconline` lead's, so
+ * it takes the text's type (`.ac-msg__text`) and top margin. The line wraps before it, never under it.
+ */
 .ac-msg__aside--floating {
-  position: absolute;
-  top: 0;
-  right: 16px;
+  float: right;
+  /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
+  align-self: flex-end;
+  margin: 2px 0 0 8px;
+  font-size: 15.5px;
+  line-height: 1.7;
+  /* Browsers without the lh unit: the text's 26.35px line. */
+  translate: 0 calc(13.175px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-msg__aside--floating {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-msg__aside .ac-receipt {
   margin-top: 0;
+}
+/* A receipt with words: a line of its own under the message, from the text's start, the same on a first and a
+   grouped message, so the text still follows the name and the words come and go without moving it. */
+.ac-msg__foot > .ac-receipt {
+  margin-top: 2px;
+}
+/* A receipt part with nothing to show (a message no agent was asked about) takes no room, in a stacked body too. */
+.ac-msg__aside:empty,
+.ac-msg__foot:empty {
+  display: none;
 }
 
 /* Date picker (our month grid in a popover; never the native input) */
@@ -2626,6 +3112,15 @@ a.ac-list__row:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Off and unavailable: an outline, not a filled track, so it never reads as a switch that is just off (in dark
+   mode dimming alone barely shows). */
+.ac-switch[data-disabled]:not([data-state="checked"]) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+.ac-switch[data-disabled]:not([data-state="checked"]) .ac-switch__thumb {
+  background: var(--line-strong);
+}
 .ac-switch__thumb {
   display: block;
   width: 16px;
@@ -2784,24 +3279,35 @@ a.ac-list__row:focus-visible {
     transform: translateX(250%);
   }
 }
-/* The working indicator (PixelSpinner, telas/Carregando.html option A): a 3×3
+/* The working indicator (PixelSpinner): a 3×3
    pixel orbit drawn on a canvas; it reads `color` for the neutral ink. Still
    under reduced motion (the component stops its clock). */
 .ac-pixspin {
   display: inline-block;
   flex: none;
-  vertical-align: middle;
   image-rendering: pixelated;
 }
-/* Done (telas/Mensagens.html): one pixel in the ok color, the spinner's center cell, popping in. */
+/*
+ * In a line of text the pixel marks centre on the capitals, as an `.ac-iconline` lead does (a flex or grid item
+ * ignores vertical-align): their box's bottom is their baseline (the spinner is a canvas, the others draw in an
+ * absolute child), raised by half the capitals' height less half their size (`--mark-size`, set by each).
+ */
+.ac-pixspin,
+.ac-pixdone,
+.ac-pixstop {
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--mark-size, 14px) / 2);
+}
+/* Done: one pixel in the ok color, the spinner's center cell, popping in. */
 .ac-pixdone {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  position: relative;
   flex: none;
-  vertical-align: middle;
 }
 .ac-pixdone::before {
   content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
   width: var(--px, 4px);
   height: var(--px, 4px);
   background: var(--ok);
@@ -2826,12 +3332,14 @@ a.ac-list__row:focus-visible {
 }
 /* Stop: a 2×2 pixel square in the text color; while an agent works one cell dims in turn (220 ms each). */
 .ac-pixstop {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  position: relative;
   flex: none;
-  vertical-align: middle;
 }
 .ac-pixstop > span {
+  position: absolute;
+  inset: 0;
+  margin: auto;
   width: var(--stop-side, 10px);
   height: var(--stop-side, 10px);
   border-radius: var(--stop-radius, 2px);
@@ -2901,20 +3409,24 @@ a.ac-list__row:focus-visible {
   }
   /* Menus, selects and popovers grow from their trigger with a 4 px slide. */
   .ac-menu[data-state="open"],
-  .ac-menu[data-state="delayed-open"] {
+  .ac-menu[data-state="delayed-open"],
+  .ac-hint__bubble[data-state="open"] {
     transform-origin: var(
       --radix-dropdown-menu-content-transform-origin,
       var(--radix-popover-content-transform-origin, var(--radix-select-content-transform-origin, top center))
     );
     animation: ac-pop-down 140ms ease-out;
   }
-  .ac-menu[data-state="open"][data-side="top"] {
+  .ac-menu[data-state="open"][data-side="top"],
+  .ac-hint__bubble[data-state="open"][data-side="top"] {
     animation-name: ac-pop-up;
   }
-  .ac-menu[data-state="open"][data-side="left"] {
+  .ac-menu[data-state="open"][data-side="left"],
+  .ac-hint__bubble[data-state="open"][data-side="left"] {
     animation-name: ac-pop-left;
   }
-  .ac-menu[data-state="open"][data-side="right"] {
+  .ac-menu[data-state="open"][data-side="right"],
+  .ac-hint__bubble[data-state="open"][data-side="right"] {
     animation-name: ac-pop-right;
   }
   /* Lists: rows rise in, staggered, the first time the list appears. */
@@ -2999,7 +3511,7 @@ a.ac-list__row:focus-visible {
 }
 
 /* ==========================================================================
- * Design system 2026-10 (docs/design/refresh-2026-10.md, telas/Componentes.dc.html).
+ * Design system 2026-10 (docs/design/refresh-2026-10.md).
  * Overrides the v1 rules above: layered surfaces (e1–e3 + top light), glass,
  * spring presses, the living agent symbol. Same rules: neutral cards, blue
  * only for agent identity, mono only for code.
@@ -3011,19 +3523,13 @@ a.ac-list__row:focus-visible {
   --person-b: #d9d9d4;
   --person-ink: #2a2a28;
   --b1-light: rgba(255, 255, 255, 0.18);
-  /* Cards (telas/Cards.html "I · Tato com canto"): an object like the buttons, lit top edge, darker bottom
-     edge, contact + ambient shadow. Keys are the small tiles on a card (head icon); the well is pressed in. */
-  --card-face-top: #ffffff;
-  --card-shadow:
-    0 0 0 1px rgba(23, 23, 22, 0.08), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.06),
-    0 1px 2px rgba(23, 23, 22, 0.06), 0 12px 28px -14px rgba(23, 23, 22, 0.18);
-  --card-shadow-hover:
-    0 0 0 1px rgba(23, 23, 22, 0.1), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.07),
-    0 2px 4px rgba(23, 23, 22, 0.06), 0 18px 36px -16px rgba(23, 23, 22, 0.24);
-  --card-key-bottom: #f5f5f2;
-  --card-key:
-    0 0 0 1px rgba(23, 23, 22, 0.09), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.08),
-    0 1px 2px rgba(23, 23, 22, 0.08);
+  /* Cards: flat on the white page, a hairline and the cut corner, no shadow.
+     Keys (the head icon) are a bare icon, no frame; the well is pressed in. */
+  --card-face-top: var(--surface-raised);
+  --card-shadow: 0 0 0 1px rgba(23, 23, 22, 0.1);
+  --card-shadow-hover: 0 0 0 1px rgba(23, 23, 22, 0.18);
+  --card-key-bottom: var(--surface-raised);
+  --card-key: none;
   --card-well: #f6f6f3;
   --card-well-shadow: inset 0 1px 2px rgba(23, 23, 22, 0.07), inset 0 0 0 1px rgba(23, 23, 22, 0.05), 0 1px 0 #ffffff;
 }
@@ -3032,17 +3538,11 @@ a.ac-list__row:focus-visible {
   --person-b: #2a2a28;
   --person-ink: #efefec;
   --b1-light: rgba(255, 255, 255, 0.12);
-  --card-face-top: #232322;
-  --card-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 30px -12px rgba(0, 0, 0, 0.75);
-  --card-shadow-hover:
-    0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.5), 0 20px 40px -14px rgba(0, 0, 0, 0.85);
-  --card-key-bottom: #1f1f1e;
-  --card-key:
-    0 0 0 1px rgba(255, 255, 255, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.5);
+  --card-face-top: var(--surface-raised);
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --card-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  --card-key-bottom: var(--surface-raised);
+  --card-key: none;
   --card-well: #121211;
   --card-well-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -3072,6 +3572,21 @@ a.ac-list__row:focus-visible {
 }
 .ac-btn:active:not([disabled]) {
   transform: scale(0.97) translateY(0.5px);
+}
+/*
+ * A toggle that is on (`aria-pressed`) stays pushed in, hovered or not; a ghost one keeps its hover plate. Keyboard
+ * focus still rings it.
+ */
+.ac-btn[aria-pressed="true"] {
+  background: var(--sunken);
+  color: var(--ink);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 1px var(--line);
+}
+.ac-btn--ghost[aria-pressed="true"] {
+  background: var(--plate);
+  box-shadow: none;
 }
 .ac-btn:focus-visible {
   outline: none;
@@ -3122,10 +3637,12 @@ a.ac-list__row:focus-visible {
 .ac-btn--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
+/* Off: a faint plate over whatever it sits on, so its shape shows on a page, a card or a well, in both themes (a
+   sunken fill is nearly the dark page's own color). */
 .ac-btn[disabled],
 .ac-btn[aria-disabled="true"] {
   color: var(--faint);
-  background: var(--sunken);
+  background: var(--plate);
   box-shadow: none;
   filter: none;
 }
@@ -3157,6 +3674,16 @@ a.ac-list__row:focus-visible {
 .ac-btn--lg .ac-icon {
   width: var(--control-icon-lg);
   height: var(--control-icon-lg);
+}
+/*
+ * A leading icon by its ink. A button that says how much air its icon's drawing leaves before it (`--lead-air`) and
+ * how far to lift it (`--lead-rise`: the capitals' `--cap-mid`, plus as far as its ink's middle sits under its box's)
+ * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
+ * folded to its icon, say), the box places it.
+ */
+:where(.ac-btn > .ac-icon:first-child) {
+  margin-inline-start: calc(-1 * var(--lead-air));
+  translate: 0 calc(-1 * var(--lead-rise));
 }
 /* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
 .ac-btn--icon {
@@ -3254,6 +3781,7 @@ a.ac-list__row:focus-visible {
   /* Never wider than its place: a long choice list scrolls sideways (the pill scrolls with it). */
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .ac-seg::-webkit-scrollbar {
@@ -3270,6 +3798,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: var(--control-fs-sm);
   font-weight: 600;
+  line-height: normal;
   height: calc(var(--seg-h) - 2 * var(--seg-in));
   padding: 0 12px;
   border: 0;
@@ -3372,8 +3901,29 @@ a.ac-list__row:focus-visible {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
+/*
+ * Dark: the raised tone and the track were the same near-black, so the chosen segment vanished. The track
+ * sinks below the page and the pill lifts above it; the other segments step back to muted.
+ */
+[data-theme="dark"] .ac-seg {
+  background: color-mix(in srgb, #000 35%, var(--bg));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+[data-theme="dark"] .ac-seg__pill {
+  background: color-mix(in srgb, var(--ink) 13%, var(--raised));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    var(--top);
+}
+[data-theme="dark"] .ac-seg__item:not([data-on]) {
+  color: var(--muted);
+}
+[data-theme="dark"] .ac-seg__item:not([data-on]):hover {
+  color: var(--ink);
+}
 
-/* Tool review pixels (telas/ConectorFerramentas.html): swatch, subject strip, proportion bar, marks. */
+/* Tool review pixels: swatch, subject strip, proportion bar, marks. */
 .ac-toolpx-swatch {
   flex: none;
   width: 12px;
@@ -3492,9 +4042,8 @@ a.ac-list__row:focus-visible {
 }
 
 /*
- * Cards (telas/Cards.html "I · Tato com canto"): neutral, an object like the buttons (lit top edge, darker
- * bottom edge, contact + ambient shadow), so it stands out on the white work area. Every card has the cut
- * corner: straight bottom-left, the rest rounded. Interactive ones lift.
+ * Cards: neutral, a hairline on the white page, no shadow. Every card keeps the cut corner: straight bottom-left, the rest rounded.
+ * Interactive ones darken their line and lift a little.
  */
 .ac-card {
   border: 0;
@@ -3514,23 +4063,30 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-1px);
 }
-/* Head: a key with the icon, title and an optional quiet line, the action on the right. */
+/* Head: a key with the icon, title and an optional quiet line, the action on the right. The key (an
+   `.ac-iconline` lead) stays on the title's line when the quiet line wraps under it; the action stays centred. */
 .ac-card__head {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+  line-height: 20px;
+}
+/* A title alone sits in the middle of a taller action, and its key with it: already centred on the title's line, the
+   key only rises to the capitals' middle. */
+.ac-card__head:not(:has(.ac-card__sub)) {
+  align-items: center;
+}
+.ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key {
+  translate: 0 calc(-1 * var(--cap-mid));
 }
 .ac-card__key {
   display: grid;
   flex: none;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px 10px 10px 3px;
-  background: linear-gradient(180deg, var(--surface-raised), var(--card-key-bottom));
-  box-shadow: var(--card-key);
-  color: var(--ink2);
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
 }
 .ac-card__heading {
   display: flex;
@@ -3558,26 +4114,23 @@ a.ac-list__row:focus-visible {
 .ac-card__action {
   display: flex;
   flex-shrink: 0;
+  align-self: center;
   align-items: center;
   gap: 6px;
   margin-left: auto;
 }
-/* Foot: help text in a well pressed into the bottom of the card (8px from its edges). */
+/* Foot: help text in a well pressed into the bottom of the card (8px from its edges), its icon an `.ac-iconline`
+   lead. */
 .ac-card__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 calc(8px - var(--card-pad, 20px)) calc(8px - var(--card-pad, 20px));
-  padding: 9px 10px;
-  border-radius: 12px 12px 12px 3px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
+  /* A quiet line under a hairline, edge to edge of the card (no gray well). */
+  margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
+  padding: 12px var(--card-pad, 20px);
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12.5px;
   line-height: 17px;
 }
 .ac-card__foot > .ac-icon {
-  flex: none;
   color: var(--faint);
 }
 .ac-list {
@@ -3585,6 +4138,98 @@ a.ac-list__row:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
+}
+
+/*
+ * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
+ * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before. The
+ * label flows as text, every line of it 18px short of the line's end, and the ⓘ follows its last word in that room,
+ * taking none of its own, so it never goes to a line alone; it sits on that line's capitals' middle, as an
+ * `.ac-iconline` lead sits on its line's. A label element is set from each line's top, as the ⓘ is, so the line's
+ * own type never moves it; one with its own icon or logo stays one box. The line sets the label's font size and line
+ * height (a field's and a card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
+ */
+.ac-hintline {
+  display: inline-block;
+  min-width: 0;
+  padding-inline-end: 18px;
+  /* No word alone on a wrapped label's last line. Not `pretty`: Chrome skips it in a paragraph holding a box, as the
+     ⓘ is. */
+  text-wrap: balance;
+}
+.ac-hintline:not(:has(> .ac-hint)) {
+  padding-inline-end: 0;
+}
+.ac-hintline > :first-child:not(.ac-hint) {
+  display: inline;
+  vertical-align: top;
+}
+.ac-hintline > :first-child:not(.ac-hint):has(> .ac-icon, > .ac-brand) {
+  display: inline-flex;
+}
+/* 4px after the last letter (the glyph is 5px inside its target), taking no room of its own. */
+.ac-hintline > .ac-hint {
+  margin-inline: -1px -23px;
+}
+.ac-field > .ac-hintline,
+.ac-field__label-row > .ac-hintline {
+  font-size: 13px;
+  line-height: 18px;
+}
+.ac-hintline:has(> .ac-card__title) {
+  font-size: 18px;
+  line-height: 24px;
+}
+.ac-hint {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  margin: -5px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  /* The line's type, not the browser's button font: its `lh` and `ex` place the glyph. */
+  font: inherit;
+  color: var(--ink-muted);
+  cursor: help;
+  /* Inline at the end of a sentence (a dialog's description), placed from its line's top as in a hint line. */
+  vertical-align: top;
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 7px);
+}
+@supports (top: 1lh) {
+  .ac-hint {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 7px);
+  }
+}
+.ac-hint:hover,
+.ac-hint[data-state="open"] {
+  color: var(--ink);
+}
+/*
+ * The target reaches 1px into the label, so the ring is drawn well inside it (20px across, clear of the glyph), not
+ * around it, where it would cover the label's last letter.
+ */
+.ac-hint:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
+}
+.ac-hint__bubble {
+  z-index: var(--z-floating);
+  box-sizing: border-box;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 8px 12px;
+  text-wrap: pretty;
+  border-radius: 12px;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  text-align: start;
 }
 
 /* Checkbox: the mark pops in; switch: the thumb springs */
@@ -3709,7 +4354,7 @@ a.ac-list__row:focus-visible {
   border-bottom-left-radius: inherit;
 }
 /*
- * The tile (telas/RefinoUI.html, "Molduras" → Céu), agents and people alike:
+ * The tile, agents and people alike:
  * radius 30% of the side, an inset hairline and a faint top highlight. The
  * agent's canvas is the tile itself (its own pixel sky, the agent standing in
  * it); the soft tint only shows until the first draw.
@@ -3736,6 +4381,10 @@ a.ac-list__row:focus-visible {
     inset 0 0 0 1px var(--line),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
+/* The tile already holds the agent at work (its face moves): no halo around it, which looked like a bigger box. */
+.ac-avatar--framed.ac-avatar--running::after {
+  content: none;
+}
 .ac-avatar--framed .ac-avatar__canvas {
   left: 0;
   top: 0;
@@ -3759,7 +4408,7 @@ a.ac-list__row:focus-visible {
   }
 }
 
-/* Messages: a faint hover plate; the action bar fades in (telas/RefinoUI.html, "Nova leitura") */
+/* Messages: a faint hover plate; the action bar fades in */
 .ac-msg {
   border-radius: 14px;
   transition: background-color 0.12s;
@@ -3767,10 +4416,15 @@ a.ac-list__row:focus-visible {
 .ac-msg:hover {
   background: var(--plate-soft);
 }
-/* A raised bar of 32px ghost icon buttons at the row's top-right: react, reply, more. Hidden at rest,
-   shown on hover and on keyboard focus inside the row. */
+/*
+ * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
+ * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
+ * check's is, and it stands left of the check. So it only reaches into the room between rows: never over the row
+ * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
+ */
 .ac-msg__actions {
-  top: -14px;
+  /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
+  top: calc(6px + var(--cap-top) - var(--cap-mid));
   right: 10px;
   z-index: var(--z-sticky);
   padding: 3px;
@@ -3778,7 +4432,9 @@ a.ac-list__row:focus-visible {
   border-radius: 13px;
   background: var(--raised);
   box-shadow: var(--e2);
-  transform: translateY(4px);
+  /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
+     `translate` declared beside a `transform`. */
+  transform: translateY(calc(-50% + 4px));
   transition:
     opacity 0.12s,
     transform 0.16s var(--out);
@@ -3787,7 +4443,20 @@ a.ac-list__row:focus-visible {
 .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
-  transform: none;
+  transform: translateY(-50%);
+}
+/* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
+.ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
+  top: calc(4px + 13.175px - var(--cap-mid));
+}
+/* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
+   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
+.ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  top: 13.175px;
+}
+/* Left of the check (20px wide), 8px from it, past the row's side padding. */
+.ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
   min-width: 32px;
@@ -3933,6 +4602,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 550;
+  line-height: normal;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -3980,7 +4650,7 @@ a.ac-list__row:focus-visible {
   background: var(--sunken);
   box-shadow: var(--e1);
 }
-/* Lower (RefinoUI "Nova leitura"): one 32px line at rest, the toolbar 4px under it. */
+/* Lower: one 32px line at rest, the toolbar 4px under it. */
 /* In the column card the height comes from the text (Composer measures it); `flex: 1` from the
    row layout above would pin it to its minimum. */
 .ac-composer textarea {
@@ -4029,6 +4699,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   background: var(--sunken);
   color: var(--ink2);
   border: 0;
@@ -4138,7 +4809,7 @@ a.ac-list__row:focus-visible {
   gap: 4px;
   color: var(--faint);
 }
-@media (hover: none), (pointer: coarse) {
+@media (max-width: 760px), (hover: none), (pointer: coarse) {
   .ac-composer-choice__hint {
     display: none;
   }
@@ -4234,6 +4905,7 @@ a.ac-list__row:focus-visible {
   flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .ac-composer__format::-webkit-scrollbar {
@@ -4593,6 +5265,7 @@ a.ac-list__row:focus-visible {
   background: transparent;
   font: inherit;
   font-size: 16px;
+  line-height: normal;
   color: var(--ink);
 }
 .ac-palette__q input::placeholder {
@@ -4658,6 +5331,269 @@ a.ac-list__row:focus-visible {
   }
 }
 /* Pending: the pixel orbit alone (a square in the round tick would poke out). */
+/*
+ * The tools of one reply (ToolBlock): a card in one line while it works (the apps' logos, what it
+ * does now, the steps, the orbit), opening into every call. Flat like every card: the hairline and the cut corner.
+ */
+.ac-tools {
+  margin: 10px 0 12px;
+  max-width: 560px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.ac-tools__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.ac-tools__head:hover {
+  background: var(--plate-soft);
+}
+/* Inside the card's clip: the ring goes inward. */
+.ac-tools__head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.ac-tools__logos {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+/* Each logo centered in its own box, never on the text's baseline (a letter tile sat lower than an icon). */
+.ac-tools__logos > * {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  margin-left: -5px;
+  box-shadow: 0 0 0 1.5px var(--surface-raised);
+  border-radius: 5px;
+}
+.ac-tools__logos > :first-child {
+  margin-left: 0;
+}
+.ac-tools__now {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ac-tools__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--ink2);
+}
+.ac-tools__count,
+.ac-tools__time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ac-tools__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.ac-tools__chev,
+.ac-tools__linechev {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.25s var(--out);
+}
+.ac-tools__head[aria-expanded="true"] .ac-tools__chev,
+.ac-tools__row[aria-expanded="true"] .ac-tools__linechev {
+  transform: rotate(90deg);
+}
+/* Working on it: the words shimmer from faint to ink. */
+.ac-tools__shimmer {
+  background: linear-gradient(90deg, var(--faint) 0%, var(--ink2) 50%, var(--faint) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ac-tools__fold {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.ac-tools__fold > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.ac-tools__fold[data-folded] {
+  grid-template-rows: 0fr;
+}
+.ac-tools__lines {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.ac-tools__line {
+  border-radius: var(--radius-item);
+}
+.ac-tools__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink2);
+  text-align: left;
+}
+button.ac-tools__row {
+  cursor: pointer;
+}
+button.ac-tools__row:hover {
+  background: var(--plate-soft);
+}
+button.ac-tools__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-tools__logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  line-height: 0;
+}
+.ac-tools__label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ac-tools__label b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.ac-tools__label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--faint);
+}
+.ac-tools__line[data-s="stop"] .ac-tools__label b {
+  color: var(--faint);
+}
+.ac-tools__why {
+  margin: -4px 0 0;
+  padding: 0 8px 8px 38px;
+  font-size: 12px;
+  color: var(--danger);
+}
+.ac-tools__detail {
+  margin: 0 8px 8px 38px;
+}
+/* What it was given and answered: the code well's look (mono only for this). */
+.ac-tools__io {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-item);
+  background: var(--card-well, var(--sunken));
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: 12px / 1.55 var(--font-mono, ui-monospace, monospace);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow: auto;
+}
+.ac-tools__io b {
+  display: block;
+  font-weight: 400;
+  color: var(--faint);
+}
+.ac-tools__io b + * {
+  margin-bottom: 8px;
+}
+.ac-tools__note {
+  margin: 2px 8px 4px 38px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-tools {
+    animation: ac-rise 0.3s var(--out) both;
+  }
+  .ac-tools__fold {
+    transition: grid-template-rows 0.45s var(--out);
+  }
+  .ac-tools__text {
+    animation: ac-tools-swap 0.35s var(--out) both;
+  }
+  .ac-tools__shimmer {
+    animation: ac-tools-shimmer 1.6s linear infinite;
+  }
+  .ac-tools__line {
+    animation: ac-rise 0.25s var(--out) both;
+  }
+}
+@keyframes ac-tools-swap {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes ac-tools-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* Failed: an exclamation of two pixels (PixelFail). */
+.ac-pixfail {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--px-gap, 1px);
+  flex: none;
+  vertical-align: middle;
+}
+.ac-pixfail::before,
+.ac-pixfail::after {
+  content: "";
+  width: var(--px, 4px);
+  height: var(--px, 4px);
+  background: var(--danger);
+}
+.ac-pixfail::before {
+  height: calc(var(--px, 4px) * 2);
+}
 .ac-tick--pending {
   background: transparent;
   color: var(--muted);
@@ -4696,6 +5632,7 @@ a.ac-list__row:focus-visible {
   align-self: flex-start;
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 .ac-recur__row {
   display: flex;
@@ -4739,6 +5676,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     background-color 0.15s var(--out),
@@ -5001,6 +5939,7 @@ a.ac-list__row:focus-visible {
     flex-wrap: nowrap;
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .ac-toolbar__filters {
@@ -5170,6 +6109,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -5402,6 +6342,16 @@ a.ac-list__row:focus-visible {
   .ac-searchfield--sm .ac-searchfield__input {
     font-size: 16px;
   }
+  /* No keyboard hints: a button's keys (its `kbd` or a key among its words), the send button's, a search field's,
+     the palette's and a menu's. */
+  .ac-btn__kbd,
+  .ac-btn > .ac-kbd,
+  .ac-composer__send-text .ac-kbd,
+  .ac-searchfield__hint,
+  .ac-palette .ac-kbd,
+  .ac-mo__kbd {
+    display: none;
+  }
 }
 
 /* Touch: hover-only actions and small controls. */
@@ -5411,7 +6361,6 @@ a.ac-list__row:focus-visible {
     outline: none;
   }
   .ac-msg__actions {
-    top: -36px;
     right: 8px;
   }
   /* The time's details: on a tap of the time, not only on hover. */
@@ -5432,6 +6381,22 @@ a.ac-list__row:focus-visible {
   .ac-btn--sm.ac-btn--icon {
     min-width: var(--control-h-md);
   }
+  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
+     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-msg__actions {
+    gap: 8px;
+  }
+  .ac-msg__actions .ac-btn--sm {
+    position: relative;
+    min-width: var(--control-h-sm);
+    min-height: var(--control-h-sm);
+    border-radius: var(--control-r-sm);
+  }
+  .ac-msg__actions .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
   .ac-composer__format-btn {
     width: var(--control-h-md);
     height: var(--control-h-md);
@@ -5451,11 +6416,6 @@ a.ac-list__row:focus-visible {
   }
   .ac-menu__item {
     min-height: 40px;
-  }
-  /* No keyboard shortcuts to show on a touch screen. */
-  .ac-composer__send-text .ac-kbd,
-  .ac-btn__kbd {
-    display: none;
   }
 }
 
@@ -5534,6 +6494,9 @@ a.ac-list__row:focus-visible {
   .ac-dialog__body {
     padding: 4px 16px;
   }
+  .ac-dialog__body:last-child {
+    padding-bottom: 16px;
+  }
   .ac-dialog__list {
     padding: 0 16px;
   }
@@ -5564,7 +6527,7 @@ a.ac-list__row:focus-visible {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .ac-details__head {
-    padding: 12px 8px 0 16px;
+    padding: 12px 16px 0;
   }
   .ac-details__body {
     padding: 12px 16px 20px;
@@ -5625,6 +6588,13 @@ a.ac-list__row:focus-visible {
   display: block;
   image-rendering: pixelated;
 }
+/* An agent's month (MonthRuns): the row's whole width, 2px cells. */
+.ac-month-runs {
+  display: block;
+  width: 100%;
+  height: 80px;
+  image-rendering: pixelated;
+}
 .ac-run-key {
   display: inline-block;
   width: 6px;
@@ -5667,7 +6637,7 @@ a.ac-list__row:focus-visible {
   image-rendering: pixelated;
   pointer-events: none;
 }
-/* The agent's pixel-sky edge along the top of a card (SkyStrip, telas/NavegadorNoChat.html "Céu"). */
+/* The agent's pixel-sky edge along the top of a card (SkyStrip). */
 .ac-sky-strip {
   display: block;
   width: 100%;
@@ -5683,7 +6653,7 @@ a.ac-list__row:focus-visible {
   height: 100%;
   image-rendering: pixelated;
 }
-/* ---------- Menu item hint: the current value of what it opens (telas/MissaoConfig.html) ---------- */
+/* ---------- Menu item hint: the current value of what it opens ---------- */
 .ac-menu__hint {
   margin-left: auto;
   padding-left: 10px;
@@ -5693,7 +6663,7 @@ a.ac-list__row:focus-visible {
   white-space: nowrap;
 }
 
-/* ---------- Choice rows (OptionList.tsx; telas/MissaoConfig.html): full width, one left edge, neutral selection ---------- */
+/* ---------- Choice rows (OptionList.tsx): full width, one left edge, neutral selection ---------- */
 .ac-optlist {
   display: flex;
   flex-direction: column;
@@ -5734,7 +6704,6 @@ a.ac-list__row:focus-visible {
     inset 0 0 0 1px var(--line2),
     var(--field-ring);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other rows step back to a flat hairline. */
 .ac-optrow[data-state="checked"] {
   box-shadow: var(--chosen-shadow);
   background: var(--chosen-bg);
@@ -5742,14 +6711,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
 }
 .ac-optrow__dot {
   width: 18px;
@@ -5836,8 +6797,8 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--chosen-shadow);
 }
 /*
- * Attached (telas/QuemPensa.html "C"): the chosen row and its settings are one card. The row on top, a
- * hairline, then the settings full width from the card's edge; the dot stays next to the leading.
+ * Attached: the chosen row and its settings are one card. The row on top, a hairline, then the settings
+ * full width from the card's edge; the dot stays next to the leading.
  */
 .ac-optcard {
   border-radius: 14px;
@@ -5873,7 +6834,7 @@ a.ac-list__row:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Effort (EffortPixels.tsx; telas/QuemPensa.html): label and meaning on one line, the pixel ramp, the names. */
+/* Effort (EffortPixels.tsx): label and meaning on one line, the pixel ramp, the names. */
 .ac-effort {
   display: flex;
   flex-direction: column;
@@ -5938,7 +6899,7 @@ a.ac-list__row:focus-visible {
 .ac-effort--off .ac-effort__names button {
   cursor: default;
 }
-/* Tiles (layout="tiles"; telas/Tarefas.html "Em que etapa?"): two per row, the icon on the title's line. */
+/* Tiles (layout="tiles"): two per row, the icon on the title's line. */
 .ac-optlist--tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5977,7 +6938,7 @@ a.ac-list__row:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Cards (layout="cards"; telas/IconesMotor.html "Motor"): side by side, illustration on top, radio in the corner. */
+/* Cards (layout="cards"): side by side, illustration on top, radio in the corner. */
 .ac-optlist__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
@@ -6009,7 +6970,7 @@ a.ac-list__row:focus-visible {
   margin-top: auto;
   max-width: 100%;
 }
-/* Rows: where the choice runs, quiet, at the row's end (telas/ContaClaude.html "Quem pensa"). */
+/* Rows: where the choice runs, quiet, at the row's end. */
 .ac-optrow__side {
   display: inline-flex;
   align-items: center;
@@ -6041,7 +7002,7 @@ a.ac-list__row:focus-visible {
   image-rendering: pixelated;
 }
 
-/* ---------- Settings blocks (Settings.tsx; telas/MissaoConfig.html): one rhythm (8/12/16/24), body 14px, meta 13px, few boxes ---------- */
+/* ---------- Settings blocks (Settings.tsx): one rhythm (8/12/16/24), body 14px, meta 13px, few boxes ---------- */
 .ac-setsec {
   padding: 24px 0;
   border-top: 1px solid var(--line);
@@ -6065,12 +7026,11 @@ a.ac-list__row:focus-visible {
   color: var(--muted);
   max-width: 62ch;
 }
+/* Small text's own 13/18 line wherever it sits: a dialog's or a page's 22px line spreads a note's lines apart. */
 .ac-setnote {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 12px 0 0;
   font-size: 13px;
+  line-height: 18px;
   color: var(--muted);
 }
 .ac-setnote + .ac-setnote {
@@ -6078,8 +7038,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-setnote .ac-icon {
   color: var(--faint);
-  margin-top: 2px;
-  flex: none;
 }
 .ac-setnote--quiet {
   color: var(--faint);
@@ -6269,7 +7227,7 @@ label.ac-setrow__title {
   color: var(--muted);
 }
 
-/* ── Agents asking agents (telas/ConversaAgentes.html, variant B) ── */
+/* ── Agents asking agents ── */
 /* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
 .ac-consult {
   margin: 6px 0 8px;
@@ -6369,8 +7327,6 @@ label.ac-setrow__title {
   color: var(--muted);
 }
 .ac-consult__foot {
-  display: flex;
-  align-items: center;
   gap: 5px;
   margin: 10px 0 0;
   font-size: 12px;
@@ -6446,7 +7402,7 @@ label.ac-setrow__title {
   }
 }
 
-/* ---------- MenuOverlay (telas/MenuOverlay.html): our menu at full screen ---------- */
+/* ---------- MenuOverlay: our menu at full screen ---------- */
 .ac-mo__scrim {
   position: fixed;
   inset: 0;
@@ -6501,17 +7457,22 @@ label.ac-setrow__title {
   align-items: center;
   gap: var(--space-4);
 }
+/* As tall as the name and the line under it (52 + 6 + 24). */
 .ac-mo__mark {
   flex: none;
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 82px;
+  height: 82px;
 }
-/* Photos and marks at the header's size (an xl avatar is bigger). */
+/* Photos and marks at the header's size (an xl avatar is bigger; a mark comes at its own size). */
+.ac-mo__mark > .ac-avatar,
+.ac-mo__mark > img,
+.ac-mo__mark > svg {
+  width: 82px;
+  height: 82px;
+}
 .ac-mo__mark > .ac-avatar {
-  width: 64px;
-  height: 64px;
-  font-size: 24px;
+  font-size: 30px;
 }
 .ac-mo__titles {
   min-width: 0;
@@ -6522,7 +7483,7 @@ label.ac-setrow__title {
 .ac-mo__title {
   margin: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 48px;
   line-height: 52px;
   letter-spacing: -0.03em;
@@ -6657,25 +7618,33 @@ label.ac-setrow__title {
     font-size: 36px;
     line-height: 40px;
   }
+  .ac-mo__mark,
+  .ac-mo__mark > .ac-avatar,
+  .ac-mo__mark > img,
+  .ac-mo__mark > svg {
+    width: 70px;
+    height: 70px;
+  }
 }
 .ac-mo__group > hr.ac-menu__separator {
   border: 0;
 }
 
-/* Carousel (telas/PerfilAgente.html): one row that slides item by item; the arrows step back when it all fits. */
+/*
+ * Carousel: one row that slides item by item. The arrows float over its edges, only where there is
+ * more to see, and the row fades out under them: the first item always starts where rows that fit do.
+ */
 .ac-carousel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
   min-width: 0;
 }
 .ac-carousel__track {
   display: flex;
-  flex: 1;
   gap: 6px;
   min-width: 0;
   padding: 2px;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
@@ -6686,9 +7655,20 @@ label.ac-setrow__title {
   flex: none;
   scroll-snap-align: start;
 }
+.ac-carousel[data-more="end"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.ac-carousel[data-more="start"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.ac-carousel[data-more="both"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
 .ac-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-raised);
   display: grid;
-  flex: none;
   place-items: center;
   width: 28px;
   height: 28px;
@@ -6699,21 +7679,25 @@ label.ac-setrow__title {
   box-shadow: var(--e1), var(--top);
   color: var(--muted);
   cursor: pointer;
+  transform: translateY(-50%);
   transition:
     color 0.15s,
     opacity 0.15s;
+}
+.ac-carousel__arrow:first-child {
+  left: 0;
+}
+.ac-carousel__arrow:last-child {
+  right: 0;
 }
 .ac-carousel__arrow:hover:not(:disabled) {
   color: var(--ink);
 }
 .ac-carousel__arrow:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0;
+  pointer-events: none;
 }
 .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
-}
-.ac-carousel--fits .ac-carousel__arrow {
-  display: none;
 }

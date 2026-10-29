@@ -8,7 +8,17 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
-import { isRoutineCall, routineOfMessage } from "@agenteschat/client/lib/routines";
+import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
+import {
+  answeredNotices,
+  isAnsweredNotice,
+  isEventLine,
+  isTalkerReply,
+  noticeAgentHandle,
+  noticeOf,
+  noticeRoutineName,
+} from "@agenteschat/client/lib/notices";
+import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -67,32 +77,93 @@ export function standsAlone(m: Message) {
       meta.issueTaken ||
       questionOf(meta) ||
       consultationsOf(meta).length > 0 ||
-      routineOfMessage(meta),
+      routineReplyOf(m) ||
+      isEventLine(meta),
   );
 }
 
 /**
- * Day dividers and messages, oldest first (the list draws them newest at the bottom). A routine's
- * message stands alone with its own header; its top-level call is left out, like the web's `buildTimeline`.
+ * Day dividers and messages, oldest first (the list draws them newest at the bottom). What a routine
+ * found, told by its agent, stands alone with its own header; the report it answers folds into it, and a
+ * routine's call written as its creator is left out, like the web's `buildTimeline`.
  */
 export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastDay = "";
   let prev: Message | null = null;
+  const answered = answeredNotices(messages);
   for (const m of [...messages].sort(byTime)) {
-    // The message a routine posts to call its agent isn't shown (as on the web): only the agent's answer is.
-    if (hidden(m) || isRoutineCall(m)) continue;
+    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });
       lastDay = day;
       prev = null;
     }
-    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && groupsWith(prev, m);
+    // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
+    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m);
     rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
     prev = m;
   }
   return rows;
+}
+
+// ── Automatic lines ──────────────────────────────────────────────────────────
+
+/**
+ * One quiet line instead of a voice (the web's `ChatNotices`): what reached an agent's conversation
+ * (`meta.notice`: "Rotina «X» entregou um relatório" while nobody answered it yet, "@Infra respondeu",
+ * "Nota de @Dev", "Chegou o resultado que Ada esperava"); the text on demand. `key`/`values` are the
+ * shared i18n (`chat.notice.*`). A talker reply is never one: it shows as the agent's message
+ * (`noticeOf` leaves it out).
+ */
+export interface EventLineView {
+  kind: "notice";
+  icon: "clock" | "agent" | "chat" | "check" | "bell";
+  key: string;
+  values: Record<string, string>;
+  /** Shown on "Ver": the message's text, else the notice's. */
+  text: string;
+}
+
+const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
+  routine_handoff: "clock",
+  consult_reply: "agent",
+  agent_note: "chat",
+  wait_result: "check",
+};
+
+export function eventLineOf(
+  m: Pick<Message, "body" | "meta">,
+  names: { author: string; agentByHandle: (handle: string) => string | null },
+): EventLineView | null {
+  const notice = noticeOf(m.meta);
+  if (!notice) return null;
+  const handle = noticeAgentHandle(notice);
+  // `from` is written for the agent ("@infra"): the app says the agent's name, without the @.
+  const from = handle ? (names.agentByHandle(handle) ?? handle) : notice.from;
+  const icon = NOTICE_ICON[notice.kind] ?? "bell";
+  const line = (key: string, values: Record<string, string> = {}): EventLineView => ({
+    kind: "notice",
+    icon,
+    key,
+    values,
+    text: m.body.trim() || notice.text,
+  });
+  switch (notice.kind) {
+    case "routine_handoff": {
+      const routine = noticeRoutineName(notice);
+      return routine ? line("chat.notice.routineHandoff", { routine }) : line("chat.notice.routineHandoffAnon");
+    }
+    case "consult_reply":
+      return from ? line("chat.notice.consultReply", { from }) : line("chat.notice.consultReplyAnon");
+    case "agent_note":
+      return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
+    case "wait_result":
+      return line("chat.notice.waitResult", { name: names.author });
+    default:
+      return line("chat.notice.other", { name: names.author });
+  }
 }
 
 // ── What a message carries ───────────────────────────────────────────────────
@@ -147,7 +218,7 @@ export function missionLinkOf(meta: Message["meta"]): { missionId: string; threa
   return p && str(p.missionId) && str(p.threadId) ? { missionId: str(p.missionId), threadId: str(p.threadId) } : null;
 }
 
-/** `meta.work`: how many steps the run took (the collapsed "N passos" header). */
+/** `meta.work`: how many tools the run used (its saved tool block shows only when it used some). */
 export function workStepsOf(meta: Message["meta"]): number | null {
   const w = obj(meta?.work);
   return w && typeof w.steps === "number" && w.steps > 0 ? w.steps : null;
@@ -217,13 +288,13 @@ export function workingEntries(
   consults: LiveConsult[],
   agentName: (id: string) => string,
 ): ActivityEntry[] {
-  // Writing agents stay in: the line above the box is on while they work (CardTrabalhando.html, A).
+  // Writing agents stay in: the line above the box is on while they work.
   return barEntries(runs, [], agentName, () => undefined, consults, true);
 }
 
 /**
  * Still working (thinking, queued, running a tool or writing): what "Parar" stops, right away, also while
- * the words arrive (Mensagens.html). A guessed "pensando…" has no run to stop yet.
+ * the words arrive. A guessed "pensando…" has no run to stop yet.
  */
 export const stoppableInLine = (runs: LiveRun[]) =>
   runs.filter((r) => !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running"));
@@ -259,26 +330,6 @@ export function markedParts(text: string): { text: string; bold: boolean }[] {
     const after = at < 0 ? "" : part.slice(at + 1);
     if (name) out.push({ text: name, bold: true });
     if (after) out.push({ text: after, bold: false });
-  }
-  return out;
-}
-
-// ── Routines ─────────────────────────────────────────────────────────────────
-
-/**
- * The agents a routine's message calls (its @handles, known agents only, in
- * order, once each): "Chamou @Atlas com as instruções da rotina".
- */
-export function routineAgents<A extends { handle: string }>(body: string, agents: A[]): A[] {
-  const byHandle = new Map(agents.map((a) => [a.handle.toLowerCase(), a]));
-  const seen = new Set<string>();
-  const out: A[] = [];
-  for (const match of body.matchAll(/@([\w.-]+)/g)) {
-    const h = (match[1] ?? "").toLowerCase();
-    const a = byHandle.get(h);
-    if (!a || seen.has(h)) continue;
-    seen.add(h);
-    out.push(a);
   }
   return out;
 }
@@ -407,7 +458,8 @@ export type Block =
   | { kind: "heading"; inline: Inline[] }
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
-  | { kind: "code"; text: string };
+  | { kind: "code"; lang: string; text: string; open?: boolean }
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
 
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
@@ -447,41 +499,70 @@ export function parseInline(text: string): Inline[] {
   }, []);
 }
 
-/** Blocks: fenced code, headings, lists, quotes and paragraphs (lines of a paragraph keep their breaks). */
+/**
+ * Blocks: fenced code (with its language), tables (the web's rule: `tableAt` from the shared parser, so a
+ * table right under a sentence is still a table), headings, lists, quotes and paragraphs (lines of a
+ * paragraph keep their breaks).
+ */
 export function parseBlocks(body: string): Block[] {
   const out: Block[] = [];
-  const parts = body.split(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/g);
-  parts.forEach((chunk, i) => {
-    if (i % 2 === 1) {
-      out.push({ kind: "code", text: chunk.replace(/\n$/, "") });
-      return;
-    }
-    let para: string[] = [];
-    const flush = () => {
-      if (para.length) out.push({ kind: "paragraph", inline: parseInline(para.join("\n")) });
-      para = [];
-    };
-    for (const raw of chunk.split("\n")) {
-      const line = raw.trimEnd();
-      if (!line.trim()) {
-        flush();
-        continue;
-      }
-      const heading = /^#{1,6}\s+(.*)$/.exec(line);
-      const bullet = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(line);
-      const quote = /^>\s?(.*)$/.exec(line);
-      if (heading) {
-        flush();
-        out.push({ kind: "heading", inline: parseInline(heading[1] ?? "") });
-      } else if (bullet) {
-        flush();
-        out.push({ kind: "bullet", inline: parseInline(bullet[2] ?? ""), ordinal: bullet[1] ?? null });
-      } else if (quote) {
-        flush();
-        out.push({ kind: "quote", inline: parseInline(quote[1] ?? "") });
-      } else para.push(line);
-    }
-    flush();
-  });
+  const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
+  for (let i = 0; i < parts.length; i += 3) {
+    const text = parts[i] ?? "";
+    // The last part may hold a block still being written (no closing fence yet): the web's rule, so an
+    // answer that is still streaming shows its code (or "Montando o gráfico…") instead of the raw text.
+    const last = i + 3 >= parts.length;
+    const open = last ? /```([a-zA-Z0-9_+-]*)\n([\s\S]*)$/.exec(text) : null;
+    if (open) {
+      textBlocks(text.slice(0, open.index), out);
+      const code = (open[2] ?? "").replace(/`{1,2}$/, "").replace(/\n$/, "");
+      out.push({ kind: "code", lang: open[1] ?? "", text: code, open: true });
+    } else textBlocks(last ? text.replace(/```[a-zA-Z0-9_+-]*$/, "") : text, out); // a fence still opening
+    if (i + 2 < parts.length)
+      out.push({ kind: "code", lang: parts[i + 1] ?? "", text: (parts[i + 2] ?? "").replace(/\n$/, "") });
+  }
   return out;
+}
+
+function textBlocks(chunk: string, out: Block[]) {
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) out.push({ kind: "paragraph", inline: parseInline(para.join("\n")) });
+    para = [];
+  };
+  const lines = chunk.split("\n");
+  for (let n = 0; n < lines.length; n++) {
+    const table = tableAt(lines, n);
+    if (table) {
+      flush();
+      const cells = (row: string[]) => row.map((c) => parseInline(c));
+      out.push({
+        kind: "table",
+        header: cells(table.table.header),
+        rows: table.table.rows.map(cells),
+        align: table.table.align,
+      });
+      n = table.next - 1;
+      continue;
+    }
+    const line = (lines[n] ?? "").trimEnd();
+    if (!line.trim()) {
+      flush();
+      continue;
+    }
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    const bullet = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(line);
+    const quote = /^>\s?(.*)$/.exec(line);
+    if (heading) {
+      flush();
+      out.push({ kind: "heading", inline: parseInline(heading[1] ?? "") });
+    } else if (bullet) {
+      flush();
+      out.push({ kind: "bullet", inline: parseInline(bullet[2] ?? ""), ordinal: bullet[1] ?? null });
+    } else if (quote) {
+      flush();
+      out.push({ kind: "quote", inline: parseInline(quote[1] ?? "") });
+    } else para.push(line);
+  }
+  flush();
 }

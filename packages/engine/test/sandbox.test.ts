@@ -28,6 +28,8 @@ import {
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
+const WHY = "The person asked for this and the checks passed: this action finishes what was requested.";
+
 let f: Fixture;
 afterEach(async () => {
   const current = f;
@@ -70,7 +72,7 @@ function sandboxSetup(exec?: NonNullable<Parameters<typeof createFakeSandboxProv
 }
 
 describe("access", () => {
-  test("new agents get the computer and the browser (D61)", async () => {
+  test("new agents get the computer and the browser", async () => {
     f = await setup({ reply: () => ({ chunks: ["ok"] }) });
     const agent = await createAgent(
       f.db,
@@ -251,7 +253,7 @@ describe("limits and cost", () => {
     const outcome = await f.tools?.invoke(await runCtx(), {
       toolUseId: crypto.randomUUID(),
       name: "run_code",
-      input: { language: "bash", code: "echo oi" },
+      input: { language: "bash", code: "echo oi", why: WHY },
     });
     expect(outcome?.type).toBe("approval");
   });
@@ -301,7 +303,7 @@ describe("what the agent is running", () => {
       threadId: string | null;
     }[];
     expect(out.length).toBeGreaterThan(0);
-    // Asked in the channel: the output streams where the run answers, the channel itself (D67).
+    // Asked in the channel: the output streams where the run answers, the channel itself.
     expect(out.every((o) => o.toolUseId === start?.toolUseId && o.threadId === null)).toBe(true);
     const streamed = out.map((o) => o.text).join("");
     expect(streamed.length).toBeLessThan(66 * 1024);

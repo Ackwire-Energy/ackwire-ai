@@ -41,7 +41,7 @@ const person = (userId: string) => ({ type: "person" as const, userId });
 
 /**
  * A run's tool context whose trigger is a real message by the owner (tools act for them): in the
- * channel (the run answers there, D67), or `inThread` (a reply under another message).
+ * channel (the run answers there), or `inThread` (a reply under another message).
  */
 async function runContext(fx: Fixture, body = "please organize this", inThread = false): Promise<ToolContext> {
   const root = inThread
@@ -59,11 +59,26 @@ async function runContext(fx: Fixture, body = "please organize this", inThread =
     author: { type: "person", userId: fx.owner.id },
     body,
   });
+  // A real run on the person's message: who asked is read from it (ADR 0053's authority gate).
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: root?.id ?? trigger.id,
+      triggerMessageId: trigger.id,
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+    })
+    .returning();
+  if (!run) throw new Error("no run");
   return {
     db: fx.db,
     orgId: fx.org.id,
     agentId: fx.agent.id,
-    runId: crypto.randomUUID(),
+    runId: run.id,
     channelId: fx.general.id,
     threadRootId: root?.id ?? trigger.id,
     triggerMessageId: trigger.id,

@@ -6,7 +6,7 @@ import { organizations } from "./tenancy";
  * Skills in Markdown (Agent Skills `SKILL.md` format), per organization:
  * a name and description the agent sees, and a body it loads on demand
  * (`load_skill`). No code runs: scripts are kept as "ignored" until the
- * sandbox exists (D29).
+ * sandbox exists (ADR 0020).
  */
 export const skills = pgTable(
   "skills",

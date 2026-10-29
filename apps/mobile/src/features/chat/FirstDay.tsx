@@ -2,36 +2,44 @@ import type { Agent } from "@agenteschat/client";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { Icon, Sky, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
-import { agentLook, genderOf } from "../shared/logic";
+import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { agentIntro, firstAsks, isNewAgent } from "./intent";
 
 /**
- * The first conversation with an agent (MobileIntencional.html, "Primeiro dia"): under its sky, it says
+ * The first conversation with an agent: under its sky, it says
  * who it is in plain words (what it does, else its role), then three first requests tied to what it
  * does. Tapping one sends it; the composer stays the other way in.
  */
 export function FirstDay({
   agent,
   bottomInset,
+  keyboardLift,
   onAsk,
 }: {
   agent: Agent;
   /** Room for the composer floating over the bottom. */
   bottomInset: number;
+  /** How much of the composer's bottom padding hides behind the open keyboard. */
+  keyboardLift: number;
   onAsk: (text: string) => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
-  const g = genderOf(agent.name);
   const intro = agentIntro(agent);
   const asks = useMemo(() => firstAsks(agent), [agent]);
+  // The composer rides the keyboard; the welcome gives way with it instead of staying under the keys.
+  const keyboard = useReanimatedKeyboardAnimation();
+  const above = useAnimatedStyle(() => ({ paddingBottom: Math.max(0, -keyboard.height.value - keyboardLift) }));
   const title = isNewAgent(agent.createdAt)
-    ? t(`mobile.chat.intent.arrived${g}`, { name: agent.name })
+    ? // No "o"/"a" before the name: guessing it from the name gave "O Atende".
+      t("mobile.chat.intent.arrived", { name: agent.name })
     : t("mobile.chat.intent.meet", { name: agent.name });
   const line =
     intro.kind === "what"
@@ -41,55 +49,57 @@ export function FirstDay({
         : t("mobile.chat.intent.noIntro");
 
   return (
-    <ScrollView
-      style={styles.grow}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 16 }]}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="interactive"
-    >
-      <View style={[styles.welc, surface]}>
-        <Sky color={agentLook(agent).color} depth={0.8} surface="raised" style={styles.sky} />
-        <View style={styles.born}>
-          <AgentFace agentId={agent.id} size={78} />
+    <Animated.View style={[styles.grow, above]}>
+      <ScrollView
+        style={styles.grow}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 16 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
+        <View style={[styles.welc, surface]}>
+          <Sky color={agentLook(agent).color} depth={0.8} surface="raised" style={styles.sky} />
+          <View style={styles.born}>
+            <AgentFace agentId={agent.id} size={78} />
+          </View>
+          <Text variant="display" style={styles.h2} accessibilityRole="header">
+            {title}
+          </Text>
+          <Text variant="callout" tone="muted" style={styles.p}>
+            {line}
+          </Text>
         </View>
-        <Text variant="display" style={styles.h2} accessibilityRole="header">
-          {title}
+        <Text variant="footnote" tone="faint" style={styles.h3}>
+          {t("mobile.chat.intent.firstTitle")}
         </Text>
-        <Text variant="callout" tone="muted" style={styles.p}>
-          {line}
-        </Text>
-      </View>
-      <Text variant="footnote" tone="faint" style={styles.h3}>
-        {t("mobile.chat.intent.firstTitle")}
-      </Text>
-      <View style={[styles.card, surface]}>
-        {asks.map((a, i) => {
-          const text = t(`mobile.chat.intent.first.${a.key}`);
-          return (
-            <Pressable
-              key={a.key}
-              onPress={() => {
-                tapHaptic();
-                onAsk(text);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={text}
-              accessibilityHint={t("mobile.chat.intent.sendHint")}
-              style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-            >
-              {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
-              <View style={[styles.tile, { backgroundColor: c.sunken }]}>
-                <Icon name={a.icon} size={18} color={c.ink2} />
-              </View>
-              <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
-                {text}
-              </Text>
-              <Icon name="send" size={16} color={c.faint} />
-            </Pressable>
-          );
-        })}
-      </View>
-    </ScrollView>
+        <View style={[styles.card, surface]}>
+          {asks.map((a, i) => {
+            const text = t(`mobile.chat.intent.first.${a.key}`);
+            return (
+              <Pressable
+                key={a.key}
+                onPress={() => {
+                  tapHaptic();
+                  onAsk(text);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={text}
+                accessibilityHint={t("mobile.chat.intent.sendHint")}
+                style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+              >
+                {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
+                <View style={[styles.tile, { backgroundColor: c.sunken }]}>
+                  <Icon name={a.icon} size={18} color={c.ink2} />
+                </View>
+                <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
+                  {text}
+                </Text>
+                <Icon name="send" size={16} color={c.faint} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </Animated.View>
   );
 }
 

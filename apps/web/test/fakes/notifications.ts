@@ -1,5 +1,5 @@
 /**
- * Test fake — the inbox (contract: `/notifications`, telas/Notificacoes.html):
+ * Test fake — the inbox (contract: `/notifications`):
  * the list per filter with every filter's count, the badge count, read /
  * done / snooze, and "Marcar tudo como lido". Same rules as the contract:
  * done and snoozed ones are hidden, waiting ones first, then the newest.

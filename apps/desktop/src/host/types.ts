@@ -1,4 +1,16 @@
+import type { ServerCheck } from "@agenteschat/client/lib/server";
 import type { HelloLine } from "../control/client";
+import type { Candidate } from "../control/first-run";
+import type {
+  LocalChoice,
+  LocalServerStatus,
+  ReachResult,
+  ReachStage,
+  StepChange,
+  Tailnet,
+} from "../control/local-server";
+import type { Platform } from "../control/platform";
+import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 
@@ -29,9 +41,16 @@ export interface NotchInfo {
 
 export interface AppInfo {
   version: string;
+  /** Rust's name: `macos`, `windows` or `linux`. */
   os: string;
   /** Rust's name: `aarch64` or `x86_64`. */
   arch: string;
+}
+
+/** What the site last put on the Dock's badge (`this_mac` `badge`). */
+export interface BadgeCounts {
+  waiting: number;
+  unread: number;
 }
 
 /**
@@ -42,6 +61,8 @@ export interface Host {
   readonly window: WindowName;
   /** The in-browser fake (design work), not the real app. */
   readonly fake: boolean;
+  /** This computer's system: the copy's `{{device}}` and each system's own ways (tray, title bar). */
+  readonly platform: Platform;
   listRunners(): Promise<RunnerInfo[]>;
   send(homeId: string, line: string): Promise<void>;
   /** A new, empty organization home with its runner started; resolves with its id. */
@@ -52,12 +73,34 @@ export interface Host {
   onRunnerState(cb: (change: RunnerStateChange) => void): () => void;
   /** A window was brought up (`show_window`). */
   onShown(cb: (name: WindowName) => void): () => void;
-  /** Opens an https://agentes.chat link in the person's browser. */
+  /**
+   * A page of a server this app opens goes to the main window (switching to that server); a provider's
+   * sign-in page opens in the person's browser. Nothing else opens.
+   */
   openExternal(url: string): Promise<void>;
+  /** The servers this app opens, and the one open now (`servers.json`). */
+  servers(): Promise<ServerList>;
+  /**
+   * Opens the main window on `server`, which joins the list and becomes the one open now; on `page` when
+   * given (`/login`, `/signup`, a link's handover or owner page).
+   */
+  chooseServer(server: string, page?: string): Promise<void>;
+  /** Takes `server` out of the list (the server and the account there stay as they are). */
+  removeServer(server: string): Promise<void>;
+  /** Where a server may be: this computer and the person's Tailscale network, not checked yet. */
+  discover(): Promise<Candidate[]>;
+  /** Whether `server` is an agentes.chat server this app can use (`GET /api/instance`). */
+  checkServer(server: string): Promise<ServerCheck>;
+  /** The connect link (`agenteschat://connect…`) waiting for an answer, taken once; null when none. */
+  takeLink(): Promise<string | null>;
+  /** A connect link arrived (the welcome window takes it). */
+  onLink(cb: () => void): () => void;
   /** Shows a local folder in Finder. */
   revealFolder(path: string): Promise<void>;
   pickFolder(): Promise<string | null>;
   setTrayState(state: TrayState): Promise<void>;
+  /** The menu bar icon on a Mac (Windows and Linux always keep theirs, `tray.rs`). */
+  setTrayVisible(show: boolean): Promise<void>;
   showWindow(name: WindowName): Promise<void>;
   hideWindow(name: WindowName): Promise<void>;
   quit(): Promise<void>;
@@ -65,8 +108,15 @@ export interface Host {
   autostart(): Promise<boolean>;
   setAutostart(on: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>;
-  /** Installs the newer version and relaunches the app; false when there is nothing to install. */
+  /**
+   * Downloads the newer version (its progress at `onUpdateProgress`), installs it and relaunches the app; false when
+   * there is nothing to install. Rejects with "cancelled" after `cancelUpdate`.
+   */
   installUpdate(): Promise<boolean>;
+  /** Drops the download under way: nothing is installed until it is whole. */
+  cancelUpdate(): Promise<void>;
+  /** The download's bytes so far, and its size when the server says it. */
+  onUpdateProgress(cb: (got: number, total: number | null) => void): () => void;
   /** Creates (on) or destroys (off) the notch window. */
   setNotch(on: boolean): Promise<void>;
   /** The notch of this Mac's screen; null without one (an external display alone). */
@@ -75,13 +125,69 @@ export interface Host {
   notchPlace(width: number, height: number): Promise<NotchInfo | null>;
   /** The current window's size in points (the popover follows its content). */
   resize(width: number, height: number): Promise<void>;
-  /** The site in the main window asking this Mac (D79; the popover answers, `this_mac` in main_window.rs). */
+  /** The site in the main window asking this computer (the popover answers, `this_mac` in main_window.rs). */
   onThisMac(cb: (id: number, request: ThisMacRequest) => void): () => void;
   thisMacReply(id: number, ok: boolean, data: unknown): Promise<void>;
-  /** The Mac's menu bar, in the app's language (only the popover sets it; `app_menu_set` in menus.rs). */
+  /**
+   * The menu bar's labels, the tray menu's on Windows and Linux and the pairing dialog's, in the app's
+   * language (only the popover sets them; `app_menu_set` in menus.rs).
+   */
   setAppMenu(labels: Record<string, string>): Promise<void>;
-  /** A menu bar choice the popover owns (`menu://action`): updates, quit, access requests, this Mac. */
+  /** A menu choice the popover owns (`menu://action`). */
   onMenuAction(cb: (action: MenuAction) => void): () => void;
+  /** The popover listens for the site's requests now (requests sent before that wait, main_window.rs). */
+  thisMacListening(): Promise<void>;
+  /** Preferences → "Show in the Dock" (dock.rs): off, the app lives in the menu bar while no window shows. */
+  setDock(show: boolean): Promise<void>;
+  /** Preferences › "Let me know about messages and requests": whether the site's notifications show. */
+  setSiteNotify(on: boolean): Promise<void>;
+  /** The Dock's counts whenever the site changes them. */
+  onBadge(cb: (counts: BadgeCounts) => void): () => void;
+  /** The server here (`local_server.rs`): whether this build carries it, what `~/.agentes` holds, its state. */
+  localServer(): Promise<LocalServerStatus>;
+  onLocalServer(cb: (status: LocalServerStatus) => void): () => void;
+  /**
+   * "Run agentes.chat on this computer": sets it up, starts it, makes the owner, makes this computer its agents'
+   * computer, turns reach on when asked, and opens the main window there, signed in. Rejects with the step that
+   * failed, or "cancelled" after `cancelLocalSetup`; each step's progress arrives at `onSetupStep`.
+   */
+  installLocalServer(choice: LocalChoice): Promise<void>;
+  /** Cancel while it is set up: what it started stops and the database it made goes, then it rejects. */
+  cancelLocalSetup(): Promise<void>;
+  onSetupStep(cb: (change: StepChange) => void): () => void;
+  startLocalServer(): Promise<void>;
+  /** Stops it; `forget`: it no longer starts with the app (its data stays). */
+  stopLocalServer(forget: boolean): Promise<void>;
+  restartLocalServer(): Promise<void>;
+  /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
+  setLocalReach(on: boolean): Promise<ReachResult>;
+  /** What `setLocalReach` is doing while it takes. */
+  onLocalReach(cb: (stage: ReachStage) => void): () => void;
+  /** Stops waiting for HTTPS to be allowed in the tailnet (`setLocalReach` then answers `stopped`). */
+  stopLocalReach(): Promise<void>;
+  /** The usage-statistics switch (`TELEMETRY` in its settings; it starts again). */
+  setLocalUsage(on: boolean): Promise<void>;
+  /** "Back up now": the file it wrote. */
+  backupLocalServer(): Promise<string>;
+  /** What "Copy details" copies. */
+  localDiagnostics(): Promise<string>;
+  /** The server here's homes again, with new tokens for the organizations in `rotate`. */
+  syncLocalHomes(rotate: string[]): Promise<void>;
+  /** Tailscale on this computer. */
+  tailscale(): Promise<Tailnet>;
+  /** Tailscale's app (a Mac), its download page, or the admin page where HTTPS is turned on. */
+  openTailscale(page: "app" | "download" | "https"): Promise<void>;
+  /** A home the server here's sync just made (its first tools go on, `firstTools`). */
+  onNewHostHome(cb: (homeId: string) => void): () => void;
 }
 
-export type MenuAction = "updates" | "quit" | "requests" | "thisMac";
+export type MenuAction =
+  | "updates"
+  | "quit"
+  | "requests"
+  | "thisMac"
+  | "servers"
+  | "pause1h"
+  | "pauseTomorrow"
+  | "pauseManual"
+  | "resume";

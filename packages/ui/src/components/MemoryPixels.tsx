@@ -63,7 +63,7 @@ function draw(canvas: HTMLCanvasElement, look: AgentAppearance, at: number, anim
 }
 
 /**
- * The memory mark's picture (telas/ReacoesAgente.html): the agent, drawn by
+ * The memory mark's picture: the agent, drawn by
  * the agent engine in its own colors, reading an open pixel book. It moves
  * once when it appears and while `active` (hover or focus): a page turns and
  * the agent blinks. Still with reduced motion. Decorative: the caller names it.

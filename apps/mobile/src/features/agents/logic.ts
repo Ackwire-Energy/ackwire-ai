@@ -38,12 +38,14 @@ export interface WorkItem {
   plan: { done: number; total: number } | null;
   /** Since when (the mission's or the run's start, else when it was created). */
   since: string;
+  /** A run stopped on a person (your ok, your answer): it isn't working, it waits ("espera seu ok"). */
+  waiting: boolean;
 }
 
 /**
  * Active missions first (they are long work), then runs in progress (`GET
  * …/active-runs`, everyone's view of the conversations they are in), newest
- * first, one per agent and conversation.
+ * first, one per agent and conversation. A routine's background runs are left out.
  */
 export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] | undefined): WorkItem[] {
   const out: WorkItem[] = [];
@@ -62,13 +64,15 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       missionId: m.id,
       plan: { done: m.plan.done, total: m.plan.total },
       since: m.startedAt ?? m.createdAt,
+      waiting: false,
     });
     seen.add(spot(m.agentId, m.channelId, m.threadId));
   }
   const newest = (r: WorkingRun) => r.startedAt ?? r.createdAt;
   for (const r of [...(runs ?? [])].sort((a, b) => newest(b).localeCompare(newest(a)))) {
     const at = spot(r.agentId, r.channelId, r.threadId);
-    if (!ACTIVE.has(r.status) || seen.has(at)) continue;
+    // A routine's background run holds no conversation: never "trabalhando" (its report comes as a notice).
+    if (r.background || !ACTIVE.has(r.status) || seen.has(at)) continue;
     seen.add(at);
     out.push({
       key: `r:${r.runId}`,
@@ -81,6 +85,7 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       missionId: null,
       plan: null,
       since: newest(r),
+      waiting: r.status === "waiting_approval" || r.status === "waiting_input",
     });
   }
   return out;
@@ -117,7 +122,7 @@ export interface TeamLine {
 }
 
 /**
- * Agentes (MobileIntencional): "Esperando você" (agents with a request you may decide, the one closest to
+ * Agentes: "Esperando você" (agents with a request you may decide, the one closest to
  * expiring first; `waiting` as `waitingApprovals` gives it), "Trabalhando agora" (in `workByAgent` order:
  * missions, then the newest runs) and "Livres" (the latest conversation first, then by name), each agent once.
  */
@@ -201,7 +206,7 @@ export function agoOf(iso: string, now = Date.now()): Ago {
 }
 
 /**
- * "Este mês": money only when the API gives it to this person (D39: members
+ * "Este mês": money only when the API gives it to this person (ADR 0026: members
  * see a percentage), else the share of the budget used.
  */
 export type Spend =
@@ -239,7 +244,7 @@ export function canUse(access: AgentAccess | null | undefined): { key: string; l
   return [...apps, ...builtins];
 }
 
-/* ---------- The profile as a teammate (MobileIntencional "Perfil do agente") ---------- */
+/* ---------- The profile as a teammate ("Perfil do agente") ---------- */
 
 /** Openings of a system prompt that name the agent ("Você é o Theo, …", "You are Theo, …"). */
 const SELF_INTRO = /^(voc[eê] [eé]|you are|tu [eé]s)(?=[\s,]|$)/i;
@@ -319,7 +324,7 @@ export function dayWord(iso: string, now = new Date()): DayWord {
 /** One line of "O que fez por você": what to say (an i18n key under `mobile.intentAgents.did` + values), the icon, where it opens. */
 export interface DidLine {
   key: string;
-  icon: "issue" | "doc" | "code" | "shield" | "check" | "x" | "pen" | "chat" | "clock" | "hash";
+  icon: "issue" | "doc" | "code" | "wait" | "check" | "x" | "pen" | "chat" | "clock" | "hash";
   /** i18n key (relative to `mobile.intentAgents.did`) and its values for line 1. */
   title: { key: string; values: Record<string, string> };
   /** Line 2: a literal (a title) or an i18n key (relative to `mobile.intentAgents.did`). */
@@ -373,7 +378,7 @@ export function didLines(items: AgentForYouItem[] | undefined): DidLine[] {
       return [
         {
           key: `a:${a.id}`,
-          icon: a.waitingOnYou ? "shield" : a.status === "refused" ? "x" : "check",
+          icon: a.waitingOnYou ? "wait" : a.status === "refused" ? "x" : "check",
           title: { key: "approval", values: { title: a.title } },
           sub: sub ? { key: sub } : null,
           href: { kind: "approval", id: a.id },

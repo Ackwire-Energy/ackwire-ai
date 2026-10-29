@@ -1,8 +1,10 @@
 import type {
   Routine,
+  RoutineAccess,
   RoutineEvent,
   RoutineInput,
   RoutinePatch,
+  RoutineReport,
   RoutineRun,
   RoutineTarget,
   RoutineTargetInput,
@@ -11,6 +13,7 @@ import {
   useCalendar,
   useChannels,
   useDms,
+  useMachineOutages,
   useMailAccounts,
   useRoutineAction,
   useRoutineRuns,
@@ -18,8 +21,27 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
-import { relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
+import type { RunStatus } from "@agenteschat/client/lib/calendar";
+import { capitalize, formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
+import {
+  busyOnComputer,
+  healthWords,
+  isRunAtWork,
+  pausedFix,
+  type RoutineFix,
+  routineChannelOf,
+  routineStateWords,
+  runMessageLink,
+  runOutcome,
+  runPixelStatus,
+  runPixels,
+  runsPerDay,
+  usageParts,
+  type Words,
+  whereItRuns,
+} from "@agenteschat/client/lib/routine-view";
 import { browserTimezone, onceParts, timezoneName } from "@agenteschat/client/lib/routines";
 import {
   Button,
@@ -37,6 +59,7 @@ import {
   FilterChip,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Menu,
   MenuItem,
@@ -53,6 +76,7 @@ import {
   Toolbar,
   zonedInstant,
 } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,6 +85,7 @@ import { useActors } from "@/components/actors";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
+import { SwitchComputerDialog } from "@/components/MachineOutages";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { lookOf } from "@/lib/look";
@@ -95,11 +120,25 @@ const isEventDriven = (r: Routine) => r.trigger.type === "event" || r.trigger.ty
 const mailTrouble = (r: Routine) =>
   r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
 
-/** A one-off that already fired (or was cancelled): shown muted, under "Concluídos". */
-export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
-const isPaused = (r: Routine) => !isDoneOnce(r) && !r.active;
+/** A run of it is working now (Parar stops it). */
+const isRunning = (r: Routine) => r.state === "running";
+/** A run of it is at work: working, or waiting for a person or its computer. */
+const isAtWork = (r: Routine) => isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer";
+/** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
+const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
+/** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
+export const isDoneOnce = (r: Routine) => hasFired(r) && !isAtWork(r);
+/** Paused: inactive and not a one-off (a fired one-off is done, or live while its run works). */
+const isPaused = (r: Routine) => !r.active && r.trigger.type !== "once";
 
-/** The horizon: the last 4 hours and the next 20 (telas/Rotinas.html). */
+/** Says the routine's words (`lib/routine-view`): its key and values, else its fallback key. */
+function useSay() {
+  const { t } = useTranslation();
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return (w: Words) => tt(w.key, { ...w.values, ...(w.fallback ? { defaultValue: tt(w.fallback) } : {}) });
+}
+
+/** The horizon: the last 4 hours and the next 20. */
 const HORIZON_BACK = 4 * 3_600_000;
 const HORIZON_AHEAD = 20 * 3_600_000;
 const RUN_SLOTS = 14;
@@ -174,7 +213,7 @@ function useWhen() {
       return `${
         r.trigger.rule
           ? ruleSentence(t, i18n.language, fromApiRule(r.trigger.rule, toYmd(new Date())), new Date(), false)
-          : r.trigger.description
+          : everyMinutes(t, r.trigger.cron) || r.trigger.description
       }${zoneNote}`;
     if (r.trigger.type === "once")
       return t("routines.once", { ...onceParts(i18n.language, r.trigger.at, zone), zone: zoneNote });
@@ -182,7 +221,7 @@ function useWhen() {
   };
 }
 
-/** Rotinas (telas/Rotinas.html): scheduled and event-driven agent tasks. */
+/** Rotinas: scheduled and event-driven agent tasks. */
 export function RoutinesPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -203,7 +242,7 @@ export function RoutinesPage() {
   const query = q.trim().toLowerCase();
   const matches = (r: Routine) =>
     (agents.length === 0 || agents.includes(`agent:${r.agentId}`)) &&
-    (!query || `${r.name} ${r.prompt} ${when(r)}`.toLowerCase().includes(query));
+    (!query || `${r.name} ${r.prompt ?? ""} ${when(r)}`.toLowerCase().includes(query));
   const shown = list.filter(matches);
   const current = shown.filter((r) => !isDoneOnce(r));
   const done = shown.filter(isDoneOnce);
@@ -263,10 +302,6 @@ export function RoutinesPage() {
           <div>
             <h1>{t("routines.title")}</h1>
             <p className="routines-head__sub">{t("routines.subtitle")}</p>
-            <p className="routines-head__guard">
-              <Icon name="shield" size={14} />
-              {t("routines.guard")}
-            </p>
           </div>
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             {t("routines.new")}
@@ -285,9 +320,7 @@ export function RoutinesPage() {
                 {t("routines.new")}
               </Button>
             }
-          >
-            {t("routines.empty")}
-          </EmptyState>
+          />
         )}
         {list.length > 0 && (
           <>
@@ -396,33 +429,47 @@ export function RoutinesPage() {
 /** A title for the card: a routine made from a chat message may be named with its whole prompt. */
 export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
   const name = r.name.trim();
-  if (name !== r.prompt.trim() && name.length <= 80) return name;
+  if (name !== (r.prompt ?? "").trim() && name.length <= 80) return name;
   const first = (name.split("\n")[0] ?? name).trim();
   if (first.length <= 60) return first;
   const cut = first.slice(0, 60);
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
 }
 
+/** "A cada 30 minutos" for a routine every N minutes (kept as cron `*\/N * * * *`, no rule); "" otherwise. */
+function everyMinutes(t: TFunction, cron: string) {
+  const every = /^\*\/(\d+) \* \* \* \*$/.exec(cron.trim())?.[1] ?? (cron.trim() === "* * * * *" ? "1" : null);
+  return every ? t("recurrence.s.minutely", { count: Number(every) }) : "";
+}
+
 /** The runs as words, for the strip's label and the horizon's tooltips. */
 function useRunWords() {
   const { t, i18n } = useTranslation();
   return {
-    status: (s: RoutineRun["status"]) => t(`routines.statusWord.${s}`),
+    status: (s: RunStatus) => t(`routines.statusWord.${s}`),
     caption: (r: Routine, now: Date) => {
-      if (r.running) return t("routines.runningNow");
-      const runs = r.recentRuns ?? (r.lastRun ? [r.lastRun] : []);
+      if (isRunning(r)) return t("routines.runningNow");
+      // The finished runs (one at work is the strip's own "running").
+      const runs = runPixels(r.recentRuns.length > 0 ? r.recentRuns : r.lastRun ? [r.lastRun] : []);
       const last = runs[0];
       if (!last) return t("routines.neverRan");
       const silent = runs.filter((x) => x.status === "silent").length;
       if (last.status === "silent" && silent > 1) return t("routines.silentOf", { count: silent, total: runs.length });
-      return t(`routines.lastRun.${last.status}`, { when: relativeTime(t, i18n.language, last.at, now) });
+      const when = relativeTime(t, i18n.language, last.at, now);
+      // A person stopped it: that's no skipped slot (the strip draws both gray).
+      if (r.recentRuns[0]?.status === "canceled" && r.recentRuns[0].at === last.at)
+        return t("routines.lastRun.stopped", { when });
+      return t(`routines.lastRun.${last.status}`, { when });
     },
     label: (r: Routine) => {
-      const runs = (r.recentRuns ?? []).slice(0, RUN_SLOTS);
+      const runs = runPixels(r.recentRuns).slice(0, RUN_SLOTS);
       if (runs.length === 0) return t("routines.stripNone");
-      return t("routines.stripLabel", {
-        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join("; "),
+      // A sentence per run. The first follows the label's colon, so only the others start with a capital.
+      const list = runs.map((x, i) => {
+        const when = whenAt(t, i18n.language, x.at);
+        return `${i > 0 ? capitalize(when, i18n.language) : when}: ${t(`routines.statusWord.${x.status}`)}`;
       });
+      return t("routines.stripLabel", { list: list.join(". ") });
     },
   };
 }
@@ -431,14 +478,14 @@ function useRunWords() {
 function useNextText() {
   const { t, i18n } = useTranslation();
   return (r: Routine, now: Date) => {
-    if (r.running) return t("routines.runningNow");
-    if (isDoneOnce(r))
+    if (isRunning(r)) return t("routines.runningNow");
+    if (hasFired(r))
       return r.lastRun
         ? t("routines.firedAt", { when: whenAt(t, i18n.language, r.lastRun.at) })
         : t("routines.canceled");
     if (!r.active) return t("routines.paused");
     if (isEventDriven(r)) {
-      const week = (r.recentRuns ?? []).filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
+      const week = r.recentRuns.filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
       if (r.trigger.type === "email")
         return week > 0 ? t("mail.routine.thisWeek", { count: week }) : t("mail.routine.waiting");
       return week > 0 ? t("routines.eventThisWeek", { count: week }) : t("routines.waitingEvent");
@@ -459,6 +506,84 @@ function useNextText() {
   };
 }
 
+/** Pause, resume, run, stop, the one-tap fixes and delete: one place for the toasts they say. */
+function useRoutineControls(r: Routine) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const toast = useToast();
+  const action = useRoutineAction(org.id);
+  const running = isRunning(r);
+  return {
+    action,
+    setActive: (active: boolean) =>
+      action.mutate(
+        { type: "active", id: r.id, active },
+        {
+          onSuccess: () =>
+            toast.show(
+              t(active ? "routines.resumedToast" : running ? "routines.pausedRunningToast" : "routines.pausedToast"),
+            ),
+        },
+      ),
+    run: () => action.mutate({ type: "run", id: r.id }),
+    stop: () => action.mutate({ type: "stop", id: r.id }, { onSuccess: () => toast.show(t("routines.stoppedToast")) }),
+    fix: (fix: RoutineFix) => {
+      const channelId = routineChannelOf(r.target);
+      if (fix === "add_agent" && channelId)
+        action.mutate(
+          { type: "addAgent", id: r.id, agentId: r.agentId, channelId },
+          {
+            onSuccess: () =>
+              toast.show(t("routines.fix.addedToast", { name: actors.name({ type: "agent", id: r.agentId }) })),
+          },
+        );
+      else if (fix === "take_over")
+        action.mutate({ type: "takeOver", id: r.id }, { onSuccess: () => toast.show(t("routines.fix.takenToast")) });
+      else
+        action.mutate(
+          { type: "active", id: r.id, active: true },
+          { onSuccess: () => toast.show(t("routines.resumedToast")) },
+        );
+    },
+  };
+}
+
+/** The state as a chip ("Pausada: o agente não está mais no canal", "Falhando (3 seguidas)"…). */
+function RoutineStateChip({ routine: r, className }: { routine: Routine; className?: string }) {
+  const { t, i18n } = useTranslation();
+  const say = useSay();
+  const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
+  const state = routineStateWords(r, since);
+  return (
+    <Chip
+      icon={state.icon}
+      tone={state.tone}
+      className={className}
+      lead={r.state === "running" ? <AgentSpinner agentId={r.agentId} /> : undefined}
+    >
+      {say(state)}
+    </Chip>
+  );
+}
+
+/** The one-tap fix of a paused routine ("Adicionar agente ao canal", "Assumir rotina", "Retomar"). */
+function FixButton({ routine: r, fix, size = "sm" }: { routine: Routine; fix: RoutineFix; size?: "sm" }) {
+  const { t } = useTranslation();
+  const controls = useRoutineControls(r);
+  return (
+    <Button
+      size={size}
+      variant={fix === "resume" ? "default" : "primary"}
+      icon={fix === "add_agent" ? "plus" : fix === "take_over" ? "person" : "play"}
+      loading={controls.action.isPending}
+      onClick={() => controls.fix(fix)}
+    >
+      {t(`routines.fix.${fix}`)}
+    </Button>
+  );
+}
+
 function RoutineRow({
   routine: r,
   now,
@@ -473,10 +598,10 @@ function RoutineRow({
   onEdit: () => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
   const actors = useActors();
   const toast = useToast();
-  const action = useRoutineAction(org.id);
+  const controls = useRoutineControls(r);
+  const action = controls.action;
   const [deleting, setDeleting] = useState(false);
   const target = useTargetLabel();
   const when = useWhen();
@@ -487,13 +612,13 @@ function RoutineRow({
   const title = routineTitle(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
+  const fired = hasFired(r);
   const paused = isPaused(r);
+  const running = isRunning(r);
   const more = t("routines.more", { name: title });
-  const setActive = (active: boolean) =>
-    action.mutate(
-      { type: "active", id: r.id, active },
-      { onSuccess: () => toast.show(t(active ? "routines.resumedToast" : "routines.pausedToast")) },
-    );
+  // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
+  const needsLook = !done && routineStateWords(r).tone === "waiting";
+  const fix = r.canManage && needsLook ? pausedFix(r) : null;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title is the keyboard way to the details
     <article
@@ -502,7 +627,8 @@ function RoutineRow({
       data-active={r.active || undefined}
       data-paused={paused || undefined}
       data-done={done || undefined}
-      data-running={r.running || undefined}
+      data-running={running || undefined}
+      data-state={r.state}
       onClick={(e) => {
         // The row opens the details; its own controls don't.
         if ((e.target as HTMLElement).closest("button, a, [role=switch], [role=menu]")) return;
@@ -531,9 +657,11 @@ function RoutineRow({
               {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
             </Chip>
           )}
+          {needsLook && <RoutineStateChip routine={r} className="routine-row__chip" />}
+          {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
-      <div className="routine-row__when">
+      <div className="routine-row__when ac-iconline">
         <span className="routine-row__when-icon" aria-hidden="true">
           <Icon
             name={
@@ -552,34 +680,48 @@ function RoutineRow({
         </span>
         <span className="routine-row__when-text">
           <b>{when(r)}</b>
-          <small className={cx(r.running && "is-live")}>{nextText(r, now)}</small>
+          <small className={cx(running && "is-live")}>{nextText(r, now)}</small>
         </span>
       </div>
       <div className="routine-row__runs" role="img" aria-label={words.label(r)}>
-        <RunStrip runs={r.recentRuns ?? []} color={look.color} slots={RUN_SLOTS} running={r.running} />
+        <RunStrip runs={runPixels(r.recentRuns)} color={look.color} slots={RUN_SLOTS} running={running} />
         <small>{words.caption(r, now)}</small>
       </div>
       <div className="routine-row__actions">
-        {done ? (
+        {fired || !r.canManage ? (
           <span className="routine-row__ph routine-row__ph--switch" aria-hidden="true" />
         ) : (
           <Switch
             checked={r.active}
-            onCheckedChange={setActive}
+            onCheckedChange={controls.setActive}
             aria-label={t("routines.activeLabel", { name: title })}
           />
         )}
-        {!done && !reminder ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            iconOnly
-            icon={r.running ? "spinner" : "play"}
-            title={r.running ? t("routines.running") : t("routines.runNow")}
-            aria-label={r.running ? t("routines.running") : t("routines.runNow")}
-            disabled={r.running || action.isPending}
-            onClick={() => action.mutate({ type: "run", id: r.id })}
-          />
+        {/* Parar for a run at work, also a paused routine's or a fired one-off's; "Rodar agora" while it may run. */}
+        {(running || !fired) && !reminder && r.canManage ? (
+          running ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="stop"
+              title={t("routines.stop")}
+              aria-label={t("routines.stopName", { name: title })}
+              disabled={action.isPending}
+              onClick={controls.stop}
+            />
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="play"
+              title={t("routines.runNow")}
+              aria-label={t("routines.runNow")}
+              disabled={action.isPending}
+              onClick={controls.run}
+            />
+          )
         ) : (
           <span className="routine-row__ph" aria-hidden="true" />
         )}
@@ -588,27 +730,31 @@ function RoutineRow({
           label={more}
           trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
         >
-          <MenuItem icon="edit" onSelect={onEdit}>
-            {t("routines.edit")}
-          </MenuItem>
+          {r.canManage && (
+            <MenuItem icon="edit" onSelect={onEdit}>
+              {t("routines.edit")}
+            </MenuItem>
+          )}
           <MenuItem icon="waiting" onSelect={() => !selected && onOpen()}>
             {t("routines.runs")}
           </MenuItem>
-          <MenuItem
-            icon="copy"
-            onSelect={() =>
-              action.mutate(
-                { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
-                {
-                  onSuccess: (copy) =>
-                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                },
-              )
-            }
-          >
-            {t("routines.duplicate")}
-          </MenuItem>
-          {r.webhookUrl && (
+          {r.canManage && (
+            <MenuItem
+              icon="copy"
+              onSelect={() =>
+                action.mutate(
+                  { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
+                  {
+                    onSuccess: (copy) =>
+                      toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                  },
+                )
+              }
+            >
+              {t("routines.duplicate")}
+            </MenuItem>
+          )}
+          {r.canManage && r.webhookUrl && (
             <MenuItem
               icon="link"
               onSelect={async () => {
@@ -619,16 +765,18 @@ function RoutineRow({
               {t("routines.copyWebhook")}
             </MenuItem>
           )}
-          <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-            {t("routines.delete")}
-          </MenuItem>
+          {r.canManage && (
+            <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
+              {t("routines.delete")}
+            </MenuItem>
+          )}
         </Menu>
       </div>
       <Dialog
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
         title={t("routines.deleteTitle", { name: title })}
-        description={t("routines.deleteBody")}
+        description={running ? t("routines.deleteBodyRunning") : t("routines.deleteBody")}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -763,11 +911,11 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
                   now={now}
                   color={color}
                   eyes={eyes}
-                  running={r.running}
-                  past={(r.recentRuns ?? []).filter((x) => new Date(x.at) >= from && new Date(x.at) <= now)}
+                  running={isRunning(r)}
+                  past={runPixels(r.recentRuns).filter((x) => new Date(x.at) >= from && new Date(x.at) <= now)}
                   future={future}
                 />
-                {next && !r.running && (!hourly || soon) && (
+                {next && !isRunning(r) && (!hourly || soon) && (
                   <span
                     className={cx("routines-horizon__next", soon && "is-soon")}
                     style={{ left: `max(${pos(new Date(next))}%, calc(${nowAt}% + 12px))` }}
@@ -797,7 +945,7 @@ function AgentFace({ agentId }: { agentId: string }) {
   return actors.avatar({ type: "agent", id: agentId }, "xs");
 }
 
-/** The routine's details: what it does, when, where it delivers and the run history. */
+/** The routine's details: its state, the week, what it does, when, where, how it works and its runs. */
 function RoutineDetails({
   routine: r,
   now,
@@ -812,24 +960,48 @@ function RoutineDetails({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
-  const action = useRoutineAction(org.id);
+  const controls = useRoutineControls(r);
+  const action = controls.action;
   const runs = useRoutineRuns(org.id, r.id);
   const target = useTargetLabel();
   const when = useWhen();
   const nextText = useNextText();
-  const toast = useToast();
+  const say = useSay();
+  const outages = useMachineOutages(org.id, r.state === "waiting_computer");
+  const [switching, setSwitching] = useState(false);
   const agent = { type: "agent" as const, id: r.agentId };
   const name = actors.name(agent);
   const title = routineTitle(r);
   const done = isDoneOnce(r);
-  const paused = isPaused(r);
+  const fired = hasFired(r);
+  const running = isRunning(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
     org.id,
     r.active && r.trigger.type === "schedule" && r.trigger.rule ? r.trigger.rule : null,
   );
   const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
-  const state = r.running ? "running" : done ? "done" : paused ? "paused" : "live";
+  const fix = r.canManage ? pausedFix(r) : null;
+  // "Trocar computador": the outage its run waits on, for whoever can move agents.
+  const outage =
+    r.state === "waiting_computer" && r.waitingFor && can(org.role, "manage_agents")
+      ? outages.data?.outages.find((o) => o.machineId === r.waitingFor?.machineId)
+      : undefined;
+  const health = healthWords(r.health);
+  const usage = usageParts(r.usage, can(org.role, "view_usage"));
+  const usageText = usage
+    ? [
+        t("routines.usage.runs", { count: usage.runs }),
+        usage.tokens !== null
+          ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
+          : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+  const perDay = r.trigger.type === "schedule" ? runsPerDay(r.trigger.rule ?? null, r.trigger.cron) : 0;
+  const busy = r.active ? busyOnComputer(r.brain, perDay) : null;
   const whereHint =
     r.target.type === "conversation"
       ? r.target.threadId
@@ -838,6 +1010,7 @@ function RoutineDetails({
       : r.target.type === "dm"
         ? "dm"
         : r.target.type;
+  const list = runs.data ?? r.recentRuns;
   return (
     <DetailsDialog
       open
@@ -845,53 +1018,57 @@ function RoutineDetails({
       closeLabel={t("routines.panel.close")}
       className="routine-details"
       eyebrow={t("routines.panel.eyebrow")}
-      icon={<AgentAvatar agentId={r.agentId} name={name} size="md" running={r.running} />}
+      icon={<AgentAvatar agentId={r.agentId} name={name} size="md" running={running} />}
       title={title}
       subtitle={
         <>
           <span>{name}</span>
-          <Chip
-            icon={
-              state === "running" ? "spinner" : state === "paused" ? "pause" : state === "done" ? "check" : "repeat"
-            }
-            lead={state === "running" ? <AgentSpinner agentId={r.agentId} /> : undefined}
-          >
-            {t(`routines.panel.state.${state}`)}
-          </Chip>
+          {done ? <Chip icon="check">{t("routines.panel.state.done")}</Chip> : <RoutineStateChip routine={r} />}
         </>
       }
     >
-      <div className="routine-details__actions">
-        <Button size="sm" icon="edit" onClick={onEdit}>
-          {t("routines.edit")}
-        </Button>
-        {!done && !reminder && (
-          <Button
-            size="sm"
-            icon="play"
-            disabled={r.running || action.isPending}
-            onClick={() => action.mutate({ type: "run", id: r.id })}
-          >
-            {r.running ? t("routines.running") : t("routines.runNow")}
+      {r.canManage && (
+        <div className="routine-details__actions">
+          {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
+          {outage && outages.data && (
+            <Button size="sm" variant="primary" icon="computer" onClick={() => setSwitching(true)}>
+              {t("outage.switch")}
+            </Button>
+          )}
+          <Button size="sm" icon="edit" onClick={onEdit}>
+            {t("routines.edit")}
           </Button>
-        )}
-        {!done && (
-          <Button
-            size="sm"
-            icon={r.active ? "pause" : "play"}
-            onClick={() =>
-              action.mutate(
-                { type: "active", id: r.id, active: !r.active },
-                { onSuccess: () => toast.show(t(r.active ? "routines.pausedToast" : "routines.resumedToast")) },
-              )
-            }
-          >
-            {r.active ? t("routines.panel.pause") : t("routines.resume")}
-          </Button>
-        )}
-      </div>
+          {(running || !fired) &&
+            !reminder &&
+            (running ? (
+              <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
+                {t("routines.stop")}
+              </Button>
+            ) : (
+              <Button size="sm" icon="play" disabled={action.isPending} onClick={controls.run}>
+                {t("routines.runNow")}
+              </Button>
+            ))}
+          {!fired && (
+            <Button size="sm" icon={r.active ? "pause" : "play"} onClick={() => controls.setActive(!r.active)}>
+              {r.active ? t("routines.panel.pause") : t("routines.resume")}
+            </Button>
+          )}
+        </div>
+      )}
+      {outage && outages.data && (
+        <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
+      )}
+      <DetailsSection title={t("routines.panel.week")}>
+        <p className="routine-details__sentence">{health ? health.map(say).join(" · ") : t("routines.health.none")}</p>
+        {usageText && <p className="small muted">{`${t("routines.panel.usage")}: ${usageText}`}</p>}
+      </DetailsSection>
       <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>
-        <p className="routine-details__prompt">{r.prompt}</p>
+        {r.canSeeDetails && r.prompt !== null ? (
+          <p className="routine-details__prompt">{r.prompt}</p>
+        ) : (
+          <p className="small muted">{t("routines.detailsHidden")}</p>
+        )}
       </DetailsSection>
       <DetailsSection title={t("routines.panel.when")}>
         <p className="routine-details__sentence">{when(r)}</p>
@@ -927,48 +1104,38 @@ function RoutineDetails({
           </span>
         </div>
       </DetailsSection>
+      <DetailsSection title={t("routines.panel.runsOn")}>
+        <p className="routine-details__sentence">{say(whereItRuns(r.brain))}</p>
+        {busy && (
+          <p className="routine-note small ac-iconline">
+            <Icon name="computer" size={14} />
+            <span>{say(busy)}</span>
+          </p>
+        )}
+      </DetailsSection>
+      <DetailsSection title={t("routines.panel.access")}>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.access.${r.access}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
+              {t("routines.access.hint")}
+            </InfoHint>
+          </span>
+        </p>
+      </DetailsSection>
+      <DetailsSection title={t("routines.panel.report")}>
+        <p className="routine-details__sentence">{t(`routines.report.${r.report}`)}</p>
+      </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
-        {runs.isLoading && <LoadingList count={3} avatar={false} />}
-        {(r.running || (runs.data?.length ?? 0) > 0) && (
+        {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
+        {list.length > 0 && (
           <ol className="routine-runs">
-            {r.running && (
-              <li className="routine-runs__item">
-                <span className="routine-runs__node routine-runs__node--running">
-                  <Icon name="play" size={14} />
-                </span>
-                <span>
-                  <b>{t("routines.runningNow")}</b>
-                  <small>{t("routines.panel.runningBy", agentGrammar(t, name))}</small>
-                </span>
-                <time>{t("common.now")}</time>
-              </li>
-            )}
-            {(runs.data ?? []).slice(0, 30).map((x) => (
-              <li key={x.id} className="routine-runs__item">
-                <span className={`routine-runs__node routine-runs__node--${x.status}`}>
-                  <Icon
-                    name={
-                      x.status === "ok"
-                        ? "check"
-                        : x.status === "failed"
-                          ? "close"
-                          : x.status === "silent"
-                            ? "dash"
-                            : "wallet"
-                    }
-                    size={14}
-                  />
-                </span>
-                <span>
-                  <b>{runSummary(t, x)}</b>
-                  <small>{t(`routines.statusWord.${x.status}`)}</small>
-                </span>
-                <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
-              </li>
+            {list.slice(0, 30).map((x) => (
+              <RunItem key={x.id} run={x} routine={r} />
             ))}
           </ol>
         )}
-        {runs.isSuccess && runs.data.length === 0 && !r.running && (
+        {runs.isSuccess && list.length === 0 && (
           <p className="small muted">
             {t("routines.noRuns")}
             {nexts[0] && !done && ` ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`}
@@ -976,6 +1143,66 @@ function RoutineDetails({
         )}
       </DetailsSection>
     </DetailsDialog>
+  );
+}
+
+const RUN_NODE_ICON: Record<RunStatus, IconName> = { ok: "check", silent: "dash", failed: "close", skipped: "pause" };
+
+/**
+ * One run: its outcome in plain words ("Contou o que achou", "Pulada: a anterior ainda estava rodando",
+ * "Parada por Walter"), the agent's words when the viewer may read them, and where to go: the agent's
+ * message ("Abrir na conversa") or the approval it waits for.
+ */
+function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const say = useSay();
+  const pixel = runPixelStatus(x.status);
+  const outcome = say(runOutcome(x, (id) => actors.dir.memberById.get(id)?.name ?? null));
+  const link = runMessageLink(x);
+  const words = r.canSeeDetails && (x.status === "reported" || x.status === "silent") ? x.summary.trim() : "";
+  return (
+    <li className="routine-runs__item">
+      <span className={`routine-runs__node routine-runs__node--${pixel ?? "running"}`}>
+        <Icon name={pixel ? RUN_NODE_ICON[pixel] : isRunAtWork(x.status) ? "play" : "dash"} size={14} />
+      </span>
+      <span>
+        {x.status === "waiting" && x.approvalId ? (
+          <Link
+            to="/org/$orgId/approvals"
+            params={{ orgId: org.id }}
+            search={{ open: x.approvalId }}
+            className="routine-runs__link"
+          >
+            {outcome}
+          </Link>
+        ) : (
+          <b>{outcome}</b>
+        )}
+        {words && <small>{words}</small>}
+        {link &&
+          (link.threadId ? (
+            <Link
+              to="/org/$orgId/threads/$threadId"
+              params={{ orgId: org.id, threadId: link.threadId }}
+              className="routine-runs__open"
+            >
+              {t("routines.openInChat")}
+            </Link>
+          ) : (
+            <Link
+              to="/org/$orgId/c/$channelId"
+              params={{ orgId: org.id, channelId: link.channelId }}
+              search={{ m: link.messageId }}
+              className="routine-runs__open"
+            >
+              {t("routines.openInChat")}
+            </Link>
+          ))}
+      </span>
+      <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
+    </li>
   );
 }
 
@@ -1080,6 +1307,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [active, setActive] = useState(routine?.active ?? true);
+  // The two plain questions: when it speaks, and what it may do on its own.
+  const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
+  const [access, setAccess] = useState<RoutineAccess>(routine?.access ?? "read");
+  const say = useSay();
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
   const [rule, setRule] = useState<RecurrenceRule>(() => ruleOf(routine, wasUtc ? myZone : savedZone || myZone));
@@ -1163,7 +1394,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const changes = (r: Routine): RoutinePatch => {
     const patch: RoutinePatch = {};
     if (name.trim() && name.trim() !== r.name) patch.name = name.trim();
-    if (prompt.trim() !== r.prompt) patch.prompt = prompt.trim();
+    if (r.prompt !== null && prompt.trim() !== r.prompt) patch.prompt = prompt.trim();
     if (agentId !== r.agentId) patch.agentId = agentId;
     const forumChanged =
       target === TARGET_FORUM &&
@@ -1190,8 +1421,16 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
+    if (report !== r.report) patch.report = report;
+    if (access !== r.access) patch.access = access;
     return patch;
   };
+  // A routine on someone's computer that runs hourly or more often: say how often it wakes that computer.
+  const brain = actors.dir.agentById.get(agentId)?.brain;
+  const busy =
+    kind === "schedule" && !once && brain
+      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(rule)))
+      : null;
   // Only a phrase that wasn't understood says something here; the sentence above already says what was.
   const phraseError = () => {
     if (phraseFailed && parsed.data && !parsed.data.ok) {
@@ -1245,6 +1484,8 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
+          access,
+          report,
         },
       },
       {
@@ -1437,7 +1678,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </>
           )}
           {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-            <p className="routine-utc-hint small">
+            <p className="routine-utc-hint small ac-iconline">
               <Icon name="waiting" size={14} />
               <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
               <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
@@ -1449,7 +1690,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             <Field
               label={t("routines.form.event")}
               id="nr-event"
-              help={t("routines.form.eventHelp", { org: org.name })}
+              hint={{
+                name: t("common.about", { label: t("routines.form.event") }),
+                text: t("routines.form.eventHelp", { org: org.name }),
+              }}
             >
               <Select
                 value={event}
@@ -1458,6 +1702,35 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               />
             </Field>
           )}
+          {busy && (
+            <p className="routine-note small ac-iconline" role="status">
+              <Icon name="computer" size={14} />
+              <span>{say(busy)}</span>
+            </p>
+          )}
+          <div className="routine-kind">
+            <span className="ac-field__label">{t("routines.form.report")}</span>
+            <Segmented
+              label={t("routines.form.report")}
+              value={report}
+              onValueChange={setReport}
+              options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
+            />
+          </div>
+          <div className="routine-kind">
+            <span className="ac-hintline">
+              <span className="ac-field__label">{t("routines.form.access")}</span>
+              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
+                {t("routines.access.hint")}
+              </InfoHint>
+            </span>
+            <Segmented
+              label={t("routines.form.access")}
+              value={access}
+              onValueChange={setAccess}
+              options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
+            />
+          </div>
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />
@@ -1512,12 +1785,4 @@ function runLabel(locale: string, iso: string, timeZone: string) {
     timeZone,
   }).format(d);
   return `${date} · ${time}`;
-}
-
-/** A run's summary in the UI language (from its code), else the server's words. */
-function runSummary(t: TFunction, run: RoutineRun) {
-  if (!run.summaryCode) return run.summary;
-  const key = `routines.summary.${run.summaryCode.replace(/^routine_run\./, "")}`;
-  const tt = t as unknown as (k: string, o: Record<string, unknown>) => string;
-  return tt(key, { ...(run.summaryParams ?? {}), defaultValue: run.summary });
 }

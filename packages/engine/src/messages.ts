@@ -15,21 +15,29 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AgentActionView, actionsFor } from "./agent-actions";
-import { getAgentCached } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
-import { cancelRun, interruptRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
-import { isStopRequest, type Judge, personMentionAddressees } from "./judge";
+import {
+  type DecidedBy,
+  decidedByOf,
+  MENTION_NEEDED,
+  publishChannelEvent,
+  publishMessageCreated,
+  publishUserEvent,
+} from "./events";
+import { type Judge, personMentionAddressees } from "./judge";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
-import { enqueue } from "./outbox";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
-import { replyThreadOf } from "./runs";
+import { NO_AI } from "./runs";
+import { afterSteered } from "./steering";
+import type { Talker } from "./talker";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
+
+export { stopChecksSettled } from "./steering";
 
 const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions, threads } = schema;
 
@@ -152,11 +160,19 @@ export interface Receipts {
     /** The run answering it: its own, the task it was steered into, or the run its answer resumed. */
     runId: string;
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
+    /** `no_ai`: it failed for want of an AI to think with. */
+    reason?: typeof NO_AI;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
   /** Agents it only mentions as part of the request to another agent: no run, by design (not blocked). */
   referenced?: string[];
+  /** Routed to nobody: the organization had no AI connected. */
+  noAi?: true;
+  /** The router's step that picked (ADR 0074); absent for a decision made before the chain. */
+  decidedBy?: DecidedBy;
+  /** No step could read it and no rule fit: only a mention reaches an agent. */
+  reason?: typeof MENTION_NEEDED;
 }
 
 /** `meta.referencedAgentIds`: agents a person's message only references (no run; see `classifyAddressees`). */
@@ -185,10 +201,16 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     triggerMessageId: schema.agentRuns.triggerMessageId,
     agentId: schema.agentRuns.agentId,
     status: schema.agentRuns.status,
+    error: schema.agentRuns.error,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
-      .select({ messageId: schema.routingDecisions.messageId, candidates: schema.routingDecisions.candidates })
+      .select({
+        messageId: schema.routingDecisions.messageId,
+        candidates: schema.routingDecisions.candidates,
+        error: schema.routingDecisions.error,
+        strategy: schema.routingDecisions.strategy,
+      })
       .from(schema.routingDecisions)
       .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
     db
@@ -210,6 +232,8 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
       : Promise.resolve([]),
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
+  const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
+  const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
@@ -227,7 +251,12 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     out.set(m.id, {
       seenBy,
       pickedBy: [...picked],
-      handled: mine.map((r) => ({ agentId: r.agentId, runId: r.id, status: r.status })),
+      handled: mine.map((r) => ({
+        agentId: r.agentId,
+        runId: r.id,
+        status: r.status,
+        ...(r.error === NO_AI ? { reason: NO_AI } : {}),
+      })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.
       blocked:
@@ -235,9 +264,19 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           ? m.mentionedAgentIds.filter((id) => !picked.has(id) && !referenced.includes(id))
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
+      ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...decisionOf(strategyOf.get(m.id), m.authorUserId),
     });
   }
   return out;
+}
+
+/** What a routing decision's `strategy` tells a receipt: who picked, or that nobody could. */
+function decisionOf(strategy: string | undefined, authorUserId: string | null): Pick<Receipts, "decidedBy" | "reason"> {
+  if (strategy === undefined) return {};
+  if (strategy === "none") return { reason: MENTION_NEEDED };
+  const decidedBy = decidedByOf(strategy, authorUserId);
+  return decidedBy ? { decidedBy } : {};
 }
 
 /** `@handle` tokens in a message, lower-cased and de-duplicated. Emails (`a@b.c`) are not mentions. */
@@ -249,10 +288,15 @@ export function parseMentionHandles(body: string): string[] {
   return [...found];
 }
 
-/** An agent's message may bring in one more agent only up to this hop (D49); `router.ts` enforces it too. */
+/** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */
 export const AGENT_CHIME_IN_MAX_HOP = 2;
 /** A reply waits this long before its thread is assessed (`threads.assess`); a newer reply's job takes over. */
 export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
+/**
+ * The floor: a person's follow-up without @ in a channel's main timeline goes to the agent's run
+ * still answering that person there, when it was asked within this window (else the router decides).
+ */
+export const FLOOR_WINDOW_MS = 30 * 60_000;
 
 export type MessageAuthor =
   | { type: "person"; userId: string }
@@ -317,7 +361,7 @@ interface RawMessage {
   edited_at: Date | string | null;
   deleted_at: Date | string | null;
   runs: { id: string; agentId: string }[] | string | null;
-  /** Agents the sender addressed but can't talk to (D31). */
+  /** Agents the sender addressed but can't talk to. */
   blocked?: string[] | string | null;
   /** Active runs this message was delivered to (no new run). */
   steered?: { id: string; agentId: string }[] | string | null;
@@ -354,7 +398,11 @@ const parseJson = <T>(v: T | string | null, fallback: T): T =>
 export async function insertMessageWithRuns(
   tx: Executor,
   input: NewMessage,
-  options: { startRuns: boolean },
+  /**
+   * `deliver: false`: a person's message written on their behalf (a routine's trigger) answers no open
+   * question and joins no run in progress; only the runs its caller starts read it.
+   */
+  options: { startRuns: boolean; deliver?: boolean },
 ): Promise<{
   message: Message;
   runs: { id: string; agentId: string }[];
@@ -384,6 +432,7 @@ export async function insertMessageWithRuns(
   const hop = input.author.type === "agent" ? input.author.hop : 0;
   const threadId = input.threadId ?? null;
   const startRuns = options.startRuns && person;
+  const deliver = person && options.deliver !== false;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
@@ -436,13 +485,13 @@ export async function insertMessageWithRuns(
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
-        where ${person}::boolean and q.status = 'open' and not exists (select 1 from archived)
+        where ${deliver}::boolean and q.status = 'open' and not exists (select 1 from archived)
           and exists (select 1 from fresh) and q.id = (
             select oq.id from ${agentQuestions} oq
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
-              -- In a channel's main timeline (D67) many talk at once: who asked the agent answers it, or
+              -- In a channel's main timeline many talk at once: who asked the agent answers it, or
               -- whoever addresses it.
               and (${threadId}::uuid is not null
                 or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
@@ -469,7 +518,7 @@ export async function insertMessageWithRuns(
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
-        -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
+        -- Who can talk to the agent: the others get no run, only a notice for the sender.
         select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
@@ -478,10 +527,14 @@ export async function insertMessageWithRuns(
         -- message in the channel joins the agent's run that answers in the channel itself (not one in
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
         -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
+        -- Background runs (a routine's) hold no conversation: a person's message never goes to one.
+        -- Nor does a run waiting on an approval: the agent answers in a run of its own meanwhile
+        -- (one waiting on a secret or a mission's decision hands it on after the insert: steering.ts).
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
-        where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
-          and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+        where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.status in ('queued', 'running', 'waiting_input')
+          and not r.background
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -492,8 +545,41 @@ export async function insertMessageWithRuns(
                 or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
+            -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
+            -- answering this same person there, asked within the last minutes. Deterministic, no router.
+            or (${startRuns && !threadId}::boolean and not exists (select 1 from mentioned)
+              and r.status in ('queued', 'running') and ${inChannelRun(sql`r`)}
+              and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
+              and ra.archived_at is null
+              and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
+              and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
+                and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
+              and ${audienceSql("ra", sql`${userId}::text`)})
           )
         order by r.agent_id, r.created_at desc
+      ), held as (
+        -- A reply in a thread where the agent's run waits on an approval (it takes nothing new):
+        -- the agent answers it in a run of its own, as that run would have read it.
+        select distinct r.agent_id from ${agentRuns} r
+        join ${agents} ra on ra.id = r.agent_id
+        where ${startRuns}::boolean and ${deliver}::boolean and ${threadId}::uuid is not null
+          and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.thread_root_id = ${threadId}::uuid and r.status = 'waiting_approval' and not r.background
+          and ra.archived_at is null
+          and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
+          and r.agent_id <> all(${referenced}::uuid[])
+          and ${audienceSql("ra", sql`${userId}::text`)}
+      ), steered as (
+        -- Queued on the run only while it is still active: one that ended since (its unread messages
+        -- already handed on) is never appended to; the message starts a run of its own below instead.
+        -- Same conditions as m (the message is written).
+        update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
+          updated_at = now()
+        from active a where r.id = a.id
+          and r.status in ('queued', 'running', 'waiting_input')
+          and ${threadOk} and not exists (select 1 from archived) and exists (select 1 from fresh)
+        returning r.id, r.agent_id
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
           author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
@@ -504,7 +590,7 @@ export async function insertMessageWithRuns(
           ${JSON.stringify(input.meta ?? {})}::jsonb
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
-            || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(ac.id)) from active ac
+            || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st
                 having count(*) > 0), '{}'::jsonb)
             -- Addressed the mission's agent without the right to: a suggestion the owner decides.
             || coalesce((select jsonb_build_object('missionSuggestion',
@@ -524,17 +610,14 @@ export async function insertMessageWithRuns(
         where ${person}::boolean and ${threadId}::uuid is not null and t.org_id = ${input.orgId}::uuid
           and t.root_message_id = ${threadId}::uuid and t.state = 'closed' and exists (select 1 from m)
         returning t.id
-      ), steered as (
-        update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
-          updated_at = now()
-        from active a where r.id = a.id and exists (select 1 from m)
-        returning r.id, r.agent_id
       ), runs as (
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
           coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
-        from answering an where exists (select 1 from m)
-          and an.agent_id not in (select agent_id from active)
+        from (select agent_id, trig from answering
+          union select agent_id, 'mention' from held where agent_id not in (select agent_id from answering)) an
+        where exists (select 1 from m)
+          and an.agent_id not in (select agent_id from steered)
         on conflict do nothing
         returning id, agent_id
       ), jobs as (
@@ -550,11 +633,11 @@ export async function insertMessageWithRuns(
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
-          -- An agent's message without a mention goes to the router too: another agent may chime in (D49).
+          -- An agent's message without a mention goes to the router too: another agent may chime in (ADR 0034).
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
             or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
         union all
-        -- In-app notifications (D46): people mentioned, a reply in a thread, a person's DM.
+        -- In-app notifications: people mentioned, a reply in a thread, a person's DM.
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
           where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
@@ -617,7 +700,7 @@ export async function insertMessageWithRuns(
     editedAt: asDate(row.edited_at),
     deletedAt: asDate(row.deleted_at),
   };
-  // `[[…]]` links become backlinks of the pages they name (D34).
+  // `[[…]]` links become backlinks of the pages they name (ADR 0023).
   if (body.includes("[[")) {
     await syncWikiLinks(tx, input.orgId, { type: "message", id: message.id, channelId: input.channelId }, body);
   }
@@ -677,19 +760,6 @@ async function markOpenedByReply(db: Database, reply: Message, userId: string): 
   return marked.length > 0;
 }
 
-/** Stop checks still being judged (they run after the post returns). */
-const stopChecks = new Set<Promise<unknown>>();
-
-function trackStopCheck(check: Promise<unknown>) {
-  const tracked = check.catch(() => undefined).finally(() => stopChecks.delete(tracked));
-  stopChecks.add(tracked);
-}
-
-/** Resolves once every stop check started so far is judged (and its cancel done): for tests and shutdown. */
-export async function stopChecksSettled() {
-  while (stopChecks.size > 0) await Promise.all([...stopChecks]);
-}
-
 /**
  * A person posts in a channel: org membership, channel membership and the
  * `post` permission are checked, then message + outbox event commit together,
@@ -706,8 +776,11 @@ async function resendView(deps: { db: Database; pubsub: PubSub }, orgId: string,
 }
 
 export async function postPersonMessage(
-  /** `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop). */
-  deps: { db: Database; pubsub: PubSub; judge?: Judge },
+  /**
+   * `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop).
+   * `talker`: the agents' conversation layer, for fast replies while they work (none = no fast replies).
+   */
+  deps: { db: Database; pubsub: PubSub; judge?: Judge; talker?: Talker },
   userId: string,
   orgId: string,
   channelId: string,
@@ -736,7 +809,7 @@ export async function postPersonMessage(
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
-  // A forum topic is written through the forum (its turns), never as a plain chat (D33).
+  // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
   const clientId = normalizeClientId(input.clientId);
@@ -819,7 +892,7 @@ export async function postPersonMessage(
   }
   const answers = message.meta.answersQuestionId;
   if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
-  // Agents this person can't talk to (D31): no run; only they hear why ("Theo only replies to …").
+  // Agents this person can't talk to: no run; only they hear why ("Theo only replies to …").
   if (blocked.length > 0) {
     view.notices = await notifyBlocked(deps, orgId, userId, {
       agentIds: blocked,
@@ -828,75 +901,19 @@ export async function postPersonMessage(
       messageId: message.id,
     });
   }
+  // Delivered to the agent's task in progress: it reads it at its next step, now, or wakes from a wait.
   if (steered.length > 0) {
-    // Delivered to the agent's task in progress: it reads it at its next step, or now ("Parar e mandar").
-    const now = input.steer === "now";
-    const steeredIds = steered.map((s) => s.id);
-    const activeRuns = await deps.db.select().from(agentRuns).where(inArray(agentRuns.id, steeredIds));
-    for (const s of steered) {
-      const active = activeRuns.find((r) => r.id === s.id);
-      const threadId = active ? replyThreadOf(active) : null;
-      await publishChannelEvent(deps.pubsub, {
-        type: "agent.run.steered",
-        channelId,
-        threadId,
-        runId: s.id,
-        agentId: s.agentId,
-        messageId: message.id,
-        ...(now ? { now: true as const } : {}),
-      });
-      // Its model call stops and the loop reads the message at once (a running tool finishes first).
-      // A computer brain (Claude Code, Codex) can't drop its turn halfway: the task stops for real, and
-      // stopping it starts it again from this message (`restartAfterStopAndSend`). Who may not stop it
-      // just leaves the message for its next step.
-      if (now && active?.status === "running") {
-        const agent = await getAgentCached(deps.db, orgId, s.agentId);
-        if (agent && agent.brain !== "model") await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
-        else await interruptRun(deps.pubsub, s.id, message.id);
-      }
-      // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
-      // and reads this message with the rest; still away: it parks again quietly (one answer later).
-      else if (active?.status === "waiting_input" && active.waitingMachineId) {
-        const wait = (active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain?.waitId;
-        await enqueue(deps.db, {
-          orgId,
-          kind: "agent_run.execute",
-          payload: { runId: s.id, ...(wait ? { wait } : {}) },
-          dedupeKey: `agent_run.execute:${s.id}:steer:${message.id}`,
-          maxAttempts: 4,
-        }).catch(() => undefined);
-      }
-      // A plain "stop", in any language, cancels the task instead (the judge decides; short messages
-      // only). Never in the way of the send: judged after the response, the app hears `stop` then.
-      const judge = deps.judge;
-      if (judge) {
-        const judgeStop = async () => {
-          const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
-          const stop = await isStopRequest(judge, {
-            orgId,
-            text: message.body,
-            agentName,
-            agentId: s.agentId,
-            runId: s.id,
-          }).catch(() => false);
-          if (!stop) return;
-          await publishChannelEvent(deps.pubsub, {
-            type: "agent.run.steered",
-            channelId,
-            threadId,
-            runId: s.id,
-            agentId: s.agentId,
-            messageId: message.id,
-            stop: true,
-          });
-          await cancelRun(deps, userId, orgId, s.id);
-        };
-        trackStopCheck(judgeStop());
-      }
-    }
+    await afterSteered(deps, {
+      orgId,
+      userId,
+      channelId,
+      message,
+      runIds: steered.map((s) => s.id),
+      now: input.steer === "now",
+    });
   }
   // Receipts: who answers it — new runs, the task in progress it was steered into, the run its
-  // answer resumes — and the mentioned agents that won't (D31). Nothing else routes this message.
+  // answer resumes — and the mentioned agents that won't. Nothing else routes this message.
   const answering = [
     ...runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
     ...steered.map((s) => ({ agentId: s.agentId, runId: s.id })),
@@ -922,7 +939,7 @@ export async function postPersonMessage(
     });
   }
   if (runs.length > 0) {
-    // The runs answer where the message is (D67).
+    // The runs answer where the message is.
     const threadId = message.threadId;
     for (const run of runs) {
       await publishChannelEvent(deps.pubsub, {

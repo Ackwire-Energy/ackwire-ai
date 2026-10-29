@@ -25,7 +25,7 @@ import { organizations } from "./tenancy";
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 /**
- * The core search index (D11, D15; docs/adr/0017-search-and-context.md):
+ * The core search index (docs/adr/0017-search-and-context.md):
  * one row per searchable thing (message, context item, issue, forum post,
  * file), fed by the outbox. Hybrid: full-text (`tsv`, `simple` config so
  * Portuguese and English both work) + pgvector (`embedding`, optional).
@@ -84,7 +84,7 @@ export interface ContextEvidence {
 }
 
 /**
- * Derived context (D13) and agent memories, in one table
+ * Derived context (ADR 0017) and agent memories, in one table
  * (docs/adr/0017-search-and-context.md). Summaries, decisions, facts,
  * preferences, open questions, entity profiles; notes and lessons belong to
  * an agent (`agent_id`) or, with `agent_id` null and kind `lesson`, to the

@@ -7,8 +7,9 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { OrgPausedError, STANDING_COLUMNS } from "./standing";
 
-const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
+const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
 export type Channel = typeof channels.$inferSelect;
 
@@ -188,8 +189,9 @@ export async function isChannelMember(db: Database, orgId: string, channelId: st
 
 /**
  * The single authorization check for reading a channel (HTTP and WebSocket):
- * the user belongs to the organization, the channel belongs to that
- * organization, and the user is a member of the channel.
+ * the user belongs to the organization (a blocked account belongs nowhere,
+ * as in `getMembership`), the channel belongs to that organization, and the
+ * user is a member of the channel.
  */
 export async function requireChannelAccess(db: Database, userId: string, orgId: string, channelId: string) {
   // One round trip: membership of the org, the channel, and membership of the channel.
@@ -197,23 +199,26 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     .select({
       role: organizationMembers.role,
       orgName: organizations.name,
+      standing: STANDING_COLUMNS,
       channel: channels,
       memberId: channelMembers.id,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
     .leftJoin(channels, and(eq(channels.id, channelId), eq(channels.orgId, orgId)))
     .leftJoin(
       channelMembers,
       and(eq(channelMembers.channelId, channelId), eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)),
     )
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)));
   if (!row) throw new ForbiddenError("You are not a member of this organization");
+  if (row.standing.state === "suspended") throw new OrgPausedError(row.standing);
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
-  // Forum topics are readable by the whole organization (D33); writing goes through the forum.
+  // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
   if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
-  const membership: Membership = { orgId, orgName: row.orgName, role: row.role };
+  const membership: Membership = { orgId, orgName: row.orgName, role: row.role, standing: row.standing };
   return { channel, membership };
 }
 
@@ -400,14 +405,8 @@ export async function removeChannelMember(
   await publishChannelEvent(options.pubsub, removed);
 }
 
-/** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */
-export async function archiveChannel(
-  db: Database,
-  actorId: string,
-  orgId: string,
-  channelId: string,
-  options: { pubsub?: PubSub } = {},
-) {
+/** The channel, when `actorId` may archive it or bring it back: its creator or an admin. */
+async function archivableChannel(db: Database, actorId: string, orgId: string, channelId: string) {
   const membership = await getMembership(db, actorId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
   const [channel] = await db
@@ -418,8 +417,27 @@ export async function archiveChannel(
   if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
+  return channel;
+}
+
+/** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */
+export async function archiveChannel(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
+  const channel = await archivableChannel(db, actorId, orgId, channelId);
   if (channel.name === "general") throw new ValidationError("#general can't be archived");
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
+}
+
+/** Brings an archived channel back as it was (creator or admin): "Refazer" after an agent's channel was undone. */
+export async function unarchiveChannel(db: Database, actorId: string, orgId: string, channelId: string) {
+  await archivableChannel(db, actorId, orgId, channelId);
+  await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, channelId));
+  caches.channels.delete(`${orgId}:${channelId}`);
 }

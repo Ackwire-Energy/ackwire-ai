@@ -23,10 +23,15 @@ export interface ToolContext {
    */
   bridge?: { machineId: string; taskId?: string };
   /**
-   * Tools on demand (D65): the tool groups this run loaded (`Transcript.toolGroups`); the others sit
+   * Tools on demand (ADR 0043): the tool groups this run loaded (`Transcript.toolGroups`); the others sit
    * behind `find_tools` / `use_tool`. Undefined or null: every tool is listed as is.
    */
   loadedGroups?: readonly string[] | null;
+  /**
+   * A background run (`agent_runs.background`, a routine's): `hand_off` is offered to it. What it may
+   * do is the run policy's (`run-policy.ts`), read from who is behind the run, never from this flag.
+   */
+  background?: boolean;
 }
 
 export interface ToolOutput {
@@ -37,7 +42,7 @@ export interface ToolOutput {
   data?: Record<string, unknown>;
   /** Ground truth this call produced (tests passed, PR merged…), recorded by the gateway. */
   outcome?: { kind: OutcomeKind; subject?: string; summary?: string; details?: Record<string, unknown> };
-  /** Built-in `ask_user` only: suspend the run until a person answers this question. */
+  /** Built-in `ask_user` only: suspend the run until a person answers this question (its `why` is the gateway's). */
   waitForAnswer?: { text: string; choices: string[] | null };
   /** `request_secret` only: suspend the run until the person answers this request (ADR 0027). */
   waitForSecret?: { requestId: string };

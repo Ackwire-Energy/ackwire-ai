@@ -92,7 +92,7 @@ async function member(name: string, missionId?: string) {
   return user;
 }
 
-describe("Configurações da missão (telas/MissaoConfig.html)", () => {
+describe("Configurações da missão", () => {
   test("removing an allowed rule: owner or deciders, audited, the command asks again, the next task's list drops it", async () => {
     const { view, runner, prompt } = await working();
     const asked = await prompt({ tool_name: "Bash", input: { command: "swift build -c release" } });

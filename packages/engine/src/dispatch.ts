@@ -1,12 +1,15 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { audienceSql } from "./audience";
-import { dmAgents } from "./dms";
+import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
+import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { holdsMessages } from "./run-hold";
+import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
 
-const { agents, channelMembers, agentRuns } = schema;
+const { agents, channelMembers, channels, agentRuns, messages } = schema;
 
 export type RunTrigger = AgentRun["trigger"];
 
@@ -30,76 +33,141 @@ export async function createAgentRuns(
   message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
   agentIds: string[],
   trigger: RunTrigger,
-  /**
-   * A person's new message in the channel (the router picked the agent): it also joins the agent's
-   * run that answers in the channel itself (D62), so two people calling one agent get one answer.
-   * Routines, agents' messages and consultations keep one run per message.
-   */
-  options: { joinChannelRun?: boolean } = {},
+  options: StartRunOptions = {},
 ): Promise<AgentRun[]> {
   const created: AgentRun[] = [];
   for (const agentId of agentIds) {
-    // One active run per agent and conversation (forum turns are driven separately):
-    // the message goes to it, read at its next step, instead of a second run.
-    if (trigger !== "forum") {
-      const [active] = await tx
-        .select({
-          id: agentRuns.id,
-          pending: agentRuns.pendingMessageIds,
-          triggerMessageId: agentRuns.triggerMessageId,
-        })
-        .from(agentRuns)
-        .where(
-          and(
-            eq(agentRuns.orgId, message.orgId),
-            eq(agentRuns.agentId, agentId),
-            eq(agentRuns.channelId, message.channelId),
-            inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
-            sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
-              select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
-              or ${
-                options.joinChannelRun && !message.threadId
-                  ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
-                  : sql`false`
-              })`,
-          ),
-        )
-        .orderBy(sql`${agentRuns.createdAt} desc`)
-        .limit(1);
-      if (active && active.triggerMessageId !== message.id) {
-        if (!active.pending.includes(message.id)) {
-          await tx
-            .update(agentRuns)
-            .set({ pendingMessageIds: sql`array_append(${agentRuns.pendingMessageIds}, ${message.id}::uuid)` })
-            .where(eq(agentRuns.id, active.id));
-        }
-        continue;
-      }
-    }
-    const [run] = await tx
-      .insert(agentRuns)
-      .values({
-        orgId: message.orgId,
-        agentId,
-        channelId: message.channelId,
-        threadRootId: message.threadId ?? message.id,
-        triggerMessageId: message.id,
-        trigger,
-        hop: message.hop + 1,
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (!run) continue;
-    await enqueue(tx, {
-      orgId: message.orgId,
-      kind: "agent_run.execute",
-      payload: { runId: run.id },
-      dedupeKey: `agent_run.execute:${run.id}`,
-      maxAttempts: 4,
-    });
-    created.push(run);
+    const started = await startOrJoinRun(tx, message, agentId, trigger, options);
+    if (started && "created" in started) created.push(started.created);
   }
   return created;
+}
+
+export interface StartRunOptions {
+  /**
+   * A person's new message in the channel (the router picked the agent): it also joins the agent's
+   * run that answers in the channel itself (ADR 0029), so two people calling one agent get one answer.
+   * Routines, agents' messages and consultations keep one run per message.
+   */
+  joinChannelRun?: boolean;
+  /**
+   * Background work (a routine's run): it holds no conversation's slot, so it never joins the
+   * conversation's active run (nor does anything ever join it).
+   */
+  background?: boolean;
+}
+
+/**
+ * One agent and one message: the message joins the agent's active run in that conversation (read
+ * at its next step; `joined`), or a run starts on it (`created`). Null: nothing to do (a
+ * redelivered event). A run that ends between the lookup and the append is never appended to:
+ * the message starts a run of its own instead.
+ */
+export async function startOrJoinRun(
+  tx: Executor,
+  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
+  agentId: string,
+  trigger: RunTrigger,
+  options: StartRunOptions = {},
+): Promise<{ created: AgentRun } | { joined: string } | null> {
+  // One active run per agent and conversation (forum turns are driven separately; background runs
+  // hold no slot): the message goes to it, read at its next step, instead of a second run.
+  if (trigger !== "forum" && !options.background) {
+    // Several runs may be active (in the agents' DM one per person behind them; elsewhere a person's run
+    // next to an unattended one, or one held by a decision): the message joins the newest it may
+    // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
+    // (`holdsMessages`): the agent answers this in a run of its own meanwhile.
+    const active = await tx
+      .select({
+        id: agentRuns.id,
+        orgId: agentRuns.orgId,
+        status: agentRuns.status,
+        triggerMessageId: agentRuns.triggerMessageId,
+      })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.orgId, message.orgId),
+          eq(agentRuns.agentId, agentId),
+          eq(agentRuns.channelId, message.channelId),
+          inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+          eq(agentRuns.background, false),
+          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
+            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
+            or ${
+              options.joinChannelRun && !message.threadId
+                ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
+                : sql`false`
+            })`,
+        ),
+      )
+      .orderBy(sql`${agentRuns.createdAt} desc`)
+      .limit(10);
+    for (const run of active) {
+      if (
+        run.triggerMessageId === message.id ||
+        (await holdsMessages(tx, run)) ||
+        !(await mayJoin(tx, message, run.id))
+      )
+        continue;
+      if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
+      break;
+    }
+  }
+  const [run] = await tx
+    .insert(agentRuns)
+    .values({
+      orgId: message.orgId,
+      agentId,
+      channelId: message.channelId,
+      threadRootId: message.threadId ?? message.id,
+      triggerMessageId: message.id,
+      trigger,
+      hop: message.hop + 1,
+      ...(options.background ? { background: true } : {}),
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!run) return null;
+  await enqueue(tx, {
+    orgId: message.orgId,
+    kind: "agent_run.execute",
+    payload: { runId: run.id },
+    dedupeKey: `agent_run.execute:${run.id}`,
+    maxAttempts: 4,
+  });
+  return { created: run };
+}
+
+/**
+ * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
+ * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
+ * run works for one person. Another agent's message for a person joins only a run working for that same
+ * person. A routine's report or another agent's note joins only a run such news woke: never one working
+ * for a person, nor the agent's own work (a mission's); it starts a run of its own. The agent's own
+ * events (a task that ended, a folder decision) still go to whatever run is working there.
+ */
+export async function mayJoin(
+  tx: Executor,
+  message: Pick<Message, "id" | "orgId" | "channelId">,
+  runId: string,
+): Promise<boolean> {
+  const [channel] = await tx
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
+  const agentsDm = !!channel && isAgentOnlyDm(channel);
+  const [row] = await tx
+    .select({ authorType: messages.authorType })
+    .from(messages)
+    .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
+  if (row?.authorType === "person" && !agentsDm) return true;
+  const root = await messageRoot(tx, message.orgId, message.id);
+  if (root.kind === "agent" && !agentsDm) return true;
+  const behind = await runAuthorityById(tx, message.orgId, runId);
+  if (root.kind === "person") return behind.personId === root.personId;
+  if (root.kind === "agent") return behind.personId === null;
+  return behind.kind === "unattended" && behind.reason !== "agent";
 }
 
 /** Active agents among `agentIds` that are members of the channel (re-checked at dispatch time). */
@@ -121,7 +189,7 @@ export async function eligibleChannelAgents(
         inArray(agents.id, agentIds),
         isNull(agents.archivedAt),
         options.autoReplyOnly ? eq(channelMembers.autoReply, true) : undefined,
-        // Who can talk to the agent (D31), for the person behind the message.
+        // Who can talk to the agent, for the person behind the message.
         options.requesterUserId !== undefined
           ? audienceSql("agents", sql`${options.requesterUserId}::text`)
           : undefined,
@@ -130,24 +198,11 @@ export async function eligibleChannelAgents(
 }
 
 /**
- * The person behind a message: its author, or for an agent's message the
- * person whose message started that agent's run (up to a few hops). Null when
- * a routine, webhook or other system started the chain.
+ * The person behind a message (`authority.ts`): its author, or for an agent's message the person
+ * behind the run that wrote it. Null when nobody is (a routine, a webhook, an agent on its own).
  */
-export async function requesterOf(db: Executor, message: Pick<Message, "orgId" | "authorUserId" | "agentRunId">) {
-  let current: Pick<Message, "authorUserId" | "agentRunId"> | null = message;
-  for (let hop = 0; current && hop < 6; hop++) {
-    if (current.authorUserId) return current.authorUserId;
-    if (!current.agentRunId) return null;
-    const [run] = await db
-      .select({ trigger: agentRuns.triggerMessageId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.id, current.agentRunId), eq(agentRuns.orgId, message.orgId)));
-    if (!run) return null;
-    current = await getMessage(db, message.orgId, run.trigger);
-  }
-  return null;
-}
+export const requesterOf = (db: Executor, message: Pick<Message, "orgId" | "id">) =>
+  personOfMessage(db, message.orgId, message.id);
 
 /**
  * Handles `message.posted` for messages with mentions: starts one run per

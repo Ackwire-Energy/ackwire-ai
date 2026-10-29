@@ -6,12 +6,12 @@ import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Count, Icon, type IconName, LIST_AVATAR, PixelOrbit, Text } from "@/ui";
+import { Chip, Count, Icon, type IconName, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
-import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr } from "./logic";
+import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
 
 /** An agent's step in the person's words ("Consultou o github · trips.service.ts"), as the web says it. */
 export function useStepText() {
@@ -52,7 +52,7 @@ export function ColumnHeader({ label, count }: { label: string; count: number })
 }
 
 const STATE_ICON: Record<Exclude<IssueState, "running">, IconName> = {
-  waiting: "shield",
+  waiting: "wait",
   stalled: "pause",
   review: "code",
   progress: "clock",
@@ -129,9 +129,43 @@ export function AssigneeFace({ issue, size, live }: { issue: Issue; size: number
   );
 }
 
+/** A row's state, only when the section doesn't say it already: icon and words, no pill, on the text's edge. */
+function StateLine({ issue }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const state = listState(issue);
+  if (!state) return null;
+  const pr = latestPr(issue);
+  const label =
+    state === "review" && pr
+      ? t("mobile.issues.state.reviewPr", { number: pr.number })
+      : t(`mobile.issues.state.${state}`);
+  const tone = state === "waiting" ? c.warn : c.muted;
+  const agent = issue.assignee?.type === "agent" ? dir.agentById.get(issue.assignee.id) : undefined;
+  return (
+    <View style={styles.inline}>
+      {state === "running" ? (
+        <PixelOrbit color={agentLook(agent).color} size={10} />
+      ) : (
+        <Icon name={STATE_ICON[state]} size={12} color={tone} />
+      )}
+      <Text variant="caption" style={[styles.bold, { color: tone }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** The row's avatar: smaller than a conversation's, its top on the title's first line. */
+const ROW_AVATAR = 40;
+const ROW_GUTTER = 20;
+const ROW_GAP = 12;
+
 /**
- * One task in the list (MobileDriveIssues.html `.irow`): who has it, "#134 · Alta · até sex", the title in
- * two lines, then its state, the agent's current step while it works, and the criteria.
+ * One task in the list: who has it, the title in two lines, then one line under it with
+ * "#134 · Alta · até sex", the criteria and, when the section doesn't say it, the state; the
+ * agent's current step while it works. Everything starts on the title's edge.
  */
 export const IssueRow = memo(function IssueRow({
   issue: i,
@@ -147,6 +181,7 @@ export const IssueRow = memo(function IssueRow({
   const stepText = useStepText();
   const step = issueState(i) === "running" ? stepText(currentStep(i.work)) : "";
   const late = isLate(i);
+  const due = i.dueDate && i.status !== "done" && i.status !== "canceled";
   return (
     <Pressable
       onPress={() => router.push(`/issues/${i.number}`)}
@@ -156,32 +191,30 @@ export const IssueRow = memo(function IssueRow({
     >
       {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
       <View style={styles.lead}>
-        <AssigneeFace issue={i} size={46} live={live} />
+        <AssigneeFace issue={i} size={ROW_AVATAR} live={live} />
       </View>
       <View style={styles.text}>
-        <View style={styles.inline}>
-          <Text variant="caption" tone="muted">
-            #{i.number}
-          </Text>
-          <PriorityMark issue={i} />
-          {i.dueDate && i.status !== "done" && i.status !== "canceled" ? (
-            <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
-              · {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate) })}
-            </Text>
-          ) : null}
-        </View>
         <Text variant="body" numberOfLines={2} style={styles.title}>
           {i.title}
         </Text>
         <View style={styles.meta}>
-          <StateChip issue={i} />
-          {step ? (
-            <Text variant="small" tone="muted" numberOfLines={1} style={styles.step}>
-              {step}
+          <Text variant="caption" tone="faint">
+            #{i.number}
+          </Text>
+          <PriorityMark issue={i} />
+          {due ? (
+            <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
+              {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate as string) })}
             </Text>
           ) : null}
           <CriteriaCount issue={i} />
+          <StateLine issue={i} />
         </View>
+        {step ? (
+          <Text variant="small" tone="muted" numberOfLines={1}>
+            {step}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -190,21 +223,25 @@ export const IssueRow = memo(function IssueRow({
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 76,
-    paddingVertical: 10,
-    paddingLeft: 14,
-    paddingRight: 16,
+    alignItems: "flex-start",
+    gap: ROW_GAP,
+    paddingVertical: 14,
+    paddingLeft: ROW_GUTTER,
+    paddingRight: ROW_GUTTER,
   },
-  divider: { position: "absolute", top: 0, right: 0, left: 14 + LIST_AVATAR + 12, height: StyleSheet.hairlineWidth },
-  lead: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
-  text: { flex: 1, minWidth: 0, gap: 2 },
+  divider: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    left: ROW_GUTTER + ROW_AVATAR + ROW_GAP,
+    height: StyleSheet.hairlineWidth,
+  },
+  lead: { width: ROW_AVATAR, height: ROW_AVATAR, alignItems: "center", justifyContent: "center" },
+  text: { flex: 1, minWidth: 0, gap: 4, minHeight: ROW_AVATAR, justifyContent: "center" },
   inline: { flexDirection: "row", alignItems: "center", gap: 4 },
   bold: { fontWeight: "600" },
   title: { fontWeight: "600" },
-  meta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minWidth: 0 },
-  step: { flexShrink: 1 },
+  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 10, rowGap: 2 },
   column: {
     flexDirection: "row",
     alignItems: "center",

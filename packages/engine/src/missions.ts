@@ -44,6 +44,7 @@ import {
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
+import { MISSION_LIMITS } from "./mission-limits";
 import { MISSION_RULES } from "./mission-rules";
 import {
   closeMissionWorktree,
@@ -67,11 +68,14 @@ import {
   tellMainSession,
 } from "./missions-engine";
 import { notifyMissionEnded } from "./notification-producers";
+import { recordTaskFinished } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
 import { autoThreadTitle, createThreadFromRange } from "./threads";
 import { createWikiPage } from "./wiki";
+
+export { MISSION_LIMITS };
 
 const {
   missions,
@@ -202,27 +206,6 @@ export const MISSION_STUCK = { failures: 3, idleWakeups: 5 } as const;
 
 /** The mission's branches start with this (the runner lets its executor push only these). */
 export const missionBranchPrefix = (missionId: string) => `agentes/${missionId.replace(/-/g, "").slice(-8)}/`;
-export const MISSION_LIMITS = {
-  title: 120,
-  goal: 2000,
-  planItems: 60,
-  itemTitle: 200,
-  itemNote: 500,
-  sendText: 8000,
-  inbox: 50,
-  repoDir: 300,
-  /** Plan items in a mission view (the strip); the full plan is `GET …/plan`. */
-  viewItems: 40,
-  /** `GET …/tasks/{id}/output`: at most this many lines. */
-  outputLines: 200,
-  /** Findings of the investigation before the proposal (ADR 0037 round 2). */
-  findings: 12,
-  findingText: 600,
-  findingRefs: 8,
-  findingRef: 300,
-  /** Plan items an agent may propose with the mission. */
-  proposedPlan: 20,
-} as const;
 /** Open: work may still happen (`awaiting_close` waits for its owner to conclude it). */
 export const OPEN_MISSION_STATUSES: MissionStatus[] = ["proposed", "active", "paused", "awaiting_close"];
 const OPEN = OPEN_MISSION_STATUSES;
@@ -390,7 +373,7 @@ export function requireOpen(mission: MissionRow) {
   if (!OPEN.includes(mission.status)) throw new ConflictError("This mission is closed", "mission.closed");
 }
 
-/** The mission's agent answers this person (D31) and is still in the mission's conversation. */
+/** The mission's agent answers this person and is still in the mission's conversation. */
 export async function agentAnswers(
   db: Executor,
   mission: Pick<MissionRow, "orgId" | "channelId" | "agentId">,
@@ -1130,7 +1113,7 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
 
 /**
  * `/mission <goal>` from the web, or "Nova missão": the caller must be able
- * to talk to the agent (D31) in that conversation. In a thread, that thread
+ * to talk to the agent in that conversation. In a thread, that thread
  * is the home; otherwise a new top-level message starts it.
  */
 export async function createMission(
@@ -1374,7 +1357,7 @@ export async function tellSession(
   if (mission.status === "awaiting_close" && (options.requestedBy || options.kind === "person")) {
     mission = await reactivateMission(deps, mission, "message");
   }
-  // Work on someone's computer only for people the agent answers (D31).
+  // Work on someone's computer only for people the agent answers.
   if (options.requestedBy && !(await agentAnswers(deps.db, mission, options.requestedBy))) {
     throw new ForbiddenError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
   }
@@ -1736,7 +1719,10 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
         .set({ status: "canceled", endedAt: new Date(), wokeAt: new Date(), updatedAt: new Date() })
         .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
         .returning();
-      if (ended) await publishTaskEvent(deps.pubsub, ended);
+      if (ended) {
+        await recordTaskFinished(deps.db, ended);
+        await publishTaskEvent(deps.pubsub, ended);
+      }
     }
     canceled++;
   }
@@ -1960,7 +1946,7 @@ export async function setParticipant(
   if (input.userId === mission.ownerId)
     throw new ValidationError("The owner already does everything", "mission.is_owner");
   await requireSeesHome(deps.db, orgId, mission, input.userId);
-  // Deciding makes work run on someone's computer: only for people the agent answers (D31).
+  // Deciding makes work run on someone's computer: only for people the agent answers.
   if (input.role === "decide" && !(await agentAnswers(deps.db, mission, input.userId))) {
     throw new ValidationError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
   }
@@ -2586,7 +2572,8 @@ export async function updatePlan(
       })
       .onConflictDoNothing()
       .returning({ version: missionPlanVersions.version });
-    if (!inserted) throw new ConflictError("The plan changed at the same time; send it again", "mission.plan_conflict");
+    if (!inserted)
+      throw new ConflictError("The plan changed at the same time. Send it again.", "mission.plan_conflict");
     // An item changing state is progress: the stuck-loop guard starts over.
     const moved = change.added.length > 0 || change.changed.some((c) => c.from !== c.to);
     await tx
@@ -3149,11 +3136,11 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
           waiting.length ? `, ${waiting.length} waiting for you` : ""
         }.`
       : "No plan yet.",
-    ...(doing.length ? [`In progress: ${doing.map((i) => i.title).join("; ")}.`] : []),
-    ...(waiting.length ? [`Waiting for you: ${waiting.map((i) => i.title).join("; ")}.`] : []),
-    ...(pending.length ? [`Decisions to take: ${pending.map((d) => d.question).join("; ")}.`] : []),
+    ...(doing.length ? [`In progress: ${doing.map((i) => i.title).join(" · ")}.`] : []),
+    ...(waiting.length ? [`Waiting for you: ${waiting.map((i) => i.title).join(" · ")}.`] : []),
+    ...(pending.length ? [`Decisions to take: ${pending.map((d) => d.question).join(" · ")}.`] : []),
     ...(provisional.length ? [`Provisional decisions to review: ${provisional.length}.`] : []),
-    ...(reviews.length ? [`Ready for you to see: ${reviews.map((r) => r.title).join("; ")}.`] : []),
+    ...(reviews.length ? [`Ready for you to see: ${reviews.map((r) => r.title).join(" · ")}.`] : []),
     ...(running.length
       ? [
           `Running: ${running
@@ -3161,7 +3148,7 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
               (t) =>
                 `"${t.title}"${t.branch ? ` (${t.branch})` : ""}, ${formatDuration(taskSeconds(t))}${t.lastLine ? `: ${t.lastLine}` : ""}`,
             )
-            .join("; ")}.`,
+            .join(" · ")}.`,
         ]
       : ["Nothing running now."]),
     ...(computer ? [`Computer: ${computer.name} (${computer.online ? "online" : "offline"}).`] : []),
@@ -3279,7 +3266,7 @@ export interface EligibleAgent {
 /**
  * "Nova missão": every agent of the organization, each saying whether it can
  * run a mission for the caller: a connected computer that allows commands
- * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience (D31).
+ * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience.
  * The others carry the reason (`cloud`: the server has cloud computers, so an
  * agent without a connected one is on the cloud computer). Eligible first. One query.
  */

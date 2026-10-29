@@ -1,6 +1,7 @@
 import type { Agent, AgentAudience } from "@agenteschat/client";
 import {
   useAgents,
+  useBrainMachines,
   useChannels,
   useCreateAgent,
   useCredentials,
@@ -18,7 +19,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
-import { modelChoices } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -32,6 +33,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Kbd,
   Logo,
@@ -57,6 +59,8 @@ import {
   ModelCards,
   NO_OWNER,
   OwnerSelect,
+  PlanCards,
+  type PlanChoice,
   usd,
 } from "@/components/AgentFields";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -78,7 +82,6 @@ import {
   type NewAgentStep,
   presetChannels,
   presetLevels,
-  presetModel,
   ROLE_GROUPS,
   ROLE_PRESETS,
   type RoleGroupId,
@@ -86,6 +89,8 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+import { useToast } from "@/lib/toast";
+import "./new-agent.css";
 
 /** The icon next to each group of roles on the first step. */
 const GROUP_ICON: Record<RoleGroupId, IconName> = { tech: "code", customers: "members", operations: "layers" };
@@ -128,10 +133,9 @@ interface Created {
   agent: Agent;
   look: Required<AgentAppearance>;
   channels: { id: string; name: string }[];
-  ownerName: string | null;
 }
 
-/** docs/design/telas/NovoAgente.html — the steps on a rail, a live preview of the agent on the right. */
+/** "Criar agente": the steps on a rail, a live preview of the agent on the right. */
 export function NewAgentPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -163,6 +167,8 @@ function NewAgentFlow() {
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
+  const brainMachines = useBrainMachines(org.id);
+  const toast = useToast();
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
@@ -174,6 +180,7 @@ function NewAgentFlow() {
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
 
   // Navigation
@@ -195,7 +202,10 @@ function NewAgentFlow() {
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
-  const [model, setModel] = useState<string | undefined>(undefined);
+  // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
+  const [model, setModel] = useState<string>(AUTO);
+  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists.
+  const [plan, setPlan] = useState<PlanChoice | null>(null);
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
@@ -224,11 +234,7 @@ function NewAgentFlow() {
     [agents.data, members.data],
   );
 
-  // Defaults once the data arrives: the deployment's usable model, the skills on for new agents, the levels.
-  useEffect(() => {
-    if (model || !models.data || !credentials.data) return;
-    setModel(presetModel("sonnet", models.data.models, (m) => usable.has(m.id), models.data.defaultModel));
-  }, [model, models.data, credentials.data, usable]);
+  // Defaults once the data arrives: the skills on for new agents, the levels.
   useEffect(() => {
     if (library.data && skillIds === null)
       setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
@@ -257,7 +263,7 @@ function NewAgentFlow() {
     ownerUserId: ownerId,
     audience,
     budget,
-    modelOk: Boolean(model && usable.has(model)),
+    modelOk: plan !== null || (isAuto(model) ? usable.size > 0 : usable.has(model)),
   };
   const errors = tried.has(step) ? stepErrors(step, check) : [];
   const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
@@ -281,6 +287,11 @@ function NewAgentFlow() {
   const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const budgetShown = amount ?? defaultBudget;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
+  const modelLabel = plan
+    ? t(`brain.card.${plan.kind}`)
+    : isAuto(model)
+      ? t("brain.auto.label")
+      : (modelInfo?.label ?? model);
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
@@ -337,6 +348,16 @@ function NewAgentFlow() {
       monthlyBudgetUsd: amount,
       appearance: look,
     });
+    // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
+    // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
+    if (plan) {
+      try {
+        await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
+        await api.agents.setBrain(org.id, agent.id, { brain: plan.kind });
+      } catch {
+        toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
+      }
+    }
     if (joined.length > 0) {
       await api.agents.setChannels(
         org.id,
@@ -372,7 +393,6 @@ function NewAgentFlow() {
       agent,
       look,
       channels: joined.map((c) => ({ id: c.id, name: c.name })),
-      ownerName: ownerFirst,
     });
     mood.react("happy", 2200);
     scrollTop();
@@ -411,7 +431,7 @@ function NewAgentFlow() {
     setChannelIds(new Set());
     setOwner(me.user.id);
     setAudience({ mode: "everyone", userIds: [] });
-    setModel(undefined);
+    setModel(AUTO);
     setKey(DEFAULT_KEY);
     setBudget("");
     scrollTop();
@@ -460,7 +480,7 @@ function NewAgentFlow() {
     setInstructions(t(`newAgent.roles.${id}.instructions`));
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
-    if (models.data) setModel(presetModel(preset.model, models.data.models, (m) => usable.has(m.id), model));
+    setModel(AUTO);
     setTried((prev) => {
       const nextTried = new Set(prev);
       nextTried.delete("role");
@@ -488,15 +508,27 @@ function NewAgentFlow() {
 
   /* ---------- The step's content ---------- */
 
-  const head = (title: string, lead: string) => (
-    <header className="onb__head">
-      <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+  const head = (title: string, lead?: string, hint?: string) => {
+    const h1 = (
       <h1 className="onb__title newag__title" ref={heading} tabIndex={-1}>
         {title}
       </h1>
-      <p className="onb__lead">{lead}</p>
-    </header>
-  );
+    );
+    return (
+      <header className="onb__head">
+        <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+        {hint ? (
+          <div className="ac-hintline">
+            {h1}
+            <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>
+          </div>
+        ) : (
+          h1
+        )}
+        {lead && <p className="onb__lead">{lead}</p>}
+      </header>
+    );
+  };
   const errorLine = (e: DraftError | undefined) =>
     e ? (
       <span className="newag__err" role="alert">
@@ -505,7 +537,7 @@ function NewAgentFlow() {
       </span>
     ) : null;
   const mailChip = (account: (typeof mailboxes)[number]) => (
-    <span key={account.id} className="ac-chip newag__chip">
+    <span key={account.id} className="ac-chip">
       <MailIcon choice={choiceOf(account)} />
       {t(mailLevels[account.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", {
         name: account.address,
@@ -515,8 +547,8 @@ function NewAgentFlow() {
   const connectorChip = (item: ConnectedItem) => {
     const n = itemName(t, item);
     return (
-      <span key={item.id} className="ac-chip newag__chip">
-        <ConnectorIcon def={item.def} label={n} />
+      <span key={item.id} className="ac-chip">
+        <ConnectorIcon def={item.def} image={item.image} label={n} />
         {t(levels[item.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", { name: n })}
       </span>
     );
@@ -569,7 +601,7 @@ function NewAgentFlow() {
                       <span className="newag__check" aria-hidden="true">
                         <Icon name="check" size={14} />
                       </span>
-                      <span className="newag__role-top">
+                      <span className="newag__role-top ac-faceline">
                         <AgentAvatar
                           name={t(`newAgent.roles.${id}.agent`)}
                           appearance={preset.look}
@@ -577,7 +609,7 @@ function NewAgentFlow() {
                           className="newag__role-agent"
                         />
                         <span className="newag__role-name">
-                          <b>{t(`newAgent.roles.${id}.name`)}</b>
+                          <b className="ac-captop">{t(`newAgent.roles.${id}.name`)}</b>
                           <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
                         </span>
                       </span>
@@ -585,8 +617,8 @@ function NewAgentFlow() {
                       {(kit.length > 0 || room) && (
                         <span className="newag__chips">
                           {kit.slice(0, 3).map((i) => (
-                            <span key={i.id} className="ac-chip newag__chip">
-                              <ConnectorIcon def={i.def} label={itemName(t, i)} />
+                            <span key={i.id} className="ac-chip">
+                              <ConnectorIcon def={i.def} image={i.image} label={itemName(t, i)} />
                               {itemName(t, i)}
                             </span>
                           ))}
@@ -635,6 +667,7 @@ function NewAgentFlow() {
                 value={name}
                 maxLength={32}
                 autoComplete="off"
+                spellCheck={false}
                 placeholder={t("newAgent.namePlaceholder")}
                 onChange={(e) => changeName(e.target.value)}
               />
@@ -651,6 +684,7 @@ function NewAgentFlow() {
                 value={handle}
                 maxLength={32}
                 autoComplete="off"
+                spellCheck={false}
                 placeholder={t("newAgent.handlePlaceholder")}
                 onChange={(e) => {
                   setHandleTouched(true);
@@ -692,7 +726,11 @@ function NewAgentFlow() {
       const changed = role !== null && role !== "custom" && instructions !== original;
       return (
         <>
-          {head(t("newAgent.steps.instructions.title", g), t("newAgent.steps.instructions.lead"))}
+          {head(
+            t("newAgent.steps.instructions.title", g),
+            t("newAgent.steps.instructions.lead"),
+            t("agent.instructionsHelp", { ...g, org: org.name }),
+          )}
           <Textarea
             className="newag__textarea"
             rows={9}
@@ -739,10 +777,6 @@ function NewAgentFlow() {
               });
             }}
           />
-          <p className="newag__note">
-            <Icon name="info" size={16} />
-            <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
-          </p>
           {!instructions.trim() && <p className="small muted">{t("newAgent.noInstructions", g)}</p>}
         </>
       );
@@ -788,7 +822,7 @@ function NewAgentFlow() {
                   return (
                     <LevelRow
                       key={item.id}
-                      icon={<ConnectorIcon def={item.def} label={n} />}
+                      icon={<ConnectorIcon def={item.def} image={item.image} label={n} />}
                       name={n}
                       description={item.account}
                       asks={level === "write" ? asksOf(item) : []}
@@ -831,7 +865,7 @@ function NewAgentFlow() {
             <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
           </Link>
         </Card>
-        <p className="newag__note">
+        <p className="newag__note ac-iconline">
           <Icon name="shield" size={16} />
           <span>
             <b>{t("newAgent.approvalsNote")}</b>{" "}
@@ -935,13 +969,39 @@ function NewAgentFlow() {
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
           <ModelCards
             choices={choices}
-            value={model}
+            value={plan ? undefined : model}
             money
             onChange={(id) => {
               setModel(id);
+              setPlan(null);
               mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
             }}
           />
+          <div className="newag__sect">
+            <div className="ac-hintline">
+              <h2>
+                <Icon name="computer" />
+                {t("newAgent.plans")}
+              </h2>
+              <InfoHint name={t("common.about", { label: t("newAgent.plans") })}>{t("newAgent.plansHelp")}</InfoHint>
+            </div>
+          </div>
+          <PlanCards
+            machines={brainMachines.data ?? []}
+            value={plan}
+            onChange={(choice) => {
+              setPlan(choice);
+              mood.react("happy", 800);
+            }}
+          />
+          {plan && (
+            <span className="small muted">
+              {t("newAgent.planOnlyOwner", {
+                ...g,
+                owner: ownerId === me.user.id ? t("common.you") : (ownerFirst ?? t("common.you")),
+              })}
+            </span>
+          )}
           {errorLine(errorOf("model"))}
           <div className="newag__sect">
             <h2>
@@ -951,11 +1011,15 @@ function NewAgentFlow() {
           </div>
           <KeySelect value={key} onChange={setKey} options={keys} />
           <div className="newag__sect">
-            <h2>
-              <Icon name="wallet" />
-              {t("newAgent.budgetTitle")}
-            </h2>
-            <span className="small muted">{t("newAgent.budgetHelp", g)}</span>
+            <div className="ac-hintline">
+              <h2>
+                <Icon name="wallet" />
+                {t("newAgent.budgetTitle")}
+              </h2>
+              <InfoHint name={t("common.about", { label: t("newAgent.budgetTitle") })}>
+                {`${t("newAgent.budgetHelp", g)} ${ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}`}
+              </InfoHint>
+            </div>
           </div>
           <Card as="div" className="newag__card">
             <BudgetField
@@ -969,8 +1033,7 @@ function NewAgentFlow() {
               <span className="small muted">
                 {defaultBudget === undefined
                   ? t("agent.budgetDefaultHelp")
-                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}{" "}
-                {ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}
+                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}
               </span>
             )}
           </Card>
@@ -1000,7 +1063,7 @@ function NewAgentFlow() {
         list.length ? <span className="newag__chips">{list}</span> : <span className="muted">{empty}</span>;
       return (
         <>
-          {head(t("newAgent.steps.review.title", g), t("newAgent.steps.review.lead"))}
+          {head(t("newAgent.steps.review.title", g))}
           <Card as="div" className="newag__card newag__review">
             {row(
               "role",
@@ -1075,7 +1138,7 @@ function NewAgentFlow() {
               "bolt",
               t("newAgent.modelAndCost"),
               <span>
-                {modelInfo?.label ?? model}{" "}
+                {modelLabel}{" "}
                 <span className="muted">
                   · {keyLabel}
                   {budgetShown !== undefined && ` · ${t("newAgent.upTo", { amount: usd(t, locale, budgetShown) })}`}
@@ -1083,12 +1146,6 @@ function NewAgentFlow() {
               </span>,
             )}
           </Card>
-          <p className="newag__note">
-            <Icon name="shield" size={16} />
-            <span>
-              {ownerFirst ? t("newAgent.reviewNoteOwner", { name: ownerFirst }) : t("newAgent.reviewNoteAdmins")}
-            </span>
-          </p>
         </>
       );
     },
@@ -1132,7 +1189,7 @@ function NewAgentFlow() {
         ? t("newAgent.hints.tools", { count: granted.length + grantedMail.length })
         : t("newAgent.hints.noTools"),
     where: joined.length ? t("newAgent.hints.where", { count: joined.length }) : t("newAgent.noChannelsYet"),
-    model: modelInfo?.label ?? "",
+    model: modelLabel,
     review: t("newAgent.hints.review"),
   };
 
@@ -1181,11 +1238,13 @@ function NewAgentFlow() {
         <aside className="newag__aside" aria-label={t("newAgent.preview.label")}>
           <div className="newag__cap">
             <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
-            <span className="small muted">{t("newAgent.preview.hint")}</span>
           </div>
           <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
-            <div className="newag__pv-cover">
-              <AgentPreviewSky color={look.color as AgentColor} />
+            <div className="newag__pv-cover" ref={preview}>
+              <AgentPreviewSky
+                color={look.color as AgentColor}
+                clear={() => [...(preview.current?.querySelectorAll(".newag__pv-state, .newag__pv-agent") ?? [])]}
+              />
               <span className="newag__pv-state">
                 <Icon name="edit" size={14} />
                 {t("newAgent.preview.draft")}
@@ -1263,7 +1322,7 @@ function NewAgentFlow() {
               </PreviewSection>
               <PreviewSection label={t("newAgent.modelAndCost")}>
                 <span className="newag__chips">
-                  {modelInfo && chip("bolt", modelInfo.label, "model")}
+                  {modelLabel && chip("bolt", modelLabel, "model")}
                   {budgetShown !== undefined &&
                     !budgetInvalid &&
                     chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}
@@ -1315,7 +1374,7 @@ function NewAgentRail({
         </Button>
       </div>
       <div className="newag__rail-title">
-        <b>{t("newAgent.railTitle")}</b>
+        <b>{t("newAgent.title")}</b>
         <span>{t("newAgent.railOrg", { org: org.name, role: t(`roles.${org.role}Lower`) })}</span>
       </div>
       <StepRail
@@ -1352,6 +1411,7 @@ function CreatedMoment({
   const { t } = useTranslation();
   const { org } = useOrg();
   const text = useRef<HTMLDivElement>(null);
+  const born = useRef<HTMLSpanElement>(null);
   const { agent, channels } = created;
   const first = channels[0];
   const names = joinNames(
@@ -1359,71 +1419,45 @@ function CreatedMoment({
     t("newAgent.and"),
   );
   return (
-    <>
-      <section className="newag__born" aria-labelledby="ag-born">
-        <AgentBornSky color={created.look.color} at={phone ? [0.5, 0.26] : [0.8, 0.45]} calm={() => [text.current]} />
-        <span className="newag__born-agent">
-          <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
-        </span>
-        <div className="newag__born-text" ref={text}>
-          <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
-          <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
-            {t("newAgent.createdTitle", { name: agent.name })}
-          </h1>
-          <p className="newag__born-lead">
-            {channels.length > 0
-              ? t("newAgent.createdText", { channels: names, handle: agent.handle })
-              : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
-          </p>
-          <div className="newag__born-actions">
-            {first && (
-              <Button asChild variant="primary" className="newag__on-sky">
-                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
-                  {t("newAgent.goTo", { channel: first.name })}
-                  <Icon name="arrowRight" size={16} />
-                </Link>
-              </Button>
-            )}
-            <Button asChild variant={first ? "default" : "primary"} className="newag__on-sky">
-              <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-                {t("newAgent.openProfile")}
+    <section className="newag__born" aria-labelledby="ag-born">
+      <AgentBornSky
+        color={created.look.color}
+        at={phone ? [0.5, 0.26] : [0.8, 0.45]}
+        calm={() => [text.current]}
+        clear={() => [born.current]}
+      />
+      <span className="newag__born-agent" ref={born}>
+        <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
+      </span>
+      <div className="newag__born-text" ref={text}>
+        <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
+        <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
+          {t("newAgent.createdTitle", { name: agent.name })}
+        </h1>
+        <p className="newag__born-lead">
+          {channels.length > 0
+            ? t("newAgent.createdText", { channels: names, handle: agent.handle })
+            : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
+        </p>
+        <div className="newag__born-actions">
+          {first && (
+            <Button asChild variant="primary" className="newag__on-sky">
+              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
+                {t("newAgent.goTo", { channel: first.name })}
+                <Icon name="arrowRight" size={16} />
               </Link>
             </Button>
-            <Button icon="plus" className="newag__on-sky" onClick={onAgain}>
-              {t("newAgent.createAnother")}
-            </Button>
-          </div>
+          )}
+          <Button asChild variant={first ? "default" : "primary"} className="newag__on-sky">
+            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              {t("newAgent.openProfile")}
+            </Link>
+          </Button>
+          <Button icon="plus" className="newag__on-sky" onClick={onAgain}>
+            {t("newAgent.createAnother")}
+          </Button>
         </div>
-      </section>
-      <div className="newag__nexts">
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="message" size={16} />
-            {t("newAgent.next.hello.title")}
-          </b>
-          <span>
-            {first
-              ? t("newAgent.next.hello.inChannel", { handle: agent.handle, channel: first.name })
-              : t("newAgent.next.hello.text", { handle: agent.handle })}
-          </span>
-        </Card>
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="bell" size={16} />
-            {created.ownerName
-              ? t("newAgent.next.alerts.owner", { name: created.ownerName })
-              : t("newAgent.next.alerts.admins")}
-          </b>
-          <span>{t("newAgent.next.alerts.text")}</span>
-        </Card>
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="shield" size={16} />
-            {t("newAgent.next.profile.title")}
-          </b>
-          <span>{t("newAgent.next.profile.text")}</span>
-        </Card>
       </div>
-    </>
+    </section>
   );
 }

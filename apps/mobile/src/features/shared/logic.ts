@@ -4,6 +4,8 @@
  * the keys into words).
  */
 
+import { isFeminineName } from "@agenteschat/client/lib/grammar";
+
 export const AGENT_COLORS = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"] as const;
 export type AgentColor = (typeof AGENT_COLORS)[number];
 export const AGENT_EYES = ["round", "dots", "wide", "happy", "sleepy"] as const;
@@ -45,12 +47,7 @@ export function agentLook(agent: { appearance?: unknown } | null | undefined): A
   };
 }
 
-/** Portuguese needs the grammatical gender of an agent's name ("a Iris", "o Theo"): names ending in "a". */
-export function isFeminineName(name: string) {
-  return /a$/i.test(name.trim().normalize("NFD").replace(/[̀-ͯ]/g, ""));
-}
-
-/** Which grammar keys to use with a name (`mobile.grammar.*F` / `*M`). */
+/** Which grammar keys to use with a name (`mobile.grammar.*F` / `*M`), by the web's rule. */
 export const genderOf = (name: string): "F" | "M" => (isFeminineName(name) ? "F" : "M");
 
 /** "Ana e Theo", "Ana, Theo e Iris" (`and` is " e " / " and "). */

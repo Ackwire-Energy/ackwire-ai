@@ -1,4 +1,4 @@
-//! The notch (telas/NotchAgente.html, "A · Asas"): a borderless window over the MacBook's camera
+//! The notch: a borderless window over the MacBook's camera
 //! housing that shows what the agents are doing on this Mac. Off by default (Preferências → Geral):
 //! the window only exists while it's on. Rust finds the notch and places the window; the web view
 //! draws the island and asks for its size.
@@ -104,7 +104,7 @@ pub fn place(app: &AppHandle, width: f64, height: f64) -> Result<Option<NotchInf
 }
 
 #[cfg(target_os = "macos")]
-mod native {
+pub(crate) mod native {
     use std::ffi::c_void;
 
     use objc2::encode::{Encode, Encoding};
@@ -114,8 +114,8 @@ mod native {
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct CGPoint {
-        x: f64,
-        y: f64,
+        pub x: f64,
+        pub y: f64,
     }
     unsafe impl Encode for CGPoint {
         const ENCODING: Encoding = Encoding::Struct("CGPoint", &[f64::ENCODING, f64::ENCODING]);
@@ -124,8 +124,8 @@ mod native {
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct CGSize {
-        width: f64,
-        height: f64,
+        pub width: f64,
+        pub height: f64,
     }
     unsafe impl Encode for CGSize {
         const ENCODING: Encoding = Encoding::Struct("CGSize", &[f64::ENCODING, f64::ENCODING]);
@@ -134,8 +134,8 @@ mod native {
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct CGRect {
-        origin: CGPoint,
-        size: CGSize,
+        pub origin: CGPoint,
+        pub size: CGSize,
     }
     unsafe impl Encode for CGRect {
         const ENCODING: Encoding = Encoding::Struct("CGRect", &[CGPoint::ENCODING, CGSize::ENCODING]);

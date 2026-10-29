@@ -1,5 +1,7 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import { MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
+import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { BrowserHandoffView } from "./browser/handoff";
@@ -30,6 +32,34 @@ import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
 import type { SecretRequestView } from "./secrets";
 import type { ThreadChange, ThreadInfo, ThreadState } from "./threads";
+
+/** Which step of the router's chain picked the agents for a message nobody mentioned (ADR 0074). */
+export type DecidedBy =
+  | { step: "jev" }
+  | { step: "model"; model: string; provider: string }
+  /** The author's own plan: `ownerId` is the author. */
+  | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+
+/** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
+export const MENTION_NEEDED = "mention_needed";
+
+const RULES = new Set(["reply", "only_agent", "follow_up"]);
+
+/**
+ * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
+ * for anything else: a mention's judge, or a decision from before the chain.
+ */
+export function decidedByOf(strategy: string, authorUserId: string | null): DecidedBy | undefined {
+  if (strategy === "jev") return { step: "jev" };
+  const [step, rest = ""] = strategy.split(/:(.*)/s);
+  if (step === "llm" && rest) return { step: "model", model: rest, provider: MODEL_CATALOG[rest]?.provider ?? "" };
+  if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
+    return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
+  }
+  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as "reply" | "only_agent" | "follow_up" };
+  return undefined;
+}
 
 /**
  * Real-time events sent to WebSocket clients subscribed to a channel. The
@@ -75,6 +105,8 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       status: RunStatus;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -85,8 +117,16 @@ export type ChannelEvent =
    * show "thinking" right away. `runId` is null when announced at post time,
    * before the run exists.
    */
-  | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
-  /** An agent asked another agent (`ask_agent`, ADR 0034) and waits for it: "Dev is asking Infra…". */
+  | {
+      type: "agent.thinking";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
+    }
+  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -108,7 +148,10 @@ export type ChannelEvent =
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
     }
-  /** The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`). */
+  /**
+   * The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`,
+   * with its `toolUseId`, `failed` when the tool answered with an error, `held` when it waits on a person).
+   */
   | {
       type: "agent.tool";
       channelId: string;
@@ -123,6 +166,10 @@ export type ChannelEvent =
       toolUseId?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
+      /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
+      failed?: boolean;
+      /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
+      held?: boolean;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {
@@ -138,12 +185,20 @@ export type ChannelEvent =
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
-  | { type: "agent.idle"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  | {
+      type: "agent.idle";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      background?: true;
+    }
   | {
       type: "run.finished";
       channelId: string;
       threadId: string | null;
       agentId: string;
+      background?: true;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       error?: string;
@@ -175,6 +230,49 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       messageIds: string[];
+    }
+  /**
+   * Handed to a computer brain mid-turn (Claude Code reads it at its next tool boundary), not
+   * confirmed read yet: "Ada recebeu". `agent.run.read` follows once the turn reports it read.
+   */
+  | {
+      type: "agent.run.delivered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /**
+   * Messages a run took but never read (it ended, failed, was stopped or interrupted by a deploy)
+   * went to a run of their own: nothing sent to an agent is dropped.
+   */
+  | {
+      type: "agent.run.redispatched";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageIds: string[];
+    }
+  /** The run ended without posting: nobody called it by name and it had nothing to add (`pass`). */
+  | { type: "agent.passed"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /**
+   * A person's message reached a run that was waiting (help in the browser, another agent's answer,
+   * an approval): `outcome` says what became of it. `resolved`: it ended the wait (e.g. "pronto,
+   * loguei" closed the browser help as done). `woke`: the run stopped waiting and reads it now (the
+   * wait stays open; its result comes later as a notice). `held`: it waits for the decision on a card.
+   */
+  | {
+      type: "agent.run.wait_message";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      waitKind: string;
+      outcome: "resolved" | "woke" | "held";
     }
   /**
    * A person pressed "Continuar" under a stopped reply (`messageId`): `newRunId` picks up where
@@ -209,13 +307,25 @@ export type ChannelEvent =
       pickedBy: string[];
       /** The run each picked agent answers with (new, steered into, or resumed by an answer). */
       runs?: { agentId: string; runId: string }[];
-      /** Agents it mentions that won't answer (they don't reply to this person, D31). */
+      /** Agents it mentions that won't answer (they don't reply to this person). */
       blocked?: string[];
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy: "mention" | "dm" | "router" | "none";
+      /**
+       * `no_ai`: the organization has no AI. `mention_needed`: no step could pick an agent (no Jev, no small
+       * model, no plan of the author, no rule): a mention still calls one.
+       */
       reason?: string;
+      /** The router's step that picked (ADR 0074). */
+      decidedBy?: DecidedBy;
+      /** With `no_ai`: the Connect step the message asks for (`aiConnectIntent`). */
+      intent?: ConnectIntent["intent"];
+      provider?: string;
+      autoOpen?: true;
     }
+  /** The author's own plan reads a message nobody mentioned, which takes seconds: "Picking who answers" until `message.routed`. */
+  | { type: "message.routing"; channelId: string; messageId: string; step: "plan" }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId: string }
   | {
       type: "message.handled";
@@ -224,6 +334,8 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
+      /** `no_ai`: the agent has no AI to think with. */
+      reason?: string;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
@@ -375,6 +487,42 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     messageId: message.id,
     ...(inline ? { message } : {}),
   });
+}
+
+/** Receipts of a routed message (`message.routed`), then "thinking" for each run it started, where the message is. */
+export async function publishRouted(
+  pubsub: PubSub | undefined,
+  message: { id: string; channelId: string; threadId: string | null },
+  routed: {
+    strategy: "mention" | "dm" | "router" | "none";
+    seenBy: string[];
+    runs: { id: string; agentId: string }[];
+    reason?: string;
+    decidedBy?: DecidedBy;
+  } & Partial<ConnectIntent>,
+) {
+  const { strategy, seenBy, runs, reason, decidedBy, ...intent } = routed;
+  await publishChannelEvent(pubsub, {
+    type: "message.routed",
+    channelId: message.channelId,
+    messageId: message.id,
+    seenBy,
+    pickedBy: runs.map((r) => r.agentId),
+    runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
+    strategy,
+    ...(reason ? { reason } : {}),
+    ...(decidedBy ? { decidedBy } : {}),
+    ...intent,
+  });
+  for (const run of runs) {
+    await publishChannelEvent(pubsub, {
+      type: "agent.thinking",
+      channelId: message.channelId,
+      threadId: message.threadId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+  }
 }
 
 /**

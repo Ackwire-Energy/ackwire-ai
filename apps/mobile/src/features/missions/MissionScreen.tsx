@@ -8,7 +8,7 @@ import { Button, Card, Chip, Count, Icon, IconButton, PixelOrbit, PlanTrack, Sec
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { MONO, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -16,6 +16,7 @@ import { DecisionCardView, ReviewCardView, SetupFailedCard } from "./cards";
 import {
   hoursSince,
   liveSessions,
+  missionComputerKey,
   missionTrack,
   planProgress,
   planRows,
@@ -53,6 +54,7 @@ function Mission({ id }: { id: string }) {
   const reviews = useMissionReviews(orgId, id);
   const decisions = useMissionDecisions(orgId, id);
   const computer = useComputerKind(orgId, m?.machine?.id);
+  const cloud = useEdition() === "cloud";
 
   if (!m) {
     return (
@@ -154,7 +156,7 @@ function Mission({ id }: { id: string }) {
               {m.machine ? (
                 <Chip
                   leading={<ComputerIcon kind={computer} size={13} color={c.muted} />}
-                  label={t(m.machine.online ? "mobile.mission.computerOn" : "mobile.mission.computerOff", {
+                  label={t(missionComputerKey(m.machine.online, cloud), {
                     name: m.machine.name,
                   })}
                 />

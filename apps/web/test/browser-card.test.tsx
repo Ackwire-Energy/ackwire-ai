@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { BrowserHandoff } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
@@ -45,7 +46,7 @@ function seedRequest() {
   return { state, handoff };
 }
 
-describe("a help request opens the agent's browser in its card (NavegadorNoChat A)", () => {
+describe("a help request opens the agent's browser in its card", () => {
   test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
@@ -64,7 +65,7 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
     const card = document.querySelector(".brw-ac") as HTMLElement;
     expect(card.classList.contains("is-open")).toBe(true);
     expect(card.classList.contains("is-control")).toBe(true);
-    // The request is the title; the line under it says who is in control (prototype A + Céu).
+    // The request is the title; the line under it says who is in control.
     expect(card.querySelector(".brw-ac__tx b")?.textContent).toBe("Entrar no painel com a conta de teste");
     expect(card.querySelector(".brw-ac__tx small")?.textContent).toContain("Você no controle ·");
     expect(card.querySelector(".brw-ac__tx small")?.textContent).not.toContain("Entrar no painel");
@@ -88,10 +89,36 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
         .map((b) => b.getAttribute("aria-label")),
     ).toEqual(["Tab", "Enter", "Apagar", "Esc"]);
 
-    // Pronto hands back: the card folds away, the request says it's done.
+    // Desistir asks what happened: its note is one line in the middle of its field that grows as it wraps.
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desistir" })));
+    expect(card.textContent).toContain("O que aconteceu?");
+    const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
+    expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
+
+    // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
+    expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(note);
+    // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
+    expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
+      "TEXTAREA",
+      "1",
+      "ac-input brw-ac__note",
+    ]);
+    await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
+    // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.
+    expect(fireEvent.keyDown(note, { key: "Enter", shiftKey: true })).toBe(true);
+    let typed = true;
+    await act(async () => {
+      typed = fireEvent.keyDown(note, { key: "Enter" });
+    });
+    expect(typed).toBe(false);
     await settle(4);
-    expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
+    expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([
+      [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],
+    ]);
     expect(document.querySelector(".brw-ac")).toBeNull();
   });
 });
@@ -99,7 +126,7 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
 /** A JPEG's first bytes (SOI + a start-of-frame for 1280×800): enough for the page's size. */
 const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
 
-describe("the card in the message (NavegadorCardScroll 4)", () => {
+describe("the card in the message", () => {
   test("closed it's a small live card; a click opens it in place", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
@@ -132,6 +159,11 @@ describe("the card in the message (NavegadorCardScroll 4)", () => {
     expect(card.textContent).toContain("Clique para expandir");
     await act(async () => fireEvent.click(card.querySelector(".brw-ac__tt") as HTMLElement));
     expect(card.classList.contains("is-open")).toBe(true);
+    // Full screen and back, as in the computer's window: corners pulled apart, then pushed together.
+    const glyph = (name: string) => within(card).getByRole("button", { name }).querySelector("path")?.getAttribute("d");
+    expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
+    expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
   });
 
   test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {

@@ -2,6 +2,9 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import composeFile from "../../../docker-compose.yml" with { type: "text" };
+import installScript from "../../../install.sh" with { type: "text" };
+import { registerAppLinks } from "./app-links";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
@@ -19,10 +22,12 @@ import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
 import { databaseRoutes } from "./routes/app/databases";
+import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
+import { jevRoutes } from "./routes/app/jev";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { machineAccountRoutes } from "./routes/app/machine-accounts";
 import { mailRoutes } from "./routes/app/mail";
@@ -30,6 +35,7 @@ import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { missionRoutes } from "./routes/app/missions";
 import { notificationRoutes } from "./routes/app/notifications";
+import { planUsageRoutes } from "./routes/app/plan-usage";
 import { pushRoutes } from "./routes/app/push";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
@@ -37,12 +43,19 @@ import { sandboxRoutes } from "./routes/app/sandboxes";
 import { secretRoutes } from "./routes/app/secrets";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
+import { telemetryRoutes } from "./routes/app/telemetry";
 import { threadRoutes } from "./routes/app/threads";
 import { wikiRoutes } from "./routes/app/wiki";
-import { createDesktopReleases, registerDesktopRoutes } from "./routes/desktop";
+import {
+  createDesktopReleases,
+  createNativeReleases,
+  registerDesktopRoutes,
+  registerNativeRoutes,
+} from "./routes/desktop";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
+import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
@@ -68,16 +81,21 @@ export interface AppOptions {
  *
  * Layout:
  * - `/api/health`         health probe
+ * - `/api/instance`       public: what this server is, for the phone and desktop apps choosing a server
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web and phone apps (cookie session + CSRF, ADR 0035)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
- * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
+ * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
- * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page)
+ * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
+ * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
+ * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
+ * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
+ * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -101,6 +119,7 @@ export function createApp(options: AppOptions) {
     const { auth } = options.services;
     api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
     const deps = options.services;
+    registerInstance(api, deps, options.version);
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
@@ -118,6 +137,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", browserRoutes(deps));
+    api.route("/app", desktopRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));
@@ -136,6 +156,9 @@ export function createApp(options: AppOptions) {
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
+    api.route("/app", planUsageRoutes(deps));
+    api.route("/app", telemetryRoutes(deps));
+    api.route("/app", jevRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);
@@ -151,7 +174,16 @@ export function createApp(options: AppOptions) {
         fetch: deps.extras?.desktopFetch,
       }),
     );
-    registerWaitlist(api, deps);
+    registerNativeRoutes(
+      api,
+      deps,
+      createNativeReleases({
+        token: deps.config.DESKTOP_RELEASES_TOKEN,
+        repo: deps.config.DESKTOP_RELEASES_REPO,
+        fetch: deps.extras?.desktopFetch,
+      }),
+    );
+    if (deps.config.LANDING_URL) registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 
@@ -179,8 +211,18 @@ export function createApp(options: AppOptions) {
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
   app.route("/api", api);
+  if (options.services) registerAppLinks(app, options.services.config);
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
+  );
+  for (const path of ["/install", "/install.sh"]) {
+    app.get(path, (c) =>
+      c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
+    );
+  }
+  // The setup downloads it into a folder that has none: this release's, from any instance.
+  app.get("/install/docker-compose.yml", (c) =>
+    c.body(composeFile, 200, { "content-type": "application/yaml; charset=utf-8", "cache-control": "no-store" }),
   );
 
   if (options.webDir) {
@@ -196,13 +238,32 @@ export function createApp(options: AppOptions) {
       if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
       return res;
     });
+    // The service worker (browser push, ADR 0071): at the root so it controls the whole app, always
+    // revalidated so a new deploy's worker takes over, JavaScript, and never the SPA when missing.
+    app.get("/sw.js", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "no-cache");
+      res.headers.set("content-type", "text/javascript; charset=utf-8");
+      return res;
+    });
+    // Emails' pictures and font: fetched by mail clients and Gmail's image proxy, so readable without a
+    // session and from any origin; never the SPA when missing. A changed picture gets a new name.
+    app.get("/email/*", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "public, max-age=31536000, immutable");
+      res.headers.set("access-control-allow-origin", "*");
+      return res;
+    });
     // Hashed build files never change: the browser (and the Mac app's window) opens them from disk.
     // index.html is always revalidated, so a new deploy shows on the next open.
     app.use("/*", async (c, next) => {
       await next();
       if (isApi(c.req.path) || !c.res.ok || c.res.headers.has("cache-control")) return;
       if (c.res.headers.get("content-type")?.startsWith("text/html")) c.res.headers.set("cache-control", "no-cache");
-      else if (c.req.path.startsWith("/assets/")) c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
+      else if (c.req.path.startsWith("/assets/"))
+        c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
     });
     app.use("/*", (c, next) => (isApi(c.req.path) ? next() : assets(c, next)));
     app.get("/*", (c, next) => (isApi(c.req.path) ? next() : spa(c, next)));

@@ -1,6 +1,8 @@
-import type { Credential, OrgSettings, Role } from "@agenteschat/client";
+import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAiAccounts,
+  useComputerSetup,
   useConnections,
   useCredentials,
   useInvitations,
@@ -9,26 +11,29 @@ import {
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
+  useServerTelemetry,
+  useSetServerTelemetry,
   useSettings,
   useSkills,
   useStorage,
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
-  isProviderId,
   keyLooksValid,
   PROVIDERS,
   type ProviderId,
+  providerGuess,
   providerLabel,
+  providerOf,
 } from "@agenteschat/client/lib/providers";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
-  CardFooter,
   CardHeader,
   Chip,
   Dialog,
@@ -36,80 +41,37 @@ import {
   DialogFooter,
   Field,
   Icon,
-  type IconName,
+  InfoHint,
   Input,
   List,
   Meter,
+  ProviderLogo,
   Select,
+  Switch,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AiAccountsSection } from "@/components/ai/AiAccounts";
+import { WhoPicksSection } from "@/components/ai/Jev";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
-import { ErrorState, LoadingList } from "@/components/Loading";
+import { ImportExportSection } from "@/components/ImportFlow";
+import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { PlanUsageCards } from "@/components/PlanUsage";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
-
-export type SettingsSection =
-  | "general"
-  | "members"
-  | "access"
-  | "connectors"
-  | "skills"
-  | "keys"
-  | "storage"
-  | "computers"
-  | "usage";
-
-type SettingsGroup = "org" | "agents" | "costs";
-
-/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
-export const SETTINGS_SECTIONS: {
-  id: SettingsSection;
-  icon: IconName;
-  group: SettingsGroup;
-  allowed: (role: Role) => boolean;
-}[] = [
-  { id: "general", icon: "settings", group: "org", allowed: () => true },
-  { id: "members", icon: "members", group: "org", allowed: () => true },
-  { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
-  { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
-  { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
-  // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
-  { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
-  { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
-  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
-  { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
-];
-
-const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
-
-export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
-
-/** Old section ids and where they live now ("sandbox" joined Computadores). */
-export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
-
-/**
- * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
- * classify) and `?mail=connected|failed` (back from Gmail/Outlook).
- */
-export const settingsSearch = (
-  search: Record<string, unknown>,
-): { connected?: string; review?: string; mail?: string } => ({
-  connected: typeof search.connected === "string" ? search.connected : undefined,
-  review: search.review === undefined ? undefined : String(search.review),
-  mail: typeof search.mail === "string" ? search.mail : undefined,
-});
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
 
 /**
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
@@ -134,6 +96,10 @@ export function SettingsPage({
   const { org } = useOrg();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
+  const setup = useComputerSetup(org.id);
+  const edition = computerEdition(setup.data);
+  const strip = useRef<HTMLDivElement>(null);
+  useCentreCurrent(strip, current);
 
   return (
     <div className="settings">
@@ -145,7 +111,7 @@ export function SettingsPage({
             <span>{org.name}</span>
           </span>
         </div>
-        <div className="settings__groups">
+        <div className="settings__groups" ref={strip}>
           {SETTINGS_GROUPS.map((g) => {
             const items = visible.filter((s) => s.group === g);
             if (items.length === 0) return null;
@@ -179,9 +145,18 @@ export function SettingsPage({
         {current !== "members" && current !== "general" && (
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              {t(`settings.sectionText.${current}`)}
-            </p>
+            {current !== "computers" ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {t(`settings.sectionText.${current}`)}
+              </p>
+            ) : edition ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}
+              </p>
+            ) : setup.isError ? null : (
+              // Never one edition's words before the server says which this is (the section says if it couldn't).
+              <LoadingLine width={320} />
+            )}
           </header>
         )}
         {current === "general" && <GeneralSection />}
@@ -189,17 +164,24 @@ export function SettingsPage({
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
-        {current === "keys" && <KeysSection />}
+        {current === "keys" && (
+          <>
+            <AiAccountsSection />
+            <KeysSection />
+            <WhoPicksSection />
+          </>
+        )}
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
+        {current === "import" && <ImportExportSection />}
       </div>
     </div>
   );
 }
 
 /**
- * Geral (telas/Configuracoes.html, C with A's rows): the org's rows, the context every agent reads, then a
+ * Geral: the org's rows, the context every agent reads, then a
  * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
  * while typing.
  */
@@ -272,6 +254,8 @@ function GeneralSection() {
     });
   };
   const ideas = (["who", "now", "never"] as const).map((k) => t(`settings.contextIdeas.${k}`));
+  const orgName = name.trim() || org.name;
+  const contextTitle = t("settings.contextTitle", { name: orgName });
   const missing = ideas.filter((label) => !context.toLowerCase().includes(label.toLowerCase()));
 
   return (
@@ -299,7 +283,6 @@ function GeneralSection() {
           <div className="settings-row">
             <div className="settings-row__text">
               <span className="settings-row__label">{t("orgLogo.label")}</span>
-              <span className="settings-row__help">{t("orgLogo.labelHelp")}</span>
             </div>
             <div className="settings-row__control">
               <OrgMark logo={org.logo} size={40} className="settings__org-logo" />
@@ -315,11 +298,11 @@ function GeneralSection() {
               <label className="settings-row__label" htmlFor="set-name">
                 {t("settings.name")}
               </label>
-              <span className="settings-row__help">{t("settings.nameHelp")}</span>
             </div>
             <div className="settings-row__control">
               <Input
                 id="set-name"
+                spellCheck={false}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={saveName}
@@ -332,8 +315,12 @@ function GeneralSection() {
           </div>
           <div className="settings-row">
             <div className="settings-row__text">
-              <span className="settings-row__label">{t("settings.timezone")}</span>
-              <span className="settings-row__help">{t("settings.timezoneHelp")}</span>
+              <span className="ac-hintline">
+                <span className="settings-row__label">{t("settings.timezone")}</span>
+                <InfoHint name={t("common.about", { label: t("settings.timezone") })}>
+                  {t("settings.timezoneHelp")}
+                </InfoHint>
+              </span>
             </div>
             <div className="settings-row__control">
               <ZoneSelect
@@ -347,6 +334,27 @@ function GeneralSection() {
               />
             </div>
           </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <span className="ac-hintline">
+                <label className="settings-row__label" htmlFor="set-action-check">
+                  {t("settings.actionCheck")}
+                </label>
+                <InfoHint name={t("common.about", { label: t("settings.actionCheck") })} id="set-action-check-hint">
+                  {t("settings.actionCheckHelp")}
+                </InfoHint>
+              </span>
+            </div>
+            <div className="settings-row__control">
+              <Switch
+                id="set-action-check"
+                checked={settings.data?.actionCheck ?? true}
+                onCheckedChange={(on) => save({ actionCheck: on })}
+                disabled={!editable || !settings.data}
+                aria-describedby="set-action-check-hint"
+              />
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -354,8 +362,11 @@ function GeneralSection() {
         <CardHeader
           id="sec-context"
           icon="agent"
-          title={t("settings.contextTitle", { name: name.trim() || org.name })}
-          subtitle={t("settings.contextSubtitle")}
+          title={contextTitle}
+          hint={{
+            name: t("common.about", { label: contextTitle }),
+            text: `${t("settings.contextSubtitle")} ${t("settings.contextHelp", { name: orgName })}`,
+          }}
         />
         <Textarea
           ref={contextRef}
@@ -377,12 +388,90 @@ function GeneralSection() {
             ))}
           </div>
         )}
-        <CardFooter>{t("settings.contextHelp", { name: name.trim() || org.name })}</CardFooter>
       </Card>
 
       <SettingsTiles />
+      <UsageStatisticsCard />
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </>
+  );
+}
+
+/**
+ * The usage report's switch (ADR 0060 §5): the title, the switch and "Ver o que é enviado". Only the
+ * installation's owner gets it (the API answers `null` to everyone else, and on agentes.chat itself).
+ */
+function UsageStatisticsCard() {
+  const { t } = useTranslation();
+  const telemetry = useServerTelemetry();
+  const set = useSetServerTelemetry();
+  const [open, setOpen] = useState(false);
+  const data = telemetry.data;
+  if (!data) return null;
+  return (
+    <Card aria-labelledby="sec-telemetry">
+      <CardHeader
+        id="sec-telemetry"
+        icon="chart"
+        title={t("settings.telemetry.title")}
+        action={
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setOpen(true);
+              void telemetry.refetch();
+            }}
+          >
+            {t("settings.telemetry.see")}
+          </Button>
+        }
+      />
+      <div className="settings-rows">
+        <div className="settings-row">
+          <div className="settings-row__text">
+            <span className="ac-hintline">
+              <label className="settings-row__label" htmlFor="set-telemetry">
+                {t("settings.telemetry.label")}
+              </label>
+              <InfoHint name={t("common.about", { label: t("settings.telemetry.label") })} id="set-telemetry-hint">
+                {t("settings.telemetry.help")}
+              </InfoHint>
+            </span>
+            {data.envOff && (
+              <span className="settings-row__help" id="set-telemetry-help">
+                {t(
+                  data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff",
+                )}
+              </span>
+            )}
+          </div>
+          <div className="settings-row__control">
+            <Switch
+              id="set-telemetry"
+              checked={data.enabled && !data.envOff}
+              onCheckedChange={(on) => set.mutate(on)}
+              disabled={data.envOff || set.isPending}
+              aria-describedby={data.envOff ? "set-telemetry-hint set-telemetry-help" : "set-telemetry-hint"}
+            />
+          </div>
+        </div>
+      </div>
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t("settings.telemetry.dialogTitle")}
+        description={t("settings.telemetry.dialogText")}
+        closeLabel={t("common.close")}
+        width={560}
+      >
+        <DialogBody>
+          <pre className="md__code" style={{ margin: 0, maxHeight: 420 }}>
+            {JSON.stringify(data.report, null, 2)}
+          </pre>
+        </DialogBody>
+      </Dialog>
+    </Card>
   );
 }
 
@@ -397,9 +486,12 @@ function SettingsTiles() {
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("computers"));
-  const credentials = useCredentials(org.id, shown("keys"));
+  const managesKeys = can(role, "manage_credentials");
+  const credentials = useCredentials(org.id, managesKeys);
+  const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
+  const edition = computerEdition(useComputerSetup(org.id, shown("storage")).data);
 
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
   const keys = (credentials.data ?? []).filter((c) => !c.revokedAt);
@@ -435,14 +527,21 @@ function SettingsTiles() {
     usage:
       overview.data &&
       t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
-    keys:
-      credentials.data &&
-      (keys.length > 0
-        ? t("settings.tileState.keys", { count: keys.length })
-        : platform.data
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")),
-    storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
+    keys: managesKeys
+      ? credentials.data &&
+        (keys.length > 0
+          ? t("settings.tileState.keys", { count: keys.length })
+          : platform.data
+            ? t("settings.tileState.platformKey")
+            : t("settings.tileState.noKeys"))
+      : plans.data &&
+        (plans.data.accounts.length > 0
+          ? t("settings.tileState.plans", { count: plans.data.accounts.length })
+          : t("settings.tileState.noPlans")),
+    storage:
+      storage.data && edition
+        ? t(storage.data.kind === "s3" ? "storage.s3" : edition === "cloud" ? "storage.agentes" : "storage.server")
+        : undefined,
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
   const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role));
@@ -465,7 +564,6 @@ function SettingsTiles() {
               </span>
               <div className="ac-card__heading">
                 <h3>{t(`settings.section.${s.id}`)}</h3>
-                <p className="ac-card__sub">{t(`settings.tile.${s.id}`)}</p>
               </div>
               <Icon name="chevronRight" size={16} className="settings-tile__chevron" />
             </div>
@@ -500,12 +598,12 @@ function KeysSection() {
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
   return (
     <Card aria-labelledby="sec-keys">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+      <div className="row" style={{ gap: 12 }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-keys" className="ac-card__title">
             {t("settings.keysTitle")}
           </h2>
-          <span className="small muted">{t("settings.keysSubtitle")}</span>
+          <InfoHint name={t("common.about", { label: t("settings.keysTitle") })}>{t("settings.keysSubtitle")}</InfoHint>
         </div>
         <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
           {t("settings.addKey")}
@@ -520,6 +618,7 @@ function KeysSection() {
             const isDefault = settings.data?.defaultCredentialId === c.id;
             return (
               <div key={c.id} className="ac-list__row">
+                <ProviderLogo id={c.provider} size="sm" />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{c.label}</span>
                   <span className="small muted">
@@ -598,14 +697,26 @@ function KeysSection() {
   );
 }
 
-function KeyDialog({
+/**
+ * Adds or rotates a key. The Connect dialog (`ConnectAi`) opens it to add one with the provider it
+ * guessed, or the key a person pasted in the chat, and hears when it was saved (`onAdded`).
+ */
+export function KeyDialog({
   mode,
   cred,
   onClose,
+  provider: suggested,
+  apiKey: pasted,
+  title,
+  onAdded,
 }: {
   mode: "add" | "rotate" | null;
   cred: Credential | undefined;
   onClose: () => void;
+  provider?: string;
+  apiKey?: string;
+  title?: string;
+  onAdded?: (cred: Credential) => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -620,19 +731,28 @@ function KeyDialog({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form each time it opens
   useEffect(() => {
     setLabel("");
-    setApiKey("");
+    setApiKey(pasted ?? "");
     setWorkspaceId("");
-    setProvider(cred && isProviderId(cred.provider) ? cred.provider : "anthropic");
+    setProvider(providerGuess(pasted, suggested ?? cred?.provider));
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
-  const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
+  const error =
+    !touched || valid ? undefined : mode === "add" ? (
+      <KeyMismatch provider={provider} apiKey={apiKey} onPick={setProvider} />
+    ) : (
+      t(`onboarding.keyInvalid.${provider}`)
+    );
   const pending = add.isPending || rotate.isPending;
   return (
     <Dialog
       open={mode !== null}
       onOpenChange={(o) => !o && onClose()}
-      title={mode === "rotate" ? t("settings.rotateTitle", { label: cred?.label ?? "" }) : t("settings.addKeyTitle")}
+      title={
+        mode === "rotate"
+          ? t("settings.rotateTitle", { label: cred?.label ?? "" })
+          : (title ?? t("settings.addKeyTitle"))
+      }
       description={mode === "rotate" ? t("settings.rotateHelp") : undefined}
       closeLabel={t("common.close")}
       width={440}
@@ -660,7 +780,12 @@ function KeyDialog({
                 apiKey: apiKey.trim(),
                 ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
               },
-              { onSuccess: onClose },
+              {
+                onSuccess: (saved) => {
+                  onAdded?.(saved);
+                  onClose();
+                },
+              },
             );
           }
         }}
@@ -671,7 +796,17 @@ function KeyDialog({
               <Select
                 value={provider}
                 onValueChange={setProvider}
-                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+                options={PROVIDERS.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  leading: <ProviderLogo id={p.id} size="xs" />,
+                }))}
+                renderValue={(o) => (
+                  <span className="row">
+                    {o.leading}
+                    {o.label}
+                  </span>
+                )}
               />
             </Field>
           )}
@@ -680,15 +815,15 @@ function KeyDialog({
               <Input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder={t("settings.keyLabelPlaceholder")}
+                placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
               />
             </Field>
           )}
-          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={t("connectors.apiKeyHelp")}>
+          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={<KeySite provider={provider} />}>
             <Input
               type="password"
               autoComplete="off"
-              placeholder={PROVIDERS.find((p) => p.id === provider)?.placeholder}
+              placeholder={providerOf(provider)?.placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
@@ -697,9 +832,17 @@ function KeyDialog({
             <Field
               label={t("onboarding.anthropicWorkspace")}
               id="key-ws-set"
-              help={t("onboarding.anthropicWorkspaceHelp")}
+              hint={{
+                name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
+                text: t("onboarding.anthropicWorkspaceHelp"),
+              }}
             >
-              <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+              <Input
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                placeholder={t("settings.workspaceIdPlaceholder")}
+                autoComplete="off"
+              />
             </Field>
           )}
         </DialogBody>
@@ -714,78 +857,49 @@ function KeyDialog({
   );
 }
 
-/** The one place with money (admins): the default agent budget, this month's spend by kind and per agent. */
+/**
+ * Uso (ADR 0063): the plan accounts by computer and the API per agent for everyone (money only for
+ * admins), then the API's spend by kind and the default budget (admins).
+ */
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const allowed = can(org.role, "view_usage");
   const report = useUsageReport(org.id, allowed);
-  if (!allowed) return null;
   return (
     <>
-      <DefaultBudgetCard />
-      <Card aria-labelledby="sec-usage">
-        <h2 id="sec-usage" className="ac-card__title">
-          {t("settings.usageTitle")}
-        </h2>
-        {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
-        {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
-        {report.data && (
-          <>
-            <span className="small muted">
-              {t("settings.usageTotal", {
-                amount: formatUsd(t, i18n.language, report.data.totalUsd),
-                since: formatShortDate(i18n.language, report.data.since),
-              })}
-            </span>
-            <div>
-              {report.data.byKind.map((k) => (
-                <div key={k.kind} className="connector-row">
-                  <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
-                  <span className="connector-row__granted tabular">{t("settings.usageCalls", { count: k.calls })}</span>
-                  <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-      {report.data && report.data.agents.length > 0 && (
-        <Card aria-labelledby="sec-usage-agents">
-          <h2 id="sec-usage-agents" className="ac-card__title">
-            {t("settings.usageAgents")}
+      <PlanUsageCards />
+      {allowed && (
+        <Card aria-labelledby="sec-usage">
+          <h2 id="sec-usage" className="ac-card__title">
+            {t("settings.usageTitle")}
           </h2>
-          <List>
-            {report.data.agents.map((a) => (
-              <Link
-                key={a.agentId}
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: a.agentId }}
-                className="ac-list__row usage-agent"
-              >
-                <AgentAvatar agentId={a.agentId} size="sm" name={a.name} />
-                <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>{a.name}</span>
-                  <span className="small muted tabular">
-                    {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                      spent: formatUsd(t, i18n.language, a.costUsd),
-                      budget: formatUsd(t, i18n.language, a.monthlyBudgetUsd),
-                    })}
-                  </span>
-                </span>
-                <span className="usage-agent__meter">
-                  <Meter
-                    value={Math.min(100, a.budgetUsedPercent)}
-                    max={100}
-                    label={t("settings.usageAgentMeter", { name: a.name })}
-                  />
-                  <span className="small tabular">{formatPercent(i18n.language, a.budgetUsedPercent)}</span>
-                </span>
-              </Link>
-            ))}
-          </List>
+          {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
+          {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
+          {report.data && (
+            <>
+              <span className="small muted">
+                {t("settings.usageTotal", {
+                  amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                  since: formatShortDate(i18n.language, report.data.since),
+                })}
+              </span>
+              <div>
+                {report.data.byKind.map((k) => (
+                  <div key={k.kind} className="connector-row">
+                    <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
+                    <span className="connector-row__granted tabular">
+                      {t("settings.usageCalls", { count: k.calls })}
+                    </span>
+                    <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </Card>
       )}
+      {allowed && <DefaultBudgetCard />}
     </>
   );
 }
@@ -826,7 +940,10 @@ function DefaultBudgetCard() {
         <Field
           label={t("settings.defaultBudget")}
           id="set-default-budget"
-          help={t("settings.defaultBudgetHelp")}
+          hint={{
+            name: t("common.about", { label: t("settings.defaultBudget") }),
+            text: t("settings.defaultBudgetHelp"),
+          }}
           error={invalid ? t("agent.budgetInvalid") : undefined}
         >
           <Input

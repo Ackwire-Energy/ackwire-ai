@@ -48,6 +48,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
+import "./drive.css";
 
 /** Authors shown on a channel's group header. */
 const STACK_MAX = 5;
@@ -58,7 +59,7 @@ const typing = (el: Element | null) =>
 const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]'));
 
 /**
- * Drive (docs/design/telas/Drive.html): everything the viewer can see, as a
+ * Drive: everything the viewer can see, as a
  * grid of real previews (or a list), with quick filters, grouping, a details
  * panel, multi-select with a floating bar, drop to upload and the trash.
  */
@@ -546,7 +547,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
             {list.isSuccess && rows.length === 0 && !filtered && (
               <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
-                {t("drive.emptyText")} {t("files.emptyHint")}
+                {t("drive.emptyText")}
               </EmptyState>
             )}
             {list.isSuccess && rows.length === 0 && filtered && (

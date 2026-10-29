@@ -364,7 +364,7 @@ describe("missions (ADR 0029)", () => {
       title: "Mobile app",
       executor: "claude",
     });
-    // Asked in the channel: the mission's home is a thread of its own, like from a DM (D67).
+    // Asked in the channel: the mission's home is a thread of its own, like from a DM.
     expect(mission.threadRootId).not.toBe(ask.id);
     // No executor task: the main session is the agent's run in the thread, told to plan.
     expect(runner.started).toHaveLength(0);
@@ -683,12 +683,14 @@ describe("missions (ADR 0029)", () => {
         items: [
           { id: "a", title: "Navigation", status: "done" },
           { id: "b", title: "Sign-in", status: "waiting_you" },
+          { id: "c", title: "Push, email", status: "waiting_you" },
         ],
       }),
     );
     const summary = await missionSummary(md(), f.owner.id, f.org.id, view.id);
-    expect(summary.text).toContain("Plan: 1 of 2 done, 1 waiting for you.");
-    expect(summary.plan).toEqual({ done: 1, total: 2, doing: 0, waiting: 1 });
+    expect(summary.text).toContain("Plan: 1 of 3 done, 2 waiting for you.");
+    expect(summary.text).toContain("Waiting for you: Sign-in · Push, email.");
+    expect(summary.plan).toEqual({ done: 1, total: 3, doing: 0, waiting: 2 });
     const closed = await closeMission(md(), f.owner.id, f.org.id, view.id, { outcome: "done", saveToWiki: true });
     expect(closed.status).toBe("done");
     const [page] = await f.db.select().from(schema.wikiPages);

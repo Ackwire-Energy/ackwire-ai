@@ -1,6 +1,6 @@
 {
   "identifier": "prefs",
-  "description": "Preferences: name, organizations, folders, tools, updates, activity, limits.",
+  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits.",
   "windows": ["prefs"],
   "permissions": [
     "core:default",
@@ -10,12 +10,30 @@
     "allow-open-external",
     "allow-reveal-folder",
     "allow-pick-folder",
+    "allow-servers-get",
+    "allow-server-choose",
+    "allow-server-remove",
+    "allow-tray-visible",
+    "allow-notify-site-set",
     "allow-show-window",
     "allow-hide-window",
     "allow-app-info",
     "allow-notch-set",
     "allow-autostart-get",
     "allow-autostart-set",
-    "allow-update-install"
+    "allow-update-install",
+    "allow-update-cancel",
+    "allow-dock-set",
+    "allow-local-server-status",
+    "allow-local-server-start",
+    "allow-local-server-stop",
+    "allow-local-server-restart",
+    "allow-local-server-reach",
+    "allow-local-server-reach-stop",
+    "allow-local-server-usage",
+    "allow-local-server-backup",
+    "allow-local-server-diagnostics",
+    "allow-tailscale-status",
+    "allow-tailscale-open"
   ]
 }

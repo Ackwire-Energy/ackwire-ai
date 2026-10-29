@@ -12,6 +12,7 @@ import {
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  createAgent,
   createMachineHub,
   declineSecret,
   deleteMachine,
@@ -302,6 +303,31 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(row).toMatchObject({ online: false, connectedReplica: null });
   });
 
+  test("a pong's browser traffic is stored with when it came, with or without a load (protocol 23)", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const row = async () =>
+      (await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId)))[0];
+    const browserTraffic = { up: 4096, down: 1_250_000, hours: 0.2 };
+    const before = Date.now();
+    await runner.frame({ type: "pong", at: 1, browserTraffic });
+    const stored = await row();
+    expect(stored?.browserTraffic).toEqual({ ...browserTraffic, at: expect.any(String) });
+    expect(Date.parse(stored?.browserTraffic?.at ?? "")).toBeGreaterThanOrEqual(before - 1000);
+    expect(stored?.load).toBeNull();
+
+    const load = { loadAvg: 0.1, loadPeak: 0.5, memoryAvg: 0.3, memoryPeak: 0.4, hours: 0.2 };
+    const more = { up: 8192, down: 2_000_000, hours: 0.3 };
+    await runner.frame({ type: "pong", at: 2, load, browserTraffic: more });
+    expect(await row()).toMatchObject({ load: { ...load, at: expect.any(String) }, browserTraffic: more });
+    // A pong without either keeps what the last one said; one out of bounds says nothing.
+    await runner.frame({ type: "pong", at: 3, browserTraffic: { ...more, up: -5 } });
+    expect((await row())?.browserTraffic).toMatchObject(more);
+  });
+
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {
     f = await setup({ machines: true });
     const hub = f.machineHub as MachineHub;
@@ -381,6 +407,23 @@ describe("pairing", () => {
 });
 
 describe("machines and targets", () => {
+  test("a computer lists its agents in the order they came, as the agents' own list does", async () => {
+    f = await setup();
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa" },
+      { model: "claude-sonnet-5-5" },
+    );
+    const box = await pair();
+    // The newer agent moves there first: the order its rows were written in isn't the one people see.
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, qa.id, box.machineId);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, box.machineId);
+    const [machine] = await listMachines(f.db, f.owner.id, f.org.id);
+    expect(machine?.agents.map((a) => a.handle)).toEqual(["dev", "qa"]);
+  });
+
   test("list, rename and delete: every member sees them, only the pairer or an admin changes them", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -398,11 +441,18 @@ describe("machines and targets", () => {
       agents: [{ id: f.agent.id, handle: "dev" }],
       workspace: null,
       canManage: false,
+      mode: "single",
     });
     expect((await listMachines(f.db, bia.id, f.org.id))[0]).toMatchObject({
       workspace: RUNNER.workspace,
       canManage: true,
     });
+    // A runner in system mode (ADR 0057) says so at hello: each agent its own user, not the pairing folder.
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { mode: "system" } })
+      .where(eq(schema.machines.id, mine.machineId));
+    expect((await listMachines(f.db, carl.id, f.org.id))[0]?.mode).toBe("system");
 
     await expect(renameMachine(deps(), carl.id, f.org.id, mine.machineId, { name: "x" })).rejects.toThrow(
       ForbiddenError,
@@ -706,7 +756,19 @@ describe("tools on a connected machine", () => {
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
     expect(status.content).not.toContain(RUNNER.workspace);
-    expect((await call(ctx, "computer_stop", {})).content).toContain("only its owner");
+    // Turning a computer on and off is a sandbox's: a computer of the workspace has no such tools.
+    expect(listed?.filter((t) => t.name.startsWith("computer_")).map((t) => t.name)).toEqual(["computer_status"]);
+
+    // The workspace's own computer is always on.
+    const kind = (k: "managed" | "connected") =>
+      f.db.update(schema.machines).set({ kind: k }).where(eq(schema.machines.id, paired.machineId));
+    await kind("managed");
+    expect((await call(ctx, "computer_status", {})).content).toContain(
+      `You are on "Build box", this workspace's own computer (Linux), always on: answering now.`,
+    );
+    const ownRunCode = (await f.tools?.list(ctx))?.find((t) => t.name === "run_code");
+    expect(ownRunCode?.description).toContain(`Runs on "Build box" (Linux), this workspace's own computer, always on`);
+    await kind("connected");
 
     expect(await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.kind, "sandbox"))).toEqual([]);
     expect(await f.db.select().from(schema.sandboxes)).toEqual([]);
@@ -714,7 +776,7 @@ describe("tools on a connected machine", () => {
     await runner.disconnect();
     const offline = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(offline).toMatchObject({ isError: true });
-    expect(offline.content).toContain("The computer Build box is offline; ask its owner to start the runner.");
+    expect(offline.content).toContain("The computer Build box is offline. Ask its owner to start the runner.");
   });
 
   test("commands turned off on the machine are explained", async () => {

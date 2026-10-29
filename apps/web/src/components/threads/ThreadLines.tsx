@@ -15,7 +15,7 @@ import { ThreadStatusChip } from "./ThreadBits";
 import "./threads.css";
 
 /**
- * What a channel shows of its threads (ThreadContexto.html, Threads.html):
+ * What a channel shows of its threads:
  * the quiet marker where a range became a thread's context, the stub once it
  * left the channel, one line per closed thread, and "Threads (N)" in the header.
  */
@@ -74,7 +74,7 @@ function OpenThread({
 }
 
 /**
- * Under a message someone answered with "Responder" (telas/ThreadPainel.html, "D · Linha simples"):
+ * Under a message someone answered with "Responder":
  * who is in it, "N respostas", what it needs (Esperando você / Trabalhando) and the last reply's
  * time. Opens the thread in the panel beside the channel; pressed while open there.
  */
@@ -158,7 +158,7 @@ export function ThreadStartLine({
   }
   // In context: one quiet line, its link as text (the range above stays the conversation).
   return (
-    <div className="thread-marker" data-message-id={message.id}>
+    <div className="thread-marker ac-iconline" data-message-id={message.id}>
       <Icon name="link" size={14} />
       <span>{t("threads.line.context", { title })}</span>
       <span aria-hidden="true">·</span>
@@ -174,9 +174,9 @@ export function ClosedThreadLine({ thread }: { thread: ThreadInfo }) {
   const { t } = useTranslation();
   return (
     <div className="thread-closed" data-message-id={thread.id}>
-      <Icon name="check" size={16} />
-      <span className="thread-closed__text">
-        {t("threads.line.closed", { title: threadTitle(thread), count: threadMessageCount(thread) })}
+      <span className="thread-closed__text ac-iconline">
+        <Icon name="check" size={16} />
+        <span>{t("threads.line.closed", { title: threadTitle(thread), count: threadMessageCount(thread) })}</span>
       </span>
       <span className="thread-closed__actions">
         <Button size="sm" variant="ghost" asChild>
@@ -199,8 +199,10 @@ export function ArchivedThreadsNote({ channelId, count }: { channelId: string; c
   if (count === 0) return null;
   return (
     <div className="thread-closed thread-closed--quiet">
-      <Icon name="archiveBox" size={16} />
-      <span className="thread-closed__text">{t("threads.line.archived", { count })}</span>
+      <span className="thread-closed__text ac-iconline">
+        <Icon name="archiveBox" size={16} />
+        <span>{t("threads.line.archived", { count })}</span>
+      </span>
       <span className="thread-closed__actions">
         <Button size="sm" variant="ghost" asChild>
           <Link to="/org/$orgId/threads" params={{ orgId: org.id }} search={{ tab: "archived", channel: channelId }}>

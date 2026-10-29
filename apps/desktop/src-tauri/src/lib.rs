@@ -1,20 +1,35 @@
-//! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
-//! runners it spawns, one per organization, plus the main window with the whole site (D79, `main_window`).
-//! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
-//! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
+//! agentes.chat for macOS, Windows and Linux: the main window on the server open now (agentes.chat or a
+//! server of the person's own, `servers`), the welcome window that finds one, and, only while agents work on
+//! this computer for a server of the person's own, the runners it spawns (one per organization), the menu bar
+//! popover and Preferences' tabs for this computer. On every system it can also run agentes.chat itself, as
+//! its child (`local_server`, with this computer as its agents' computer, `host_sync`). Rust stays thin:
+//! windows, the tray, the server list, links, the children, single instance, start at login, notifications,
+//! native dialogs and self-update. Everything else lives in the runner and the server (TypeScript) and in the
+//! web view.
 
+mod cover;
+mod deep_link;
+mod discover;
+mod dock;
+mod host_sync;
+mod local_server;
 mod main_window;
 mod menus;
 mod notch;
 mod runners;
+mod servers;
+mod tailscale;
 mod tray;
+mod window_state;
 
+use std::io::{self, Read};
 use std::path::Path;
-use std::sync::Mutex;
+use std::process::{Command, Stdio};
+use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Url, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
@@ -24,8 +39,6 @@ use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
-/// The only site the app opens: in its main window (`main_window`), never another site.
-const SITE: &str = "https://agentes.chat";
 const WINDOWS: &[&str] = &["popover", "welcome", "prefs"];
 
 /// When the popover last hid because it lost focus: a click on the tray icon blurs it first,
@@ -39,19 +52,9 @@ struct AppInfo {
     arch: &'static str,
 }
 
-fn is_site_url(url: &str) -> bool {
-    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return false;
-    }
-    url == SITE || url.starts_with("https://agentes.chat/") || url.starts_with("https://agentes.chat?")
-}
-
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
-/// (ADR 0041): the account dialog's "Abrir o link" when the browser didn't open by itself.
+/// (ADR 0041): the account dialog's "Open the link" when the browser didn't open by itself.
 fn is_sign_in_url(url: &str) -> bool {
-    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return false;
-    }
     const PREFIXES: &[&str] = &[
         "https://claude.com/cai/oauth/authorize?",
         "https://claude.ai/oauth/authorize?",
@@ -60,19 +63,32 @@ fn is_sign_in_url(url: &str) -> bool {
     PREFIXES.iter().any(|p| url.starts_with(p))
 }
 
+/// The app's own builds ("Download version …" in Updates), whichever server it opens.
+fn is_app_download(url: &str) -> bool {
+    url.starts_with("https://agentes.chat/api/desktop/download/")
+}
+
+/// The help pages on agentes.chat ("Which one to choose?", "How folders work"), whichever server it opens.
+fn is_help_page(url: &str) -> bool {
+    url.starts_with("https://agentes.chat/help/")
+}
+
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
-/// (with the open-window dot, clickable); with all of them closed it lives in the menu bar only.
+/// (with the open-window dot, clickable), even when the person took it out of the Dock.
 const APP_WINDOWS: &[&str] = &["welcome", "prefs", main_window::LABEL];
 
-/// Dock icon on while an app window is visible, off otherwise (macOS).
+/// The Dock icon: always, like Slack's (dock.rs), or, when the person turned that off, only while an app
+/// window is visible (macOS).
 pub(crate) fn sync_dock(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
-        let open = APP_WINDOWS.iter().any(|name| {
-            app.get_webview_window(name)
-                .and_then(|w| w.is_visible().ok())
-                .unwrap_or(false)
-        });
+        // By window, not web view: the main window holds two (the site and its cover).
+        let open = dock::shows(app)
+            || APP_WINDOWS.iter().any(|name| {
+                app.get_window(name)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false)
+            });
         let policy = if open {
             tauri::ActivationPolicy::Regular
         } else {
@@ -88,7 +104,10 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     if !WINDOWS.contains(&name) {
         return Err(format!("unknown window: {name}"));
     }
-    let window = app.get_webview_window(name).ok_or("window not found")?;
+    let window = match app.get_webview_window(name) {
+        Some(window) => window,
+        None => make_window(app, name)?,
+    };
     if name == "popover" {
         // Right under the menu bar icon.
         let _ = window.move_window(Position::TrayCenter);
@@ -103,18 +122,39 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Welcome and Preferences are made when they open and go when they close (`"create": false` in
+/// tauri.conf.json): each is a whole web view, kept alive for nothing otherwise.
+const MADE_ON_OPEN: &[&str] = &["welcome", "prefs"];
+
+fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, String> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == name)
+        .ok_or("window not found")?
+        .clone();
+    tauri::WebviewWindowBuilder::from_config(app, &config)
+        .and_then(|b| b.build())
+        .map_err(|e| e.to_string())
+}
+
 /// The launch argument start at login passes, so a login start stays in the menu bar.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// "Open the app": the main window, or the welcome while this Mac isn't connected to any organization.
-fn open_app(app: &AppHandle) {
-    if app.state::<Runners>().any_paired() {
+/// "Open the app": the main window on the server open now, or the first run while there is none. A setup whose
+/// window was closed comes back where it is (still running, or on the step that failed).
+pub(crate) fn open_app(app: &AppHandle) {
+    let hidden_setup = app.get_webview_window("welcome").is_some_and(|w| !w.is_visible().unwrap_or(true));
+    if servers::current(app).is_some() && !hidden_setup {
         let _ = main_window::open(app, None);
     } else {
         let _ = present(app, "welcome");
     }
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn toggle_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("popover") else { return };
     if window.is_visible().unwrap_or(false) {
@@ -134,19 +174,147 @@ pub(crate) fn toggle_popover(app: &AppHandle) {
     }
 }
 
-/// Graceful quit: every runner gets `shutdown` and a few seconds, then the app exits.
+/// The children finish their work: every runner gets `shutdown` and a few seconds, and the server here
+/// drains (at most 25 s), side by side.
+fn stop_children(app: &AppHandle) {
+    let server = {
+        let app = app.clone();
+        std::thread::spawn(move || local_server::shutdown(&app))
+    };
+    app.state::<Runners>().shutdown_all();
+    let _ = server.join();
+}
+
+/// A program the app starts opens no console window of its own on Windows (the runner, the server and the
+/// tools they call are console programs, and the app has no console to lend them). Nothing elsewhere.
+pub(crate) fn no_console(command: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
+/// How a program the app waited on ended: its exit code (None when the app ended it), what it printed (1 MB of
+/// each at most), and why the app ended it, if it did.
+pub(crate) struct Ran {
+    pub code: Option<i32>,
+    pub out: String,
+    pub err: String,
+    pub cut: Option<Cut>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum Cut {
+    /// It ran past its limit.
+    TooLong,
+    /// Cancel, or the app quitting.
+    Stopped,
+}
+
+/// What `run_watched` does next, from what the program printed so far.
+pub(crate) enum Watch {
+    /// Keeps waiting, up to the wait it was given.
+    Wait,
+    /// Keeps waiting, up to this long from its start.
+    WaitUpTo(Duration),
+    /// Ends it now (`Cut::Stopped`).
+    Stop,
+}
+
+/// The one way the app waits on a program (Tailscale, the server's `migrate` and database moves, `host --once`):
+/// until it ends, `wait` passes or `stop` says so, checked every 50 ms; a cut kills it. Its output is read while
+/// it runs: a pipe holds 64 KB, and `tailscale status --json` on a large tailnet prints more, so a reader after
+/// the exit would never see it end. A program it started that outlives it keeps the pipes open until it ends too.
+pub(crate) fn run_program(command: &mut Command, wait: Duration, stop: &dyn Fn() -> bool) -> io::Result<Ran> {
+    run_watched(command, wait, &mut |_| if stop() { Watch::Stop } else { Watch::Wait })
+}
+
+/// `run_program`, with `watch` asked every 50 ms, given what the program printed so far (both outputs, as they
+/// came), whether to wait longer or end it: `tailscale serve` names the page for allowing HTTPS and then waits
+/// there until it is allowed.
+pub(crate) fn run_watched(
+    command: &mut Command,
+    wait: Duration,
+    watch: &mut dyn FnMut(&str) -> Watch,
+) -> io::Result<Ran> {
+    let mut child = no_console(command)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let (sent, arrived) = mpsc::channel::<Vec<u8>>();
+    let reader = |pipe: Option<Box<dyn Read + Send>>, sent: mpsc::Sender<Vec<u8>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(pipe) = pipe {
+                let mut pipe = pipe.take(1024 * 1024);
+                let mut chunk = [0u8; 8192];
+                loop {
+                    match pipe.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            bytes.extend_from_slice(&chunk[..n]);
+                            let _ = sent.send(chunk[..n].to_vec());
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                        Err(_) => break,
+                    }
+                }
+            }
+            String::from_utf8_lossy(&bytes).into_owned()
+        })
+    };
+    let out = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent.clone());
+    let err = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent);
+    let started = Instant::now();
+    let mut so_far = String::new();
+    let (code, cut) = loop {
+        while let Ok(chunk) = arrived.try_recv() {
+            so_far.push_str(&String::from_utf8_lossy(&chunk));
+        }
+        let cut = match child.try_wait() {
+            Ok(Some(status)) => break (status.code(), None),
+            Ok(None) => match watch(&so_far) {
+                Watch::Stop => Cut::Stopped,
+                Watch::Wait if started.elapsed() <= wait => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                Watch::WaitUpTo(longer) if started.elapsed() <= wait.max(longer) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                _ => Cut::TooLong,
+            },
+            // It can't be asked.
+            Err(_) => Cut::TooLong,
+        };
+        let _ = child.kill();
+        let _ = child.wait();
+        break (None, Some(cut));
+    };
+    Ok(Ran { code, out: out.join().unwrap_or_default(), err: err.join().unwrap_or_default(), cut })
+}
+
+/// Graceful quit: the children stop, then the app exits.
 fn begin_quit(app: AppHandle) {
     let runners = app.state::<Runners>();
     if runners.is_quitting() {
         return;
     }
-    for name in WINDOWS.iter().chain([&main_window::LABEL]) {
-        if let Some(window) = app.get_webview_window(name) {
+    if let Some(window) = app.get_window(main_window::LABEL) {
+        window_state::remember(&window, false);
+    }
+    for name in WINDOWS.iter().chain([&main_window::LABEL, &notch::LABEL]) {
+        if let Some(window) = app.get_window(name) {
             let _ = window.hide();
         }
     }
     std::thread::spawn(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.exit(0);
     });
 }
@@ -174,16 +342,19 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+/// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page, the
+/// app's own downloads and the help pages open in the person's browser. Nothing else. Async, as every command
+/// that may make a window (`server_choose`).
 #[tauri::command]
-fn open_external(app: AppHandle, url: String) -> Result<(), String> {
-    if is_site_url(&url) {
-        let page = url.parse().map_err(|_| "not a URL")?;
-        return main_window::open(&app, Some(page));
+async fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("not a link the app opens".into());
     }
-    if !is_sign_in_url(&url) {
-        return Err("only agentes.chat and sign-in links open from the app".into());
+    if is_sign_in_url(&url) || is_app_download(&url) || is_help_page(&url) {
+        return app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string());
     }
-    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+    let page: Url = url.parse().map_err(|_| "not a URL")?;
+    main_window::show_url(&app, page)
 }
 
 #[tauri::command]
@@ -206,8 +377,9 @@ fn set_tray_state(app: AppHandle, state: String) -> Result<(), String> {
     tray::set_state(&app, &state)
 }
 
+/// Async: Welcome and Preferences are made here (`server_choose`).
 #[tauri::command]
-fn show_window(app: AppHandle, name: String) -> Result<(), String> {
+async fn show_window(app: AppHandle, name: String) -> Result<(), String> {
     present(&app, &name)
 }
 
@@ -216,8 +388,12 @@ fn hide_window(app: AppHandle, name: String) -> Result<(), String> {
     if !WINDOWS.contains(&name.as_str()) {
         return Err(format!("unknown window: {name}"));
     }
-    let window = app.get_webview_window(&name).ok_or("window not found")?;
-    window.hide().map_err(|e| e.to_string())?;
+    let Some(window) = app.get_webview_window(&name) else { return Ok(()) };
+    if MADE_ON_OPEN.contains(&name.as_str()) {
+        window.destroy().map_err(|e| e.to_string())?;
+    } else {
+        window.hide().map_err(|e| e.to_string())?;
+    }
     sync_dock(&app);
     Ok(())
 }
@@ -258,27 +434,90 @@ fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Downloads and installs the newer version (signed with the key built into the app, checked by
-/// the plugin), stops the runners and relaunches. `false`: nothing newer to install.
+/// The update being checked for or downloaded now: Cancel drops it (nothing is installed until it is whole).
+#[derive(Default)]
+struct UpdateDownload(Mutex<Option<Box<dyn Fn() + Send>>>);
+
+const UPDATE_PROGRESS_EVENT: &str = "update://progress";
+
+/// Downloads the newer version, with its progress to Preferences, then installs it (signed with the key built
+/// into the app, checked by the plugin), stops the runners and relaunches. `false`: nothing newer to install.
+/// Err "cancelled": Cancel dropped the check or the download.
 #[tauri::command]
 async fn update_install(app: AppHandle) -> Result<bool, String> {
-    let updater = app.updater().map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
-        return Ok(false);
-    };
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
+    // Windows runs the installer and ends the app at once, and the installer can't replace the files of a
+    // runner or a server still running: they stop first there (then the plugin's own cleanup, which this
+    // replaces).
+    let before_exit = app.clone();
+    let updater = app
+        .updater_builder()
+        .timeout(Duration::from_secs(30))
+        // The plugin's requests never time out by themselves: a download that receives nothing for a minute
+        // fails, while a slow one that still moves goes on (the limit resets on every read).
+        .configure_client(|client| client.read_timeout(Duration::from_secs(60)))
+        .on_before_exit(move || {
+            stop_children(&before_exit);
+            before_exit.cleanup_before_exit();
+        })
+        .build()
         .map_err(|e| e.to_string())?;
-    // The runners finish their work first, as when quitting; then the new app opens.
+    let progress = app.clone();
+    // The check and the download are one task: Preferences shows Cancel from the click, and the check can take
+    // its 30 s.
+    let task = tauri::async_runtime::spawn(async move {
+        let Some(mut update) = updater.check().await? else {
+            return Ok(None);
+        };
+        // The 30 s are the check's: a download of any length is fine while it keeps moving.
+        update.timeout = None;
+        let (mut got, mut said) = (0u64, None::<u64>);
+        let on_chunk = move |chunk: usize, total: Option<u64>| {
+            got += chunk as u64;
+            // Once per percent, or per MB without a size: never once per chunk.
+            let step = total.map_or(got / 1_048_576, |t| got * 100 / t.max(1));
+            if said != Some(step) {
+                said = Some(step);
+                let _ = progress.emit_to("prefs", UPDATE_PROGRESS_EVENT, (got, total));
+            }
+        };
+        let bytes = update.download(on_chunk, || {}).await?;
+        Ok::<_, tauri_plugin_updater::Error>(Some((update, bytes)))
+    });
+    let abort = task.inner().abort_handle();
+    let download = app.state::<UpdateDownload>();
+    if let Ok(mut current) = download.0.lock() {
+        *current = Some(Box::new(move || abort.abort()));
+    }
+    let done = task.await;
+    if let Ok(mut current) = download.0.lock() {
+        *current = None;
+    }
+    let (update, bytes) = match done {
+        Ok(Ok(Some(found))) => found,
+        Ok(Ok(None)) => return Ok(false),
+        Ok(Err(e)) => return Err(e.to_string()),
+        Err(_) => return Err("cancelled".into()),
+    };
+    // Windows: the installer runs and the app ends here.
+    update.install(bytes).map_err(|e| e.to_string())?;
+    // The runners and the server here finish their work first, as when quitting; then the new app opens
+    // (and starts the server here's new version, `local_server`).
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.restart();
     });
     Ok(true)
 }
 
-/// Turns the notch on or off (Preferências → Geral; the popover applies the saved choice at start).
+/// Preferences' Cancel while an update downloads.
+#[tauri::command]
+fn update_cancel(download: tauri::State<'_, UpdateDownload>) {
+    if let Some(abort) = download.0.lock().ok().and_then(|mut current| current.take()) {
+        abort();
+    }
+}
+
+/// Turns the notch on or off (Preferences › General; the popover applies the saved choice at start).
 #[tauri::command]
 async fn notch_set(app: AppHandle, on: bool) -> Result<(), String> {
     notch::set_enabled(&app, on)
@@ -308,23 +547,54 @@ fn migrate_login_item(app: &AppHandle) {
     let _ = app;
 }
 
+/// The servers at start: as they were, or (the first start of an app that keeps a list) from the menu bar
+/// app's homes, whose Cloud ones retire before any runner starts (`runners::migrate`).
+fn starting_servers(app: &AppHandle) -> servers::ServerFile {
+    if let Some(file) = servers::read(app) {
+        return file;
+    }
+    let moved = runners::migrate(app);
+    let mut list = moved.servers;
+    if !moved.retire.is_empty() {
+        list.push(servers::CLOUD.to_string());
+        menus::retired_cloud_homes(app, moved.retired.unwrap_or_else(|| "~/agentes".into()));
+    }
+    servers::ServerFile { current: list.first().cloned(), servers: list }
+}
+
 pub fn run() {
     let builder = tauri::Builder::default()
-        // First: a second launch brings the running app's window back.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            open_app(app);
+        // First: a second launch brings the running app's window back; one carrying a link (Windows,
+        // Linux) goes to the deep-link plugin first (`deep_link.rs` shows it).
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if !deep_link::in_args(&argv) {
+                open_app(app);
+            }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        // Without its click script: it takes every `target="_blank"` link in every page and asks over IPC, which
+        // the site may not do, so the click did nothing. The main window routes those itself (`on_new_window`).
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
+        .manage(servers::Servers::default())
+        .manage(local_server::LocalServer::default())
+        .manage(host_sync::HostSync::default())
+        .manage(deep_link::PendingLink::default())
         .manage(main_window::Bridge::default())
+        .manage(main_window::Notices::default())
         .manage(menus::Zoom::default())
+        .manage(cover::Cover::default())
+        .manage(dock::Dock::default())
+        .manage(menus::MenuParts::default())
+        .manage(window_state::LastSaved::default())
+        .manage(UpdateDownload::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -342,13 +612,41 @@ pub fn run() {
             autostart_set,
             notify,
             update_install,
+            update_cancel,
             notch_set,
             notch_info,
             notch_place,
+            servers::servers_get,
+            servers::server_choose,
+            servers::server_remove,
+            discover::discover,
+            deep_link::link_take,
+            local_server::local_server_status,
+            local_server::local_server_install,
+            local_server::local_server_cancel,
+            local_server::local_server_start,
+            local_server::local_server_stop,
+            local_server::local_server_restart,
+            local_server::local_server_reach,
+            local_server::local_server_reach_stop,
+            local_server::local_server_usage,
+            local_server::local_server_backup,
+            local_server::local_server_diagnostics,
+            local_server::local_server_sync,
+            tailscale::tailscale_status,
+            tailscale::tailscale_open,
+            tray::tray_visible,
             main_window::this_mac,
             main_window::this_mac_reply,
+            main_window::this_mac_listening,
+            main_window::notify_site_set,
+            dock::dock_set,
             menus::app_menu_set,
-            menus::context_menu
+            menus::context_menu,
+            cover::page_ready,
+            cover::cover_retry,
+            cover::cover_hide,
+            cover::cover_server
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -358,43 +656,103 @@ pub fn run() {
                     *at = Some(Instant::now());
                 }
             }
-            WindowEvent::CloseRequested { api, .. } => {
-                // Windows are made once and only hidden; quitting goes through "Sair".
+            WindowEvent::Focused(true) if window.label() == main_window::LABEL => {
+                main_window::focused(window.app_handle());
+            }
+            WindowEvent::Focused(false) if window.label() == main_window::LABEL => {
+                main_window::keep_lights(window.app_handle());
+            }
+            // Closing it while agentes.chat is being set up only hides it: the setup goes on (Cancel stops it).
+            WindowEvent::CloseRequested { api, .. }
+                if window.label() == "welcome" && local_server::setting_up(window.app_handle()) =>
+            {
                 api.prevent_close();
                 let _ = window.hide();
                 sync_dock(window.app_handle());
             }
+            // Welcome and Preferences really close (made again when they open).
+            WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
+            WindowEvent::Destroyed if MADE_ON_OPEN.contains(&window.label()) => sync_dock(window.app_handle()),
+            WindowEvent::CloseRequested { api, .. } => {
+                // The other windows are made once and only hidden; quitting goes through "Quit".
+                api.prevent_close();
+                if window.label() == main_window::LABEL {
+                    window_state::remember(window, false);
+                    // Some Linux desktops show no tray icon: there the window stays in reach, minimized.
+                    #[cfg(target_os = "linux")]
+                    {
+                        let _ = window.minimize();
+                        return;
+                    }
+                    // ⌘W in full screen: out of full screen first, so no empty Space stays behind.
+                    #[cfg(not(target_os = "linux"))]
+                    if window.is_fullscreen().unwrap_or(false) {
+                        let _ = window.set_fullscreen(false);
+                        let window = window.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(700));
+                            let _ = window.hide();
+                            sync_dock(window.app_handle());
+                        });
+                        return;
+                    }
+                }
+                let _ = window.hide();
+                sync_dock(window.app_handle());
+            }
+            WindowEvent::Moved(_) if window.label() == main_window::LABEL => window_state::remember(window, true),
+            WindowEvent::Resized(_) if window.label() == main_window::LABEL => {
+                window_state::remember(window, true);
+                // Full screen in or out: the page's title bar keeps or drops the room for the buttons.
+                main_window::fit_page(window.app_handle());
+            }
             WindowEvent::ThemeChanged(theme) if window.label() == main_window::LABEL => {
-                let _ = window.set_background_color(Some(main_window::backdrop(*theme)));
+                let color = main_window::backdrop(*theme);
+                let _ = window.set_background_color(Some(color));
+                if let Some(page) = window.app_handle().get_webview(main_window::LABEL) {
+                    let _ = page.set_background_color(Some(color));
+                }
             }
             _ => {}
         })
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            tray::create(app.handle())?;
             let handle = app.handle().clone();
+            // Before the tray (it lists them) and before any runner (Cloud homes retire first).
+            servers::load(&handle, starting_servers(&handle));
+            tray::create(&handle)?;
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
             let launcher = handle.autolaunch();
             if launcher.is_enabled().unwrap_or(false) {
                 let _ = launcher.enable();
             }
-            let runners = app.state::<Runners>();
-            runners.start_all(&handle);
-            // Started at login: the menu bar only (the welcome while nothing is paired, as before).
+            // The server here first (its own homes start with the rest); nothing starts without homes: in the
+            // Cloud, or with a server whose agents work elsewhere.
+            local_server::load(&handle);
+            app.state::<Runners>().start_all(&handle);
+            host_sync::start(&handle);
+            deep_link::setup(&handle);
+            // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
+            // the server open now, or the first run while there is none.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
-            if !runners.any_paired() {
+            if servers::current(&handle).is_none() {
                 let _ = present(&handle, "welcome");
             } else if !at_login {
                 let _ = main_window::open(&handle, None);
             }
+            // In the Dock from the start, like Slack (the popover then applies the person's choice).
+            sync_dock(&handle);
             Ok(())
         });
     // After long in the background macOS may end a window's page to free memory, which leaves it blank:
     // it loads again (the site opens from the disk cache, so it is back at once).
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(|webview| {
+        if webview.label() == main_window::LABEL {
+            cover::show(webview.app_handle(), std::time::Duration::ZERO);
+        }
         let _ = webview.reload();
     });
     let app = builder
@@ -413,4 +771,87 @@ pub fn run() {
         RunEvent::Reopen { .. } => open_app(app),
         _ => {}
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn what_opens_in_the_browser() {
+        assert!(is_sign_in_url("https://claude.ai/oauth/authorize?client_id=x"));
+        assert!(is_app_download("https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
+        assert!(!is_app_download("https://agentes.chat.evil.com/api/desktop/download/x"));
+        assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
+        assert!(is_help_page("https://agentes.chat/help/run-on-your-computer?lang=en#who"));
+        assert!(!is_help_page("https://agentes.chat.evil.com/help/x"));
+        assert!(!is_help_page("https://agentes.chat/helpdesk"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_ends_on_its_own_runs_out_of_time_or_is_stopped() {
+        use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
+        let sh = |script: &str| {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]);
+            command
+        };
+        // On its own: its code and both outputs, read while it runs (more than a pipe holds).
+        let ran = run_program(
+            &mut sh("head -c 200000 /dev/zero | tr '\\000' a; echo done >&2; exit 3"),
+            Duration::from_secs(5),
+            &|| false,
+        )
+        .unwrap();
+        assert_eq!((ran.code, ran.cut, ran.out.len(), ran.err.as_str()), (Some(3), None, 200_000, "done\n"));
+        // Out of time: ended, what it printed kept.
+        let started = Instant::now();
+        let ran = run_program(&mut sh("echo early; exec sleep 5"), Duration::from_millis(300), &|| false).unwrap();
+        assert_eq!((ran.code, ran.cut, ran.out.as_str()), (None, Some(Cut::TooLong), "early\n"));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        // Stopped (Cancel, quitting): at once, whatever its limit.
+        let stop = AtomicBool::new(false);
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                std::thread::sleep(Duration::from_millis(150));
+                stop.store(true, SeqCst);
+            });
+            let started = Instant::now();
+            let ran = run_program(&mut sh("exec sleep 5"), Duration::from_secs(60), &|| stop.load(SeqCst)).unwrap();
+            assert_eq!(ran.cut, Some(Cut::Stopped));
+            assert!(started.elapsed() < Duration::from_secs(2));
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_watched_run_waits_longer_once_asked_and_stops_when_told() {
+        let sh = |script: &str| {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]);
+            command
+        };
+        // It names a page, then takes longer than the first wait: the watcher gives it more time.
+        let script = "echo 'visit https://login.tailscale.com/f/serve?node=abc'; sleep 1; echo done";
+        let mut seen = None;
+        let ran = run_watched(&mut sh(script), Duration::from_millis(300), &mut |so_far: &str| {
+            match so_far.split_whitespace().find(|w| w.starts_with("https://")) {
+                Some(url) => {
+                    seen.get_or_insert(url.to_string());
+                    Watch::WaitUpTo(Duration::from_secs(5))
+                }
+                None => Watch::Wait,
+            }
+        })
+        .unwrap();
+        assert_eq!((ran.code, ran.cut), (Some(0), None), "it finished on its own");
+        assert!(ran.out.ends_with("done\n"));
+        assert_eq!(seen.as_deref(), Some("https://login.tailscale.com/f/serve?node=abc"));
+        // Told to stop: it ends at once, well before its own end.
+        let started = Instant::now();
+        let ran = run_watched(&mut sh("exec sleep 5"), Duration::from_secs(10), &mut |_| Watch::Stop).unwrap();
+        assert_eq!(ran.cut, Some(Cut::Stopped));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
 }

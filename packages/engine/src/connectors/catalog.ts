@@ -2,7 +2,7 @@ import type { OutcomeKind } from "../context/outcomes";
 
 /**
  * Connector catalog: which MCP servers agentes.chat knows, and how each of
- * their tools maps to one of OUR scopes (D7: MCP has no standard scopes).
+ * their tools maps to one of OUR scopes (ADR 0016: MCP has no standard scopes).
  * A tool the server offers but this catalog doesn't list is never exposed.
  * `sensitive` tools always need a person's approval (merge, deploy and
  * rollback are sensitive whatever this says; see `isSensitive`).
@@ -24,8 +24,17 @@ export interface ConnectorTool {
   onSuccess?: { kind: OutcomeKind; subject: string };
 }
 
-/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, payments, support, marketing, automation. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
+export type ConnectorCategory =
+  | "dev"
+  | "product"
+  | "docs"
+  | "data"
+  | "payments"
+  | "sales"
+  | "support"
+  | "marketing"
+  | "automation";
 
 export interface ConnectorDefinition {
   id: string;

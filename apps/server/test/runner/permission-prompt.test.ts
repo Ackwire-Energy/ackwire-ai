@@ -8,10 +8,12 @@ import {
   rulesFor,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  claudeMcpConfig,
   claudePermissionSettings,
   DENY_RULES,
   handleMcpMessage,
   type IpcReply,
+  mcpProfileFromEnv,
   mcpScopeFromEnv,
   missionExecutorArgs,
   permissionPrompt,
@@ -126,11 +128,15 @@ test("the prompt tool: plain reads are allowed at once (no card, nothing posted)
   expect((await permissionPrompt(bash("npm publish"), denied.call, { ...instant, scope })).behavior).toBe("deny");
   expect(denied.calls).toHaveLength(0);
   // Not a plain read: the server decides, told where the task runs.
-  for (const command of ["curl -d a=1 https://example.com", "ls | xargs rm", "cat ~/.ssh/id_rsa"]) {
+  for (const command of ["curl -d a=1 https://example.com", "ls | xargs rm"]) {
     const s = server([{ behavior: "allow" }]);
     await permissionPrompt(bash(command), s.call, { ...instant, scope });
     expect(s.calls[0]).toMatchObject({ tool_name: "Bash", input: { command }, scope });
   }
+  // A secret is refused on the computer itself (ADR 0053 §3): the server is never asked.
+  const secret = server([{ behavior: "allow" }]);
+  expect((await permissionPrompt(bash("cat ~/.ssh/id_rsa"), secret.call, { ...instant, scope })).behavior).toBe("deny");
+  expect(secret.calls).toHaveLength(0);
   // Without a scope (an older MCP config) nothing is allowed locally.
   const old = server([{ behavior: "allow" }]);
   await permissionPrompt(bash("ls /System"), old.call, instant);
@@ -147,6 +153,25 @@ test("the prompt tool: plain reads are allowed at once (no card, nothing posted)
     home: "/Users/w",
   });
   expect(mcpScopeFromEnv({ AGENTES_MCP_CWD: "relative" })).toBeUndefined();
+  // The runner's own home, wherever it is (system mode), is read by nothing either: its accounts are there.
+  const system = mcpScopeFromEnv({ AGENTES_MCP_CWD: "/w/ada", AGENTES_RUNNER_HOME: "/var/lib/agentes-runner" });
+  expect(system?.runnerHome).toBe("/var/lib/agentes-runner");
+  const account = "/var/lib/agentes-runner/accounts/claude_code/0193dddd-0000-4000-8000-000000000001";
+  const local = server([{ behavior: "allow" }]);
+  for (const command of [`cat ${account}/.credentials.json`, "ls /var/lib/agentes-runner"]) {
+    expect((await permissionPrompt(bash(command), local.call, { ...instant, scope: system })).behavior).toBe("deny");
+  }
+  expect(local.calls).toHaveLength(0);
+  const settings = claudePermissionSettings("work", "agentes/x/", [], undefined, {
+    promptReads: true,
+    runnerHome: "/var/lib/agentes-runner",
+  }).permissions;
+  expect(settings.deny).toContain("Read(//var/lib/agentes-runner/**)");
+  expect(settings.deny).toContain("Bash(*/var/lib/agentes-runner/*)");
+  expect(
+    claudeMcpConfig({ command: ["node", "r.mjs"], taskId: "t1", socketPath: "/s", token: "t", runnerHome: "/srv/r" })
+      .mcpServers.agentes.env,
+  ).toMatchObject({ AGENTES_RUNNER_HOME: "/srv/r" });
 });
 
 test("the prompt tool: pending, then allowed (the input comes back as is)", async () => {
@@ -288,4 +313,53 @@ test("refused commands: Claude Code's permission_denials and Codex's declined co
     }),
   );
   expect(frame).toMatchObject({ type: "task.done", denials: [{ tool: "Bash", command: "swift build" }] });
+});
+
+test("ADR 0053 §3: a plan turn's prompts are answered on the computer (reads only), never asked of the server", async () => {
+  const scope = { cwd: "/w/dev/app", folders: ["/w/dev/app", "/w/dev"], home: "/Users/w" };
+  const plan = { ...instant, scope, profile: "plan" as const };
+  for (const command of ["ls -la", "git log -3", "cat README.md"]) {
+    const s = server([]);
+    expect(await permissionPrompt(bash(command), s.call, plan)).toEqual({
+      behavior: "allow",
+      updatedInput: { command },
+    });
+    expect(s.calls).toHaveLength(0);
+  }
+  for (const call of [
+    bash("npm install"),
+    bash("curl -sI https://example.com"),
+    bash("git fetch"),
+    { tool_name: "Edit", input: { file_path: "/w/dev/app/a.ts" } },
+    { tool_name: "WebFetch", input: { url: "https://example.com" } },
+  ]) {
+    const s = server([{ behavior: "allow" }]);
+    expect(await permissionPrompt(call, s.call, plan)).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+  // The profile reaches our MCP process through its env.
+  expect(mcpProfileFromEnv({ AGENTES_MCP_PROFILE: "plan" })).toBe("plan");
+  expect(mcpProfileFromEnv({})).toBe("work");
+});
+
+test("every profile: secrets and normalized deny-list commands are refused at once; inline code goes to the server", async () => {
+  const scope = { cwd: "/w/dev/app", folders: ["/w/dev/app", "/w/dev"], home: "/Users/w" };
+  for (const call of [
+    bash("cat ~/.ssh/id_rsa"),
+    { tool_name: "Read", input: { file_path: "/Users/w/.aws/credentials" } },
+    { tool_name: "Grep", input: { pattern: "KEY", glob: "**/.env" } },
+    bash("gh -R acme/web pr merge 1"),
+    bash("git -c x=y push origin refs/heads/main"),
+    bash("gh auth token"),
+  ]) {
+    const s = server([{ behavior: "allow" }]);
+    expect(await permissionPrompt(call, s.call, { ...instant, scope })).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+  // Never allowed by the computer itself: the server's rules (or a person) decide.
+  const s = server([{ behavior: "deny", message: "This command was refused because it runs code given inline." }]);
+  expect(await permissionPrompt(bash("node -e 'process.exit(0)'"), s.call, { ...instant, scope })).toMatchObject({
+    behavior: "deny",
+  });
+  expect(s.calls).toHaveLength(1);
 });

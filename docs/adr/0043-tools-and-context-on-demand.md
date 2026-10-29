@@ -2,15 +2,14 @@
 
 - Status: Accepted (2026-10-20)
 - Date: 2026-10-20
-- Planning: D65 (completes D58 step 2)
-- Extends: ADR 0015 (Tool Gateway), ADR 0032 (computer brains), D58 (big connectors as a directory)
-- Out of scope for now: provider-native tool search (Anthropic `defer_loading`, Claude Code's own ToolSearch), changing the list in the middle of a run, Claude Code's own floor (D60)
+- Extends: ADR 0015 (Tool Gateway), ADR 0032 (computer brains), big connectors as a directory (`packages/engine/src/tools/directory.ts`)
+- Out of scope for now: provider-native tool search (Anthropic `defer_loading`, Claude Code's own ToolSearch), changing the list in the middle of a run, Claude Code's own floor (`apps/server/runner/brain.ts`)
 
 ## Context
 
 Every run listed every tool the agent was granted, and the prompt repeated each one with a description. An agent with the default scopes and two connectors had 105 tools. One run of a Claude Code agent read ~1M input tokens over ~15 steps, because every step resends the whole base (~48k). Memory and wiki pages also went in as full text whether the message needed them or not.
 
-D58 step 1 turned big connectors into a directory (`<prefix>_find_tools` + `<prefix>_use_tool`), provider-neutral, through the gateway. Step 2 (the judge picks which connectors go in whole) was evaluated on 222 real runs: the judge alone at ≥ 0.3 got 92% of connector uses, and with "always load what was used in the channel in the last 6 hours", 77/77.
+Big connectors already became a directory (`<prefix>_find_tools` + `<prefix>_use_tool`), provider-neutral, through the gateway. Letting the judge pick which connectors go in whole was evaluated on 222 real runs: the judge alone at ≥ 0.3 got 92% of connector uses, and with "always load what was used in the channel in the last 6 hours", 77/77.
 
 Requirement: provider-neutral. The same mechanism must work for the API (any provider), Claude Code and Codex.
 
@@ -43,6 +42,6 @@ Tool names only, by group (the description is already in each tool's schema), pl
 
 ## Consequences
 
-- Smaller base per call on every brain, with the biggest gain on the API (schemas of the core and the chosen groups only). On Claude Code, which already hides MCP tools behind its own ToolSearch, the gain is the shorter prompt now; a short MCP list also makes D60's `alwaysLoad` cheap, removing its extra ToolSearch call.
-- One more judge call at the start of a new run (p50 ~245 ms in the D58 eval), in front of the first model call.
+- Smaller base per call on every brain, with the biggest gain on the API (schemas of the core and the chosen groups only). On Claude Code, which already hides MCP tools behind its own ToolSearch, the gain is the shorter prompt now; a short MCP list also makes the runner's `alwaysLoad` cheap, removing its extra ToolSearch call.
+- One more judge call at the start of a new run (p50 ~245 ms in that eval), in front of the first model call.
 - The model sometimes needs one `find_tools` call before acting. To verify with a behavior eval on real models before tuning the threshold or the core.

@@ -1,17 +1,28 @@
 /**
- * The icons from Mobile.html (`I`), same names and geometry: 24×24, stroke 1.7, round caps and joins.
- * Pure data (react-native-svg draws it in ./Icon.tsx); `fill` marks the few filled dots, `sw` a
- * different stroke width.
+ * The phone app's line icons: 24×24, stroke 1.7, round caps and joins.
+ * Pure data (react-native-svg draws it in ./Icon.tsx); `fill` marks the few filled dots and pixels
+ * (`opacity` fades a pixel), `sw` a different stroke width.
  */
 export type IconShape =
   | { t: "path"; d: string; sw?: number }
   | { t: "circle"; cx: number; cy: number; r: number; fill?: boolean }
-  | { t: "rect"; x: number; y: number; w: number; h: number; rx: number };
+  | { t: "rect"; x: number; y: number; w: number; h: number; rx: number; fill?: boolean; opacity?: number };
 
 const p = (d: string, sw?: number): IconShape => (sw ? { t: "path", d, sw } : { t: "path", d });
 const c = (cx: number, cy: number, r: number, fill?: boolean): IconShape =>
   fill ? { t: "circle", cx, cy, r, fill } : { t: "circle", cx, cy, r };
 const r = (x: number, y: number, w: number, h: number, rx: number): IconShape => ({ t: "rect", x, y, w, h, rx });
+/** A filled square pixel, faded to `opacity`. */
+const px = (x: number, y: number, s: number, opacity: number): IconShape => ({
+  t: "rect",
+  x,
+  y,
+  w: s,
+  h: s,
+  rx: 0,
+  fill: true,
+  opacity,
+});
 
 export const ICONS = {
   home: [p("M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z")],
@@ -30,6 +41,8 @@ export const ICONS = {
   check: [p("m5 12.5 4.5 4.5L19 7.5")],
   x: [p("M6 6l12 12M18 6 6 18")],
   clock: [c(12, 12, 8.5), p("M12 7.5V12l3 2")],
+  /** Waits on you: three pixels burning out, the request's fuse in small (no shield). */
+  wait: [px(2, 9.5, 5, 1), px(9.5, 9.5, 5, 0.6), px(17, 9.5, 5, 0.3)],
   shield: [p("M12 3.5 5 6.5v5c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9v-5Z"), p("m9 12 2 2 4-4")],
   hash: [p("M5 9h14M5 15h14M10 4 8 20M16 4l-2 16")],
   chev: [p("m6 9 6 6 6-6")],
@@ -43,10 +56,12 @@ export const ICONS = {
     c(12, 12.5, 3.5),
   ],
   mic: [r(9, 3.5, 6, 11, 3), p("M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5")],
+  sound: [p("M4 9.5v5h3.5l5 4.5V5L7.5 9.5Z"), p("M16 9a4.2 4.2 0 0 1 0 6M18.6 6.4a7.8 7.8 0 0 1 0 11.2")],
   target: [c(12, 12, 8), c(12, 12, 4), c(12, 12, 0.8, true)],
   list: [p("M9 6.5h11M9 12h11M9 17.5h11"), p("M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01", 2.6)],
   reply: [p("M4 5h16v9H11l-4 3.5V14H4Z"), p("M9 9h6")],
   copy: [r(8, 8, 11.5, 11.5, 2.5), p("M5 15.5V6.5A1.5 1.5 0 0 1 6.5 5h9")],
+  expand: [p("M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5")],
   pin: [p("M9 4h6l-1 5 3.5 3.5h-11L10 9Z"), p("M12 12.5V20")],
   eyeoff: [
     p("M4 4l16 16"),
@@ -74,7 +89,7 @@ export const ICONS = {
   ],
   smile: [c(12, 12, 8.5), p("M8.5 14c.8 1.4 2 2 3.5 2s2.7-.6 3.5-2M9 9.5h.01M15 9.5h.01", 2)],
   laptop: [r(5, 5, 14, 10, 1.8), p("M3 18.5h18")],
-  // IconesComputador.html: each computer's line icon (the small form of its portrait, `ComputerIcon`).
+  // Each computer's line icon (the small form of its portrait, `ComputerIcon`).
   computerMac: [
     r(4, 4.5, 16, 11, 2),
     p("M10.4 4.5h3.2v.7a.9.9 0 0 1-.9.9h-1.4a.9.9 0 0 1-.9-.9Z"),
@@ -96,26 +111,28 @@ export const ICONS = {
   archive: [r(3.5, 5, 17, 4, 1.2), p("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4")],
   circle: [c(12, 12, 7)],
   pause: [p("M9 6v12M15 6v12")],
-  // From NavegadorCardScroll.html: the agent's browser card (Senha, the keys, Parar).
+  // The agent's browser card (Senha, the keys, Parar).
   lock: [r(5, 11, 14, 9.5, 2.5), p("M8.5 11V8a3.5 3.5 0 0 1 7 0v3")],
   keyboard: [r(3, 6, 18, 12, 2.5), p("M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14.5h4", 2)],
   stop: [r(7, 7, 10, 10, 2)],
   flag: [p("M6 21V4M6 4h11l-2 4 2 4H6")],
-  // From MobileConversas.html: the question card, "Conversa com…" and "Livre".
+  // The question card, "Conversa com…" and "Livre".
   help: [c(12, 12, 8.5), p("M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01", 2)],
+  // The ⓘ beside a label that shows its explanation (`InfoHint`).
+  info: [c(12, 12, 8.5), p("M12 11v5M12 8h.01", 2)],
   compose: [
     p("M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"),
     p("M16.5 4.5a2 2 0 0 1 3 3L12 15l-3.5.5L9 12Z"),
   ],
   checkc: [c(12, 12, 8.5), p("m8.5 12 2.5 2.5 4.5-5")],
-  // From MobileRefinos.html ("Arquivos"): the file viewer's actions.
+  // The file viewer's actions.
   share: [
     p("M12 3.5v11M8 7.5l4-4 4 4"),
     p("M6.5 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-.5"),
   ],
   photos: [r(3.5, 5, 17, 14, 3), c(9, 10, 1.6), p("m4 17 5-4.5 4 3.5 3-2.5 4 3.5")],
   drive: [p("M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z")],
-  // From FazerDesfazer.html: the receipts of what an agent did (Desfazer, issue, memory).
+  // The receipts of what an agent did (Desfazer, issue, memory).
   undo: [p("M9 7 4.5 11.5 9 16"), p("M5 11.5h9.5a5 5 0 0 1 0 10H11")],
   issue: [c(12, 12, 8.5), c(12, 12, 2.2, true)],
   brain: [
@@ -123,13 +140,22 @@ export const ICONS = {
       "M9 5.5a3 3 0 0 0-3 3v.5a3 3 0 0 0-1.5 5.3A3 3 0 0 0 9 18.5h1V5.5ZM15 5.5a3 3 0 0 1 3 3v.5a3 3 0 0 1 1.5 5.3A3 3 0 0 1 15 18.5h-1V5.5Z",
     ),
   ],
-  // From Mensagens.html: talking to an agent while it works, the "↓ novas" pill and the connection banner.
+  // Talking to an agent while it works, the "↓ novas" pill and the connection banner.
   bolt: [p("M13 3 5 13.5h6L10 21l8-10.5h-6Z")],
   join: [p("M5 12h11M12 7l5 5-5 5"), p("M19 5v14")],
   play: [p("M8 5.5v13l10.5-6.5Z")],
   eye: [p("M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"), c(12, 12, 2.6)],
   down: [p("M12 5v14M6 13l6 6 6-6")],
   wifi: [p("M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"), p("M12 19h.01")],
+  // The web's Membros icon on this grid: someone asking to join.
+  members: [
+    c(9.6, 8.4, 3.4),
+    p("M3.6 19.2c.7-3.1 3-4.8 6-4.8s5.3 1.7 6 4.8M16.2 5.4a3.1 3.1 0 0 1 0 6M18 14.8c1.3.7 2.2 2.3 2.4 4.4"),
+  ],
+  // The web's person on this grid: the one person in a channel with an agent.
+  person: [c(12, 8.4, 3.8), p("M5 20.4c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5")],
+  // The web's reply arrow on this grid. `reply` here is the web's thread drawing.
+  replyTo: [p("M9.6 6 4.8 10.8l4.8 4.8M4.8 10.8h8.4a6 6 0 0 1 6 6v1.8")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

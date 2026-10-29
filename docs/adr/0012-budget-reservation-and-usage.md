@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements the backend decisions of 2026-10-14 (planejamento "Decisões do backend"): budget reservation, router usage, mid-stream failures. Refines 0007.
+- Refines 0007: budget reservation, router usage, mid-stream failures.
 
 ## Context
 

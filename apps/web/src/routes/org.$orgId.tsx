@@ -1,3 +1,4 @@
+import { useMe } from "@agenteschat/client";
 import { membershipIn } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
@@ -7,14 +8,20 @@ import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
+import { ConnectAiProvider } from "@/components/ConnectAi";
+import { ComputerDialogProvider } from "@/components/computer/ComputerDialog";
 import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
+import { PushOpens } from "@/components/NotificationOpen";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
+import { HoldBanner, SuspendedScreen } from "@/components/Standing";
+import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
+import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
@@ -31,11 +38,19 @@ export const Route = createFileRoute("/org/$orgId")({
 });
 
 function OrgLayout() {
-  const { me, membership } = Route.useRouteContext();
+  const loaded = Route.useRouteContext();
+  const { orgId } = Route.useParams();
+  // The cached person, so a new logo or workspace name shows at once, not at the next navigation.
+  const me = useMe().data ?? loaded.me;
+  const membership = membershipIn(me, orgId);
   const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
   const focused = /\/agents\/new\/?$/.test(path) && can(membership?.role, "manage_agents");
+  // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
+  useWebPushRefresh(me.user.id);
+  // …and the ones it still shows for what was already read elsewhere close.
+  useWebPushClear();
   useEffect(() => {
     if (membership) storage.set(STORAGE_KEYS.lastOrg, membership.id);
   }, [membership]);
@@ -60,6 +75,17 @@ function OrgLayout() {
     );
   }
 
+  // Suspended: its own screen, the socket still open so lifting it brings the workspace back at once.
+  if (membership.standing?.state === "suspended") {
+    return (
+      <OrgProvider org={membership} me={me}>
+        <RealtimeProvider orgId={membership.id}>
+          <SuspendedScreen org={membership} me={me} />
+        </RealtimeProvider>
+      </OrgProvider>
+    );
+  }
+
   return (
     <OrgProvider org={membership} me={me}>
       <RealtimeProvider orgId={membership.id}>
@@ -77,11 +103,19 @@ function OrgLayout() {
                   <ShellBar />
                 </>
               )}
-              {/* The work area: a notice on top when a computer the agents run on went offline, then the page. */}
+              {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
+                  the agents run on went offline), then the page. */}
               <div className="shell__work">
+                {!focused && <HoldBanner />}
+                {!focused && <ComputerSetupNotice />}
                 {!focused && <OutageNotices />}
                 <div className="shell__pages">
-                  <Outlet />
+                  <ConnectAiProvider>
+                    <ComputerDialogProvider>
+                      <PushOpens />
+                      <Outlet />
+                    </ComputerDialogProvider>
+                  </ConnectAiProvider>
                 </div>
               </div>
             </div>

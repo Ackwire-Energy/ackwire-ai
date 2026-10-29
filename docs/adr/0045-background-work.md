@@ -2,16 +2,15 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D71
 - Extends: ADR 0008 (agent runs), ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other)
-- Related: ADR 0029 (missions), D62 (send while the agent works)
+- Related: ADR 0029 (missions, and sending while the agent works)
 
 ## Context
 
 A run holds its conversation for up to `AGENT_MAX_TOOL_TURNS` (25) model calls (`executor.ts`). While it works:
 
 - New messages only reach it between steps, as "[Nova mensagem de X, enquanto você trabalhava]" (`pending_message_ids`, `dispatch.ts`). The agent can't answer a quick side question without first finishing or abandoning the long task.
-- "Stop and send" (D62) can cut a model call, but the agent still carries the whole task in the same loop.
+- "Stop and send" (ADR 0029) can cut a model call, but the agent still carries the whole task in the same loop.
 - The person sees "trabalhando…" with no idea of what is happening, and a long investigation ends in `too_many_tool_calls` instead of a report.
 
 Missions (ADR 0029) solve this for work measured in hours, with a plan, a worktree and reviews. Most asks are in between: a few minutes of reading logs, querying a database, checking a PR. They don't deserve a mission, but they shouldn't hold the chat either.
@@ -34,7 +33,7 @@ The prompt rule ("How you work"): if an ask would take more than two rounds of t
 
 ### Who the work acts for
 
-- Same agent, same person behind it (`personBehindRun`, D31 audience), same scopes, same monthly budget. Nothing is granted.
+- Same agent, same person behind it (`personBehindRun`, the agent's audience), same scopes, same monthly budget. Nothing is granted.
 - `ask_user` and approvals from the work surface in the parent conversation with the work's title, exactly as they do for a run today. The work waits in `waiting_input` / `waiting_approval`.
 
 ### Limits
@@ -44,7 +43,7 @@ The prompt rule ("How you work"): if an ask would take more than two rounds of t
 
 ### Waking the parent
 
-When the work ends (`done`, `failed`, `canceled`), an `agent_run.work_finished` job (priority 1, ADR 0046) creates a conversation run on the parent thread whose trigger is a hidden system message: "Background work «title» finished: <final report, ≤ 16,000 chars>". The run writes the reply in the agent's voice, where the original ask was made (D67, `replyThreadOf`). If the conversation run is still active, the report joins it through `pending_message_ids` instead.
+When the work ends (`done`, `failed`, `canceled`), an `agent_run.work_finished` job (priority 1, ADR 0046) creates a conversation run on the parent thread whose trigger is a hidden system message: "Background work «title» finished: <final report, ≤ 16,000 chars>". The run writes the reply in the agent's voice, where the original ask was made (`replyThreadOf`). If the conversation run is still active, the report joins it through `pending_message_ids` instead.
 
 Two works ending at once produce one wake with both reports (dedupe key per parent thread, 5 s window).
 

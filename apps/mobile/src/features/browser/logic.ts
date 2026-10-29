@@ -1,18 +1,50 @@
-import type { BrowserHandoff } from "@agenteschat/client";
+import {
+  type AgentAccess,
+  BROWSER_TOOL_SCOPE,
+  type BrowserHandoff,
+  type BrowserLiveUnavailable,
+  type BrowserStep,
+  handoffScreen,
+  type ScreenKind,
+} from "@agenteschat/client";
+import type { TFunction } from "i18next";
 
 /**
- * The agent's browser on the phone (ADR 0040, NavegadorAgente.html): what only the app decides. The
+ * The agent's browser on the phone (ADR 0040): what only the app decides. The
  * request, the live connection and the input events are shared with the web (`@agenteschat/client`,
  * `browser/*`). Pure, so it is unit-tested.
  */
 
-/** What the card shows: waiting for someone, me in control, someone else helping, or how it ended. */
-export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled";
+/**
+ * What the card shows: waiting for someone, me in control, someone else helping, or how it ended;
+ * `computer`: an open request on the agent's desktop, which the phone can't show (ADR 0058), so it is
+ * never taken here.
+ */
+export type CardState = "waiting" | "mine" | "helping" | "computer" | "done" | "failed" | "expired" | "cancelled";
 
-export function cardStateOf(h: Pick<BrowserHandoff, "status" | "controllerUserId">, meId: string | null): CardState {
+export function cardStateOf(
+  h: Pick<BrowserHandoff, "status" | "controllerUserId" | "screen">,
+  meId: string | null,
+): CardState {
+  if ((h.status === "pending" || h.status === "active") && handoffScreen(h) === "desktop") return "computer";
   if (h.status === "pending") return "waiting";
   if (h.status === "active") return h.controllerUserId && h.controllerUserId === meId ? "mine" : "helping";
   return h.status;
+}
+
+/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"), as on the web; its screen's too. */
+export function stepText(
+  t: TFunction,
+  s: Pick<BrowserStep, "tool" | "detail">,
+  screen: ScreenKind = "browser",
+): string {
+  const tool = s.tool.replace(/^mcp__agentes__/, "");
+  const words = screen === "desktop" ? "desktop.watch.step" : "browser.watch.step";
+  const open = screen === "desktop" ? "desktop_open" : "browser_open";
+  if (tool === open) return s.detail ? t(`${words}.${open}`, { detail: s.detail }) : t(`${words}.${open}_plain`);
+  const key = `${words}.${tool}`;
+  const text = t(key);
+  return text === key ? t(`${words}.other`) : text;
 }
 
 /** "dashboard.stripe.com" from a frame's URL (or nothing). */
@@ -48,3 +80,40 @@ export type LiveKey = (typeof LIVE_KEYS)[number];
 /** Quick reasons on "Não consegui" (the person may also write their own). */
 export const FAILED_REASONS = ["code", "password", "blocked"] as const;
 export type FailedReason = (typeof FAILED_REASONS)[number];
+
+/** The longest note the server takes on Pronto, Devolver or Não consegui. */
+export const NOTE_MAX = 1000;
+
+/** The agent may use its browser: `browser:use` granted to it ("all tools" doesn't cover it). */
+export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | undefined) =>
+  Boolean(access?.builtins.some((s) => s.scope === BROWSER_TOOL_SCOPE && s.state === "granted"));
+
+/** Why the card has no live page: the server's reason, or the stream ended. */
+export type PageGap = BrowserLiveUnavailable | "ended";
+
+/** The words for why the page shows nothing; the Cloud's computer is always on, so offline there isn't answering. */
+export const pageGapKey = (gap: PageGap, gender: "F" | "M", cloud: boolean) =>
+  `mobile.browser.live.unavailable.${gap === "offline" && cloud ? "offlineCloud" : gap}${gender}` as const;
+
+export interface PageNote {
+  say: PageGap | "starting" | "hidden";
+  /** Only while the page may still come by itself. */
+  spin: boolean;
+  help: "grace" | "closedHelp" | null;
+}
+
+/**
+ * The page box with no page to show: opening, hidden while someone else is in control (their screen
+ * stays theirs), or why it can't be shown, with a line of help where waiting means something. A closed
+ * or ended browser holds until a frame comes, and none comes to a hidden view: there, who holds it wins.
+ */
+export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean): PageNote {
+  if (gap && !(hidden && (gap === "closed" || gap === "ended"))) {
+    const help = gap === "closed" ? "closedHelp" : gap === "reconnecting" && mine ? "grace" : null;
+    return { say: gap, spin: gap === "reconnecting", help };
+  }
+  return hidden ? { say: "hidden", spin: false, help: null } : { say: "starting", spin: true, help: null };
+}
+
+/** A browser that is closed, ended or on a computer that's off: the agent's sky in the page's place, the words on it. */
+export const skyBehind = (note: PageNote) => note.say === "closed" || note.say === "ended" || note.say === "offline";

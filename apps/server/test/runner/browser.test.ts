@@ -1,11 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   AGENT_BROWSER_VERSION,
+  BROWSER_LIMITS,
   BROWSER_PROTOCOL,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
+  parseRunnerFrame,
   parseServerFrame,
   type RunnerAccess,
   type RunnerFrame,
@@ -16,6 +18,8 @@ import {
   BrowserManager,
   type BrowserManagerOptions,
   CHROME_ARGS,
+  ChromeStartError,
+  captureMarks,
   chromeLabel,
   chromeLaunchArgs,
   chromeUserAgent,
@@ -24,13 +28,15 @@ import {
   findChrome,
   type InputState,
   isWebPage,
+  jpegSize,
+  launchChrome,
   type OwnChrome,
   relayCommands,
   type StreamSocket,
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -209,7 +215,16 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
   mkdirSync(mac, { recursive: true });
   writeFileSync(path.join(mac, "Google Chrome for Testing"), "");
   expect(findChrome(home, "darwin")).toBe(path.join(mac, "Google Chrome for Testing"));
-  expect(CHROME_ARGS).toContain("--disable-component-update");
+  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), and no
+  // chip asking to sign in to Chrome itself.
+  expect(CHROME_ARGS).toEqual([
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-component-update",
+    "--force-prefers-reduced-motion",
+    "--disable-features=SigninPromoOnAvatarPill",
+  ]);
 });
 
 test("site allowlist: exact hosts, *. wildcards with the bare domain, blank pages always", () => {
@@ -364,6 +379,203 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
   );
 });
 
+/** Starts a fake Chrome that runs `body` (sh) and exits; what `launchChrome` threw. */
+async function failedStart(body: string): Promise<ChromeStartError> {
+  const dir = tempDir("chrome-");
+  dirs.push(dir);
+  const exe = path.join(dir, "chrome");
+  writeFileSync(exe, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  const err = await launchChrome(exe, ["--headless=new"], dir).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(ChromeStartError);
+  return err as ChromeStartError;
+}
+
+test.if(posix)(
+  "a Chrome that can't load its libraries says which, in words for people; a profile in use only when Chrome says so",
+  async () => {
+    const loader = `echo "$0: error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory" >&2; exit 127`;
+    let err = await failedStart(loader);
+    expect(err.missing).toEqual(["libnspr4.so"]);
+    expect(err.message).toBe(
+      "the agent's computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
+    );
+    expect(err.detail).toMatch(
+      /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
+    );
+
+    // The loader stops at the first one: ldd lists them all, and people read the first few.
+    const bin = tempDir("ldd-");
+    dirs.push(bin);
+    const libs = ["libglib-2.0.so.0", "libnss3.so", "libnssutil3.so", "libsmime3.so", "libnspr4.so", "libX11.so.6"];
+    const all = [...libs, "libasound.so.2"];
+    writeFileSync(
+      path.join(bin, "ldd"),
+      `#!/bin/sh\nprintf '\\tlibc.so.6 => /lib/libc.so.6 (0x7f00)\\n'\nfor l in ${all.join(" ")}; do printf '\\t%s => not found\\n' "$l"; done\n`,
+      { mode: 0o755 },
+    );
+    const PATH = process.env.PATH;
+    process.env.PATH = `${bin}:${PATH}`;
+    try {
+      err = await failedStart(loader);
+    } finally {
+      process.env.PATH = PATH;
+    }
+    expect(err.missing).toEqual(all);
+    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more). Install them on it`);
+    expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
+
+    // A profile another Chrome holds, as Chrome for Testing says it and exits.
+    const held =
+      "Failed to create a ProcessSingleton for your profile directory. Aborting now to avoid profile corruption.";
+    err = await failedStart(`echo "${held}" >&2; exit 21`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting (another Chrome is using this profile)");
+    expect(err.detail).toBe(held);
+
+    // Any other exit, a loader error among them, gets no guess at why; what Chrome said goes to the logs.
+    err = await failedStart(`echo "$0: /lib/libc.so.6: version 'GLIBC_2.38' not found (required by $0)" >&2; exit 1`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting");
+    expect(err.detail).toContain("version 'GLIBC_2.38' not found");
+  },
+);
+
+test.if(posix)("a started Chrome's browser endpoint comes from the second line of its port file", async () => {
+  const dir = tempDir("chrome-");
+  dirs.push(dir);
+  const exe = path.join(dir, "chrome");
+  // `$1` is the profile; `$2` what the port file holds.
+  writeFileSync(exe, `#!/bin/sh\nprintf "$2" > "$1/DevToolsActivePort"\nexec sleep 30\n`, { mode: 0o755 });
+  const start = async (content: string) => {
+    const chrome = await launchChrome(exe, [dir, content], dir);
+    chrome.kill();
+    await chrome.exited;
+    return chrome;
+  };
+  expect(await start("45678\\n/devtools/browser/0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0")).toMatchObject({
+    port: 45678,
+    wsPath: "/devtools/browser/0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0",
+  });
+  // A port alone, or anything else on the second line, gives no endpoint: its traffic isn't counted.
+  expect(await start("45679")).not.toHaveProperty("wsPath");
+  expect(await start("45680\\nws://elsewhere/devtools/browser/x")).not.toHaveProperty("wsPath");
+});
+
+/**
+ * A Chrome's DevTools endpoint on this computer, for the traffic counter: each connection's first
+ * auto-attach is answered when `answer` lets it, then a page attaches, and once its network events are on
+ * it says it received the next of `down` (bytes) and sent a request of 100 bytes of body.
+ */
+function fakeDevtools(down: number[], answer: (reply: () => void) => void = (reply) => reply()) {
+  const asked: string[] = [];
+  let connections = 0;
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: (req, srv) => (srv.upgrade(req) ? undefined : new Response("upgrade", { status: 426 })),
+    websocket: {
+      open(ws) {
+        (ws as unknown as { data: number }).data = connections++;
+      },
+      message(ws, raw) {
+        const msg = JSON.parse(String(raw)) as { id: number; method: string; sessionId?: string };
+        asked.push(msg.sessionId ? `${msg.method} ${msg.sessionId}` : msg.method);
+        const n = (ws as unknown as { data: number }).data;
+        const event = (method: string, params: object, sessionId?: string) =>
+          ws.send(JSON.stringify({ method, params, ...(sessionId ? { sessionId } : {}) }));
+        if (msg.method === "Target.setAutoAttach" && !msg.sessionId) {
+          answer(() => {
+            ws.send(JSON.stringify({ id: msg.id, result: {} }));
+            event("Target.attachedToTarget", { sessionId: `page-${n}`, targetInfo: { type: "page" } });
+          });
+        } else if (msg.method === "Network.enable") {
+          event(
+            "Network.requestWillBeSentExtraInfo",
+            { requestId: "r", headers: { "content-length": "100" } },
+            msg.sessionId,
+          );
+          event("Network.loadingFinished", { requestId: "r", encodedDataLength: down[n] ?? 0 }, msg.sessionId);
+        }
+      },
+    },
+  });
+  return { port: server.port as number, asked, stop: () => server.stop(true) };
+}
+
+/** Fake Chromes whose endpoint is `devtools`. */
+function chromesAt(devtools: { port: number }) {
+  const chromes = fakeChromes();
+  const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => ({
+    ...(await chromes.start(exe, args, profile)),
+    port: devtools.port,
+    wsPath: "/devtools/browser/fake",
+  });
+  return { started: chromes.started, start };
+}
+
+const SENT = Buffer.byteLength("content-length") + 3 + 4 + 100;
+
+test.if(posix)("a new Chrome's first command waits for its traffic counter to attach, a second at most", async () => {
+  let reply = () => {};
+  const held = fakeDevtools([], (r) => {
+    reply = r;
+  });
+  try {
+    const t = setup({ startChrome: chromesAt(held).start });
+    const opened = t.act("open", ["https://a.example/"]);
+    await waitFor(() => held.asked.includes("Target.setAutoAttach"));
+    await Bun.sleep(300);
+    expect(t.logged()).toEqual([]);
+    reply();
+    expect(await opened).toMatchObject({ success: true });
+    expect(t.logged().map((l) => l.args.at(-1))).toEqual(["https://a.example/"]);
+  } finally {
+    held.stop();
+  }
+
+  // An endpoint that never answers holds the first command a second, no more.
+  const silent = fakeDevtools([], () => {});
+  try {
+    const t = setup({ startChrome: chromesAt(silent).start });
+    const at = Date.now();
+    expect(await t.act("open", ["https://b.example/"])).toMatchObject({ success: true });
+    expect(Date.now() - at).toBeGreaterThanOrEqual(950);
+  } finally {
+    silent.stop();
+  }
+});
+
+test.if(posix)("takeTraffic: what each Chrome moved, across a restart and after it exits, taken once", async () => {
+  const devtools = fakeDevtools([1000, 500]);
+  try {
+    const chromes = chromesAt(devtools);
+    const t = setup({ startChrome: chromes.start });
+    expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
+    // The endpoint says what each Chrome moved as soon as its network events are on.
+    const counted = async (n: number) => {
+      await waitFor(() => devtools.asked.includes(`Network.enable page-${n}`));
+      await Bun.sleep(100);
+    };
+    await t.act("open", ["https://a.example/"]);
+    await counted(0);
+    // It stops and starts again: what the first one moved waits to be taken.
+    await t.manager.stop(dev);
+    await t.act("open", ["https://a.example/again"]);
+    await counted(1);
+    expect(chromes.started.map((c) => c.killed)).toEqual([true, false]);
+    expect(t.manager.takeTraffic()).toEqual({ up: 2 * SENT, down: 1500 });
+    expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
+    await t.manager.close();
+    expect(chromes.started.map((c) => c.killed)).toEqual([true, true]);
+    expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
+  } finally {
+    devtools.stop();
+  }
+});
+
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
   const t = setup();
   expect(await errorCode(() => t.act("open", ["https://x.com", "--profile", "Default"]))).toBe("bad_request");
@@ -405,6 +617,111 @@ test.if(posix)(
     expect(commands().filter((c) => c === "stream status")).toHaveLength(1);
   },
 );
+
+test("jpegSize reads a JPEG's frame header; captureMarks keeps only well-formed marks", () => {
+  // SOI, an APP0 segment to skip, then SOF0 with 800 × 1280.
+  const jpeg = Uint8Array.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x20, 0x05, 0x00, 0x03, 0, 0, 0,
+    0, 0, 0,
+  ]);
+  expect(jpegSize(jpeg)).toEqual({ width: 1280, height: 800 });
+  expect(jpegSize(Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).toBeNull();
+  expect(
+    captureMarks([
+      { ref: "@e2", number: 2, role: "link", box: { x: 1, y: 2, width: 3, height: 4 } },
+      { ref: "not-a-ref", box: {} },
+      "nope",
+    ]),
+  ).toEqual([{ ref: "e2", number: 2, role: "link", box: { x: 1, y: 2, width: 3, height: 4 } }]);
+});
+
+test.if(posix)(
+  "a batch runs back to back in the agent's session and stops at a failure it doesn't tolerate",
+  async () => {
+    const t = setup();
+    const res = await t.manager.batch(dev, await t.folder(), {
+      op: "browser.batch",
+      commands: [
+        { command: "open", args: ["https://shop.example.com"], timeoutSeconds: 30 },
+        // The fake knows neither: one tolerated, one not.
+        { command: "fill", args: ["@e1", "x"], timeoutSeconds: 30, tolerate: true },
+        { command: "snapshot", args: ["-c"], timeoutSeconds: 30 },
+        { command: "press", args: ["Enter"], timeoutSeconds: 30 },
+        { command: "click", args: ["@e1"], timeoutSeconds: 30 },
+      ],
+    });
+    expect(res.answers.map((a) => a.success)).toEqual([true, false, true, false]);
+    expect(res.answers[2]).toMatchObject({ data: { snapshot: '- button "Go" [ref=e1]' } });
+    // The command after the failure never ran.
+    expect(t.logged().some((c) => c.args.slice(-2).join(" ") === "click @e1")).toBe(false);
+  },
+);
+
+test.if(posix)("a command that throws mid-batch keeps the answers of what already ran", async () => {
+  const t = setup();
+  const res = await t.manager.batch(dev, await t.folder(), {
+    op: "browser.batch",
+    commands: [
+      { command: "open", args: ["https://shop.example.com"], timeoutSeconds: 30 },
+      // Checked when it runs: a bad ref throws there.
+      { command: "agentes:type_secret", args: ["not-a-ref", "X"], timeoutSeconds: 30 },
+      { command: "snapshot", args: [], timeoutSeconds: 30 },
+    ],
+  });
+  expect(res.answers.map((a) => a.success)).toEqual([true, false]);
+  expect(res.answers[1]?.error).toContain("agentes:type_secret takes a ref");
+});
+
+test.if(posix)("a capture of a page outside the agent's sites is refused (like every read)", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  expect(await errorCode(async () => t.manager.capture(dev, await t.folder(), ["other.example"]))).toBe("not_allowed");
+  expect(t.logged().some((c) => c.args.includes("--annotate"))).toBe(false);
+});
+
+test.if(posix)("a batch with one command that wouldn't pass is refused before anything runs", async () => {
+  const t = setup();
+  const folder = await t.folder();
+  const batch = (commands: { command: string; args: string[] }[], allowedDomains?: string[]) =>
+    errorCode(() =>
+      t.manager.batch(dev, folder, {
+        op: "browser.batch",
+        commands: commands.map((c) => ({ ...c, timeoutSeconds: 30 })),
+        ...(allowedDomains ? { allowedDomains } : {}),
+      }),
+    );
+  expect(
+    await batch(
+      [
+        { command: "open", args: ["https://shop.example.com"] },
+        { command: "open", args: ["https://evil.example"] },
+      ],
+      ["shop.example.com"],
+    ),
+  ).toBe("not_allowed");
+  expect(await batch([{ command: "open", args: ["https://x.com", "--profile", "Default"] }])).toBe("bad_request");
+  expect(await batch([{ command: "chat", args: ["hi"] }])).toBe("bad_request");
+  expect(await batch([])).toBe("bad_request");
+  expect(t.logged()).toHaveLength(0);
+});
+
+test.if(posix)("capture: the page as a JPEG with its numbered elements, and the file gone at once", async () => {
+  const t = setup();
+  expect(await errorCode(async () => t.manager.capture(dev, await t.folder()))).toBe("bad_request");
+  await t.act("open", ["https://shop.example.com"]);
+  const shot = await t.manager.capture(dev, await t.folder());
+  expect(shot).toMatchObject({
+    width: 1280,
+    height: 800,
+    viewport: { width: 1280, height: 800 },
+    url: "https://shop.example.com",
+    marks: [{ ref: "e1", number: 1, role: "button", name: "Go", box: { x: 10, y: 20, width: 100, height: 40 } }],
+  });
+  expect([...Buffer.from(shot.data, "base64").subarray(0, 2)]).toEqual([0xff, 0xd8]);
+  expect(readdirSync(path.join(await t.folder(), ".agentes", "captures"))).toEqual([]);
+  const call = t.logged().find((c) => c.args.includes("--annotate"));
+  expect(call?.args).toContain("jpeg");
+});
 
 test.if(posix)("the first screenshot works: its folder is made before", async () => {
   const t = setup();
@@ -574,11 +891,64 @@ test.if(posix)(
   },
 );
 
+test.if(posix)("a command while the browsers close (a runner that just started) starts its Chrome after", async () => {
+  const chromes = fakeChromes();
+  let closing = true;
+  const startedWhileClosing: boolean[] = [];
+  const t = setup({
+    startChrome: (exe, args, profile) => {
+      startedWhileClosing.push(closing);
+      return chromes.start(exe, args, profile);
+    },
+  });
+  const closed = t.manager.closeAll().then(() => {
+    closing = false;
+  });
+  expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
+  await closed;
+  expect(startedWhileClosing).toEqual([false]);
+  expect(t.logged().map((l) => l.args.at(-1))).toEqual(["--all", "https://a.example/"]);
+});
+
+/** A computer without Chrome for Testing until the fake's `install` ran. */
+function setupWithoutChrome() {
+  const box: { t?: ReturnType<typeof setup> } = {};
+  const installs = () => box.t?.logged().filter((l) => l.args[0] === "install").length ?? 0;
+  box.t = setup({
+    chrome: () => (installs() > 0 ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
+  });
+  return { t: box.t, installs };
+}
+
+test.if(posix)("an agent's first two commands at once share its new session and one Chrome install", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const folder = await t.folder();
+  const act = (command: string, args: string[]) =>
+    t.manager.act(dev, folder, { op: "browser.act", command, args, timeoutSeconds: 30 });
+  // The person's open and the live view's `get url` right after it, as the app sends them.
+  const [opened, url] = await Promise.all([act("open", ["https://a.example/"]), act("get", ["url"])]);
+  expect(opened).toMatchObject({ success: true });
+  // In the same session's queue, behind the open (a second session has no Chrome: "the browser isn't open").
+  expect(url).toMatchObject({ success: true, data: { url: "https://a.example/" } });
+  expect(installs()).toBe(1);
+  expect(t.chromes).toHaveLength(1);
+});
+
+test.if(posix)("two agents' first commands at once install Chrome once", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const answers = await Promise.all([
+    t.act("open", ["https://a.example/"]),
+    t.act("open", ["https://b.example/"], { agent: ops }),
+  ]);
+  expect(answers).toMatchObject([{ success: true }, { success: true }]);
+  expect(installs()).toBe(1);
+});
+
 // ── Live view ────────────────────────────────────────────────────────────────
 
 test.if(posix)("the stream relays frames with the page's URL, changes mode, and ends with a frame", async () => {
   const t = setup();
-  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("bad_request");
+  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
   await t.act("open", ["https://shop.example.com"]);
   expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
   const socket = t.sockets[0] as FakeSocket;
@@ -607,6 +977,81 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
   expect(await t.manager.streamStop(dev)).toEqual({ stopped: false });
+});
+
+test.if(posix)("a stream can't start on a closed browser, never opened or closed since: browser_closed", async () => {
+  const t = setup();
+  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
+  await t.act("open", ["https://shop.example.com"]);
+  await t.act("close");
+  expect(await errorCode(() => t.manager.streamStart(dev, "control"))).toBe("browser_closed");
+  expect(t.sockets).toHaveLength(0);
+  // Opening a page (the agent, or a person in control) starts it again, and it streams.
+  await t.act("open", ["https://shop.example.com"]);
+  expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+  await t.manager.streamStop(dev);
+});
+
+test.if(posix)(
+  "an idle page shows at once: a stream with no frame sends one screenshot, with the tab's address and title",
+  async () => {
+    const t = setup({ firstFrameMs: 5 });
+    await t.act("open", ["https://shop.example.com"]);
+    await t.manager.streamStart(dev, "watch");
+    const socket = t.sockets[0] as FakeSocket;
+    // What the stream says on connect: the page's size, then the tabs (the active one's title).
+    socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+    socket.push({
+      type: "tabs",
+      tabs: [
+        { url: "https://x.example/", title: "X", active: false },
+        { url: "https://shop.example.com/", title: "Loja", active: true },
+      ],
+    });
+    await waitFor(() => t.frames.some((f) => f.type === "browser.frame"));
+    expect(t.frames[0]).toEqual({
+      type: "browser.frame",
+      agentId: dev.id,
+      seq: 0,
+      data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes for a .jpg
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/", title: "Loja" },
+    });
+    const shot = t.logged().find((c) => c.args.includes("screenshot"));
+    expect(shot?.args.slice(-6)).toEqual([
+      "screenshot",
+      path.join(t.home, "browser", "agent-01a142cb-frame.jpg"),
+      "--screenshot-format",
+      "jpeg",
+      "--screenshot-quality",
+      "70",
+    ]);
+    // The screenshot is removed after the frame goes out, not before.
+    await waitFor(() => !existsSync(path.join(t.home, "browser", "agent-01a142cb-frame.jpg")));
+    // Another page: frames carry its address; its title comes with the next tab list.
+    socket.push({ type: "url", url: "https://shop.example.com/cart" });
+    socket.push({ type: "frame", seq: 3, data: "/9j/B", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    expect(t.frames.at(-1)).toEqual({
+      type: "browser.frame",
+      agentId: dev.id,
+      seq: 3,
+      data: "/9j/B",
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/cart" },
+    });
+    await t.manager.streamStop(dev);
+  },
+);
+
+test.if(posix)("a page that repaints by itself gets no screenshot", async () => {
+  const t = setup({ firstFrameMs: 5 });
+  await t.act("open", ["https://shop.example.com"]);
+  await t.manager.streamStart(dev, "watch");
+  const socket = t.sockets[0] as FakeSocket;
+  socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+  socket.push({ type: "frame", seq: 1, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+  await Bun.sleep(40);
+  expect(t.logged().some((c) => c.args.includes("screenshot"))).toBe(false);
+  expect(t.frames.filter((f) => f.type === "browser.frame")).toHaveLength(1);
+  await t.manager.streamStop(dev);
 });
 
 test.if(posix)("two starts at once open one socket; a stop sent meanwhile closes it", async () => {
@@ -769,6 +1214,29 @@ test("a download that doesn't match its pinned checksum is never used", async ()
   expect(fetched).toBe("");
 });
 
+test.if(posix)(
+  "a Chrome install that fails without a word says so in a sentence, with no empty parentheses",
+  async () => {
+    const home = tempDir("runner-home-");
+    const ws = tempDir();
+    dirs.push(home, ws);
+    const manager = new BrowserManager({
+      home,
+      log: () => {},
+      send: () => true,
+      secret: async () => null,
+      command: ["/bin/sh", "-c", ":"],
+      chrome: () => null,
+    });
+    const act = () =>
+      manager.act(dev, ws, { op: "browser.act", command: "open", args: ["https://a.example"], timeoutSeconds: 5 });
+    expect(await errorCode(act)).toBe("browser_unavailable");
+    const { reason } = manager.info();
+    expect(reason).toStartWith("Couldn't install a browser for the agent.");
+    expect(reason).not.toMatch(/[;—]|\(\)/);
+  },
+);
+
 test.if(posix)("the desktop app's sidecar is used as is, and closeAll closes this runner's browsers only", async () => {
   const home = tempDir("runner-home-");
   const bin = tempDir("runner-bin-");
@@ -840,6 +1308,20 @@ test.if(posix)("a paused computer starts no browser work", async () => {
   };
   expect(await errorCode(() => handleRequest(ctx, req, scope))).toBe("paused");
   expect(t.logged()).toHaveLength(0);
+});
+
+test("a frame reaches the server with the page's address and title, the title cut to its limit", () => {
+  const frame = (metadata: Record<string, unknown>) =>
+    parseRunnerFrame(JSON.stringify({ type: "browser.frame", agentId: dev.id, seq: 1, data: "/9j/A", metadata }));
+  const size = { deviceWidth: 1280, deviceHeight: 720 };
+  expect(frame({ ...size, url: "https://shop.example.com/", title: "Loja" })).toMatchObject({
+    metadata: { ...size, url: "https://shop.example.com/", title: "Loja" },
+  });
+  const long = frame({ ...size, title: "x".repeat(BROWSER_LIMITS.title + 50) });
+  expect(long?.type === "browser.frame" && long.metadata.title?.length).toBe(BROWSER_LIMITS.title);
+  // An older runner sends none; an empty one isn't kept.
+  const none = frame({ ...size, title: "" });
+  expect(none?.type === "browser.frame" && "title" in none.metadata).toBe(false);
 });
 
 // ── For the desktop app's tray ───────────────────────────────────────────────

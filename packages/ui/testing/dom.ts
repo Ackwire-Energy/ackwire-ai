@@ -17,6 +17,8 @@
  * never replaced.
  */
 import { afterAll, beforeAll } from "bun:test";
+import { Duplex } from "node:stream";
+import { createGunzip, createInflate, createInflateRaw } from "node:zlib";
 import { Window } from "happy-dom";
 
 const KEEP_NATIVE = new Set([
@@ -73,6 +75,22 @@ interface DomState {
   attached: boolean;
 }
 
+const INFLATE: Record<string, () => Duplex> = {
+  gzip: createGunzip,
+  deflate: createInflate,
+  "deflate-raw": createInflateRaw,
+};
+
+/** The browser's `DecompressionStream` on node:zlib: it streams, and a corrupt input errors it. */
+class ZlibDecompressionStream {
+  constructor(format: string) {
+    const inflate = INFLATE[format];
+    if (!inflate) throw new TypeError(`Unsupported compression format: '${format}'`);
+    // Its `readable` and `writable` sides: all that `pipeThrough` takes.
+    Object.assign(this, Duplex.toWeb(inflate()));
+  }
+}
+
 function state(): DomState {
   const existing = g.__agentesDom as DomState | undefined;
   if (existing) return existing;
@@ -104,6 +122,8 @@ function state(): DomState {
   }
   w.ResizeObserver ??= NoopResizeObserver;
   g.ResizeObserver ??= w.ResizeObserver;
+  // Every browser has it; older Bun releases (and happy-dom) don't.
+  g.DecompressionStream ??= ZlibDecompressionStream;
   g.IS_REACT_ACT_ENVIRONMENT = true;
   const native = new Map<string, PropertyDescriptor | undefined>();
   for (const key of SWAPPED) native.set(key, Object.getOwnPropertyDescriptor(globalThis, key));

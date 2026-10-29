@@ -199,6 +199,26 @@ export async function revokeCredential(db: Database, actorId: string, orgId: str
 }
 
 /**
+ * A credential that isn't revoked, as stored (its key still sealed). Org-scoped. The row is cached;
+ * the key is decrypted per call and never cached.
+ */
+export async function usableCredentialRow(db: Executor, orgId: string, credentialId: string) {
+  return (await caches.credentials.getOrLoad(`${orgId}:${credentialId}`, async () => {
+    const [r] = await db
+      .select()
+      .from(providerCredentials)
+      .where(
+        and(
+          eq(providerCredentials.id, credentialId),
+          eq(providerCredentials.orgId, orgId),
+          isNull(providerCredentials.revokedAt),
+        ),
+      );
+    return r ?? null;
+  })) as typeof providerCredentials.$inferSelect | null;
+}
+
+/**
  * Decrypts a credential for a model call. Backend-only: the Model Gateway is
  * its only caller. Org-scoped: a credential id from another org is not found.
  */
@@ -213,20 +233,7 @@ export async function decryptCredential(
   workspaceId?: string;
   options?: { organization?: string; project?: string };
 } | null> {
-  // The row (ciphertext) is cached; the key is decrypted per call and never cached.
-  const row = (await caches.credentials.getOrLoad(`${orgId}:${credentialId}`, async () => {
-    const [r] = await db
-      .select()
-      .from(providerCredentials)
-      .where(
-        and(
-          eq(providerCredentials.id, credentialId),
-          eq(providerCredentials.orgId, orgId),
-          isNull(providerCredentials.revokedAt),
-        ),
-      );
-    return r ?? null;
-  })) as typeof providerCredentials.$inferSelect | null;
+  const row = await usableCredentialRow(db, orgId, credentialId);
   if (!row) return null;
   const apiKey = await openSecret(
     keyWrappers,

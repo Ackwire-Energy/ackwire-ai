@@ -48,22 +48,31 @@ test("run failures, approvals and memory updates carry codes", async () => {
     errorParams: { detail: "rate limited" },
   });
   expect(runErrorDetail("canceled_by:u1")).toEqual({ errorCode: "run.canceled", errorParams: { byUserId: "u1" } });
+  expect(runErrorDetail("Add an API key for Claude in the workspace settings")).toEqual({
+    errorCode: "run.missing_credential",
+    errorParams: { provider: "Claude" },
+  });
+  // Errors stored while the provider was labelled "Anthropic" read with today's name.
   expect(runErrorDetail("Add an API key for Anthropic in the workspace settings")).toEqual({
     errorCode: "run.missing_credential",
-    errorParams: { provider: "Anthropic" },
+    errorParams: { provider: "Claude" },
   });
   expect(runErrorDetail("Interrupted by a server update")).toMatchObject({ errorCode: "run.interrupted" });
+  expect(runErrorDetail("This agent's API key was revoked. Pick another one in the agent's settings.")).toEqual({
+    errorCode: "run.credential_revoked",
+  });
+  // Older rows keep the earlier wording, joined by a semicolon.
   expect(runErrorDetail("This agent's API key was revoked; pick another one in the agent's settings")).toEqual({
     errorCode: "run.credential_revoked",
   });
   expect(runErrorDetail("This agent's model is from OpenAI, but the chosen key is from Anthropic")).toEqual({
     errorCode: "run.credential_wrong_provider",
-    errorParams: { modelProvider: "OpenAI", keyProvider: "Anthropic" },
+    errorParams: { modelProvider: "OpenAI", keyProvider: "Claude" },
   });
   // Rows written before the backend was in English still map to their codes.
   expect(runErrorDetail("Configure uma chave da API da Anthropic nas configurações do workspace")).toEqual({
     errorCode: "run.missing_credential",
-    errorParams: { provider: "Anthropic" },
+    errorParams: { provider: "Claude" },
   });
   expect(runErrorDetail("Interrompida por uma atualização do servidor")).toMatchObject({
     errorCode: "run.interrupted",

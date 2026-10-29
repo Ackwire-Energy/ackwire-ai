@@ -80,6 +80,10 @@ export const caches = {
   contextPresence: new TtlCache<unknown>(TTL_MS),
   /** Whether a thread's context range from another channel is still visible to everyone in the thread. */
   rangeVisible: new TtlCache<unknown>(TTL_MS),
+  /** A person's time zone in an org, else the org's (`orgId:userId`): the "Now" block of every run. */
+  zones: new TtlCache<unknown>(TTL_MS),
+  /** An org's standing (`standing.ts`), read before every model and computer call: a hold bites within 5 s everywhere. */
+  standing: new TtlCache<unknown>(5_000),
 };
 
 /** Forgets everything about an org (used after broad changes and in tests). */

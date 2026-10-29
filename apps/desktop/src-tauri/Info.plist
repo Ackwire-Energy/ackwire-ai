@@ -16,5 +16,8 @@
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
+  <!-- Files downloaded from the site get the quarantine mark, as from a browser: the Mac checks them. -->
+  <key>LSFileQuarantineEnabled</key>
+  <true/>
 </dict>
 </plist>

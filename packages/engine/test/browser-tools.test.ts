@@ -1,15 +1,19 @@
 import { afterEach, expect, test } from "bun:test";
-import type { MachineRequest } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { DESKTOP_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   agentBrowserStatus,
   agentFolderPath,
+  BROWSER_SCOPE,
   BROWSER_TOOLS,
   browserErrorText,
   cleanBrowserDomains,
   createBrowserToolSource,
+  createFakeJudge,
+  DESKTOP_SCOPE,
   getAgentBrowser,
   grantScopes,
+  type Judge,
   type MachineCaller,
   MachineRequestError,
   type MachineStatus,
@@ -17,6 +21,7 @@ import {
   setAgentBrowserDomains,
   wrapPage,
 } from "../src";
+import { actionCommands } from "../src/browser/surface";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
@@ -28,6 +33,7 @@ afterEach(async () => {
 });
 
 type Reply = { success: boolean; data: unknown; error?: string };
+type Act = Extract<MachineRequest, { op: "browser.act" }>;
 
 /** A hub for one machine: its status as the test sets it, and every request it got. */
 function fakeHub(state: { machineId: string; orgId: string }) {
@@ -35,6 +41,8 @@ function fakeHub(state: { machineId: string; orgId: string }) {
   const s = {
     status: {} as Partial<MachineStatus>,
     reply: { success: true, data: { snapshot: '- button "Save" [ref=e1]', url: "https://shop.example/" } } as Reply,
+    /** Per request, when set (else `reply` for everything). */
+    respond: null as ((request: MachineRequest) => unknown) | null,
     error: null as Error | null,
   };
   const hub: MachineCaller = {
@@ -57,13 +65,13 @@ function fakeHub(state: { machineId: string; orgId: string }) {
     async call(_id, request) {
       calls.push(request as MachineRequest);
       if (s.error) throw s.error;
-      return s.reply as never;
+      return (s.respond ? s.respond(request as MachineRequest) : s.reply) as never;
     },
   };
   return { hub, calls, s };
 }
 
-async function browserSetup() {
+async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: () => number } = {}) {
   const holder: { hub?: MachineCaller } = {};
   f = await setup({
     toolSources: [
@@ -74,6 +82,9 @@ async function browserSetup() {
             call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
           },
         },
+        ...(options.judge ? { judge: options.judge } : {}),
+        ...(options.vision ? { vision: () => true } : {}),
+        ...(options.now ? { now: options.now } : {}),
       }),
     ],
   });
@@ -89,8 +100,17 @@ async function browserSetup() {
     if (r.type !== "result") throw new Error("expected a result");
     return r.output;
   };
-  return { ...fake, machineId: paired.machineId, ctx, names, call };
+  /** The `browser.act` commands sent from now on. */
+  const since = () => {
+    const n = fake.calls.length;
+    return () => fake.calls.slice(n).filter((c): c is Act => c.op === "browser.act");
+  };
+  return { ...fake, machineId: paired.machineId, ctx, names, call, since };
 }
+
+/** What a runner answers a settle, a wait and a look with (and the action itself). */
+const ok = (data: unknown = {}): Reply => ({ success: true, data });
+const page = (snapshot: string, url = "https://shop.example/") => ok({ snapshot, origin: url, refs: {} });
 
 test("offered only with browser:use (never through 'all tools') and a machine that serves the browser", async () => {
   const b = await browserSetup();
@@ -137,17 +157,27 @@ test("each tool is one agent-browser command in the agent's session, with its si
   expect(b.calls.at(-1)).toMatchObject({
     op: "browser.act",
     command: "snapshot",
-    args: ["-c"],
+    args: [],
     agent: { id: f.agent.id, handle: "dev", name: "Dev" },
     allowedDomains: ["shop.example.com", "*.stripe.com"],
   });
 
-  await b.call("browser_click", { ref: "e1" });
-  expect(b.calls.at(-1)).toMatchObject({ command: "click", args: ["@e1"] });
-  await b.call("browser_fill", { ref: "[ref=e2]", text: "ana@example.com" });
-  expect(b.calls.at(-1)).toMatchObject({ command: "fill", args: ["@e2", "ana@example.com"] });
-  await b.call("browser_check", { ref: "e3", checked: false });
-  expect(b.calls.at(-1)).toMatchObject({ command: "uncheck", args: ["@e3"] });
+  // An action, then the page settles and is looked at again: on protocol 12, one command at a time.
+  let sent = b.since();
+  const clicked = await b.call("browser_click", { target: "e1" });
+  expect(sent().map((c) => c.command)).toEqual(["click", "eval", "wait", "eval", "snapshot"]);
+  expect(sent()[0]).toMatchObject({
+    command: "click",
+    args: ["@e1"],
+    allowedDomains: ["shop.example.com", "*.stripe.com"],
+  });
+  expect(clicked.content).toContain("Clicked button (e1).");
+  sent = b.since();
+  await b.call("browser_fill", { target: "[ref=e2]", text: "ana@example.com" });
+  expect(sent()[0]).toMatchObject({ command: "fill", args: ["@e2", "ana@example.com"] });
+  sent = b.since();
+  await b.call("browser_check", { target: "e3", checked: false });
+  expect(sent()[0]).toMatchObject({ command: "uncheck", args: ["@e3"] });
   await b.call("browser_tabs", { action: "switch", index: 1 });
   expect(b.calls.at(-1)).toMatchObject({ command: "tab", args: ["1"] });
   await b.call("browser_wait", { text: "Order placed", timeout_seconds: 10 });
@@ -162,22 +192,223 @@ test("each tool is one agent-browser command in the agent's session, with its si
   expect((await b.call("browser_open", { url: "view-source:file:///etc/passwd" })).isError).toBe(true);
   expect((await b.call("browser_tabs", { action: "open", url: "FILE:///Users/x/.ssh/id_rsa" })).isError).toBe(true);
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "tab" && c.args[0] === "new")).toHaveLength(0);
-  expect((await b.call("browser_upload", { ref: "e4", path: "../secrets.txt" })).isError).toBe(true);
-  expect((await b.call("browser_upload", { ref: "e4", path: "/Users/ana/x.pdf" })).isError).toBe(true);
+  expect((await b.call("browser_upload", { target: "e4", path: "../secrets.txt" })).isError).toBe(true);
+  expect((await b.call("browser_upload", { target: "e4", path: "/Users/ana/x.pdf" })).isError).toBe(true);
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "upload")).toHaveLength(0);
+  sent = b.since();
+  await b.call("browser_upload", { target: "e4", path: "reports/q3.pdf" });
+  expect(sent()).toMatchObject([{ command: "upload", args: ["@e4", "reports/q3.pdf"] }]);
+});
+
+test("on protocol 17 an action, its settling and the look after it are one round trip", async () => {
+  const b = await browserSetup();
+  b.s.status = { protocol: 17 };
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.respond = (r) =>
+    r.op === "browser.batch"
+      ? {
+          answers: r.commands.map((c) =>
+            c.command === "snapshot" ? page('- button "Save" [ref=e1]\n- alert "Saved" [ref=e2]') : ok(),
+          ),
+        }
+      : page('- button "Save" [ref=e1]');
+  await b.call("browser_read", {});
+  const before = b.calls.length;
+  const out = await b.call("browser_click", { target: "e1" });
+  const batch = b.calls.slice(before);
+  expect(batch.map((c) => c.op)).toEqual(["browser.batch"]);
+  const commands = (batch[0] as Extract<MachineRequest, { op: "browser.batch" }>).commands;
+  expect(commands.map((c) => [c.command, c.tolerate === true])).toEqual([
+    ["click", false],
+    ["eval", true],
+    ["wait", true],
+    ["eval", true],
+    ["snapshot", false],
+  ]);
+  // Only what changed since the agent last read the page.
+  expect(out.content).toContain("Changed on the page");
+  expect(out.content).toContain('+ - alert "Saved" [ref=e2]');
+  expect(out.content).not.toContain("New page");
+});
+
+test("a target in words is found by the judge on the page as it is, then remembered for the site", async () => {
+  const judge = createFakeJudge((kind, id, _state, _q, request) => {
+    if (kind !== "screen_target") return undefined;
+    const elements = String((request.state.screen as { elements?: string }).elements ?? "");
+    if (id === "present") return 0.95;
+    return elements.includes('button "Sign in"') ? { choice: "e7", probabilities: { e7: 0.93 } } : "none";
+  });
+  const b = await browserSetup({ judge });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const login = '- textbox "Email" [ref=e3]\n- button "Sign in" [ref=e7]\n- link "Sign up" [ref=e8]';
+  b.s.respond = () => page(login, "https://app.acme.example/login");
+  const sent = b.since();
+  const out = await b.call("browser_click", { target: "the button that signs me in" });
+  expect(out.isError).toBeUndefined();
+  // It looked first, then clicked what the judge picked.
+  expect(
+    sent()
+      .map((c) => c.command)
+      .slice(0, 2),
+  ).toEqual(["snapshot", "click"]);
+  expect(sent()[1]).toMatchObject({ args: ["@e7"] });
+  expect(out.content).toContain("Clicked button (e7).");
+  // The same words on the same page again: no judge.
+  const asked = judge.calls.length;
+  await b.call("browser_click", { target: "the button that signs me in" });
+  expect(judge.calls).toHaveLength(asked);
+  // An exact name needs no judge either.
+  await b.call("browser_fill", { target: "Email", text: "ana@acme.example" });
+  expect(judge.calls).toHaveLength(asked);
+});
+
+test("browser_do runs a sign-in across pages, checks what it expects and stops where it doesn't hold", async () => {
+  const judge = createFakeJudge((kind, _id, state) => {
+    if (kind !== "screen_check") return undefined;
+    const text = String((state.screen as { text?: string }).text ?? "");
+    // The dashboard shows; no list of orders ever does.
+    return String(state.condition).includes("dashboard") && text.includes("Dashboard") ? 0.9 : 0.05;
+  });
+  // A clock that runs fast: the expectation that never holds gives up at once instead of after 3 s.
+  let t = Date.now();
+  const now = () => {
+    t += 400;
+    return t;
+  };
+  const b = await browserSetup({ judge, now });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  let at = "login";
+  b.s.respond = (r) => {
+    const a = r as Act;
+    if (a.op === "browser.act" && a.command === "click") at = "dashboard";
+    return at === "login"
+      ? page('- textbox "Email" [ref=e3]\n- button "Sign in" [ref=e7]', "https://app.acme.example/login")
+      : page('- heading "Dashboard" [level=1]\n- link "Orders" [ref=e20]', "https://app.acme.example/home");
+  };
+  const out = await b.call("browser_do", {
+    steps: [
+      { do: "open", url: "https://app.acme.example/login" },
+      { do: "fill", target: "Email", text: "ana@acme.example" },
+      { do: "click", target: "Sign in", expect: "the dashboard shows" },
+      { do: "click", target: "Orders", expect: "the list of orders shows" },
+      { do: "click", target: "Export" },
+    ],
+  });
+  expect(out.isError).toBeUndefined();
+  // The click on Orders happened; only what it should show didn't: the agent is told not to click again.
+  expect(out.content).toContain(
+    'Stopped after step 4 of 5 (click "Orders"): Clicked link (e20), but the page doesn\'t show "the list of orders shows". It was done: don\'t do it again',
+  );
+  expect(out.content).toContain("Done before it: 3 steps.");
+  expect(out.content).toContain("Now at https://app.acme.example/home");
+  // Each step goes to the chat's trail as the tool it stands for; the open names its page (no query string).
+  expect(out.data?.browserTrail).toEqual([
+    { tool: "browser_open", detail: "app.acme.example/login" },
+    { tool: "browser_fill" },
+    { tool: "browser_click" },
+    { tool: "browser_click" },
+  ]);
+  // The step after the stop never ran.
+  expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(2);
+  // A single step whose click went through, and only its check didn't hold, isn't an error: it was done.
+  const single = await b.call("browser_do", {
+    steps: [{ do: "click", target: "Orders", expect: "the list of orders shows" }],
+  });
+  expect(single.isError).toBeUndefined();
+  expect(single.content).toStartWith(
+    "Clicked link (e20), but the page doesn't show \"the list of orders shows\". It was done: don't do it again",
+  );
+});
+
+test("a person who takes the browser and gives it back within a step stops the plan, and reading comes first", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  let taken = false;
+  b.s.respond = async (r) => {
+    const a = r as Act;
+    // During the first click a person takes the browser and gives it back.
+    if (a.op === "browser.act" && a.command === "click" && !taken) {
+      taken = true;
+      await f.db.insert(schema.browserHandoffs).values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        machineId: b.machineId,
+        kind: "takeover",
+        status: "done",
+        controllerUserId: f.owner.id,
+        expiresAt: new Date(),
+        resolvedAt: new Date(Date.now() + 1000),
+      });
+    }
+    return page('- button "Save" [ref=e1]\n- button "Next" [ref=e2]');
+  };
+  const out = await b.call("browser_do", {
+    steps: [
+      { do: "click", target: "e1" },
+      { do: "click", target: "e2" },
+    ],
+  });
+  expect(out.content).toContain("a person had the browser meanwhile");
+  expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(1);
+  // The page wasn't marked as read: the next action is held until the agent reads it.
+  expect((await b.call("browser_click", { target: "e2" })).content).toContain("Read the page again first");
+});
+
+test("a hidden file field is reached by a CSS selector", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const sent = b.since();
+  await b.call("browser_upload", { target: "input[type=file]", path: "reports/q3.pdf" });
+  expect(sent()).toMatchObject([{ command: "upload", args: ["input[type=file]", "reports/q3.pdf"] }]);
+});
+
+test("a scroll step that names a target scrolls the page as before: the target isn't looked for", async () => {
+  const judge = createFakeJudge();
+  const b = await browserSetup({ judge });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.respond = () => page('- heading "Shop"');
+  const sent = b.since();
+  const out = await b.call("browser_do", { steps: [{ do: "scroll", target: "the results list", direction: "down" }] });
+  expect(out.isError).toBeUndefined();
+  expect(sent()[0]).toMatchObject({ command: "scroll", args: ["down", "800"] });
+  expect(judge.calls).toHaveLength(0);
+});
+
+test("a box found only on the image isn't ticked by a click there (a click would only flip it)", () => {
+  expect(() => actionCommands({ kind: "check", at: { x: 10, y: 20 } }, () => null)).toThrow("ticked by its element");
+  expect(actionCommands({ kind: "check", at: { ref: "e3" } }, () => null)).toMatchObject([
+    { command: "check", args: ["@e3"] },
+  ]);
+});
+
+test("a read with `find` returns only the lines that answer it", async () => {
+  const judge = createFakeJudge((kind, id) => {
+    if (kind !== "screen_find") return undefined;
+    if (id === "answers") return 0.92;
+    return { choice: "L3", probabilities: { L3: 0.9 } };
+  });
+  const b = await browserSetup({ judge });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const lines = Array.from({ length: 40 }, (_, i) => `- paragraph: line ${i + 1}`);
+  lines[2] = '- row "Total R$ 42,00"';
+  b.s.respond = () => page(lines.join("\n"), "https://shop.example/cart");
+  const out = await b.call("browser_read", { find: "the order total" });
+  expect(out.content).toContain('Where the page answers "the order total"');
+  expect(out.content).toContain('- row "Total R$ 42,00"');
+  expect(out.content).not.toContain("line 30");
 });
 
 test("stale numbers, covered clicks and runner refusals reach the agent as plain guidance", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
   b.s.reply = { success: false, data: null, error: "Unknown ref @e9" };
-  const stale = await b.call("browser_click", { ref: "e9" });
+  const stale = await b.call("browser_click", { target: "e9" });
   expect(stale.isError).toBe(true);
-  expect(stale.content).toStartWith("stale_ref:");
+  expect(stale.content).toStartWith('Couldn\'t click "e9": stale_ref:');
   expect(stale.content).toContain("browser_read");
 
   b.s.reply = { success: false, data: null, error: "covered by <div#consent-banner>" };
-  const covered = await b.call("browser_click", { ref: "e1" });
+  const covered = await b.call("browser_click", { target: "e1" });
   expect(covered.content).toContain("covered by <div#consent-banner>");
 
   b.s.error = new MachineRequestError("not_allowed", "browser is off");
@@ -199,12 +430,12 @@ test("after a person had the browser, the agent must read the page before acting
     expiresAt: new Date(),
     resolvedAt: new Date(),
   });
-  const blocked = await b.call("browser_click", { ref: "e1" });
+  const blocked = await b.call("browser_click", { target: "e1" });
   expect(blocked.isError).toBe(true);
   expect(blocked.content).toContain("Read the page again first");
   expect(b.calls).toHaveLength(0);
   expect((await b.call("browser_read", {})).isError).toBeUndefined();
-  expect((await b.call("browser_click", { ref: "e1" })).isError).toBeUndefined();
+  expect((await b.call("browser_click", { target: "e1" })).isError).toBeUndefined();
 });
 
 test("a browser closed after a person had it is never a dead end: opening a page works and counts as seeing it", async () => {
@@ -226,7 +457,68 @@ test("a browser closed after a person had it is never a dead end: opening a page
   // …but opening a page still works, and then the agent can act on it.
   b.s.reply = { success: true, data: { url: "https://shop.example/" } };
   expect((await b.call("browser_open", { url: "https://shop.example/" })).isError).toBeUndefined();
-  expect((await b.call("browser_click", { ref: "e1" })).isError).toBeUndefined();
+  expect((await b.call("browser_click", { target: "e1" })).isError).toBeUndefined();
+});
+
+test("an agent whose Chrome belongs on its desktop says so on every command that may start it", async () => {
+  const b = await browserSetup();
+  b.s.status = { protocol: DESKTOP_PROTOCOL };
+  b.s.respond = (r) =>
+    r.op === "browser.batch" ? { answers: r.commands.map(() => ok()) } : page('- button "Save" [ref=e1]');
+  await grantScopes(
+    f.db,
+    f.org.id,
+    f.agent.id,
+    [BROWSER_SCOPE, DESKTOP_SCOPE].map((scope) => ({ connectionId: null, scope })),
+  );
+  const commands = () => b.calls.filter((c) => c.op === "browser.act" || c.op === "browser.batch");
+  const desktop = { browser: { available: true }, desktop: { available: true } };
+  const serve = (on: boolean) =>
+    f.db
+      .update(schema.machines)
+      .set({
+        protocol: DESKTOP_PROTOCOL,
+        executors: desktop,
+        access: { folders: [], tools: { claude: false, codex: false, commands: true, browser: true, desktop: on } },
+      })
+      .where(eq(schema.machines.id, b.machineId));
+
+  // A computer that doesn't serve desktops: headless.
+  await b.call("browser_click", { target: "e1" });
+  expect(commands().length).toBeGreaterThan(0);
+  expect(commands().some((c) => "desktop" in c)).toBe(false);
+
+  await serve(true);
+  let n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  await b.call("browser_open", { url: "https://shop.example/" });
+  expect(commands().slice(n).length).toBeGreaterThan(1);
+  expect(
+    commands()
+      .slice(n)
+      .every((c) => "desktop" in c && c.desktop === true),
+  ).toBe(true);
+
+  // Its desktop switch off on that computer, or no desktop:use: headless again.
+  await serve(false);
+  n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  expect(
+    commands()
+      .slice(n)
+      .some((c) => "desktop" in c),
+  ).toBe(false);
+  await serve(true);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, DESKTOP_SCOPE)));
+  n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  expect(
+    commands()
+      .slice(n)
+      .some((c) => "desktop" in c),
+  ).toBe(false);
 });
 
 test("the computer the browser runs on is remembered for the live view, take over and Stop", async () => {
@@ -240,7 +532,7 @@ test("the computer the browser runs on is remembered for the live view, take ove
 test("type_secret names a secret delivered to this computer; the value never passes through", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
-  const refused = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  const refused = await b.call("browser_type_secret", { target: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(refused.isError).toBe(true);
   expect(refused.content).toContain("request_secret");
   expect(b.calls).toHaveLength(0);
@@ -261,7 +553,7 @@ test("type_secret names a secret delivered to this computer; the value never pas
     expiresAt: new Date(Date.now() + 60_000),
   });
   // Asked without a site: the browser won't type it anywhere.
-  const noSite = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  const noSite = await b.call("browser_type_secret", { target: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(noSite.isError).toBe(true);
   expect(noSite.content).toContain("`site`");
   expect(b.calls).toHaveLength(0);
@@ -269,11 +561,10 @@ test("type_secret names a secret delivered to this computer; the value never pas
     .update(schema.secretRequests)
     .set({ site: "https://dashboard.stripe.com" })
     .where(eq(schema.secretRequests.name, "STRIPE_TEST_PASSWORD"));
-  const typed = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  const typed = await b.call("browser_type_secret", { target: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(typed.isError).toBeUndefined();
   // The site comes from the request the person answered: the runner types it only there.
-  expect(b.calls.at(-1)).toMatchObject({
-    command: "agentes:type_secret",
+  expect(b.calls.find((c) => c.op === "browser.act" && c.command === "agentes:type_secret")).toMatchObject({
     args: ["@e2", "STRIPE_TEST_PASSWORD", "https://dashboard.stripe.com"],
   });
 
@@ -284,7 +575,7 @@ test("type_secret names a secret delivered to this computer; the value never pas
     .update(schema.secretRequests)
     .set({ machineId: other.machineId })
     .where(eq(schema.secretRequests.name, "STRIPE_TEST_PASSWORD"));
-  const elsewhere = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  const elsewhere = await b.call("browser_type_secret", { target: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(elsewhere.isError).toBe(true);
   expect(elsewhere.content).toContain("request_secret");
   expect(b.calls).toHaveLength(before);

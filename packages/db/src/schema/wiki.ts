@@ -5,7 +5,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * The org wiki (D34): markdown pages every member reads, linked with
+ * The org wiki (ADR 0023): markdown pages every member reads, linked with
  * `[[Title]]`, `[[slug|text]]` or `[[Page#section]]`. Agents write only when
  * a person asks. Every save is a version; links are parsed on save into
  * `wiki_links` (backlinks and the graph).

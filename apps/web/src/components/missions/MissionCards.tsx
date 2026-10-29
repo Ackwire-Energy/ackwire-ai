@@ -28,6 +28,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { folderName } from "@agenteschat/client/lib/machines";
 import {
   executorName,
@@ -84,8 +85,7 @@ import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
 /**
- * The mission's cards and lines inside the thread (ThreadContexto.html,
- * "App mobile"): the plan card (Começar / Mudar algo), the decision card,
+ * The mission's cards and lines inside the thread: the plan card (Começar / Mudar algo), the decision card,
  * the review card ("Pronto para você ver"), the plan-change line, the
  * computer and task lines, a report's "via Claude Code no …", the
  * suggestion bar on a person's message, and the `/summary` and `/plan`
@@ -141,6 +141,8 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   const agentName = dir.agentById.get(m?.agentId ?? "")?.name ?? "";
   const current = m?.executor ?? meta.executor;
   const executor = executorName(current, agentName);
+  // "do Claude Code", "da Ada": its words in Portuguese.
+  const xg = agentGrammar(t, executor);
   // Before Start the owner may switch who programs, among those the computer can run.
   const choices = m?.role === "owner" && m.status === "proposed" ? (m.machine?.executors ?? []) : [];
   const items = (plan.data?.current?.items ?? []).filter((i) => i.status !== "dropped");
@@ -197,7 +199,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       <div className="mi-plan__head">
         <span className="mi-cap">
           <ExecutorMark executor={current} agentId={m?.agentId} agentName={agentName} />
-          {investigated ? t("missions.findings.proposed") : t("missions.plan.cap", { executor })}
+          {investigated ? t("missions.findings.proposed") : t("missions.plan.cap", { executor, of: xg.of })}
         </span>
         <h3>{meta.title}</h3>
         {!investigated && !sameAsTitle(meta.title, meta.goal) && <p>{firstSentence(meta.goal)}</p>}
@@ -226,7 +228,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         <div className="mi-plan__drafting" role="status">
           <p>
             <AgentSpinner agentId={m?.agentId} />
-            {t("missions.plan.drafting", { executor, computer })}
+            {t("missions.plan.drafting", { executor, computer, The: xg.The })}
           </p>
           <ul className="mi-plan__list mi-plan__list--ghost" aria-hidden="true">
             {["58%", "44%", "51%"].map((w) => (
@@ -243,7 +245,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       {items.length > 0 && (
         <p className="mi-plan__note">
           {items.length > PLAN_SHOWN ? `${t("missions.plan.more", { count: items.length - PLAN_SHOWN })} · ` : ""}
-          {t("missions.plan.adjusts", { executor })}
+          {t("missions.plan.adjusts", { executor, article: xg.article })}
         </p>
       )}
       <div className="mi-plan__metas">
@@ -362,8 +364,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
 const FINDING_ICONS: Record<MissionFinding["kind"], IconName> = { read: "search", data: "chart", decision: "question" };
 
 /**
- * What the agent found before proposing (telas/FazerDesfazer.html,
- * "mission"): what it read (files and lines), what the numbers say, and
+ * What the agent found before proposing: what it read (files and lines), what the numbers say, and
  * the one decision left, highlighted. Refs are code chips; a file opens in
  * the repository when the agent's repository is known.
  */
@@ -381,7 +382,7 @@ export function MissionFindings({ mission, agentName }: { mission: Mission; agen
         <li
           // biome-ignore lint/suspicious/noArrayIndexKey: findings have no id and never reorder
           key={i}
-          className={f.kind === "decision" ? "mi-finding mi-finding--decision" : "mi-finding"}
+          className={f.kind === "decision" ? "mi-finding mi-finding--decision ac-iconline" : "mi-finding ac-iconline"}
           data-kind={f.kind}
         >
           <Icon name={FINDING_ICONS[f.kind]} size={16} label={t(`missions.findings.${f.kind}`)} />
@@ -469,7 +470,7 @@ export function AutoApprovedLine({ messages }: { messages: Message[] }) {
       onError: (error) => toast.show(errorText(t, error), "error"),
     });
   return (
-    <div className="mi-evt mi-evt--auto" data-message-id={first.id}>
+    <div className="mi-evt mi-evt--auto ac-iconline" data-message-id={first.id}>
       <Icon name="check" size={14} />
       <span>
         {t("missions.auto.label")}:{" "}
@@ -477,14 +478,14 @@ export function AutoApprovedLine({ messages }: { messages: Message[] }) {
         {reason} · {formatTime(i18n.language, first.at)}
       </span>
       {items.length > 1 && (
-        <button type="button" className="mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <button type="button" className="ac-link mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? t("missions.auto.hide") : t("missions.auto.show")}
         </button>
       )}
       {canRevoke && (
         <button
           type="button"
-          className="mi-lnk"
+          className="ac-link mi-lnk"
           title={t("missions.auto.revokeHint")}
           disabled={set.isPending}
           onClick={revoke}
@@ -684,7 +685,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
           <span className="mi-hint">{t("missions.decision.yourOpinion", { option: mine.option })}</span>
         )}
         <span className="mi-foot__grow" />
-        <span className="mi-hint">
+        <span className="mi-hint ac-iconline">
           <Icon name="document" size={14} />
           {t("missions.decision.goesTo")} <code>{DECISIONS_FILE}</code>
         </span>
@@ -889,7 +890,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
   // A newer delivery replaced this one: it says so in one quiet line.
   if (d.status === "superseded") {
     return (
-      <p className="mi-evt">
+      <p className="mi-evt ac-iconline">
         <Icon name="refresh" size={14} />
         <span>{t("missions.delivery.superseded")}</span>
       </p>
@@ -1072,7 +1073,7 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
   const shown = long ? parts.slice(0, PLAN_CHANGE_SHOWN - 1) : parts;
   const rest = parts.length - shown.length;
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className="mi-evt ac-iconline" data-message-id={message.id}>
       <Icon name="edit" size={14} />
       <span className="mi-evt__text" title={before || (long ? parts.join("\n") : undefined)}>
         <b>{t("missions.planChange.title")}</b>
@@ -1112,7 +1113,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
-  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (D79).
+  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
   const asked = (message.meta as { machineAccess?: { machineId?: unknown } } | null)?.machineAccess?.machineId;
   const here = useIsThisMac(org.id, typeof asked === "string" ? asked : "");
   if (!notice) return null;
@@ -1127,7 +1128,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const task = machineTaskOf(message.meta);
   const blocked = task?.blocked ?? [];
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className="mi-evt ac-iconline" data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
         {t(`missions.notice.${notice.code}`, {
@@ -1141,7 +1142,11 @@ export function TaskNoticeLine({ message }: { message: Message }) {
       {blocked.length > 0 && task?.missionId && (
         <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
       )}
-      {notice.code === "machine_access_requested" && here && <ShowRequestsButton />}
+      {notice.code === "machine_access_requested" && here && (
+        <span className="mi-evt__act">
+          <ShowRequestsButton />
+        </span>
+      )}
       {notice.code === "machine_access_requested" && p.command && !here && (
         <span className="mi-evt__command">
           <span className="small muted">{t("missions.notice.access_command")}</span>
@@ -1226,7 +1231,11 @@ export function MissionStartLink({ message }: { message: Message }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
-    <Link to="/org/$orgId/threads/$threadId" params={{ orgId: org.id, threadId: message.id }} className="mi-tag mi-lnk">
+    <Link
+      to="/org/$orgId/threads/$threadId"
+      params={{ orgId: org.id, threadId: message.id }}
+      className="ac-link mi-tag mi-lnk"
+    >
       <Icon name="flag" size={14} />
       {t("missions.openThread")}
     </Link>
@@ -1423,12 +1432,12 @@ export function MissionSetupCard({ setup, threadId }: { setup: MissionSetupMeta;
         </pre>
       )}
       {state === "preparing" ? (
-        <p className="mi-hint mi-setup__now">
+        <p className="mi-hint mi-setup__now ac-iconline">
           <AgentSpinner agentId={m?.agentId} />
           {t("missions.setup.preparing")}
         </p>
       ) : state === "ready" ? (
-        <p className="mi-hint mi-setup__now">
+        <p className="mi-hint mi-setup__now ac-iconline">
           <Icon name="check" size={14} />
           {t("missions.setup.ready")}
         </p>

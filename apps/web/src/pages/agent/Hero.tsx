@@ -3,9 +3,11 @@ import { formatMonth, formatPercent, formatUsd } from "@agenteschat/client/lib/f
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AgentColor, Button, Icon, Menu, MenuItem, Meter } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usd } from "@/components/AgentFields";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AgentCover } from "@/components/Sky";
 import { thisMonth } from "@/lib/agent-edit";
@@ -33,8 +35,8 @@ function useLiveRun(agentId: string) {
   return { status, channelId, connector };
 }
 
-/** Runs, budget (money for admins, % for everyone else) and lessons: one quiet line under "Como trabalha". */
-function Numbers() {
+/** Runs, budget (money for admins, % for everyone else) and lessons: quiet lines under "Como trabalha". */
+export function Numbers() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org } = useOrg();
@@ -94,7 +96,7 @@ export function AgentHero({
   const { org } = useOrg();
   const navigate = useNavigate();
   const toast = useToast();
-  const { agent, draft, viewer, goTo, saved, openWork } = useAgentEdit();
+  const { agent, draft, viewer, goTo, saved, openWork, workInAside } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const live = useLiveRun(agent.id);
   const busy = Boolean(live && live.status !== "waiting_approval");
@@ -102,13 +104,15 @@ export function AgentHero({
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
   const g = agentGrammar(t, agent.name);
+  const face = useRef<HTMLSpanElement>(null);
+  const acts = useRef<HTMLDivElement>(null);
   return (
     <header className="agp-hero">
-      {/* One card holds who the agent is: cover, face, name and how it works (telas/AgenteFundo.html, B). */}
+      {/* Open sky: the cover edge to edge, the agent on its left edge, no card. */}
       <section className="agp-idcard" aria-label={name}>
         <div className="agp-cover" data-busy={busy || undefined}>
-          <AgentCover color={draft.look.color as AgentColor} busy={busy} />
-          <div className="agp-cover__acts">
+          <AgentCover color={draft.look.color as AgentColor} busy={busy} clear={() => [face.current, acts.current]} />
+          <div className="agp-cover__acts" ref={acts}>
             {!onClose && (
               <Button asChild variant="primary" size="sm" className="agp-chat">
                 <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
@@ -192,8 +196,8 @@ export function AgentHero({
             )}
           </div>
         </div>
-        {/* In the middle, over the cover's edge, cut out by a ring of the card (telas/AgenteTopo.html, D). */}
-        <span className="agp-face">
+        {/* Over the cover's left edge, cut out by a ring of the page. */}
+        <span className="agp-face" ref={face}>
           <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
         </span>
         <div className="agp-ident">
@@ -202,9 +206,15 @@ export function AgentHero({
             @{agent.handle}
             {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
           </span>
+          <NoAiChip agentId={agent.id} />
         </div>
-        {/* In the panel the numbers stay on the full page. */}
-        <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+        {/* Narrow (the panel beside its DM, small screens): how it works stays up here, on every tab. Wide, it
+            is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}
+        {!workInAside && (
+          <div className="agp-hero__work">
+            <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+          </div>
+        )}
       </section>
     </header>
   );

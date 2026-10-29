@@ -16,14 +16,69 @@ import {
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
-/** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7) and its browser (protocol 12). */
+/**
+ * A plan's usage limits as the runner last reported them (protocol 19): the
+ * same shape as `PlanUsage` in the machine protocol.
+ */
+export interface MachinePlanUsage {
+  windows: {
+    kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+    label?: string;
+    usedPercent: number;
+    resetsAt?: string;
+  }[];
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
+/**
+ * What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7), its browser (protocol 12),
+ * its desktops and its terminal (protocol 18), and the agents' use of their desktops (protocol 21).
+ */
 export interface MachineExecutors {
   /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
   claude?: { version: string; loggedIn?: boolean; authMethod?: string; plan?: string };
   codex?: { version: string };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
+  /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
+  desktop?: { available: boolean; reason?: string; width?: number; height?: number };
+  /** `hello.terminal` (ADR 0058): whether people can open a terminal there; absent = not reported. */
+  terminal?: { available: boolean; reason?: string };
+  /** `hello.desktopUse` (ADR 0062): whether agents can use their desktops there; absent = not reported. */
+  desktopUse?: { available: boolean; reason?: string };
+  /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
+  mode?: "system";
+  /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
+  ownUsage?: { claude_code?: MachinePlanUsage; codex?: MachinePlanUsage };
   detectedAt?: string;
+}
+
+/** A computer's size as its runner reported it (protocol 22), the same shape as `MachineSize` in the protocol. */
+export interface MachineSizeRecord {
+  cpus: number;
+  memoryGb: number;
+  diskGb: number;
+  limit?: { cpus: number; memoryGb: number };
+}
+
+/** How busy a computer got over the last day (protocol 22: `MachineLoad` in the protocol), and when it said so. */
+export interface MachineLoadRecord {
+  loadAvg: number;
+  loadPeak: number;
+  memoryAvg: number;
+  memoryPeak: number;
+  hours: number;
+  at: string;
+}
+
+/** What its agents' browsers sent and received over the last day (protocol 23: `BrowserTraffic`), and when it said so. */
+export interface MachineTrafficRecord {
+  up: number;
+  down: number;
+  hours: number;
+  at: string;
 }
 
 /**
@@ -33,8 +88,23 @@ export interface MachineExecutors {
  */
 export interface MachineAccess {
   folders: { path: string; agents: string[] }[];
-  tools: { claude: boolean; codex: boolean; commands: boolean; browser?: boolean };
+  tools: {
+    claude: boolean;
+    codex: boolean;
+    commands: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
+
+/**
+ * Where a computer came from: `connected` (a person paired it, ADR 0036 §5),
+ * `host` (the server's own computer, one row per organization it serves) or
+ * `managed` (the workspace's computer, given by the operator's provisioner:
+ * ADR 0056 §10; one per organization).
+ */
+export type MachineKind = "connected" | "host" | "managed";
 
 /**
  * Connected computers (ADR 0025): machines people paired, where our runner
@@ -51,9 +121,15 @@ export const machines = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    kind: text().$type<MachineKind>().notNull().default("connected"),
     pairedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** SHA-256 (hex) of `agm_…`; null once deleted. */
     tokenHash: text().unique(),
+    /**
+     * `host` rows: SHA-256 of the `HOST_COMPUTER_TOKEN` their token was
+     * issued under; a server started with another one retires that token.
+     */
+    hostKey: text(),
     hostname: text().notNull().default(""),
     /** `linux`, `darwin`, `windows` or `other`. */
     os: text().notNull().default("other"),
@@ -79,6 +155,12 @@ export const machines = pgTable(
     pausedUntil: timestamp({ withTimezone: true }),
     /** Folders and tools the machine allows (protocol 10); null: its runner doesn't report them. */
     access: jsonb().$type<MachineAccess>(),
+    /** Its size (protocol 22, kept from the last runner that said); null: unknown. */
+    size: jsonb().$type<MachineSizeRecord>(),
+    /** Its last day's load (protocol 22); null: unknown. */
+    load: jsonb().$type<MachineLoadRecord>(),
+    /** Its agents' browsers' last day of traffic, in bytes (protocol 23); null: unknown. */
+    browserTraffic: jsonb().$type<MachineTrafficRecord>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /**
@@ -96,16 +178,53 @@ export const machines = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.id), index().on(t.orgId)],
+  (t) => [
+    unique().on(t.orgId, t.id),
+    index().on(t.orgId),
+    // Removed ones too: turning the server's computer back on, or issuing a
+    // managed computer again, brings the same row back.
+    uniqueIndex("machines_host_org").on(t.orgId).where(sql`${t.kind} = 'host'`),
+    uniqueIndex("machines_managed_org").on(t.orgId).where(sql`${t.kind} = 'managed'`),
+  ],
 );
 
 /**
- * Accounts of the computer brains on a machine (ADR 0041): a folder on the
- * computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or Codex
- * keeps its own sign-in. Nothing secret here: what the CLI's status command
- * says (email, plan) and whether it is still signed in. `id` is the folder's
- * name (made by the server, or by the desktop app's runner), so it is unique
- * per organization; the runner's `hello.accounts` keeps the rows in sync.
+ * How far the workspace's computer is (ADR 0056 §10), with
+ * `MACHINE_PROVISIONING=external`: `preparing` (`step`: reserving, starting,
+ * installing, connecting), `waiting` (`reason`: capacity; an older
+ * provisioner's `approval` reads as capacity) and `problem` are the
+ * provisioner's to set; `ready` is set here, on the managed computer's first
+ * hello. No row: nothing reported yet.
+ */
+export const machineProvisioning = pgTable("machine_provisioning", {
+  orgId: uuid()
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  state: text().notNull(),
+  step: text(),
+  /** With `preparing`: what the computer is doing within its step, in the provisioner's word (`updating`, `apps`…). */
+  stage: text(),
+  reason: text(),
+  /** With `preparing`: the earliest ready time this wait was told (already past: it runs over). */
+  expectedReadyAt: timestamp({ withTimezone: true }),
+  /** When people started waiting: set when the computer is taken away; null: since the workspace was created. */
+  requestedAt: timestamp({ withTimezone: true }),
+  /** The wait was said to take over a minute: the owners were told they'd get the ready email. */
+  emailWhenReady: boolean().notNull().default(false),
+  specs: jsonb().$type<{ cpus: number; memoryGb: number; diskGb: number }>(),
+  /** When this state (and step or reason) began. */
+  since: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Accounts of the computer brains on a machine (ADR 0041, ADR 0059): a folder
+ * on the computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or
+ * Codex keeps its own sign-in. Nothing secret here: what the CLI's status
+ * command says (email, plan) and whether it is still signed in. `id` is the
+ * folder's name (made by the server when a sign-in starts, or by the desktop
+ * app's runner), so it is unique per organization; the runner's
+ * `hello.accounts` keeps the rows in sync.
  */
 export const machineAccounts = pgTable(
   "machine_accounts",
@@ -122,10 +241,27 @@ export const machineAccounts = pgTable(
     email: text(),
     /** `pro`, `max`, `team`, `plus`… as the CLI says. */
     plan: text(),
-    /** `active` or `signed_out` (the CLI refused the sign-in, or said it isn't signed in). */
+    /**
+     * `active`, `signed_out` (the CLI refused the sign-in, or said it isn't
+     * signed in), `signing_in` (started from the app, not finished yet: not an
+     * account until the runner reports it) or `removing` (disconnected: the
+     * runner signs it out and deletes its folder, even if that waits for the
+     * computer to come back, then the row goes).
+     */
     status: text().notNull().default("active"),
-    /** Who added it from the app; null when the runner reported it first (the desktop app). */
+    /**
+     * Whose account it is: who started its sign-in, bound when it starts. One
+     * the runner reported first (the desktop app) is its pairer's. Null: nobody's.
+     */
     createdBy: text().references(() => users.id, { onDelete: "set null" }),
+    /** A coding plan's provider for an account that signs in with a key; null: the CLI's own sign-in. */
+    provider: text(),
+    /** The last 4 characters of a plan key, as the runner reports them. */
+    keyHint: text(),
+    /** The Claude Team or Enterprise organization of the seat, as the CLI reports it. */
+    orgName: text(),
+    /** The plan's usage limits, as the runner last reported them. */
+    usage: jsonb().$type<MachinePlanUsage>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp({ withTimezone: true }),

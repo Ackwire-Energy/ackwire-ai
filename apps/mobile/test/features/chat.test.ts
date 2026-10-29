@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { toolCalls } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
   consultationsOf,
+  eventLineOf,
   hidesBody,
   markedParts,
   markName,
@@ -19,7 +21,6 @@ import {
   reactionEmoji,
   reactionName,
   reactionPills,
-  routineAgents,
   standsAlone,
   stoppableInLine,
   threadFaces,
@@ -32,6 +33,7 @@ import {
   fadeTail,
   OPENERS,
   openingRuns,
+  outputTail,
   pruneMarks,
   recentTurn,
   rememberTurn,
@@ -40,7 +42,6 @@ import {
   turnOpener,
   turnPhase,
   turnRuns,
-  turnSteps,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -213,42 +214,39 @@ describe("working line", () => {
 });
 
 describe("routine messages", () => {
-  const routineMeta = { routineId: "rt1", routine: { id: "rt1", name: "Erros do Sentry", runId: "x" } };
+  const atlas = { type: "agent" as const, id: "atlas" };
+  const told = { routine: { id: "rt1", name: "Erros do Sentry", runId: "rr1", noticeId: "rep" } };
 
-  test("the routine's top-level call is left out; only the agent's answer shows", () => {
-    const call = message({ id: "call", body: "@atlas Verificar no Sentry…", meta: routineMeta, createdAt: at(10) });
-    const answer = message({
-      id: "ans",
-      threadId: "call",
-      author: { type: "agent", id: "atlas" },
-      meta: { viaRoutine: { id: "rt1", name: "Erros do Sentry" } },
-      createdAt: at(9),
-    });
+  test("a routine's call written as its creator is left out; only the agent's answer shows", () => {
+    const call = message({ id: "call", body: "@atlas Verificar no Sentry…", meta: told, createdAt: at(10) });
+    const answer = message({ id: "ans", threadId: "call", author: atlas, createdAt: at(9) });
     const rows = buildRows([call, answer]);
     expect(rows.filter((r) => r.kind === "message").map((r) => (r.kind === "message" ? r.message.id : ""))).toEqual([
       "ans",
     ]);
   });
 
-  test("a routine's message inside a thread shows with its own header: never grouped, nothing groups under it", () => {
-    const before = message({ id: "a", threadId: "t", createdAt: at(10) });
-    const routine = message({ id: "b", threadId: "t", meta: routineMeta, createdAt: at(9) });
-    const after = message({ id: "c", threadId: "t", createdAt: at(8) });
-    const rows = buildRows([before, routine, after]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
-    expect(rows).toEqual([false, false, false]);
-    expect(standsAlone(routine)).toBe(true);
-  });
-
-  test("the agents it calls: known @handles, in order, once each", () => {
-    const agents = [
-      { handle: "atlas", name: "Atlas" },
-      { handle: "ada", name: "Ada" },
-    ];
-    expect(routineAgents("@ada veja os issues; @Atlas e @ada, @nobody", agents).map((a) => a.name)).toEqual([
-      "Ada",
-      "Atlas",
+  test("what a routine found stands alone with its own header; the report it answers folds into it", () => {
+    const before = message({ id: "a", author: atlas, createdAt: at(10) });
+    const report = message({
+      id: "rep",
+      author: atlas,
+      meta: { notice: { kind: "routine_handoff", text: "3 erros", refs: { routineName: "Erros do Sentry" } } },
+      createdAt: at(9),
+    });
+    const routine = message({ id: "b", author: atlas, meta: told, createdAt: at(8) });
+    const after = message({ id: "c", author: atlas, createdAt: at(7) });
+    const rows = buildRows([before, report, routine, after]).flatMap((r) =>
+      r.kind === "message" ? [[r.message.id, r.grouped] as const] : [],
+    );
+    expect(rows).toEqual([
+      ["a", false],
+      ["b", false],
+      ["c", false],
     ]);
-    expect(routineAgents("sem menção", agents)).toEqual([]);
+    expect(standsAlone(routine)).toBe(true);
+    // Without its answer, the report is still there, as its line.
+    expect(buildRows([report]).filter((r) => r.kind === "message")).toHaveLength(1);
   });
 });
 
@@ -333,7 +331,37 @@ describe("markdown", () => {
     expect(blocks.map((b) => b.kind)).toEqual(["heading", "paragraph", "bullet", "bullet", "quote", "code"]);
     expect(blocks[1]).toEqual({ kind: "paragraph", inline: [{ kind: "text", text: "Linha um\nlinha dois" }] });
     expect(blocks[3]).toMatchObject({ kind: "bullet", ordinal: "2" });
-    expect(blocks[5]).toEqual({ kind: "code", text: "const a = 1;" });
+    expect(blocks[5]).toEqual({ kind: "code", lang: "ts", text: "const a = 1;" });
+  });
+  test("blocks: a fence still being written is an open code block; a fence still opening is hidden", () => {
+    expect(parseBlocks('Aqui:\n```chart\n{"type":"bar","ti')).toEqual([
+      { kind: "paragraph", inline: [{ kind: "text", text: "Aqui:" }] },
+      { kind: "code", lang: "chart", text: '{"type":"bar","ti', open: true },
+    ]);
+    expect(parseBlocks("```ts\nconst a = 1;\n``").at(-1)).toEqual({
+      kind: "code",
+      lang: "ts",
+      text: "const a = 1;",
+      open: true,
+    });
+    expect(parseBlocks("Aqui:\n```cha")).toEqual([{ kind: "paragraph", inline: [{ kind: "text", text: "Aqui:" }] }]);
+    expect(parseBlocks("use `npm` e pronto `x`").map((b) => b.kind)).toEqual(["paragraph"]);
+  });
+  test("blocks: a table right under a sentence, with inline marks in cells and numbers aligned right", () => {
+    const blocks = parseBlocks(
+      "Usei a semana desde 18/10:\n| Gatilho | Exibições | Taxa |\n|---|---|---|\n| `generic` | 435 | ~6,7% |\nDepois.",
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "table", "paragraph"]);
+    expect(blocks[1]).toEqual({
+      kind: "table",
+      header: [
+        [{ kind: "text", text: "Gatilho" }],
+        [{ kind: "text", text: "Exibições" }],
+        [{ kind: "text", text: "Taxa" }],
+      ],
+      rows: [[[{ kind: "code", text: "generic" }], [{ kind: "text", text: "435" }], [{ kind: "text", text: "~6,7%" }]]],
+      align: ["left", "right", "right"],
+    });
   });
 });
 
@@ -432,7 +460,7 @@ describe("an agent's turn as one block", () => {
     expect(turnPhase(run({ runId: "e", status: "canceled", text: "Ontem" }))).toBe("stopped");
   });
 
-  test("its work in order: steps (running or done), what it said, the messages it read", () => {
+  test("its work in order, as the tool block's items: calls (running or done), what it said, what it read", () => {
     const items = turnItems(
       run({
         runId: "r",
@@ -444,11 +472,19 @@ describe("an agent's turn as one block", () => {
         ],
       }),
     );
-    expect(items.map((x) => x.kind)).toEqual(["step", "say", "read", "step"]);
-    expect(items[0]).toMatchObject({ kind: "step", running: false, activity: { kind: "consulting", app: "Sentry" } });
-    expect(items[2]).toMatchObject({ kind: "read", messageId: "m2", now: true });
-    expect(items[3]).toMatchObject({ kind: "step", running: true });
-    expect(turnSteps(items)).toBe(2);
+    expect(items.map((x) => x.kind)).toEqual(["call", "say", "steer", "call"]);
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "done", kind: "consulting", app: "Sentry" } });
+    expect(items[2]).toMatchObject({ kind: "steer", messageId: "m2", now: true });
+    expect(items[3]).toMatchObject({ kind: "call", line: { state: "run" } });
+    expect(toolCalls(items)).toBe(2);
+  });
+
+  test("the same call again, nothing said between: one line counting both", () => {
+    const items = turnItems(
+      run({ runId: "r", work: [call("1", "sentry_list_issues", false), call("2", "sentry_list_issues", true)] }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "run", count: 2 } });
   });
 
   test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
@@ -465,7 +501,7 @@ describe("an agent's turn as one block", () => {
     });
     const opened = turnOpener(said, turnItems(said));
     expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
-    expect(opened.lines.map((x) => x.kind)).toEqual(["step"]);
+    expect(opened.lines.map((x) => x.kind)).toEqual(["call"]);
 
     expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
     expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
@@ -476,9 +512,17 @@ describe("an agent's turn as one block", () => {
     expect(openingRuns(runs).map((r) => r.runId)).toEqual(["a", "c"]);
   });
 
-  test("a stopped run's steps are not running any more", () => {
+  test("a stopped run's call that was running shows as stopped", () => {
     const items = turnItems(run({ runId: "r", status: "canceled", work: [call("1", "sentry_list_issues", true)] }));
-    expect(items[0]).toMatchObject({ running: false });
+    expect(items[0]).toMatchObject({ kind: "call", line: { state: "stop" } });
+  });
+
+  test("an open code line shows what it printed, its end when long", () => {
+    expect(outputTail([{ text: "a\n" }, { text: "b" }])).toBe("a\nb");
+    const long = outputTail([{ text: "x".repeat(50) }, { text: "end" }], 10);
+    expect(long).toHaveLength(10);
+    expect(long.startsWith("…")).toBe(true);
+    expect(long.endsWith("end")).toBe(true);
   });
 
   test("blocks: every run at work (a guess too) and a stopped one; one in its browser has its card", () => {
@@ -555,5 +599,96 @@ describe("an agent's turn as one block", () => {
     const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
     expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
     expect(stoppedOf(next)?.continuedRunId).toBe("r2");
+  });
+});
+
+describe("automatic lines (notices) and fast replies", () => {
+  const handles: Record<string, string> = { infra: "Infra", dev: "Dev" };
+  const names = { author: "Ada", agentByHandle: (handle: string) => handles[handle] ?? null };
+  const agentMsg = (id: string, meta: Record<string, unknown>, over: Partial<Message> = {}) =>
+    message({ id, author: { type: "agent", id: "ada" }, body: "", meta, ...over });
+
+  test("a routine's report: «name» from the refs or `from`; the text on demand", () => {
+    const own = eventLineOf(
+      agentMsg("n1", {
+        notice: { kind: "routine_handoff", text: "3 erros novos", refs: { routineName: "Sentry diário" } },
+      }),
+      names,
+    );
+    expect(own).toEqual({
+      kind: "notice",
+      icon: "clock",
+      key: "chat.notice.routineHandoff",
+      values: { routine: "Sentry diário" },
+      text: "3 erros novos",
+    });
+    const fromOnly = eventLineOf(
+      agentMsg("n2", { notice: { kind: "routine_handoff", text: "x", from: "Rotina «Bom dia»" } }),
+      names,
+    );
+    expect(fromOnly?.values).toEqual({ routine: "Bom dia" });
+    const anon = eventLineOf(agentMsg("n3", { notice: { kind: "routine_handoff", text: "x" } }), names);
+    expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
+  });
+
+  test("another agent's answer and note say its name, not the agent-facing handle (no @)", () => {
+    const reply = eventLineOf(agentMsg("n1", { notice: { kind: "consult_reply", text: "ok", from: "@infra" } }), names);
+    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "Infra" } });
+    const unknown = eventLineOf(
+      agentMsg("n2", { notice: { kind: "agent_note", text: "ok", refs: { agentHandle: "@zed" } } }),
+      names,
+    );
+    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "zed" } });
+    const anon = eventLineOf(agentMsg("n3", { notice: { kind: "consult_reply", text: "ok" } }), names);
+    expect(anon?.key).toBe("chat.notice.consultReplyAnon");
+  });
+
+  test("a wait's result names the agent that waited; the message's own text wins over the notice's", () => {
+    const line = eventLineOf(
+      agentMsg("n1", { notice: { kind: "wait_result", text: "notice text" } }, { body: "  o deploy terminou  " }),
+      names,
+    );
+    expect(line).toMatchObject({
+      icon: "check",
+      key: "chat.notice.waitResult",
+      values: { name: "Ada" },
+      text: "o deploy terminou",
+    });
+    expect(eventLineOf(agentMsg("n2", { notice: { kind: "new_kind", text: "x" } }), names)).toMatchObject({
+      icon: "bell",
+      key: "chat.notice.other",
+    });
+  });
+
+  test("a talker reply is the agent's message, never a line (it carries both meta.talker and a notice)", () => {
+    const talker = agentMsg("t1", {
+      talker: { runId: "r1", inReplyTo: "m1" },
+      notice: { kind: "talker_reply", text: "Já vejo isso" },
+    });
+    expect(eventLineOf(talker, names)).toBeNull();
+    expect(standsAlone(talker)).toBe(false);
+  });
+
+  test("a routine's firing written as its creator (before its own room) is never shown, nor a line", () => {
+    const start = message({
+      id: "bg",
+      body: "@ada veja os erros",
+      meta: { background: true, routineId: "rt1", routine: { id: "rt1", name: "Sentry diário" } },
+    });
+    expect(eventLineOf(start, names)).toBeNull();
+    expect(buildRows([start]).filter((r) => r.kind === "message")).toHaveLength(0);
+    expect(eventLineOf(message({ id: "plain" }), names)).toBeNull();
+  });
+
+  test("lines never group; a fast reply keeps its header (enquanto trabalha)", () => {
+    const ada = { type: "agent" as const, id: "ada" };
+    const rows = buildRows([
+      message({ id: "a", author: ada, createdAt: at(10) }),
+      message({ id: "n", author: ada, meta: { notice: { kind: "agent_note", text: "x" } }, createdAt: at(9) }),
+      message({ id: "b", author: ada, createdAt: at(8) }),
+      message({ id: "t", author: ada, meta: { talker: { runId: "r1" } }, createdAt: at(7) }),
+      message({ id: "c", author: ada, createdAt: at(6) }),
+    ]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
+    expect(rows).toEqual([false, false, false, false, true]);
   });
 });

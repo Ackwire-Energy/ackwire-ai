@@ -1,10 +1,9 @@
 /**
- * The connected computers' portraits, defined once (telas/IconesComputador.html).
+ * The connected computers' portraits, defined once.
  * Every place that shows a computer at 48 px and up draws it from here: the
  * computers list, the computer page, `/conectar`, the agent's computer, the
- * desktop app, and the HTML prototypes in docs/design/telas (which import this
- * file as is, so it stays plain JavaScript with types in portrait.d.ts and no
- * imports).
+ * desktop app, and plain HTML pages that import this file as is (so it stays
+ * plain JavaScript with types in portrait.d.ts and no imports).
  *
  * Our own drawings, never the vendors' marks: each system is told apart by its
  * device and what its screen shows.
@@ -21,6 +20,16 @@
 export const COMPUTER_GRID = 48;
 export const COMPUTER_KINDS = ["mac", "windows", "linux", "cloud"];
 export const COMPUTER_STATES = ["online", "paused", "offline"];
+/**
+ * The columns each drawing covers, shadow included, in every state and frame: [first, count]. A portrait's box
+ * is this wide, so its pixels meet the row's edge like any other lead (the tower is half the grid's width).
+ */
+export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25], cloud: [7, 38] };
+/**
+ * The rows each drawing covers, in every state and frame: [first, count]. The box keeps the whole grid's height, so
+ * a row that starts text at a picture's top (`.ac-faceline`) starts it at the drawing's first row instead.
+ */
+export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42], cloud: [8, 36] };
 
 const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);

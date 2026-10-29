@@ -4,7 +4,9 @@ import {
   type ArtifactDeps,
   type BrowserLive,
   type ContextDeps,
+  clearOldOutboxPayloads,
   createOutboxPump,
+  type DesktopControl,
   enqueue,
   enqueueIdleReflections,
   enqueueWaitlistContacts,
@@ -18,11 +20,15 @@ import {
   listenForRunCancels,
   type MailDeps,
   pollImapWatches,
+  pruneJoinRequests,
   pruneMessageClientIds,
+  pruneOperatorEvents,
   purgeDeletedArtifacts,
   queueApprovalDigests,
+  reapRoutineRuns,
   reconcileComposioAccounts,
   recoverStaleRuns,
+  sweepEndedInboxes,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
@@ -41,6 +47,8 @@ export interface WorkerDeps {
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
+  /** Agents' desktops (ADR 0058): the ones with an open handoff stay up. */
+  desktops?: Pick<DesktopControl, "keepAlive">;
   log: Logger;
   workerId?: string;
 }
@@ -61,6 +69,8 @@ export const WORKER_INTERVALS_MS = {
   notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
+  /** Ended runs still holding unread messages (safety net: they get a run of their own); routine runs left open. */
+  inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
@@ -122,6 +132,8 @@ export function startWorkers(deps: WorkerDeps) {
         outcome,
         error: String(error),
       }),
+    // How long each job waited to be claimed (ADR 0053 §10): a person's run should never queue behind routines.
+    onTiming: (name, ms, attrs) => log.debug(name, { ms, ...attrs }),
   });
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
     while (!stopped && (await outboxPump.pump()) > 0) {}
@@ -133,6 +145,13 @@ export function startWorkers(deps: WorkerDeps) {
     // Old send ids (idempotent resends) are no longer needed.
     const pruned = await pruneMessageClientIds(db);
     if (pruned > 0) log.info("pruned message client ids", { pruned });
+    const events = await pruneOperatorEvents(db);
+    if (events > 0) log.info("pruned operator events", { pruned: events });
+    const cleared = await clearOldOutboxPayloads(db);
+    if (cleared > 0) log.info("cleared old job contents", { cleared });
+    // Requests to join answered or run out 90 days ago go; notices with nothing left waiting close (ADR 0068).
+    const requests = await pruneJoinRequests({ db, pubsub: deps.pubsub });
+    if (requests > 0) log.info("pruned join requests", { pruned: requests });
   });
 
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {
@@ -148,8 +167,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("browserHandoffs", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireBrowserHandoffs(deps.browserLive?.handoffDeps ?? { db, pubsub: deps.pubsub });
     if (expired > 0) log.info("browser handoffs expired", { expired });
-    // A page a person was asked to work in stays open past the runner's idle shutdown.
+    // A page or a desktop a person was asked to work in stays open past the runner's idle shutdown.
     await deps.browserLive?.keepAlive();
+    await deps.desktops?.keepAlive();
   });
 
   every("consultations", WORKER_INTERVALS_MS.approvals, async () => {
@@ -165,6 +185,14 @@ export function startWorkers(deps: WorkerDeps) {
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+  });
+
+  every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {
+    const swept = await sweepEndedInboxes({ db, pubsub: deps.pubsub });
+    if (swept > 0) log.warn("unread messages of ended runs handed on", { runs: swept });
+    // Routine runs left open by an ending that didn't close them, or whose job died (ADR 0053 §5).
+    const reaped = await reapRoutineRuns({ db, pubsub: deps.pubsub });
+    if (reaped > 0) log.warn("routine runs closed by the reaper", { runs: reaped });
   });
 
   const files = deps.artifacts;

@@ -1,6 +1,7 @@
 import type { MissionFileName } from "@agenteschat/client";
 import { useMission, useMissionFiles } from "@agenteschat/client";
 import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { editDiff, executorName, type MdLine, mdLines, newLineIndexes } from "@agenteschat/client/lib/missions";
 import { DetailsDialog, Diff, Icon, Segmented, Skeleton } from "@agenteschat/ui";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * "Arquivos da missão" (ThreadContexto.html, A3/A6): mission.md (plan and
+ * "Arquivos da missão": mission.md (plan and
  * rules, written by agentes.chat), decisions.md (approved decisions) and
  * notes.md (the executor's notes), rendered. Lines that arrived while the
  * panel was open fade in with a faint time; an edit found on the computer
@@ -49,6 +50,7 @@ export function MissionFilesPanel({
     mission.data?.executor ?? "claude",
     dir.agentById.get(mission.data?.agentId ?? "")?.name ?? "",
   );
+  const xg = agentGrammar(t, executor);
   const content = file?.content ?? "";
   const key = `${missionId}:${tab}`;
   // The lines new since we last drew this file, and when they came.
@@ -61,7 +63,7 @@ export function MissionFilesPanel({
   const subtitle: Record<string, string> = {
     "mission.md": t("missions.files.missionSub"),
     "decisions.md": t("missions.files.decisionsSub"),
-    "notes.md": t("missions.files.notesSub", { executor }),
+    "notes.md": t("missions.files.notesSub", { executor, of: xg.of }),
   };
   const synced = file?.writtenAt ?? file?.updatedAt;
   return (
@@ -78,9 +80,11 @@ export function MissionFilesPanel({
       }
       closeLabel={t("common.close")}
       footer={
-        <div className="mi-files__foot">
+        <div className="mi-files__foot ac-iconline">
           <Icon name="info" size={14} />
-          <span>{tab === "notes.md" ? t("missions.files.notesFoot", { executor }) : t("missions.files.foot")}</span>
+          <span>
+            {tab === "notes.md" ? t("missions.files.notesFoot", { executor, The: xg.The }) : t("missions.files.foot")}
+          </span>
         </div>
       }
     >

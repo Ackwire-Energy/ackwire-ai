@@ -12,7 +12,7 @@ import { DRIVE_TYPES, type DriveDaySection, type DriveType, driveSections, gridR
 const PAGE = 24;
 
 /**
- * Drive (MobileDriveIssues.html, "Grade com prévia"), pushed from Você: the search, the type chips (Tudo,
+ * Drive, pushed from Você: the search, the type chips (Tudo,
  * Documentos, Imagens, Tabelas, Diffs), and everything the person can see grouped by day (Hoje, Esta semana,
  * then by month) in a two-column grid of real previews. A card opens the file viewer. `highlightId`: the
  * item "Ver no Drive" came from, outlined.
@@ -82,9 +82,9 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
         </View>
       ) : total === 0 ? (
         search || type !== "all" ? (
-          <EmptyState title={t("mobile.drive.noResults")} />
+          <EmptyState icon="search" title={t("mobile.drive.noResults")} />
         ) : (
-          <EmptyState title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
+          <EmptyState icon="drive" title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
         )
       ) : (
         <>

@@ -9,12 +9,12 @@
       "!**/node_modules",
       "!**/dist",
       "!**/migrations/meta",
-      "!docs/prototipo",
       "!**/*.html",
       "!docs/design",
       "!**/routeTree.gen.ts",
       "!**/src-tauri/target",
-      "!**/src-tauri/gen"
+      "!**/src-tauri/gen",
+      "!packages/engine/eval/out"
     ]
   },
   "formatter": {
@@ -44,6 +44,16 @@
         "rules": {
           "style": {
             "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/public/brands/*.svg"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noSvgWithoutTitle": "off"
           }
         }
       }

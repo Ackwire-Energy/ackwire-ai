@@ -3,9 +3,8 @@ import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
-import { requesterOf } from "./dispatch";
-import { getMessage } from "./messages";
 import { requirePermission } from "./organizations";
+import { personBehindCall } from "./requester";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
@@ -33,7 +32,7 @@ export const TEAM_IN_PROMPT = 15;
 
 type Teammate = Pick<
   typeof agents.$inferSelect,
-  "id" | "name" | "handle" | "role" | "instructions" | "ownerUserId" | "audienceMode" | "audienceUserIds"
+  "id" | "name" | "handle" | "role" | "instructions" | "ownerUserId" | "audienceMode" | "audienceUserIds" | "brain"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -49,6 +48,7 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         ownerUserId: agents.ownerUserId,
         audienceMode: agents.audienceMode,
         audienceUserIds: agents.audienceUserIds,
+        brain: agents.brain,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -59,7 +59,7 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
 export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team`);
 
 /**
- * "# Your team" for the system prompt (D54): the other agents the person
+ * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
  * described in "Where you are" (channel members) are left out.
@@ -71,7 +71,7 @@ export function teamPrompt(team: Teammate[], selfId: string, requester: string |
     others.length > TEAM_IN_PROMPT
       ? `${others.length} other agents work in this organization.`
       : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it.`;
+  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it (its answer reaches you as a message; you carry on meanwhile), or let one know something with \`tell_agent\`.`;
 }
 
 const words = (s: string) =>
@@ -83,7 +83,7 @@ const words = (s: string) =>
     .filter((w) => w.length >= 3);
 
 /**
- * The built-in `find_agent` tool (D54): who else works here, searchable by
+ * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
  * talk to, with what they can do, who is responsible and whether they are
  * busy. Read-only; asking one is `ask_agent`.
@@ -104,8 +104,7 @@ export function createFindAgentToolSource(): ToolSource {
     describe: (input) => ({ title: "Find agents", detail: String(input.query ?? "") }),
     async execute(input, ctx) {
       const { db } = ctx;
-      const trigger = await getMessage(db, ctx.orgId, ctx.triggerMessageId);
-      const person = trigger ? await requesterOf(db, trigger) : null;
+      const person = await personBehindCall(ctx);
       const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
       const query = words(String(input.query ?? ""));
       const scored = team
@@ -168,17 +167,8 @@ export function createFindAgentToolSource(): ToolSource {
 /** Consultations shown on the team screen: the last day. */
 export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
 
-const firstSentence = (text: string) => {
-  const one =
-    text
-      .trim()
-      .replace(/\s+/g, " ")
-      .split(/(?<=[.!?])\s/)[0] ?? "";
-  return one.length > 160 ? `${one.slice(0, 157)}…` : one;
-};
-
 /**
- * The team screen (D54): the org's agents grouped by their responsible person,
+ * The team screen: the org's agents grouped by their responsible person,
  * what each can do (stable capability keys), who is working now, and which
  * agents consulted each other in the last day. Questions and answers stay out:
  * a conversation between agents is private.
@@ -191,11 +181,11 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       name: agents.name,
       handle: agents.handle,
       role: agents.role,
-      instructions: agents.instructions,
       appearance: agents.appearance,
       ownerUserId: agents.ownerUserId,
       audienceMode: agents.audienceMode,
       audienceUserIds: agents.audienceUserIds,
+      brain: agents.brain,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -244,7 +234,6 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       name: a.name,
       handle: a.handle,
       role: a.role,
-      callFor: a.role.trim() || firstSentence(a.instructions),
       appearance: (a.appearance ?? null) as AgentAppearance | null,
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),

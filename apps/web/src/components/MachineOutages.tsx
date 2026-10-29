@@ -26,6 +26,7 @@ import {
   Icon,
   OptionList,
   type OptionListItem,
+  ProviderLogo,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -34,11 +35,12 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): the notice at the top of the work area,
+ * "Computador desconectado": the notice at the top of the work area,
  * the "Trocar o computador" dialog, and the agent's one waiting card in the chat.
  */
 
@@ -100,8 +102,10 @@ function OutageNotice({
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
-  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (D79).
+  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, o.machineId);
+  // The Cloud's one computer: its people are told it is being looked after, with no other computer to go to.
+  const cloud = useComputerEdition(org.id) === "cloud";
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -113,6 +117,7 @@ function OutageNotice({
     t("newAgent.and"),
   );
   const sub = [
+    cloud ? t("outage.cloudSub") : null,
     t("outage.waitFor", { count: o.agents.length, names }),
     o.waitingRuns > 0 ? t("outage.stopped", { count: o.waitingRuns }) : null,
   ]
@@ -125,7 +130,9 @@ function OutageNotice({
         <b>
           {here
             ? t("machines.thisMac.outageTitle", { ago: offlineFor(t, o.offlineSince, now) })
-            : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
+            : cloud
+              ? t("outage.titleCloud", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })
+              : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
         </b>
         <span>{sub}</span>
       </span>
@@ -149,9 +156,11 @@ function OutageNotice({
           </Link>
         </Button>
         {here && <ReconnectThisMacButton orgId={org.id} primary />}
-        <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
-          {t("outage.switch")}
-        </Button>
+        {!cloud && (
+          <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
+            {t("outage.switch")}
+          </Button>
+        )}
         <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("outage.dismiss")} onClick={onDismiss} />
       </span>
       {open && <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={o} data={data} />}
@@ -169,7 +178,6 @@ function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[
     return {
       value: "cloud",
       title: t("outage.dialog.cloud"),
-      tag: block ? undefined : t("outage.dialog.alwaysOn"),
       description: block ? t(`outage.dialog.block.${block}`, { brains: needed }) : t("outage.dialog.cloudText"),
       leading: <Icon name="computerCloud" />,
       disabled: block !== null,
@@ -215,7 +223,8 @@ export function SwitchComputerDialog({
   const chosenAgents = o.agents.filter((a) => picked.includes(a.agentId));
   // A target must run every brain of the agents chosen (all of them while none is chosen).
   const brains = brainsOf(chosenAgents.length > 0 ? chosenAgents : o.agents);
-  const targets = targetsFor(data, o.machineId);
+  // Which rows show doesn't change with the checks: only whether each can take who is checked.
+  const targets = targetsFor(data, o.machineId, brainsOf(o.agents));
   const options = targets.map((x) => targetOption(t, x, brains));
   const firstOpen = options.find((x) => !x.disabled)?.value ?? "";
   const [target, setTarget] = useState(firstOpen);
@@ -309,7 +318,7 @@ export function SwitchComputerDialog({
             );
           })}
         </div>
-        <p className="outage-dialog__hint">
+        <p className="outage-dialog__hint ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("outage.dialog.hint", { name: o.name })}</span>
         </p>
@@ -362,7 +371,7 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   if (state !== "waiting") {
     return (
       <div className="waitcard" data-done="">
-        <span className="waitcard__top">
+        <span className="waitcard__top ac-iconline">
           <Icon name="check" size={16} />
           <span>{state === "back" ? t("outage.card.back", { name }) : t("outage.card.moved")}</span>
         </span>
@@ -371,11 +380,14 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   }
   return (
     <div className="waitcard">
-      <span className="waitcard__top">
+      <span className="waitcard__top ac-iconline">
         <Icon name="waiting" size={16} />
         <span>{t("outage.card.waiting", { name })}</span>
       </span>
-      <p>{[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}</p>
+      <p className="ac-iconline">
+        <ProviderLogo id={notice.brain} size="xs" />
+        {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
+      </p>
       {manage && outage && outages.data && (
         <span className="waitcard__acts">
           <Button size="sm" onClick={() => setOpen(true)}>

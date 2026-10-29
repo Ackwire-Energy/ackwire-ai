@@ -98,7 +98,7 @@ interface DragProps {
 }
 
 /**
- * The board (telas/Tarefas.html): the org's columns, each in a fixed stage.
+ * The board: the org's columns, each in a fixed stage.
  * Stage headers group the columns only when the board is customized; cards
  * drag between and inside columns with an insertion line.
  */
@@ -507,7 +507,7 @@ export function AddColumnDialog({
               }))}
             />
           </div>
-          <p className="issues-explain">
+          <p className="issues-explain ac-iconline">
             <Icon name="arrowRight" size={16} />
             <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
           </p>
@@ -637,7 +637,7 @@ function DeleteColumnDialog({
             })}
           </div>
           {to && to.stage !== col.stage && (
-            <p className="issues-explain">
+            <p className="issues-explain ac-iconline">
               <Icon name="arrowRight" size={16} />
               <span>
                 {t("issues.columns.stageChange", {

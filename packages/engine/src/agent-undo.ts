@@ -1,10 +1,10 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, gte, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { actionsFor, actionView, describeAction, publishMessageActions, UNDO_WINDOW_MS } from "./agent-actions";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
-import { addChannelMember, removeChannelMember } from "./channels";
+import { addChannelMember, archiveChannel, removeChannelMember, unarchiveChannel } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { getIssue, type IssueView, setCriterion, updateIssue, type WorkActor } from "./issues";
 import { announceMessageMemories } from "./message-memories";
@@ -15,7 +15,7 @@ import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
 
-const { agentActions, contextItems, routines, channelMembers, issueActivity, messages, users } = schema;
+const { agentActions, contextItems, routines, channels, channelMembers, issueActivity, messages, users } = schema;
 
 type Row = typeof agentActions.$inferSelect;
 
@@ -29,7 +29,7 @@ const same = (a: unknown, b: unknown) => canonicalJson(a ?? null) === canonicalJ
 
 /** Someone changed the target since the agent did: undoing would overwrite their work. */
 const changedSince = () =>
-  new ConflictError("This was changed after the agent did it; undo it by hand", "action.changed_since");
+  new ConflictError("This changed after the agent did it. Undo it by hand.", "action.changed_since");
 
 // ── Issues ───────────────────────────────────────────────────────────────────
 
@@ -157,6 +157,8 @@ const ROUTINE_FIELDS = [
   "event",
   "rule",
   "active",
+  "access",
+  "report",
 ] as const;
 
 /** The fields a routine change can touch (what undo restores). */
@@ -325,6 +327,19 @@ const handlers: Record<string, Handler> = {
     return undefined;
   },
 
+  async "routine.deleted"(deps, a, _userId, direction) {
+    const row = await routineRow(deps.db, a.orgId, a.targetId);
+    if (!row) throw new NotFoundError("The routine is gone", "action.target_gone");
+    if (direction === "undo") {
+      if (!row.deletedAt) throw changedSince();
+      await setRoutine(deps.db, row, { active: obj(a.before).active !== false }, false);
+    } else {
+      if (row.deletedAt) throw changedSince();
+      await setRoutine(deps.db, row, {}, true);
+    }
+    return undefined;
+  },
+
   async "routine.updated"(deps, a, _userId, direction) {
     const row = await routineRow(deps.db, a.orgId, a.targetId);
     if (!row || row.deletedAt) throw new NotFoundError("The routine is gone", "action.target_gone");
@@ -355,6 +370,36 @@ const handlers: Record<string, Handler> = {
         { pubsub: deps.pubsub },
       );
     }
+    return undefined;
+  },
+
+  async "channel.created"(deps, a, userId, direction) {
+    const [channel] = await deps.db
+      .select({ createdAt: channels.createdAt, archivedAt: channels.archivedAt })
+      .from(channels)
+      .where(and(eq(channels.orgId, a.orgId), eq(channels.id, a.targetId)));
+    if (!channel) throw new NotFoundError("The channel is gone", "action.target_gone");
+    if (direction === "redo") {
+      if (!channel.archivedAt) throw changedSince();
+      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId);
+      return undefined;
+    }
+    if (channel.archivedAt) throw changedSince();
+    // Someone already wrote there: archiving would hide their messages.
+    const [written] = await deps.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, a.orgId),
+          eq(messages.channelId, a.targetId),
+          gte(messages.createdAt, channel.createdAt),
+          isNull(messages.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (written) throw changedSince();
+    await archiveChannel(deps.db, userId, a.orgId, a.targetId, { pubsub: deps.pubsub });
     return undefined;
   },
 
@@ -457,7 +502,7 @@ async function toggle(deps: AgentUndoDeps, userId: string, orgId: string, id: st
   if (direction === "undo" && a.undoneAt) throw new ConflictError("Already undone", "action.already_undone");
   if (direction === "redo" && !a.undoneAt) throw new ConflictError("Not undone", "action.not_undone");
   if (a.undoableUntil.getTime() <= now.getTime()) {
-    throw new ConflictError("Too late to undo this; change it by hand", "action.expired");
+    throw new ConflictError("Too late to undo this. Change it by hand.", "action.expired");
   }
   const handler = handlers[a.kind];
   if (!handler) throw new ConflictError("This can't be undone", "action.not_undoable");

@@ -14,11 +14,11 @@ afterEach(async () => {
  * SQL statements; transaction BEGIN/COMMIT are not counted. Raise these only
  * on purpose.
  */
-test("claim → model request stays within 11 statements; a whole mention run within 20", async () => {
+test("claim → model request stays within 12 statements; a whole mention run within 21", async () => {
   let beforeModel = -1;
   f = await setup({
     reply: (req) => {
-      // The agent's call only: the router's (structured output) may run after an agent's answer (D49).
+      // The agent's call only: the router's (structured output) may run after an agent's answer (ADR 0034).
       if (!req.outputSchema) beforeModel = currentQueryCount();
       return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
     },
@@ -39,9 +39,10 @@ test("claim → model request stays within 11 statements; a whole mention run wi
   await drainOutbox(f.db, handlers);
   expect(beforeModel).toBeGreaterThan(0);
   // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
-  expect(beforeModel).toBeLessThanOrEqual(11);
+  // 12 since the run stores the brain it runs with (ADR 0053 §10).
+  expect(beforeModel).toBeLessThanOrEqual(12);
   expect(profile).not.toBeNull();
   const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };
-  expect(p.total.queries).toBeLessThanOrEqual(20);
+  expect(p.total.queries).toBeLessThanOrEqual(21);
   expect(p.stages.map((s) => s.stage)).toEqual(["claim", "context", "model#1", "persist", "events"]);
 });

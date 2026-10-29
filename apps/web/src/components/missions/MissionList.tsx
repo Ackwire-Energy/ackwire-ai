@@ -14,7 +14,7 @@ import { ExecutorChip, MachineChip, MissionHead, MissionStatusChip, MissionStrip
 import { CloseMissionDialog } from "./MissionDialogs";
 
 /**
- * The Missões tab (Threads.html): one card per mission with its agent, the
+ * The Missões tab: one card per mission with its agent, the
  * home thread, the plan as the pixel strip ("4 de 12 itens"), what waits for
  * you, what runs on the computer (online or offline), when it started, and
  * Abrir thread. Active first, then the ones that ended.
@@ -57,7 +57,7 @@ export function MissionsTab({
           )
         }
       >
-        {filtered ? t("threads.empty.noResultsText") : t("missions.empty.text")}
+        {filtered ? t("threads.empty.noResultsText") : null}
       </EmptyState>
     );
   }

@@ -31,7 +31,7 @@ import { navigateAway } from "@/lib/navigate";
 import { ChangedTag, useAgentEdit, WasLine } from "./context";
 
 /*
- * Which GitHub repositories the agent may use (RepositoriosAgente.html):
+ * Which GitHub repositories the agent may use:
  * under the GitHub row of Ferramentas e acesso, the chips and "Mudar"; the
  * choice happens in a dialog. Changes go to the page's draft (save bar).
  */
@@ -222,7 +222,7 @@ function AccountRows({
 }
 
 /**
- * "Repositórios da Ada" (telas/RepositoriosDialogo.html, B): "Todos os repositórios" on top of
+ * "Repositórios da Ada": "Todos os repositórios" on top of
  * the list, which is always there (with Todos on, all of it checked and dimmed); search; the
  * organization's repositories by account. The button says what it will do ("Usar 2
  * repositórios") and puts the choice in the draft. `add` ("Liberar") starts with it checked.

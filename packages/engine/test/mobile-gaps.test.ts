@@ -21,7 +21,7 @@ import {
   setThreadFollow,
   unpinMessage,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, answerSteering, type Fixture, setup } from "./fixtures";
 
 /**
  * What the phone app needed from the API: unread and last message per
@@ -50,8 +50,15 @@ const general = async (userId: string) => {
 async function withBia() {
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await nextMillisecond();
   return bia;
 }
+
+/**
+ * PGlite's clock counts whole milliseconds, so a message posted in the same millisecond as a join or a
+ * read ties with it and isn't unread; waiting for the next one keeps what a test posts next after it.
+ */
+const nextMillisecond = () => Bun.sleep(2);
 
 const threadReplies = async (userId: string) =>
   f.db
@@ -71,6 +78,7 @@ describe("channel list: unread and last message", () => {
     expect(before.unreadCount).toBe(2);
     expect(before.lastMessage).toMatchObject({ authorType: "person", authorId: bia.id, authorName: "bia" });
     await markChannelRead(f.db, bia.id, f.org.id, f.general.id);
+    await nextMillisecond();
     expect((await general(bia.id)).unreadCount).toBe(0);
     const last = await post(f.owner.id, f.general.id, `**Deploy** ${"y".repeat(300)}`);
     const after = await general(bia.id);
@@ -101,6 +109,7 @@ describe("channel list: unread and last message", () => {
     const root = await post(f.owner.id, f.general.id, "Release checklist");
     const mine = await post(bia.id, f.general.id, "My question");
     await markChannelRead(f.db, bia.id, f.org.id, f.general.id);
+    await nextMillisecond();
 
     await post(f.owner.id, f.general.id, "reply in ana's thread", root.id);
     expect((await general(bia.id)).unreadCount).toBe(0);
@@ -135,6 +144,8 @@ describe("channel list: unread and last message", () => {
     f = await setup();
     await post(f.owner.id, f.general.id, "before bia");
     const bia = await withBia();
+    // PGlite's clock counts whole milliseconds: posted in the join's millisecond, the message would tie with it.
+    await Bun.sleep(2);
     await post(f.owner.id, f.general.id, "after bia");
     expect((await general(bia.id)).unreadCount).toBe(1);
   });
@@ -274,18 +285,24 @@ describe("working now (any member)", () => {
   test("runs in progress where I am; never someone else's DM or a private channel I'm not in", async () => {
     f = await setup();
     const bia = await withBia();
-    const run = async (channelId: string, triggerMessageId: string, status: "running" | "done" = "running") =>
-      f.db.insert(schema.agentRuns).values({
-        orgId: f.org.id,
-        agentId: f.agent.id,
-        channelId,
-        threadRootId: triggerMessageId,
-        triggerMessageId,
-        trigger: "router",
-        hop: 1,
-        status,
-        startedAt: new Date(),
-      });
+    const run = async (channelId: string, triggerMessageId: string, status: "running" | "done" = "running") => {
+      const [row] = await f.db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId,
+          threadRootId: triggerMessageId,
+          triggerMessageId,
+          trigger: "router",
+          hop: 1,
+          status,
+          startedAt: new Date(),
+        })
+        .returning();
+      // The same person's next message in the channel goes into a running one.
+      if (row?.status === "running") answerSteering(f, row);
+    };
     const ask = await post(f.owner.id, f.general.id, "Dev, can you check the deploy?");
     await run(f.general.id, ask.id);
     const old = await post(f.owner.id, f.general.id, "older");
@@ -305,7 +322,7 @@ describe("working now (any member)", () => {
       channelId: f.general.id,
       channelKind: "channel",
       channelName: "general",
-      // Asked in the channel: it answers there (D67).
+      // Asked in the channel: it answers there.
       threadId: null,
       status: "running",
       label: "Dev, can you check the deploy?",

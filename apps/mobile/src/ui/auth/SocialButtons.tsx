@@ -3,6 +3,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
+import { socialRefusalText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -10,6 +11,7 @@ import { Icon } from "../Icon";
 import { Text } from "../Text";
 import { useTheme } from "../theme";
 import { OrDivider } from "./AuthLink";
+import { SocialMark } from "./SocialMarks";
 
 const ORDER: SignInProvider[] = ["apple", "google", "github"];
 
@@ -29,7 +31,8 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
 }
 
 /**
- * "Continue with Apple/Google/GitHub" for the given providers, the last one used marked.
+ * "Continue with Apple/Google/GitHub" for the given providers with their marks (as on the web), the last one
+ * used marked.
  * On iOS, Apple uses the system button (Apple's rules) and a native sign-in sent to the server as an
  * ID token; the others go through the system browser and back on `agenteschat://`.
  */
@@ -61,8 +64,8 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient.signIn.social({ provider, callbackURL: "/" });
-      if (res.error) onError(t("mobile.auth.social.failed"));
+      const res = await authClient().signIn.social({ provider, callbackURL: "/" });
+      if (res.error) onError(socialRefusalText(t, res.error));
     } catch {
       onError(t("mobile.auth.errors.network"));
     } finally {
@@ -81,8 +84,11 @@ export function SocialButtons({
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
       setBusy(true);
       rememberSignIn("apple");
-      const res = await authClient.signIn.social({ provider: "apple", idToken: { token: credential.identityToken } });
-      if (res.error) onError(t("mobile.auth.social.failed"));
+      const res = await authClient().signIn.social({
+        provider: "apple",
+        idToken: { token: credential.identityToken },
+      });
+      if (res.error) onError(socialRefusalText(t, res.error));
     } catch (e) {
       // Closing Apple's sheet is not an error.
       if ((e as { code?: string })?.code !== "ERR_REQUEST_CANCELED") onError(t("mobile.auth.social.failed"));
@@ -115,7 +121,14 @@ export function SocialButtons({
               onPress={() => void appleNative()}
             />
           ) : (
-            <Button variant="secondary" wide label={label[p]} disabled={busy} onPress={() => void browser(p)} />
+            <Button
+              variant="secondary"
+              wide
+              leading={(color) => <SocialMark provider={p} color={color} />}
+              label={label[p]}
+              disabled={busy}
+              onPress={() => void browser(p)}
+            />
           )}
           {last === p ? <LastUsed /> : null}
         </View>

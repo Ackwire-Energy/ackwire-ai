@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -16,6 +16,13 @@ const go = async (path: string, state = seedState()) => {
 };
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** A help line's link: to the page on agentes.chat in Portuguese, in a new tab with no referrer. */
+const expectHelpLink = (link: HTMLElement, page: string) => {
+  expect(link.getAttribute("href")).toBe(`https://agentes.chat/help/${page}?lang=pt-BR`);
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(link.className).toBe("ac-link ac-link--muted");
+};
 
 describe("Aprovações", () => {
   const pills = () =>
@@ -45,6 +52,30 @@ describe("Aprovações", () => {
     expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
     expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
     expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+  });
+
+  test("nothing waiting: All decided and one link to how approvals work; the header says no more", async () => {
+    const state = seedState();
+    state.approvals = [];
+    await go("approvals", state);
+    const empty = document.querySelector(".ac-empty") as HTMLElement;
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Tudo decidido");
+    const link = within(empty).getByRole("link", { name: "Como as aprovações funcionam" });
+    expectHelpLink(link, "approvals");
+    expect(empty.querySelector(".ac-empty__text")?.textContent).toBe("Como as aprovações funcionam");
+    expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  test("refusing asks why, optional; the exact action is approved only for its values", async () => {
+    await go("approvals?open=ap-merge");
+    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
+    expect(within(dialog).getByRole("region", { name: "A ação exata" }).textContent).toContain(
+      "Só para estes valores: qualquer mudança precisa de nova aprovação.",
+    );
+    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
+    const why = within(dialog).getByLabelText("Por que não?");
+    expect(why.getAttribute("placeholder")).toBe("Opcional");
+    expect(dialog.textContent).toContain("Vira uma lição na memória da Ada");
   });
 
   test("a normal-risk approval goes with one click", async () => {
@@ -82,6 +113,33 @@ describe("Aprovações", () => {
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
   });
 
+  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Detalhes técnicos", async () => {
+    const state = seedState();
+    const merge = state.approvals[0];
+    if (!merge) throw new Error("no approval");
+    state.approvals = [
+      {
+        ...merge,
+        id: "ap-trace",
+        tool: "sentry_execute_tool",
+        scope: "custom:conn-sentry:write",
+        title: "Sentry: Execute sentry tool",
+        connector: "custom:conn-sentry",
+        params: { name: "get_event_stacktrace", arguments: { issue: "ACME-177" } },
+      },
+    ];
+    await go("approvals", state);
+    const card = screen().getByRole("article", { name: "Ver stack trace do evento" });
+    expect(card.textContent).toContain("Só lê");
+    expect(card.textContent).toContain("Issue: ACME-177");
+    expect(card.textContent).not.toContain("custom:");
+    expect(card.textContent).not.toContain("get_event_stacktrace");
+    await click(within(card).getByRole("button", { name: "Detalhes" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Ver stack trace do evento" });
+    expect(dialog.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
+  });
+
   test("approvals you can't decide show who they wait for, without buttons", async () => {
     const state = seedState();
     for (const a of state.approvals) a.canDecide = false;
@@ -96,6 +154,13 @@ describe("Memória e propostas", () => {
   test("tabs, search, pin, archive and edit with history", async () => {
     await go(`agents/${ADA_ID}/memory`);
     expect(screen().getByRole("heading", { level: 1, name: "O que a Ada sabe" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    // How memory works is a page on the site, linked once under the list.
+    const how = screen().getByRole("link", { name: "Como a memória funciona" });
+    expectHelpLink(how, "memory");
+    expect(how.closest(".page__note")?.textContent).toBe("Como a memória funciona");
     const tabs = screen().getByRole("tablist", { name: "Tipo" });
     expect(
       within(tabs)
@@ -137,8 +202,10 @@ describe("Memória e propostas", () => {
     expect(added.length).toBe(2);
     expect(removed.length).toBe(1);
     expect(removed[0]?.textContent).toBe("−Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    expect(detail.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
     await click(within(detail).getByRole("button", { name: "Editar antes de aceitar" }));
     const text = within(detail).getByLabelText("Texto final das instruções");
+    expect(text.getAttribute("aria-describedby")).toBeNull();
     await type(text, "Programa em branches, nunca direto na main.");
     await click(within(detail).getByRole("button", { name: "Aceitar com ajustes" }));
     await settle(4);
@@ -249,6 +316,8 @@ describe("Criar agente", () => {
   test("role presets, validation, and creation in the chosen channels", async () => {
     const { state } = await go("agents/new");
     expect(screen().getByRole("heading", { level: 1, name: "Qual vai ser o papel?" })).toBeTruthy();
+    // The page says what the button that opened it said.
+    expect(document.querySelector(".newag__rail-title b")?.textContent).toBe("Criar agente");
     await click(screen().getByRole("button", { name: /^Dev/ }));
     await click(screen().getByRole("button", { name: "Continuar" }));
     // Dev starts as Ada, and @ada is taken: renamed here.
@@ -271,7 +340,7 @@ describe("Criar agente", () => {
       name: "Íris",
       handle: "iris",
       role: "Dev",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       ownerUserId: "u-walter",
       // "Chave padrão do workspace".
       credentialId: null,
@@ -307,11 +376,102 @@ describe("Equipe", () => {
     expect(sky.textContent).toContain("João");
     await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
     const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(card.textContent).toContain("Chame para");
+    expect(card.textContent).toContain("O que faz");
     expect(card.textContent).toContain("Arquivos");
     expect(within(card).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
     expect(screen().getByText("Nenhum agente pediu ajuda a outro nas últimas 24 h.")).toBeTruthy();
+  });
+
+  test("the card: what it does, available or with no AI, each ability named and drawn its own way", async () => {
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [
+          { agentId: ADA_ID, state: "ready" },
+          { agentId: ATLAS_ID, state: "no_ai", reason: "no_key" },
+        ],
+      },
+    });
+    const imported = state.agents.find((a) => a.id === ADA_ID);
+    if (imported)
+      imported.instructions =
+        "# SOUL.md - Quem você é\n\n_Você não é um chatbot. Você está se tornando alguém._\n\n## Verdades\n\n- **Ajude de verdade.**";
+    const api = createFakeApi(state);
+    const team = api.agents.team;
+    api.agents.team = async (orgId) => {
+      const t = await team(orgId);
+      return {
+        ...t,
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["sandbox", "desktop", "browser", "drive"] })),
+      };
+    };
+    await renderApp(`/org/${ORG_ID}/team`, { api });
+    await settle(4);
+    // The same action as the sidebar's, in the same words.
+    const head = document.querySelector(".team-head") as HTMLElement;
+    expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    // Its role is beside its name; what it does comes from its instructions, in plain words: their first line,
+    // as its page starts.
+    expect(ada.querySelector(".team-card__meta")?.textContent).toContain("Dev");
+    expect(ada.querySelector(".team-card__call")?.textContent).toBe(
+      "Você não é um chatbot. Você está se tornando alguém.",
+    );
+    expect(ada.querySelector(".team-card__status")?.textContent).toBe("Disponível");
+    expect(ada.textContent).not.toContain("Livre");
+    const chip = (name: string) =>
+      Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name) as HTMLElement;
+    for (const name of ["Computador", "Tela", "Navegador", "Arquivos"]) expect(chip(name)).toBeTruthy();
+    const drawn = new Set(["Computador", "Tela", "Navegador"].map((n) => chip(n).querySelector("svg")?.innerHTML));
+    expect(drawn.size).toBe(3);
+    await click(within(sky).getByRole("button", { name: "Atlas, ver detalhes" }));
+    const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
+    expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
+    expect(atlas.textContent).not.toContain("Disponível");
+  });
+
+  test("the card names another company's service by its own mark, from the connector catalog", async () => {
+    const api = createFakeApi(seedState());
+    const team = api.agents.team;
+    api.agents.team = async (orgId) => {
+      const t = await team(orgId);
+      return {
+        ...t,
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "gdrive", "sentry", "browser"] })),
+      };
+    };
+    await renderApp(`/org/${ORG_ID}/team`, { api });
+    await settle(4);
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    const mark = (name: string) => {
+      const chip = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name);
+      const el = chip?.querySelector<HTMLElement>(".connector-icon__mark");
+      return el && [el.style.getPropertyValue("--connector-icon"), el.style.getPropertyValue("--connector-color")];
+    };
+    expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
+    expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
+    expect(mark("Google Drive")).toEqual(['url("/connectors/googledrive.svg")', "#4285F4"]);
+    // A service's mark sits beside the service's own name.
+    expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
+    // Our own abilities keep their icons.
+    expect(mark("Navegador")).toBeNull();
+    const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");
+    expect(browser?.querySelector("svg.ac-icon")).not.toBeNull();
+  });
+
+  test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {
+    await go("team", seedState({ aiStatus: { any: true, agents: [{ agentId: ADA_ID, state: "waiting" }] } }));
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    expect(ada.querySelector(".team-card__status")).toBeNull();
+    expect(within(ada).queryByRole("button", { name: "Sem IA" })).toBeNull();
+    expect(ada.textContent).toContain("Instruções de Ada.");
   });
 });

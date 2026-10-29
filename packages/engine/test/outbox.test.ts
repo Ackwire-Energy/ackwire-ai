@@ -3,12 +3,14 @@ import { type Database, eq, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   claimJobs,
+  clearOldOutboxPayloads,
   completeJob,
   createOutboxPump,
   DEFAULT_LEASE_MS,
   drainOutbox,
   enqueue,
   failJob,
+  MissingCredentialError,
   PermanentJobError,
   processOutbox,
   renewLease,
@@ -152,6 +154,23 @@ test("processOutbox runs handlers and records outcomes", async () => {
   expect(byKind).toEqual({ ok: "done", permanent: "failed", flaky: "pending", "unknown.kind": "failed" });
 });
 
+test("a job that hits a missing provider key fails at once instead of retrying 8 times", async () => {
+  await enqueue(db, job("reflect"));
+  const outcomes: string[] = [];
+  await processOutbox(
+    db,
+    {
+      reflect: async () => {
+        throw new MissingCredentialError("Add an API key for Anthropic in the workspace settings");
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  expect(outcomes).toEqual(["failed"]);
+  const [row] = await rows();
+  expect([row?.status, row?.attempts, row?.maxAttempts]).toEqual(["failed", 1, 8]);
+});
+
 test("createOutboxPump: a slow job doesn't hold back jobs claimed after it, and slots stay capped", async () => {
   let release: () => void = () => {};
   const slow = new Promise<void>((r) => {
@@ -182,6 +201,78 @@ test("createOutboxPump: a slow job doesn't hold back jobs claimed after it, and 
   expect(done).toEqual(["fast", "fast", "slow"]);
   expect(freed).toBe(3);
   expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
+test("createOutboxPump: routines hold at most half of the slots, so other work always finds one", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const started: string[] = [];
+  const waits: { kind: unknown; background: unknown }[] = [];
+  const pump = createOutboxPump(
+    db,
+    {
+      "routine.run": () => {
+        started.push("routine");
+        return held;
+      },
+      "message.posted": async () => void started.push("message"),
+    },
+    {
+      workerId: "w",
+      maxInFlight: 4,
+      onTiming: (name, _ms, attrs) => {
+        if (name === "queue_wait_ms") waits.push({ kind: attrs.kind, background: attrs.background });
+      },
+    },
+  );
+  for (let i = 0; i < 5; i++) await enqueue(db, job("routine.run"));
+  expect(await pump.pump()).toBe(2);
+  // Two free slots left, but no more routines while two run.
+  expect(await pump.pump()).toBe(0);
+  await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(1);
+  while (pump.inFlight() > 2) await Bun.sleep(1);
+  expect(started.filter((s) => s === "routine")).toHaveLength(2);
+  expect(started).toContain("message");
+  expect(waits).toEqual([
+    { kind: "routine.run", background: true },
+    { kind: "routine.run", background: true },
+    { kind: "message.posted", background: false },
+  ]);
+  release();
+  await pump.idle();
+  // The slots free up: the next routines go.
+  expect(await pump.pump()).toBe(2);
+  await pump.idle();
+  expect(await pump.pump()).toBe(1);
+  await pump.idle();
+  expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
+test("finished jobs lose their content after 30 days and keep their row and dedupe key", async () => {
+  const day = 86_400_000;
+  for (const kind of ["old", "failed", "recent", "waiting"]) await enqueue(db, job(kind, { dedupeKey: kind }));
+  const set = (kind: string, values: Partial<typeof schema.outbox.$inferInsert>) =>
+    db.update(schema.outbox).set(values).where(eq(schema.outbox.kind, kind));
+  await set("old", { status: "done", completedAt: at(-31 * day), lastError: "a@example.com bounced" });
+  await set("failed", { status: "failed", createdAt: at(-31 * day), lastError: "a@example.com bounced" });
+  await set("recent", { status: "done", completedAt: at(-29 * day) });
+  await set("waiting", { createdAt: at(-31 * day) });
+
+  expect(await clearOldOutboxPayloads(db)).toBe(2);
+  const kept = Object.fromEntries((await rows()).map((r) => [r.kind, [r.payload, r.lastError, r.dedupeKey]]));
+  expect(kept).toEqual({
+    old: [{}, null, "old"],
+    failed: [{}, null, "failed"],
+    recent: [{ n: 1 }, null, "recent"],
+    waiting: [{ n: 1 }, null, "waiting"],
+  });
+  // The cleared row still refuses the same key, and a second pass finds nothing to clear.
+  await enqueue(db, job("old", { dedupeKey: "old" }));
+  expect(await rows()).toHaveLength(4);
+  expect(await clearOldOutboxPayloads(db)).toBe(0);
 });
 
 test("drainOutbox follows chains of jobs", async () => {

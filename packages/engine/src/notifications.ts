@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { PubSub, ScreenKind } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -18,11 +18,12 @@ import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
+import type { ApprovalOrigin } from "./tools/run-policy";
 
 const { notifications, organizationMembers } = schema;
 
 /**
- * In-app notifications (D46): one inbox per person per organization.
+ * In-app notifications: one inbox per person per organization.
  *
  * - People only: agents are never recipients, and nobody is notified of
  *   their own action.
@@ -53,10 +54,27 @@ export const NOTIFICATION_KINDS = [
   "mission_stopped",
   "routine_finished",
   "routine_failed",
+  /** A routine paused itself (its reason in `latest.reason`), ADR 0053. */
+  "routine_paused",
+  /** A routine waits for its computer (once per outage), ADR 0053. */
+  "routine_stalled",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
+  /**
+   * The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8), or on
+   * agentes.chat Cloud one of its agents was held (`statusTo: "agent_hold"`, also its responsible person, §9).
+   */
+  "org_standing",
+  /** The workspace's own computer is ready (owners, ADR 0056 §10). */
+  "computer_ready",
+  /**
+   * Someone asks to join through the invitation link (owners and admins, ADR 0068): waiting, one row per workspace
+   * merging the burst, `latest.title` the newest name and `latest.names` the first ones, `source.label` the
+   * workspace's. No actor: the person isn't a member. Never their note.
+   */
+  "join_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -84,12 +102,16 @@ export interface NotificationSource {
   machineId?: string;
   /** An agent's browser handoff (ADR 0040). */
   handoffId?: string;
+  /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
+  screen?: ScreenKind;
+  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
+  agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }
 
 export interface NotificationLatest {
-  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars). */
+  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars); an approval's why. */
   text?: string;
   title?: string;
   emojis?: string[];
@@ -101,6 +123,22 @@ export interface NotificationLatest {
   expiresAt?: string;
   round?: number;
   rounds?: number;
+  /**
+   * `routine_paused`: why it paused itself; `routine_failed`: its failed run's code (coded reasons the app
+   * translates).
+   */
+  reason?: string;
+  /** `approval`: asked while nobody watched, by a routine (its name) or an unattended run (ADR 0053 §8). */
+  origin?: ApprovalOrigin;
+  /** `org_standing` to `agent_hold`: the hold's kind, `network` or `operator`, never its reason. */
+  holdKind?: string;
+  /** `org_standing` on agentes.chat Cloud: the apps read `text` as the restriction does, with how to contest it. */
+  cloud?: boolean;
+  /**
+   * `join_request`: who asked, by name (they aren't members, so no actors), the first `MAX_NAMES` in the order they
+   * asked: a merged row names whoever its time is from, and `count` says how many asked in all.
+   */
+  names?: string[];
 }
 
 export interface NotificationView {
@@ -135,7 +173,7 @@ export interface NotificationDeps {
 type Row = typeof notifications.$inferSelect;
 
 /** Kinds whose events merge into one open row of their group. */
-const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction"]);
+const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction", "join_request"]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 /** A read reaction row still takes new reactions for this long (the "9 min" span on the card). */
@@ -147,6 +185,9 @@ export const MAX_PAGE = 100;
 export const MAX_SNOOZE_MS = 365 * 24 * 3600_000;
 
 const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
+
+/** How many people a merged row names (`latest.names`); the rest are counted. */
+const MAX_NAMES = 2;
 
 /**
  * Plain text for a card: code fences, markdown marks and links reduced to
@@ -190,6 +231,12 @@ const sameActor = (a: NotificationActor, b: NotificationActor) => a.type === b.t
 export function mergeActors(newest: NotificationActor | null | undefined, before: NotificationActor[]) {
   const list = newest ? [newest, ...before.filter((a) => !sameActor(a, newest))] : before;
   return list.slice(0, MAX_ACTORS);
+}
+
+/** A merge's `latest`: the newest event's, the names the row had kept first (each once, `MAX_NAMES`). */
+function mergeLatest(next: Record<string, unknown>, before: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(next.names) || !Array.isArray(before.names)) return next;
+  return { ...next, names: [...new Set([...before.names, ...next.names])].slice(0, MAX_NAMES) };
 }
 
 /** Drops empty values so the stored JSON holds only what is set. */
@@ -309,7 +356,7 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
           .set({
             actors: mergeActors(input.actor, open.actors),
             count: sql`${notifications.count} + 1`,
-            latest: Object.keys(latest).length ? latest : open.latest,
+            latest: Object.keys(latest).length ? mergeLatest(latest, open.latest) : open.latest,
             source: { ...open.source, ...source },
             readAt: null,
             updatedAt: now,

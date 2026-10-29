@@ -29,6 +29,7 @@ import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { useThreadWhere } from "@/components/threads/ThreadView";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import {
@@ -196,7 +197,7 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
             label={t("missions.menu.label")}
             trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("missions.pinned.more")} />}
           >
-            {/* Actions only, each saying what it does; the settings are in their own dialog (telas/MissaoConfig.html). */}
+            {/* Actions only, each saying what it does; the settings are in their own dialog. */}
             {menu && m.canAct && (m.status === "active" || m.status === "awaiting_close") && (
               <MenuItem icon="pause" description={t("missions.menu.pauseHint")} onSelect={() => act("pause")}>
                 {t("missions.menu.pause")}
@@ -309,8 +310,10 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
       </div>
       {m.needsComputer && (
         <div className="mh__note">
-          <Icon name="computer" size={14} />
-          <span>{m.role === "owner" ? t("missions.pinned.pickComputer") : t("missions.pinned.waitsComputer")}</span>
+          <span className="ac-iconline">
+            <Icon name="computer" size={14} />
+            <span>{m.role === "owner" ? t("missions.pinned.pickComputer") : t("missions.pinned.waitsComputer")}</span>
+          </span>
           {m.role === "owner" && <PickComputer mission={m} />}
         </div>
       )}
@@ -360,6 +363,7 @@ export function useCompactOnScroll(fold = 240, unfold = 48) {
 function PickComputer({ mission }: { mission: Mission }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
+  const cloud = useComputerEdition(org.id) === "cloud";
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -377,7 +381,9 @@ function PickComputer({ mission }: { mission: Mission }) {
     >
       {mine.length === 0 && (
         <MenuItem icon="info" disabled onSelect={() => {}}>
-          {t("missions.pinned.noComputers")}
+          {cloud
+            ? t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) })
+            : t("missions.pinned.noComputers")}
         </MenuItem>
       )}
       {mine.map((x) => (

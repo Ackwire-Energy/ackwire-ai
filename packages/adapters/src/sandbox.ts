@@ -1,5 +1,5 @@
 /**
- * Isolated environments where agents run code (D30). Core talks to this
+ * Isolated environments where agents run code (ADR 0021). Core talks to this
  * interface only; Cloud uses Daytona (REST API), tests use the fake. Nothing
  * secret of ours ever goes in: no environment variables are passed, at
  * creation or per command, and the network is blocked unless the org allows

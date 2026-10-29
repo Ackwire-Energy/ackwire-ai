@@ -8,7 +8,6 @@ import {
   genderOf,
   greetingKey,
   initialOf,
-  isFeminineName,
   isSafeId,
   joinNames,
   minutesLeft,
@@ -32,11 +31,12 @@ describe("shared helpers", () => {
   });
 
   test("Portuguese grammar by the name", () => {
-    expect(isFeminineName("Iris")).toBe(false);
-    expect(isFeminineName("Nina")).toBe(true);
-    expect(isFeminineName("Luíza")).toBe(true);
+    expect(genderOf("Iris")).toBe("F");
+    expect(genderOf("Nina")).toBe("F");
+    expect(genderOf("Luíza")).toBe("F");
     expect(genderOf("Infra")).toBe("F");
     expect(genderOf("Dev")).toBe("M");
+    expect(genderOf("Theo")).toBe("M");
   });
 
   test("names and initials", () => {
@@ -44,7 +44,7 @@ describe("shared helpers", () => {
     expect(joinNames(["Ana", "Theo", "Iris"], " e ")).toBe("Ana, Theo e Iris");
     expect(initialOf(" walter")).toBe("W");
     expect(initialOf("")).toBe("?");
-    expect(firstName("Walter Caldas")).toBe("Walter");
+    expect(firstName("Walter Nogueira")).toBe("Walter");
   });
 
   test("times in lists", () => {
@@ -93,9 +93,25 @@ describe("the screens' strings", () => {
       expect([key, vars(get(featureKeysEn, key) as string)]).toEqual([key, vars(get(featureKeysPtBR, key) as string)]);
   });
 
+  test("an agent's profile, which says she or he, never calls the agent it", () => {
+    const profile = featureKeysEn.intentAgents;
+    expect(leaves(profile).filter((key) => /\b(it|its)\b/i.test(get(profile, key) as string))).toEqual([]);
+  });
+
   test("they never repeat a group of the foundation's strings (both merge under `mobile`)", () => {
     const mine = Object.keys(featureKeysPtBR);
     for (const group of Object.keys(mobilePtBR)) expect(mine).not.toContain(group);
+  });
+
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [featureKeysPtBR, featureKeysEn]) {
+      const paths = leaves(tree)
+        .map((key) => get(tree, key) as string)
+        .filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(1);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
+    }
   });
 
   test("plural keys come in pairs", () => {

@@ -1,5 +1,5 @@
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): when the computer that runs some agents' brain
+ * "Computador desconectado": when the computer that runs some agents' brain
  * (Claude Code / Codex) goes offline, the app says so once (a notice), each waiting agent says what it waits
  * for, and "Trocar computador" moves the agents to another computer that can run their brain. Pure helpers
  * shared by the web and the phone app: the notice's inputs, the waiting counts, which targets the switch
@@ -23,6 +23,8 @@ export interface OutageLike {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: readonly OutageAgentLike[];
   waitingRuns: number;
@@ -34,6 +36,8 @@ export type OutageTargetLike =
       machineId: string;
       name: string;
       platform: string;
+      /** The workspace's own computer (ADR 0056 §10). */
+      managed?: boolean;
       online: boolean;
       brains: readonly ComputerBrain[];
       /** "offline" | "paused" | null. */
@@ -127,6 +131,8 @@ export interface TargetOption {
   /** The computer's name (null for the cloud computer, which the UI names itself). */
   name: string | null;
   platform: string | null;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed: boolean;
   online: boolean;
   brains: ComputerBrain[];
   enabled: boolean;
@@ -144,10 +150,10 @@ export function brainsNeeded(o: Pick<OutageLike, "agents">, agentIds: Iterable<s
 }
 
 /**
- * "Para onde": the targets that can run the waiting agents' brains (a computer with none of their brains is
- * left out; the offline computer itself too), the usable ones first. One that can't take the chosen agents
- * now stays, disabled, with the reason: offline, a server reason ("paused"), or the brain it lacks. The cloud
- * computer is offered when the server lists it; unavailable or without the agents' brains, it is disabled.
+ * "Para onde", as on the web: every other computer, the usable ones first; one that can't take the chosen
+ * agents now stays, disabled, with the reason: offline, a server reason ("paused"), or the brain it lacks. The
+ * cloud computer is offered only where the server has it and it runs one of the agents' brains (today it runs
+ * none): a row nobody could ever pick only adds words.
  */
 export function targetOptions(
   o: Pick<OutageLike, "machineId" | "agents">,
@@ -156,20 +162,23 @@ export function targetOptions(
 ): TargetOption[] {
   const all = new Set(o.agents.map((a) => a.brain));
   const need = brainsNeeded(o, agentIds);
+  // With nobody checked, a target is measured against everyone (the button is off anyway).
+  const wanted = need.length > 0 ? need : [...all];
   const out: TargetOption[] = [];
   for (const t of targets ?? []) {
     if (t.kind === "cloud") {
       const brains = t.brains ? [...t.brains] : null;
       // Without the list (older servers) only `available` says; with it, it must run the agents' brains.
-      const wanted = need.length > 0 ? need : [...all];
+      if (!t.available || (brains && !brains.some((b) => all.has(b)))) continue;
       const missing = brains ? (wanted.find((b) => !brains.includes(b)) ?? null) : null;
-      const reason: TargetOffReason | null = !t.available ? "unavailable" : missing ? "missing_brain" : null;
+      const reason: TargetOffReason | null = missing ? "missing_brain" : null;
       out.push({
         key: "cloud",
         target: { kind: "cloud" },
         kind: "cloud",
         name: null,
         platform: null,
+        managed: false,
         online: t.available,
         brains: brains ?? [],
         enabled: reason === null,
@@ -179,8 +188,7 @@ export function targetOptions(
       continue;
     }
     if (t.machineId === o.machineId) continue;
-    if (!t.brains.some((b) => all.has(b))) continue;
-    const missing = need.find((b) => !t.brains.includes(b)) ?? null;
+    const missing = wanted.find((b) => !t.brains.includes(b)) ?? null;
     const reason: TargetOffReason | null = !t.online
       ? "offline"
       : t.reasonOff
@@ -194,6 +202,7 @@ export function targetOptions(
       kind: "machine",
       name: t.name,
       platform: t.platform,
+      managed: t.managed === true,
       online: t.online,
       brains: [...t.brains],
       enabled: reason === null,

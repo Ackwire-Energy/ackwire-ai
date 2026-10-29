@@ -1,24 +1,23 @@
 import { Button, Card, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ObsidianMark } from "./ObsidianMark";
-import { type useVaultReader, VaultDropZone, VaultLines, VaultReading, VaultStats, vaultMapping } from "./WikiImport";
+import { type useVaultReader, VaultDropZone, VaultReading, VaultStats } from "./WikiImport";
 
 /**
- * Onboarding, step 2 (prototype: docs/design/telas/OnboardingV2.html): an
- * Obsidian vault becomes the workspace's wiki. Read here; imported when the
- * person continues (the workspace exists by then).
+ * Onboarding, step 2: an Obsidian vault becomes the workspace's wiki. Read here; imported when the person continues
+ * (the workspace exists by then). It shows what it found; what each part becomes is in the wiki's own import.
  */
 export function VaultCard({ reader }: { reader: ReturnType<typeof useVaultReader> }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { state, report } = reader;
   return (
     <Card as="section" className="vault-card" aria-label={t("onboarding.vault.title")}>
-      <div className="vault-card__head">
+      <div className="vault-card__head ac-faceline">
         <span className="vault-card__icon">
           <ObsidianMark size={22} />
         </span>
         <span className="vault-card__t">
-          <b>{t("onboarding.vault.title")}</b>
+          <b className="ac-captop">{t("onboarding.vault.title")}</b>
           <span className="small muted">{t("onboarding.vault.text")}</span>
         </span>
         {state.step === "ready" ? (
@@ -52,8 +51,7 @@ export function VaultCard({ reader }: { reader: ReturnType<typeof useVaultReader
               </span>
             ))}
           </div>
-          <VaultLines lines={vaultMapping(t, i18n.language, report).slice(0, 5)} />
-          <p className="vault-notice">
+          <p className="vault-notice ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("onboarding.vault.when")}</span>
           </p>

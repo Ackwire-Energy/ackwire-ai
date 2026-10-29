@@ -40,8 +40,9 @@ import {
   taskRequester,
   taskSeconds,
 } from "./machine-tasks";
-import { MachineOfflineError, pausedMessage } from "./machines";
+import { MachineOfflineError, pausedMessage, REMOVED_COMPUTER_MESSAGE } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
 import {
   agentComputerInfo,
@@ -49,6 +50,7 @@ import {
   getSandboxSettings,
   NO_COMPUTER_MESSAGE,
   ownComputerStatus,
+  PREPARING_COMPUTER_MESSAGE,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
   type SandboxDeps,
@@ -218,18 +220,22 @@ type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
 /** One or two sentences the agent reads about its computer, in `run_code`'s description. */
 export function computerSentence(info: ComputerInfo, network: Network) {
   if (info.kind === "removed") {
-    return "Your connected computer was removed; ask an admin or your owner to choose another one (calls fail until then).";
+    return REMOVED_COMPUTER_MESSAGE.replace(/\.$/, " (calls fail until then).");
   }
   if (info.kind === "cloud") {
-    if (!info.available) return NO_COMPUTER_MESSAGE;
+    if (!info.available) return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
     return `Runs on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)}`;
   }
   const os = info.os === "darwin" ? "macOS" : info.os === "windows" ? "Windows" : info.os === "linux" ? "Linux" : "";
   return [
-    `Runs on the connected computer "${info.name}"${os ? ` (${os})` : ""}: a real machine people connected, not an isolated sandbox. It has its own internet and installed tools; commands run in its workspace folder as the user that runs the runner.`,
+    info.managed
+      ? `Runs on "${info.name}"${os ? ` (${os})` : ""}, this workspace's own computer, always on: a real machine, not an isolated sandbox. It has its own internet and installed tools; commands run in your folder there as your own user.`
+      : `Runs on the connected computer "${info.name}"${os ? ` (${os})` : ""}: a real machine people connected, not an isolated sandbox. It has its own internet and installed tools; commands run in its workspace folder as the user that runs the runner.`,
     info.online
       ? "It is online now."
-      : "It is offline now: calls fail until its owner starts the runner; tell the people.",
+      : info.managed
+        ? "It isn't answering right now: calls fail until it is back (usually within minutes); tell the people."
+        : "It is offline now: calls fail until its owner starts the runner; tell the people.",
     info.paused
       ? `${pausedMessage(info.name, info.paused.until, info.paused.timezone)} Tell the people when they ask for work there.`
       : "",
@@ -395,7 +401,7 @@ const slug = (s: string) =>
 
 /**
  * Sandbox tools through the Tool Gateway (scope `sandbox:run`, on by
- * default (D61) and not part of "all tools"): `run_code`, `write_file`,
+ * default and not part of "all tools"): `run_code`, `write_file`,
  * `read_file`, `list_files`, `export_file` (text to a native Drive kind),
  * `upload_file` (any file or folder as is, ADR 0025), `import_file` (from
  * the Drive) and `run_skill_script`. One computer per agent, shared
@@ -649,50 +655,55 @@ export function createSandboxToolSource(
         }
       },
     },
-    {
-      name: "computer_start",
-      description:
-        "Turn your computer on now (it is created the first time). Usually not needed: it starts by itself when you run code. No approval needed.",
-      scope: SANDBOX_SCOPE,
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      async execute(_input, ctx) {
-        try {
-          const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
-          if (target.kind === "machine") {
-            await run(ctx, 30, async () => undefined);
-            return { content: `The connected computer "${target.name}" is online.` };
-          }
-          await run(ctx, 30, async () => undefined);
-          const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
-          return {
-            content: `Your computer is ${s.status}. ${networkSentence(networkOf(s.network))}`,
-            data: { computer: s },
-          };
-        } catch (error) {
-          return failed(error);
-        }
-      },
-    },
-    {
-      name: "computer_stop",
-      description: "Turn your computer off now (files stay; it starts again when you need it).",
-      scope: SANDBOX_SCOPE,
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      async execute(_input, ctx) {
-        try {
-          const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
-          if (target.kind === "machine") {
-            return {
-              content: `Your computer is the connected computer "${target.name}": only its owner turns it on and off (by running the agentes runner). Nothing to stop.`,
-            };
-          }
-          const s = await stopOwnComputer(deps, ctx.orgId, ctx.agentId);
-          return { content: `Your computer is ${s.status}; files kept.`, data: { computer: s } };
-        } catch (error) {
-          return failed(error);
-        }
-      },
-    },
+    // Turning a computer on and off is a sandbox's (Daytona): a connected or the workspace's own computer has no switch here.
+    ...(computerInfo.kind === "cloud" && computerInfo.available
+      ? ([
+          {
+            name: "computer_start",
+            description:
+              "Turn your computer on now (it is created the first time). Usually not needed: it starts by itself when you run code. No approval needed.",
+            scope: SANDBOX_SCOPE,
+            inputSchema: { type: "object", properties: {}, additionalProperties: false },
+            async execute(_input, ctx) {
+              try {
+                const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+                if (target.kind === "machine") {
+                  await run(ctx, 30, async () => undefined);
+                  return { content: `The connected computer "${target.name}" is online.` };
+                }
+                await run(ctx, 30, async () => undefined);
+                const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
+                return {
+                  content: `Your computer is ${s.status}. ${networkSentence(networkOf(s.network))}`,
+                  data: { computer: s },
+                };
+              } catch (error) {
+                return failed(error);
+              }
+            },
+          },
+          {
+            name: "computer_stop",
+            description: "Turn your computer off now (files stay; it starts again when you need it).",
+            scope: SANDBOX_SCOPE,
+            inputSchema: { type: "object", properties: {}, additionalProperties: false },
+            async execute(_input, ctx) {
+              try {
+                const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+                if (target.kind === "machine") {
+                  return {
+                    content: `You work on the computer "${target.name}", which stays as it is: nothing to stop.`,
+                  };
+                }
+                const s = await stopOwnComputer(deps, ctx.orgId, ctx.agentId);
+                return { content: `Your computer is ${s.status}; files kept.`, data: { computer: s } };
+              } catch (error) {
+                return failed(error);
+              }
+            },
+          },
+        ] satisfies ToolDefinition[])
+      : []),
     requestSecretTool({
       scope: SANDBOX_SCOPE,
       browserOnly: false,
@@ -717,12 +728,16 @@ export function createSandboxToolSource(
                   : target.os === "linux"
                     ? "Linux"
                     : "unknown OS";
+            const where = target.managed
+              ? `You are on "${target.name}", this workspace's own computer (${os}), always on: ${target.online ? "answering now" : "not answering right now (it usually comes back within minutes; tell the people)"}.`
+              : `You are on the connected computer "${target.name}" (${os}), ${target.online ? "online" : "offline (ask its owner to start the runner)"}.`;
             return {
-              content: `You are on the connected computer "${target.name}" (${os}), ${target.online ? "online" : "offline (ask its owner to start the runner)"}. Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own. No cost to the organization.`,
+              content: `${where} Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own. No cost to the organization.`,
               data: {
                 computer: {
                   kind: "machine",
                   name: target.name,
+                  managed: target.managed,
                   online: target.online,
                   os: target.os,
                   execAllowed: target.execAllowed,
@@ -730,7 +745,9 @@ export function createSandboxToolSource(
               },
             };
           }
-          if (!target.available) return { content: NO_COMPUTER_MESSAGE, isError: true };
+          if (!target.available) {
+            return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
+          }
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
             content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; network: ${s.network ?? "none yet"}.`,
@@ -1230,7 +1247,10 @@ export function createSandboxToolSource(
             .set({ status: "canceled", endedAt: new Date(), updatedAt: new Date() })
             .where(and(eq(schema.machineTasks.id, row.id), eq(schema.machineTasks.canceledBy, by)))
             .returning();
-          if (ended) await publishTaskEvent(deps.pubsub, ended);
+          if (ended) {
+            await recordTaskFinished(ctx.db, ended);
+            await publishTaskEvent(deps.pubsub, ended);
+          }
           // A mission's task still gets its end handled (notes, inbox), even canceled by the agent.
           if (ended?.missionId) await enqueueWake(ctx.db, ended);
           await audit();

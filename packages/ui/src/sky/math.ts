@@ -35,6 +35,10 @@ export function mix(a: string, b: string, k: number): string {
   ).join("")}`;
 }
 
+/** An `rgba()` color as the solid "#rrggbb" it shows over `over`, for places with no alpha (classic Outlook). */
+export const opaque = (color: string, over: string) =>
+  mix(over, color, Number(/^rgba\(.*[,/]\s*([\d.]+)\s*\)$/.exec(color.trim())?.[1] ?? 1));
+
 /** A color as a little-endian RGBA pixel (for a Uint32Array over ImageData). */
 export function pixelOf(color: string): number {
   const [r, g, b] = parseColor(color);
@@ -122,7 +126,17 @@ export function lightAt(x: number, y: number, lx: number, ly: number, strength: 
   return strength * Math.exp(-(dx * dx + dy * dy) * (1 / (radius * radius)));
 }
 
-/** A calm zone: [left, top, right, bottom] in sky pixels. */
+/**
+ * The pointer light's center `dt` seconds on, from `from` toward the pointer at `to` (shares of the sky, held within
+ * 0.3 past its edges): 5% of the way each 60th of a second, so at the same pace whatever the frame rate.
+ */
+export const lightToward = (from: number, to: number, dt: number) =>
+  from + (Math.min(1.3, Math.max(-0.3, to)) - from) * (1 - 0.95 ** (dt * 60));
+
+/** A moving sky draws about 30 frames a second: the dither moves in whole cells, more frames only cost. */
+export const SKY_FRAME_MS = 32;
+
+/** A calm zone (or any box on the sky): [left, top, right, bottom] in sky pixels. */
 export type CalmZone = [left: number, top: number, right: number, bottom: number];
 
 /** How calm (0..1) the field is at (x, y): 1 inside a zone, easing to 0 over `pad` sky pixels around it. */
@@ -163,6 +177,58 @@ export interface SkyFrame {
   h: number;
   t: number;
   tones: number[];
+}
+
+/** Whether a pixel agent at (x, y), `k` sky pixels per sprite pixel, comes within `pad` sky pixels of any box. */
+export function spriteNear(boxes: readonly CalmZone[], x: number, y: number, k: number, pad: number): boolean {
+  const s = 9 * k;
+  for (const b of boxes) if (x - pad < b[2] && x + s + pad > b[0] && y - pad < b[3] && y + s + pad > b[1]) return true;
+  return false;
+}
+
+/**
+ * Where a pixel agent can stand in a `w`×`h` sky: wholly inside it, not above `top`, and `pad` away from every box
+ * in `avoid`. Null after 24 tries: a crowded sky shows fewer agents rather than stacking them.
+ */
+export function placeSprite(
+  rand: () => number,
+  w: number,
+  h: number,
+  k: number,
+  top: number,
+  avoid: readonly CalmZone[],
+  pad: number,
+): [x: number, y: number] | null {
+  const s = 9 * k;
+  const from = Math.ceil(top);
+  if (w < s || h - from < s) return null;
+  for (let i = 0; i < 24; i++) {
+    const x = Math.floor(rand() * (w - s + 1));
+    const y = from + Math.floor(rand() * (h - from - s + 1));
+    if (!spriteNear(avoid, x, y, k, pad)) return [x, y];
+  }
+  return null;
+}
+
+/**
+ * An x for a pixel agent rising from below to `top` whose path keeps `pad` from every box it passes (any x when no
+ * column does, after 12 tries).
+ */
+export function riseColumn(
+  rand: () => number,
+  w: number,
+  k: number,
+  top: number,
+  boxes: readonly CalmZone[],
+  pad: number,
+): number {
+  const s = 9 * k;
+  const passed = boxes.filter((b) => b[3] + pad > top);
+  for (let i = 0; i < 12; i++) {
+    const x = rand() * w;
+    if (!passed.some((b) => x - pad < b[2] && x + s + pad > b[0])) return x;
+  }
+  return rand() * w;
 }
 
 /** Draws one pixel agent at (x, y), `k` sky pixels per sprite pixel, skipping pixels where `skip` says so. */

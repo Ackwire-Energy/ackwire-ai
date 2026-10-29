@@ -31,7 +31,16 @@ const reply = (req: ModelRequest) => {
   if (last.includes("deploy it"))
     return {
       chunks: [],
-      toolUses: [{ name: "ask_user", input: { question: "Qual ambiente?", choices: ["staging", "production"] } }],
+      toolUses: [
+        {
+          name: "ask_user",
+          input: {
+            why: "I need a person's answer before I go on: this decides what I change next.",
+            question: "Qual ambiente?",
+            choices: ["staging", "production"],
+          },
+        },
+      ],
     };
   return { chunks: ["Feito."] };
 };
@@ -56,7 +65,7 @@ describe("ask_user", () => {
     expect(run?.status).toBe("waiting_input");
     const [q] = await questions();
     expect(q).toMatchObject({ text: "Qual ambiente?", choices: ["staging", "production"], status: "open" });
-    // Asked in the channel: the card is in the main timeline (D67).
+    // Asked in the channel: the card is in the main timeline.
     expect(q?.threadId).toBeNull();
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const card = main.find((m) => m.id === q?.messageId);

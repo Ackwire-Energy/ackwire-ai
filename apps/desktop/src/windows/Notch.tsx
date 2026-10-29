@@ -1,5 +1,5 @@
 /**
- * The notch (telas/NotchAgente.html, "A · Asas"; off by default, Preferências → Geral): a black
+ * The notch (off by default, Preferências → Geral): a black
  * island over the MacBook's camera housing. Closed, it grows wings: who is working on the left, the
  * clock (or what needs you) on the right. When an agent needs a person, or the last work ends, it
  * drops for a few seconds with one line; a click opens the list. Nothing going on: hidden.
@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { siteLink } from "../control/browser";
 import {
-  elapsedClock,
   finishedOf,
   type NotchHelp,
   type NotchState,
@@ -19,12 +18,13 @@ import {
   notchStateOf,
   oldestStart,
 } from "../control/notch";
+import { homeServer } from "../control/server";
 import { type Home, pairedHomes } from "../control/store";
-import { SITE_URL } from "../control/version";
 import { agentOf } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
+import { elapsedClock } from "../ui/time";
 
 /** Each wing beside the notch. */
 const WING = 74;
@@ -309,7 +309,8 @@ function HelpLine({ home, help, row }: { home: Home | undefined; help: NotchHelp
         variant="primary"
         onClick={(e) => {
           e.stopPropagation();
-          void host.openExternal(siteLink(home?.status?.server, help.link, SITE_URL)).catch(() => {});
+          const server = home ? homeServer(home) : null;
+          if (server) void host.openExternal(siteLink(server, help.link, server)).catch(() => {});
         }}
       >
         {t("desktop.notch.open")}

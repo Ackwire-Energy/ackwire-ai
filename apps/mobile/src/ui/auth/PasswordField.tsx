@@ -19,7 +19,7 @@ export interface PasswordFieldProps {
   label: string;
 }
 
-/** A password with "show" beside it; a new one also gets the 8-pixel meter (telas/EntrarCadastro.html). */
+/** A password with "show" beside it; a new one also gets the 8-pixel meter. */
 export const PasswordField = forwardRef<ComponentRef<typeof TextInput>, PasswordFieldProps>(function PasswordField(
   { value, onChangeText, fresh, onSecretChange, onShow, onSubmitEditing, label },
   ref,
@@ -88,7 +88,9 @@ export function PasswordMeter({ password }: { password: string }) {
           : t("auth.passwordMissing", { count: 8 - password.length });
   const on = state === "ok" ? colors.ok : state === "long" ? colors.danger : colors.ink2;
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 4 }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 4 }}
+    >
       <View style={{ flexDirection: "row", gap: 2 }} accessibilityElementsHidden importantForAccessibility="no">
         {Array.from({ length: 8 }, (_, i) => (
           <View

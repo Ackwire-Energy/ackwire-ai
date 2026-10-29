@@ -6,9 +6,9 @@ import { useFrameTime } from "./live";
 import { inkOrbitCells, orbitHead, RING, stopBreath } from "./orbit";
 
 /**
- * The pixel marks next to the agent's orbit (Mensagens.html): the neutral orbit ("enviando", "lê na próxima
- * pausa"), a finished step's one green pixel, a stopped step's dim block and the composer's rounded stop
- * square. Same grid and gaps as `PixelOrbit`; nothing moves with reduced motion.
+ * The pixel marks next to the agent's orbit: the neutral orbit ("enviando", "lê na próxima
+ * pausa"), a finished step's one green pixel, a failed step's red exclamation, a stopped step's dim block
+ * and the composer's rounded stop square. Same grid and gaps as `PixelOrbit`; nothing moves with reduced motion.
  */
 
 const cellBox = (size: number, n: number, x: number, y: number) => {
@@ -58,6 +58,18 @@ export function PixelDone({ size = 14 }: { size?: number }) {
   return (
     <View style={{ width: size, height: size }} {...hidden}>
       <Animated.View style={[cellBox(size, 3, 1, 1), { backgroundColor: colors.ok }, style]} />
+    </View>
+  );
+}
+
+/** A failed step: an exclamation of two pixels in the danger color (a tall one over the center column's last cell). */
+export function PixelFail({ size = 14 }: { size?: number }) {
+  const { colors } = useTheme();
+  const top = cellBox(size, 3, 1, 0);
+  return (
+    <View style={{ width: size, height: size }} {...hidden}>
+      <View style={[top, { height: top.height + size / 3, backgroundColor: colors.danger }]} />
+      <View style={[cellBox(size, 3, 1, 2), { backgroundColor: colors.danger }]} />
     </View>
   );
 }

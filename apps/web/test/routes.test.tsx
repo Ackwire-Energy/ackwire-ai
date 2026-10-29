@@ -5,7 +5,7 @@ setupDom();
 
 import { afterEach } from "bun:test";
 import { cleanup } from "@testing-library/react";
-import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -14,9 +14,14 @@ afterEach(() => {
 });
 
 describe("route guards", () => {
-  test("signed out: / goes to sign-in (the landing page is its own site)", async () => {
-    const { router } = await renderApp("/", { api: createFakeApi(seedState({ me: null })) });
+  test("signed out: / goes to sign-in (the landing page is its own site), or to sign-up on first run", async () => {
+    const signedOut = (authConfig: { firstRun?: boolean }) => createFakeApi(seedState({ me: null, authConfig }));
+    const { router } = await renderApp("/", { api: signedOut({}) });
     expect(router.state.location.pathname).toBe("/login");
+    expect(screen().getByRole("heading", { name: "Oi. Qual é o seu e-mail?" })).toBeTruthy();
+    cleanup();
+    const first = await renderApp("/", { api: signedOut({ firstRun: true }) });
+    expect(first.router.state.location.pathname).toBe("/signup");
   });
 
   test("signed in without organizations: / goes to onboarding", async () => {
@@ -39,6 +44,21 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
   });
 
+  test("a redirect back to a deep link keeps its query, out of the last parameter", async () => {
+    const target = `/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=budget`;
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(target)}`, { api: createFakeApi() });
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
+  });
+
+  test("an email's Connect your AI: #general with the dialog open, and the address drops the request", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}?connect=ai`, { api: createFakeApi() });
+    await settle();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
+    expect(router.state.location.search).toEqual({});
+  });
+
   test("open redirects are dropped", async () => {
     const { router } = await renderApp("/login?redirect=//evil.example", {
       api: createFakeApi(seedState({ me: null })),
@@ -55,8 +75,26 @@ describe("route guards", () => {
     await renderApp(`/org/${ORG_ID}/threads`, { api: createFakeApi() });
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
+    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
     expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Responda a uma mensagem para abrir uma thread.",
+    );
     cleanup();
+    for (const [tab, title] of [
+      ["working", "Nenhum agente trabalhando agora"],
+      ["closed", "Nada fechado por aqui"],
+      ["archived", "Nenhuma thread arquivada"],
+    ]) {
+      await renderApp(`/org/${ORG_ID}/threads?tab=${tab}`, { api: createFakeApi() });
+      await settle();
+      const empty = document.querySelector(".ac-empty") as HTMLElement;
+      expect(empty.querySelector(".ac-empty__title")?.textContent).toBe(title);
+      expect(empty.querySelector(".ac-empty__text")).toBeNull();
+      expect(screen().getByRole("button", { name: "Ver todas as threads" })).toBeTruthy();
+      cleanup();
+    }
     await renderApp(`/org/${ORG_ID}/threads/x`, { api: createFakeApi() });
     await settle();
     expect(screen().getByText("Thread não encontrada")).toBeTruthy();
@@ -84,5 +122,21 @@ describe("route guards", () => {
     expect(
       screen().getByRole("button", { name: /^Conta: .+\. 26% do orçamento dos agentes usado este mês$/ }),
     ).toBeTruthy();
+  });
+
+  test("the budget under the person's name says what it is; nothing used, no bar drawn", async () => {
+    const api = createFakeApi();
+    const usage = () => document.querySelector(".sidebar__user .sidebar__usage") as HTMLElement;
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle();
+    expect(usage().textContent).toBe("Orçamento26%");
+    expect(usage().querySelector(".sidebar__usage-bar")).toBeTruthy();
+    cleanup();
+    const overview = api.orgs.overview;
+    api.orgs.overview = async (orgId) => ({ ...(await overview(orgId)), budgetUsedPercent: 0 });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle();
+    expect(usage().textContent).toBe("Orçamento0%");
+    expect(usage().querySelector(".sidebar__usage-bar")).toBeNull();
   });
 });

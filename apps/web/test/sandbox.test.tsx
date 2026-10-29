@@ -39,17 +39,17 @@ describe("Configurações → Computadores: the cloud computer", () => {
 
   test("the card: on/off and a summary; internet, limits and approval in the Ajustar dialog", async () => {
     const state = await go();
-    const region = screen().getByRole("region", { name: "Computador na nuvem" });
+    const region = screen().getByRole("region", { name: "Sandboxes da Daytona" });
     expect(region.textContent).toContain("Sem internet · até");
     // Only the switch and Ajustar on the card.
     expect(within(region).queryByRole("radio")).toBeNull();
     await click(within(region).getByRole("button", { name: "Ajustar" }));
-    const dialog = screen().getByRole("dialog", { name: "Computador na nuvem" });
+    const dialog = screen().getByRole("dialog", { name: "Sandboxes da Daytona" });
     const card = within(dialog);
     expect(card.getByRole("radio", { name: /Sem internet/ }).getAttribute("aria-checked")).toBe("true");
-    expect(dialog.textContent).toContain("O que o computador na nuvem acessa lá fora.");
+    expect(dialog.textContent).toContain("O que a sandbox acessa lá fora.");
     // Only for the cloud computer: the person's own computers follow the app.
-    expect(card.getByRole("note").textContent).toContain("quem decide o que os agentes podem fazer é o app agentes");
+    expect(card.getByRole("note").textContent).toContain("Estas regras valem só para as sandboxes da Daytona.");
     // The domain list only for "Só os sites liberados".
     expect(card.queryByLabelText("Adicionar site")).toBeNull();
     await click(card.getByRole("radio", { name: /Só os sites liberados/ }));
@@ -75,7 +75,7 @@ describe("Configurações → Computadores: the cloud computer", () => {
       requireApproval: true,
     });
     // Saved: the dialog closes.
-    expect(screen().queryByRole("dialog", { name: "Computador na nuvem" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "Sandboxes da Daytona" })).toBeNull();
   });
 
   test("every agent's cloud computer with status, and Ligar / Desligar / Apagar in '…'", async () => {
@@ -112,9 +112,9 @@ describe("internet mode", () => {
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(state) });
     await settle(8);
     await click(
-      within(screen().getByRole("region", { name: "Computador na nuvem" })).getByRole("button", { name: "Ajustar" }),
+      within(screen().getByRole("region", { name: "Sandboxes da Daytona" })).getByRole("button", { name: "Ajustar" }),
     );
-    const card = within(screen().getByRole("dialog", { name: "Computador na nuvem" }));
+    const card = within(screen().getByRole("dialog", { name: "Sandboxes da Daytona" }));
     await click(card.getByRole("radio", { name: /Qualquer site/ }));
     expect(card.getAllByRole("note").map((n) => n.textContent)).toContain(
       "O agente acessa qualquer site. Chaves e segredos continuam fora da máquina.",
@@ -122,7 +122,7 @@ describe("internet mode", () => {
     await click(card.getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "sandbox.saveSettings")?.args[1]).toMatchObject({ network: "open" });
-    expect(document.body.textContent).toContain("Os computadores na nuvem ligados já usam a nova regra de internet.");
+    expect(document.body.textContent).toContain("As sandboxes ligadas já usam a nova regra de internet.");
   });
 });
 
@@ -232,7 +232,7 @@ describe("creating the PC feels alive", () => {
     await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}?tab=settings`, { api });
     await settle(8);
     const pc = screen().getByRole("region", { name: "PC do Atlas" });
-    expect(pc.textContent).toContain("Um computador só do Atlas para rodar código e guardar arquivos.");
+    expect(pc.textContent).toContain("Uma sandbox da Daytona só do Atlas, para rodar código e guardar arquivos.");
     await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));
     expect(pc.textContent).toContain("Ligando…");
     expect(pc.textContent).toContain("Criando a máquina");
@@ -257,7 +257,13 @@ describe("creating the PC feels alive", () => {
     const pc = screen().getByRole("region", { name: "PC do Atlas" });
     await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));
     await settle(4);
-    expect(within(pc).getByRole("alert").textContent).toContain("Não deu para ligar: sem cota no provedor");
+    const alert = within(pc).getByRole("alert");
+    expect(alert.textContent).toContain("Não deu para ligar: sem cota no provedor");
+    // The icon leads the words in a line of their own; the button sits beside it, so the row centres it on them.
+    const line = alert.querySelector(".ac-iconline") as HTMLElement;
+    expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+    expect(line.textContent).toContain("sem cota no provedor");
+    expect(line.contains(within(pc).getByRole("button", { name: "Tentar de novo" }))).toBe(false);
     await click(within(pc).getByRole("button", { name: "Tentar de novo" }));
     await settle(4);
     expect(calls).toBe(2);

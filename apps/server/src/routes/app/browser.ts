@@ -1,3 +1,4 @@
+import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
   cancelHandoff,
   claimHandoff,
@@ -6,6 +7,7 @@ import {
   type HandoffDeps,
   handoffView,
   openHandoffOf,
+  openPageInControl,
   requireBrowserAccess,
   startTakeover,
   stopAgentBrowser,
@@ -15,12 +17,13 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 
 const tags = ["Agent browser"];
 
-const BrowserHandoff = z
+export const BrowserHandoff = z
   .object({
     id: z.uuid(),
     agentId: z.uuid(),
     runId: z.uuid().nullable(),
     machineId: z.uuid(),
+    screen: z.enum(SCREEN_KINDS).openapi({ description: "Which of the agent's screens: one open handoff per screen." }),
     kind: z.enum(["ask", "takeover"]),
     instructions: z.string(),
     status: z.enum(["pending", "active", "done", "failed", "expired", "cancelled"]),
@@ -37,11 +40,12 @@ const HandoffParams = OrgParams.extend({ handoffId: z.uuid() });
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
 /**
- * A person's turn in an agent's browser (ADR 0040 §6). The agent asks
+ * A person's turn on one of an agent's screens (ADR 0040 §6). The agent asks
  * (`browser_ask_person`: a card, "Waiting for you", a push); the person
  * takes control on the live view, then presses Done or Couldn't and the
  * agent goes on. Someone watching can also take over and hand back. The
- * live view itself is on `/api/ws` (`browser.watch`).
+ * browser's live view itself is on `/api/ws` (`browser.watch`). A handoff's
+ * own routes (`…/browser/handoffs/{handoffId}/…`) serve every screen.
  */
 export function browserRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -65,21 +69,61 @@ export function browserRoutes(deps: AppDeps) {
     },
   );
 
+  for (const screen of SCREEN_KINDS) {
+    app.openapi(
+      createRoute({
+        method: "get",
+        path: `/organizations/{orgId}/agents/{agentId}/${screen}/handoff`,
+        tags,
+        security,
+        summary: `The open handoff of an agent's ${screen} (who is in control), if any`,
+        request: { params: AgentParams },
+        responses: { 200: json(z.object({ handoff: BrowserHandoff.nullable() })), ...errors },
+      }),
+      async (c) => {
+        const { orgId, agentId } = c.req.valid("param");
+        await requireBrowserAccess(db, c.get("user").id, orgId, agentId, undefined, screen);
+        const open = await openHandoffOf(db, orgId, agentId, screen);
+        return c.json({ handoff: open ? handoffView(open) : null }, 200);
+      },
+    );
+
+    app.openapi(
+      createRoute({
+        method: "post",
+        path: `/organizations/{orgId}/agents/{agentId}/${screen}/takeover`,
+        tags,
+        security,
+        summary: `Take over an agent's ${screen} while watching; it waits until handed back`,
+        description:
+          "`runId`: the agent's run whose card it was taken from; the take over is bound to it (its card stays in that conversation).",
+        request: { params: AgentParams, body: body(z.object({ runId: z.uuid().optional() })) },
+        responses: { 200: json(BrowserHandoff), ...errors },
+      }),
+      async (c) => {
+        const { orgId, agentId } = c.req.valid("param");
+        const { runId } = c.req.valid("json");
+        return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId, runId ?? null, screen), 200);
+      },
+    );
+  }
+
+  // Only the browser stops: the agent's screen stays on (ADR 0058 §1).
   app.openapi(
     createRoute({
-      method: "get",
-      path: "/organizations/{orgId}/agents/{agentId}/browser/handoff",
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/stop",
       tags,
       security,
-      summary: "The open handoff of an agent's browser (who is in control), if any",
+      summary: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
       request: { params: AgentParams },
-      responses: { 200: json(z.object({ handoff: BrowserHandoff.nullable() })), ...errors },
+      responses: { 204: { description: "Stopped" }, ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await requireBrowserAccess(db, c.get("user").id, orgId, agentId);
-      const open = await openHandoffOf(db, orgId, agentId);
-      return c.json({ handoff: open ? handoffView(open) : null }, 200);
+      const hub = deps.extras?.sandbox?.machines?.hub;
+      await stopAgentBrowser(db, hub, c.get("user").id, orgId, agentId, adapters.pubsub);
+      return c.body(null, 204);
     },
   );
 
@@ -106,12 +150,17 @@ export function browserRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Done (or hand back a take over): the agent reads the page again and goes on",
-      request: { params: HandoffParams },
+      description: "`note`: what the person wants the agent to know; it reads it as their own words.",
+      request: { params: HandoffParams, body: body(z.object({ note: z.string().max(1000).optional() })) },
       responses: { 200: json(BrowserHandoff), ...errors },
     }),
     async (c) => {
       const { orgId, handoffId } = c.req.valid("param");
-      return c.json(await finishHandoff(handoffDeps, c.get("user").id, orgId, handoffId, { result: "done" }), 200);
+      const { note } = c.req.valid("json");
+      return c.json(
+        await finishHandoff(handoffDeps, c.get("user").id, orgId, handoffId, { result: "done", note }),
+        200,
+      );
     },
   );
 
@@ -154,42 +203,19 @@ export function browserRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
-      path: "/organizations/{orgId}/agents/{agentId}/browser/takeover",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/open",
       tags,
       security,
-      summary: "Take over an agent's browser while watching; it waits until handed back",
+      summary: "Open a site in the agent's browser (the person in control); a closed browser opens",
       description:
-        "`runId`: the agent's run whose card it was taken from; the take over is bound to it (its card stays in that conversation).",
-      request: { params: AgentParams, body: body(z.object({ runId: z.uuid().optional() })) },
-      responses: { 200: json(BrowserHandoff), ...errors },
+        "Only the person in control (409 `browser.not_in_control` otherwise), and only while the agent may use its browser (`browser:use`) and its computer serves it (403 otherwise). `url`: http(s), a bare host gets https (anything else is 400 `browser.bad_address`). A site outside the agent's list is 403 `browser.not_allowed`; a page that fails to load is 400 `browser.open_failed`.",
+      request: { params: AgentParams, body: body(z.object({ url: z.string().min(1).max(2048) })) },
+      responses: { 204: { description: "Opened" }, ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { runId } = c.req.valid("json");
-      return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId, runId ?? null), 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/organizations/{orgId}/agents/{agentId}/browser/stop",
-      tags,
-      security,
-      summary: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
-      request: { params: AgentParams },
-      responses: { 204: { description: "Closed" }, ...errors },
-    }),
-    async (c) => {
-      const { orgId, agentId } = c.req.valid("param");
-      await stopAgentBrowser(
-        db,
-        deps.extras?.sandbox?.machines?.hub,
-        c.get("user").id,
-        orgId,
-        agentId,
-        adapters.pubsub,
-      );
+      const { url } = c.req.valid("json");
+      await openPageInControl(handoffDeps, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId, url);
       return c.body(null, 204);
     },
   );

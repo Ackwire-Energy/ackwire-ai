@@ -8,9 +8,10 @@ setupDom();
  * in CI right after the calendar proposal test: the "Novo evento" dialog with
  * the new DatePicker / TimeSelect / PeoplePicker, and the DatePicker and
  * TimeSelect interaction tests. They are skipped in the main suite; a
- * separate, non-blocking CI step runs this file alone with RUN_NEW_EVENT=1 and
- * a 20 s timeout to see whether it hangs or crashes. Bring them back into
- * planning.test.tsx and floating.test.tsx once that step is green.
+ * separate CI step runs this file alone with RUN_NEW_EVENT=1 and a 20 s
+ * timeout, and a failure there fails CI. Bring them back into
+ * planning.test.tsx and floating.test.tsx once the main suite runs them
+ * without aborting.
  */
 
 import { toYmd } from "@agenteschat/client/lib/format";
@@ -155,11 +156,17 @@ describe("Calendário > Novo evento", () => {
     async () => {
       await go("calendar");
       const label = () => document.querySelector(".cal-page__range")?.textContent;
+      // The week grid only: Próximos lists this week's daily until it ends, whatever week is shown.
+      const daily = () =>
+        within(screen().getByRole("region", { name: "Grade do calendário" })).queryByRole("button", {
+          name: /^Daily de produto/,
+        });
       const now = label();
+      expect(daily()).not.toBeNull();
       await click(screen().getByRole("button", { name: "Próxima semana" }));
       await settle(4);
       expect(label()).not.toBe(now);
-      expect(screen().queryByRole("button", { name: /^Daily de produto/ })).toBeNull();
+      expect(daily()).toBeNull();
       await click(screen().getByRole("button", { name: "Hoje" }));
       await settle(4);
       expect(label()).toBe(now);
@@ -188,7 +195,14 @@ describe("Calendário > Novo evento", () => {
       await click(within(picker).getByRole("button", { name: dayName }));
       await settle(2);
       expect(picker.isConnected).toBe(false);
-      // Participants: picked ones become tokens above the search.
+      // Participants: what agents taking part get is the label's ⓘ, which also describes the search.
+      const about = within(dialog).getByRole("button", { name: "Sobre Participantes" });
+      const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+      expect(hint?.textContent).toBe("Agentes participantes recebem a pauta e podem preparar um resumo antes.");
+      expect(
+        within(dialog).getByRole("searchbox", { name: "Buscar pessoas e agentes" }).getAttribute("aria-describedby"),
+      ).toBe(hint?.id ?? null);
+      // Picked ones become tokens above the search.
       await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
       expect(within(dialog).getByRole("button", { name: "Remover Ada" })).toBeTruthy();
       await click(within(dialog).getByRole("button", { name: "Criar evento" }));

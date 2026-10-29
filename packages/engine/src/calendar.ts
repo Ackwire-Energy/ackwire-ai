@@ -277,12 +277,19 @@ async function checkParticipants(db: Database, orgId: string, participants: Cale
   }
 }
 
-/** "Oct 20, 2026, 9:00 AM" / "20 de out. de 2026, 09:00": in a time zone and the email's language. */
+/**
+ * "Oct 20, 2026 at 9:00 AM GMT-3" / "20 de out. de 2026, 09:00 BRT": in a time zone and the email's language,
+ * naming the zone, which may be the event's rather than the reader's.
+ */
 const formatWhen = (d: Date, timeZone: string, locale: EmailLocale) =>
   new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
     timeZone,
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
   }).format(d);
 
 /** Tells invited people: in the app, and by email. */
@@ -302,6 +309,7 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
     )
     .where(inArray(users.id, people));
   for (const r of rows) {
+    const zone = r.tz ?? e.timezone;
     await publishUserEvent(deps.pubsub, e.orgId, r.id, { type: "calendar.invited", eventId: e.id, title: e.title });
     await queueEmail(deps.db, {
       orgId: e.orgId,
@@ -313,8 +321,9 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
         orgName: org?.name ?? "",
         inviterName: inviter?.name ?? "",
         title: e.title,
-        when: formatWhen(e.startAt, r.tz ?? e.timezone, emailLocale(r.locale)),
-        url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/org/${e.orgId}/calendar`,
+        when: formatWhen(e.startAt, zone, emailLocale(r.locale)),
+        // Its day puts the calendar on the event's week, where `open` finds it.
+        url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/org/${e.orgId}/calendar?open=${e.id}&day=${localDate(e.startAt, zone)}`,
       },
     });
   }

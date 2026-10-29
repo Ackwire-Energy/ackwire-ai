@@ -70,6 +70,7 @@ export function createFakeMailConnector(
       hasAttachments: (m.attachments?.length ?? 0) > 0,
       text: m.text ?? "",
       replyTo: m.replyTo ?? [],
+      ...(m.deliveredTo ? { deliveredTo: m.deliveredTo } : {}),
       messageIdHeader: m.messageIdHeader ?? `<${m.id}@example.com>`,
       references: m.references ?? [],
       attachments: m.attachments ?? [],
@@ -80,7 +81,15 @@ export function createFakeMailConnector(
   for (const m of options.messages ?? []) add(m);
 
   const summary = (m: MailMessage): MailSummary => {
-    const { text: _t, replyTo: _r, messageIdHeader: _h, references: _refs, attachments: _a, ...rest } = m;
+    const {
+      text: _t,
+      replyTo: _r,
+      deliveredTo: _d,
+      messageIdHeader: _h,
+      references: _refs,
+      attachments: _a,
+      ...rest
+    } = m;
     return rest;
   };
   const guard = () => {

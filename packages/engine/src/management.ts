@@ -48,6 +48,8 @@ export interface OrgSettings {
   teamSize: TeamSize | null;
   /** Monthly budget of agents without their own (nano-USD). Routes show it to admins only. */
   defaultAgentBudgetNanoUsd: number;
+  /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
+  actionCheck: boolean;
 }
 
 export const TEAM_SIZES = ["solo", "small", "medium", "large"] as const;
@@ -68,6 +70,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     timezone: s?.timezone ?? "UTC",
     teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
     defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
+    actionCheck: s?.actionCheck ?? true,
   };
 }
 
@@ -155,6 +158,7 @@ export async function updateOrgSettings(
       ...(input.defaultAgentBudgetNanoUsd !== undefined
         ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
         : {}),
+      ...(input.actionCheck !== undefined ? { actionCheck: input.actionCheck } : {}),
     };
     if (Object.keys(settings).length > 0) {
       await tx
@@ -165,6 +169,8 @@ export async function updateOrgSettings(
   });
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
+  caches.orgs.delete(`${orgId}:action-check`);
+  caches.zones.deletePrefix(`${orgId}:`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
 }
@@ -217,10 +223,17 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
     })
     .from(usageRecords)
     .where(and(eq(usageRecords.orgId, orgId), eq(usageRecords.agentId, agentId), gte(usageRecords.createdAt, since)));
-  const [runs] = await db
-    .select({ n: sql<number>`count(*)::int` })
+  // Runs and failures per day of the month (UTC, like the month itself): the Atividade tab draws them.
+  const byDay = await db
+    .select({
+      day: sql<number>`extract(day from ${agentRuns.createdAt} at time zone 'UTC')::int`,
+      runs: sql<number>`count(*)::int`,
+      failed: sql<number>`(count(*) filter (where ${agentRuns.status} = 'failed'))::int`,
+    })
     .from(agentRuns)
-    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), gte(agentRuns.createdAt, since)));
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), gte(agentRuns.createdAt, since)))
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
@@ -239,7 +252,10 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
       budgetNanoUsd,
       budgetUsedPercent: budgetPercent(spentNanoUsd, budgetNanoUsd),
       tokens: Number(usage?.tokens ?? 0),
-      runs: runs?.n ?? 0,
+      runs: byDay.reduce((n, d) => n + d.runs, 0),
+      failures: byDay.reduce((n, d) => n + d.failed, 0),
+      /** Only the days with runs. */
+      byDay,
     },
     pendingApprovals: pending?.n ?? 0,
     channels: channelsOf,
@@ -510,7 +526,7 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
     .from(usageRecords)
     .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since), eq(usageRecords.billedTo, "org")))
     .groupBy(usageRecords.kind);
-  // Calls our platform pays for (e.g. the Jev router) are reported apart, never in the org's total.
+  // Calls the server's own keys pay for (Jev) are reported apart, never in the org's total.
   const [platform] = await db
     .select({ calls: sql<number>`count(*)::int`, cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
     .from(usageRecords)

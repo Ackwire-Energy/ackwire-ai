@@ -22,7 +22,7 @@ import { useRemoteFile } from "./source";
 import { ZoomableImage } from "./ZoomableImage";
 
 /**
- * A message's pictures, full screen (MobileRefinos.html, "Imagem aberta"): black, the name and who sent
+ * A message's pictures, full screen: black, the name and who sent
  * it on top, pinch and double tap to zoom, swipe between the pictures (dots), drag down to close, and
  * Compartilhar, Salvar em Fotos, Ver no Drive at the bottom. A tap hides and shows the bars.
  */

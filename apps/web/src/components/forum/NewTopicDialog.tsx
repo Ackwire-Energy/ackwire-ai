@@ -36,7 +36,7 @@ import { useToast } from "@/lib/toast";
 import { useForumWho } from "./pieces";
 import "@/pages/forum.css";
 
-/** The four starting points of "Novo tópico" (telas/Forum.html): format, rounds and the goal's wording. */
+/** The four starting points of "Novo tópico": format, rounds and the goal's wording. */
 export const TEMPLATES: {
   key: "tech" | "review" | "brain" | "postmortem";
   icon: IconName;
@@ -266,7 +266,7 @@ export function NewTopicDialog({
             />
           </div>
           {preset?.originText && (
-            <p className="forum-oline">
+            <p className="forum-oline ac-iconline">
               <Icon name="issues" size={16} />
               <span>{t("forum.form.origin", { origin: preset.originText })}</span>
             </p>

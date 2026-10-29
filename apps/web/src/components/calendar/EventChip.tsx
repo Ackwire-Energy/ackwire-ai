@@ -2,7 +2,7 @@ import type { RoutineTarget } from "@agenteschat/client";
 import { useChannels } from "@agenteschat/client";
 import type { CalItem } from "@agenteschat/client/lib/calendar";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { appearanceStyle, Button, Icon, Popover } from "@agenteschat/ui";
+import { appearanceStyle, Button, cx, Icon, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -84,6 +84,7 @@ export function EventChip({
     !band && (item.allDay || item.kind === "deadline")
       ? t("calendar.allDayAria", { title })
       : t("calendar.eventAria", { title: item.title, time });
+  const face = variant !== "line" ? item.agentId : null;
   return (
     <Popover
       open={open}
@@ -95,7 +96,7 @@ export function EventChip({
       trigger={
         <button
           type="button"
-          className={`cal-chip cal-chip--${variant}`}
+          className={cx("cal-chip", `cal-chip--${variant}`, face && "ac-iconline")}
           data-source={item.source}
           data-kind={item.kind}
           data-recurring={item.recurring || undefined}
@@ -104,9 +105,7 @@ export function EventChip({
           aria-pressed={open}
           onPointerDown={onPointerDown}
         >
-          {item.agentId && variant !== "line" && (
-            <AgentAvatar agentId={item.agentId} size="xs" name="" className="cal-chip__avatar" />
-          )}
+          {face && <AgentAvatar agentId={face} size="xs" name="" className="cal-chip__avatar" />}
           <span className="cal-chip__text">
             <span className="cal-chip__title">{title}</span>
             {variant === "block" && <span className="cal-chip__time tabular">{time}</span>}

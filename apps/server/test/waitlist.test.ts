@@ -3,11 +3,21 @@ import { schema } from "@agenteschat/db";
 import { enqueueWaitlistContacts, joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
 import { browser, createTestServer, ORIGIN, type TestServer } from "./harness";
 
+/** The landing page's own site. */
+const LANDING = "https://agentes.example";
+
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer();
+  t = await createTestServer({ env: { LANDING_URL: LANDING } });
 });
 afterEach(() => t.close());
+
+test("without LANDING_URL there is no waiting list", async () => {
+  await t.close();
+  t = await createTestServer();
+  expect((await browser(t)("/api/waitlist", { json: { email: "ana@acme.com" } })).status).toBe(404);
+  expect((await browser(t)("/api/waitlist/confirm", { json: { token: "x" } })).status).toBe(404);
+});
 
 const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 
@@ -43,7 +53,7 @@ test("joining emails a confirmation link (through the outbox, in their language)
     [["ana@acme.com"], "Confirm your spot on the agentes.chat waiting list"],
   ]);
   expect(t.email.sent[0]?.html).toContain('lang="en"');
-  expect(t.email.sent[0]?.text).toContain(`${ORIGIN}/?confirm=`);
+  expect(t.email.sent[0]?.text).toContain(`${LANDING}/?confirm=`);
   const token = lastToken();
   // Only a hash of the token is stored.
   const [before] = await t.db.select().from(schema.waitlistEntries);
@@ -183,7 +193,7 @@ test("a bad email or body is refused with a stable code", async () => {
   expect(t.email.sent).toEqual([]);
 });
 
-test("only our own origin can join or confirm", async () => {
+test("only the landing and our own origin can join or confirm", async () => {
   for (const path of ["/api/waitlist", "/api/waitlist/confirm"]) {
     const json = { email: "a@acme.com", token: "x".repeat(32) };
     const res = await browser(t)(path, { json, origin: "https://evil.example" });
@@ -208,7 +218,7 @@ test("too many attempts from one address are throttled, keyed by the address our
     headers: { "x-forwarded-for": "10.9.8.7, 203.0.113.7" },
   });
   expect(spoofed.status).toBe(429);
-  // Our proxy's internal hop (Railway appends one) is skipped: the client is the last public address.
+  // A proxy's internal hop is skipped: the client is the last public address.
   const behindProxy = await anon("/api/waitlist", {
     json: { email: "p12@acme.com" },
     headers: { "x-forwarded-for": "203.0.113.7, 100.64.0.2" },
@@ -237,10 +247,8 @@ test("guessing confirmation links is throttled too", async () => {
   expect(limited.status).toBe(429);
 });
 
-test("the landing page on its own site (LANDING_URL) joins and confirms through CORS, and the link opens it", async () => {
-  await t.close();
-  const landing = "https://agentes.example";
-  t = await createTestServer({ env: { LANDING_URL: landing } });
+test("the landing page on its own site joins and confirms through CORS, and the link opens it", async () => {
+  const landing = LANDING;
   // The browser's preflight for a JSON POST.
   for (const path of ["/api/waitlist", "/api/waitlist/confirm"]) {
     const preflight = await t.app.request(path, {
@@ -248,12 +256,13 @@ test("the landing page on its own site (LANDING_URL) joins and confirms through 
       headers: {
         origin: landing,
         "access-control-request-method": "POST",
-        "access-control-request-headers": "content-type",
+        "access-control-request-headers": "content-type,x-captcha-response",
       },
     });
     expect(preflight.status).toBe(204);
     expect(preflight.headers.get("access-control-allow-origin")).toBe(landing);
-    expect(preflight.headers.get("access-control-allow-headers")).toBe("content-type");
+    // JSON, and the bot check's token when this server has one; never cookies.
+    expect(preflight.headers.get("access-control-allow-headers")).toBe("content-type,x-captcha-response");
     expect(preflight.headers.get("access-control-allow-credentials")).toBeNull();
   }
   const anon = browser(t);
@@ -273,10 +282,10 @@ test("the landing page on its own site (LANDING_URL) joins and confirms through 
 test("CORS stays off everywhere else, and off entirely without LANDING_URL", async () => {
   const preflight = (path: string, origin: string) =>
     t.app.request(path, { method: "OPTIONS", headers: { origin, "access-control-request-method": "POST" } });
-  const off = await preflight("/api/waitlist", "https://agentes.example");
-  expect(off.headers.get("access-control-allow-origin")).toBeNull();
-  await t.close();
-  t = await createTestServer({ env: { LANDING_URL: "https://agentes.example" } });
-  const app = await preflight("/api/app/me", "https://agentes.example");
+  const app = await preflight("/api/app/me", LANDING);
   expect(app.headers.get("access-control-allow-origin")).toBeNull();
+  await t.close();
+  t = await createTestServer();
+  const off = await preflight("/api/waitlist", LANDING);
+  expect(off.headers.get("access-control-allow-origin")).toBeNull();
 });

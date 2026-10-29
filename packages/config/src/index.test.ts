@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { generateKeyPairSync } from "node:crypto";
 import { ConfigError, envVars, loadConfig, redactConfig, testConfig } from "./index";
 import { parsePemKey } from "./pem";
 
@@ -6,6 +7,17 @@ const valid = {
   DATABASE_URL: "postgres://u:p@localhost:5432/db",
   AGENTES_SECRET: "x".repeat(48),
 };
+
+/** A VAPID pair as the env takes it: the uncompressed public point and the private `d`, base64url. */
+function vapidPair() {
+  const jwk = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "jwk" });
+  const point = Buffer.concat([
+    Buffer.from([4]),
+    Buffer.from(jwk.x ?? "", "base64url"),
+    Buffer.from(jwk.y ?? "", "base64url"),
+  ]);
+  return { WEB_PUSH_VAPID_PUBLIC_KEY: point.toString("base64url"), WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d ?? "" };
+}
 
 describe("loadConfig", () => {
   test("applies defaults", () => {
@@ -16,6 +28,34 @@ describe("loadConfig", () => {
     expect(config.AGENT_DEFAULT_MODEL).toBe("claude-sonnet-5-5");
     expect(config.ROUTER_MODEL).toBe("claude-haiku-5-5");
     expect(config.AGENT_MAX_HOPS).toBe(3);
+    expect(config.S3_PATH_STYLE).toBe(false);
+    expect(config.MILLIONSEND_API_URL).toBe("https://api.millionsend.com");
+    // Unset: the email senders use ola@ on the host of PUBLIC_URL.
+    expect(config.EMAIL_FROM).toBeUndefined();
+  });
+
+  test("FILES_DIR must be absolute; SMTP_URL must be smtp:// or smtps://", () => {
+    expect(loadConfig({ ...valid, FILES_DIR: "/data/files" }).FILES_DIR).toBe("/data/files");
+    expect(() => loadConfig({ ...valid, FILES_DIR: "data/files" })).toThrow(/FILES_DIR/);
+    expect(loadConfig({ ...valid, SMTP_URL: "smtps://u:p@smtp.example.com:465" }).SMTP_URL).toBe(
+      "smtps://u:p@smtp.example.com:465",
+    );
+    expect(() => loadConfig({ ...valid, SMTP_URL: "https://smtp.example.com" })).toThrow(/SMTP_URL/);
+    // An unencoded / in the password (AWS SES passwords are base64) fails here, not inside nodemailer at boot.
+    const unencoded = "smtps://AKIA:abc/def+ghi@email-smtp.us-east-1.amazonaws.com:465";
+    expect(() => loadConfig({ ...valid, SMTP_URL: unencoded })).toThrow(/SMTP_URL: .*percent-encoded/);
+    expect(loadConfig({ ...valid, SMTP_URL: "smtp://u:abc%2Fdef@smtp.example.com:587" }).SMTP_URL).toBe(
+      "smtp://u:abc%2Fdef@smtp.example.com:587",
+    );
+  });
+
+  test("agentes.chat's own servers have their legal links without extra settings", () => {
+    const app = loadConfig({ ...valid, PUBLIC_URL: "https://app.agentes.chat" });
+    expect(app.TERMS_URL).toBe("https://app.agentes.chat/terms");
+    expect(app.PRIVACY_URL).toBe("https://app.agentes.chat/privacy");
+    expect(loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat" }).TERMS_URL).toBe("https://agentes.chat/terms");
+    const selfHosted = loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" });
+    expect([selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([undefined, undefined]);
   });
 
   test("treats empty strings as unset", () => {
@@ -51,6 +91,74 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });
 
+  test("external provisioning needs the operator API, which serves its requests, and no computer of the server's own", () => {
+    expect(loadConfig(valid).MACHINE_PROVISIONING).toBe("off");
+    expect(() => loadConfig({ ...valid, MACHINE_PROVISIONING: "external" })).toThrow(/OPERATOR_API_TOKEN/);
+    const token = "t".repeat(32);
+    const external = { ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token };
+    expect(loadConfig(external).MACHINE_PROVISIONING).toBe("external");
+    expect(() => loadConfig({ ...external, HOST_COMPUTER_TOKEN: "h".repeat(32) })).toThrow(/HOST_COMPUTER_TOKEN/);
+    expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
+  });
+
+  test("session screening is off by default and needs the operator API, its only reader", () => {
+    expect(loadConfig(valid).SESSION_SCREENING).toBe(false);
+    expect(() => loadConfig({ ...valid, SESSION_SCREENING: "true" })).toThrow(
+      /SESSION_SCREENING needs OPERATOR_API_TOKEN/,
+    );
+    const on = { ...valid, SESSION_SCREENING: "true", OPERATOR_API_TOKEN: "t".repeat(32) };
+    expect(loadConfig(on).SESSION_SCREENING).toBe(true);
+  });
+
+  test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
+    expect(loadConfig(valid).TELEMETRY).toBe("on");
+    expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");
+    expect(loadConfig({ ...valid, TELEMETRY: "off" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "false" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "on" }).TELEMETRY).toBe("on");
+    expect(() => loadConfig({ ...valid, TELEMETRY: "sometimes" })).toThrow(/TELEMETRY/);
+    expect(loadConfig(valid).INSTALL_MODE).toBeUndefined();
+    expect(() => loadConfig({ ...valid, INSTALL_MODE: "kubernetes" })).toThrow(/INSTALL_MODE/);
+  });
+
+  test("the bot check's two keys go together, and unset there is none", () => {
+    expect([loadConfig(valid).TURNSTILE_SITE_KEY, loadConfig(valid).TURNSTILE_SECRET_KEY]).toEqual([
+      undefined,
+      undefined,
+    ]);
+    const pair = {
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+    };
+    expect(loadConfig({ ...valid, ...pair }).TURNSTILE_SITE_KEY).toBe(pair.TURNSTILE_SITE_KEY);
+    expect(() => loadConfig({ ...valid, TURNSTILE_SITE_KEY: pair.TURNSTILE_SITE_KEY })).toThrow(/go together/);
+    expect(() => loadConfig({ ...valid, TURNSTILE_SECRET_KEY: pair.TURNSTILE_SECRET_KEY })).toThrow(/go together/);
+    expect(redactConfig(loadConfig({ ...valid, ...pair })).TURNSTILE_SECRET_KEY).toBe("********");
+  });
+
+  test("browser push: on by default, a VAPID pair or nothing, two halves of one pair", () => {
+    expect(loadConfig(valid).WEB_PUSH).toBe("on");
+    expect(loadConfig({ ...valid, WEB_PUSH: "off" }).WEB_PUSH).toBe("off");
+    const pair = vapidPair();
+    expect(loadConfig({ ...valid, ...pair }).WEB_PUSH_VAPID_PUBLIC_KEY).toBe(pair.WEB_PUSH_VAPID_PUBLIC_KEY);
+    expect(() => loadConfig({ ...valid, WEB_PUSH_VAPID_PUBLIC_KEY: pair.WEB_PUSH_VAPID_PUBLIC_KEY })).toThrow(
+      /go together/,
+    );
+    // The public half of another pair: every push would be refused.
+    const mixed = { ...valid, ...pair, WEB_PUSH_VAPID_PUBLIC_KEY: vapidPair().WEB_PUSH_VAPID_PUBLIC_KEY };
+    expect(() => loadConfig(mixed)).toThrow(/public half/);
+  });
+
+  test("TRUSTED_PROXIES: a list, trimmed", () => {
+    expect(loadConfig(valid).TRUSTED_PROXIES).toBeUndefined();
+    const list = " 10.0.0.0/8, 173.245.48.1,2400:cb00::/32 ,";
+    expect(loadConfig({ ...valid, TRUSTED_PROXIES: list }).TRUSTED_PROXIES).toEqual([
+      "10.0.0.0/8",
+      "173.245.48.1",
+      "2400:cb00::/32",
+    ]);
+  });
+
   test("ignores variables that are not in the schema", () => {
     const config = loadConfig({ ...valid, SOMETHING_ELSE: "1" }) as Record<string, unknown>;
     expect(config.SOMETHING_ELSE).toBeUndefined();
@@ -59,10 +167,13 @@ describe("loadConfig", () => {
 
 describe("redactConfig", () => {
   test("masks every secret", () => {
-    const redacted = redactConfig(loadConfig({ ...valid, GITHUB_CLIENT_SECRET: "gh" }));
+    const redacted = redactConfig(
+      loadConfig({ ...valid, GITHUB_CLIENT_SECRET: "gh", SMTP_URL: "smtps://u:p@smtp.example.com" }),
+    );
     expect(redacted.DATABASE_URL).toBe("********");
     expect(redacted.AGENTES_SECRET).toBe("********");
     expect(redacted.GITHUB_CLIENT_SECRET).toBe("********");
+    expect(redacted.SMTP_URL).toBe("********");
     expect(redacted.PORT).toBe(3000);
   });
 

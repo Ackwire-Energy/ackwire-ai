@@ -3,7 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import type { AiStatus } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -73,5 +74,78 @@ describe("channel header: who's here", () => {
     await act(() => new Promise((r) => setTimeout(r, 220)));
     await settle(2);
     expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
+  });
+});
+
+describe("answering without a mention, as true for my own messages as who picks them", () => {
+  const withRouting = async (mine: NonNullable<AiStatus["routing"]>["mine"]) => {
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [],
+        routing: { by: mine === "plan" ? "plans" : mine, mine, model: null, noSmallModel: null },
+        apiKey: false,
+      },
+    });
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    await act(async () => r.sockets.last().open());
+  };
+  const popoverAgents = async () => {
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Membros do canal (4)" })));
+    await settle(4);
+    return screen().getByRole("region", { name: "Agentes" }).textContent;
+  };
+  /** The details' row line of an agent that answers on its own, and its menu's "Por conta própria" line. */
+  const onItsOwn = async () => {
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "#eng" });
+    const row = within(dialog).getByText("Atlas").closest(".member-row") as HTMLElement;
+    const line = row.querySelector(".small")?.textContent;
+    const button = within(row).getByRole("button", { name: "Opções de Atlas" });
+    button.focus();
+    await act(async () => {
+      fireEvent.keyDown(button, { key: "Enter" });
+      fireEvent.keyUp(button, { key: "Enter" });
+    });
+    await settle(1);
+    const option = within(screen().getByRole("menu")).getByRole("menuitemradio", { name: /^Por conta própria/ });
+    return { line, option: option.querySelector(".ac-menu__desc")?.textContent };
+  };
+
+  test("my own plan picks: the chip, and the topic is what calls it", async () => {
+    await withRouting("plan");
+    expect(await popoverAgents()).toContain("responde sem menção");
+  });
+
+  test("only rules for my messages: no chip; it still takes replies and follow-ups", async () => {
+    await withRouting("rules");
+    expect(await popoverAgents()).not.toContain("responde sem menção");
+    cleanup();
+    await withRouting("rules");
+    expect(await onItsOwn()).toEqual({
+      line: "Também responde a respostas e continuações",
+      option: "Também responde a respostas e continuações",
+    });
+  });
+
+  test("the router off: for now only a mention calls it", async () => {
+    await withRouting("off");
+    expect(await popoverAgents()).not.toContain("responde sem menção");
+    cleanup();
+    await withRouting("off");
+    expect(await onItsOwn()).toEqual({
+      line: "Por enquanto, responde só quando alguém menciona",
+      option: "Por enquanto, responde só quando alguém menciona",
+    });
+  });
+
+  test("Jev picks: it joins in on its own, when the topic calls for it", async () => {
+    await withRouting("jev");
+    expect(await onItsOwn()).toEqual({
+      line: "Entra na conversa por conta própria",
+      option: "Responde quando o assunto pede, sem precisar de @",
+    });
   });
 });

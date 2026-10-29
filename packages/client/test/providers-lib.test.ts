@@ -1,0 +1,49 @@
+import { describe, expect, test } from "bun:test";
+import { PROVIDER_IDS } from "@agenteschat/providers";
+import {
+  keyLooksValid,
+  keyStepHint,
+  PROVIDERS,
+  providerGuess,
+  providerOf,
+  providersForKey,
+} from "../src/lib/providers";
+
+const ids = (key: string) => providersForKey(key).map((p) => p.id);
+const AQ = "AQ.Ab8RN6LxSampleOnlyKey_0123456789-abc";
+const AIZA = "AIzaSyD-sample0only1key2for3tests4567";
+
+describe("whose key is it", () => {
+  test("the same providers as the server's catalog, in its order: Claude, OpenAI, Gemini, then the rest", () => {
+    expect(PROVIDERS.map((p) => p.id)).toEqual([...PROVIDER_IDS]);
+  });
+
+  test("a Gemini key, either kind AI Studio hands out, fits Gemini alone, whichever provider was chosen", () => {
+    expect(ids(AQ)).toEqual(["gemini"]);
+    expect(ids(AIZA)).toEqual(["gemini"]);
+    expect(providerGuess(AQ, "anthropic")).toBe("gemini");
+    expect(providerGuess(AIZA, "zai")).toBe("gemini");
+    expect(keyLooksValid("gemini", ` ${AQ} `)).toBe(true);
+    expect(keyLooksValid("gemini", "AQ.short")).toBe(false);
+    expect(keyLooksValid("gemini", "sk-0123456789abcdef0123456789abcdef")).toBe(false);
+  });
+
+  test("other keys keep their providers: any sk- key could be several, Claude's and the plans' are their own", () => {
+    expect(ids("sk-0123456789abcdef0123456789abcdef")).toEqual(["openai", "deepseek", "moonshot", "minimax"]);
+    expect(ids("sk-ant-api03-abcdefghijklmnop")).toEqual(["anthropic"]);
+    expect(ids("0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp")).toEqual(["zai", "minimax"]);
+    // A MiniMax plan key (sk-cp-) never fits MiniMax.
+    expect(ids("sk-cp-abcdefghijklmnopqrst")).toEqual(["openai"]);
+  });
+
+  test("the key panel's first step: where a coding plan's key goes, or to turn on billing; nothing for the others", () => {
+    const hint = (id: string) => {
+      const p = providerOf(id);
+      return p && keyStepHint(p);
+    };
+    expect(hint("moonshot")).toBe("connectAi.key.notPlan");
+    expect(hint("gemini")).toBe("connectAi.key.billing");
+    expect(hint("anthropic")).toBeUndefined();
+    expect(hint("openai")).toBeUndefined();
+  });
+});

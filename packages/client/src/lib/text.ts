@@ -1,3 +1,5 @@
+import { plainLines } from "./markdown";
+
 /** `Acme Saúde` → `acme-saude` (display only: the backend has no slug yet). */
 export const slugify = (value: string) =>
   value
@@ -83,12 +85,47 @@ export function emailTypoFix(email: string): string | null {
 }
 
 /** Where to read the e-mail we just sent: the webmail of known domains ("Abrir o Gmail"). */
-export function webmailOf(email: string): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
+export function webmailOf(
+  email: string,
+): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
   const domain = email.trim().toLowerCase().split("@")[1] ?? "";
   if (domain === "gmail.com" || domain === "googlemail.com") return { name: "Gmail", url: "https://mail.google.com" };
   if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain))
     return { name: "Outlook", url: "https://outlook.live.com/mail" };
-  if (["icloud.com", "me.com", "mac.com"].includes(domain)) return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
+  if (["icloud.com", "me.com", "mac.com"].includes(domain))
+    return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
   if (domain.startsWith("yahoo.")) return { name: "Yahoo Mail", url: "https://mail.yahoo.com" };
   return null;
+}
+
+/** The text ended as a sentence: a full stop added unless it already ends with one, "!", "?" or "…". */
+export const endSentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
+
+/** `text` around the last `part` in it (a value put into a sentence): what comes before and after, or null. */
+export function around(text: string, part: string): [before: string, after: string] | null {
+  const at = part ? text.lastIndexOf(part) : -1;
+  return at < 0 ? null : [text.slice(0, at), text.slice(at + part.length)];
+}
+
+/** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
+const STOPS = /[.!?…](?=\s)|\n/g;
+
+/**
+ * The start of a Markdown text in plain words (`plainLines`), in at most `lines` lines and `max` characters:
+ * whole lines and sentences while they fit, so a full stop is never followed by an ellipsis. A first sentence
+ * longer than that is cut at a word, with "…".
+ */
+export function excerpt(text: string, max: number, lines = 3) {
+  const whole = plainLines(text).slice(0, lines).join("\n");
+  if (whole.length <= max) return whole;
+  let end = 0;
+  for (const stop of whole.matchAll(STOPS)) {
+    const at = stop.index + (stop[0] === "\n" ? 0 : 1);
+    if (at > max) break;
+    end = at;
+  }
+  if (end > 0) return whole.slice(0, end).trimEnd();
+  const cut = whole.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, "")}…`;
 }

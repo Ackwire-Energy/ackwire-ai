@@ -69,9 +69,9 @@ test("forum API: a plan for an issue with a seated person, pass, sub-issues, a n
     createdBy: { id: string };
   };
   const me = issue.createdBy.id;
-  const ops = (await (await api("/agents", { json: { name: "Ops", handle: "ops", credentialId } })).json()) as {
-    id: string;
-  };
+  const ops = (await (
+    await api("/agents", { json: { name: "Ops", handle: "ops", model: "claude-sonnet-5-5", credentialId } })
+  ).json()) as { id: string };
 
   const created = await api("/forum/topics", {
     json: {
@@ -151,7 +151,7 @@ test("forum API: an agent's suggestion card is accepted or dismissed by a person
   for (const body of ["@dev vale um fórum?", "@dev vale um fórum de novo?"]) {
     await api(`/channels/${channelId}/messages`, { json: { body } });
     await t.drain();
-    // Asked in the channel: the card is in the main timeline (D67), the newest one is this ask's.
+    // Asked in the channel: the card is in the main timeline, the newest one is this ask's.
     const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
       messages: { id: string; meta?: Record<string, unknown> }[];
     };

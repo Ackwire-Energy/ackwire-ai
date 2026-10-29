@@ -5,7 +5,7 @@ import type { AgentColor, AgentEyes } from "./AgentLook";
 import { BAYER, reduced, token, useCanvas } from "./RunPixels";
 
 /**
- * The pixel pieces of a connector's tool review (telas/ConectorFerramentas.html):
+ * The pixel pieces of a connector's tool review:
  * a level swatch, a subject's strip (one square per tool, in its level's
  * tone), the proportion bar, the "needs your decision" illustration (the
  * agent and a "?" bubble), the suggestion sparkle and the happy agent of the
@@ -210,7 +210,7 @@ const ASK = [
 ];
 
 /**
- * "Needs your decision" (22×22 cells, 2 css px each; MissaoConfig.html's
+ * "Needs your decision" (22×22 cells, 2 css px each; the mission settings'
  * family): the agent bottom-left and a "?" bubble top-right, alive (it
  * blinks, the bubble bobs); still with reduced motion.
  */

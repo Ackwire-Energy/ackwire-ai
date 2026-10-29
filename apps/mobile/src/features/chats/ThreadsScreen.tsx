@@ -16,7 +16,7 @@ import { waitingInThreads } from "./waiting";
 const LIVE_ROWS = 8;
 
 /**
- * Threads, the second tab (MobileRefinos.html, Threads C): like the home, under the native large title with
+ * Threads, the second tab: like the home, under the native large title with
  * Você and "+" in the bar, the "Esperando você" strip with only what waits in missions and threads, then the
  * sections Missões and Threads (collapsible, remembered) in Conversas' rows.
  */
@@ -46,7 +46,7 @@ export function ThreadsScreen() {
           {t("mobile.common.loading")}
         </Text>
       ) : rows.length === 0 ? (
-        <EmptyState title={t("mobile.threads.empty")} subtitle={t("mobile.threads.emptyHint")} />
+        <EmptyState icon="reply" title={t("mobile.threads.empty")} subtitle={t("mobile.threads.emptyHint")} />
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);

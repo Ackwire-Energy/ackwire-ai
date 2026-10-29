@@ -10,14 +10,14 @@ import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * agentes for Mac (D79): in the app's window, Google/GitHub/Apple sign in
+ * agentes for Mac (ADR 0036): in the app's window, Google/GitHub/Apple sign in
  * through the browser; the browser page hands the fresh sign-in back.
  */
 
-const app = window as { __agentesDesktop?: unknown };
+const app = () => window as { __agentesDesktop?: unknown };
 afterEach(() => {
   cleanup();
-  delete app.__agentesDesktop;
+  delete app().__agentesDesktop;
   sessionStorage.clear();
 });
 
@@ -36,7 +36,7 @@ function recordAssign() {
 
 describe("in the Mac app's window", () => {
   test("GitHub opens in the browser and the window waits, then enters", async () => {
-    app.__agentesDesktop = { version: "0.6.0" };
+    app().__agentesDesktop = { version: "0.6.0" };
     const assign = recordAssign();
     let redeemed = false;
     const { auth, calls } = createFakeAuth();
@@ -53,6 +53,9 @@ describe("in the Mac app's window", () => {
       await settle(6);
       expect(calls.some((c) => c.method === "signInSocial")).toBe(false);
       expect(heading()).toBe("Continue no navegador");
+      expect(document.querySelector(".auth__lead")?.textContent).toBe(
+        "A gente volta para cá quando você entrar com GitHub.",
+      );
       const opened = new URL(assign.urls[0] ?? "", "https://agentes.chat");
       expect(opened.pathname).toBe("/desktop/sign-in");
       expect(opened.searchParams.get("provider")).toBe("github");

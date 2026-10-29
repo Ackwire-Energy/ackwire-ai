@@ -1,10 +1,10 @@
-/* agentes — design system 2026-10 (docs/design/telas/Componentes.dc.html; spec: docs/design/refresh-2026-10.md) */
+/* agentes — design system 2026-10 (spec: docs/design/refresh-2026-10.md) */
 :root, [data-theme="light"] {
-  /* Light is near white (telas/RefinoUI.html): white work area, paper sidebar; gray only in fields' tracks and chosen states. */
+  /* Light is near white: white work area, paper sidebar; gray only in fields' tracks and chosen states. */
   --bg: #fbfbfa; --raised: #ffffff; --raised-2: #ffffff; --sunken: #f3f3f0;
-  /* The app shell: the sidebar's paper and the work area beside it. */
-  --side: #f8f8f6; --pane: #ffffff;
-  /* The open book of the memory mark (telas/ReacoesAgente.html). */
+  /* The app shell: the sidebar on the sky's paper (the faintest cool tint) and the work area beside it. */
+  --side: #f6f9fd; --pane: #ffffff;
+  /* The open book of the memory mark. */
   --book-page: #fffdf6; --book-line: #cfc8b6;
   --glass: rgba(255, 255, 255, 0.88); --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.07); --line2: rgba(23, 23, 22, 0.12); --line-strong: #82827d;
@@ -17,19 +17,10 @@
   --e3: 0 2px 4px rgba(23, 23, 22, 0.04), 0 24px 56px -16px rgba(23, 23, 22, 0.3), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(10, 10, 10, 0.32);
-  /* Chosen (telas/Selecao.html "H"), never a thick ring. Light: it sinks into the page in place, like a key
-     held down. Dark: it rises (brighter face, deeper shadow) and, in a single-choice group, the others step
-     back to a flat hairline (components.css). */
-  --chosen-bg: var(--sunken);
-  --chosen-shadow:
-    inset 0 2px 5px rgba(23, 23, 22, 0.16), inset 0 1px 1.5px rgba(23, 23, 22, 0.12), inset 0 0 0 1px var(--line),
-    0 1px 0 rgba(255, 255, 255, 0.7);
-  --chosen-lift: none;
-  --unchosen-shadow: inset 0 0 0 1px var(--line);
 }
 [data-theme="dark"] {
   --bg: #0f0f0e; --raised: #1c1c1b; --raised-2: #242423; --sunken: #0a0a09;
-  --side: #0a0a09; --pane: #0f0f0e;
+  --side: #0d1015; --pane: #0f0f0e;
   --book-page: #ebe6d8; --book-line: #a59e8c;
   --glass: rgba(30, 30, 28, 0.86); --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1); --line2: rgba(255, 255, 255, 0.15); --line-strong: #71716c;
@@ -42,10 +33,6 @@
   --e3: 0 28px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.5);
-  --chosen-bg: color-mix(in srgb, #fff 7%, var(--raised));
-  --chosen-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.1), 0 14px 28px -8px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --chosen-lift: translateY(-2px);
 }
 :root, [data-theme] {
   /* Names from v1, kept so every component keeps working (they follow the theme). */
@@ -56,12 +43,19 @@
   --success: var(--ink);
   --focus-ring: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink);
   --overlay: var(--e3);
+  /* Chosen, the same in both themes: held down into the page like a pressed key, inside a hairline (--chosen-press
+     alone for a card that keeps its own outline). Never a thick ring and never moved, so a row of options keeps its
+     words on one line. */
+  --chosen-bg: var(--sunken);
+  --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12);
+  --chosen-shadow: var(--chosen-press), inset 0 0 0 1px var(--line);
+  --chosen-lift: none;
   --spring: cubic-bezier(0.34, 1.4, 0.5, 1); --out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
   --radius-sm: 6px; --radius-item: 10px; --radius-md: 10px; --radius-btn: 12px; --radius-lg: 14px;
   --radius-xl: 18px; --radius-section: 20px; --radius-cut: 2px; --radius-full: 999px;
   --radius-agent: 30% 30% 30% 9%;
-  /* The control ruler (telas/RefinoUI.html): everything you click or type in is one of three heights, radius
+  /* The control ruler: everything you click or type in is one of three heights, radius
      30% of the height. sm 32 = toolbars, list filters, in-row actions, composer; md 40 = forms, page and dialog
      buttons, search, selects, sidebar items; lg 48 = only the main action of a full screen. Pills (radius-full)
      are only for labels you don't press (status, counters, mentions). */
@@ -72,6 +66,22 @@
   --control-icon-sm: 16px; --control-icon-md: 18px; --control-icon-lg: 20px;
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+  /*
+   * Where a line's capitals sit, in x-heights (`ex` follows font-size-adjust): their middle --cap-mid above the line
+   * box's middle, their top --cap-top above it. Measured for Source Sans 3 (0.037ex, 0.716ex) and Onest (0.040ex,
+   * 0.711ex): a new font is measured again.
+   */
+  --cap-mid: 0.04ex;
+  --cap-top: 0.71ex;
+  /*
+   * What looks the same in both themes: a site is a light page, behind its frame and before it loads; our drawings
+   * of the Mac's own menus and switches keep its blue and white; an agent's screen keeps its dark ground.
+   */
+  --site-paper: #fff;
+  --site-blank: #fbfbfc;
+  --mac-accent: #2f7cf6;
+  --mac-accent-ink: #fff;
+  --screen-bg: #1f2128;
   --text-xs: 12px; --text-sm: 13px; --text-md: 14.5px; --text-base: 15px; --text-lg: 16px;
   --text-h3: 17px; --text-h2: 20px; --text-h1: 28px; --text-display: 32px;
   --track-tight: -0.025em; --track-tighter: -0.035em;

@@ -5,6 +5,7 @@ import {
   type IssuePriority,
   type IssueStatus,
   keys,
+  useAiStatus,
   useApi,
   useChannels,
   useIssue,
@@ -14,6 +15,7 @@ import {
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -22,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
+import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { chatHref } from "../links/logic";
 import { useOpenDm } from "../new/useOpenDm";
@@ -50,7 +53,7 @@ import {
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
- * One task (MobileDriveIssues.html, "Issue aberta"; called "tarefa" in the app): where it came from, the big title, its state, priority
+ * One task (called "tarefa" in the app): where it came from, the big title, its state, priority
  * and who has it; the agent's card with its live steps; the description, the acceptance criteria (checked
  * here too), what is linked (the source message, Drive files, PRs) and its sub-issues. Conversar and Concluir
  * at the bottom; "…" moves it to another board column, changes priority and who does it, as the web allows.
@@ -176,8 +179,11 @@ function WorkCard({ issue: i }: { issue: Issue }) {
   const orgId = useOrgId();
   const action = useIssueAction(orgId);
   const toast = useToast();
+  const ai = useAiStatus(orgId);
   const w = i.work;
   if (!w || i.assignee?.type !== "agent" || !isOpen(i)) return null;
+  // Stopped because the agent has nothing to think with: say so, and the way out is connecting one.
+  const noAi = aiStateOf(ai.data, w.agentId) === "no_ai";
   const agent = dir.agentById.get(i.assignee.id);
   const name = agent?.name ?? "";
   const color = agentLook(agent).color;
@@ -210,29 +216,43 @@ function WorkCard({ issue: i }: { issue: Issue }) {
               {t("issues.work.lastStep", { step: stepText(w.steps[last]) })}
             </Text>
           ) : null}
-          {w.reason ? (
+          {noAi ? (
+            <Text variant="small" tone="muted">
+              {t("noAi.agent", agentGrammar(t, name))}
+            </Text>
+          ) : w.reason ? (
             <Text variant="small" tone="muted">
               {t(`issues.work.reason.${w.reason}`)}
             </Text>
           ) : null}
           <View>
-            <Button
-              variant="primary"
-              size="sm"
-              icon="right"
-              label={t("issues.work.continue")}
-              disabled={action.isPending}
-              onPress={() =>
-                action.mutate(
-                  { type: "ask", id: i.id, agentId: w.agentId },
-                  {
-                    onSuccess: () =>
-                      toast({ title: t("issues.work.resumed", agentGrammar(t, name)), agentId: w.agentId }),
-                    onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
-                  },
-                )
-              }
-            />
+            {noAi ? (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="brain"
+                label={t("mobile.ai.connect")}
+                onPress={() => openConnectAi({ agentId: w.agentId })}
+              />
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="right"
+                label={t("issues.work.continue")}
+                disabled={action.isPending}
+                onPress={() =>
+                  action.mutate(
+                    { type: "ask", id: i.id, agentId: w.agentId },
+                    {
+                      onSuccess: () =>
+                        toast({ title: t("issues.work.resumed", agentGrammar(t, name)), agentId: w.agentId }),
+                      onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                    },
+                  )
+                }
+              />
+            )}
           </View>
         </>
       ) : w.steps.length > 0 ? (

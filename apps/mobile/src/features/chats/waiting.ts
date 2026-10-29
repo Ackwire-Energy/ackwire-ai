@@ -5,7 +5,7 @@ import { minutesLeft } from "../shared/logic";
 import { missionWaitingItems } from "./logic";
 
 /**
- * "Esperando você" (MobileRefinos.html, B + C): what waits on you as items in one order (requests, the one
+ * "Esperando você": what waits on you as items in one order (requests, the one
  * closest to expiring first, then missions, then agents' questions), the dark strip that shows the first one
  * with the others stacked behind it, and the card it opens into. Pure: the strip turns this into text.
  */
@@ -114,7 +114,7 @@ export const waitingMinutes = (i: Pick<WaitingItem, "expiresAt">, now = Date.now
 /** The i18n keys of an item's verb ("precisa do seu ok") and its chip ("Aprovar", "Pergunta", "Missão"). */
 export const waitingVerbKey = (kind: WaitingKind) => `mobile.chats.wait.verb.${kind}` as const;
 export const waitingChipKey = (kind: WaitingKind) => `mobile.chats.wait.chip.${kind}` as const;
-export const WAITING_ICON = { approval: "shield", question: "help", mission: "target" } as const;
+export const WAITING_ICON = { approval: "wait", question: "help", mission: "target" } as const;
 
 /**
  * The strip's two copies behind it, like grouped notifications: a little narrower and lower each, in ink

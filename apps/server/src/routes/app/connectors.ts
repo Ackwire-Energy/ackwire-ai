@@ -1,6 +1,7 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
   acceptCustomSuggestion,
+  appOAuthRedirect,
   BUILTIN_SCOPES,
   type ConnectorDeps,
   completeOAuth,
@@ -9,11 +10,16 @@ import {
   connectorGrantValidator,
   connectorListing,
   createApiKeyConnection,
+  desktopOAuthRedirect,
+  desktopReturnPath,
   getAgent,
+  isAppReturn,
   isCustom,
+  isDesktopReturn,
   listAgentScopes,
   listConnections,
   NotFoundError,
+  peekOAuthState,
   presetForServer,
   requirePermission,
   revokeAtProvider,
@@ -23,6 +29,7 @@ import {
   syncCustomTools,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { sessionUser } from "../../auth";
 import {
   type AppDeps,
   body,
@@ -62,7 +69,7 @@ const CatalogEntry = z
       description:
         "`catalog`: our connector with its own scopes; `remote_mcp`: a vendor's official MCP server (one click).",
     }),
-    category: z.enum(["dev", "product", "docs", "payments", "support", "marketing", "automation"]),
+    category: z.enum(["dev", "product", "docs", "data", "payments", "sales", "support", "marketing", "automation"]),
     auth: z.array(z.enum(["oauth", "api_key"])),
     oauthConfigured: z
       .boolean()
@@ -70,7 +77,10 @@ const CatalogEntry = z
     available: z.boolean().openapi({ description: "Can be connected on this server." }),
     needsServerUrl: z.boolean(),
     serverUrl: z.string().nullable().openapi({ description: "The MCP endpoint (`remote_mcp`)." }),
-    iconUrl: z.string().nullable().openapi({ description: "Brand icon served by the web app; null = a monogram." }),
+    iconUrl: z.string().nullable().openapi({
+      description:
+        "Brand icon served by the web app, null for a monogram: `/connectors/…` has one color, drawn in `brandColor`, and `/brands/…` keeps its maker's colors.",
+    }),
     brandColor: z.string().nullable().openapi({ description: "Tint of the icon; null = the ink." }),
     scopes: z.array(ScopeInfo),
     tools: z.array(z.object({ name: z.string(), scope: z.string(), sensitive: z.boolean() })),
@@ -80,14 +90,20 @@ const CatalogEntry = z
 const Grant = z.object({ connectionId: z.uuid().nullable(), scope: z.string() }).openapi("ScopeGrant");
 
 /**
- * Connectors in two layers (D7): the organization connects an MCP server once
+ * Connectors in two layers (ADR 0016): the organization connects an MCP server once
  * (OAuth or API key, stored encrypted); each agent gets a subset of its
  * scopes. Also lists the built-in scopes.
  */
 export function connectorRoutes(deps: AppDeps) {
   const { db, config, adapters } = deps;
   const app = createAppRouter(deps);
-  for (const path of ["/organizations/*", "/connectors/*"]) app.use(path, requireSession(deps.auth));
+  app.use("/organizations/*", requireSession(deps.auth));
+  // The OAuth callback is a browser navigation: from the web app it carries our session; from the phone app
+  // (the system browser) it doesn't, and it only hands the code back to the app (see the callback).
+  const session = requireSession(deps.auth);
+  app.use("/connectors/*", (c, next) =>
+    c.req.path.endsWith("/connectors/oauth/callback") ? next() : session(c, next),
+  );
   const oauthApps = connectorOAuthApps(config);
   const connectorDeps: ConnectorDeps = {
     db,
@@ -204,7 +220,10 @@ export function connectorRoutes(deps: AppDeps) {
         params: OrgParams.extend({ connector: z.string() }),
         body: body(
           z.object({
-            returnTo: z.string().max(500).optional().openapi({ description: "Path to land on afterwards." }),
+            returnTo: z.string().max(500).optional().openapi({
+              description:
+                'Path to land on afterwards; "app:connectors" from the phone app, "desktop:" + the path from the desktop app\'s window (the callback hands the code back to the app, which finishes with `oauth/complete`).',
+            }),
             serverUrl: z.url().optional(),
           }),
         ),
@@ -238,28 +257,28 @@ export function connectorRoutes(deps: AppDeps) {
     async (c) => {
       const q = c.req.valid("query");
       const base = config.PUBLIC_URL.replace(/\/$/, "");
+      // Started by the phone app: the system browser has no session of ours. Hand what the provider sent back
+      // to the app, which finishes with its own session (the state stays bound to the person who started it).
+      const started = q.state ? await peekOAuthState(connectorDeps, q.state) : null;
+      if (started && isAppReturn(started.returnTo)) {
+        if (q.error || !q.code) return c.redirect(appOAuthRedirect({ error: q.error ?? "missing_code" }), 302);
+        return c.redirect(appOAuthRedirect({ state: q.state, code: q.code }), 302);
+      }
+      // Started in the desktop app's window: the browser the provider opened in isn't signed in either. The app
+      // opens what the provider sent back in its window, which finishes with the window's session.
+      if (started && isDesktopReturn(started.returnTo)) {
+        const org = started.orgId;
+        if (q.error || !q.code) return c.redirect(desktopOAuthRedirect({ org, error: q.error ?? "missing_code" }), 302);
+        return c.redirect(desktopOAuthRedirect({ org, state: q.state, code: q.code }), 302);
+      }
       if (q.error || !q.state || !q.code) {
         return c.redirect(`${base}/?connector_error=${encodeURIComponent(q.error ?? "missing_code")}`, 302);
       }
+      const user = c.get("user") ?? (await sessionUser(deps.auth, c.req.raw.headers));
+      if (!user) return c.redirect(`${base}/?connector_error=sign_in`, 302);
       try {
-        const { connection, returnTo } = await completeOAuth(connectorDeps, c.get("user"), {
-          state: q.state,
-          code: q.code,
-        });
-        if (isCustom(connection)) {
-          const connect = deps.extras?.mcpConnect ?? connectOverHttp;
-          const judge = deps.extras?.context?.judge;
-          await syncCustomTools({ ...connectorDeps, connect, judge }, connection).catch(() => {});
-          // A one-click connector: its tools get our suggested classification right away.
-          if (presetForServer(connection.serverUrl)) {
-            await acceptCustomSuggestion(
-              { ...connectorDeps, connect },
-              c.get("user").id,
-              connection.orgId,
-              connection.id,
-            ).catch(() => {});
-          }
-        }
+        const { connection, returnTo } = await completeOAuth(connectorDeps, user, { state: q.state, code: q.code });
+        await afterConnected(connection, user.id);
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}connected=${encodeURIComponent(connection.connector)}`, 302);
       } catch (error) {
@@ -268,6 +287,59 @@ export function connectorRoutes(deps: AppDeps) {
       }
     },
   );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/connectors/oauth/complete",
+      tags,
+      security,
+      summary: "Finish an OAuth connection the phone app or the desktop app started (admins)",
+      description:
+        'The phone app opened the authorize URL in the system browser (`returnTo: "app:connectors"`), or the desktop app\'s window did (`returnTo: "desktop:"` + a path); the callback handed `state` and `code` back to the app, which sends them here with its own session. The state must be this person\'s and this organization\'s, unused and not expired. `returnTo`: the path a desktop authorization lands on.',
+      request: {
+        params: OrgParams,
+        body: body(z.object({ state: z.string().min(1).max(200), code: z.string().min(1).max(2000) })),
+      },
+      responses: {
+        200: json(z.object({ connectionId: z.uuid(), connector: z.string(), returnTo: z.string().optional() })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const user = c.get("user");
+      const started = await peekOAuthState(connectorDeps, input.state);
+      // Another organization's (or an unknown) state reads as not found: nothing about it leaks.
+      if (
+        !started ||
+        started.orgId !== orgId ||
+        !(isAppReturn(started.returnTo) || isDesktopReturn(started.returnTo))
+      ) {
+        throw new NotFoundError("This authorization link is invalid or expired");
+      }
+      const { connection, returnTo } = await completeOAuth(connectorDeps, user, input);
+      await afterConnected(connection, user.id);
+      const landing = isDesktopReturn(returnTo) ? { returnTo: desktopReturnPath(returnTo) } : {};
+      return c.json({ connectionId: connection.id, connector: connection.connector, ...landing }, 200);
+    },
+  );
+
+  /** A server connected by address: its tools are read; a one-click one gets our classification right away. */
+  async function afterConnected(connection: Awaited<ReturnType<typeof completeOAuth>>["connection"], userId: string) {
+    if (!isCustom(connection)) return;
+    const connect = deps.extras?.mcpConnect ?? connectOverHttp;
+    const judge = deps.extras?.context?.judge;
+    await syncCustomTools({ ...connectorDeps, connect, judge, blobs: adapters.platformBlobs }, connection).catch(
+      () => {},
+    );
+    if (presetForServer(connection.serverUrl)) {
+      await acceptCustomSuggestion({ ...connectorDeps, connect }, userId, connection.orgId, connection.id).catch(
+        () => {},
+      );
+    }
+  }
 
   // ── Agent permissions (layer 2) ───────────────────────────────────────────
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });

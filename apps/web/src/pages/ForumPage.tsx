@@ -51,7 +51,7 @@ export { filterTopics } from "@agenteschat/client/lib/forum";
 
 const FILTERS: ForumFilter[] = ["open", "done", "mine"];
 
-/** Fórum (telas/Forum.html): who is discussing now, what needs me, and every topic in aligned rows. */
+/** Fórum: who is discussing now, what needs me, and every topic in aligned rows. */
 export function ForumPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -97,7 +97,7 @@ export function ForumPage() {
         <div>
           <h1>{t("forum.title")}</h1>
           <p className="forum-head__sub">{t("forum.subtitle")}</p>
-          <p className="forum-head__guard">
+          <p className="forum-head__guard ac-iconline">
             <Icon name="shield" size={14} />
             <span>{t("forum.guard")}</span>
           </p>
@@ -338,7 +338,7 @@ function NeedRow({ need }: { need: ForumNeed }) {
           : t(plan ? "forum.need.planIssues" : "forum.need.issues", { count: need.count });
       case "budget": {
         const name = who.agentName(need.agentId);
-        return t("forum.need.budget", { name, The: who.g(name).The });
+        return t("forum.need.budget", who.g(name));
       }
       default:
         return t("forum.need.stalled");

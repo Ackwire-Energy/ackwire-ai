@@ -1,13 +1,14 @@
 import type { AgentAction, AgentActionKind, AgentActionTarget, Role } from "@agenteschat/client";
 import { actionPhase, actionTimeLeft, canUndoAction, formatTimeLeft } from "@agenteschat/client/lib/actions";
 import type { IconName } from "@/ui";
-import { type AppHref, chatHref } from "../links/logic";
+import { type AppHref, chatHref, routineHref } from "../links/logic";
+import { isSafeId } from "../shared/logic";
 
 /**
- * Act with undo (ADR 0037 round 2) on the phone: the receipts under an agent's reply (FazerDesfazer.html,
- * uOne / uGroup / uDone). One change shows as one sunken row (A); two or more as a group with
- * "N mudanças · há X" and Desfazer tudo (B). The rules (phase, time left, who may undo) are the shared
- * client's `lib/actions`; this file only lays them out for the phone.
+ * Act with undo (ADR 0037 round 2) on the phone: the receipts under an agent's reply. One change shows
+ * as one sunken row; two or more as a group with "N mudanças · há X" and Desfazer tudo. The rules
+ * (phase, time left, who may undo) are the shared client's `lib/actions`; this file only lays them out
+ * for the phone.
  */
 
 export type ReceiptLayout = "none" | "one" | "group";
@@ -45,13 +46,15 @@ export function receiptIcon(kind: AgentActionKind): IconName {
 }
 
 /**
- * Where tapping the target goes: the issue, the channel or the thread (the phone has no routine, wiki or
+ * Where tapping the target goes: the issue, the routine, the channel or the thread (the phone has no wiki or
  * memory screens yet: null, the text is not a link).
  */
 export function targetHref(target: AgentActionTarget, channelId: string): AppHref | null {
   switch (target.type) {
     case "issue":
       return typeof target.number === "number" ? `/issues/${target.number}` : null;
+    case "routine":
+      return isSafeId(target.id) ? routineHref(target.id) : null;
     case "channel":
       return target.id ? chatHref(target.id) : null;
     case "thread":

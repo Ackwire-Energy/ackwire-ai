@@ -10,7 +10,9 @@
     "./machine-protocol": "./src/machine-protocol.ts",
     "./runner-control": "./src/runner-control.ts",
     "./command-policy": "./src/command-policy.ts",
-    "./secret-box": "./src/secret-box.ts"
+    "./secret-box": "./src/secret-box.ts",
+    "./redact": "./src/redact.ts",
+    "./host-stats": "./src/host-stats.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
@@ -27,5 +29,5 @@
     "@types/mailparser": "^3.9.0",
     "@types/nodemailer": "^8.0.2"
   },
-  "license": "UNLICENSED"
+  "license": "AGPL-3.0-only"
 }

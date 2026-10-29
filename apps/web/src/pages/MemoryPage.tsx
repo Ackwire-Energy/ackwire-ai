@@ -22,6 +22,7 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { HelpLink } from "@/components/HelpLink";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -73,7 +74,7 @@ export function usageLabel(t: TFunction, m: Memory, now = new Date()) {
   return m.uses === 0 ? t("memory.used_zero") : t("memory.used", { count: m.uses });
 }
 
-/** telas/Memoria.dc.html — "O que a Ada sabe". */
+/** An agent's memory: "O que a Ada sabe". */
 export function MemoryPage({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -223,7 +224,9 @@ function MemoryView({ agent }: { agent: Agent }) {
           </p>
         )}
       </List>
-      <p className="page__note">{t("memory.footer", g)}</p>
+      <p className="page__note">
+        <HelpLink slug="memory">{t("memory.how")}</HelpLink>
+      </p>
 
       <EditMemoryDialog
         memory={editing}

@@ -32,6 +32,9 @@ interface Account {
   email: string | null;
   plan: string | null;
   status: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  mine: boolean;
   usedBy: string[];
 }
 
@@ -41,6 +44,8 @@ function fakeRunner() {
   const keys = new Map<string, string>();
   const codes = new Map<string, string>();
   const requests: Extract<ServerFrame, { type: "request" }>[] = [];
+  /** What the CLI says once a sign-in is done. */
+  const signedIn = { email: "ana@example.com", plan: "max" };
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const conn = hub.open({
     send(text: string) {
@@ -61,16 +66,7 @@ function fakeRunner() {
         }
         if (frame.action === "status") {
           return codes.has(frame.loginId)
-            ? ok({
-                state: "done",
-                account: {
-                  id: frame.loginId,
-                  kind: "claude_code",
-                  loggedIn: true,
-                  email: "ana@example.com",
-                  plan: "max",
-                },
-              })
+            ? ok({ state: "done", account: { id: frame.loginId, kind: "claude_code", loggedIn: true, ...signedIn } })
             : ok({ state: "waiting" });
         }
         return ok({});
@@ -81,8 +77,11 @@ function fakeRunner() {
   return {
     codes,
     requests,
+    signedIn,
+    accountRequests: (action: string) => requests.filter((r) => r.op === "account" && r.action === action),
     hello: (token: string, accounts: RunnerAccountInfo[] = []) =>
       hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, accounts })),
+    changed: (accounts: RunnerAccountInfo[]) => reply({ type: "accounts.changed", accounts }),
   };
 }
 
@@ -101,31 +100,65 @@ async function workspace() {
   await admin(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
   const asAdmin = (path: string, init?: Parameters<typeof admin>[1]) =>
     admin(`/api/app/organizations/${seeded.orgId}${path}`, init);
-  return { ...seeded, api, asAdmin };
+  return {
+    ...seeded,
+    api,
+    asAdmin,
+    ownerId: await userId("owner@example.com"),
+    adminId: await userId("bia@example.com"),
+  };
 }
+
+async function userId(email: string) {
+  const [row] = await t.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email));
+  if (!row) throw new Error(`no user ${email}`);
+  return row.id;
+}
+
+const accountRow = async (id: string) =>
+  (await t.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, id)))[0] ?? null;
 
 const code = async (r: Response) => ((await r.json()) as { error: { code: string } }).error.code;
 
+/** Lets the hub's own requests (sent outside the frame that caused them) and their replies land. */
+const settle = async () => {
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 5));
+};
+
 test("accounts on a computer: the runner's list, signing in with a sealed code, rename, pick for an agent, remove", async () => {
-  const { api, asAdmin, agentId, orgId } = await workspace();
+  const { api, asAdmin, agentId, orgId, ownerId } = await workspace();
   const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
   const runner = fakeRunner();
   await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: false }]);
   const base = `/machines/${mac.machineId}`;
 
-  // The runner's accounts, as the owner and an admin see them.
+  // The runner's accounts (signed in on the computer itself: its pairer's), as the owner and an admin see them.
   const listed = await api(`${base}/accounts`);
   expect(listed.status).toBe(200);
   expect(await listed.json()).toEqual({
     accounts: [
-      { id: OLD_ACCOUNT, kind: "codex", label: "Codex", email: null, plan: null, status: "signed_out", usedBy: [] },
+      {
+        id: OLD_ACCOUNT,
+        kind: "codex",
+        label: "ChatGPT",
+        email: null,
+        plan: null,
+        status: "signed_out",
+        ownerId,
+        ownerName: "owner",
+        mine: true,
+        usedBy: [],
+        usage: null,
+        provider: null,
+        keyHint: null,
+      },
     ],
     canManage: true,
     supported: true,
   });
   expect(((await (await asAdmin(`${base}/accounts`)).json()) as { canManage: boolean }).canManage).toBe(false);
 
-  // Only the person who connected it signs in.
+  // On a computer a person connected, only that person signs in.
   const refused = await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code" } });
   expect(refused.status).toBe(403);
   expect(await code(refused)).toBe("account.not_owner");
@@ -149,7 +182,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   };
   expect(done).toMatchObject({
     state: "done",
-    account: { id: login.loginId, kind: "claude_code", label: "Claude Max", plan: "max", status: "active" },
+    account: { id: login.loginId, kind: "claude_code", label: "Claude Max", plan: "max", status: "active", mine: true },
   });
   const stored = JSON.stringify(await t.db.select().from(schema.machineAccounts));
   expect(stored).not.toContain("abc#123");
@@ -160,6 +193,9 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   expect(renamed.status).toBe(200);
   expect(((await renamed.json()) as Account).label).toBe("Trabalho");
   expect((await api(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "" } })).status).toBe(400);
+  expect((await asAdmin(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "Meu" } })).status).toBe(
+    403,
+  );
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
   const brain = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
@@ -193,8 +229,8 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   expect(after.accounts.map((a) => a.id)).toEqual([OLD_ACCOUNT]);
 });
 
-test("an offline computer can't start a sign-in; renaming still works", async () => {
-  const { api, orgId } = await workspace();
+test("an offline computer: no sign-in starts, renaming works, and removing leaves a tombstone until it is back", async () => {
+  const { api, orgId, ownerId } = await workspace();
   const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
   await t.db.insert(schema.machineAccounts).values({
     id: OLD_ACCOUNT,
@@ -202,6 +238,7 @@ test("an offline computer can't start a sign-in; renaming still works", async ()
     machineId: mac.machineId,
     kind: "claude_code",
     label: "Claude",
+    createdBy: ownerId,
   });
   const base = `/machines/${mac.machineId}`;
   const offline = await api(`${base}/account-logins`, { json: { kind: "claude_code" } });
@@ -210,6 +247,90 @@ test("an offline computer can't start a sign-in; renaming still works", async ()
   const renamed = await api(`${base}/accounts/${OLD_ACCOUNT}`, { method: "PATCH", json: { label: "Pessoal" } });
   expect(renamed.status).toBe(200);
   expect(((await renamed.json()) as Account).label).toBe("Pessoal");
+
+  expect((await api(`${base}/accounts/${OLD_ACCOUNT}`, { method: "DELETE" })).status).toBe(204);
+  expect(await accountRow(OLD_ACCOUNT)).toMatchObject({ status: "removing" });
+  expect(((await (await api(`${base}/accounts`)).json()) as { accounts: Account[] }).accounts).toEqual([]);
+
+  // The computer comes back still signed in to it: told to remove it, and the row goes.
+  const runner = fakeRunner();
+  await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "claude_code", loggedIn: true, email: "w@example.com" }]);
+  await settle();
+  expect(runner.accountRequests("remove")).toMatchObject([{ kind: "claude_code", accountId: OLD_ACCOUNT }]);
+  expect(await accountRow(OLD_ACCOUNT)).toBeNull();
+});
+
+test("a computer nobody connected: anyone signs in, the account is theirs from the start, its email only theirs", async () => {
+  const { api, asAdmin, orgId, adminId } = await workspace();
+  const box = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "box" });
+  await t.db.update(schema.machines).set({ pairedByUserId: null }).where(eq(schema.machines.id, box.machineId));
+  const runner = fakeRunner();
+  await runner.hello(box.token);
+  runner.signedIn.email = "bia@example.com";
+  const base = `/machines/${box.machineId}`;
+
+  // The address that names the account is a plain one: anything else never reaches the computer.
+  for (const email of ["a&calc&x@y.z", "x@y.z & calc", '"a"@y.z']) {
+    const refused = await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code", email } });
+    expect(refused.status).toBe(400);
+    expect(await code(refused)).toBe("account.invalid_email");
+  }
+  expect(runner.accountRequests("begin")).toEqual([]);
+
+  const begun = await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code", email: "bia@example.com" } });
+  expect(begun.status).toBe(201);
+  const login = (await begun.json()) as { loginId: string; publicKey: string };
+  expect(runner.accountRequests("begin")).toMatchObject([{ loginId: login.loginId, email: "bia@example.com" }]);
+  // Bound when it starts.
+  expect(await accountRow(login.loginId)).toMatchObject({ status: "signing_in", createdBy: adminId });
+  // Nobody else follows it or sends its code.
+  const theirs = await api(`${base}/account-logins/${login.loginId}`);
+  expect(theirs.status).toBe(403);
+  expect(await code(theirs)).toBe("account.not_owner");
+
+  const sealed = await sealSecret(login.publicKey, "abc#123", accountCodeAad(login.loginId, orgId));
+  expect((await asAdmin(`${base}/account-logins/${login.loginId}/code`, { json: { box: sealed } })).status).toBe(204);
+  // The runner says it has the account before Bia's page asks: still hers.
+  await runner.changed([
+    { id: login.loginId, kind: "claude_code", loggedIn: true, email: "bia@example.com", plan: "max" },
+  ]);
+  expect(await accountRow(login.loginId)).toMatchObject({ status: "active", createdBy: adminId, label: "Claude Max" });
+  const done = (await (await asAdmin(`${base}/account-logins/${login.loginId}`)).json()) as {
+    state: string;
+    account: Account;
+  };
+  expect(done).toMatchObject({ state: "done", account: { email: "bia@example.com", mine: true } });
+
+  // Only Bia sees the email; the others see whose it is.
+  const asOwner = (await (await api(`${base}/accounts`)).json()) as { accounts: Account[]; canManage: boolean };
+  expect(asOwner.canManage).toBe(true);
+  expect(asOwner.accounts).toMatchObject([{ id: login.loginId, email: null, mine: false, ownerName: "bia" }]);
+  expect(JSON.stringify(asOwner)).not.toContain("bia@example.com");
+
+  // The same account again: refused, and the new folder removed there.
+  const again = (await (await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code" } })).json()) as {
+    loginId: string;
+    publicKey: string;
+  };
+  const sealedAgain = await sealSecret(again.publicKey, "abc#456", accountCodeAad(again.loginId, orgId));
+  await asAdmin(`${base}/account-logins/${again.loginId}/code`, { json: { box: sealedAgain } });
+  const duplicate = await asAdmin(`${base}/account-logins/${again.loginId}`);
+  // Named, and the account itself, with its email for its owner: theirs to think with instead.
+  expect(await duplicate.json()).toMatchObject({
+    state: "failed",
+    duplicate: { label: "Claude Max", account: { id: login.loginId, email: "bia@example.com", mine: true } },
+  });
+  expect(runner.accountRequests("remove")).toMatchObject([{ accountId: again.loginId }]);
+  expect(await accountRow(again.loginId)).toBeNull();
+
+  // Each start runs a CLI on the shared computer: ten per person per computer every 15 minutes.
+  for (let n = 0; n < 5; n++) {
+    expect((await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code", email: "x" } })).status).toBe(400);
+  }
+  const tooMany = await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code" } });
+  expect(tooMany.status).toBe(429);
+  expect(await code(tooMany)).toBe("rate_limited");
+  expect((await api(`${base}/account-logins`, { json: { kind: "claude_code", email: "x" } })).status).toBe(400);
 });
 
 test("the OpenAPI document lists the account routes", async () => {
@@ -221,7 +342,46 @@ test("the OpenAPI document lists the account routes", async () => {
     "/app/organizations/{orgId}/machines/{machineId}/account-logins",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}/code",
+    "/app/organizations/{orgId}/ai-accounts",
+    "/app/organizations/{orgId}/ai-accounts/refresh",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
   }
+});
+
+test("refreshing plan usage: 202, the computer is asked to look the caller's accounts up again; the usage it reports shows", async () => {
+  const { api, ownerId } = await workspace();
+  const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
+  const runner = fakeRunner();
+  await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true }]);
+  const res = await api("/ai-accounts/refresh", { json: {} });
+  expect(res.status).toBe(202);
+  await settle();
+  expect(runner.accountRequests("list")).toEqual([
+    expect.objectContaining({ fresh: [OLD_ACCOUNT, "own:claude_code", "own:codex"] }),
+  ]);
+  // What the computer found comes back with the list.
+  const usage = { windows: [{ kind: "five_hour", usedPercent: 12 }], source: "probe", at: "2030-01-01T10:00:00.000Z" };
+  await runner.changed([{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true, usage } as RunnerAccountInfo]);
+  const listed = (await (await api(`/machines/${mac.machineId}/accounts`)).json()) as { accounts: Account[] };
+  expect(listed.accounts[0]).toMatchObject({ id: OLD_ACCOUNT, ownerId, usage });
+});
+
+test("Contas de IA: the caller's own accounts with their computer, and where they can add one; an unknown plan is refused", async () => {
+  const { api } = await workspace();
+  const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
+  const runner = fakeRunner();
+  await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true }]);
+  const res = await api("/ai-accounts");
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    accounts: (Account & { machineId: string; computer: string })[];
+    computers: { machineId: string; name: string; canAdd: boolean; keys: boolean }[];
+  };
+  expect(body.accounts).toMatchObject([{ id: OLD_ACCOUNT, machineId: mac.machineId, computer: "mac", provider: null }]);
+  expect(body.computers).toMatchObject([{ machineId: mac.machineId, name: "mac", canAdd: true, keys: true }]);
+  const bad = await api(`/machines/${mac.machineId}/account-logins`, {
+    json: { kind: "claude_code", provider: "nope" },
+  });
+  expect(bad.status).toBe(400);
 });

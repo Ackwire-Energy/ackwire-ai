@@ -7,7 +7,7 @@ import { CountChip } from "./Chip";
 import { Kbd } from "./Kbd";
 
 /**
- * A menu that takes the whole screen (telas/MenuOverlay.html, approved): the
+ * A menu that takes the whole screen: the
  * app behind blurs (`html[data-menu-overlay]`), the card that opened it grows
  * into the header, and the options are our menu items, larger. Radix Dialog
  * underneath: focus trap, Esc, focus back to the trigger. ↑↓ move between
@@ -216,14 +216,34 @@ export function MenuOverlayItem({
   );
 }
 
-/** A row that holds a control (theme, language) instead of opening something. */
-export function MenuOverlayRow({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
+/**
+ * A row that holds a control (theme, language) instead of opening something. `description` is a line under
+ * the name, as on `MenuOverlayItem` (pass `descriptionId` to point the control's `aria-describedby` at it).
+ */
+export function MenuOverlayRow({
+  icon,
+  label,
+  description,
+  descriptionId,
+  children,
+}: {
+  icon: IconName;
+  label: string;
+  description?: ReactNode;
+  descriptionId?: string;
+  children: ReactNode;
+}) {
   return (
     // biome-ignore lint/a11y/useSemanticElements: a menu row holding one control, not a form fieldset
     <div className="ac-menu__item ac-mo__item ac-mo__item--static" role="group" aria-label={label}>
       <Icon name={icon} />
       <span className="ac-menu__label">
         <span className="ac-mo__name">{label}</span>
+        {description && (
+          <span className="ac-menu__desc" id={descriptionId}>
+            {description}
+          </span>
+        )}
       </span>
       <span className="ac-menu__hint">
         {children}

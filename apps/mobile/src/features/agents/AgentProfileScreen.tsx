@@ -4,11 +4,15 @@ import {
   useAgentAccess,
   useAgentDetail,
   useAgentForYou,
+  useAiStatus,
   useApi,
   useMemoryAboutMe,
   useMemoryAction,
   useUsage,
 } from "@agenteschat/client";
+import { brainLine } from "@agenteschat/client/lib/brain";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -25,6 +29,7 @@ import {
   Icon,
   type IconName,
   PixelOrbit,
+  ProviderLogo,
   Row,
   Section,
   Sky,
@@ -33,7 +38,9 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
-import { AgentBrowserRow } from "../browser/AgentBrowserRow";
+import { openAgentAi } from "../ai/AgentAiScreen";
+import { openConnectAi } from "../ai/NoAiCard";
+import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -42,6 +49,8 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { openAgentUsage } from "../usage/UsageScreen";
+import { openAgentEdit } from "./AgentEditScreen";
 import {
   canEditMemories,
   type DidLine,
@@ -53,6 +62,7 @@ import {
   spendOf,
   usesOf,
 } from "./logic";
+import { MonthPixels } from "./MonthPixels";
 import { workTitle } from "./work";
 
 /** Rows of "O que fez por você" before "Ver tudo". */
@@ -69,10 +79,12 @@ const AREA_ICON: Record<string, IconName> = {
   schedule: "clock",
   forum: "chat",
   sandbox: "laptop",
+  browser: "globe",
+  desktop: "laptop",
 };
 
 /**
- * An agent's profile as a teammate (MobileIntencional.html, "Perfil do agente"): its sky and living body, its
+ * An agent's profile as a teammate: its sky and living body, its
  * role in one plain sentence, who answers for it, what it is on now (or what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.
@@ -110,6 +122,7 @@ function Profile({ id }: { id: string }) {
   const knows = useMemoryAboutMe(orgId, id);
   const work = useWorkingNow().filter((w) => w.agentId === id);
   const asking = useWaitingApprovals().filter((a) => a.agentId === id);
+  const noAi = aiStateOf(useAiStatus(orgId).data, id) === "no_ai";
   const waitingNow = asking[0];
   const [allDid, setAllDid] = useState(false);
   const look = agentLook(agent);
@@ -126,6 +139,8 @@ function Profile({ id }: { id: string }) {
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
+  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
+  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -216,6 +231,9 @@ function Profile({ id }: { id: string }) {
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
+        // The browser card's own text field: its buttons and the page take a tap with the keyboard up.
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         <View style={[styles.cover, { paddingTop: insets.top + 56 }]}>
@@ -242,9 +260,16 @@ function Profile({ id }: { id: string }) {
           ) : null}
           {waitingNow ? (
             <NowPill
-              leading={<Icon name="shield" size={15} color={c.amber} />}
+              leading={<Icon name="wait" size={15} color={c.amber} />}
               label={t("mobile.intentAgents.nowWaiting", { title: waitingNow.title })}
               onPress={() => router.push(`/approval/${waitingNow.id}`)}
+            />
+          ) : null}
+          {noAi ? (
+            <NowPill
+              leading={<Icon name="bolt" size={15} color={c.amber} />}
+              label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
+              onPress={() => openConnectAi({ agentId: id })}
             />
           ) : null}
           {work.map((w) => (
@@ -276,7 +301,7 @@ function Profile({ id }: { id: string }) {
 
         {forYou.data || forYou.isError ? (
           <Section
-            title={t("mobile.intentAgents.did.title")}
+            title={t("mobile.intentAgents.did.title", agentGrammar(t, name))}
             {...(did.length > DID_SHOWN
               ? {
                   action: {
@@ -290,6 +315,19 @@ function Profile({ id }: { id: string }) {
               <Text variant="small" tone="muted" style={styles.lead}>
                 {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
               </Text>
+            ) : null}
+            {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
+            {detail.data && detail.data.runsThisMonth > 0 ? (
+              <View style={styles.pixels}>
+                <MonthPixels
+                  perDay={detail.data.runsByDay}
+                  color={look.color}
+                  label={t("agentPage.activity.chartLabel", {
+                    count: detail.data.runsThisMonth,
+                    month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(new Date()),
+                  })}
+                />
+              </View>
             ) : null}
             {did.length > 0 ? (
               <Card>
@@ -323,7 +361,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title")}>
+          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(t, name))}>
             {memories.length > 0 ? (
               <>
                 <Card>
@@ -354,10 +392,23 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
-        <AgentBrowserRow agentId={id} />
+        <AgentComputerRow agentId={id} />
+
+        {thinks ? (
+          <Section title={t("mobile.intentAgents.thinks")}>
+            <Card>
+              {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
+              <Row
+                leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
+                title={thinks.text}
+                {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
+              />
+            </Card>
+          </Section>
+        ) : null}
 
         {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title")}>
+          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(t, name))}>
             {uses.lines.length > 0 ? (
               <Card>
                 {uses.lines.map((u) => (
@@ -401,50 +452,78 @@ function Profile({ id }: { id: string }) {
                     : t("mobile.intentAgents.uses.asksAdmins")}
               </Text>
             ) : null}
+            {decides ? (
+              // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
+              <View style={styles.foot}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="plus"
+                  label={t("mobile.connectors.fromAgent")}
+                  onPress={() => router.push("/connectors")}
+                />
+              </View>
+            ) : null}
           </Section>
         ) : null}
 
-        {spend ? (
-          <Section title={t("mobile.agent.month")}>
-            <Card>
-              <View style={styles.spend}>
-                <View style={styles.spendHead}>
-                  {spend.kind === "money" ? (
-                    <>
-                      <Text variant="body" tone="ink2">
-                        {money(spend.spentUsd)}
-                      </Text>
-                      <Text variant="small" tone="muted">
-                        {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text variant="body" tone="ink2">
-                        {t("mobile.agent.percent", { percent: spend.percent })}
-                      </Text>
-                      <Text variant="small" tone="muted">
-                        {t("mobile.agent.ofLimit")}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <SpendBar color={look.color} value={spend.fraction} />
-                {spend.fraction >= 1 ? (
-                  <View style={styles.warn}>
-                    <Icon name="clock" size={14} color={c.muted} />
-                    <Text variant="caption" tone="muted">
-                      {t(`mobile.agent.exhausted${g}`, { name })}
-                    </Text>
+        <Section title={t("mobile.agent.month")}>
+          <View style={styles.monthCards}>
+            {spend ? (
+              <Card>
+                <View style={styles.spend}>
+                  <View style={styles.spendHead}>
+                    {spend.kind === "money" ? (
+                      <>
+                        <Text variant="body" tone="ink2">
+                          {money(spend.spentUsd)}
+                        </Text>
+                        <Text variant="small" tone="muted">
+                          {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text variant="body" tone="ink2">
+                          {t("mobile.agent.percent", { percent: spend.percent })}
+                        </Text>
+                        <Text variant="small" tone="muted">
+                          {t("mobile.agent.ofLimit")}
+                        </Text>
+                      </>
+                    )}
                   </View>
-                ) : null}
-              </View>
+                  <SpendBar color={look.color} value={spend.fraction} />
+                  {spend.fraction >= 1 ? (
+                    <View style={styles.warn}>
+                      <Icon name="clock" size={14} color={c.muted} />
+                      <Text variant="caption" tone="muted">
+                        {t(`mobile.agent.exhausted${g}`, { name })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Card>
+            ) : null}
+            {/* Uso: the month by account and the plan it thinks with now, as the web's Uso tab. */}
+            <Card>
+              <Row
+                leading={<Tile icon="chart" />}
+                title={t("usageViews.agent.title", agentGrammar(t, name))}
+                chevron
+                onPress={() => openAgentUsage(id)}
+              />
             </Card>
-          </Section>
-        ) : null}
+          </View>
+        </Section>
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
-        <PushedHeader plate solid={false} />
+        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
+        <PushedHeader
+          plate
+          solid={false}
+          {...(decides && agent ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } } : {})}
+        />
       </View>
     </View>
   );
@@ -534,9 +613,6 @@ function MemoryFix({
           </Pressable>
         ) : null}
       </View>
-      <Text variant="small" tone="muted">
-        {t(`mobile.intentAgents.fix.fine${g}`, { name: agentName })}
-      </Text>
       <Button
         variant="primary"
         wide
@@ -586,6 +662,8 @@ const styles = StyleSheet.create({
   },
   nowText: { flexShrink: 1, fontWeight: "500" },
   lead: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
+  pixels: { paddingHorizontal: 4, marginBottom: 12 },
+  monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },

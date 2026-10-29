@@ -17,7 +17,7 @@ import type {
 } from "../api/types";
 
 /**
- * Missions (ADR 0029, telas/ThreadContexto.html "App mobile"): the pure
+ * Missions (ADR 0029): the pure
  * pieces the thread, the pinned card and the Missões tab share. The plan is a
  * living checklist (no phases, no gates), drawn as one pixel cell per item.
  */
@@ -402,13 +402,6 @@ export function taskNoticeOf(meta: Message["meta"]): { code: string; params: Rec
  */
 export const executorName = (executor: string, agentName = "") =>
   executor === "codex" ? "Codex" : executor === "agent" ? agentName : "Claude Code";
-
-/** The executor's own icon (Claude Code, Codex); null for our agent (its pixel avatar instead). */
-export function executorIcon(executor: string | null | undefined): "executorClaude" | "executorCodex" | null {
-  if (executor === "claude") return "executorClaude";
-  if (executor === "codex") return "executorCodex";
-  return null;
-}
 
 /** "Claude Code no MacBook do Walter", "Ada no MacBook do Walter": who programs and where (no "via"). */
 export function executorOnText(t: TFunction, executor: string, agentName: string, computer: string | null | undefined) {

@@ -1,6 +1,8 @@
 /* App styles: fonts, the design system, and page layout. No component visuals here: those live in @agenteschat/ui. */
+@import "@fontsource-variable/source-sans-3/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
+/* Onest: the design system's own default face (`--font-sans` in its tokens). */
 @import "@fontsource-variable/onest/index.css";
-@import "@fontsource-variable/martian-mono/index.css";
 @import "./fonts.css";
 @import "@agenteschat/ui/styles.css";
 @import "./layout.css";
@@ -8,9 +10,17 @@
 @import "./desktop.css";
 
 :root {
-  --font-sans: "Onest Variable", Onest, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Martian Mono Variable", "Martian Mono", ui-monospace, Menlo, monospace;
+  /* The app reads in Source Sans 3, titles too; code in JetBrains Mono. */
+  --font-sans: "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --font-display: var(--font-sans);
+  --font-display-weight: 600;
+  /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15. */
+  --font-size-adjust: 0.52;
+  /* A dialog title's capitals' middle above its line's middle (18px on 24px), measured in this face: its baseline lands
+     on a whole pixel, so it is 1.19px where --cap-mid says 0.37. A title in another type measures its own. */
+  --title-cap-mid: 1.19px;
   /* The wordmark, and its dot-matrix ".chat". */
-  --font-display: "Funnel Display", var(--font-sans);
+  --font-brand: "Funnel Display", var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
 }

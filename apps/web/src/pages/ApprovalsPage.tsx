@@ -1,13 +1,16 @@
-import type { Agent, Approval, Member } from "@agenteschat/client";
+import type { Agent, Approval, ConnectorDef, Member } from "@agenteschat/client";
 import {
   sendHelpers,
   useApproval,
   useApprovals,
   useCatalog,
   useChannels,
+  useCustomServers,
   useDecideApproval,
   usePostMessage,
 } from "@agenteschat/client";
+import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -33,8 +36,18 @@ import type { TFunction } from "i18next";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
+import {
+  approvalAction,
+  approvalReadsOnly,
+  approvalRisk,
+  approvalTitle,
+  approvalTraits,
+  approvalValues,
+  decisionLabel,
+} from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { EmailLetter } from "@/components/EmailLetter";
+import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import {
   MissionCommandsPending,
@@ -116,10 +129,12 @@ const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = 
   irreversible: "alert",
   reversible: "undo",
   external: "send",
+  unsent: "archiveBox",
+  deletable: "undo",
 };
 
 /**
- * Aprovações (telas/Aprovacoes.html): who waits on you, each request with its
+ * Aprovações: who waits on you, each request with its
  * exact action, then the history. Under the requests, the missions' command
  * cards and the decisions and reviews waiting on you in missions (ADR 0029).
  * A request's details open in the centered details dialog (`?open=<id>`).
@@ -254,12 +269,6 @@ export function ApprovalsPage() {
                 t("approvals.nothing")
               )}
             </p>
-            <p className="ap-head__guard">
-              <span aria-hidden="true" className="ap-head__guard-icon">
-                <Icon name="shield" size={14} />
-              </span>
-              {t("approvals.guard")}
-            </p>
           </div>
         </header>
         <Toolbar
@@ -316,7 +325,7 @@ export function ApprovalsPage() {
           commands === 0 &&
           !missionWaiting && (
             <EmptyState sky title={t("approvals.emptyTitle")}>
-              {t("approvals.empty")}
+              <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
           )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
@@ -413,48 +422,127 @@ function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[
 }
 
 /** "github · acme" with the brand icon, or the app's own tool. */
-function ConnectorLine({ approval }: { approval: Approval }) {
+type ApprovalVia = {
+  kind: "mail" | "connector" | "own";
+  name: string;
+  account: string | null;
+  def: ConnectorDef | null;
+  /** A server connected by address: its own icon. */
+  image?: string | null;
+};
+
+/** What an approval goes through: a mailbox, a server connected by address, a catalog connector, or the app itself. */
+function useApprovalVia(approval: Approval): ApprovalVia {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const catalog = useCatalog();
-  const def = approval.connector ? catalog.data?.connectors.find((c) => c.id === approval.connector) : undefined;
-  const name = approval.connector
-    ? connectorName(t, def ?? { id: approval.connector, label: approval.connector })
-    : t("approvals.panel.builtIn");
+  // A server connected by address (`custom:{connectionId}`): its own name, and the preset's icon when it came from one.
+  const customId = approval.connector?.startsWith("custom:") ? approval.connector.slice("custom:".length) : null;
+  const servers = useCustomServers(org.id, customId !== null);
+  // An email goes through a mailbox, not a catalog connector ("email" has no entry): the box and its provider.
+  if (approval.email)
+    return { kind: "mail", name: approval.email.mailbox, account: approval.email.provider, def: null };
+  if (!approval.connector) return { kind: "own", name: t("approvals.panel.builtIn"), account: null, def: null };
+  const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
+  const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
+  const def = custom ? custom.def : (catalog.data?.connectors.find((c) => c.id === approval.connector) ?? null);
+  const name = custom
+    ? itemName(t, custom)
+    : customId
+      ? t("approvals.panel.orgConnector")
+      : connectorName(t, def ?? { id: approval.connector, label: approval.connector });
+  return { kind: "connector", name, account: approval.connectorAccount ?? null, def, image: custom?.image };
+}
+
+function ViaGlyph({ via }: { via: ApprovalVia }) {
+  if (via.kind === "connector") return <ConnectorIcon def={via.def} image={via.image} label={via.name} />;
   return (
-    <span className="ap-conn">
-      {approval.connector ? (
-        <ConnectorIcon def={def ?? null} label={name} />
-      ) : (
-        <span className="ap-conn__own" aria-hidden="true">
-          <Icon name="shield" size={14} />
-        </span>
-      )}
-      <b>{name}</b>
-      {approval.connectorAccount && <span className="ap-conn__account">· {approval.connectorAccount}</span>}
+    <span className="ap-conn__own" aria-hidden="true">
+      <Icon name={via.kind === "mail" ? "mail" : "shield"} size={14} />
     </span>
   );
 }
 
-/** The exact action: connector, then its values (names are the tool's own identifiers, shown as code). */
+export function ConnectorLine({ approval }: { approval: Approval }) {
+  const via = useApprovalVia(approval);
+  return (
+    <span className="ap-conn">
+      <ViaGlyph via={via} />
+      <b>{via.name}</b>
+      {via.account && <span className="ap-conn__account">· {via.account}</span>}
+    </span>
+  );
+}
+
+/** Only the logo, its name in a tooltip and for screen readers (the approval sentence in Notificações). */
+export function ConnectorMark({ approval }: { approval: Approval }) {
+  const via = useApprovalVia(approval);
+  const label = via.account ? `${via.name} · ${via.account}` : via.name;
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so a keyboard reaches the name in its tooltip
+    <span className="ap-conn-mark" role="img" aria-label={label} data-tip={label} tabIndex={0}>
+      <ViaGlyph via={via} />
+    </span>
+  );
+}
+
+/**
+ * The exact action, in words (AprovacaoConector B): the connector and "Só lê" on one line, then its values
+ * with labels; a list shows a few as chips, the details every one, and the tool's own name and values
+ * behind "Detalhes técnicos". An email shows as the email itself.
+ */
 export function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
-  const values = scalars(approval.params);
-  const shown = max ? values.slice(0, max) : values;
+  const { t } = useTranslation();
+  // An email shows as the email itself (folded in lists, whole in the details).
+  if (approval.email) return <EmailLetter email={approval.email} full={!max} />;
+  const full = max === undefined;
+  const values = approvalValues(approval, full ? { long: true } : { max });
   return (
     <div className="ap-exact">
-      <ConnectorLine approval={approval} />
-      {shown.length > 0 && (
-        <dl className="ap-exact__values">
-          {shown.map(([k, v]) => (
-            <div key={k}>
-              <dt>
-                <code>{k}</code>
-              </dt>
-              <dd>{String(v)}</dd>
-            </div>
-          ))}
-        </dl>
+      <div className="ap-exact__via">
+        <ConnectorLine approval={approval} />
+        {approvalReadsOnly(approval) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
+      </div>
+      {values.length > 0 &&
+        (full ? (
+          <dl className="ap-exact__rows">
+            {values.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <div className="ap-exact__facts">
+            {values.map(([label, value]) => (
+              <Chip key={label}>
+                {label}: {value}
+              </Chip>
+            ))}
+          </div>
+        ))}
+      {full && (
+        <details className="ap-exact__tech">
+          <summary>{t("approvals.technical")}</summary>
+          <pre>{`${approval.tool}\n${JSON.stringify(approval.params ?? {}, null, 2)}`}</pre>
+        </details>
       )}
     </div>
+  );
+}
+
+/** "Pedido pela rotina «X» enquanto ninguém acompanhava": asked while nobody was watching (ADR 0053 §8). */
+function ApprovalOrigin({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const origin = approvalOriginWords(approval);
+  if (!origin) return null;
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return (
+    <p className="ap-origin ac-iconline">
+      <Icon name="routines" size={14} />
+      <span>{tt(origin.key, origin.values)}</span>
+    </p>
   );
 }
 
@@ -478,7 +566,7 @@ function Traits({ approval }: { approval: Approval }) {
   );
 }
 
-function expiryText(t: TFunction, a: Approval) {
+export function expiryText(t: TFunction, a: Approval) {
   const left = timeLeft(t, a.expiresAt);
   if (!left) return t("approval.expired");
   return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS
@@ -487,7 +575,7 @@ function expiryText(t: TFunction, a: Approval) {
 }
 
 /** Approve: one click, or a hold for high risk (let go early and nothing happens). */
-function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
+export function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -577,7 +665,7 @@ function ApproveButton({ approval, block }: { approval: Approval; block?: boolea
 const SUGGESTIONS = ["later", "review", "tests", "smaller"] as const;
 
 /** Refuse with a reason the agent reads (and keeps as a lesson). */
-function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: Agent; onCancel: () => void }) {
+export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: Agent; onCancel: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -594,7 +682,7 @@ function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: 
     );
   return (
     <div className="ap-refuse">
-      <label htmlFor={id}>{t("approvals.refuseLabel", { The: g.The, name: g.name })}</label>
+      <label htmlFor={id}>{t("approvals.refuseLabel")}</label>
       <textarea
         id={id}
         ref={ref}
@@ -665,6 +753,9 @@ function RequestCard({
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
   const owner = a.ownerUserId ?? agent?.ownerUserId;
   const title = approvalTitle(t, a);
+  const origin = approvalOriginShort(a);
+  const why = approvalWhy(a);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <article
       className={cx("ap-card", selected && "is-selected", running && "is-running")}
@@ -685,6 +776,12 @@ function RequestCard({
       <div className="ap-card__meta">
         <b>{name}</b>
         <span>{t(`approvals.verb.${approvalAction(a)}`)}</span>
+        {origin && (
+          <span className="ap-card__origin">
+            · <Icon name="routines" size={14} />
+            {tt(origin.key, origin.values)}
+          </span>
+        )}
         <span>
           · {channel ? `#${channel} · ` : ""}
           {relativeTime(t, i18n.language, a.createdAt)}
@@ -707,7 +804,14 @@ function RequestCard({
       </h3>
       <div className="ap-card__body">
         <ExactAction approval={a} max={4} />
-        {a.why && <p className="ap-why">{a.why}</p>}
+        {why && (
+          <p className="ap-said ac-iconline">
+            <AgentAvatar agentId={a.agentId} name={name} size="xs" />
+            <span>
+              <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />
+            </span>
+          </p>
+        )}
         <Traits approval={a} />
         {running && <p className="ap-card__running">{t("approvals.running", { The: g.The, name })}</p>}
         {refusing && a.canDecide && <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />}
@@ -964,24 +1068,10 @@ function ApprovalDetails({
 
       {p !== "waiting" && <Outcome approval={a} agent={agent} />}
 
-      <DetailsSection title={t("approvals.panel.exact")}>
-        <ExactAction approval={a} />
-        {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
-          <pre className="ap-code">
-            <code>{JSON.stringify(a.params, null, 2)}</code>
-          </pre>
-        )}
-        <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
-        {pr && (
-          <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
-            {t("approvals.panel.openPr")}
-          </a>
-        )}
-      </DetailsSection>
-
-      {a.why && (
+      <ApprovalOrigin approval={a} />
+      {approvalWhy(a) && (
         <DetailsSection title={t("approvals.panel.why")}>
-          <p className="ap-bubble">{a.why}</p>
+          <p className="ap-bubble">{approvalWhy(a)}</p>
           {a.issue && (
             <Link
               className="ap-link"
@@ -994,17 +1084,28 @@ function ApprovalDetails({
         </DetailsSection>
       )}
 
+      <DetailsSection title={t("approvals.panel.exact")}>
+        {/* Values in words; nested values and the tool's own name behind "Detalhes técnicos". */}
+        <ExactAction approval={a} />
+        <p className="ap-bound">{t("approvals.panel.bound")}</p>
+        {pr && (
+          <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
+            {t("approvals.panel.openPr")}
+          </a>
+        )}
+      </DetailsSection>
+
       {(a.trail?.length ?? 0) > 1 && (
         <DetailsSection title={t("approvals.panel.trail")}>
           <ol className="ap-trail">
             {a.trail?.map((s) => (
-              <li key={s.at + s.text.slice(0, 12)}>
+              <li key={s.at + s.text.slice(0, 12)} className="ac-iconline">
                 <span className="ap-trail__dot" aria-hidden="true" />
                 <span className="ap-trail__text">{s.text}</span>
                 <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
               </li>
             ))}
-            <li className="is-current">
+            <li className="is-current ac-iconline">
               <span className="ap-trail__dot" aria-hidden="true" />
               <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
               <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>

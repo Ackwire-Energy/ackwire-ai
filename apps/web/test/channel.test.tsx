@@ -27,7 +27,7 @@ describe("Canal", () => {
     const ask = articles.find((a) => a.textContent?.includes("o login está devolvendo 401"));
     expect(ask?.textContent).toContain("João");
     expect(ask?.querySelector(".ac-mention")?.textContent).toBe("@Ada");
-    // Ada was asked in the channel, so her reply is in the channel (D67).
+    // Ada was asked in the channel, so her reply is in the channel.
     const reply = articles.find((a) => a.textContent?.includes("Achei a causa"));
     expect(reply?.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(reply?.querySelector("code")?.textContent).toBe("expires_at");
@@ -68,7 +68,7 @@ describe("Canal", () => {
     const { socket } = await open();
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    // Asked in the channel: it answers there, its events carry no thread (D67).
+    // Asked in the channel: it answers there, its events carry no thread.
     const run = { threadId: null, runId: "r-9", agentId: ATLAS_ID };
     await ev({ type: "agent.run", ...run, status: "running" });
     await ev({ type: "agent.delta", ...run, seq: 1, text: "Os 401 no Sentry caíram de 312 para" });
@@ -123,15 +123,17 @@ describe("Canal", () => {
     expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
   });
 
-  test("the inline approval card: approve calls the API, shrinks to one line; events update it", async () => {
+  test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;
-    // The card lives on the agent message with meta.approvalId.
+    // It lives on the agent message with meta.approvalId: the agent asking, the action in one line.
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.closest("article")?.textContent).toContain("Ada");
-    expect(card.textContent).toContain("Ada pede aprovação");
-    expect(card.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
+    expect(card.textContent).toContain("Preciso do seu ok para seguir:");
     expect(card.textContent).toContain("Merge PR #42 into main");
+    // Its text isn't repeated above it ("Pedido de aprovação: …").
+    expect(card.closest("article")?.querySelector(".ac-msg__text")).toBeNull();
+    expect(within(card).getByRole("button", { name: "Agora não" })).toBeTruthy();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar merge" })));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
@@ -179,7 +181,7 @@ describe("Canal", () => {
     expect(dialog.textContent).toContain("Agentes");
     expect(dialog.textContent).toContain("Pessoas");
     expect(dialog.textContent).toContain("João");
-    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    expect(dialog.textContent).toContain("Entra na conversa por conta própria");
     expect(within(dialog).queryByRole("searchbox", { name: "Buscar pessoa ou agente" })).toBeNull();
   });
 

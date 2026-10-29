@@ -92,10 +92,10 @@ describe("the mission's ⋯ menu: actions only", () => {
       "Fechar missão",
       "Configurações da missão…",
     ]);
-    expect(items[0]?.textContent).toContain("Nada novo começa; o que está rodando termina.");
+    expect(items[0]?.textContent).toContain("Nada novo começa. O que está rodando termina.");
     expect(items[1]?.textContent).toContain("Interrompe as tarefas rodando e pausa a missão.");
     expect(items[2]?.textContent).toContain("Chamar alguém para ver ou decidir.");
-    expect(items[3]?.textContent).toContain("Termina a missão; nada mais roda.");
+    expect(items[3]?.textContent).toContain("Termina a missão. Nada mais roda.");
     expect(items[4]?.querySelector(".ac-menu__hint")?.textContent).toBe("Só o que é arriscado");
     // No settings inside the menu any more.
     expect(within(menu).queryAllByRole("menuitemradio")).toHaveLength(0);
@@ -130,7 +130,7 @@ describe("Configurações da missão", () => {
     expect(dialog.textContent).toContain("Nesta missão: 14 liberados automaticamente · 3 perguntados · 0 bloqueados");
     expect(dialog.textContent).toContain("O que já foi liberado");
     expect(dialog.textContent).toContain("Nada liberado ainda");
-    expect(dialog.textContent).toContain("Próximas missões do Ada");
+    expect(dialog.textContent).toContain("Próximas missões da Ada");
     // Mais opções is folded: who does the work and the switch appear when opened, locked after start.
     expect(within(dialog).queryByRole("switch")).toBeNull();
     await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
@@ -201,7 +201,7 @@ describe("Configurações da missão", () => {
     await render(api);
     let dialog = await openSettings();
     expect(dialog.textContent).toContain("Começar com “Só o que é arriscado”");
-    expect(dialog.textContent).toContain("Já é o padrão do Ada.");
+    expect(dialog.textContent).toContain("Já é o padrão da Ada.");
     expect(dialog.querySelector(".ac-setrow .ac-chip")?.textContent).toBe("Padrão");
     await click(within(dialog).getByRole("radio", { name: /^Não pergunta/ }));
     await settle(6);
@@ -211,7 +211,7 @@ describe("Configurações da missão", () => {
     expect(calls(state, "missions.setAgentDefault")).toEqual([[ORG_ID, ADA_ID, "never"]]);
     expect(dialog.querySelector(".ac-setrow .ac-chip")?.textContent).toBe("Padrão");
     expect(within(dialog).queryByRole("button", { name: "Usar como padrão" })).toBeNull();
-    expect((document.querySelector(".ac-toasts") as HTMLElement).textContent).toContain("Padrão do Ada atualizado");
+    expect((document.querySelector(".ac-toasts") as HTMLElement).textContent).toContain("Padrão da Ada atualizado");
 
     // Someone who doesn't look after the agent: the button is there, disabled, with why.
     cleanup();
@@ -223,7 +223,7 @@ describe("Configurações da missão", () => {
     dialog = await openSettings();
     const button = within(dialog).getByRole("button", { name: "Usar como padrão" });
     expect(button.hasAttribute("disabled")).toBe(true);
-    expect(dialog.textContent).toContain("Só quem cuida do Ada ou um admin muda o padrão.");
+    expect(dialog.textContent).toContain("Só quem cuida da Ada ou um admin muda o padrão.");
   });
 
   test("Quem faz o trabalho: the executor's model, changeable after start; saves at once", async () => {
@@ -243,6 +243,24 @@ describe("Configurações da missão", () => {
     expect(calls(state, "missions.setBrain").map((a) => a[2])).toEqual([{ model: "opus" }]);
     expect(within(dialog).getByRole("combobox", { name: "Modelo" }).textContent).toContain("Opus");
     expect(document.body.textContent).toContain("Modelo: Opus");
+  });
+
+  test("an agent on Automático: the mission's model reads 'Automático', never the raw value", async () => {
+    const { api } = await missionThread();
+    // The mission follows the agent's own Claude Code model, which is "auto".
+    const brain = api.missions.brain;
+    api.missions.brain = async (orgId, missionId) => ({
+      ...(await brain(orgId, missionId)),
+      model: null,
+      effectiveModel: "auto",
+    });
+    await render(api);
+    const dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
+    await settle(4);
+    const trigger = within(dialog).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toContain("Automático");
+    expect(trigger.textContent).not.toContain("auto");
   });
 
   test("Retomar sozinho: the switch saves resumeTasks", async () => {

@@ -24,7 +24,14 @@ import {
 import { gitAccess } from "./git/proxy";
 import type { MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
-import { type ComputerTarget, computerTarget, MachineOfflineError, MachinePausedError } from "./machines";
+import { computerPreparing } from "./machine-provisioning";
+import {
+  type ComputerTarget,
+  computerTarget,
+  MachineOfflineError,
+  MachinePausedError,
+  REMOVED_COMPUTER_MESSAGE,
+} from "./machines";
 import { missionOfRun } from "./mission-context";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -34,7 +41,7 @@ import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
 const { sandboxes, orgSandboxSettings, sandboxUsageDays, usageRecords, agentBudgetPeriods } = schema;
 
-/** The scope of the sandbox tools: on by default (D61), and not covered by "all tools" (D30). */
+/** The scope of the sandbox tools: on by default, and not covered by "all tools" (ADR 0021). */
 export const SANDBOX_SCOPE = "sandbox:run";
 
 export const SANDBOX_LIMITS = {
@@ -67,7 +74,7 @@ export interface SandboxDeps {
   archiveAfterDays: number;
   now?: () => Date;
   /**
-   * The git proxy (D35): computers get our credential helper and
+   * The git proxy (ADR 0024): computers get our credential helper and
    * `insteadOf` so `git clone https://github.com/…` goes through
    * `{publicUrl}/api/git/…`, and our host stays reachable even when the
    * computer's network is blocked.
@@ -83,6 +90,10 @@ export type CloudSandboxDeps = Omit<SandboxDeps, "provider"> & { provider: Sandb
 /** Told when an agent with no connected machine has no cloud computer either. */
 export const NO_COMPUTER_MESSAGE =
   "You have no computer: this server has no cloud computers and no connected computer was chosen for you. Ask an admin or your owner to connect one (Settings → Computers).";
+
+/** Told instead while the workspace's own computer is still being prepared (ADR 0056 §10). */
+export const PREPARING_COMPUTER_MESSAGE =
+  "Your workspace's computer is still being prepared: commands, files and the browser work once it is ready, and the workspace's owners are told then. Tell the person it isn't ready yet; nothing is lost meanwhile.";
 
 /**
  * The computer a tool acts on (ADR 0025): the provider's id for it and the
@@ -379,7 +390,7 @@ async function applyNetwork(
 }
 
 /**
- * Git through our proxy (D35), when the org has GitHub connected and the
+ * Git through our proxy (ADR 0024), when the org has GitHub connected and the
  * agent may use git: our short-lived credential, the helper and `insteadOf`,
  * written on each start and refreshed every few hours. Never a GitHub token.
  */
@@ -549,7 +560,10 @@ export async function withSandbox<T>(
   }
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
   const provider = deps.provider;
-  if (!provider) throw new SandboxUnavailableError(NO_COMPUTER_MESSAGE);
+  if (!provider) {
+    const preparing = await computerPreparing(deps.db, ctx.orgId);
+    throw new SandboxUnavailableError(preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE);
+  }
   const cloud: CloudSandboxDeps = { ...deps, provider };
   await checkLimits(cloud, ctx, settings, budgetSeconds);
   const clock = () => (deps.now?.() ?? new Date()).getTime();
@@ -609,9 +623,7 @@ export async function withConnectedMachine<T>(
 ): Promise<T> {
   const status = await hub.status(machineId);
   if (!status || status.orgId !== ctx.orgId) {
-    throw new SandboxUnavailableError(
-      "Your connected computer was removed; ask an admin or your owner to choose another one.",
-    );
+    throw new SandboxUnavailableError(REMOVED_COMPUTER_MESSAGE);
   }
   if (!status.online) throw new MachineOfflineError(status.name);
   // Paused by its owner (ADR 0036 §6): nothing new starts there; the agent relays why and until when.
@@ -634,11 +646,14 @@ export async function agentComputerInfo(
   /** In a mission's thread: the mission's computer (ADR 0029), which may not be the agent's. */
   machineOverride?: { machineId: string | null } | null,
 ): Promise<
-  | { kind: "cloud"; available: boolean }
+  /** `preparing`: no cloud computers here, and the workspace's own computer is on its way. */
+  | { kind: "cloud"; available: boolean; preparing?: boolean }
   | {
       kind: "machine";
       machineId: string;
       name: string;
+      /** The workspace's own computer (ADR 0056 §10): always on, nobody's to turn on or off. */
+      managed: boolean;
       online: boolean;
       execAllowed: boolean;
       os: string;
@@ -654,13 +669,17 @@ export async function agentComputerInfo(
   const agent = await getAgentCached(deps.db, orgId, agentId);
   if (machineOverride && !machineOverride.machineId) return { kind: "removed" };
   const machineId = machineOverride?.machineId ?? agent?.machineId;
-  if (!machineId) return { kind: "cloud", available: Boolean(deps.provider) };
+  if (!machineId) {
+    const available = Boolean(deps.provider);
+    return { kind: "cloud", available, preparing: !available && (await computerPreparing(deps.db, orgId)) };
+  }
   const status = await deps.machines?.hub.status(machineId);
   if (!status || status.orgId !== orgId) return { kind: "removed" };
   return {
     kind: "machine",
     machineId: status.id,
     name: status.name,
+    managed: status.kind === "managed",
     online: status.online,
     execAllowed: status.execAllowed,
     os: status.os,

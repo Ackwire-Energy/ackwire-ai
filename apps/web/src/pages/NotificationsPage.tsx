@@ -1,6 +1,7 @@
-import type { AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
+import type { Agent, AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
 import {
   dropNotification,
+  useAiStatus,
   useApproval,
   useChannels,
   useForumAction,
@@ -12,24 +13,33 @@ import {
   useNotifications,
   useThreadMessages,
 } from "@agenteschat/client";
+import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   allItems,
+  askersOf,
   channelOf,
   groupByDay,
   isExpandable,
   MENTION_RE,
   NOTIFICATION_FILTERS,
-  openTarget,
+  opensConnectAi,
   replyTarget,
+  restrictionOf,
   snoozeTimes,
   sortWaiting,
   stepCells,
+  workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
+import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import {
+  Avatar,
   Button,
   Chip,
+  ComputerIcon,
   cx,
   ExpiryFuse,
   Icon,
@@ -47,20 +57,22 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { approvalAction } from "@/components/ApprovalItem";
-import { requestBrowserCard } from "@/components/browser/open";
+import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
+import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import { useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useWraps } from "@/hooks/useWraps";
+import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ExactAction } from "./ApprovalsPage";
+import { ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -68,7 +80,7 @@ const TTL_MS = 24 * 3_600_000;
 const LATE_MS = 20 * 60_000;
 /** An approval this close to expiring is urgent. */
 const URGENT_MS = 3 * 3_600_000;
-/** The exit: slide out, then fold the space (approvals and the prototype use the same timing). */
+/** The exit: slide out, then fold the space (approvals use the same timing). */
 const LEAVE_MS = 450;
 
 type Dir = ReturnType<typeof useDirectory>;
@@ -94,6 +106,12 @@ function durationText(t: TFunction, ms: number) {
   return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
 }
 
+/** Words from the client's rules (a key and its values) in the person's language; `otherwise` for an unknown key. */
+function sayWords(t: TFunction, w: Words, otherwise = "") {
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
+}
+
 const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
   !a
     ? ""
@@ -101,10 +119,11 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
       ? (dir.agentById.get(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
-/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2". */
-function namesText(t: TFunction, names: string[], max = 2) {
-  if (names.length <= max) return joinNames(names, t("notifications.and"));
-  return t("notifications.namesMore", { names: names.slice(0, max).join(", "), count: names.length - max });
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people. */
+function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
+  const shown = names.slice(0, max);
+  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
+  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
 }
 
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
@@ -128,6 +147,27 @@ function Face({
     return <AgentAvatar agentId={actor.id} name={name} size={size} state={state} className={className} labelled />;
   return (
     <ActorAvatar actor={{ type: "person", id: actor.id }} name={name} size={size} className={className} labelled />
+  );
+}
+
+/**
+ * Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. Someone
+ * asking to join isn't a member yet: their initials.
+ */
+function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
+  if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
+  if (n.kind === "computer_ready")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
+      </span>
+    );
+  if (n.kind !== "org_standing") return null;
+  const status = n.latest.statusTo;
+  return (
+    <span className="nt-sys" aria-hidden="true">
+      <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
+    </span>
   );
 }
 
@@ -155,22 +195,35 @@ function Snippet({ text, mine }: { text: string; mine: string | null }) {
 }
 
 /** Where it happened, as a chip. */
-function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: string) => string }) {
+function SourceChip({
+  n,
+  channelName,
+  className,
+}: {
+  n: AppNotification;
+  channelName: (id: string) => string;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const s = n.source;
   const channel = channelOf(n);
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
-  else if (n.kind === "machine_connected") [icon, label] = ["computer", t("notifications.source.machine")];
+  else if (n.kind === "join_request") [icon, label] = ["members", t("notifications.source.members")];
+  else if (
+    n.kind === "machine_connected" ||
+    n.kind === "computer_ready" ||
+    (n.kind === "browser_handoff" && s.screen === "desktop")
+  )
+    [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
   else if (n.kind === "mission_finished" || n.kind === "mission_stopped")
     [icon, label] = ["flag", t("notifications.source.mission")];
-  else if (n.kind === "routine_finished" || n.kind === "routine_failed")
-    [icon, label] = ["routines", t("notifications.source.routine")];
+  else if (n.kind.startsWith("routine_")) [icon, label] = ["routines", t("notifications.source.routine")];
   else if (n.kind === "dm" || s.dmId) [icon, label] = ["person", t("notifications.source.dm")];
   else if (s.threadId) {
     const name = channel ? channelName(channel) : "";
@@ -180,7 +233,25 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
     ];
   } else if (channel) [icon, label] = ["channel", t("notifications.source.channel", { name: channelName(channel) })];
   if (!label) return null;
-  return <Chip icon={icon}>{label}</Chip>;
+  return (
+    <Chip icon={icon} className={className}>
+      {label}
+    </Chip>
+  );
+}
+
+/** How long is left to answer, as a chip that turns to attention in the last hours. */
+function LeftChip({ n, className }: { n: AppNotification; className?: string }) {
+  const { t } = useTranslation();
+  const at = n.latest.expiresAt;
+  const left = at ? timeLeft(t, at) : null;
+  if (!at || !left) return null;
+  const urgent = new Date(at).getTime() - Date.now() <= URGENT_MS;
+  return (
+    <Chip icon="clock" tone={urgent ? "waiting" : "neutral"} className={className}>
+      {urgent ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
+    </Chip>
+  );
 }
 
 type WhatKey =
@@ -202,9 +273,14 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "routinePaused"
+  | "routineStalled"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
+  | "desktopHandoff"
+  | "joinRequest"
+  | "joinRequestMany"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -220,9 +296,12 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
   const channel = channelOf(n);
   const label =
     n.source.label && channel && n.source.label === channelName(channel) ? `#${n.source.label}` : n.source.label;
+  // Names and titles are typed by people (someone asking to join is not even a member): text, never markup.
   const k = (key: WhatKey, values: Record<string, unknown>) => (
-    <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} />
+    <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
   );
+  const own = workspaceHeadline(n);
+  if (own) return t(own, { name: n.source.label });
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -253,12 +332,23 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "routine_paused":
+      return k("routinePaused", { name });
+    case "routine_stalled":
+      return k("routineStalled", { name });
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })
         : k("machineConnectedAny", { name });
     case "browser_handoff":
-      return k("browserHandoff", { name });
+      return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
+    case "join_request": {
+      // Merged while unread: the first ones to ask, by name, then how many more.
+      const asked = askersOf(n);
+      return asked.total > 1
+        ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
+        : k("joinRequest", { name: asked.names[0] });
+    }
     case "reaction":
       return k("reaction", { names, count });
   }
@@ -548,6 +638,8 @@ function Row({
   const unread = n.readAt === null;
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
+  const own = workspaceHeadline(n);
+  const label = own ? t(own, { name: n.source.label }) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));
@@ -562,25 +654,39 @@ function Row({
       <Face actor={first} dir={dir} size="sm" className="nt-av22" />
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
-  ) : (
+  ) : first ? (
     <Face actor={first} dir={dir} className="nt-av28" />
+  ) : (
+    <SystemFace n={n} />
   );
   const l = n.latest;
+  // Asked while nobody watched (ADR 0053 §8): who asked leads an approval's line, its why follows.
+  const origin = n.kind === "approval" ? approvalOriginWords({ origin: l.origin }) : null;
   const lead =
     n.source.issueNumber != null && l.title && (n.kind === "issue_assigned" || n.kind === "issue_status")
       ? `#${n.source.issueNumber} ${l.title}`
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
-            n.kind === "routine_finished" ||
-            n.kind === "routine_failed" ||
+            n.kind.startsWith("routine_") ||
             n.kind === "forum_synthesis") &&
           n.source.label
         ? n.source.label
-        : null;
+        : origin
+          ? sayWords(t, origin)
+          : null;
   const speaker = n.count > 1 && (n.kind === "thread_reply" || n.kind === "issue_comment") ? name : null;
   const expandable = isExpandable(n);
   const steps = l.steps && l.steps.total > 0 ? l.steps : null;
   const failed = n.kind === "mission_stopped" || n.kind === "routine_failed" || l.steps?.failedAt != null;
+  // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
+  // run what went wrong (never the server's English).
+  const why = routineNotificationWords(n);
+  const restriction = restrictionOf(n);
+  const text = restriction
+    ? restrictionLine(t, restriction.code, restriction.facts)
+    : why
+      ? sayWords(t, why, l.text ?? "")
+      : l.text;
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -606,7 +712,7 @@ function Row({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a focusable item (J/K, E, R, Enter) with its own actions inside
       tabIndex={0}
       data-n={n.id}
-      aria-label={unread ? t("notifications.unreadItem", { name }) : name}
+      aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);
@@ -653,11 +759,11 @@ function Row({
           </>
         ) : (
           <>
-            {(l.text || lead) && (
-              <p className="nt-snip">
+            {(text || lead) && (
+              <p className={cx("nt-snip", restriction && "nt-snip--whole")}>
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
                 {speaker && <b>{t("notifications.speaker", { name: speaker })} </b>}
-                {l.text && <Snippet text={l.text} mine={mine} />}
+                {text && <Snippet text={text} mine={mine} />}
               </p>
             )}
             {steps && (
@@ -702,7 +808,7 @@ function Row({
               </>
             )}
             {s.replied && (
-              <div className="nt-replied">
+              <div className="nt-replied ac-iconline">
                 <Icon name="check" size={14} />
                 <span>{t("notifications.youReplied", { text: s.replied })}</span>
               </div>
@@ -792,25 +898,136 @@ function RoundWaits({ topicId }: { topicId: string }) {
   return <Chip icon="clock">{t("notifications.wait.roundWaits", { time: left })}</Chip>;
 }
 
-/** The approval's exact action (from Aprovações) and its verb. */
-function ApprovalBody({ approvalId }: { approvalId: string }) {
-  const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId);
-  return approval.data ? <ExactAction approval={approval.data} max={3} /> : null;
-}
-
-function ApprovalVerb({ approvalId }: { approvalId?: string }) {
+/**
+ * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then the
+ * connector's logo (its name in a tooltip), "Só lê", its values in words and the agent's why behind "Por quê?".
+ */
+function ApprovalSay({
+  approvalId,
+  name,
+  why,
+  mine,
+  fallback,
+}: {
+  approvalId: string;
+  name: string;
+  /** The notification's text (the why), for an approval that doesn't carry its own. */
+  why?: string;
+  mine: string | null;
+  fallback: string;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId ?? "", !!approvalId);
+  const approval = useApproval(org.id, approvalId);
+  const [open, setOpen] = useState(false);
+  const a = approval.data;
+  if (!a) return <h3>{fallback}</h3>;
+  const reason = approvalWhy(a) ?? why;
+  const values = approvalValues(a, { max: 3 }).map(([label, value]) => `${label}: ${value}`);
   return (
-    <span>
-      {approval.data ? t(`approvals.verb.${approvalAction(approval.data)}`) : t("notifications.wait.approval")}
-    </span>
+    <>
+      <p className="nt-say">
+        <Trans
+          i18nKey="notifications.wait.wants"
+          values={{ name, action: approvalDoing(t, a) }}
+          components={{ b: <b /> }}
+        />
+      </p>
+      {(a.connector || a.email || approvalReadsOnly(a) || values.length > 0 || reason) && (
+        <div className="nt-facts">
+          {(a.connector || a.email) && <ConnectorMark approval={a} />}
+          {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
+          {values.map((v) => (
+            <Chip key={v}>{v}</Chip>
+          ))}
+          {reason && (
+            <button
+              type="button"
+              className="nt-why-btn"
+              aria-expanded={open}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen((o) => !o);
+              }}
+            >
+              {open ? t("notifications.wait.hideWhy") : t("notifications.wait.why")}
+            </button>
+          )}
+        </div>
+      )}
+      {open && reason && (
+        <p className="nt-why">
+          <Snippet text={reason} mine={mine} />
+        </p>
+      )}
+    </>
   );
 }
 
-/** A card in "Esperando você": an agent's question, my turn at the table, an approval. */
+/** Aprovar / Recusar right on the card (a hold for high risk, a reason on refusal); others open Aprovações. */
+function ApprovalActs({
+  approvalId,
+  agent,
+  onOpen,
+  tail,
+}: {
+  approvalId: string;
+  agent?: Agent;
+  onOpen: () => void;
+  tail: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const approval = useApproval(org.id, approvalId);
+  const [refusing, setRefusing] = useState(false);
+  const a = approval.data;
+  if (a?.canDecide && a.status === "pending") {
+    if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
+    return (
+      <div className="nt-wacts ac-acts">
+        <ApproveButton approval={a} />
+        <Button
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setRefusing(true);
+          }}
+        >
+          {t("approval.refuse")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
+          {t("notifications.wait.openApprovals")}
+        </Button>
+        {tail}
+      </div>
+    );
+  }
+  return (
+    <div className="nt-wacts ac-acts">
+      <Button
+        variant="primary"
+        size="sm"
+        icon="shield"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      >
+        {t("notifications.wait.decide")}
+      </Button>
+      {tail}
+    </div>
+  );
+}
+
+/** An item in "Esperando você": a card for an agent's question, my turn at the table or an approval, else a row. */
 function WaitCard({
   n,
   s,
@@ -839,10 +1056,11 @@ function WaitCard({
   const feminine = isFeminineName(name);
   const l = n.latest;
   const unread = n.readAt === null;
+  const asked = n.kind === "join_request" ? askersOf(n) : null;
   const waitedMs = Date.now() - new Date(n.createdAt).getTime();
   const agent = first?.type === "agent" ? dir.agentById.get(first.id) : undefined;
   const tail = (
-    <>
+    <span className="nt-tail ac-acts">
       <SnoozeMenu
         onPick={(c) => h.onSnooze(n, c)}
         trigger={
@@ -868,8 +1086,29 @@ function WaitCard({
           h.onDone(n);
         }}
       />
-    </>
+    </span>
   );
+  const label = !asked
+    ? [name, l.title ?? l.text].filter(Boolean).join(": ")
+    : asked.total > 1
+      ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
+      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+  const face = first ? (
+    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
+  ) : (
+    <SystemFace n={n} className="nt-av40" />
+  );
+  const fuse = n.kind === "approval" && l.expiresAt && (
+    <ExpiryFuse left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS} color={colorOf(agent)} />
+  );
+  const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
+  // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.
+  if (n.kind !== "agent_question" && n.kind !== "forum_turn" && !approvalId)
+    return (
+      <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
+        {fuse}
+      </WaitRow>
+    );
   let meta: ReactNode;
   let head: ReactNode;
   let body: ReactNode;
@@ -933,7 +1172,7 @@ function WaitCard({
             ))}
           </div>
         )}
-        <div className="nt-wacts">
+        <div className="nt-wacts ac-acts">
           <Button
             variant="primary"
             size="sm"
@@ -955,7 +1194,6 @@ function WaitCard({
           >
             {t("notifications.wait.openThread")}
           </Button>
-          <span className="nt-grow" />
           {tail}
         </div>
       </>
@@ -1000,7 +1238,7 @@ function WaitCard({
             onCancel={h.onCancel}
           />
         ) : (
-          <div className="nt-wacts">
+          <div className="nt-wacts ac-acts">
             <Button
               variant="primary"
               size="sm"
@@ -1024,58 +1262,31 @@ function WaitCard({
             >
               {t("notifications.wait.pass")}
             </Button>
-            <span className="nt-grow" />
             {tail}
           </div>
         )}
       </>
     );
-  } else {
-    const leftMs = l.expiresAt ? new Date(l.expiresAt).getTime() - Date.now() : null;
-    const left = l.expiresAt ? timeLeft(t, l.expiresAt) : null;
+  } else if (approvalId) {
+    // An approval says who asked while nobody watched, then the agent's why (ADR 0053 §8).
+    const origin = approvalOriginWords({ origin: l.origin });
+    const why = l.title ? l.text : undefined;
+    // An approval (AprovacaoConector B): the sentence says who and what; decided right here.
     meta = (
       <>
-        {n.kind === "approval" ? (
-          <>
-            <b>{name}</b>
-            <ApprovalVerb approvalId={n.source.approvalId} />
-          </>
-        ) : (
-          <span>
-            <Headline n={n} dir={dir} channelName={channelName} />
+        <span>{whenText(t, i18n.language, n.createdAt)}</span>
+        {origin && (
+          <span className="nt-origin">
+            <Icon name="routines" size={14} />
+            {sayWords(t, origin)}
           </span>
         )}
-        <SourceChip n={n} channelName={channelName} />
-        <span>{whenText(t, i18n.language, n.createdAt)}</span>
         <span className="nt-grow" />
-        {left && leftMs !== null && (
-          <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
-            {leftMs <= URGENT_MS ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
-          </Chip>
-        )}
+        <LeftChip n={n} />
       </>
     );
-    head = <h3>{l.title ?? l.text ?? ""}</h3>;
-    body = (
-      <>
-        {n.kind === "approval" && n.source.approvalId && <ApprovalBody approvalId={n.source.approvalId} />}
-        <div className="nt-wacts">
-          <Button
-            variant="primary"
-            size="sm"
-            icon={n.kind === "approval" ? "shield" : "external"}
-            onClick={(e) => {
-              e.stopPropagation();
-              h.onOpen(n);
-            }}
-          >
-            {n.kind === "approval" ? t("notifications.wait.decide") : t("notifications.open")}
-          </Button>
-          <span className="nt-grow" />
-          {tail}
-        </div>
-      </>
-    );
+    head = <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />;
+    body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={() => h.onOpen(n)} tail={tail} />;
   }
   return (
     <article
@@ -1085,22 +1296,98 @@ function WaitCard({
       data-n={n.id}
       data-wait=""
       data-burst=""
-      aria-label={`${name}: ${l.title ?? l.text ?? ""}`}
+      aria-label={label}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);
       }}
       onKeyDown={() => {}}
     >
-      <span className="nt-face">
-        <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
-      </span>
+      <span className="nt-face">{face}</span>
       <div className="nt-meta">{meta}</div>
       <div>{head}</div>
       <div className="nt-body">{body}</div>
-      {n.kind === "approval" && l.expiresAt && (
-        <ExpiryFuse left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS} color={colorOf(agent)} />
+      {fuse}
+    </article>
+  );
+}
+
+/**
+ * A waiting item that only points somewhere, on one line: its face, its words, Open, Remind me later and Done. A click
+ * anywhere on it opens it, as Open does.
+ */
+function WaitRow({
+  n,
+  s,
+  h,
+  dir,
+  channelName,
+  label,
+  face,
+  tail,
+  children,
+}: {
+  n: AppNotification;
+  s: RowState;
+  h: RowHandlers;
+  dir: Dir;
+  channelName: (id: string) => string;
+  label: string;
+  face: ReactNode;
+  tail: ReactNode;
+  children?: ReactNode;
+}) {
+  const { t, i18n } = useTranslation();
+  const unread = n.readAt === null;
+  // A request to join says it all in its headline; an agent's hand and an approval add what they are about.
+  const sub = n.kind === "join_request" ? null : (n.latest.title ?? n.latest.text);
+  const l1 = useRef<HTMLDivElement>(null);
+  const wraps = useWraps(l1);
+  return (
+    <article
+      className={cx(
+        "nt-wi nt-wr",
+        unread && "is-unread",
+        s.cur && "is-cur",
+        s.fresh && "is-new",
+        s.leaving && "is-leaving",
       )}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a focusable item (J/K, E, Enter) with its own actions inside
+      tabIndex={0}
+      data-n={n.id}
+      data-wait=""
+      data-burst=""
+      aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
+      onClick={(e) => {
+        const target = e.target as Element;
+        // The Remind menu renders in a portal, and React still bubbles its clicks up to here.
+        if (!e.currentTarget.contains(target) || target.closest("button, a")) return;
+        if (window.getSelection()?.type === "Range") return;
+        h.onOpen(n);
+      }}
+      onKeyDown={() => {}}
+    >
+      <span className="nt-face">{face}</span>
+      <div className="nt-wr__main">
+        <div className="nt-wr__text">
+          <div ref={l1} className={cx("nt-wr__l1", (sub || wraps) && "ac-captop")}>
+            <span className="nt-what">
+              <Headline n={n} dir={dir} channelName={channelName} />
+            </span>{" "}
+            <SourceChip n={n} channelName={channelName} className="nt-wr__src" />{" "}
+            <span className="nt-wr__tm">{whenText(t, i18n.language, n.createdAt)}</span>{" "}
+            <LeftChip n={n} className="nt-wr__left" />
+          </div>
+          {sub && <p className="nt-wr__sub">{sub}</p>}
+        </div>
+        <div className="nt-wr__acts ac-acts">
+          <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
+            {t("notifications.open")}
+          </Button>
+          {tail}
+        </div>
+      </div>
+      {children}
     </article>
   );
 }
@@ -1157,13 +1444,12 @@ function useArrivals(items: AppNotification[], filter: NotificationFilter, ready
   return { fresh, pulse };
 }
 
-/** Notificações (telas/Notificacoes.html): what waits on me on top, the rest by day, grouped by conversation. */
+/** Notificações: what waits on me on top, the rest by day, grouped by conversation. */
 export function NotificationsPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const channels = useChannels(org.id);
-  const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
   const live = useLiveStore();
@@ -1196,7 +1482,7 @@ export function NotificationsPage() {
   const waitingTotal = counts?.waiting ?? 0;
   const nothing = list.isSuccess && (counts?.all ?? 0) === 0 && items.length === 0;
 
-  // The tab says how many are unread, like the prototype.
+  // The tab says how many are unread.
   useEffect(() => {
     const previous = document.title;
     document.title = unreadTotal ? t("notifications.docTitleUnread", { count: unreadTotal }) : t("notifications.title");
@@ -1254,7 +1540,7 @@ export function NotificationsPage() {
         ? t("notifications.toast.doneQuestion", { name })
         : n.kind === "approval"
           ? t("notifications.toast.doneApproval")
-          : t("notifications.toast.doneOther"),
+          : undefined,
     );
   };
 
@@ -1275,41 +1561,20 @@ export function NotificationsPage() {
     );
   };
 
+  const connect = useConnectAi();
+  const aiStatus = useAiStatus(org.id);
+  const openNotification = useNotificationOpener();
+  // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
+  const connectsAi = (n: AppNotification) => connect !== null && opensConnectAi(n, aiStatus.data);
+  /** "Abrir": the same place a click on its browser notification goes (`useNotificationOpener`). */
   const openItem = (n: AppNotification) => {
     markRead(n);
-    const target = openTarget(n);
-    if (!target) return;
-    // An agent asked for help in its browser: its card opens there, in control (no page of its own).
-    if (n.kind === "browser_handoff" && n.source.handoffId) requestBrowserCard({ handoffId: n.source.handoffId });
-    const orgId = org.id;
-    switch (target.to) {
-      case "/org/$orgId/threads/$threadId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/c/$channelId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: target.search ?? {} });
-      case "/org/$orgId/dm/agent/$agentId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/dm/person/$userId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/issues/$number":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/forum/$topicId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/threads":
-        return void navigate({ to: target.to, params: { orgId }, search: target.search });
-      case "/org/$orgId/settings/computers/$machineId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/settings/$section":
-        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
-      default:
-        return void navigate({ to: target.to, params: { orgId } });
-    }
+    openNotification(n, org.id, { ai: aiStatus.data });
   };
 
   const startReply = (n: AppNotification) => {
     if (!replyTarget(n)) {
-      if (n.kind === "approval")
-        toast.show(t("notifications.toast.decideThere"), "info", undefined, t("notifications.toast.decideThereDetail"));
+      if (n.kind === "approval") toast.show(t("notifications.toast.decideThere"), "info");
       return;
     }
     setReplying(n.id);
@@ -1394,15 +1659,10 @@ export function NotificationsPage() {
       { type: "readAll", filter },
       {
         onSuccess: (res) =>
-          toast.show(
-            t("notifications.toast.readAll", { count: res.ids.length || count }),
-            "info",
-            {
-              label: t("notifications.toast.undo"),
-              run: () => action.mutate({ type: "unreadMany", ids: res.ids }),
-            },
-            t("notifications.toast.readAllDetail"),
-          ),
+          toast.show(t("notifications.toast.readAll", { count: res.ids.length || count }), "info", {
+            label: t("notifications.toast.undo"),
+            run: () => action.mutate({ type: "unreadMany", ids: res.ids }),
+          }),
       },
     );
   };
@@ -1420,6 +1680,9 @@ export function NotificationsPage() {
 
   const select = (n: AppNotification) => {
     setCur(n.id);
+    // Connecting an AI is the one next step there is: a click opens it, as Open does. Any other row stays put, so
+    // its actions (on a phone, shown by that tap) stay in reach.
+    if (connectsAi(n)) return openItem(n);
     markRead(n);
     // A grouped item opens its replies on the first tap.
     if (isExpandable(n) && !open.has(n.id) && !n.waiting) toggle(n);
@@ -1664,13 +1927,6 @@ export function NotificationsPage() {
           <Button variant="ghost" size="sm" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
             {t("notifications.more")}
           </Button>
-        </div>
-      )}
-
-      {filter === "all" && items.length > 0 && (
-        <div className="nt-foot">
-          <Icon name="check" size={14} />
-          {t("notifications.foot")}
         </div>
       )}
     </div>

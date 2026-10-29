@@ -7,7 +7,7 @@ export { softTones } from "@agenteschat/ui/sky/math";
 export { BAYER, bayerAt };
 
 /**
- * The pixel/dither drawings (sky, fuse, spend bar, plan track) as pure math, ported from Mobile.html
+ * The pixel/dither drawings (sky, fuse, spend bar, plan track) as pure math
  * (`fromSurface`, `addSky`, `addFuse`, `addBar`, `addTrack`, `drawDithers`). The app draws them with a
  * Skia shader (./shaders.ts) that does the same steps; the `shader*` functions below mirror the SkSL line
  * by line, and test/sky-math.test.ts checks they pick the same tone as the web's loop.
@@ -33,7 +33,7 @@ export function hash2(a: number, b: number): number {
   return s - Math.floor(s);
 }
 
-/** Seven tones from a surface color into an agent color (Mobile.html `fromSurface`). */
+/** Seven tones from a surface color into an agent color. */
 export function fromSurface(surface: string, depth = 1, color: AgentColorName = "sky"): string[] {
   const [top, bot] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
   return [
@@ -106,7 +106,36 @@ export const sweepField: Field = (u, _v, t) => {
   return 0.08 + 0.5 * Math.exp(-(d * d) / 0.035);
 };
 
-/** The grid of a drawing `width`×`height` (points) at `pixel` points per cell (Mobile.html `drawDithers`). */
+/**
+ * The conversation header's pill: a little of the agent's sky at its right end,
+ * breathing; over glass, so the lowest tone is see-through (`clear`).
+ */
+export const pillField: Field = (u, v, t) => {
+  const e = Math.max(0, (u - 0.55) / 0.45);
+  return 0.55 * e * e * (0.8 + 0.2 * Math.sin(v * 5 + t * 0.7));
+};
+
+/** The pill while the agent works: a sweep in its color crossing it (the sidebar's trail), stronger to the right. */
+export const pillWorkField: Field = (u, v, t) => {
+  const p = mod(t * 0.42, 1.6) - 0.3;
+  const d = u - p;
+  const band = 0.32 * u * u * u + 0.5 * Math.exp(-(d * d) / 0.02) * (0.5 + 0.5 * u);
+  return Math.min(0.75, band) + 0.04 * Math.sin(v * 6 + t);
+};
+
+/**
+ * The launch splash's sky up to `level` (share of the height from the bottom), deepest at the bottom; its top
+ * edge waves a little, more as it rises (nothing at all at level 0).
+ */
+export const horizonField =
+  (level: number): Field =>
+  (u, v, t) => {
+    const edge = v - (1 - level) + 0.08 * level * Math.sin(u * 6 + t * 1.1);
+    const s = Math.min(1, Math.max(0, edge / Math.max(0.0001, level)));
+    return s * s * (3 - 2 * s) * 0.97;
+  };
+
+/** The grid of a drawing `width`×`height` (points) at `pixel` points per cell. */
 export const gridOf = (width: number, height: number, pixel: number) => ({
   w: Math.max(2, Math.ceil(width / pixel)),
   h: Math.max(2, Math.ceil(height / pixel)),

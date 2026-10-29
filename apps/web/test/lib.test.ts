@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Me } from "@agenteschat/client";
 import {
   dayLabel,
   formatInt,
@@ -11,14 +12,24 @@ import {
   timeLeft,
   whenAt,
 } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
-import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@agenteschat/client/lib/onboarding";
+import {
+  addInvites,
+  firstAskOrder,
+  ONBOARDING_STEPS,
+  splitEmails,
+  validInvites,
+} from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
 import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
+import { createBetterAuthClient } from "@/auth/better-auth";
 import { createI18n } from "@/i18n";
+import { announceConfirmation, emailConfirmedToast } from "@/lib/email-confirmation";
+import type { ToastAction } from "@/lib/toast";
+import { createFakeAuth } from "./fake-auth";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
@@ -29,6 +40,7 @@ describe("format (pt-BR, machine numbers precise)", () => {
   test("money", () => {
     expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
+    expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
@@ -112,6 +124,10 @@ describe("text", () => {
     ]);
     expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["import", "computer", "team"]);
   });
+  test("onboarding's first message: Lia offers it where the agents can browse, Theo where they can't, then Ada", () => {
+    expect(firstAskOrder(true)).toEqual(["lia", "theo", "ada"]);
+    expect(firstAskOrder(false)).toEqual(["theo", "lia", "ada"]);
+  });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");
     expect(passwordState("curta")).toBe("short");
@@ -130,7 +146,92 @@ describe("grammar", () => {
     expect(isFeminineName("Theo")).toBe(false);
     expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
     expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
-    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toContain("entra no contexto dela");
+    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    expect(t("agent.instructionsHelp", { ...agentGrammar(t, "Atlas"), org: "Acme" })).toEndWith(
+      "escreva aqui só o que é do Atlas.",
+    );
+  });
+
+  test("one agent, one pronoun: she or he in English as in Portuguese, never it", () => {
+    const english = createI18n("en");
+    const te = english.t.bind(english) as TFunction;
+    const ada = agentGrammar(te, "Ada");
+    const theo = agentGrammar(te, "Theo");
+    // Her page says "her" in both lines it has for her.
+    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI connected.");
+    expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
+    expect(te("agentPage.work.cell.label", ada)).toBe("How she works");
+    expect(te("agentPage.overview.proposes", ada)).toBe("Ada proposes changing her instructions");
+    expect(te("chat.work.block", theo)).toBe("What he did");
+    expect(te("chat.joined.tip", theo)).toBe("Nobody called Theo. He joined to help.");
+    expect(te("channelMembers.removeAgentBody", ada)).toBe(
+      "She stops reading and answering in this channel. You can add her back later.",
+    );
+    // Where Portuguese needs no pronoun, English has none either.
+    expect(te("agent.budgetHelp", { ...ada, ownerNote: "" }).trim()).toBe(
+      "At the limit, Ada stops and says so in the channel.",
+    );
+    expect(te("newAgent.budgetHelp", ada)).toBe("At the limit, Ada stops and says so.");
+    expect(te("look.onHead")).toBe("On the head");
+    expect(te("database.agent.levelText")).toBe("Queries the tables the rules allow, read-only.");
+    expect(te("agentPage.memory.counts")).toBe("What's in memory");
+    // Her Access tab says what each level gives her in her own words.
+    expect(te("access.areaText.context.read", ada)).toBe("Searches messages, summaries and facts in the channels.");
+    expect(te("access.areaText.context.write", ada)).toBe("Searches the context and keeps her own notes.");
+    expect(te("access.areaText.browser.write", theo)).toBe(
+      "Browses websites in his own browser, on his computer. Logins are kept per agent.",
+    );
+    // Settings › Computers names each agent's own folder as her page does.
+    expect(te("agentPage.computer.foldersOwn", { ...ada, machine: "Mac" })).toBe("Only uses her own folder on Mac.");
+    expect(te("machines.page.agentOwnFolder", ada)).toBe("Only her own folder");
+    expect(te("machines.page.agentFolders", { ...theo, folders: "Desktop" })).toBe("Uses Desktop and his own folder");
+    // Portuguese says each one's own words, articles and forms too.
+    expect(t("chat.joined.tip", agentGrammar(t, "Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(t("missions.settings.defaults.title", agentGrammar(t, "Ada"))).toBe("Próximas missões da Ada");
+    expect(t("access.areaText.desktop.write", agentGrammar(t, "Ada"))).toStartWith(
+      "Usa qualquer app na própria tela, no computador dela,",
+    );
+    expect(t("browser.agent.signedIn", agentGrammar(t, "Ada"))).toBe(
+      "A Ada fica com o login feito nos sites em que entrar, neste computador.",
+    );
+  });
+
+  test("the app's starter agents get their names' own pronoun and article", () => {
+    const english = createI18n("en");
+    const te = english.t.bind(english) as TFunction;
+    const feminine = ["Ada", "Iris", "Nina", "Mila", "Dora", "Clara", "Eva"];
+    const masculine = ["Atlas", "Theo", "Leo", "Bento", "Otto", "Hugo"];
+    for (const dict of [ptBR, en]) {
+      const roles = Object.values(dict.newAgent.roles as Record<string, { agent?: string }>);
+      expect(roles.flatMap((r) => (r.agent ? [r.agent] : [])).toSorted()).toEqual(
+        [...feminine, ...masculine].toSorted(),
+      );
+    }
+    for (const name of feminine)
+      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
+    for (const name of masculine)
+      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
+    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI connected.");
+    expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
+  });
+
+  test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
+    expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
+    expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");
+    expect(providerGrammar(t, "Claude")).toEqual({ provider: "Claude", of: "do" });
+    // One this app doesn't know keeps its name, with the usual "da".
+    expect(providerGrammar(t, "mistral")).toEqual({ provider: "mistral", of: "da" });
+    expect(t("agentPage.activity.errors.missing_credential", runErrorGrammar(t, { provider: "Claude" }))).toBe(
+      "Falta uma chave do Claude no workspace.",
+    );
+    expect(
+      t(
+        "agentPage.activity.errors.credential_wrong_provider",
+        runErrorGrammar(t, { modelProvider: "Claude", keyProvider: "DeepSeek" }),
+      ),
+    ).toBe("O modelo é do Claude, mas a chave é da DeepSeek.");
   });
 });
 
@@ -184,5 +285,90 @@ describe("i18n", () => {
     };
     walk(ptBR);
     expect(strings.filter((s) => s.includes("!"))).toEqual([]);
+  });
+});
+
+describe("the confirmation email", () => {
+  test("its link lands back here: confirmed, or a link that no longer works; anything else is no toast", () => {
+    expect(emailConfirmedToast("?email_confirmed=1")).toEqual({ key: "auth.emailConfirmed", tone: "info" });
+    expect(emailConfirmedToast("?email_confirmed=1&error=TOKEN_EXPIRED")).toEqual({
+      key: "auth.emailLinkExpired",
+      tone: "error",
+    });
+    expect(emailConfirmedToast("?connector_error=x")).toBeNull();
+    expect(emailConfirmedToast("")).toBeNull();
+  });
+
+  test("a link that no longer works offers a new one to whoever is signed in here with the address unconfirmed", async () => {
+    const shown: { text: string; tone?: string; action?: ToastAction | ToastAction[] }[] = [];
+    const show = (text: string, tone?: "info" | "error", action?: ToastAction | ToastAction[]) => {
+      shown.push({ text, tone, action });
+    };
+    const { auth, calls } = createFakeAuth();
+    const signedIn = (emailVerified: boolean | null) => async () =>
+      emailVerified === null ? null : ({ user: { email: "bia@example.com", emailVerified } } as Me);
+    const expired = { key: "auth.emailLinkExpired", tone: "error" } as const;
+
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(false) });
+    expect(shown).toMatchObject([
+      { text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.", tone: "error" },
+    ]);
+    const action = shown[0]?.action as ToastAction;
+    expect(action.label).toBe("Mandar outro link");
+    action.run();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["bia@example.com"] }]);
+    expect(shown[1]).toMatchObject({ text: "Mandamos outro link para bia@example.com." });
+
+    // Signed out, or confirmed meanwhile: nothing to send. A link that worked only says so.
+    shown.length = 0;
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(null) });
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(true) });
+    await announceConfirmation({ key: "auth.emailConfirmed", tone: "info" }, { auth, t, show, me: signedIn(false) });
+    expect(shown).toEqual([
+      {
+        text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
+        tone: "error",
+        action: undefined,
+      },
+      {
+        text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
+        tone: "error",
+        action: undefined,
+      },
+      { text: "E-mail confirmado.", tone: "info", action: undefined },
+    ]);
+  });
+
+  test("the auth client says the app's language on every request; the server picks where a link lands", async () => {
+    const sent: { path: string; language: string | null; body: Record<string, unknown> | null }[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      sent.push({
+        path: new URL(String(url)).pathname,
+        language: new Headers(init?.headers).get("accept-language"),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+      });
+      return Response.json({ token: null, user: { id: "u", name: "Bia", email: "bia@example.com" } });
+    }) as typeof fetch;
+    try {
+      let language = "en";
+      const auth = createBetterAuthClient("http://localhost:3000", () => language);
+      await auth.signUp({ name: "Bia", email: "bia@example.com", password: "senha-longa" });
+      language = "pt-BR";
+      await auth.requestPasswordReset({ email: "bia@example.com", redirectTo: "/reset-password" });
+      expect(await auth.sendVerificationEmail("bia@example.com")).toEqual({ ok: true });
+      const signUp = sent.find((r) => r.path === "/api/auth/sign-up/email");
+      expect(signUp?.language).toBe("en");
+      expect(signUp?.body).not.toHaveProperty("callbackURL");
+      expect(sent.find((r) => r.path === "/api/auth/request-password-reset")?.language).toBe("pt-BR");
+      expect(sent.find((r) => r.path === "/api/auth/send-verification-email")).toEqual({
+        path: "/api/auth/send-verification-email",
+        language: "pt-BR",
+        body: { email: "bia@example.com" },
+      });
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });

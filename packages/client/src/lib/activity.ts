@@ -63,6 +63,11 @@ export type ActivityKind =
   | "readingWiki"
   | "linkingWiki"
   | "readingForum"
+  | "creatingChannel"
+  | "offeringConnectAi"
+  | "askingAgent"
+  | "tellingAgent"
+  | "findingTools"
   | "usingTool";
 
 export interface Activity {
@@ -137,6 +142,12 @@ const BUILTIN: Record<string, ActivityKind> = {
   read_wiki_page: "readingWiki",
   search_wiki: "readingWiki",
   link_to_wiki: "linkingWiki",
+  // Setting up the workspace.
+  create_channel: "creatingChannel",
+  offer_connect_ai: "offeringConnectAi",
+  // Another agent of the team (the consultation card says who and what it answered).
+  ask_agent: "askingAgent",
+  tell_agent: "tellingAgent",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -150,6 +161,8 @@ const CONNECTORS: Record<string, string> = {
   notion: "Notion",
   jira: "Jira",
   stripe: "Stripe",
+  // The org's own mailboxes (`mail_<slug>_<verb>`, ADR 0038), labeled "Email" like their tools.
+  mail: "Email",
 };
 
 /** First words that are verbs, not a connector prefix ("send_email" is a tool, not the app "send"). */
@@ -206,6 +219,8 @@ export function toolActivity(
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
+  // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
+  if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };
   // The agent's own browser (ADR 0040): not an app called "browser".
   if (name.startsWith("browser_")) return { kind: "browsing" };
   const label = connector?.trim();
@@ -378,7 +393,7 @@ export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: M
 /** The bar's sentence as plain text (see `activitySentence`). */
 export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);
 
-/** How often the card's phrase turns (telas/CardTrabalhando.html, A). */
+/** How often the card's phrase turns. */
 export const PHRASE_TURN_MS = 2600;
 /** A step running this long gets an aside in turn ("Isso leva um minutinho…"). */
 export const LONG_STEP_MS = 4000;

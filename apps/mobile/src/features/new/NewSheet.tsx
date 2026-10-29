@@ -2,7 +2,7 @@ import { useApi } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { Button, SheetScreen, Text } from "@/ui";
 import { busyAgents } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
@@ -15,8 +15,14 @@ import { askTargets, pickedTarget, requestBody } from "./logic";
 import { SheetHeader } from "./parts";
 import { useOpenDm } from "./useOpenDm";
 
+/** "Criar agente" is a pushed screen of its own: "Novo" closes first, so it opens over the tabs. */
+function openNewAgent() {
+  if (router.canDismiss()) router.dismissAll();
+  setTimeout(() => router.push("/new-agent"), 60);
+}
+
 /**
- * "Novo" (the "+" of the tabs, MobileIntencional.html variant A): request first. "O que você precisa?",
+ * "Novo" (the "+" of the tabs): request first. "O que você precisa?",
  * for whom (the agent you talked to last comes picked; a tap changes it), and one button, "Pedir ao
  * Theo", that posts the request in that agent's conversation and opens it. Starting something new (an
  * agent, a channel, a conversation with a person) sits below, smaller.
@@ -57,7 +63,7 @@ export function NewSheet() {
             key: "agent",
             leading: <Tile icon="agent" size={32} />,
             label: t("mobile.agents.new"),
-            onPress: () => router.push("/new-agent"),
+            onPress: () => openNewAgent(),
           },
         ]),
     {
@@ -82,13 +88,7 @@ export function NewSheet() {
           <Text variant="body" tone="muted" style={styles.lone}>
             {t("mobile.new.ask.noAgents")}
           </Text>
-          <Button
-            variant="primary"
-            wide
-            icon="plus"
-            label={t("mobile.agents.new")}
-            onPress={() => router.push("/new-agent")}
-          />
+          <Button variant="primary" wide icon="plus" label={t("mobile.agents.new")} onPress={() => openNewAgent()} />
         </>
       ) : (
         <>
@@ -144,7 +144,10 @@ export function NewSheet() {
   );
 }
 
-/** One agent a request can go to: its face, its name and its role; picked, it turns dark. */
+/**
+ * One agent a request can go to: its face in its own sky tile (as the "Esperando você" strip shows it), its name
+ * and its role; picked, the chip turns dark.
+ */
 function WhoChip({
   agentId,
   name,
@@ -170,9 +173,7 @@ function WhoChip({
       accessibilityLabel={role ? `${name}, ${role}` : name}
       style={({ pressed }) => [styles.who, picked ? { backgroundColor: c.ink } : surface, pressed && styles.pressed]}
     >
-      <View style={[styles.face, { backgroundColor: picked ? c.ink2 : c.sunken }]}>
-        <AgentFace agentId={agentId} size={30} mode={working ? "run" : "idle"} live={picked} />
-      </View>
+      <AgentFace agentId={agentId} size={32} mode={working ? "run" : "idle"} live={picked} />
       <Text variant="subhead" style={[styles.bold, { color: picked ? c.bg : c.ink2 }]} numberOfLines={1}>
         {name}
       </Text>
@@ -198,12 +199,11 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 44,
     maxWidth: 260,
-    paddingLeft: 5,
+    paddingLeft: 6,
     paddingRight: 14,
     borderRadius: 22,
   },
   pressed: { transform: [{ scale: 0.96 }] },
-  face: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   bold: { fontWeight: "600" },
   role: { flexShrink: 1, opacity: 0.85 },
 });

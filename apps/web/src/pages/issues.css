@@ -1,5 +1,5 @@
 /*
- * Tarefas (telas/Tarefas.html; issues in the code): agents working now, the
+ * Tarefas (issues in the code): agents working now, the
  * org's board (custom columns inside fixed stages; drag between and inside
  * columns) or a list, and the details (the shared details dialog, or the
  * task's own page). Pixel pieces: CriteriaPixels and WorkSweep from
@@ -31,7 +31,7 @@
 .issues-head h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -139,6 +139,11 @@
 @keyframes issues-caret {
   50% {
     opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .issues-now__step.is-live::after {
+    animation: none;
   }
 }
 .issues-now__go {
@@ -540,8 +545,6 @@
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
 .issue-agent-note {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 0;
   font-size: 12.5px;
@@ -555,8 +558,6 @@
   gap: 6px;
 }
 .issues-explain {
-  display: flex;
-  align-items: flex-start;
   gap: 9px;
   margin: 0;
   padding: 10px 12px;
@@ -567,8 +568,6 @@
   color: var(--ink2);
 }
 .issues-explain .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--muted);
 }
 .issues-dests {
@@ -605,6 +604,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .issues-dest[aria-checked="true"] {
@@ -870,6 +870,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .issue-ask__other:hover {

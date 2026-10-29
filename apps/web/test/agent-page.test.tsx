@@ -37,6 +37,13 @@ const openTab = async (name: RegExp) => {
   await settle(4);
 };
 const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
+/** The hidden text of the ⓘ named `About <label>`. */
+const hintText = (inside: HTMLElement, label: string) => {
+  const about = within(inside).getByRole("button", { name: `Sobre ${label}` });
+  return document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent;
+};
+const CONTEXT_RULE =
+  "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é da Ada.";
 const asMember = (state = seedState()) => {
   if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
   return state;
@@ -52,7 +59,7 @@ const updates = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2]);
 
 describe("agent page: tabs and the URL", () => {
-  test("seven tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
+  test("eight tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
     const { router } = await go();
     const tabs = screen().getByRole("tablist", { name: "Seções da Ada" });
     expect(
@@ -65,6 +72,7 @@ describe("agent page: tabs and the URL", () => {
       "Ferramentas e acesso",
       "Memória1",
       "Arquivos",
+      "Uso",
       "Atividade",
       "Configurações",
     ]);
@@ -72,6 +80,11 @@ describe("agent page: tabs and the URL", () => {
     await openTab(/^Atividade/);
     expect(router.state.location.search).toMatchObject({ tab: "activity" });
     expect(screen().getByRole("searchbox", { name: "Buscar execuções" })).toBeTruthy();
+    // The month on top: runs per day in pixels, the numbers as its legend (from the server's counts).
+    const month = screen().getByRole("region", { name: /^O mês de / });
+    expect(within(month).getByRole("img", { name: /^142 execuções em / })).toBeTruthy();
+    expect(month.querySelector("canvas.ac-month-runs")).toBeTruthy();
+    expect(month.querySelector(".agp-month__legend")?.textContent).toContain("142");
     cleanup();
     await go("?tab=memory");
     expect(
@@ -82,14 +95,17 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
-  test("the cover with its actions; the agent, name and @ in the middle; Como trabalha with the numbers", async () => {
+  test("the cover with its actions; the agent, name and @ under it; Como trabalha with the numbers in the side column", async () => {
     await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     const cover = hero.querySelector(".agp-cover") as HTMLElement;
-    // No status pill (telas/AgenteTopo.html, D).
+    // No status pill.
     expect(hero.textContent).not.toContain("Esperando aprovação");
     expect(hero.querySelector(".agp-face")).toBeTruthy();
-    const work = within(hero).getByRole("region", { name: "Como trabalha" });
+    // A wide page: how it works is the overview's side column, not under the name.
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(hero.contains(work)).toBe(false);
+    expect(work.closest(".agp-aside")).toBeTruthy();
     expect(work.textContent).toContain("US$ 12,30");
     expect(work.textContent).toContain("de US$ 40");
     expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
@@ -102,6 +118,59 @@ describe("agent page: tabs and the URL", () => {
   });
 });
 
+describe("agent page: what it does", () => {
+  test("what it does and how it works: the workspace context rule is the title's ⓘ, not a line or a note", async () => {
+    await go();
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    expect(hintText(does, "O que a Ada faz")).toBe(CONTEXT_RULE);
+    expect(does.querySelector(".ac-card__foot")).toBeNull();
+    cleanup();
+    await go("?tab=instructions");
+    const how = screen().getByRole("region", { name: "Como a Ada trabalha" });
+    expect(hintText(how, "Como a Ada trabalha")).toBe(CONTEXT_RULE);
+    // Under the field, only the character count; beside it, no note.
+    expect(how.querySelector(".newag__ta-meta")?.children).toHaveLength(1);
+    expect(document.querySelector(".newag__note")).toBeNull();
+  });
+
+  test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions =
+        "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que achou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos; para mudanças grandes, abre o PR como rascunho e explica o plano ali.\nNunca faz merge sozinho: pede revisão a uma pessoa.";
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    const text = does.querySelector(".agp-prose")?.textContent ?? "";
+    expect(text).toEndWith("explica o plano ali.");
+    expect(text).not.toContain("…");
+    expect(text).not.toContain("Nunca faz merge");
+  });
+
+  test("instructions in Markdown (an imported agent's) read as plain words, in three lines at most", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions = [
+        "# SOUL.md - Quem você é",
+        "",
+        "_Você não é um chatbot. Você está se tornando alguém._",
+        "",
+        "## Verdades",
+        "",
+        "- **Ajude de verdade.** Pule o “Ótima pergunta!” e ajude.",
+        "- Tenha opiniões.",
+        "- Seja cuidadosa com o que é dos outros.",
+        "- Lembre do que importa.",
+      ].join("\n");
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    expect(does.querySelector(".agp-prose")?.textContent).toBe(
+      "Você não é um chatbot. Você está se tornando alguém.\nAjude de verdade. Pule o “Ótima pergunta!” e ajude.\nTenha opiniões.",
+    );
+  });
+});
+
 describe("agent page: its files", () => {
   test("Arquivos lists the Drive files it made or changed, filters by kind, and opens one", async () => {
     await go("?tab=files");
@@ -111,6 +180,42 @@ describe("agent page: its files", () => {
     expect(card.textContent).not.toContain("Organograma do time");
     expect(card.textContent).toContain("Só aparecem arquivos de conversas que você vê.");
     expect(within(card).getByRole("radiogroup", { name: "Tipo" })).toBeTruthy();
+  });
+});
+
+describe("agent page: its usage (ADR 0063)", () => {
+  test("Uso: the month by account, the account it thinks with now with its part, and by account", async () => {
+    await go("?tab=usage");
+    const month = screen().getByRole("region", { name: "Uso da Ada" });
+    // The MacBook's own sign-in, the viewer's: the account their agents share, as the Connect cards name it.
+    expect(month.textContent).toContain("97% na conta que os seus agentes dividem e 2,6% pela API.");
+    expect(month.textContent).toContain("Pelo preço da API, seria ≈ US$ 77,00.");
+    expect(within(month).getByRole("img", { name: /^Tokens por dia em / })).toBeTruthy();
+    const now = screen().getByRole("region", { name: "Agora" });
+    expect(now.textContent).toContain("A conta que os seus agentes dividem");
+    expect(now.textContent).toContain("divide com Atlas");
+    // Its part of each window in full ink, and in words; the estimate says so.
+    const week = within(now).getByRole("meter", { name: "Semana" });
+    expect(week.getAttribute("aria-valuenow")).toBe("41");
+    expect(week.querySelector(".ac-meter__part")?.getAttribute("style")).toContain("width: 30%");
+    expect(now.textContent).toContain("Parte da Ada: ≈ 30%");
+    expect(now.textContent).toContain("é uma estimativa");
+    // It informs: changing the account is "Quem pensa"'s.
+    expect(within(now).queryByRole("button")).toBeNull();
+    const sources = screen().getByRole("region", { name: "Por conta, este mês" });
+    expect(sources.textContent).toContain("≈ US$ 76,00 pela API");
+    expect(sources.textContent).toContain("US$ 0,80 pagos");
+  });
+
+  test("a member sees the tokens and the percentages, never money", async () => {
+    await go("?tab=usage", asMember());
+    const month = screen().getByRole("region", { name: "Uso da Ada" });
+    expect(month.textContent).toContain("97% na conta que os seus agentes dividem");
+    expect(screen().getByRole("region", { name: "Por conta, este mês" }).textContent).toContain("2% do orçamento");
+    const shown = ["Uso da Ada", "Agora", "Por conta, este mês"].map(
+      (name) => screen().getByRole("region", { name }).textContent,
+    );
+    expect(shown.join(" ")).not.toContain("US$");
   });
 });
 
@@ -309,6 +414,31 @@ describe("agent page: memory and proposals", () => {
     expect(second.state.calls.find((c) => c.method === "proposals.refuse")?.args).toEqual([ORG_ID, "prop-1"]);
   });
 
+  test("a proposal someone else decides names who: the person, or an admin", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (!prop) throw new Error("no prop-1");
+    prop.canDecide = false;
+    await go("?tab=memory", state);
+    const card = () => screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(within(card()).queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
+    expect(within(card()).getByText("João decide.")).toBeTruthy();
+    cleanup();
+    prop.decider = { type: "admins" };
+    await go("?tab=memory", state);
+    expect(within(card()).getByText("Um admin decide.")).toBeTruthy();
+  });
+
+  test("the side column is one link to how memory works", async () => {
+    await go("?tab=memory");
+    const link = screen().getByRole("link", { name: "Como a memória funciona" });
+    expect(link.getAttribute("href")).toBe("https://agentes.chat/help/memory?lang=pt-BR");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(card.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
+  });
+
   test("what it knows: kinds and search", async () => {
     await go("?tab=memory");
     const kinds = screen().getByRole("radiogroup", { name: "Tipo" });
@@ -345,6 +475,13 @@ describe("agent page: activity", () => {
     const state = seedState();
     state.runs.push(
       extra({ id: "run-f", what: "roda a suíte de checkout", status: "failed", errorCode: "run.budget_exceeded" }),
+      extra({
+        id: "run-k",
+        what: "resume o canal",
+        status: "failed",
+        errorCode: "run.missing_credential",
+        errorParams: { provider: "Claude" },
+      }),
       extra({ id: "run-w", what: "faz o merge do PR #42", status: "waiting_approval" }),
     );
     await go("?tab=activity", state);
@@ -357,6 +494,7 @@ describe("agent page: activity", () => {
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
     expect(runs.textContent).toContain("roda a suíte de checkout");
     expect(runs.textContent).toContain("O orçamento do mês acabou.");
+    expect(runs.textContent).toContain("Falta uma chave do Claude no workspace.");
     expect(runs.textContent).not.toContain("faz o merge");
     await click(within(filters).getByRole("radio", { name: /^Esperando/ }));
     expect(runs.textContent).toContain("faz o merge do PR #42");

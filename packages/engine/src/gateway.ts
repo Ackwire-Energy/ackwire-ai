@@ -22,9 +22,10 @@ import {
 } from "@agenteschat/providers";
 import { type Agent, getAgent } from "./agents";
 import { caches } from "./cache";
-import { decryptCredential } from "./credentials";
+import { decryptCredential, usableCredentialRow } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
+import { assertCanWork } from "./standing";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
 const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
@@ -53,13 +54,19 @@ export const BUDGET_WARNING_RATIO = 0.8;
 export interface GatewayCall {
   orgId: string;
   agentId: string;
-  /** The agent row, when the caller already has it (saves a lookup). */
+  /**
+   * The agent row, when the caller already has it (saves a lookup). A run on
+   * "Automático" passes it with the model it chose: the call is priced,
+   * reserved and recorded at that model.
+   */
   agent?: Agent;
   runId?: string;
   system: SystemPrompt;
   messages: ModelMessage[];
   maxTokens: number;
   tools?: ToolSpec[];
+  /** How hard the model thinks (set by "Automático"); absent: the provider's default. */
+  effort?: ModelRequest["effort"];
   onDelta(text: string): void;
   signal?: AbortSignal;
 }
@@ -99,7 +106,8 @@ export const MIN_OUTPUT_TOKENS = 256;
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /**
- * The only way to call a model (docs/adr/0007, 0012, D2). For every call:
+ * The only way to call a model (docs/adr/0007, 0012). For every call:
+ * 0. refuse it for a workspace on hold or suspended, or a held agent (`standing.ts`);
  * 1. resolve the model from the catalog (agent's model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
  *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;
@@ -151,7 +159,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (agentCredentialId) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, agentCredentialId);
       if (!credential) {
-        throw new MissingCredentialError("This agent's API key was revoked; pick another one in the agent's settings");
+        throw new MissingCredentialError("This agent's API key was revoked. Pick another one in the agent's settings.");
       }
       if (credential.provider !== provider) {
         throw new MissingCredentialError(
@@ -253,7 +261,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   ) {
     // Price by the model that answered (a server-side fallback may differ), if we know it.
     const pricedModel = isKnownModel(input.model) ? input.model : input.requestedModel;
-    const cost = costNanoUsd(pricedModel, input.usage);
+    const cost = costNanoUsd(pricedModel, input.usage, now());
     const [record] = await tx
       .insert(usageRecords)
       .values({
@@ -438,7 +446,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   }) {
     const { agent, usage } = input;
     const pricedModel = isKnownModel(input.model) ? input.model : agent.model;
-    const cost = costNanoUsd(pricedModel, usage);
+    const cost = costNanoUsd(pricedModel, usage, now());
     const id = Bun.randomUUIDv7();
     const period = input.reservation?.periodStart ?? periodOf(now());
     const at = now().toISOString();
@@ -485,21 +493,32 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   return {
     /**
      * Whether the agent's model brain can be called at all: its model is in
-     * the catalog, its provider is registered and a key resolves (its own,
-     * the org's default, or the platform's). Used by the computer brains'
-     * fallback (ADR 0032 §5 "Fallback, by what exists"); no call is made.
+     * the catalog, its provider is registered and a key would resolve (its own,
+     * the org's default, or the platform's), in `resolveKey`'s order. Used by the
+     * computer brains' fallback (ADR 0032 §5 "Fallback, by what exists") and the
+     * AI status (`ai-status.ts`). No call is made and no key is decrypted: a page
+     * load must not unwrap every key (a network call per key with a KMS wrapper).
      */
     async hasModelCredential(agent: Pick<Agent, "orgId" | "model" | "credentialId">): Promise<boolean> {
       const info = MODEL_CATALOG[agent.model];
       if (!info || !deps.providers[info.provider]) return false;
-      return resolveKey(agent.orgId, info.provider, agent.credentialId).then(
-        () => true,
-        () => false,
-      );
+      const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === info.provider;
+      try {
+        if (agent.credentialId) return await usable(agent.credentialId);
+        const defaultId = await orgDefaultCredentialId(agent.orgId, info.provider);
+        if (defaultId && (await usable(defaultId))) return true;
+        const platform = deps.platformCredentials;
+        return platform.available
+          ? await platform.available(agent.orgId, info.provider)
+          : (await platform.resolve(agent.orgId, info.provider)) !== null;
+      } catch {
+        return false;
+      }
     },
 
     /** An agent's model call (runs). Streams deltas through `onDelta`. */
     async stream(call: GatewayCall): Promise<GatewayResult> {
+      await assertCanWork(db, call.orgId, call.agentId);
       const row =
         call.agent && call.agent.id === call.agentId && call.agent.orgId === call.orgId
           ? call.agent
@@ -517,6 +536,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         messages: call.messages,
         maxTokens: call.maxTokens,
         tools: call.tools,
+        ...(call.effort ? { effort: call.effort } : {}),
         signal: call.signal,
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.
@@ -573,7 +593,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /**
      * Usage of a non-model service called for an org (e.g. the Jev router):
-     * recorded like every call, with its kind and provider, billed to the platform.
+     * recorded like every call, with its kind and provider, billed to the server's own key (`platform`).
      */
     async recordExternalUsage(input: {
       orgId: string;
@@ -638,6 +658,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /** A call for the organization (router, summaries). Not streamed to anyone; no agent budget. */
     async complete(call: OrgCall): Promise<GatewayResult> {
+      await assertCanWork(db, call.orgId);
       const info = MODEL_CATALOG[call.model];
       if (!info) throw new ValidationError(`Model ${call.model} is not in the catalog`);
       const provider = providerFor(info.provider);

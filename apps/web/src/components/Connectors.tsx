@@ -34,6 +34,7 @@ import {
 import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import {
+  MailAddressesDialog,
   MailConnectFlow,
   MailDisconnectDialog,
   type MailFlowState,
@@ -83,6 +84,7 @@ export function ConnectorsSection({
   const accounts = mailAccounts.data ?? [];
   const [mailFlow, setMailFlow] = useState<MailFlowState | null>(null);
   const [reconnecting, setReconnecting] = useState<MailAccount | null>(null);
+  const [addressesOf, setAddressesOf] = useState<MailAccount | null>(null);
   const [removingMail, setRemovingMail] = useState<MailAccount | null>(null);
   // People's Postgres databases (ADR 0039): rows of the same list, the same kind of flow.
   const databases = useDatabases(org.id);
@@ -131,19 +133,18 @@ export function ConnectorsSection({
       : connected
         ? latest(all.filter((i) => !i.custom && i.def?.id === connected))
         : latest(all.filter((i) => i.custom && i.needsReview));
+    // Signing in elsewhere ends here: say it worked, as connecting with a key does.
+    if (item && connected) toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
     if (item && admin) setFlow({ step: 1, item });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, review, connections.data, servers.data, catalog.data, admin]);
+  }, [connected, review, connections.data, servers.data, catalog.data, admin, t, toast]);
 
   return (
     <Card aria-labelledby="sec-conn">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-conn" className="ac-card__title">
-            {t("connectors.title")}
-          </h2>
-          <span className="small muted">{t("connectors.subtitle", { org: org.name })}</span>
-        </div>
+      <div className="row" style={{ gap: 12 }}>
+        <h2 id="sec-conn" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+          {t("connectors.title")}
+        </h2>
         {admin && (
           <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
             {t("connectors.add")}
@@ -166,6 +167,7 @@ export function ConnectorsSection({
               admin={admin}
               onTools={() => setMailFlow({ step: 1, account })}
               onWho={() => setMailFlow({ step: 2, account })}
+              onAddresses={() => setAddressesOf(account)}
               onReconnect={() => reconnect(account)}
               onDisconnect={() => setRemovingMail(account)}
             />
@@ -231,6 +233,7 @@ export function ConnectorsSection({
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
       <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
       <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
+      <MailAddressesDialog account={addressesOf} onClose={() => setAddressesOf(null)} />
       <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
       <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
       <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />
@@ -270,7 +273,7 @@ function ConnectedRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row connected-row">
-      <ConnectorIcon def={item.def} label={itemName(t, item)} size="lg" />
+      <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
       <span className="list-col connected-row__text">
         <span className="connected-row__name">
           <span>{itemName(t, item)}</span>

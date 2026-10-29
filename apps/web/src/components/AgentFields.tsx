@@ -1,5 +1,6 @@
-import type { Credential, Member, Model } from "@agenteschat/client";
-import { type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
+import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
+import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
   AGENT_ACCESSORIES,
@@ -11,6 +12,7 @@ import {
   Carousel,
   Field,
   Icon,
+  ProviderLogo,
   Select,
   type SelectOption,
 } from "@agenteschat/ui";
@@ -42,7 +44,7 @@ export function priceTier(model: Model, models: Model[]) {
   return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
-/** Model descriptions of the approved screen, by model family. */
+/** Model descriptions, by model family. */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
   const id = model.id.toLowerCase();
   if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
@@ -52,7 +54,10 @@ export function modelDescription(t: TFunction, locale: string, model: Model) {
   return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
 }
 
-/** Key choices: the workspace default first (with its masked hint), then the other stored keys. */
+/**
+ * Key choices by their provider's mark: the workspace default first (with its masked hint), then the other
+ * stored keys.
+ */
 export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
   const live = credentials.filter((c) => !c.revokedAt);
   const def = live.find((c) => c.id === defaultId);
@@ -63,6 +68,13 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
       description: def
         ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
         : undefined,
+      leading: def ? (
+        <ProviderLogo id={def.provider} size="sm" />
+      ) : (
+        <span className="newag__ib">
+          <Icon name="key" size={16} />
+        </span>
+      ),
     },
     ...live
       .filter((c) => c.id !== defaultId)
@@ -70,6 +82,7 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
         value: c.id,
         label: c.label,
         description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
+        leading: <ProviderLogo id={c.provider} size="sm" />,
       })),
   ];
 }
@@ -215,7 +228,7 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
 }
 
 /**
- * The look right on the agent's settings (telas/PerfilAgente.html): the colors, then the eyes and what it
+ * The look right on the agent's settings: the colors, then the eyes and what it
  * wears as one sliding row each, so the section stays short. Each pick shows at once.
  */
 export function LookRows({
@@ -316,14 +329,7 @@ export function KeySelect({
       value={value}
       onValueChange={onChange}
       placeholder={t("newAgent.noKeys")}
-      options={options.map((k) => ({
-        ...k,
-        leading: (
-          <span className="newag__ib">
-            <Icon name="key" size={16} />
-          </span>
-        ),
-      }))}
+      options={options}
       renderValue={pickerValue}
     />
   );
@@ -354,14 +360,15 @@ function ModelCard({
     <>
       <span className="newag__model-head">
         <b>{model.label}</b>
-        <span className="newag__model-prov">{providerLabel(provider)}</span>
+        <span className="newag__model-prov">
+          <ProviderLogo id={provider} size="xs" />
+          {providerLabel(provider)}
+        </span>
       </span>
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || /sonnet|opus|haiku/i.test(model.id)) && (
         <span className="newag__model-desc">
-          {available
-            ? modelDescription(t, locale, model)
-            : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
+          {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
         </span>
       )}
       {available ? (
@@ -381,7 +388,7 @@ function ModelCard({
       ) : (
         <span className="newag__cost">
           <Icon name="key" size={14} />
-          {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
+          {t("newAgent.noKeyFor", providerGrammar(t, provider))}
         </span>
       )}
     </>
@@ -400,7 +407,7 @@ function ModelCard({
   );
 }
 
-/** The models as cards, grouped by provider; those without a key say why. */
+/** "Automático" first, then the models as cards, grouped by provider; those without a key say why. */
 export function ModelCards({
   choices,
   value,
@@ -414,9 +421,27 @@ export function ModelCards({
 }) {
   const { t } = useTranslation();
   const all = choices.flatMap(([, list]) => list.map((c) => c.model));
+  // "Automático" picks from the line of the agent's key: usable once any model is.
+  const autoAvailable = choices.some(([, list]) => list.some((c) => c.available));
   return (
     // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
     <div className="newag__models" role="group" aria-label={t("newAgent.model")}>
+      <button
+        type="button"
+        className="newag__model"
+        aria-pressed={isAuto(value)}
+        aria-disabled={!autoAvailable || undefined}
+        onClick={() => autoAvailable && onChange(AUTO)}
+      >
+        <span className="newag__model-head">
+          <b>{t("brain.auto.label")}</b>
+        </span>
+        <span className="newag__model-desc">{t("brain.auto.hint")}</span>
+        <span className="newag__cost">
+          <Icon name="bulb" size={14} />
+          {t("newAgent.autoCost")}
+        </span>
+      </button>
       {choices.flatMap(([provider, list]) =>
         list.map(({ model, available }) => (
           <ModelCard
@@ -431,6 +456,76 @@ export function ModelCards({
           />
         )),
       )}
+    </div>
+  );
+}
+
+/** A plan brain (Claude Code, Codex) on a computer, chosen while creating an agent. */
+export interface PlanChoice {
+  kind: "claude_code" | "codex";
+  machineId: string;
+}
+
+const PLAN_KINDS = ["claude_code", "codex"] as const;
+/** Whose models each plan runs, for the mark in the corner (the same as the API cards'). */
+const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai" } as const;
+
+/**
+ * "Pelo plano, num computador": Claude Code and Codex on each computer that has them, as cards like the models';
+ * one that no computer offers says why ("Sem computador", "Indisponível") instead.
+ */
+export function PlanCards({
+  machines,
+  value,
+  onChange,
+}: {
+  machines: BrainMachine[];
+  value: PlanChoice | null;
+  onChange: (choice: PlanChoice) => void;
+}) {
+  const { t } = useTranslation();
+  const head = (kind: PlanChoice["kind"]) => (
+    <span className="newag__model-head">
+      <b>{t(`brain.card.${kind}`)}</b>
+      <span className="newag__model-prov">
+        <ProviderLogo id={PLAN_PROVIDER[kind]} size="xs" />
+        {providerLabel(PLAN_PROVIDER[kind])}
+      </span>
+    </span>
+  );
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+    <div className="newag__models" role="group" aria-label={t("newAgent.plans")}>
+      {PLAN_KINDS.flatMap((kind) => {
+        const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
+        if (on.length === 0)
+          return [
+            <button key={kind} type="button" className="newag__model" aria-disabled="true">
+              {head(kind)}
+              <span className="newag__model-desc">{t(`brain.${kind}Text`)}</span>
+              <span className="newag__cost">
+                <Icon name="computer" size={14} />
+                {machines.length === 0 ? t("brain.foot.noComputer") : t("brain.foot.unavailable")}
+              </span>
+            </button>,
+          ];
+        return on.map((m) => (
+          <button
+            key={`${kind}:${m.machineId}`}
+            type="button"
+            className="newag__model"
+            aria-pressed={value?.kind === kind && value.machineId === m.machineId}
+            onClick={() => onChange({ kind, machineId: m.machineId })}
+          >
+            {head(kind)}
+            <span className="newag__model-desc">{t(`brain.${kind}Text`)}</span>
+            <span className="newag__cost">
+              <Icon name="computer" size={14} />
+              {m.online ? m.name : t("brain.foot.offline", { computer: m.name })}
+            </span>
+          </button>
+        ));
+      })}
     </div>
   );
 }

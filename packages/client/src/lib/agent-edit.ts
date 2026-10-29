@@ -2,13 +2,22 @@ import type { AgentAudience, BrainKind, Run } from "../api/types";
 import { readBudget } from "./new-agent";
 
 /*
- * The agent page (docs/design/telas/AgentePerfil.html): one draft over
+ * The agent page: one draft over
  * everything that can be edited, one save bar. These are the rules that
  * don't need the agent's look; the draft itself (`Saved`, `Edits`) lives with
  * each platform, which knows the look's types.
  */
 
-export const AGENT_TABS = ["overview", "instructions", "access", "memory", "files", "activity", "settings"] as const;
+export const AGENT_TABS = [
+  "overview",
+  "instructions",
+  "access",
+  "memory",
+  "files",
+  "usage",
+  "activity",
+  "settings",
+] as const;
 export type AgentTab = (typeof AGENT_TABS)[number];
 export const isAgentTab = (v: unknown): v is AgentTab => AGENT_TABS.includes(v as AgentTab);
 
@@ -26,12 +35,22 @@ export const AGENT_SECTIONS = [
 export type AgentSection = (typeof AGENT_SECTIONS)[number];
 export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.includes(v as AgentSection);
 
-/** `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa"). */
-export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; sec?: AgentSection } {
+/**
+ * `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa").
+ * `?computer=1` opens the agent's computer; `?browser=1`, `?desktop=1` and `?terminal=1` are older links to it
+ * (notifications, the Mac app's tray).
+ */
+export function agentSearch(search: Record<string, unknown>): {
+  tab?: AgentTab;
+  sec?: AgentSection;
+  computer?: 1;
+} {
   const sec = search.sec === "model" ? "brain" : search.sec;
+  const on = (v: unknown) => v === 1 || v === "1" || v === true;
   return {
     tab: isAgentTab(search.tab) ? search.tab : undefined,
     sec: isAgentSection(sec) ? sec : undefined,
+    ...([search.computer, search.browser, search.desktop, search.terminal].some(on) ? { computer: 1 as const } : {}),
   };
 }
 
@@ -40,16 +59,9 @@ export interface BrainChoice {
   brain: BrainKind;
   model: string | null;
   fallback: boolean;
-  /** The person confirmed the plan warning for this brain in this edit (never sent; gates `acceptPlanTerms`). */
-  termsAccepted?: boolean;
 }
 export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
   a.brain === b.brain && (a.brain === "model" || a.model === b.model) && a.fallback === b.fallback;
-/** Choosing Claude Code or Codex anew needs the warning confirmed (the plan is personal). */
-export const needsPlanWarning = (saved: BrainKind | undefined, next: BrainKind) => next !== "model" && next !== saved;
-/** Saving a switch to Claude Code or Codex the person hasn't confirmed yet: the warning blocks the save first. */
-export const termsPending = (saved: BrainKind | undefined, next: BrainChoice | undefined) =>
-  Boolean(next && needsPlanWarning(saved, next.brain) && next.termsAccepted !== true);
 
 const sorted = (list: string[]) => [...list].sort();
 export const sameList = (a: string[], b: string[]) => sorted(a).join("\n") === sorted(b).join("\n");

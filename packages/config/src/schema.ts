@@ -29,6 +29,8 @@ export interface EnvVarDefinition {
     | "Email"
     | "Email for agents"
     | "Push"
+    | "Operator"
+    | "Usage report"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -66,7 +68,7 @@ export const envVars = {
   LANDING_URL: {
     schema: z.url().optional(),
     description:
-      "Public URL of the landing page when it is a separate site, without a trailing slash. That origin may call the waiting list (CORS on `/api/waitlist` only), and the confirmation email links there. Without it, the link points at PUBLIC_URL.",
+      "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting list: that origin may call it (CORS on `/api/waitlist` only), and the confirmation email links there. Unset: no waiting list.",
     section: "Server",
     example: "https://agentes.chat",
   },
@@ -77,9 +79,14 @@ export const envVars = {
     section: "Server",
   },
   DATABASE_URL: {
-    schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    schema: z
+      .string()
+      .regex(
+        /^(postgres(ql)?:\/\/|pglite:\/\/\/)/,
+        "must be a postgres:// or postgresql:// URL, or pglite:/// and an absolute folder",
+      ),
     description:
-      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS.",
+      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS. Native mode (`agentes-server`, no Docker) sets it to `pglite:///<folder>`: the database built into the server, in that folder, for one process.",
     section: "Database",
     example: "postgres://agenteschat:password@db.example.com:5432/agenteschat?sslmode=require",
     secret: true,
@@ -96,7 +103,7 @@ export const envVars = {
     section: "Database",
   },
   AGENTES_SECRET: {
-    schema: z.string().min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`"),
+    schema: z.string().min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`"),
     description:
       "Master secret. Session signing and the key that encrypts stored provider credentials (API keys of model providers) derive from it. Generate with `openssl rand -base64 48`. **Changing it makes stored credentials unreadable.** Back it up.",
     section: "Security",
@@ -109,12 +116,65 @@ export const envVars = {
       "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
     section: "Sign-in",
   },
-  TRUSTED_PROXIES: {
-    schema: z.string().optional(),
+  OWNER_CLAIM_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
+      .optional(),
     description:
-      "Comma-separated IPs/CIDRs of your reverse proxies (load balancer, Cloudflare…). Used to find the real client IP for sign-in rate limiting. Leave empty if agentes.chat is reached directly.",
+      "SHA-256 (hex) of the token in an owner link (`<PUBLIC_URL>/owner#claim=<token>`). While no account exists, only that link creates the first account, the installation's owner; every other sign-up waits. Unset: the first account to sign up owns the installation.",
+    section: "Sign-in",
+  },
+  OWNER_KEY_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner key)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the key the agentes.chat desktop app keeps when it runs this server on the same computer. Only that key creates the first account (the owner, with no password), and the app signs that owner in with it again whenever the session ends. Set by the desktop app.",
+    section: "Sign-in",
+  },
+  TERMS_URL: {
+    schema: z.url().optional(),
+    description:
+      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on https://agentes.chat: its /terms page.",
+    section: "Sign-in",
+    example: "https://example.com/terms",
+  },
+  PRIVACY_URL: {
+    schema: z.url().optional(),
+    description:
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on https://agentes.chat: its /privacy page.",
+    section: "Sign-in",
+    example: "https://example.com/privacy",
+  },
+  TRUSTED_PROXIES: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      ),
+    description:
+      "Comma-separated IPs/CIDRs of your reverse proxies (load balancer, Cloudflare…). Used to find the real client IP for every rate limit. Leave empty if agentes.chat is reached directly.",
     section: "Sign-in",
     example: "10.0.0.0/8,172.16.0.0/12",
+  },
+  TURNSTILE_SITE_KEY: {
+    schema: z.string().optional(),
+    description:
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's site key. With `TURNSTILE_SECRET_KEY`, a bot check runs before email lookup, sign-in, sign-up, password reset, the code to ask to join and the waiting list. Unset: no check, and no page loads anything from Cloudflare.",
+    section: "Sign-in",
+  },
+  TURNSTILE_SECRET_KEY: {
+    schema: z.string().optional(),
+    description:
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's secret key, which this server uses to check each answer with Cloudflare. Set both keys or neither. A secret Cloudflare refuses stops the server at boot.",
+    section: "Sign-in",
+    secret: true,
   },
   GOOGLE_CLIENT_ID: {
     schema: z.string().optional(),
@@ -176,48 +236,72 @@ export const envVars = {
   },
   APPLE_APP_BUNDLE_ID: {
     schema: z.string().optional(),
-    description: "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively.",
+    description:
+      "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively. With `APPLE_TEAM_ID`, invitation and password reset links open the app (`/.well-known/apple-app-site-association`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_PACKAGE: {
+    schema: z.string().optional(),
+    description:
+      "Package of the Android app (e.g. `chat.agentes.app`). With `ANDROID_APP_CERT_SHA256`, invitation and password reset links open the app (`/.well-known/assetlinks.json`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_CERT_SHA256: {
+    schema: z.string().optional(),
+    description:
+      "SHA-256 fingerprints of the Android app's signing certificates (`AA:BB:…`), comma-separated (e.g. the upload key and Play's app signing key).",
     section: "Sign-in",
   },
   AGENT_DEFAULT_MODEL: {
     schema: modelId.default("claude-sonnet-5-5"),
-    description: "Model used by new agents unless one is chosen explicitly.",
+    description:
+      "Unused: new agents start on Automático (`auto`, each run picks the model and effort), whatever this says. Still checked when set; to be removed.",
     section: "Agents",
   },
   ROUTER_ENABLED: {
     schema: z.stringbool().default(true),
     description:
-      "Let the router pick which agents (at most 2) answer messages that mention nobody. Off = agents answer only when @mentioned.",
+      "Let the router pick which agents (at most 4) answer messages that mention nobody. Off = agents answer only when @mentioned.",
     section: "Agents",
   },
   ROUTER_MODEL: {
     schema: modelId.default("claude-haiku-5-5"),
     description:
-      "Small, fixed model that scores which agents should answer a message without mentions (router). Any model in the catalog; an organization can override it in its settings. Billed to the organization's default provider key.",
+      "Small model the router uses on a Claude key when Jev doesn't decide. An OpenAI key uses `OPENAI_CHEAP_MODEL`, other providers their catalog's routing pick. Any model in the catalog. An organization can override it in its settings.",
     section: "Agents",
   },
   ROUTER_STRATEGY: {
     schema: z.enum(["jev", "llm"]).optional(),
     description:
-      "How the router scores agents: `jev` (TypeSafe Jev, needs `TYPESAFE_API_KEY`; falls back to `llm` on error or timeout) or `llm` (a structured-output call with `ROUTER_MODEL`). Default: `jev` when `TYPESAFE_API_KEY` is set, else `llm`.",
+      "How the router starts: `jev` (TypeSafe Jev, with the server's Jev key from `TYPESAFE_API_KEY` or Settings › AI accounts) or `llm` (skips Jev). When a step can't decide, the next one does: a small model on the organization's keys, then, on a self-hosted server, the author's own plan, then simple rules. Default: `jev` when a Jev key is set.",
     section: "Agents",
   },
   TYPESAFE_API_KEY: {
     schema: z.string().optional(),
     description:
-      "Platform key for TypeSafe Jev (router). Internal: never per organization, never exposed by the API. Jev usage is recorded per organization as `router` usage billed to the platform.",
+      "Your TypeSafe key for Jev (https://console.typesafe.ai/keys), optional. Jev picks who answers messages nobody @mentioned, keeps memory tidy and finds what agents look for on their screens. The installation's owner can also add it in Settings › AI accounts. This variable wins over that one. Never sent to a browser. Calls are billed to your TypeSafe account.",
     section: "Agents",
     secret: true,
   },
   JEV_TIMEOUT_MS: {
     schema: z.coerce.number().int().min(200).max(30_000).default(2000),
-    description: "Timeout for a Jev router call; after it the LLM router decides.",
+    description:
+      "Timeout for each Jev call: picking who answers and its judgments (memory, stops, hand-offs, the tools a turn loads). Screen judgments wait at least 6 s. After it, the next step decides, as without Jev.",
+    section: "Agents",
+  },
+  JEV_VISION_MODEL: {
+    schema: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+      .default("jev-preview"),
+    description:
+      "Jev model for judgments over images (an agent finding a target on a screenshot of its browser or desktop). Needs a release that takes images.",
     section: "Agents",
   },
   OPENAI_CHEAP_MODEL: {
     schema: modelId.default("gpt-6-luna"),
     description:
-      "Cheap OpenAI model for the organization's own calls (router fallback, summaries, reflection) when its default key is an OpenAI key.",
+      "Small OpenAI model for the organization's own calls on an OpenAI key: picking who answers when Jev doesn't, summaries, reflection.",
     section: "Agents",
   },
   ROUTER_MIN_SCORE: {
@@ -255,7 +339,7 @@ export const envVars = {
   PLATFORM_ANTHROPIC_API_KEY: {
     schema: z.string().optional(),
     description:
-      "Platform Anthropic key (Cloud): organizations without a key of their own, and the onboarding option “Chave do agentes”, use it. Usage is still recorded per organization.",
+      "The server's own Claude API key. Workspaces without a key of their own can use it (the setup's key step offers it beside the providers), and the router uses its small model when a workspace has no key with one. Usage is still recorded per organization.",
     section: "Agents",
     secret: true,
   },
@@ -402,14 +486,40 @@ export const envVars = {
   MILLIONSEND_API_KEY: {
     schema: z.string().optional(),
     description:
-      "MillionSend API key (transactional email: invitations, password reset, email verification, budget and approval alerts). Without it, emails are written to the log instead of sent, and password reset and email verification stay off.",
+      "MillionSend API key (transactional email: invitations, password reset, email verification, budget and approval alerts). Without it or `SMTP_URL`, emails are written to the log instead of sent, and password reset and email verification stay off.",
     section: "Email",
     secret: true,
   },
-  EMAIL_FROM: {
-    schema: z.string().default("agentes <ola@agentes.chat>"),
+  MILLIONSEND_API_URL: {
+    schema: z.url().default("https://api.millionsend.com"),
     description:
-      "Sender of transactional emails, e.g. `agentes <ola@agentes.chat>` (the domain must be verified in MillionSend).",
+      "Base URL of the email API used with `MILLIONSEND_API_KEY`. Any Resend-compatible API works (Resend, a self-hosted MillionSend).",
+    section: "Email",
+  },
+  SMTP_URL: {
+    // Parsed, not only prefix-checked: nodemailer prints a URL it can't parse, password included, then throws at boot.
+    schema: z
+      .url({
+        protocol: /^smtps?$/,
+        error: "must be an smtp:// or smtps:// URL, with any / # ? in the user and password percent-encoded",
+      })
+      .optional(),
+    description:
+      "SMTP server for transactional email when `MILLIONSEND_API_KEY` is not set: `smtps://` for implicit TLS (port 465), `smtp://` for STARTTLS (port 587), which is then required; `?requireTLS=false` at the end allows a relay without TLS on a trusted network. Percent-encode special characters in the user and password.",
+    section: "Email",
+    example: "smtps://user:password@smtp.example.com:465",
+    secret: true,
+  },
+  EMAIL_FROM: {
+    schema: z.string().optional(),
+    description:
+      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
+    section: "Email",
+  },
+  EMAIL_ART: {
+    schema: z.enum(["auto", "attach"]).default("auto"),
+    description:
+      "Where emails get their pictures. `auto`: from this server's `/email/` when its address is public, else attached to each message. `attach`: always attached, for a server that people outside can't open.",
     section: "Email",
   },
   COMPOSIO_API_KEY: {
@@ -465,10 +575,48 @@ export const envVars = {
     section: "Push",
     secret: true,
   },
+  WEB_PUSH: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Push notifications to browsers (Web Push), for people who turn them on in the web app. Nothing to set up: the server makes its own key pair on first use and keeps it in the database. `off` turns it off.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PUBLIC_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{86,88}={0,2}$/, "must be a base64url P-256 public key (65 bytes)")
+      .optional(),
+    description:
+      "Pins the Web Push key pair (VAPID public key, base64url) instead of the one the server makes; set it with `WEB_PUSH_VAPID_PRIVATE_KEY`. Changing it makes every browser subscribe again.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PRIVATE_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{42,44}={0,2}$/, "must be a base64url P-256 private key (32 bytes)")
+      .optional(),
+    description: "The private half of `WEB_PUSH_VAPID_PUBLIC_KEY` (base64url).",
+    section: "Push",
+    secret: true,
+  },
+  FILES_DIR: {
+    // `/data/files`, or on Windows (the desktop app's server) `C:\…` or `\\server\share\…`.
+    schema: z
+      .string()
+      .regex(/^(\/|[A-Za-z]:[\\/]|\\\\)/, "must be an absolute path")
+      .optional(),
+    description:
+      "Absolute path of a folder on this server's disk for platform file storage (Drive files, uploads, photos), used when the `S3_*` bucket is not set. Without either, files are stored in Postgres. Choose before the first upload: files stay in the store they were written to.",
+    section: "Storage",
+    example: "/data/files",
+  },
   S3_ENDPOINT: {
     schema: z.url().optional(),
     description:
-      "S3-compatible endpoint for platform file storage (artifacts, uploads), e.g. a Cloudflare R2 endpoint. Without S3_ENDPOINT and S3_BUCKET, files are stored in Postgres.",
+      "S3-compatible endpoint for platform file storage (artifacts, uploads), e.g. a Cloudflare R2 endpoint. Used when S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are all set.",
     section: "Storage",
     example: "https://<account>.r2.cloudflarestorage.com",
   },
@@ -492,6 +640,12 @@ export const envVars = {
     description: "Secret access key for the platform bucket.",
     section: "Storage",
     secret: true,
+  },
+  S3_PATH_STYLE: {
+    schema: z.stringbool().default(false),
+    description:
+      "Path-style bucket URLs (`https://endpoint/bucket/key`), for MinIO, Garage and similar stores. Off: virtual-hosted URLs (`https://bucket.endpoint/key`), as R2 and AWS expect.",
+    section: "Storage",
   },
   DAYTONA_API_KEY: {
     schema: z.string().optional(),
@@ -543,10 +697,21 @@ export const envVars = {
     description: "Price of one GiB of disk per hour, for sandbox usage.",
     section: "Sandbox",
   },
+  HOST_COMPUTER_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true` or `MACHINE_PROVISIONING=external`. Unset: off.",
+    section: "Sandbox",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
   DESKTOP_RELEASES_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`). Unset: those endpoints answer 404.",
+      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases and the server's. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`), and the packages that run agentes.chat without Docker from the latest `v*` one (`/api/native/latest`, `/api/native/download/...`). Unset: those endpoints answer 404.",
     section: "Sandbox",
     secret: true,
   },
@@ -555,8 +720,65 @@ export const envVars = {
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
       .default("agentes-chat/agentes.chat"),
-    description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
+    description:
+      "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app, and `v<version>` the packages without Docker.",
     section: "Sandbox",
+  },
+  OPERATOR_API_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Turns on the operator API (ADR 0056): a second listener on `OPERATOR_API_PORT` that serves `/api/operator/v1` to your own automation, called with this value as `Authorization: Bearer`. It reaches every workspace and account on the instance, so never publish that port or put it behind your reverse proxy. While it is set the server also keeps 90 days of events for it (sign-ups, sign-ins with their IP address, workspaces, agents, runs; metadata only). Unset (default): nothing listens there and nothing is recorded. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  OPERATOR_API_PORT: {
+    schema: z.coerce.number().int().min(1).max(65535).default(3001),
+    description:
+      "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
+    section: "Operator",
+  },
+  SUPPORT_EMAIL: {
+    schema: z.email().optional(),
+    description:
+      "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
+    section: "Operator",
+    example: "support@example.com",
+  },
+  SESSION_SCREENING: {
+    schema: z.stringbool().default(false),
+    description:
+      "For agentes.chat Cloud. Unset by default. While a person is in control of an agent's screen, reads the screen's text to screen it for abuse (needs `OPERATOR_API_TOKEN`).",
+    section: "Operator",
+  },
+  MACHINE_PROVISIONING: {
+    schema: z.enum(["off", "external"]).default("off"),
+    description:
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People can't connect computers of their own then (pairing answers 403 `machine.pairing_off`). Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
+    section: "Operator",
+  },
+  TELEMETRY: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Send anonymous usage statistics to agentes.chat once a day: counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. `off` stops it, whatever the switch in Settings → General says (the installation's owner can turn it off there too). `docker compose run --rm agentes telemetry` prints exactly what would be sent. SELF_HOSTING.md lists every field.",
+    section: "Usage report",
+  },
+  TELEMETRY_URL: {
+    schema: z.url().default("https://telemetry.agentes.chat/v1/report"),
+    description: "Where the usage report is sent (the report as JSON in a POST).",
+    section: "Usage report",
+  },
+  INSTALL_MODE: {
+    schema: z.enum(["docker", "native", "desktop"]).optional(),
+    description:
+      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it, and `agentes-server` (no Docker) when it isn't set. Unset: `docker` inside a container, else `native`.",
+    section: "Usage report",
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

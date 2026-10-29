@@ -3,20 +3,40 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { createApiClient, createSnapshot, meQuery } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
-import { createI18n, savedLocale } from "./i18n";
+import { loadI18n, savedLocale } from "./i18n";
+import {
+  checkAppVersion,
+  createVersionWatch,
+  fetchIndexHtml,
+  loadedEntry,
+  startVersionWatch,
+  VERSION_CHECK_MS,
+} from "./lib/app-version";
+import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
-import { inDesktopApp } from "./lib/desktop";
+import { installSounds } from "./lib/sounds";
 import { createToastStore } from "./lib/toast";
+import { withWebPushSignOut } from "./lib/web-push";
 import { routeTree } from "./routeTree.gen";
 
-const i18n = createI18n(savedLocale());
+const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
-// In agentes for Mac (D79): the site draws the window's title bar (desktop.css).
-if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
+// In the desktop app (ADR 0036): the site draws the window's title bar (desktop.css), with room for a Mac's
+// buttons only there; and "this Mac" is this computer's own name.
+const platform = desktopPlatform();
+if (platform) {
+  document.documentElement.dataset.desktop = platform;
+  applyDesktopDevice(i18n, platform);
+  if (asksForPhone(window.location.search)) askForPhone();
+}
 const toasts = createToastStore();
+// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in the account menu.
+installSounds();
 const api = createApiClient();
 
 /** A 401 anywhere means the session ended: back to sign-in, then here again. */
@@ -32,6 +52,7 @@ const queryClient = createQueryClient({
   onUnauthorized,
   onMutationError: (message) => toasts.show(message, "error"),
   unknownError: () => i18n.t("common.unknownError"),
+  describeError: (error) => knownErrorText(i18n.t, error),
 });
 
 // The last lists and chats saved on this device show at once; everything revalidates as usual.
@@ -49,8 +70,8 @@ const router = createRouter({
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
-  // Page changes cross-fade where the browser has the View Transitions API (CSS fallback in layout.css).
-  defaultViewTransition: true,
+  // No View Transitions: they freeze the whole page while the next one renders (the sidebar's pill
+  // stalled mid-slide). Each page's main fades in on mount instead (layout.css).
 });
 
 declare module "@tanstack/react-router" {
@@ -59,6 +80,29 @@ declare module "@tanstack/react-router" {
   }
 }
 
+// A deploy while this tab is open: say so, and the next page change loads the new app.
+const versionWatch = startVersionWatch(
+  createVersionWatch({
+    loaded: loadedEntry(),
+    fetchHtml: fetchIndexHtml,
+    onStale: () =>
+      toasts.show(i18n.t("common.newVersion"), "info", {
+        label: i18n.t("common.reload"),
+        run: () => window.location.reload(),
+      }),
+  }),
+);
+router.subscribe("onBeforeNavigate", ({ toLocation, fromLocation }) => {
+  if (versionWatch.stale && fromLocation && toLocation.href !== fromLocation.href) {
+    window.location.assign(toLocation.href);
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void checkAppVersion();
+});
+window.addEventListener("online", () => void checkAppVersion());
+setInterval(() => void checkAppVersion(), VERSION_CHECK_MS);
+
 // The connector OAuth callback reports failures as `/?connector_error=…`.
 const connectorError = new URLSearchParams(window.location.search).get("connector_error");
 if (connectorError) {
@@ -66,7 +110,29 @@ if (connectorError) {
   window.history.replaceState(null, "", window.location.pathname);
 }
 
-const services: AppServices = { api, auth: createBetterAuthClient(), queryClient, i18n, toasts };
+const services: AppServices = {
+  api,
+  // Signing out also stops this browser's notifications for the account (ADR 0071).
+  auth: withWebPushSignOut(
+    createBetterAuthClient(window.location.origin, () => i18n.language),
+    api,
+  ),
+  queryClient,
+  i18n,
+  toasts,
+};
+
+// The confirmation email's link: wherever `/` then goes, the person hears how it went.
+const confirmation = emailConfirmedToast(window.location.search);
+if (confirmation) {
+  window.history.replaceState(null, "", window.location.pathname);
+  void announceConfirmation(confirmation, {
+    auth: services.auth,
+    t: i18n.t,
+    show: toasts.show,
+    me: () => queryClient.fetchQuery({ ...meQuery(api), staleTime: 0 }),
+  });
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");

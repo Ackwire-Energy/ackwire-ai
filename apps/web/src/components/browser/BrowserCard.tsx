@@ -1,4 +1,11 @@
-import type { BrowserHandoff, BrowserInputEvent, BrowserStep, LiveRun } from "@agenteschat/client";
+import type {
+  BrowserFrame,
+  BrowserHandoff,
+  BrowserInputEvent,
+  BrowserStep,
+  LiveRun,
+  ScreenKind,
+} from "@agenteschat/client";
 import {
   browserSiteUrl,
   browserSteps,
@@ -16,20 +23,44 @@ import {
   textEvent,
   useAgentBrowserHandoff,
   useBrowserHandoffMutations,
+  useDesktopStatus,
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, FilterToggle, Icon, type IconName, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
+import { isBlankPage } from "@agenteschat/client/lib/sites";
+import {
+  Button,
+  FilterToggle,
+  Icon,
+  type IconName,
+  onScreenKeyboard,
+  onScreenNow,
+  PixelSpinner,
+  SkyStrip,
+  Textarea,
+} from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type KeyboardEvent, type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useStreams } from "@/realtime/context";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
+import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
-import { colorOf } from "../Sky";
+import { ComputerSky, colorOf } from "../Sky";
+import { useComputerEdition } from "../WorkspaceComputer";
+import { AddressBar } from "./AddressBar";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import "./browser.css";
 
@@ -48,6 +79,7 @@ function scrollerOf(el: HTMLElement | null): HTMLElement | null {
 }
 
 const STEP_ICON = {
+  browser_do: "bolt",
   browser_open: "globe",
   browser_back: "chevronLeft",
   browser_tabs: "layers",
@@ -70,8 +102,37 @@ type StepTool = keyof typeof STEP_ICON;
 const isStepTool = (tool: string): tool is StepTool => Object.hasOwn(STEP_ICON, tool);
 export const iconOf = (tool: string): IconName => (isStepTool(tool) ? STEP_ICON[tool] : "globe");
 
-/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"). */
-export function stepText(t: TFunction, s: BrowserStep): string {
+/** The desktop's steps on its trail (`meta.desktop.steps`) with words of their own. */
+const DESKTOP_STEPS = [
+  "desktop_open_file",
+  "desktop_read",
+  "desktop_click",
+  "desktop_double_click",
+  "desktop_right_click",
+  "desktop_focus",
+  "desktop_fill",
+  "desktop_type",
+  "desktop_select",
+  "desktop_check",
+  "desktop_press",
+  "desktop_scroll",
+  "desktop_drag",
+  "desktop_wait",
+  "desktop_screenshot",
+  "desktop_ask_person",
+] as const;
+const isDesktopStep = (tool: string): tool is (typeof DESKTOP_STEPS)[number] =>
+  (DESKTOP_STEPS as readonly string[]).includes(tool);
+
+/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"); the desktop's too. */
+export function stepText(t: TFunction, s: BrowserStep, screen: ScreenKind = "browser"): string {
+  if (screen === "desktop") {
+    if (s.tool === "desktop_open")
+      return s.detail
+        ? t("desktop.watch.step.desktop_open", { detail: s.detail })
+        : t("desktop.watch.step.desktop_open_plain");
+    return isDesktopStep(s.tool) ? t(`desktop.watch.step.${s.tool}`) : t("desktop.watch.step.other");
+  }
   if (s.tool === "browser_open")
     return s.detail
       ? t("browser.watch.step.browser_open", { detail: s.detail })
@@ -146,7 +207,7 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
 /**
  * A take over held after its run's live block went (the run paused for the person, or ended): the
  * same card, on the run's last saved message or at the end of its conversation, until the browser
- * is handed back (telas/NavegadorNoChat.html: "Assumir pausa o agente e abre a tela ao vivo").
+ * is handed back.
  * Nothing while the run's live block is there (it draws the card) or when no take over holds it.
  */
 export function HeldBrowserCard({
@@ -186,11 +247,55 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
 const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
 /**
- * An agent's browser in its card in the conversation (telas/NavegadorNoChat.html, A with the
- * "Céu" header; ADR 0040 §6–7). Closed: one line with the agent's sky edge, the site and what
- * it does now. Open: the same line over the live page and its steps. In control (Assumir, or
- * a help request opened here) the same card takes the person's clicks and the app's own text
- * field, and Pronto in the header hands back. Nothing leaves the chat.
+ * What covers the page (or the agent's desktop) instead of it: a state said plainly, with a spinner only
+ * while something is on its way; `action`: what the person can do about it.
+ */
+export function Cover({
+  icon,
+  art,
+  spinner,
+  sky,
+  color,
+  text,
+  help,
+  action,
+}: {
+  icon?: IconName;
+  /** A picture over the words instead of the icon (the computer's portrait). */
+  art?: ReactNode;
+  spinner?: boolean;
+  /** The agent's sky behind it (a screen opening). */
+  sky?: boolean;
+  color: ReturnType<typeof colorOf>;
+  text: ReactNode;
+  help?: ReactNode;
+  action?: ReactNode;
+}) {
+  const box = useRef<HTMLSpanElement>(null);
+  return (
+    <div className={sky ? "brw-dim brw-dim--sky" : "brw-dim"}>
+      {sky && <ComputerSky color={color} clear={() => [box.current]} />}
+      <span className="brw-dim__box" role="status" ref={box}>
+        {art}
+        <span className="brw-dim__row">
+          {spinner ? <PixelSpinner size={16} color={color} /> : icon && <Icon name={icon} size={16} />}
+          {text}
+        </span>
+        {help && <small>{help}</small>}
+        {action}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * An agent's browser in its card, under a "Céu" header (ADR 0040 §6–7): in the conversation and on its
+ * computer's page; in the computer dialog (`surface`), its page.
+ * Closed: one line with the agent's sky edge, the site and what it does now. Open: the same line
+ * over the live page and its steps, full screen on request. In control (Assumir, or a help request
+ * opened here) the same card takes the person's clicks, the app's own text field and an address
+ * bar; Pronto (a request) or Devolver (a take over) in the header hands back. While someone else
+ * is in control the page is hidden from everyone else.
  */
 export function BrowserCard({
   agentId,
@@ -198,6 +303,9 @@ export function BrowserCard({
   steps = [],
   handoff: given = null,
   defaultOpen = false,
+  surface = false,
+  canTakeOver = true,
+  onFold,
   onSettled,
   runId,
   place,
@@ -213,6 +321,15 @@ export function BrowserCard({
   /** The help request this card answers (opened from it). */
   handoff?: BrowserHandoff | null;
   defaultOpen?: boolean;
+  /**
+   * The computer dialog's page: always open, its sub-line and actions in the dialog's head (which also holds
+   * full screen), the site above the page, and no log or Parar (the dialog shows the steps).
+   */
+  surface?: boolean;
+  /** Take control may show (the dialog says no while the agent is held or a request waits). */
+  canTakeOver?: boolean;
+  /** Folding takes the card away (its place shows its own line again) instead of to its small form. */
+  onFold?: () => void;
   /** The person handed back or said it couldn't be done: the holder can fold the card away. */
   onSettled?: () => void;
 }) {
@@ -220,16 +337,26 @@ export function BrowserCard({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
+  const head = useDialogHead();
+  const sayFailed = useSayFailed();
+  const openComputer = useOpenComputer();
+  // The workspace's own computer is never off and nobody connects one: its words say so.
+  const cloud = useComputerEdition(org.id) === "cloud";
   const agent = dir.agentById.get(agentId);
   const g = agentGrammar(t, name);
   const color = colorOf(agent);
-  const [open, setOpenState] = useState(defaultOpen);
+  const [open, setOpenState] = useState(defaultOpen || surface);
   const root = useRef<HTMLDivElement>(null);
   // Opening or closing by hand keeps the card where it is on screen: the conversation doesn't jump.
   const anchor = useRef<number | null>(null);
   const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
     anchor.current = root.current?.getBoundingClientRect().top ?? null;
     setOpenState(next);
+  };
+  const fold = () => {
+    if (surface) return;
+    if (onFold) onFold();
+    else setOpen(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs after each open/close to restore the card's place
   useLayoutEffect(() => {
@@ -246,19 +373,26 @@ export function BrowserCard({
   useEffect(() => {
     const el = root.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)));
+    const io = new IntersectionObserver((entries) => setVisible(onScreenNow(entries) === true));
     io.observe(el);
     return () => io.disconnect();
   }, []);
   const live = useBrowserLive(agentId, open || visible || holding);
   const [still, setStill] = useState<typeof live.frame>(null);
+  const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
-    if (live.frame) setStill(live.frame);
+    if (!live.frame) return;
+    setStill(live.frame);
+    // A new page after Parar: the browser is open again (the agent, or a person opening a site).
+    setStoppedAt(null);
   }, [live.frame]);
   const openQ = useAgentBrowserHandoff(org.id, agentId, open);
   const actions = useBrowserHandoffMutations(org.id);
   const machines = useMachines(org.id);
   const imgRef = useRef<HTMLImageElement>(null);
+  // The agent's desktop runs (its Chrome shows there): "Ver a tela inteira" opens it on the agent's page.
+  const desktop = useDesktopStatus(org.id, agentId, { enabled: open });
+  const onDesktop = desktop.data?.available === true && desktop.data.running;
 
   const handoff = newest(
     live.status?.handoff ?? null,
@@ -268,6 +402,8 @@ export function BrowserCard({
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
   useEffect(() => setHolding(inControl), [inControl]);
+  // A chat card's Hand back keeps its check and words: only the dialog's head folds it.
+  const back = useHandBack(surface && handoff?.kind === "takeover");
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";
   // The computer the browser runs on: the request's, else the one this agent works on.
   const machine = (machines.data ?? []).find((m) =>
@@ -281,12 +417,34 @@ export function BrowserCard({
   const [failing, setFailing] = useState(false);
   const [reason, setReason] = useState<(typeof FAIL_REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
+  const [handingBack, setHandingBack] = useState(false);
+  const [backNote, setBackNote] = useState("");
+  const backRef = useRef<HTMLTextAreaElement>(null);
   const [confirmStop, setConfirmStop] = useState(false);
-  const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   const [keysOpen, setKeysOpen] = useState(false);
+  const [goOpen, setGoOpen] = useState(false);
+  const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+
+  // The browser is closed (the server says so, or its stream ended), or a site the person typed is opening:
+  // only a new frame ends either. Every retry's status clears the server's "closed" for a moment, so the
+  // card would otherwise flash "opening" in between.
+  const [wait, setWait] = useState<{ frame: BrowserFrame | null; why: "closed" | "opening"; site?: string } | null>(
+    null,
+  );
+  // In the computer dialog a browser someone stopped is just closed: Assumir opens it again.
+  const closedNow =
+    live.unavailable?.reason === "closed" || (live.ended && (surface || live.endedBy?.reason !== "stopped"));
+  useEffect(() => {
+    if (closedNow) setWait({ frame: live.frame, why: "closed" });
+  }, [closedNow, live.frame]);
+  const waitingFor = wait && live.frame === wait.frame ? wait : null;
+  const closed = waitingFor?.why === "closed";
+  const opening = waitingFor?.why === "opening";
+  // Someone else is in control: the server sends this view no frames until it's handed back.
+  const hidden = live.status?.hidden === true;
 
   // The bar or a notification asked for this card: open it here and bring it into view.
   const asked = useBrowserCardRequest({ agentId, ...(given ? { handoffId: given.id } : {}) });
@@ -296,6 +454,38 @@ export function BrowserCard({
     setOpenState(true);
     root.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [asked]);
+
+  useEffect(() => {
+    if (!open) setFull(false);
+  }, [open]);
+  // Full screen: the browser's own when it allows it (above everything, Esc leaves it); either way the
+  // card fills the window.
+  useEffect(() => {
+    const el = root.current;
+    if (!full || !el) return;
+    const left = () => {
+      if (!document.fullscreenElement) setFull(false);
+    };
+    document.addEventListener("fullscreenchange", left);
+    if (typeof el.requestFullscreen === "function") el.requestFullscreen().catch(() => {});
+    return () => {
+      document.removeEventListener("fullscreenchange", left);
+      if (document.fullscreenElement === el) document.exitFullscreen().catch(() => {});
+    };
+  }, [full]);
+  // Esc leaves full screen (after the page lets go of the wheel), before a dialog or the page hears it.
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (capturing) setCapturing(false);
+      else setFull(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [full, capturing]);
 
   const send = (events: BrowserInputEvent[] | null) => {
     if (!inControl || !events?.length) return;
@@ -314,6 +504,8 @@ export function BrowserCard({
     send(clickEvents(at, modifiersOf(e, remoteIsMac)));
   };
 
+  // What is shown of the page: nothing while it is closed, opening or hidden (only a stale frame is held).
+  const frame = closed || opening || hidden ? null : live.frame;
   // Only a page that was clicked into takes the wheel (a native listener: the conversation's scroll is
   // stopped only then); anywhere else the wheel scrolls the conversation.
   const wheelTo = useRef<(e: globalThis.WheelEvent) => void>(() => {});
@@ -332,7 +524,7 @@ export function BrowserCard({
     const on = (e: globalThis.WheelEvent) => wheelTo.current(e);
     el.addEventListener("wheel", on, { passive: false });
     return () => el.removeEventListener("wheel", on);
-  }, [open, Boolean(live.frame)]);
+  }, [open, Boolean(frame)]);
   useEffect(() => {
     if (!capturing) return;
     const out = (e: PointerEvent) => {
@@ -343,7 +535,11 @@ export function BrowserCard({
   }, [capturing]);
   useEffect(() => {
     if (!inControl || !open) setCapturing(false);
+    if (!inControl) setHandingBack(false);
   }, [inControl, open]);
+  useEffect(() => {
+    if (handingBack) backRef.current?.focus();
+  }, [handingBack]);
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
@@ -365,16 +561,20 @@ export function BrowserCard({
     setText("");
   };
 
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
+  const didntWork = () => sayFailed(t("browser.live.actionFailed"));
 
+  /** Pronto (a request) or Devolver (a take over), with what the person wants the agent to know. */
   const finish = () => {
     if (!handoff) return;
-    actions.done.mutate(handoff.id, {
+    const words = backNote.trim();
+    actions.done.mutate(words ? { handoffId: handoff.id, note: words } : handoff.id, {
       onSuccess: () => {
-        setOpen(false);
+        setHandingBack(false);
+        setBackNote("");
+        fold();
         onSettled?.();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
   };
 
@@ -386,10 +586,10 @@ export function BrowserCard({
       {
         onSuccess: () => {
           setFailing(false);
-          setOpen(false);
+          fold();
           onSettled?.();
         },
-        onError: failedToast,
+        onError: didntWork,
       },
     );
   };
@@ -398,14 +598,14 @@ export function BrowserCard({
     setOpen(true);
     actions.takeover.mutate(runId ? { agentId, runId } : agentId, {
       onSuccess: (h) => {
+        setStoppedAt(null);
         // It claimed the agent's own request: that request's card is the control (one card, not two).
         if (h.kind === "ask") requestBrowserCard({ agentId, handoffId: h.id });
         else if (h.runId && place) rememberHeldPlace({ runId: h.runId, agentId, ...place });
       },
       onError: (err) =>
-        toast.show(
+        sayFailed(
           (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
-          "error",
         ),
     });
   };
@@ -414,24 +614,37 @@ export function BrowserCard({
     actions.stop.mutate(agentId, {
       onSuccess: () => {
         setConfirmStop(false);
-        setOpen(false);
         setStoppedAt(new Date().toISOString());
+        // Folded away, the card can't say it: the toast does.
+        if (onFold) toast.show(t("browser.machine.stopped", g));
+        fold();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
+
+  /** A site typed in the address bar: the card waits for its first frame. */
+  const openSite = (url: string) => {
+    const before = live.frame;
+    return actions.open.mutateAsync({ agentId, url }).then(() => {
+      setGoOpen(false);
+      setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
+    });
+  };
 
   // The agent's own request is open and mine: its card (under the request) is the control, not this one.
   if (!given && handoff?.kind === "ask" && inControl) return null;
 
-  // Parar (here, or by someone else: everyone watching hears it), or the browser closed on its own.
+  const handBackLabel = handoff?.kind === "takeover" ? t("browser.inCard.handBack") : t("browser.inCard.done");
+
+  // Parar (here, or by someone else: everyone watching hears it).
   const stopped = stoppedAt
     ? { at: stoppedAt, by: me.user.id }
     : live.endedBy?.reason === "stopped"
       ? { at: live.endedBy.at ?? null, by: live.endedBy.userId ?? null }
       : null;
-  if (stopped || live.ended) {
-    const byName = stopped?.by && stopped.by !== me.user.id ? dir.memberById.get(stopped.by)?.name : undefined;
-    const time = stopped?.at ? formatTime(i18n.language, stopped.at) : "";
+  if (stopped && !surface) {
+    const byName = stopped.by && stopped.by !== me.user.id ? dir.memberById.get(stopped.by)?.name : undefined;
+    const time = stopped.at ? formatTime(i18n.language, stopped.at) : "";
     return (
       <div className="brw-ac" ref={root}>
         <div className="brw-ac__head">
@@ -439,8 +652,8 @@ export function BrowserCard({
             <Icon name="stop" size={14} />
           </span>
           <span className="brw-ac__tx">
-            <b>{stopped ? t("browser.watch.stopped") : t("browser.live.ended", g)}</b>
-            {stopped && (stopped.by === me.user.id || byName || time) && (
+            <b>{t("browser.watch.stopped")}</b>
+            {(stopped.by === me.user.id || byName || time) && (
               <small>
                 <span>
                   {stopped.by === me.user.id
@@ -452,11 +665,25 @@ export function BrowserCard({
               </small>
             )}
           </span>
-          {inControl && handoff && (
+          {((inControl && handoff) || onFold) && (
             <span className="brw-ac__acts">
-              <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
-                {t("browser.inCard.done")}
-              </Button>
+              {inControl && handoff && (
+                <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
+                  {handBackLabel}
+                </Button>
+              )}
+              {onFold && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronDown"
+                  className="brw-ac__chev"
+                  aria-label={t("browser.inCard.collapse")}
+                  title={t("browser.inCard.collapse")}
+                  onClick={onFold}
+                />
+              )}
             </span>
           )}
         </div>
@@ -464,25 +691,29 @@ export function BrowserCard({
     );
   }
 
-  const frame = live.frame;
   const unavailable = live.unavailable;
   const reconnecting = unavailable?.reason === "reconnecting";
   // What can't change by waiting is said plainly; everything else is "opening" while it retries.
   const blocker =
     unavailable?.reason === "offline"
-      ? t("browser.inCard.offline", g)
+      ? t(cloud ? "browser.inCard.offlineCloud" : "browser.inCard.offline", g)
       : unavailable?.reason === "no_computer"
-        ? t("browser.inCard.noComputer", g)
+        ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
         : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
           ? t("browser.inCard.forbidden")
           : null;
-  const starting = open && !frame && !blocker && !reconnecting;
+  const starting = open && !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
   const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
-  const [host, path] = hostAndPath(browserSiteUrl((frame ?? still)?.metadata.url, steps));
+  // The page as last seen, for the small picture and the title: none while closed, opening or hidden.
+  const pic = closed || opening || hidden ? null : (frame ?? still);
+  const [host, path] = hostAndPath(closed || hidden ? null : browserSiteUrl(pic?.metadata.url, steps));
   const ask = handoff?.kind === "ask" ? handoff.instructions : null;
   const working = !inControl && !otherInControl;
-  const showLog = open && working && !starting && steps.length > 0;
+  const showLog = open && working && !starting && steps.length > 0 && !surface;
+  // A blank page or a closed browser: the person in control gets the address bar without asking.
+  const goForced = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
+  const goShown = inControl && (goOpen || goForced);
 
   const asTitle = titleKind({ inControl, ask, host, opening: open && starting });
   const title =
@@ -500,19 +731,47 @@ export function BrowserCard({
         : t("browser.inCard.subControlAsked", g)
       : t("browser.inCard.subTakeover", g)
     : otherInControl
-      ? t("browser.inCard.subOther", { person: controllerName })
-      : reconnecting
-        ? t("browser.inCard.subReconnect", g)
-        : (open && starting) || !lastStep
-          ? t("browser.inCard.subStarting", g)
-          : t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) });
-  const live_ = working && !blocker;
+      ? hidden
+        ? t("browser.inCard.subHidden", { person: controllerName })
+        : t("browser.inCard.subOther", { person: controllerName })
+      : closed
+        ? t("browser.inCard.subClosed")
+        : reconnecting
+          ? t("browser.inCard.subReconnect", g)
+          : (open && starting) || (!lastStep && !pic)
+            ? t("browser.inCard.subStarting", g)
+            : lastStep
+              ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
+              : t("browser.live.watchOnly");
+  const live_ = working && !blocker && !closed;
+  // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold). Over a cover
+  // it says nothing the cover says (opening, reconnecting): only who holds the page.
+  const surfaceSub = inControl
+    ? sub
+    : otherInControl
+      ? hidden
+        ? t("desktop.sub.hidden", { person: controllerName })
+        : sub
+      : blocker || reconnecting || (open && starting) || opening
+        ? ""
+        : closed
+          ? t("browser.watch.live")
+          : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
-  const thumb = frame ?? still;
-  const thumbSrc = thumb ? `data:image/jpeg;base64,${thumb.data}` : null;
+  const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
 
   // Watching: Assumir (a labelled, tactile button) and Parar (quiet, with a confirmation), never a lone red square.
-  const watchActs = confirmStop ? (
+  // A closed browser has nothing to stop: it opens straight into the person's control.
+  const watchActs = surface ? (
+    // The dialog's page: Assumir alone (the dialog holds full screen), also to open a closed browser and sign in.
+    !otherInControl &&
+    !blocker &&
+    canTakeOver && (
+      <Button size="sm" icon="person" className="cmp-take" loading={actions.takeover.isPending} onClick={takeover}>
+        <span className="cmp-act-label">{t("desktop.takeover")}</span>
+      </Button>
+    )
+  ) : confirmStop ? (
     <>
       <span className="small muted">{t("browser.watch.stopAsk")}</span>
       <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
@@ -524,7 +783,12 @@ export function BrowserCard({
     </>
   ) : (
     !otherInControl &&
-    !blocker && (
+    !blocker &&
+    (closed ? (
+      <Button size="sm" icon="globe" loading={actions.takeover.isPending} onClick={takeover}>
+        {t("browser.inCard.openBrowser")}
+      </Button>
+    ) : (
       <>
         <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
           {t("browser.inCard.takeover")}
@@ -539,7 +803,7 @@ export function BrowserCard({
           onClick={() => setConfirmStop(true)}
         />
       </>
-    )
+    ))
   );
   const controlActs = (
     <>
@@ -547,17 +811,31 @@ export function BrowserCard({
         <Button
           size="sm"
           variant="ghost"
+          {...(surface ? { icon: "block" as const, className: "cmp-couldnt ac-btn--glyph" } : {})}
           onClick={() => {
             setOpen(true);
+            setHandingBack(false);
             setFailing(true);
           }}
         >
-          {t("browser.inCard.giveUp")}
+          <span className="cmp-act-label">{surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}</span>
         </Button>
       )}
-      <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
-        {t("browser.inCard.done")}
-      </Button>
+      {!handingBack && (
+        <Button
+          size="sm"
+          variant="primary"
+          icon={back.icon}
+          className={back.className}
+          onClick={() => {
+            setOpen(true);
+            setFailing(false);
+            setHandingBack(true);
+          }}
+        >
+          <span className="cmp-act-label">{handBackLabel}</span>
+        </Button>
+      )}
     </>
   );
   const titleText = (
@@ -572,16 +850,38 @@ export function BrowserCard({
       <span>{sub}</span>
     </small>
   );
+  const cover = blocker ? (
+    <Cover color={color} text={blocker} />
+  ) : hidden ? (
+    // Its head says who is in control.
+    <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
+  ) : closed ? (
+    <Cover
+      color={color}
+      sky
+      icon="globe"
+      text={t("browser.inCard.closed", g)}
+      help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
+    />
+  ) : opening ? (
+    <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
+  ) : reconnecting ? (
+    <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
+  ) : starting ? (
+    <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
+  ) : null;
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
       ref={root}
-      className={["brw-ac", open && "is-open", inControl && "is-control"].filter(Boolean).join(" ")}
+      className={["brw-ac", open && "is-open", inControl && "is-control", full && "is-full", surface && "is-surface"]
+        .filter(Boolean)
+        .join(" ")}
       role="group"
       aria-label={t("browser.inCard.group", g)}
     >
-      <SkyStrip color={color} muted={inControl} moving={live_} />
+      {!surface && <SkyStrip color={color} muted={inControl} moving={live_} />}
       {!open ? (
         // Closed: the small live picture, the site, what the agent does now; a click opens it right here.
         <div className="brw-ac__compact">
@@ -592,7 +892,15 @@ export function BrowserCard({
             tabIndex={-1}
             onClick={() => setOpen(true)}
           >
-            {thumbSrc ? <img src={thumbSrc} alt="" draggable={false} /> : <span className="brw-ac__thumb-blank" />}
+            {thumbSrc ? (
+              <img src={thumbSrc} alt="" draggable={false} />
+            ) : closed || hidden ? (
+              <span className="brw-ac__thumb-icon">
+                <Icon name={hidden ? "eyeOff" : "globe"} size={16} />
+              </span>
+            ) : (
+              <span className="brw-ac__thumb-blank" />
+            )}
           </button>
           <button type="button" className="brw-ac__tt" aria-expanded={false} onClick={() => setOpen(true)}>
             <span className="brw-ac__tx">
@@ -603,9 +911,35 @@ export function BrowserCard({
           </button>
           <span className="brw-ac__acts">{inControl ? controlActs : watchActs}</span>
         </div>
+      ) : surface ? (
+        // The dialog's head says it; above the page, the site it is on.
+        <>
+          <DialogHead
+            sub={surfaceSub}
+            actions={
+              <>
+                {inControl ? controlActs : watchActs}
+                {!blocker && <FullButton />}
+              </>
+            }
+          />
+          {asTitle === "ask" ? (
+            <p className="cmp-asked">“{title}”</p>
+          ) : (
+            asTitle === "host" && (
+              <p className="cmp-site">
+                <Icon name="globe" size={14} />
+                <span>
+                  {host}
+                  {path && <span className="brw-ac__path">{path}</span>}
+                </span>
+              </p>
+            )
+          )}
+        </>
       ) : (
         <div className="brw-ac__head">
-          <button type="button" className="brw-ac__tt" aria-expanded onClick={() => setOpen(false)}>
+          <button type="button" className="brw-ac__tt" aria-expanded onClick={fold}>
             <span className="brw-ac__tx">
               {titleText}
               {subText}
@@ -613,23 +947,32 @@ export function BrowserCard({
           </button>
           <span className="brw-ac__acts">
             {inControl ? controlActs : watchActs}
-            <Button
-              size="sm"
-              variant="ghost"
-              iconOnly
-              icon="chevronDown"
-              className="brw-ac__chev"
-              aria-label={toggleLabel}
-              title={toggleLabel}
-              aria-expanded
-              onClick={() => setOpen(false)}
-            />
+            {onDesktop && !full && (
+              <Button size="sm" variant="ghost" icon="computer" onClick={() => openComputer(agentId)}>
+                {t("desktop.seeWhole")}
+              </Button>
+            )}
+            {!blocker && <FullScreenButton full={full} onToggle={() => setFull((v) => !v)} />}
+            {!full && (
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="chevronDown"
+                className="brw-ac__chev"
+                aria-label={toggleLabel}
+                title={toggleLabel}
+                aria-expanded
+                onClick={fold}
+              />
+            )}
           </span>
         </div>
       )}
 
       {open && (
         <>
+          {goShown && <AddressBar grammar={g} focus={closed} onOpen={openSite} cloud={cloud} />}
           <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
             <div className="brw-ac__stage">
               {src ? (
@@ -660,37 +1003,25 @@ export function BrowserCard({
                 </div>
               ) : (
                 <div className="brw-ac__page brw-ac__page--blank" aria-hidden="true">
-                  <span className="brw-skel">
-                    <i style={{ width: "40%" }} />
-                    <i style={{ width: "70%" }} />
-                    <i style={{ width: "55%" }} />
-                    <i className="brw-skel__field" />
-                    <i className="brw-skel__field" />
-                  </span>
-                </div>
-              )}
-              {(starting || reconnecting || blocker) && (
-                <div className="brw-dim">
-                  <span className="brw-dim__box" role="status">
-                    <span className="brw-dim__row">
-                      {!blocker && <PixelSpinner size={16} color={color} />}
-                      {blocker ?? (reconnecting ? t("browser.live.reconnecting") : t("browser.inCard.openingLong", g))}
+                  {(starting || reconnecting || opening) && (
+                    <span className="brw-skel">
+                      <i style={{ width: "40%" }} />
+                      <i style={{ width: "70%" }} />
+                      <i style={{ width: "55%" }} />
+                      <i className="brw-skel__field" />
+                      <i className="brw-skel__field" />
                     </span>
-                    {!blocker && (
-                      <small>
-                        {reconnecting ? t("browser.inCard.reconnectHelp", g) : t("browser.inCard.openingHelp")}
-                      </small>
-                    )}
-                  </span>
+                  )}
                 </div>
               )}
+              {cover}
             </div>
             {showLog && (
               <ol className="brw-log">
                 {steps.slice(-5).map((s, i, all) => {
                   const now = i === all.length - 1 && s.running;
                   return (
-                    <li key={s.id} className={now ? "is-now" : undefined}>
+                    <li key={s.id} className={now ? "ac-iconline is-now" : "ac-iconline"}>
                       {now ? <PixelSpinner size={14} color={color} /> : <Icon name={iconOf(s.tool)} size={14} />}
                       <span>{stepText(t, s)}</span>
                       {s.since && <small>{formatTime(i18n.language, new Date(s.since).toISOString())}</small>}
@@ -713,10 +1044,12 @@ export function BrowserCard({
                   ))}
                 </div>
                 <Textarea
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={t("browser.live.failPlaceholder")}
-                  rows={2}
                   maxLength={900}
                 />
                 <div className="brw-ac__row">
@@ -729,8 +1062,41 @@ export function BrowserCard({
                   </Button>
                 </div>
               </div>
+            ) : handingBack ? (
+              // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on one line that
+              // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
+              // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
+              <div className="brw-ac__foot brw-ac__fail">
+                <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
+                <Textarea
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
+                  ref={backRef}
+                  value={backNote}
+                  onChange={(e) => setBackNote(e.target.value)}
+                  placeholder={t("browser.inCard.backPlaceholder", g)}
+                  aria-label={t("browser.inCard.backLabel", g)}
+                  maxLength={1000}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setHandingBack(false);
+                    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                    e.preventDefault();
+                    finish();
+                  }}
+                />
+                <div className="brw-ac__row">
+                  <span className="brw-grow" />
+                  <Button size="sm" variant="ghost" onClick={() => setHandingBack(false)}>
+                    {t("browser.live.back")}
+                  </Button>
+                  <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
+                    {handBackLabel}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, send.
+              // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
               <div className="brw-ac__foot brw-type">
                 {keysOpen && (
                   // biome-ignore lint/a11y/useSemanticElements: a small row of keys, not a form fieldset
@@ -793,6 +1159,18 @@ export function BrowserCard({
                     onClick={() => setKeysOpen((v) => !v)}
                   />
                   <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon="globe"
+                    className="brw-tfield__tool"
+                    aria-pressed={goShown}
+                    aria-label={t("browser.inCard.goToggle")}
+                    title={t("browser.inCard.goToggle")}
+                    disabled={goForced}
+                    onClick={() => setGoOpen((v) => !v)}
+                  />
+                  <Button
                     variant="primary"
                     size="sm"
                     iconOnly
@@ -806,7 +1184,7 @@ export function BrowserCard({
                 </label>
               </div>
             ))}
-          {otherInControl && (
+          {otherInControl && !hidden && (
             <div className="brw-ac__foot">
               <span className="small muted">{t("browser.inCard.otherHelp", { person: controllerName })}</span>
             </div>

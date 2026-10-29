@@ -3,8 +3,9 @@ import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
+import { agentIntro } from "../chat/intent";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
@@ -17,12 +18,12 @@ import type { AgentRowState } from "./now";
 const AVATAR = LIST_AVATAR;
 
 /**
- * One conversation in the list (MobileConversas.html, readable per MobileIntencional.html), in the shared
+ * One conversation in the list, in the shared
  * `ListRow`: the agent's living body (moving while it works), a person's face, or the tile of a channel;
  * the name and the time; the last line ("Nome: …", two lines). An agent's row says what matters instead
  * (`agent`): it waits on your ok (amber, "espera seu ok · PR #128"), it waits for its offline computer
- * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions (MobileRefinos.html
- * `trowApp`) add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
+ * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions
+ * add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
  * line of its last reply. `live`: the agent moves (the first rows only).
  */
@@ -49,6 +50,18 @@ export const ConversationRowView = memo(function ConversationRowView({
     return { who, text: previewBody(t, last.text, last.meta ?? null) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
+  /** A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. */
+  const introLine = (): string => {
+    if (r.kind !== "dm") return "";
+    const a = agentDm ? dir.agentById.get(r.with.id) : undefined;
+    if (!a) return t("mobile.chats.sayHi", { name: r.with.name });
+    const intro = agentIntro(a);
+    return intro.kind === "what"
+      ? intro.text
+      : intro.kind === "role"
+        ? t("mobile.chat.intent.roleIntro", { role: intro.role })
+        : t("mobile.chat.intent.noIntro");
+  };
   const agentState = agentDm ? (agent ?? null) : null;
   // Waiting for its offline computer: dozing, no working orbit (its run only waits).
   const away = agentState?.kind === "computer";
@@ -90,7 +103,9 @@ export const ConversationRowView = memo(function ConversationRowView({
     line = (
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
-        {lines.state === "waiting" ? <Icon name="shield" size={14} color={c.amber} /> : null}
+        {lines.state === "waiting" ? (
+          <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+        ) : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text
             variant="small"
@@ -108,7 +123,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = [verb, agentState.title].filter(Boolean).join(" · ");
     line = (
       <View style={styles.work}>
-        <Icon name="shield" size={14} color={c.amber} />
+        <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
             {verb}
@@ -121,7 +136,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = t("mobile.outage.rowWaiting", { computer: agentState.computer });
     line = (
       <View style={styles.work}>
-        <Icon name="clock" size={14} color={c.muted} />
+        <LineIcon name="clock" size={14} color={c.muted} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           {label}
         </Text>
@@ -140,8 +155,10 @@ export const ConversationRowView = memo(function ConversationRowView({
     );
   } else {
     const last = lastText(r.last);
-    const text = r.kind === "channel" ? last.text || r.topic : last.text;
-    const lead = last.who;
+    const text = r.kind === "channel" ? last.text || r.topic : r.last ? last.text : introLine();
+    // In a DM the other side's own words need no "Ada:" before them (the row is already Ada's).
+    const theirs = r.kind === "dm" && r.last?.author?.type === r.with.type && r.last.author.id === r.with.id;
+    const lead = theirs ? "" : last.who;
     label = lead ? `${lead}: ${text}` : text;
     line = (
       <Text variant="small" tone={r.unread > 0 ? "ink2" : "muted"} numberOfLines={lines ? 1 : 2} style={LIST_PREVIEW}>

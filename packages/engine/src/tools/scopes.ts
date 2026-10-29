@@ -48,7 +48,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "calendar:read": { label: "View calendar", description: "View events and free time." },
   "calendar:write": {
     label: "Propose events",
-    description: "Suggest events; the person asking confirms before any invitation.",
+    description: "Suggest events. The person asking confirms before any invitation.",
   },
   "issues:write": { label: "Issues", description: "Create and update issues." },
   "skills:read": { label: "Use skills", description: "Load the skills enabled for the agent." },
@@ -76,15 +76,26 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description:
       "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
   },
+  "desktop:use": {
+    label: "Use its desktop",
+    description:
+      "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
+  },
+  "setup:write": {
+    label: "Set up the workspace",
+    description:
+      "Offer to connect an AI with a card a person clicks, and create channels for the person who asked, with Undo.",
+  },
 };
 
 /**
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
- * the org's issues before answering about them; low risk), and its computer
- * (running commands, its own browser; D61): on a connected computer each
- * still needs the switch the person at that computer turned on. Admins and
- * owners can revoke them.
+ * the org's issues before answering about them; low risk), setting up the
+ * workspace for whoever asks (cards a person clicks, channels with Undo), and
+ * its computer (running commands, its own browser and desktop): on a connected
+ * computer each still needs the switch the person at that computer turned on.
+ * Admins and owners can revoke them.
  */
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
@@ -97,8 +108,10 @@ export const DEFAULT_AGENT_SCOPES = [
   "forum:write",
   "wiki:read",
   "wiki:write",
+  "setup:write",
   "sandbox:run",
   "browser:use",
+  "desktop:use",
 ];
 
 export interface ScopeGrant {
@@ -149,7 +162,7 @@ export function toolAccess(
   // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
   const writeScope = impliedByWrite(tool.scope);
   if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
-  // "All tools" never includes running code (D30), the agent browser (ADR 0040), anyone's mailbox (ADR 0038)
+  // "All tools" never includes running code (ADR 0021), the agent's screens (ADR 0040), anyone's mailbox (ADR 0038)
   // nor a database (ADR 0039):
   // always separate, explicit grants.
   if (
@@ -169,7 +182,7 @@ export function impliedByWrite(scope: string) {
 }
 
 /** Scopes that "all tools" (`*`) doesn't cover. */
-const NOT_IN_ALL = new Set(["sandbox:run", "browser:use"]);
+export const NOT_IN_ALL: ReadonlySet<string> = new Set(["sandbox:run", "browser:use", "desktop:use"]);
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
 

@@ -4,15 +4,26 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { WikiGraph } from "@agenteschat/client";
-import { outlineOf, resolveWikiLink, splitSection, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
+import {
+  outlineOf,
+  prefixLines,
+  resolveWikiLink,
+  splitSection,
+  toggleTask,
+  wikiQuery,
+  wikiSlug,
+  wikiTree,
+  wrapSelection,
+} from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { prefixLines, wikiQuery, wrapSelection } from "@/components/WikiEditor";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
+import { VaultCard } from "@/components/wiki/VaultCard";
+import { useVaultReader } from "@/components/wiki/WikiImport";
 import { headingId, Markdown, parseWikiToken, wikiLinksIn } from "@/lib/markdown";
 import { filesFromList, homeOf, parseNote, readVault, type VaultFile } from "@/lib/obsidian";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -21,12 +32,27 @@ const type = (el: Element, value: string) =>
   act(async () =>
     fireEvent.change(el, { target: { value, selectionStart: value.length, selectionEnd: value.length } }),
   );
+/** The setup's Context step card, with a reader of its own. */
+function SetupVaultCard() {
+  return <VaultCard reader={useVaultReader([])} />;
+}
+
 const go = async (path: string, state = seedState(), seed = true) => {
   const api = createFakeApi(state, { seed });
   const r = await renderApp(`/org/${ORG_ID}/${path}`, { api });
   await settle(8);
   return { ...r, state, api };
 };
+
+describe("toggleTask", () => {
+  test("checks and unchecks one task line, leaves other lines alone", () => {
+    const body = "# Passos\n- [ ] Abrir\n- [x] Revisar\nTexto";
+    expect(toggleTask(body, 1)).toBe("# Passos\n- [x] Abrir\n- [x] Revisar\nTexto");
+    expect(toggleTask(body, 2)).toBe("# Passos\n- [ ] Abrir\n- [ ] Revisar\nTexto");
+    expect(toggleTask(body, 3)).toBe(body);
+    expect(toggleTask(body, 9)).toBe(body);
+  });
+});
 
 describe("wiki rules", () => {
   test("links, slugs, sections, outline, tree", () => {
@@ -484,5 +510,42 @@ describe("Obsidian vaults", () => {
     await click(screen().getByRole("button", { name: "Abrir Início" }));
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/wiki/inicio`);
+  });
+
+  test("the setup's card: one line on what it becomes, then what it found, and no mapping (the wiki's import has it)", async () => {
+    await renderPage(<SetupVaultCard />, { api: createFakeApi(seedState()) });
+    const card = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
+    expect(card.querySelector(".vault-card__t .small")?.textContent).toBe("Ela vira a wiki do workspace.");
+    // The drop zone already says a folder works too: under it, only the way to pick one, said as the import step
+    // says it, with its folder icon.
+    const folder = within(card).getByRole("button", { name: "Escolher uma pasta" });
+    expect(card.querySelector(".vault-drop__area + .ac-btn--ghost")).toBe(folder);
+    expect(folder.querySelector("svg")).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(within(card).getByLabelText("Escolher .zip ou .md"), {
+        target: { files: [new File(["Veja [[Notas]].\n#mapa"], "Início.md"), new File(["Volta."], "Notas.md")] },
+      });
+    });
+    await settle(8);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    expect(card.textContent).toContain("Pronta");
+    expect(card.textContent).toContain("2notas");
+    expect(card.querySelector(".vault-notice")?.textContent).toBe("Entra na wiki quando você continuar.");
+    expect(card.querySelector(".vault-lines")).toBeNull();
+    expect(card.textContent).not.toContain("frontmatter");
+  });
+});
+
+describe("the wiki's header", () => {
+  test("one subtitle line, then one link to how the wiki works", async () => {
+    await go("wiki");
+    const head = document.querySelector(".wiki-home__head") as HTMLElement;
+    expect(head.querySelector("p.muted")?.textContent).toBe("O que a empresa sabe, em páginas ligadas.");
+    const how = within(head).getByRole("link", { name: "Como a wiki funciona" });
+    expect(how.getAttribute("href")).toBe("https://agentes.chat/help/wiki?lang=pt-BR");
+    expect(how.getAttribute("target")).toBe("_blank");
+    expect(how.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(how.className).toBe("ac-link ac-link--muted");
   });
 });

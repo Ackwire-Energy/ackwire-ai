@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
+import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { consultationCardThread } from "./consultations";
@@ -10,21 +11,25 @@ import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
 import {
   type AgentQuestionRow,
+  ASK_USER_TOOL,
   publishQuestion,
   QUESTION_TTL_MS,
+  questionCardMeta,
   questionView,
   syncQuestionMessage,
 } from "./questions";
+import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
-import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
+import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
+import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks } = schema;
+const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
 
 /**
  * Tool access for runs, shared by the engine loop and the runner's `agentes`
@@ -74,10 +79,18 @@ export const bodyCode = (code: string, params: Record<string, string> = {}) => (
   bodyParams: params,
 });
 
+/**
+ * A tool as a brain receives it (the model loop and the bridge alike). A tool that asks a person (an
+ * approval, `ask_user`) takes the required `why` its card shows: the gateway's list already adds it,
+ * and this keeps it so for any list that reaches a brain.
+ */
 export const brainToolOf = (t: ToolDefinition): BrainTool => ({
   name: t.name,
   description: t.description,
-  inputSchema: t.inputSchema,
+  inputSchema:
+    isSensitive(t) || (t.name === ASK_USER_TOOL && t.scope === "" && !t.connectionId)
+      ? withWhy(t.inputSchema)
+      : t.inputSchema,
 });
 
 // ── Side effects of tools ────────────────────────────────────────────────────
@@ -94,12 +107,16 @@ export interface ToolSideEffects {
   reacted?: boolean;
   /** A mission `report` card was posted: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
+  /** Nobody called it by name and it called `pass` (reply-policy.ts): the run ends without a message. */
+  passed?: { reason: string };
   /** The GitHub repository the run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
   repo?: string;
   /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
   deniedRepo?: string;
   /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
   browser?: BrowserTrailStep[];
+  /** Its desktop calls since the last post (`meta.desktop`, ADR 0062), the same shape: the app an open started. */
+  desktop?: BrowserTrailStep[];
 }
 
 /**
@@ -113,29 +130,45 @@ export interface BrowserTrailStep {
   failed?: true;
 }
 
-/** The most browser steps one message keeps (the latest ones). */
+/** The most browser steps one message keeps (the latest ones); as many desktop steps. */
 export const BROWSER_TRAIL_MAX = 200;
 
-/** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`). */
-const browserTool = (name: string) => {
+/** The screens whose calls a message keeps as a trail, by their tools' prefix. */
+type TrailScreen = "browser" | "desktop";
+
+/** A plan's result carries its steps (`browserTrail`, `desktopTrail`): the plan call itself isn't one. */
+const TRAIL_DATA: Record<TrailScreen, { data: string; plan: string }> = {
+  browser: { data: "browserTrail", plan: "browser_do" },
+  desktop: { data: "desktopTrail", plan: "desktop_do" },
+};
+
+/** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`); the screen whose trail it joins. */
+const screenTool = (name: string): { tool: string; screen: TrailScreen } | null => {
   const tool = name.replace(/^mcp__agentes__/, "");
-  return tool.startsWith("browser_") ? tool : null;
+  if (tool.startsWith("browser_")) return { tool, screen: "browser" };
+  if (tool.startsWith("desktop_")) return { tool, screen: "desktop" };
+  return null;
 };
 
 const withTrail = (list: BrowserTrailStep[] | undefined, more: BrowserTrailStep[]) =>
   [...(list ?? []), ...more].slice(-BROWSER_TRAIL_MAX);
 
-/** Adds a browser call to `t`'s trail; any other tool leaves it as it is. */
+/**
+ * Adds a browser or desktop call to `t`'s trail of that screen; any other tool
+ * leaves it as it is. A plan (`browser_do`, `desktop_do`) isn't one step: its
+ * steps come in its result (`absorbToolData`), each as the tool it stands for.
+ */
 export function absorbBrowserCall(
   t: ToolSideEffects,
   call: { name: string; input: unknown },
   failed: boolean,
   at = new Date(),
 ) {
-  const tool = browserTool(call.name);
-  if (!tool) return;
+  const found = screenTool(call.name);
+  if (!found || found.tool === TRAIL_DATA[found.screen].plan) return;
+  const { tool, screen } = found;
   const detail = toolDetail(tool, call.input as Record<string, unknown> | undefined);
-  t.browser = withTrail(t.browser, [
+  t[screen] = withTrail(t[screen], [
     { tool, ...(detail ? { detail } : {}), at: at.toISOString(), ...(failed ? { failed: true as const } : {}) },
   ]);
 }
@@ -165,8 +198,28 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   if (link?.missionId && link.threadId) t.missionLink = link;
   if (data.reacted) t.reacted = true;
   if (data.reported) t.reported = true;
+  const passed = data.passed as { reason?: unknown } | undefined;
+  if (passed) t.passed = { reason: typeof passed.reason === "string" ? passed.reason : "" };
   if (typeof data.repo === "string") t.repo = data.repo;
   if (typeof data.deniedRepo === "string") t.deniedRepo = data.deniedRepo;
+  const at = new Date().toISOString();
+  for (const screen of ["browser", "desktop"] as const) {
+    const list = data[TRAIL_DATA[screen].data];
+    if (!Array.isArray(list)) continue;
+    const steps = list.flatMap((s): BrowserTrailStep[] => {
+      const step = s as { tool?: unknown; detail?: unknown; failed?: unknown };
+      if (typeof step.tool !== "string" || !step.tool.startsWith(`${screen}_`)) return [];
+      return [
+        {
+          tool: step.tool,
+          ...(typeof step.detail === "string" ? { detail: step.detail } : {}),
+          at,
+          ...(step.failed === true ? { failed: true as const } : {}),
+        },
+      ];
+    });
+    if (steps.length > 0) t[screen] = withTrail(t[screen], steps);
+  }
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;
@@ -180,9 +233,11 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.missionLink) t.missionLink = e.missionLink;
   if (e.reacted) t.reacted = true;
   if (e.reported) t.reported = true;
+  if (e.passed) t.passed = e.passed;
   if (e.repo) t.repo = e.repo;
   if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
   if (e.browser?.length) t.browser = withTrail(t.browser, e.browser);
+  if (e.desktop?.length) t.desktop = withTrail(t.desktop, e.desktop);
 }
 
 const hasEffects = (e: ToolSideEffects) =>
@@ -192,9 +247,11 @@ const hasEffects = (e: ToolSideEffects) =>
       e.missionLink ||
       e.reacted ||
       e.reported ||
+      e.passed ||
       e.repo ||
       e.deniedRepo ||
-      e.browser?.length,
+      e.browser?.length ||
+      e.desktop?.length,
   );
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */
@@ -311,10 +368,10 @@ export async function invokeWithChip(
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
   const input = use.input as Record<string, unknown> | undefined;
   const builtIn = scope.turnTools !== null && !(connector || def?.connectionId);
-  // The agent browser is ours on every brain: a computer brain's open names its site too.
-  const browser = browserTool(use.name);
-  const detail = browser
-    ? toolDetail(browser, input)
+  // The agent's browser and desktop are ours on every brain: a computer brain's open names its site too.
+  const screen = screenTool(use.name)?.tool;
+  const detail = screen
+    ? toolDetail(screen, input)
     : builtIn
       ? (toolDetail(use.name, input) ??
         (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
@@ -329,9 +386,29 @@ export async function invokeWithChip(
     toolUseId: use.id,
     ...(code ? { code } : {}),
   });
+  // The end names its call and whether the tool answered with an error, or didn't run because it waits on a
+  // person (an approval, a question, a secret): the chat marks that line.
+  const ended = (end: { failed?: boolean; held?: boolean }) =>
+    publishChannelEvent(deps.pubsub, {
+      type: "agent.tool",
+      ...where,
+      tool: null,
+      toolUseId: use.id,
+      ...(end.failed ? { failed: true } : {}),
+      ...(end.held ? { held: true } : {}),
+    });
   return scope.tools
     .invoke(ctx, { toolUseId: use.id, name: use.name, input: (use.input ?? {}) as Record<string, unknown> })
-    .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
+    .then(
+      async (outcome) => {
+        await ended(outcome.type === "result" ? { failed: outcome.output.isError === true } : { held: true });
+        return outcome;
+      },
+      async (error: unknown) => {
+        await ended({ failed: true });
+        throw error;
+      },
+    );
 }
 
 type Located = { ctx: ToolContext; run: AgentRun | null };
@@ -380,13 +457,14 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
-      // Tools on demand (D65): the same list the run's turns see.
+      // Tools on demand (ADR 0043): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
+      ...(run.background ? { background: true } : {}),
     },
   };
 }
 
-/** The tool groups a run listed up front (`Transcript.toolGroups`, D65); null = every tool. */
+/** The tool groups a run listed up front (`Transcript.toolGroups`, ADR 0043); null = every tool. */
 const loadedGroupsOf = (transcript: unknown): string[] | null => {
   const groups = (transcript as { toolGroups?: unknown } | null)?.toolGroups;
   return Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : null;
@@ -396,6 +474,8 @@ const loadedGroupsOf = (transcript: unknown): string[] | null => {
  * The tools of a bridge identity, as `BrainTool[]`: a run's (the Tool Gateway
  * list with its scopes, mission tools when in a mission thread) or a mission
  * task's (its own gateway). `machineId` marks the context as a bridge call.
+ * The run's policy applies as for the model loop (`run-policy.ts`): a tool the
+ * run may not use isn't listed, and every call is checked again.
  */
 export async function bridgeToolsFor(deps: RunToolsDeps, id: BridgeIdentity): Promise<BrainTool[]> {
   if (!deps.tools) return [];
@@ -479,13 +559,205 @@ export function waitOf(data: Record<string, unknown> | undefined): { id: string 
 /** A gated call the run pauses on: the gateway's (approval, question, secret) or a mission tool's wait. */
 export type RunPause = Exclude<InvokeResult, { type: "result" }> | { type: "wait"; id: string; content: string };
 
+// ── Pause cards ──────────────────────────────────────────────────────────────
+
+/** What a run pauses on in one step: approvals, questions (`ask_user`) and secret requests (ADR 0027). */
+export interface PauseRequests {
+  approvals: Approval[];
+  /** `why`: the agent's required reason (ADR 0053 §8), shown on the card. */
+  questions: { id: string; toolUseId: string; text: string; choices: string[] | null; why?: string }[];
+  secretRequestIds: string[];
+}
+
+/** The cards one pause posted (in the caller's transaction): `publishPauseCards` announces them after the commit. */
+export interface PostedPause {
+  messages: Message[];
+  approvals: Approval[];
+  questions: AgentQuestionRow[];
+  secrets: SecretRequestRow[];
+  /** Cards that took the run's receipts (`message.actions` goes out with them). */
+  withReceipts: string[];
+}
+
+/** A run's trigger, as its messages and cards read it. */
+export type RunTriggerRow = Pick<Message, "id" | "authorType" | "meta">;
+
+/** The trigger of a run (null when it is gone). */
+export async function runTriggerOf(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "triggerMessageId">,
+): Promise<RunTriggerRow | null> {
+  const [row] = await db
+    .select({ id: messages.id, authorType: messages.authorType, meta: messages.meta })
+    .from(messages)
+    .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
+  return row ?? null;
+}
+
+/**
+ * What every message a run posts carries, on every brain: the routine that called it (`viaRoutine`, a
+ * small tag, since the routine's own call isn't shown) and whether the router brought it in after another
+ * agent spoke (`joined`, ADR 0034). Only a person-authored trigger is a routine's call.
+ */
+export function runMessageMeta(
+  run: Pick<AgentRun, "trigger">,
+  trigger: Pick<Message, "authorType" | "meta"> | null | undefined,
+): Record<string, unknown> {
+  const call =
+    trigger?.authorType === "person" ? (trigger.meta.routine as { id?: unknown; name?: unknown } | undefined) : null;
+  const viaRoutine =
+    call && typeof call.id === "string" && typeof call.name === "string" ? { id: call.id, name: call.name } : null;
+  const joined = run.trigger === "router" && trigger?.authorType === "agent";
+  return { ...(viaRoutine ? { viaRoutine } : {}), ...(joined ? { joined: true } : {}) };
+}
+
+/**
+ * The one way a run's pause cards are posted (ADR 0053 §10), for the model loop and for a computer brain's
+ * bridged call alike: same meta, same receipts. Cards go where the run replies; a routine's background run
+ * posts them where it reports (`brief.deliverTo`), never in its room. Each approval card carries the agent's
+ * `why` and where it came from (`origin`); a consulted agent's approval goes to whoever asked (ADR 0034).
+ * Runs inside the caller's transaction; nothing is published here (`publishPauseCards`).
+ */
+export async function postPauseCards(tx: Executor, run: AgentRun, requests: PauseRequests): Promise<PostedPause> {
+  const out: PostedPause = { messages: [], approvals: [], questions: [], secrets: [], withReceipts: [] };
+  if (requests.approvals.length + requests.questions.length + requests.secretRequestIds.length === 0) return out;
+  const trigger = await runTriggerOf(tx, run);
+  const extra = runMessageMeta(run, trigger);
+  const brief = run.background ? routineBriefOf(trigger?.meta) : null;
+  const home = brief?.deliverTo ?? { channelId: run.channelId, threadId: replyThreadOf(run) };
+  const card = async (
+    to: { channelId: string; threadId: string | null },
+    body: string,
+    meta: Record<string, unknown>,
+  ): Promise<Message> => {
+    const message = await insertMessage(tx, {
+      orgId: run.orgId,
+      channelId: to.channelId,
+      threadId: to.threadId,
+      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+      body,
+      meta: { ...meta, ...extra },
+    });
+    // Act with undo (ADR 0037): what the run changed so far rides on its first message (its receipts).
+    if ((await linkRunActions(tx, run.orgId, run.id, message.id)) > 0) out.withReceipts.push(message.id);
+    out.messages.push(message);
+    return message;
+  };
+
+  for (const requestId of requests.secretRequestIds) {
+    const [request] = await tx
+      .update(secretRequests)
+      .set({ threadId: home.threadId, ...(brief ? { channelId: home.channelId } : {}) })
+      .where(eq(secretRequests.id, requestId))
+      .returning();
+    if (!request) continue;
+    const message = await card(home, `Secret request: ${request.name}`, {
+      ...bodyCode("secret_request", { name: request.name }),
+      secretRequestId: request.id,
+      secretRequest: secretRequestView(request),
+    });
+    const [linked] = await tx
+      .update(secretRequests)
+      .set({ messageId: message.id })
+      .where(eq(secretRequests.id, request.id))
+      .returning();
+    if (linked) {
+      await syncSecretMessage(tx, linked);
+      message.meta = { ...message.meta, secretRequest: secretRequestView(linked) };
+      out.secrets.push(linked);
+    }
+  }
+
+  for (const ask of requests.questions) {
+    const [inserted] = await tx
+      .insert(agentQuestions)
+      .values({
+        id: ask.id,
+        orgId: run.orgId,
+        runId: run.id,
+        agentId: run.agentId,
+        channelId: home.channelId,
+        threadId: home.threadId,
+        toolUseId: ask.toolUseId,
+        text: ask.text,
+        choices: ask.choices,
+        expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (!inserted) continue;
+    const message = await card(home, ask.text, questionCardMeta(inserted, ask.why ?? ""));
+    const [linked] = await tx
+      .update(agentQuestions)
+      .set({ messageId: message.id })
+      .where(eq(agentQuestions.id, ask.id))
+      .returning();
+    if (linked) {
+      await syncQuestionMessage(tx, linked);
+      message.meta = { ...message.meta, question: questionView(linked) };
+      out.questions.push(linked);
+    }
+  }
+
+  for (const approval of requests.approvals) {
+    const meta = {
+      ...bodyCode("approval_request", { title: approval.title }),
+      approvalId: approval.id,
+      ...(approval.why ? { why: approval.why } : {}),
+      ...(approval.origin ? { origin: approval.origin } : {}),
+    };
+    const to =
+      !brief && approval.channelId !== run.channelId
+        ? {
+            channelId: approval.channelId,
+            threadId: await consultationCardThread(tx, run.orgId, run.id, approval.threadRootId),
+          }
+        : home;
+    const message = await card(to, `Approval request: ${approval.title}`, meta);
+    const [linked] = await tx
+      .update(approvals)
+      .set({
+        messageId: message.id,
+        // A routine's approval lives where its card is: decided, announced and listed there.
+        ...(brief ? { channelId: home.channelId, threadRootId: home.threadId ?? message.id } : {}),
+      })
+      .where(eq(approvals.id, approval.id))
+      .returning();
+    out.approvals.push(linked ?? approval);
+  }
+  return out;
+}
+
+/** After the commit: the cards show up with their receipts, and who decides or answers hears them. */
+export async function publishPauseCards(deps: { db: Database; pubsub?: PubSub }, run: AgentRun, posted: PostedPause) {
+  const { db, pubsub } = deps;
+  if (pubsub) {
+    for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView))) {
+      await publishMessageCreated(pubsub, m);
+    }
+  }
+  for (const id of posted.withReceipts) await publishMessageActions(deps, run.orgId, id).catch(() => {});
+  if (pubsub) {
+    for (const card of posted.approvals) {
+      await publishApproval({ db, pubsub }, card, "approval.created");
+      // A mission's approval (agent mode): its owner hears it waits.
+      if (card.missionId) await notifyMissionApproval({ db, pubsub }, card).catch(() => undefined);
+    }
+  }
+  for (const q of posted.questions) {
+    await publishQuestion(pubsub, q, "question.asked");
+    await notifyQuestion({ db, pubsub } as Parameters<typeof notifyQuestion>[0], q).catch(() => {});
+  }
+  for (const r of posted.secrets) await publishSecret(pubsub, r, "secret.requested");
+}
+
 /**
  * A computer brain's gated call (through the bridge) pauses the run exactly
- * like the model path does: the approval / question / secret card is posted
- * where the run's replies go (`runWhere`), the call joins the transcript's
- * pending calls, and the run moves to `waiting_approval` / `waiting_input`. On
- * the decision the engine resumes the run, and the brain session gets the
- * result ("approved: …" / "refused: …").
+ * like the model path does: the cards are posted by the same function
+ * (`postPauseCards`), the call joins the transcript's pending calls, and the
+ * run moves to `waiting_approval` / `waiting_input`. On the decision the
+ * engine resumes the run, and the brain session gets the result
+ * ("approved: …" / "refused: …").
  *
  * The run row is locked first and its state decides before anything is
  * posted: `running` → it suspends; already waiting on a call bridged in this
@@ -503,18 +775,8 @@ export async function suspendRunForTool(
 ): Promise<ToolResult> {
   const { db } = deps;
   const where = runWhere(run);
-  const threadId = where.threadId;
   const wanted = gated.type === "approval" ? "waiting_approval" : "waiting_input";
   const questionId = gated.type === "question" ? Bun.randomUUIDv7() : null;
-  const post = (tx: Executor, body: string, meta: Record<string, unknown>) =>
-    insertMessage(tx, {
-      orgId: run.orgId,
-      channelId: run.channelId,
-      threadId,
-      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-      body,
-      meta,
-    });
 
   const posted = await db.transaction(async (tx) => {
     // Lock and decide first: the card is posted only when the pending call is kept too.
@@ -550,91 +812,14 @@ export async function suspendRunForTool(
       }
       return null;
     }
-    const messages: Message[] = [];
-    let card: Approval | null = null;
-    let question: AgentQuestionRow | null = null;
-    let secret: SecretRequestRow | null = null;
-    if (gated.type === "approval") {
-      const cardText = `Approval request: ${gated.approval.title}`;
-      const cardMeta = {
-        ...bodyCode("approval_request", { title: gated.approval.title }),
-        approvalId: gated.approval.id,
-      };
-      // A consulted agent's request goes to the conversation of whoever asked (ADR 0034).
-      const message =
-        gated.approval.channelId === run.channelId
-          ? await post(tx, cardText, cardMeta)
-          : await insertMessage(tx, {
-              orgId: run.orgId,
-              channelId: gated.approval.channelId,
-              threadId: await consultationCardThread(tx, run.orgId, run.id, gated.approval.threadRootId),
-              author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-              body: cardText,
-              meta: cardMeta,
-            });
-      messages.push(message);
-      const [linked] = await tx
-        .update(approvals)
-        .set({ messageId: message.id })
-        .where(eq(approvals.id, gated.approval.id))
-        .returning();
-      card = linked ?? gated.approval;
-    } else if (gated.type === "question" && questionId) {
-      const [inserted] = await tx
-        .insert(agentQuestions)
-        .values({
-          id: questionId,
-          orgId: run.orgId,
-          runId: run.id,
-          agentId: run.agentId,
-          channelId: run.channelId,
-          threadId,
-          toolUseId: call.id,
-          text: gated.text,
-          choices: gated.choices,
-          expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
-        })
-        .onConflictDoNothing()
-        .returning();
-      if (inserted) {
-        const message = await post(tx, gated.text, { questionId, question: questionView(inserted) });
-        messages.push(message);
-        const [linked] = await tx
-          .update(agentQuestions)
-          .set({ messageId: message.id })
-          .where(eq(agentQuestions.id, questionId))
-          .returning();
-        if (linked) {
-          await syncQuestionMessage(tx, linked);
-          message.meta = { ...message.meta, question: questionView(linked) };
-          question = linked;
-        }
-      }
-    } else if (gated.type === "secret") {
-      const [request] = await tx
-        .update(secretRequests)
-        .set({ threadId })
-        .where(eq(secretRequests.id, gated.requestId))
-        .returning();
-      if (request) {
-        const message = await post(tx, `Secret request: ${request.name}`, {
-          ...bodyCode("secret_request", { name: request.name }),
-          secretRequestId: request.id,
-          secretRequest: secretRequestView(request),
-        });
-        messages.push(message);
-        const [linked] = await tx
-          .update(secretRequests)
-          .set({ messageId: message.id })
-          .where(eq(secretRequests.id, request.id))
-          .returning();
-        if (linked) {
-          await syncSecretMessage(tx, linked);
-          message.meta = { ...message.meta, secretRequest: secretRequestView(linked) };
-          secret = linked;
-        }
-      }
-    }
+    const pause = await postPauseCards(tx, run, {
+      approvals: gated.type === "approval" ? [gated.approval] : [],
+      questions:
+        gated.type === "question" && questionId
+          ? [{ id: questionId, toolUseId: call.id, text: gated.text, choices: gated.choices, why: gated.why }]
+          : [],
+      secretRequestIds: gated.type === "secret" ? [gated.requestId] : [],
+    });
     // The engine's resume reads the pending calls from the transcript.
     const pendingCall = {
       toolUseId: call.id,
@@ -659,7 +844,7 @@ export async function suspendRunForTool(
           ? {
               transcript: {
                 ...transcript,
-                postedCount: (transcript.postedCount ?? 0) + messages.length,
+                postedCount: (transcript.postedCount ?? 0) + pause.messages.length,
                 pending: { calls: [...(transcript.pending?.calls ?? []), pendingCall] },
               },
             }
@@ -668,7 +853,7 @@ export async function suspendRunForTool(
       .where(
         and(eq(agentRuns.id, run.id), inArray(agentRuns.status, ["running", "waiting_approval", "waiting_input"])),
       );
-    return { messages, card, question, secret, status, changed: locked.status !== status };
+    return { pause, status, changed: locked.status !== status };
   });
 
   if (!posted) {
@@ -677,34 +862,13 @@ export async function suspendRunForTool(
       isError: true,
     };
   }
-  const waitingFor = posted.status;
-  const pubsub = deps.pubsub;
-  if (pubsub) {
-    for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView))) {
-      await publishMessageCreated(pubsub, m);
-    }
-  }
-  if (deps.pubsub && posted.card) {
-    await publishApproval({ db, pubsub: deps.pubsub }, posted.card, "approval.created");
-    if (posted.card.missionId) {
-      await notifyMissionApproval({ db, pubsub: deps.pubsub }, posted.card).catch(() => undefined);
-    }
-  }
-  if (posted.question) {
-    await publishQuestion(deps.pubsub, posted.question, "question.asked");
-    await notifyQuestion({ db, pubsub: deps.pubsub } as Parameters<typeof notifyQuestion>[0], posted.question).catch(
-      () => {},
-    );
-  }
-  if (posted.secret) await publishSecret(deps.pubsub, posted.secret, "secret.requested");
+  await publishPauseCards(deps, run, posted.pause);
   if (posted.changed) {
     await publishChannelEvent(deps.pubsub, {
       type: "agent.run",
-      channelId: run.channelId,
-      threadId,
-      runId: run.id,
-      agentId: run.agentId,
-      status: waitingFor,
+      ...where,
+      status: posted.status,
+      ...(run.background ? { background: true as const } : {}),
     });
   }
 

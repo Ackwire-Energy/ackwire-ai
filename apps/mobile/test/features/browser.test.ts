@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { type BrowserHandoff, browserHandoffOf, controlledBy, heldTakeoversHere } from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
-import { cardStateOf, hostOf, siteLetter, siteOf } from "../../src/features/browser/logic";
+import {
+  browserGranted,
+  cardStateOf,
+  hostOf,
+  type PageGap,
+  pageNoteOf,
+  siteLetter,
+  siteOf,
+  skyBehind,
+} from "../../src/features/browser/logic";
+import { featureKeysEn } from "../../src/features/i18n/keys.en";
+import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { handoffHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
 import { readPushData } from "../../src/lib/push-payload";
 import { notification } from "./fixtures";
@@ -36,6 +47,16 @@ describe("the help request card", () => {
     expect(cardStateOf({ status: "expired", controllerUserId: null }, "u1")).toBe("expired");
   });
 
+  test("a request on the agent's desktop opens on a computer: never the browser card, never taken here", () => {
+    const desktop = { screen: "desktop" as const, controllerUserId: null };
+    expect(cardStateOf({ ...desktop, status: "pending" }, "u1")).toBe("computer");
+    expect(cardStateOf({ ...desktop, status: "active", controllerUserId: "u1" }, "u1")).toBe("computer");
+    // How it ended reads as any request's.
+    expect(cardStateOf({ ...desktop, status: "done" }, "u1")).toBe("done");
+    expect(cardStateOf({ screen: "browser", status: "pending", controllerUserId: null }, "u1")).toBe("waiting");
+    for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card.computer).toContain("{{title}}");
+  });
+
   test("the site's host", () => {
     expect(hostOf("https://Dashboard.Stripe.com/login?x=1")).toBe("dashboard.stripe.com");
     expect(hostOf("about:blank")).toBe("");
@@ -59,6 +80,68 @@ describe("the browser card", () => {
     expect(siteLetter("www.loja.exemplo")).toBe("L");
     expect(siteLetter("dashboard.stripe.com")).toBe("D");
     expect(siteLetter("")).toBe("");
+  });
+});
+
+describe("the page box with no page to show", () => {
+  test("a closed browser says so, without a spinner, and that it opens again by itself", () => {
+    expect(pageNoteOf("closed", false, false)).toEqual({ say: "closed", spin: false, help: "closedHelp" });
+    expect(pageNoteOf("closed", false, true)).toEqual({ say: "closed", spin: false, help: "closedHelp" });
+  });
+
+  test("someone else in control: the screen stays theirs", () => {
+    expect(pageNoteOf(null, true, false)).toEqual({ say: "hidden", spin: false, help: null });
+    // A reason to show nothing at all wins over who holds it.
+    expect(pageNoteOf("offline", true, false)).toEqual({ say: "offline", spin: false, help: null });
+    // A closed browser is held until a frame, and no frame reaches a hidden view: who holds it is what it says.
+    expect(pageNoteOf("closed", true, false)).toEqual({ say: "hidden", spin: false, help: null });
+    expect(pageNoteOf("ended", true, false)).toEqual({ say: "hidden", spin: false, help: null });
+  });
+
+  test("opening and reconnecting spin; the person in control hears the 2-minute grace", () => {
+    expect(pageNoteOf(null, false, false)).toEqual({ say: "starting", spin: true, help: null });
+    expect(pageNoteOf("reconnecting", false, true)).toEqual({ say: "reconnecting", spin: true, help: "grace" });
+    expect(pageNoteOf("reconnecting", false, false)).toEqual({ say: "reconnecting", spin: true, help: null });
+    for (const gap of ["offline", "no_computer", "unavailable", "forbidden", "ended"] as const)
+      expect(pageNoteOf(gap, false, false)).toEqual({ say: gap, spin: false, help: null });
+  });
+
+  test("a closed, ended or offline browser shows the agent's sky behind its words; a page on its way doesn't", () => {
+    for (const gap of ["closed", "ended", "offline"] as const)
+      expect(skyBehind(pageNoteOf(gap, false, false))).toBe(true);
+    for (const gap of [null, "reconnecting", "no_computer", "unavailable", "forbidden"] as const)
+      expect(skyBehind(pageNoteOf(gap, false, false))).toBe(false);
+    // Someone else in control: their screen stays theirs, no sky.
+    expect(skyBehind(pageNoteOf("closed", true, false))).toBe(false);
+  });
+
+  test("every reason has its words in both languages (the key is built from the reason)", () => {
+    const reasons: PageGap[] = [
+      "reconnecting",
+      "offline",
+      "no_computer",
+      "closed",
+      "unavailable",
+      "forbidden",
+      "ended",
+    ];
+    for (const keys of [featureKeysPtBR, featureKeysEn]) {
+      const words = keys.browser.live.unavailable as Record<string, string>;
+      for (const r of reasons) for (const g of ["F", "M"]) expect(words[`${r}${g}`]).toBeTruthy();
+    }
+  });
+});
+
+describe("whether the agent may use its browser", () => {
+  test("only for an agent granted its browser (all tools doesn't cover it)", () => {
+    const access = (state: "granted" | "inherited" | "denied" | "off") => ({
+      builtins: [{ scope: "browser:use", label: "Navegador", state, tools: [] }],
+    });
+    expect(browserGranted(access("granted"))).toBe(true);
+    expect(browserGranted(access("inherited"))).toBe(false);
+    expect(browserGranted(access("off"))).toBe(false);
+    expect(browserGranted({ builtins: [] })).toBe(false);
+    expect(browserGranted(undefined)).toBe(false);
   });
 });
 

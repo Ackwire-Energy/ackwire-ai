@@ -12,9 +12,10 @@ export interface CarouselProps {
 }
 
 /**
- * One row of choices that slides sideways (telas/PerfilAgente.html: the
- * agent's eyes and what it wears), item by item, with an arrow on each side.
- * The arrows step back when everything fits; trackpads and touch scroll it too.
+ * One row of choices that slides sideways (the agent's eyes and what it
+ * wears), item by item. An arrow floats over each edge with more to see (the
+ * row fades under it), so the row starts where rows that fit do; trackpads and
+ * touch scroll it too.
  */
 export function Carousel({ label, previousLabel, nextLabel, children, className }: CarouselProps) {
   const track = useRef<HTMLDivElement>(null);
@@ -41,7 +42,10 @@ export function Carousel({ label, previousLabel, nextLabel, children, className 
     el?.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
   };
   return (
-    <div className={cx("ac-carousel", edges.start && edges.end && "ac-carousel--fits", className)}>
+    <div
+      className={cx("ac-carousel", className)}
+      data-more={edges.start ? (edges.end ? undefined : "end") : edges.end ? "start" : "both"}
+    >
       <button
         type="button"
         className="ac-carousel__arrow"

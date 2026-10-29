@@ -1,13 +1,21 @@
 import { and, type Database, desc, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 
-export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file" | "wiki";
+export type SearchKind =
+  | "message"
+  | "context_item"
+  | "issue"
+  | "forum_topic"
+  | "forum_reply"
+  | "file"
+  | "wiki"
+  | "action";
 
 export interface SearchDocument {
   orgId: string;
   kind: SearchKind;
   sourceId: string;
   /**
-   * Visibility travels with the document (D11): a reader must see EVERY
+   * Visibility travels with the document (ADR 0017): a reader must see EVERY
    * channel listed (most restrictive of the sources). Empty = whole org.
    */
   channelIds: string[];
@@ -53,7 +61,7 @@ export interface SearchIndex {
 }
 
 /**
- * Picks the search backend per organization (D18c). The core always answers
+ * Picks the search backend per organization (ADR 0002). The core always answers
  * Postgres and knows nothing about plans; the Cloud billing module replaces
  * this resolver.
  */

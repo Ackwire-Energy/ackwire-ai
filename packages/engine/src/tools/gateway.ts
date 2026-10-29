@@ -1,11 +1,26 @@
+import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { type RunAuthority, runAuthorityById } from "../authority";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
+import {
+  callTargets,
+  checkTeamAction,
+  commandAction,
+  forgetPendingCommand,
+  isOutsideTool,
+  recordTeamAction,
+  summarizeCall,
+  type TeamCheck,
+} from "../team-actions";
+import { carriesCredential, toolDetail } from "../tool-detail";
+import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
+import { approvalOrigin, type PolicyDecision, takeWhy, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
@@ -29,17 +44,74 @@ export const APPROVAL_TTL_MS = 24 * 3600_000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
 
-const EXTERNAL_MARKER = /<\s*\/?\s*external_data\b[^>]*>/gi;
 /**
- * An `external` tool's output (an MCP server's answer) reaches the model inside
- * an `<external_data>` block, with any copy of the marker in it neutralised so
- * the text can't close the block early. The system prompt says what it means.
+ * An `external` tool's output (an MCP server's answer) reaches the model inside the one envelope for
+ * outside content (`untrustedBlock`): markers in it neutralised, so the text can't close the block
+ * early. The result is already capped (`MAX_RESULT_CHARS`), so the envelope doesn't cut it again.
  */
-export const wrapExternal = (source: string, text: string) =>
-  `<external_data source="${source}">\n${text.replace(EXTERNAL_MARKER, "[marker removed]")}\n</external_data>`;
+export const wrapExternal = (source: string, text: string) => untrustedBlock(source, text, MAX_RESULT_CHARS + 100);
 /** What run steps and approvals keep: the text people see, without the model's envelope. */
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
+
+/** The answer to a call of a run nobody is behind that carries a credential (`carriesCredential`). */
+export const CREDENTIAL_REFUSAL =
+  "Refused: this call carries what looks like a key, token or private key. Work no person asked for never sends credentials anywhere: leave the value out (you may say one was found, and where).";
+
+/** `ask_user` (questions.ts): it waits for a person, so it carries a `why` like an approval. */
+const ASK_USER = "ask_user";
+
+const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool.scope === "" && !tool.connectionId;
+
+/** Whether a call of this tool waits for a person: an approval, or a built-in question. */
+const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
+  decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
+
+/** A check that failed for any reason never stops the action (ADR 0064): it only misses a notice. */
+const UNCHECKED: TeamCheck = { proceed: true, reason: null };
+
+/** `permission_prompt`'s question (Claude Code and Codex commands): a new command, or the state of one asked. */
+function promptQuestion(input: Record<string, unknown>) {
+  if (typeof input.request_id === "string" && input.request_id) return { poll: input.request_id, action: null };
+  const inner = input.input;
+  const action =
+    typeof input.tool_name === "string" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? commandAction(input.tool_name, inner as Record<string, unknown>)
+      : null;
+  return { poll: null, action };
+}
+
+/** `permission_prompt`'s answer: `{behavior}` when decided, `{status: "pending", request_id}` while a person decides. */
+function promptAnswer(content: string): { behavior?: string; status?: string; request_id?: string } {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
+const authorityOf = (ctx: ToolContext): Promise<RunAuthority | null> =>
+  ctx.runId ? runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(null);
+
+const ALLOWED: PolicyDecision = { action: "allow" };
+const policyFor = (authority: RunAuthority | null, tool: ToolDefinition) =>
+  authority ? toolPolicy(authority, tool) : ALLOWED;
+
+/**
+ * A tool as a run sees it: one the policy says asks a person becomes sensitive (its card, and the
+ * "asks a person's approval" in a directory), and every tool that asks a person takes the required
+ * `why` the card shows. The same list goes to the model loop and to the bridge.
+ */
+function asListed(tool: ToolDefinition, decision: PolicyDecision): ToolDefinition {
+  if (!asksPerson(tool, decision)) return tool;
+  return {
+    ...tool,
+    ...(decision.action === "approve" ? { sensitive: true } : {}),
+    inputSchema: withWhy(tool.inputSchema),
+  };
+}
 
 export type ToolCall = { toolUseId: string; name: string; input: Record<string, unknown> };
 export type Approval = typeof approvals.$inferSelect;
@@ -48,19 +120,26 @@ export type InvokeResult =
   | { type: "result"; output: ToolOutput }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
-  | { type: "question"; text: string; choices: string[] | null }
+  | { type: "question"; text: string; choices: string[] | null; why: string }
   /** `request_secret`: the executor posts the card and suspends the run. */
   | { type: "secret"; requestId: string };
 
 /**
- * The only way an agent's tool call runs (D2, docs/adr/0015). For each call:
+ * The only way an agent's tool call runs (docs/adr/0015). For each call:
  * 1. the tool is looked up by name in the run's tool set (never trusting the
  *    model's claim of what it is);
  * 2. the agent's scope for it is read from `agent_scopes` (a prompt can't change it);
  * 3. the input is validated against the tool's JSON Schema;
- * 4. sensitive tools create an `approvals` row bound to the action hash and
+ * 4. the run's policy (`run-policy.ts`: who is behind the run) refuses it,
+ *    lets it run, or makes it ask a person;
+ * 5. a call that asks a person (an approval, `ask_user`) must say why: the
+ *    `why` is taken out of the input and kept on the approval or question;
+ * 6. sensitive tools create an `approvals` row bound to the action hash and
  *    stop there; others run, with errors turned into error results;
- * 5. `tool_call` / `tool_result` / `approval` steps are recorded.
+ * 7. `tool_call` / `tool_result` / `approval` steps are recorded;
+ * 8. an outside call (a connected app's write, a command that leaves the
+ *    computer) is held once when the team already did it to the same target,
+ *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
 export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
   const now = deps.now ?? (() => new Date());
@@ -76,18 +155,29 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     return byName;
   }
 
-  /** Every tool this agent may call now, as is: every source, filtered by granted scopes, by name. */
+  /**
+   * Every tool this agent may call now: every source, filtered by granted scopes and by the run's
+   * policy (a refused tool isn't listed), by name. Tools that ask a person carry the required `why`.
+   */
   async function granted(ctx: ToolContext): Promise<ToolDefinition[]> {
-    const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-    return [...(await allTools(ctx)).values()]
+    return grantedFor(ctx, await authorityOf(ctx));
+  }
+
+  async function grantedFor(ctx: ToolContext, authority: RunAuthority | null): Promise<ToolDefinition[]> {
+    const [keys, all] = await Promise.all([grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId), allTools(ctx)]);
+    return [...all.values()]
       .filter((t) => isAllowed(toolAccess(keys, t)))
+      .flatMap((t) => {
+        const decision = policyFor(authority, t);
+        return decision.action === "refuse" ? [] : [asListed(t, decision)];
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
    * Tools this agent may call now, as the model sees them: each big
    * connector listed as its directory, and with tools on demand
-   * (`ctx.loadedGroups`, D65) the groups not loaded behind `find_tools` /
+   * (`ctx.loadedGroups`, ADR 0043) the groups not loaded behind `find_tools` /
    * `use_tool` (tools/directory.ts).
    */
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {
@@ -125,14 +215,17 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     granted,
 
     async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
-      const all = await allTools(ctx);
+      // Who is behind the run decides what it may do: listing already hid refused tools, this is the call.
+      const [all, authority] = await Promise.all([allTools(ctx), authorityOf(ctx)]);
       // A big connector's directory (tools/directory.ts): `use_tool` runs the real tool by its own name, so
-      // everything below (steps, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
+      // everything below (steps, policy, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
       let call = requested;
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
-        const listed = (await list(ctx)).find((t) => t.name === call.name);
+        const listed = presentTools(await grantedFor(ctx, authority), isSensitive, ctx.loadedGroups).find(
+          (t) => t.name === call.name,
+        );
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;
         else if (role?.kind === "use") {
@@ -156,7 +249,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // A mission task's call through the bridge has no run (ADR 0032): nothing to record steps on.
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
-      await record(ctx.db, step, "tool_call", { toolUseId: call.toolUseId, name: call.name, input: call.input });
+      // The same short label the live chip shows (built-in tools only, never a connector's input): the chat's
+      // line of this call says it after the run too.
+      const detail = toolDetail(call.name, call.input);
+      await record(ctx.db, step, "tool_call", {
+        toolUseId: call.toolUseId,
+        name: call.name,
+        input: call.input,
+        ...(detail ? { detail } : {}),
+      });
       const finish = async (output: ToolOutput) => {
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
@@ -171,7 +272,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
       const tool = all.get(call.name) ?? directoryTool;
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
-      const builtIn = tool.scope === "" && !tool.connectionId;
+      const builtIn = isBuiltIn(tool);
+      const decision = policyFor(authority, tool);
+      if (decision.action === "refuse") {
+        return finish({ content: decision.reason, isError: true, data: { code: "tool.not_allowed" } });
+      }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
         const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
@@ -183,22 +288,92 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           return finish({ content: `Not allowed: ${reason}`, isError: true });
         }
       }
+      // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
+      // asked for last: a call refused for any other reason (its input, a repository outside the agent's
+      // list) gets that reason first.
+      const approves = decision.action === "approve" || isSensitive(tool);
+      let why = "";
+      let whyMissing = false;
+      if (asksPerson(tool, decision)) {
+        const taken = takeWhy(tool.inputSchema, call.input);
+        why = taken.why ?? "";
+        whyMissing = !taken.why;
+        call = { ...call, input: taken.input };
+      }
+      // Team actions (ADR 0064): an outside call repeated after the agent was told the team already did it
+      // may say why (kept on the record); the tool never sees it.
+      const outside = isOutsideTool(tool);
+      let repeatWhy: string | null = null;
+      const schemaProps = tool.inputSchema.properties as Record<string, unknown> | undefined;
+      if (outside && !asksPerson(tool, decision) && "why" in call.input && schemaProps?.why === undefined) {
+        const { why: given, ...rest } = call.input;
+        repeatWhy = typeof given === "string" ? given : null;
+        call = { ...call, input: rest };
+      }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {
         // Through a directory the model never saw the schema up front: show it, so the next call can be right.
         const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
         return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
       }
+      // A run nobody is behind never sends a credential anywhere (ADR 0053 §3): a key it read on its computer
+      // (a sandbox that can't keep it from being read) can't leave through any tool, on any brain.
+      if (authority && authority.kind !== "person" && carriesCredential(call.input)) {
+        return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } });
+      }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} });
+      if (whyMissing) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
-      if (isSensitive(tool)) {
+      // Team actions (ADR 0064): before acting outside, has the team already done this to the same target?
+      // A routine's action belongs where it delivers, never to its room.
+      const actionChannel =
+        authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
+      const prompt = tool.name === PERMISSION_TOOL && builtIn ? promptQuestion(call.input) : null;
+      const targets = outside ? callTargets(call.input) : (prompt?.action?.targets ?? []);
+      let teamReason: string | null = null;
+      if (outside || prompt?.action) {
+        const seen = await checkTeamAction(ctx.db, ctx, {
+          tool: prompt?.action?.tool ?? tool.name,
+          targets,
+          why: repeatWhy ?? (why || null),
+        }).catch(() => UNCHECKED);
+        if (!seen.proceed) {
+          // A computer command is answered the way its prompt expects: a refusal with the notice.
+          const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
+          return finish({ content, isError: !prompt, data: { code: "team.action_seen" } });
+        }
+        teamReason = seen.reason;
+      }
+      const recordAction = (input: {
+        source: "tool" | "command";
+        tool: string;
+        summary: string;
+        targets: string[];
+        ref?: string;
+      }) =>
+        recordTeamAction(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId || null,
+          channelId: actionChannel || null,
+          reason: teamReason,
+          ...input,
+        });
+
+      if (approves) {
         const owner = await ownerOf(ctx);
-        // Asked by another agent (ADR 0034): the request shows where the person is, not in the agents' DM.
-        const origin = ctx.runId ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId) : null;
+        // A routine's request goes to the conversation it reports to, never its room; one asked by another
+        // agent (ADR 0034) where the person is, not in the agents' DM.
+        const deliverTo = authority?.kind === "routine" ? authority.brief?.deliverTo : undefined;
+        const origin = deliverTo
+          ? { channelId: deliverTo.channelId, threadRootId: deliverTo.threadId ?? ctx.threadRootId }
+          : ctx.runId
+            ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId)
+            : null;
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;
         const [approval] = await ctx.db
@@ -218,6 +393,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: call.input }),
             title: described.title.slice(0, 300),
             detail: (described.detail ?? "").slice(0, 2000),
+            why,
+            origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
           })
@@ -236,8 +413,30 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "approval", approval: row };
       }
       const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
+      if (outside && !output.isError) {
+        await recordAction({
+          source: "tool",
+          tool: tool.name,
+          summary: summarizeCall(tool, call.input),
+          targets: callTargets(call.input, output.data),
+        });
+      }
+      if (prompt) {
+        const answer = promptAnswer(output.content);
+        if (prompt.action && (answer.behavior === "allow" || answer.status === "pending")) {
+          // A command waiting for a person counts already; it goes away if they say no.
+          await recordAction({
+            source: "command",
+            tool: prompt.action.tool,
+            summary: prompt.action.command,
+            targets: prompt.action.targets,
+            ...(answer.status === "pending" && answer.request_id ? { ref: answer.request_id } : {}),
+          });
+        }
+        if (prompt.poll && answer.behavior === "deny") await forgetPendingCommand(ctx.db, ctx.orgId, prompt.poll);
+      }
       if (builtIn && output.waitForAnswer?.text) {
-        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
+        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
       if (!tool.connectionId && output.waitForSecret?.requestId) {
         return { type: "secret", requestId: output.waitForSecret.requestId };
@@ -285,6 +484,19 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .returning({ id: approvals.id });
         if (claimed.length === 0) return { content: "Already executed", isError: false };
         output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
+        // Team actions (ADR 0064): what a person approved and went out is the team's too.
+        if (isOutsideTool(tool) && !output.isError) {
+          await recordTeamAction(ctx.db, {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId || null,
+            channelId: approval.channelId,
+            source: "approval",
+            tool: tool.name,
+            summary: summarizeCall(tool, approval.params),
+            targets: callTargets(approval.params, output.data),
+          });
+        }
       }
       await ctx.db
         .update(approvals)

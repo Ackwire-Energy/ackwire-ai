@@ -1,4 +1,4 @@
-import type { ThreadActor, ThreadInfo, ThreadTab } from "@agenteschat/client";
+import type { ThreadActor, ThreadInfo } from "@agenteschat/client";
 import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
 import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
 import { previewBody } from "@agenteschat/client/lib/message-body";
@@ -35,20 +35,16 @@ import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
 import { useOpenParam } from "@/lib/open-param";
+import { THREAD_TABS, type ThreadsTab } from "./thread-tabs";
 import "./threads.css";
 
 /**
- * Threads (docs/design/telas/Threads.html, rows from ThreadsRefino.html
- * "Por canal"): the subjects that left the channels and DMs. Tabs, search
+ * Threads: the subjects that left the channels and DMs. Tabs, search
  * and filters, rows grouped by channel (DMs together) with the tag, people
  * and time in fixed columns, hover actions, ⋯, multi-select with the
  * floating bar, and the details panel. No unread counts (reads are per
  * channel) and no counts on the tabs (the API doesn't give them).
  */
-
-/** "Missões" sits between "Com trabalho" and "Fechadas" (ADR 0029 §11); the sidebar's "Missões" opens it. */
-export const THREAD_TABS = ["all", "working", "missions", "closed", "archived"] as const satisfies readonly ThreadTab[];
-export type ThreadsTab = (typeof THREAD_TABS)[number];
 
 const actorsOf = (t: ThreadInfo): { type: ThreadActor["type"]; id: string }[] =>
   t.participants.flatMap((p) => (p.id ? [{ type: p.type, id: p.id }] : []));
@@ -247,7 +243,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           />
         </Toolbar>
         {tab === "archived" && (
-          <p className="threads-note">
+          <p className="threads-note ac-iconline">
             <Icon name="lock" size={14} />
             <span>
               <b>{t("threads.notes.archivedTitle")}</b> {t("threads.notes.archived")}
@@ -255,7 +251,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           </p>
         )}
         {tab === "closed" && (
-          <p className="threads-note">
+          <p className="threads-note ac-iconline">
             <Icon name="refresh" size={14} />
             <span>{t("threads.notes.closed")}</span>
           </p>
@@ -615,7 +611,7 @@ function ThreadDetails({
       page={{ label: thread.state === "archived" ? t("threads.read") : t("threads.open"), onOpen: onGo }}
     >
       {thread.state === "archived" && (
-        <div className="thread-banner">
+        <div className="thread-banner ac-iconline">
           <Icon name="lock" size={16} />
           <div>
             <b>{t("threads.panel.archivedTitle")}</b>
@@ -624,7 +620,7 @@ function ThreadDetails({
         </div>
       )}
       {thread.state === "closed" && (
-        <div className="thread-banner">
+        <div className="thread-banner ac-iconline">
           <Icon name="refresh" size={16} />
           <div>
             <b>{t("threads.panel.closedTitle")}</b>
@@ -728,7 +724,7 @@ function ThreadsEmpty({
         )
       }
     >
-      {t(`threads.empty.${tab}`)}
+      {tab === "all" ? t("threads.empty.all") : null}
     </EmptyState>
   );
 }

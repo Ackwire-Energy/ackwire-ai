@@ -1,6 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
+import { type CSSProperties, useLayoutEffect, useRef } from "react";
 import { addLiveComputer, drawLiveComputer, type LiveComputer } from "../computer/live";
-import { COMPUTER_GRID, type ComputerKind, type ComputerState } from "../computer/portrait.js";
+import {
+  COMPUTER_ART,
+  COMPUTER_GRID,
+  COMPUTER_ROWS,
+  type ComputerKind,
+  type ComputerState,
+} from "../computer/portrait.js";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
@@ -17,11 +23,12 @@ export interface ComputerPortraitProps {
 }
 
 /**
- * A computer's portrait (telas/IconesComputador.html), from the one portrait
+ * A computer's portrait, from the one portrait
  * engine (computer/portrait.js): a Mac laptop, a Windows monitor, a Linux
  * tower or the cloud computer, its screen lit, dimmed (paused) or dark
  * (offline). Pixels on a 48×48 grid scaled by whole numbers; it sits directly
- * on the surface, no tile. Below 48 px use `ComputerIcon`.
+ * on the surface, no tile, its box as wide as the drawing (`COMPUTER_ART`).
+ * Below 48 px use `ComputerIcon`.
  */
 export function ComputerPortrait({ kind, state, size = 48, label, className }: ComputerPortraitProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -43,13 +50,23 @@ export function ComputerPortrait({ kind, state, size = 48, label, className }: C
   useLayoutEffect(() => {
     if (live.current) drawLiveComputer(live.current);
   }, [kind, state]);
+  const cols = COMPUTER_ART[kind][1];
   return (
     <canvas
       ref={canvas}
       className={cx("ac-computer", className)}
-      width={COMPUTER_GRID}
+      width={cols}
       height={COMPUTER_GRID}
-      style={{ width: size, height: size, imageRendering: "pixelated" }}
+      style={
+        {
+          width: (cols * size) / COMPUTER_GRID,
+          height: size,
+          imageRendering: "pixelated",
+          // Where the drawing starts under the box's top (a face line puts the text there), and ends over its bottom.
+          "--art-top": `${(COMPUTER_ROWS[kind][0] * size) / COMPUTER_GRID}px`,
+          "--art-bottom": `${((COMPUTER_GRID - COMPUTER_ROWS[kind][0] - COMPUTER_ROWS[kind][1]) * size) / COMPUTER_GRID}px`,
+        } as CSSProperties
+      }
       data-kind={kind}
       data-state={state}
       role={label ? "img" : undefined}

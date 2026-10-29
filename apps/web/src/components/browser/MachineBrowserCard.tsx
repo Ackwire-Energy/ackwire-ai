@@ -1,14 +1,15 @@
 import type { BrowserHandoff, Machine, ScopeGrant } from "@agenteschat/client";
 import {
+  agentStateOfRun,
   BROWSER_TOOL_SCOPE,
-  isActiveStatus,
-  isBrowserTool,
   isOpenHandoff,
   keys,
   useApi,
   useBrowserHandoffMutations,
+  usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { allowsInApp, canReduceAccess, commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -22,15 +23,8 @@ import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
-/** The first command in the runner's own words ("…run `agentes-runner browser install --with-deps`"). */
-function commandIn(reason: string | null | undefined): string | null {
-  const m = reason ? /`([^`]+)`/.exec(reason) : null;
-  return m?.[1] ?? null;
-}
-
 /**
- * "Navegador" on a computer's page (ADR 0040, telas/NavegadorAgente.html
- * "Computador"): whether the browser is ready here, which agents are in it
+ * "Navegador" on a computer's page (ADR 0040): whether the browser is ready here, which agents are in it
  * now (Ver, Parar), and which agents may use it. Turning it on happens on
  * the computer; the owner can only turn it off here.
  */
@@ -41,7 +35,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (D79).
+  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);
@@ -67,10 +61,11 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
       retry: false,
     })),
   });
-  // Agents whose run is in the browser right now (its current tool), from the live store.
+  // Agents at work whose latest call is in the browser, from the live store: between two calls the run
+  // has no current tool, and while it works its status reads "thinking", so neither alone says it.
   const busy = useStreams((s) =>
     Object.values(s.runs)
-      .filter((r) => agentIds.includes(r.agentId) && isActiveStatus(r.status) && isBrowserTool(r.tool))
+      .filter((r) => agentIds.includes(r.agentId) && agentStateOfRun(r) !== "idle" && usesBrowser(r))
       .map((r) => r.agentId)
       .sort()
       .join(","),
@@ -79,7 +74,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   if (!access && !m.browser) return null;
   const switchedOn = access?.tools.browser === true;
   const ready = switchedOn && m.browser?.available === true;
-  const command = commandIn(m.browser?.reason);
+  const command = commandInReason(m.browser?.reason);
   const uses = m.agents.flatMap((a, i) => {
     const h = handoffs[i]?.data as BrowserHandoff | null | undefined;
     const open = h && isOpenHandoff(h) ? h : null;
@@ -106,10 +101,9 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         id="sec-machine-browser"
         icon="globe"
         title={t("browser.title")}
-        subtitle={t("browser.machine.description")}
         action={
           switchedOn &&
-          m.canManage && (
+          canReduceAccess(m) && (
             <Button size="sm" variant="ghost" aria-label={t("browser.machine.turnOffLabel")} onClick={onTurnOff}>
               {t("browser.machine.turnOff")}
             </Button>
@@ -132,21 +126,33 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {!switchedOn && (
-        <div className="brw-note">
-          <Icon name="computer" size={16} />
-          {here ? (
-            <div className="row" style={{ flex: 1, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ flex: 1, minWidth: 200 }}>{t("machines.thisMac.toolsHere")}</span>
-              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-            </div>
-          ) : (
+      {!switchedOn &&
+        (here ? (
+          <div className="brw-note brw-note--act">
+            <span className="brw-note__text ac-iconline">
+              <Icon name="computer" size={16} />
+              <span>{t("machines.thisMac.toolsHere")}</span>
+            </span>
+            <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+          </div>
+        ) : allowsInApp(m.os) ? (
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
             <div>{t("browser.machine.offHelp")}</div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          // A Linux computer may be a server without the app: the command too.
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
+            <div className="stack-4" style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <span>{t("browser.machine.offHelp")}</span>
+              <span>{t("machines.access.grantTerminal")}</span>
+              <CommandBlock command={toolOnCommand(m, "browser")} />
+            </div>
+          </div>
+        ))}
       {switchedOn && !ready && m.browser?.reason && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {m.browser.reason}
@@ -158,7 +164,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         <>
           <h3 className="brw-gh">{t("browser.machine.inUse")}</h3>
           {uses.length === 0 ? (
-            <div className="brw-note" style={{ marginTop: 8 }}>
+            <div className="brw-note ac-iconline" style={{ marginTop: 8 }}>
               <Icon name="globe" size={16} />
               <div>{t("browser.machine.nobody")}</div>
             </div>

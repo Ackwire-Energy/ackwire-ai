@@ -4,6 +4,31 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 
 const tags = ["Approvals"];
 
+/** Where an approval asked while nobody watched comes from (ADR 0053 §8): a routine, or unattended work. */
+export const ApprovalOrigin = z.union([
+  z.object({ kind: z.literal("routine"), routineId: z.string(), routineName: z.string() }),
+  z.object({ kind: z.literal("unattended") }),
+]);
+
+/** The email a mail approval writes, as its card shows it. */
+export const ApprovalEmail = z
+  .object({
+    verb: z.enum(["draft", "send", "reply", "forward"]),
+    mailbox: z.string().openapi({ example: "support@acme.com" }),
+    provider: z.string().nullable().openapi({ example: "iCloud" }),
+    from: z.string(),
+    to: z.array(z.string()),
+    cc: z.array(z.string()),
+    bcc: z.array(z.string()),
+    subject: z.string(),
+    body: z.string().openapi({ description: "The text, cut after 1500 characters." }),
+    original: z
+      .object({ subject: z.string(), from: z.string().nullable() })
+      .nullable()
+      .openapi({ description: "The message it answers or forwards." }),
+  })
+  .openapi("ApprovalEmail");
+
 export const Approval = z
   .object({
     id: z.uuid(),
@@ -33,7 +58,16 @@ export const Approval = z
       .openapi({ description: "What the action returned once it ran (raw, short)." }),
     connector: z.string().nullable().openapi({ example: "github" }),
     connectorAccount: z.string().nullable().openapi({ example: "acme" }),
-    why: z.string().nullable().openapi({ description: "What the agent said right before asking." }),
+    email: ApprovalEmail.nullable().openapi({
+      description: "The email itself, for mail drafts and sends (From, To, Subject, text); null otherwise.",
+    }),
+    why: z
+      .string()
+      .nullable()
+      .openapi({ description: "The agent's required reason: what it found and why this action." }),
+    origin: ApprovalOrigin.nullable().openapi({
+      description: "Asked while nobody was watching: by a routine, or by unattended work.",
+    }),
     issue: z.object({ id: z.uuid(), number: z.number().int(), title: z.string() }).nullable(),
     trail: z
       .array(z.object({ text: z.string(), at: z.string() }))
@@ -46,7 +80,7 @@ const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
 const Decision = z.object({ reason: z.string().max(1000).optional() });
 
 /**
- * Sensitive actions agents asked for (D4). Decisions resume the run; events
+ * Sensitive actions agents asked for (ADR 0015). Decisions resume the run; events
  * `approval.created` / `approval.decided` go to the channel and to approvers
  * over the WebSocket.
  */

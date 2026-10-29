@@ -24,6 +24,7 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  applyWorkspaceEvent,
   type BrowserFrame,
   type BrowserInputEvent,
   type BrowserLiveStatus,
@@ -36,7 +37,10 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheReceipts,
   cacheTask,
+  catchUpChannel,
+  consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
   dropProvisional,
@@ -47,9 +51,11 @@ import {
   isNotificationEvent,
   keys,
   markStopping,
+  type OpenConsult,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
+  reconcileConsults,
   reconcileRuns,
   refreshMission,
   retargetProvisional,
@@ -65,6 +71,7 @@ import {
   unmarkStopping,
 } from "@agenteschat/client";
 import { formatPercent } from "@agenteschat/client/lib/format";
+import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
@@ -72,7 +79,11 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { checkAppVersion } from "@/lib/app-version";
+import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
+import { notificationAudience } from "@/lib/sounds";
 import { useToast } from "@/lib/toast";
+import { settleShownPushes } from "@/lib/web-push";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
 export interface LiveState {
@@ -259,10 +270,14 @@ export function createStreamsStore(
         streaming,
       );
     },
-    /** Person messages loaded over HTTP: start their receipts. */
-    seed: (messages: Message[]) => {
+    /**
+     * Person messages loaded over HTTP: start their receipts. `before`: the receipts when the read was asked for;
+     * one that hasn't changed since takes the read as it is.
+     */
+    seed: (messages: Message[], before?: ReceiptsState) => {
       let receipts = state.receipts;
-      for (const m of messages) receipts = seedReceipt(receipts, m);
+      for (const m of messages)
+        receipts = seedReceipt(receipts, m, before !== undefined && receipts[m.id] === before[m.id]);
       set({ ...state, receipts });
     },
     /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
@@ -322,6 +337,9 @@ export function createStreamsStore(
     /** The server's active runs for a channel (load, reconnect): stale rows go away. */
     reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
       set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
+    /** The server's questions still out in a channel (load, reconnect): the "asking…" line. */
+    reconcileConsults: (channelId: string, open: OpenConsult[], askedAt = now()) =>
+      set({ ...state, consults: reconcileConsults(state.consults, channelId, open, askedAt, now()) }),
     /** "Continuar" went through (or there is nothing left to continue: `newRunId` null). */
     continued: (runId: string, newRunId: string | null) =>
       set({ ...state, continued: { ...state.continued, [runId]: newRunId } }),
@@ -377,6 +395,8 @@ export function RealtimeProvider({
   const toast = useToast();
   const { t, i18n } = useTranslation();
   const streams = useMemo(() => createStreamsStore(), []);
+  // Questions agents asked that are still out, as the server lists them with the active runs.
+  useEffect(() => consultSeeds.subscribe(streams.reconcileConsults), [streams]);
   const [connection, setConnection] = useState<RealtimeConnection | null>(null);
   // Latest `t` without reconnecting when the language changes.
   const tRef = useRef(t);
@@ -391,10 +411,18 @@ export function RealtimeProvider({
     const conn = new RealtimeConnection({ url: realtimeUrl(window.location, orgId), createSocket });
     // Catch up over HTTP after a reconnect: events sent while offline are gone.
     const offReconnect = conn.onReconnect(() => {
+      // A reconnect is often a deploy: is this tab still on the app the server serves?
+      void checkAppVersion();
       // Reactions heard live may be stale now: the refetched message lists carry them again.
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
+      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
+      // (one back online, a pause) and the agents' screens.
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -407,9 +435,29 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      // Its sound (ADR 0070): in one tab only, and in the background only what matters.
+      if (isNotificationEvent(event) && event.type === "notification.upserted") {
+        const { mine, background } = notificationAudience();
+        const sound = mine ? soundForNotification(event.notification, background) : null;
+        if (sound) playSound(sound);
+      }
+      // Notifications in this browser (ADR 0071): what was read, done or snoozed closes there too; a drop in
+      // the badge ("Marcar tudo como lido") has one tab ask the server which shown ones went stale.
+      if (isNotificationEvent(event)) settleShownPushes(orgId, event, notificationAudience().mine);
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
+      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+        const notice = desktopNotice(tRef.current, orgId, event.notification);
+        if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
+      }
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
+      }
+      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count.
+      if (event.type === "org.members") {
+        void qc.invalidateQueries({ queryKey: keys.people(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
@@ -455,6 +503,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
+      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);
@@ -483,7 +533,9 @@ export function RealtimeProvider({
     return () => clearInterval(timer);
   }, [streams, qc, orgId]);
 
-  return <RealtimeContext.Provider value={{ connection, streams }}>{children}</RealtimeContext.Provider>;
+  // Stable across the layout's re-renders (every navigation): only a new socket changes it.
+  const value = useMemo(() => ({ connection, streams }), [connection, streams]);
+  return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 }
 
 function useRealtime() {
@@ -616,16 +668,26 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   const { connection, streams } = useRealtime();
   const qc = useQueryClient();
   const api = useApi();
-  // On load and after every reconnect: drop live rows the server no longer runs.
+  // On load: drop live rows the server no longer runs. The channel's events reach us only once the server confirms
+  // its subscription (the first, and again after every reconnect): then the live rows are checked again, and what
+  // happened before, after the page read the channel (an answer posted while the socket opened, right after a page
+  // change), is read and added.
   useEffect(() => {
     if (!connection || !enabled) return;
-    const check = () => {
-      void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
-        if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+    void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
+      if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+    });
+    return connection.onSubscribed((id) => {
+      if (id !== channelId) return;
+      void reconcileChannelRuns(api, streams, orgId, channelId);
+      // A receipt nothing changed while the read was on its way takes it as it is. The lists' copies get the same
+      // receipts, so the page seeding them again (on every change) changes nothing.
+      const before = streams.get().receipts;
+      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+        streams.seed(read, before);
+        cacheReceipts(qc, orgId, channelId, read);
       });
-    };
-    check();
-    return connection.onReconnect(check);
+    });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
@@ -665,8 +727,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
-      if (event.type === "message.actions")
+      if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);
+        // A channel an agent created (or its undo archived): the sidebar lists it now, not at the next refetch.
+        if (event.actions.some((a) => a.kind === "channel.created"))
+          void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
@@ -681,6 +747,17 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams]);
+}
+
+/** Each live event of a channel while mounted and `enabled` (the handler is read through a ref). */
+export function useChannelEvents(channelId: string, enabled: boolean, onEvent: (event: ChannelEvent) => void) {
+  const { connection } = useRealtime();
+  const handler = useRef(onEvent);
+  handler.current = onEvent;
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    return connection.subscribe(channelId, (event) => handler.current(event));
+  }, [connection, enabled, channelId]);
 }
 
 /** Same items in the same order (lists), or the same keys with the same values (plain objects). */

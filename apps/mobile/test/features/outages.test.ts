@@ -1,14 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "@agenteschat/client";
 import { type OutageTargetLike, targetOptions, waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
-import { resources } from "@agenteschat/i18n";
-import i18next, { type TFunction } from "i18next";
 import { teamLines, type WorkItem } from "../../src/features/agents/logic";
 import { agentRowState } from "../../src/features/chats/now";
-import { featureKeysEn } from "../../src/features/i18n/keys.en";
-import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import {
   computerIcon,
+  dismissedOutages,
   type MachineOutage,
   moveToast,
   namesText,
@@ -18,18 +15,7 @@ import {
   waitCardText,
   waitingText,
 } from "../../src/features/outages/logic";
-import { withMobileKeys } from "../../src/i18n/merge";
-
-async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
-  const i18n = i18next.createInstance();
-  await i18n.init({
-    lng,
-    fallbackLng: "pt-BR",
-    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
-    interpolation: { escapeValue: false },
-  });
-  return i18n.t;
-}
+import { translator } from "./fixtures";
 
 const air: MachineOutage = {
   machineId: "air",
@@ -62,11 +48,18 @@ const office: OutageTargetLike = {
 };
 
 describe("Computador desconectado (phone)", () => {
-  test("the notice, as in the prototype", async () => {
+  test("the notice, as designed", async () => {
     const t = await translator("pt-BR");
     expect(noticeText(t, air)).toEqual({
       title: "O MacBook Air desconectou",
+      a11y: "Computador desconectado",
       sub: "Ada e Theo esperam por ele · 3 tarefas",
+    });
+    // The Cloud's one computer isn't answering, and it is being looked after.
+    expect(noticeText(t, { ...air, name: "Computador da Acme" }, true)).toEqual({
+      title: "O Computador da Acme não está respondendo",
+      a11y: "Computador sem resposta",
+      sub: "Já estamos cuidando · Ada e Theo esperam por ele · 3 tarefas",
     });
     const one = { ...air, waitingRuns: 1, agents: [air.agents[0]] } as MachineOutage;
     expect(noticeText(t, one).sub).toBe("Ada espera por ele · 1 tarefa");
@@ -74,42 +67,53 @@ describe("Computador desconectado (phone)", () => {
     const en = await translator("en");
     expect(noticeText(en, air)).toEqual({
       title: "MacBook Air disconnected",
+      a11y: "Computer disconnected",
       sub: "Ada and Theo are waiting for it · 3 tasks",
     });
+    expect(noticeText(en, { ...air, name: "Acme's computer" }, true).sub).toBe(
+      "We're on it · Ada and Theo are waiting for it · 3 tasks",
+    );
   });
 
-  test("the sheet: who waits for what, the targets' lines, the line under the title", async () => {
+  test("the sheet: who waits for what, the targets' lines, the line under the title (who, not the computer again)", async () => {
     const t = await translator("pt-BR");
     expect(waitingText(t, air.agents[0] as MachineOutage["agents"][number])).toBe("2 rotinas esperando");
     expect(waitingText(t, air.agents[1] as MachineOutage["agents"][number])).toBe("1 conversa esperando");
-    expect(sheetDesc(t, air, new Set(["ada", "theo"]))).toBe(
-      "O MacBook Air está desconectado. Escolha onde Ada e Theo passam a trabalhar.",
+    expect(sheetDesc(t, air, new Set(["ada", "theo"]))).toBe("Escolha onde Ada e Theo passam a trabalhar.");
+    expect(sheetDesc(t, air, new Set(["ada"]))).toBe("Escolha onde Ada passa a trabalhar.");
+    expect(sheetDesc(await translator("en"), air, new Set(["ada"]))).toBe("Choose where Ada works from now on.");
+    // A cloud computer that runs no brain is no option (the web leaves it out the same way).
+    const [on, off, ...rest] = targetOptions(
+      air,
+      [office, pro, { kind: "cloud", available: true, brains: [] }],
+      ["ada"],
     );
-    expect(sheetDesc(t, air, new Set(["ada"]))).toBe(
-      "O MacBook Air está desconectado. Escolha onde Ada passa a trabalhar.",
-    );
-    const [on, off, cloud] = targetOptions(air, [office, pro, { kind: "cloud", available: true, brains: [] }], ["ada"]);
+    expect(rest).toEqual([]);
     expect(on && targetText(t, on)).toEqual({
       title: "MacBook Pro do Walter",
       tag: "Ligado",
       desc: "Tem o Claude Code",
     });
     expect(off && targetText(t, off)).toEqual({ title: "PC do escritório", tag: null, desc: "Desconectado" });
-    expect(cloud && targetText(t, cloud)).toEqual({
-      title: "Computador na nuvem",
-      tag: null,
-      desc: "Não tem o Claude Code",
-    });
     const paused = targetOptions(air, [{ ...pro, reasonOff: "paused" }], ["ada"])[0];
     expect(paused && targetText(t, paused).desc).toBe("Pausado");
     const odd = targetOptions(air, [{ ...pro, reasonOff: "something_new" }], ["ada"])[0];
     expect(odd && targetText(t, odd).desc).toBe("Não dá para usar agora");
     const able = targetOptions(air, [{ kind: "cloud", available: true, brains: ["claude_code"] }], ["ada"])[0];
-    expect(able && targetText(t, able)).toMatchObject({ tag: "Sempre ligado" });
+    // The cloud computer carries no tag: "always on" is the Cloud's word, and this is self-host.
+    expect(able && targetText(t, able)).toMatchObject({ title: "Computador na nuvem", tag: null });
     expect(computerIcon("darwin")).toBe("computerMac");
     expect(computerIcon("windows")).toBe("computerWindows");
     expect(computerIcon("linux")).toBe("computerLinux");
     expect(computerIcon(null, true)).toBe("computerCloud");
+  });
+
+  test("closed notices: the kept list, nothing when it can't be read", () => {
+    expect(dismissedOutages('["air@2026-10-18T20:00:00.000Z"]')).toEqual(["air@2026-10-18T20:00:00.000Z"]);
+    expect(dismissedOutages('["a", 2, null]')).toEqual(["a"]);
+    expect(dismissedOutages(null)).toEqual([]);
+    expect(dismissedOutages("{}")).toEqual([]);
+    expect(dismissedOutages("not json")).toEqual([]);
   });
 
   test("the toast after switching", async () => {

@@ -9,15 +9,30 @@ import {
   formatTokensShort,
   formatUsd,
 } from "@agenteschat/client/lib/format";
+import { runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { covers } from "@agenteschat/client/lib/repos";
-import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
+import {
+  type AgentColor,
+  Button,
+  Card,
+  Chip,
+  Icon,
+  Meter,
+  type MonthDay,
+  MonthRuns,
+  RunMark,
+  SearchField,
+  Segmented,
+  Toolbar,
+} from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { groupByDay, isRoutineRun, type RunFilter, runMatches, thisMonth } from "@/lib/agent-edit";
+import { colorOf } from "@/components/Sky";
+import { groupByDay, isRoutineRun, type RunFilter, runMatches } from "@/lib/agent-edit";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
 
@@ -30,11 +45,120 @@ type TT = (key: string, options?: Record<string, unknown>) => string;
 function failure(t: TFunction, run: Run) {
   const code = run.errorCode?.replace(/^run\./, "");
   if (code && code !== "failed") {
-    const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, { ...run.errorParams, defaultValue: "" });
+    const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, {
+      ...runErrorGrammar(t, run.errorParams),
+      defaultValue: "",
+    });
     if (text) return text;
   }
   return run.errorParams?.detail ?? run.error ?? t("agentPage.activity.errors.unknown");
 }
+
+/**
+ * The month on top of Atividade (NumerosAgente C): its runs per day in pixels, in the agent's tones, failures
+ * capped in the danger tone, and the numbers beside it as the legend (runs, failures, tokens, money).
+ */
+function MonthStrip({
+  color,
+  month,
+  runs,
+  failures,
+  perDay,
+  tokens,
+  money,
+}: {
+  color: AgentColor;
+  month: string;
+  runs: number;
+  failures: number;
+  perDay: MonthDay[];
+  tokens: string;
+  /** Admins see dollars against the budget; the others its share used. */
+  money: { spent: number; limit: number } | { percent: number };
+}) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
+  const now = new Date();
+  // The month is counted in UTC (the server's), like its days.
+  const today = now.getUTCDate();
+  const days = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const [tip, setTip] = useState<string | undefined>(undefined);
+  const byDay = new Map(perDay.map((d) => [d.day, d]));
+  const say = (day: number) => {
+    const d = byDay.get(day);
+    const text = t("agentPage.activity.dayRuns", { day, count: d?.runs ?? 0 });
+    return d?.failed ? `${text} · ${t("agentPage.stats.failures", { count: d.failed })}` : text;
+  };
+  const ticks = [1, 8, 15, 22, days];
+  return (
+    <section className="agp-month" aria-label={t("agentPage.activity.monthLabel", { month })}>
+      <div className="agp-month__chart">
+        <p className="agp-month__cap">
+          <b>{capitalize(month)}</b>
+          <span>{t("agentPage.activity.perDay")}</span>
+        </p>
+        <div
+          role="img"
+          aria-label={t("agentPage.activity.chartLabel", { count: runs, month })}
+          title={tip}
+          onMouseMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            const day = Math.min(days, Math.max(1, Math.floor(((e.clientX - r.left) / r.width) * days) + 1));
+            setTip(day > today ? undefined : say(day));
+          }}
+          onMouseLeave={() => setTip(undefined)}
+        >
+          <MonthRuns days={days} today={today} perDay={perDay} color={color} />
+        </div>
+        <div className="agp-month__axis" aria-hidden="true">
+          {ticks.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+      </div>
+      <dl className="agp-month__legend">
+        <dt>
+          <RunMark color={color} status="ok" />
+          {t("agentPage.activity.runs")}
+        </dt>
+        <dd>{formatInt(locale, runs)}</dd>
+        <dt>
+          <RunMark color={color} status="failed" />
+          {t("agentPage.activity.failures")}
+        </dt>
+        <dd>{formatInt(locale, failures)}</dd>
+        <dt>
+          <Icon name="document" size={14} />
+          {t("agentPage.activity.tokens")}
+        </dt>
+        <dd>{tokens}</dd>
+        <dt>
+          <Icon name="wallet" size={14} />
+          {"spent" in money ? t("agentPage.activity.spent") : t("agentPage.stats.budget")}
+        </dt>
+        <dd>
+          {"spent" in money ? (
+            <>
+              {formatUsd(t, locale, money.spent)}{" "}
+              <small>{t("agentPage.stats.of", { amount: usd(t, locale, money.limit) })}</small>
+            </>
+          ) : (
+            formatPercent(locale, money.percent)
+          )}
+        </dd>
+        <div className="agp-month__meter">
+          {"spent" in money ? (
+            <Meter value={money.spent} max={money.limit} label={t("agentPage.activity.spent")} />
+          ) : (
+            <Meter value={money.percent} max={100} label={t("agentPage.stats.budget")} />
+          )}
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Atividade: this month's runs by day, with search and filters (all, failures, waiting, routines). */
 export function ActivityTab() {
@@ -52,7 +176,7 @@ export function ActivityTab() {
   const [filter, setFilter] = useState<RunFilter>("all");
   const [shown, setShown] = useState(RUNS_PAGE);
   const prompts = useMemo(
-    () => (routines.data ?? []).filter((r) => r.agentId === agent.id).map((r) => r.prompt),
+    () => (routines.data ?? []).flatMap((r) => (r.agentId === agent.id && r.prompt ? [r.prompt] : [])),
     [routines.data, agent.id],
   );
   const month = formatMonth(locale, new Date());
@@ -77,58 +201,21 @@ export function ActivityTab() {
   const failures = list.filter((r) => r.status === "failed").length;
   const waiting = list.filter((r) => r.status === "waiting_approval" || r.status === "waiting_input").length;
   const routineCount = list.filter((r) => extra(r).routine).length;
-  const monthFailures = list.filter((r) => r.status === "failed" && thisMonth(r.createdAt)).length;
   const spent = usage.data?.find((u) => u.agentId === agent.id)?.costUsd;
   const limit = detail.data?.monthlyBudgetUsd ?? detail.data?.defaultBudgetUsd;
   const used = detail.data?.budgetUsedPercent ?? 0;
   const days = groupByDay(visible);
   return (
     <>
-      <div className="agp-tiles agp-tiles--four">
-        <div className="agp-tile">
-          <small>
-            <Icon name="routines" size={14} />
-            {t("agentPage.activity.runs")}
-          </small>
-          <b>{formatInt(locale, detail.data?.runsThisMonth ?? 0)}</b>
-          <span>{t("agentPage.activity.inMonth", { month })}</span>
-        </div>
-        <div className="agp-tile">
-          <small>
-            <Icon name="document" size={14} />
-            {t("agentPage.activity.tokens")}
-          </small>
-          <b>{formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0)}</b>
-          <span>{t("agentPage.activity.tokensHelp")}</span>
-        </div>
-        <div className="agp-tile">
-          <small>
-            <Icon name="alert" size={14} />
-            {t("agentPage.activity.failures")}
-          </small>
-          <b>{monthFailures}</b>
-          <span>{t("agentPage.activity.inMonth", { month })}</span>
-        </div>
-        {viewer === "admin" && spent !== undefined && limit !== undefined ? (
-          <div className="agp-tile">
-            <small>
-              <Icon name="wallet" size={14} />
-              {t("agentPage.activity.spent")}
-            </small>
-            <b>{formatUsd(t, locale, spent)}</b>
-            <span>{t("agentPage.stats.of", { amount: usd(t, locale, limit) })}</span>
-          </div>
-        ) : (
-          <div className="agp-tile">
-            <small>
-              <Icon name="wallet" size={14} />
-              {t("agentPage.stats.budget")}
-            </small>
-            <b>{formatPercent(locale, used)}</b>
-            <span>{t("agent.usageHidden")}</span>
-          </div>
-        )}
-      </div>
+      <MonthStrip
+        color={colorOf(agent)}
+        month={month}
+        runs={detail.data?.runsThisMonth ?? 0}
+        failures={detail.data?.failuresThisMonth ?? 0}
+        perDay={detail.data?.runsByDay ?? []}
+        tokens={formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0)}
+        money={viewer === "admin" && spent !== undefined && limit !== undefined ? { spent, limit } : { percent: used }}
+      />
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
         <Toolbar
           size="sm"
@@ -221,13 +308,13 @@ export function ActivityTab() {
                             {x.routine && <Chip icon="routines">{t("agentPage.activity.routine")}</Chip>}
                           </span>
                           {r.status === "failed" && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {failure(t, r)}
                             </span>
                           )}
                           {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {t("repos.deniedRun", { repo: r.deniedRepo, ...g })}
                             </span>

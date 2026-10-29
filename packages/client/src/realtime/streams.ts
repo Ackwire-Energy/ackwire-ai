@@ -1,4 +1,5 @@
 import type { ActiveRun, ChannelEvent, RunStatus } from "../api/types";
+import { NO_AI } from "../lib/no-ai";
 
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
@@ -128,6 +129,9 @@ export interface LiveRun {
   text: string;
   lastSeq: number;
   error?: string;
+  /** `run.finished`'s code for the error (`run.org_paused`…) and its values. */
+  errorCode?: string;
+  errorParams?: Record<string, string>;
   /** Added by the client on send; no server event yet. */
   provisional?: boolean;
   /** The tool it is calling right now ("github_list_prs"), from `agent.tool`. */
@@ -173,6 +177,12 @@ export type LiveWork =
       running: boolean;
       /** When the call started (the stop confirmation says "rodando código há 2 min"). */
       since?: number;
+      /** How long it took, once it ended (its line says "1,2 s"). */
+      ms?: number;
+      /** The tool answered with an error (`agent.tool` end with `failed`). */
+      failed?: boolean;
+      /** It didn't run: it waits on a person (an approval, a question, a secret). */
+      held?: boolean;
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -244,12 +254,18 @@ export interface AgentToolEvent {
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
   code?: LiveCode | null;
   toolUseId?: string;
+  /** On the end (`tool: null`): the tool answered with an error. */
+  failed?: boolean;
+  /** On the end: it didn't run, it waits on a person. */
+  held?: boolean;
 }
 
 export interface StreamsState {
   runs: Record<string, LiveRun>;
   /** Runs whose final message arrived: late deltas for them are ignored. */
   finished: Record<string, true>;
+  /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
+  background?: Record<string, true>;
 }
 
 export const emptyStreams: StreamsState = { runs: {}, finished: {} };
@@ -374,7 +390,24 @@ function say(work: LiveWork[], text: string, turn: number | undefined): LiveWork
   return [...work, { kind: "say" as const, text, ...(turn !== undefined ? { turn } : {}) }];
 }
 
+/**
+ * A routine's background run holds no conversation: the events that say so (`background: true`)
+ * mark its run, and nothing about a marked run makes or keeps a row. Null: not a background run's.
+ */
+function backgroundRun(state: StreamsState, event: StreamEvent): StreamsState | null {
+  const runId = "runId" in event && typeof event.runId === "string" ? event.runId : null;
+  if ((event as { background?: unknown }).background !== true) {
+    return runId && state.background?.[runId] ? state : null;
+  }
+  // Announced at post time (no run yet): no "pensando…" for it either.
+  if (!runId || state.background?.[runId]) return state;
+  const { [runId]: _row, ...runs } = state.runs;
+  return { ...state, runs, background: { ...state.background, [runId]: true } };
+}
+
 export function applyChannelEvent(state: StreamsState, event: StreamEvent, now = Date.now()): StreamsState {
+  const quiet = backgroundRun(state, event);
+  if (quiet) return quiet;
   const next = applyEvent(state, event);
   // Any news about a run keeps it "alive" (see `isQuiet`).
   const runId = "runId" in event && typeof event.runId === "string" ? event.runId : null;
@@ -456,10 +489,17 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
       if (said) work = say(work, said, current?.turn);
+      const end = (w: Extract<LiveWork, { kind: "call" }>, how: { failed?: boolean; held?: boolean } = {}) => ({
+        ...w,
+        running: false,
+        ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
+        ...(how.failed ? { failed: true } : {}),
+        ...(how.held ? { held: true } : {}),
+      });
       if (newCall) {
         // A new call means the previous ones ended.
         work = [
-          ...work.map((w) => (w.kind === "call" && w.running ? { ...w, running: false } : w)),
+          ...work.map((w) => (w.kind === "call" && w.running ? end(w) : w)),
           {
             kind: "call" as const,
             since: Date.now(),
@@ -473,12 +513,13 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           },
         ];
       } else {
-        // The call ended: the last running one stops.
+        // The call ended: that one (by id), else the last running one.
+        const named = event.toolUseId && work.some((w) => w.kind === "call" && w.id === event.toolUseId);
         let done = false;
         work = [...work].reverse().map((w) => {
-          if (!done && w.kind === "call" && w.running) {
+          if (!done && w.kind === "call" && w.running && (!named || w.id === event.toolUseId)) {
             done = true;
-            return { ...w, running: false };
+            return end(w, { failed: event.failed === true, held: event.held === true });
           }
           return w;
         });
@@ -516,7 +557,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     }
     case "message.created": {
       const m = event.message;
-      if (!m?.agentRunId) return state;
+      // A fast reply while the task works (`meta.talker`): the task's row goes on.
+      if (!m?.agentRunId || m.meta?.talker) return state;
       const next = finish(state, m.agentRunId);
       if (m.author?.type !== "agent" || !m.author.id) return next;
       if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);
@@ -543,6 +585,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
+      // No AI to think with: nothing ran, and its card (or the receipt under the message) says why.
+      if (event.status === "failed" && event.error === NO_AI) return finish(settleAfterRun(s, event), event.runId);
       // Started but nothing written yet: thinking.
       const current = s.runs[event.runId];
       const status: LiveStatus =
@@ -571,9 +615,16 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (settled.runs[event.runId]?.status === "failed") return settled;
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
+    case "agent.passed":
+      // It had nothing to add: its "pensando…" goes at once, and nothing of it comes after.
+      return finish(settleAfterRun(state, event), event.runId);
     case "run.finished": {
       const settled = settleAfterRun(state, event);
-      if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
+      if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
+      if (event.status === "failed") {
+        const { error, errorCode, errorParams } = event;
+        return upsert(settled, event, { status: "failed", error, errorCode, errorParams });
+      }
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
@@ -616,7 +667,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
 
 function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
-  return { runs, finished: { ...state.finished, [runId]: true } };
+  return { ...state, runs, finished: { ...state.finished, [runId]: true } };
 }
 
 /** No event for this long: the row says "sem notícias há 3 min · Atualizar". */
@@ -650,7 +701,8 @@ export function reconcileRuns(
   now = Date.now(),
   askedAt = now,
 ): StreamsState {
-  const known = new Set(active.filter((a) => isActiveStatus(a.status)).map((a) => a.runId));
+  // A routine's background runs show nowhere in the conversation.
+  const known = new Set(active.filter((a) => isActiveStatus(a.status) && !a.background).map((a) => a.runId));
   let s = state;
   for (const r of runsInChannel(state, channelId)) {
     if (r.provisional || r.status === "failed" || r.status === "canceled" || known.has(r.runId)) continue;
@@ -699,7 +751,7 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
 
 /**
  * Shown in the channel itself, not in a thread: a run asked there (it answers
- * there, D67: its events carry no thread), or a "pensando…" the app guessed
+ * there: its events carry no thread), or a "pensando…" the app guessed
  * for a message sent there (`topLevelIds`: the channel's own messages).
  */
 export const inMainTimeline = (

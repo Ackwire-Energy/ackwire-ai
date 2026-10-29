@@ -1,10 +1,10 @@
 /**
- * Test fake — issues, routines and calendar (D28; backend phase 6).
+ * Test fake — issues, routines and calendar.
  * Mirrors these endpoints (shapes in `api/types.ts`):
  * - Issues: `GET …/issues?q`, `GET …/issues/{number}`, `POST …/issues`, `PATCH …/issues/{id}`,
  *   `PUT …/issues/{id}/criteria/{criterionId} { done }`, `GET|POST …/issues/{id}/activity`,
  *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run);
- *   board columns (D55): `GET|POST …/issue-columns`, `PATCH|DELETE …/issue-columns/{id}`.
+ *   board columns: `GET|POST …/issue-columns`, `PATCH|DELETE …/issue-columns/{id}`.
  * - Routines: `GET|POST …/routines`, `POST …/routines/parse-schedule|parse-rule { phrase }` → cron, rule and
  *   description in the workspace time zone (phrases looked up in a table, standing in for the model),
  *   `PATCH …/routines/{id} { active }`, `POST …/routines/{id}/run`, `GET …/routines/{id}/runs`.
@@ -57,6 +57,49 @@ const PHRASES: Record<string, Omit<ApiRule, "timezone">> = {
   "dia 1 às 8h": { freq: "monthly", byMonthDay: [1], times: ["08:00"] },
 };
 const UNREADABLE = "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”.";
+
+/** What a new routine carries besides what it was made with (ADR 0053: state, week, where it runs). */
+const routineDefaults = (): Pick<
+  Routine,
+  | "access"
+  | "report"
+  | "pausedReason"
+  | "failuresInRow"
+  | "state"
+  | "waitingFor"
+  | "brain"
+  | "health"
+  | "canSeeDetails"
+  | "canManage"
+  | "lastRun"
+  | "recentRuns"
+  | "usage"
+> => ({
+  access: "read",
+  report: "when_new",
+  pausedReason: null,
+  failuresInRow: 0,
+  state: "active",
+  waitingFor: null,
+  brain: { kind: "model", machineName: null },
+  health: { ok: 0, silent: 0, failed: 0, skipped: 0, missed: 0, total: 0 },
+  canSeeDetails: true,
+  canManage: true,
+  lastRun: null,
+  recentRuns: [],
+  usage: { runs: 0, tokens: 0, costNanoUsd: 0, billedTo: "api" },
+});
+
+/** A finished run of the new shape. */
+export const routineRun = (over: Partial<RoutineRun> & Pick<RoutineRun, "at" | "status">): RoutineRun => ({
+  id: mockId("run"),
+  code: null,
+  summary: "",
+  brain: "model",
+  link: null,
+  finishedAt: over.at,
+  ...over,
+});
 
 const isWorkdays = (days: string[] | undefined) => days?.length === 5 && WORKDAYS.every((d) => days.includes(d));
 
@@ -262,17 +305,16 @@ export function createMockPlanning(
     const target = channel ? ({ type: "channel", channelId: channel } as const) : ({ type: "dm" } as const);
     const routine = (over: Partial<Routine> & Pick<Routine, "name" | "agentId" | "trigger">): Routine => {
       const r: Routine = {
+        ...routineDefaults(),
         id: mockId("rt"),
         prompt: "",
         target,
         active: true,
         nextRunAt: null,
-        running: false,
-        lastRun: null,
-        recentRuns: [],
         createdAt: minutesAgo(now, 20000),
         ...over,
       };
+      if (!r.active) r.state = "paused";
       if (r.active && r.trigger.type === "schedule")
         r.nextRunAt = nextCronRun(r.trigger.cron, now)?.toISOString() ?? null;
       return r;
@@ -289,12 +331,8 @@ export function createMockPlanning(
         description: p.description,
       };
     };
-    const run = (mins: number, summary: string, status: RoutineRun["status"] = "ok"): RoutineRun => ({
-      id: mockId("run"),
-      at: minutesAgo(now, mins),
-      status,
-      summary,
-    });
+    const run = (mins: number, summary: string, status: RoutineRun["status"] = "reported", code?: string): RoutineRun =>
+      routineRun({ at: minutesAgo(now, mins), status, summary, ...(code ? { code } : {}) });
     const weekly = routine({
       name: "Resumo da semana",
       agentId: agent(3).id,
@@ -323,7 +361,7 @@ export function createMockPlanning(
     s.runs.set(weekly.id, [
       run(7 * 1440, "Resumo postado no canal"),
       run(14 * 1440, "Resumo postado no canal"),
-      run(21 * 1440, "Orçamento do mês esgotado", "skipped"),
+      run(21 * 1440, "", "failed", "budget_exceeded"),
       run(28 * 1440, "Resumo postado no canal"),
     ]);
     s.runs.set(errors.id, [run(1440, "Abriu 1 issue")]);
@@ -405,6 +443,15 @@ export function createMockPlanning(
     const s = await store(orgId);
     s.columns = boardOrder(s.columns);
     return s;
+  };
+  /** On, off: a pause stops a run in progress; resuming clears the pause reason and the failure streak. */
+  const setActive = (r: Routine, active: boolean) => {
+    r.active = active;
+    r.state = active ? "active" : "paused";
+    if (active) {
+      r.pausedReason = null;
+      r.failuresInRow = 0;
+    }
   };
   const findRoutine = async (orgId: string, id: string) => {
     const r = (await store(orgId)).routines.find((x) => x.id === id);
@@ -588,6 +635,7 @@ export function createMockPlanning(
         else trigger = input.trigger;
         const agents = await ctx.lookup.agents(orgId);
         const r: Routine = {
+          ...routineDefaults(),
           id: mockId("rt"),
           name: input.name?.trim() || `Rotina de ${agents.find((a) => a.id === input.agentId)?.name ?? "agente"}`,
           agentId: input.agentId,
@@ -596,10 +644,9 @@ export function createMockPlanning(
           trigger,
           active: true,
           nextRunAt: trigger.type === "schedule" ? (nextCronRun(trigger.cron, ctx.now())?.toISOString() ?? null) : null,
-          running: false,
-          lastRun: null,
-          recentRuns: [],
           createdAt: ctx.now().toISOString(),
+          access: input.access ?? "read",
+          report: input.report ?? "when_new",
         };
         s.routines.push(r);
         return clone(r);
@@ -611,7 +658,9 @@ export function createMockPlanning(
         if (patch.prompt !== undefined) r.prompt = patch.prompt;
         if (patch.agentId !== undefined) r.agentId = patch.agentId;
         if (patch.target !== undefined) r.target = patch.target;
-        if (patch.active !== undefined) r.active = patch.active;
+        if (patch.access !== undefined) r.access = patch.access;
+        if (patch.report !== undefined) r.report = patch.report;
+        if (patch.active !== undefined) setActive(r, patch.active);
         if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);
         else if (patch.trigger?.type === "once")
           r.trigger = {
@@ -641,8 +690,8 @@ export function createMockPlanning(
           id: mockId("rt"),
           name: name ?? `${r.name} (copy)`,
           active: false,
+          state: "paused",
           nextRunAt: null,
-          running: false,
           lastRun: null,
           recentRuns: [],
           createdAt: ctx.now().toISOString(),
@@ -651,8 +700,9 @@ export function createMockPlanning(
         return clone(copy);
       },
       setActive: async (orgId, id, active) => {
+        record("routines.setActive", id, active);
         const r = await findRoutine(orgId, id);
-        r.active = active;
+        setActive(r, active);
         r.nextRunAt =
           active && r.trigger.type === "schedule"
             ? (nextCronRun(r.trigger.cron, ctx.now())?.toISOString() ?? null)
@@ -661,7 +711,29 @@ export function createMockPlanning(
       },
       runNow: async (orgId, id) => {
         const r = await findRoutine(orgId, id);
-        r.running = true;
+        r.state = "running";
+        return clone(r);
+      },
+      stop: async (orgId, id) => {
+        record("routines.stop", id);
+        const r = await findRoutine(orgId, id);
+        r.state = r.active ? "active" : "paused";
+        const by = (await ctx.lookup.me())?.user.id ?? "me";
+        const stopped = routineRun({
+          at: ctx.now().toISOString(),
+          status: "canceled",
+          code: "stopped",
+          codeParams: { by },
+        });
+        const s = await store(orgId);
+        s.runs.set(id, [stopped, ...(s.runs.get(id) ?? [])]);
+        r.recentRuns = [stopped, ...r.recentRuns];
+        r.lastRun = stopped;
+        return clone(r);
+      },
+      takeOver: async (orgId, id) => {
+        record("routines.takeOver", id);
+        const r = await findRoutine(orgId, id);
         return clone(r);
       },
       runs: async (orgId, id) => {

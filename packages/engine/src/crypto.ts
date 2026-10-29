@@ -1,4 +1,12 @@
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  hkdfSync,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 
 /**
@@ -7,7 +15,7 @@ import type { KeyWrapper } from "@agenteschat/adapters";
  * decrypt another. Never rename an existing purpose: data protected with it
  * would become unreadable.
  */
-export type KeyPurpose = "sessions" | "provider-credentials-kek" | "git-proxy";
+export type KeyPurpose = "sessions" | "provider-credentials-kek" | "git-proxy" | "invite-links";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));
@@ -34,13 +42,30 @@ export function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array, aad: strin
     .join(".");
 }
 
+/**
+ * A sealed value this key can never open: sealed with another key (another AGENTES_SECRET), for another
+ * owner (`aad`), or damaged. Unlike a key service that doesn't answer, trying again won't change it.
+ */
+export class SealedValueError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SealedValueError";
+  }
+}
+
 export function aesGcmDecrypt(key: Uint8Array, encrypted: string, aad: string): Buffer {
   const [version, iv, ciphertext, tag] = encrypted.split(".");
-  if (version !== "v1" || !iv || ciphertext === undefined || !tag) throw new Error("unsupported encrypted value");
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
-  decipher.setAAD(Buffer.from(aad, "utf8"));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]);
+  if (version !== "v1" || !iv || ciphertext === undefined || !tag)
+    throw new SealedValueError("unsupported encrypted value");
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
+    decipher.setAAD(Buffer.from(aad, "utf8"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]);
+  } catch (error) {
+    // Only local computation here: a wrong key, `aad` or tag, never a passing failure.
+    throw new SealedValueError(error instanceof Error ? error.message : String(error));
+  }
 }
 
 /**
@@ -89,6 +114,14 @@ export async function openSecret(wrappers: KeyWrapper[], sealed: SealedSecret, a
   } finally {
     dataKey.fill(0);
   }
+}
+
+/**
+ * The token of a workspace's invitation link (ADR 0068): an HMAC of the link's id, so the same link can be shown
+ * again while only its hash is stored. A new `AGENTES_SECRET` gives every link a token that no longer matches.
+ */
+export function inviteLinkToken(masterSecret: string, linkId: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "invite-links")).update(linkId).digest("base64url");
 }
 
 /** URL-safe random token, e.g. for invitation links. */

@@ -66,13 +66,13 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
 
   fake.tester.state.result = { ok: false, error: "auth" };
   const failed = await api("/mail/accounts/imap", {
-    json: { preset: "icloud", address: "support@icloud.com", password: "wrong" },
+    json: { preset: "icloud", address: "support@example.com", password: "wrong" },
   });
   expect(failed.status).toBe(422);
   expect(await failed.json()).toEqual({ error: "auth" });
   fake.tester.state.result = { ok: true, sentFolder: "Sent" };
   const created = await api("/mail/accounts/imap", {
-    json: { preset: "icloud", address: "support@icloud.com", password: "abcd-efgh-ijkl", label: "Suporte" },
+    json: { preset: "icloud", address: "support@example.com", password: "abcd-efgh-ijkl", label: "Suporte" },
   });
   expect(created.status).toBe(201);
   const { account } = (await created.json()) as { account: { id: string; status: string } };
@@ -84,7 +84,7 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
     redirectUrl: string;
   };
   expect(started.redirectUrl).toBe("https://composio.example/connect/ca_1");
-  fake.composio.activate("ca_1", "walt@gmail.com");
+  fake.composio.activate("ca_1", "team@example.com");
   const back = await owner(`/api/app/mail/composio/callback?account=${started.accountId}`);
   expect(back.status).toBe(302);
   expect(back.headers.get("location")).toBe(
@@ -95,8 +95,8 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(listed).not.toContain("abcd-efgh");
   const accounts = (JSON.parse(listed) as { accounts: { id: string; address: string; status: string }[] }).accounts;
   expect(accounts.map((a) => [a.address, a.status])).toEqual([
-    ["support@icloud.com", "active"],
-    ["walt@gmail.com", "active"],
+    ["support@example.com", "active"],
+    ["team@example.com", "active"],
   ]);
 
   // Agent access: sending without asking needs allowed recipients.
@@ -138,6 +138,21 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   const renamed = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { label: "Help desk" } });
   expect(((await renamed.json()) as { account: { label: string } }).account.label).toBe("Help desk");
 
+  // Other addresses of the mailbox, and the one new mail goes out from.
+  const aliased = await api(`/mail/accounts/${account.id}`, {
+    method: "PATCH",
+    json: { aliases: ["Help@Acme.com"], defaultFrom: "help@acme.com" },
+  });
+  expect(((await aliased.json()) as { account: unknown }).account).toMatchObject({
+    aliases: ["help@acme.com"],
+    defaultFrom: "help@acme.com",
+  });
+  const outside = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { defaultFrom: "x@acme.com" } });
+  expect(outside.status).toBe(400);
+  const suggested = await api(`/mail/accounts/${account.id}/suggested-addresses`);
+  expect(suggested.status).toBe(200);
+  expect(await suggested.json()).toEqual({ addresses: [] });
+
   expect((await api(`/mail/accounts/${account.id}`, { method: "DELETE" })).status).toBe(204);
   expect(((await (await api("/mail/accounts")).json()) as { accounts: unknown[] }).accounts).toHaveLength(1);
   const scopes = await t.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, account.id));
@@ -155,7 +170,7 @@ test("email routines through the routines API, woken by a signed Composio webhoo
   const { accountId } = (await (await api("/mail/accounts/composio", { json: { provider: "gmail" } })).json()) as {
     accountId: string;
   };
-  fake.composio.activate("ca_1", "walt@gmail.com");
+  fake.composio.activate("ca_1", "team@example.com");
   await owner(`/api/app/mail/composio/callback?account=${accountId}`);
   await api(`/agents/${agentId}/mail/${accountId}`, {
     method: "PUT",

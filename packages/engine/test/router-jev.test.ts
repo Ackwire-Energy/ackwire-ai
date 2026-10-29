@@ -2,13 +2,26 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import {
   createAgent,
+  createJevJudge,
+  createJevKey,
+  createJevRouterStrategy,
   createJobHandlers,
+  createLlmJudge,
   drainOutbox,
   insertMessage,
+  JevOffError,
   jevCostNanoUsd,
+  messageRouter,
   postPersonMessage,
+  RouterChainEnd,
+  RouterSkip,
+  type RouterStrategy,
   type RoutingCandidate,
+  type RoutingInput,
+  routeChain,
   selectAgents,
+  standingJudge,
+  withJudgeFallback,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -46,9 +59,60 @@ describe("policy in code", () => {
   });
 });
 
+describe("routeChain", () => {
+  const input = { orgId: "o", candidates: [cand("a")] } as unknown as RoutingInput;
+  const step = (name: string, decide: RouterStrategy["decide"]): RouterStrategy => ({ name, decide });
+  const decides = (name: string) => step(name, async () => ({ agents: [{ agentId: "a", score: 0.9 }] }));
+  const fails = (name: string, message: string) => step(name, async () => Promise.reject(new Error(message)));
+  const skips = (name: string, error: Error) => step(name, async () => Promise.reject(error));
+
+  test("the first step that decides wins, under its own name, with the failures before it; a skip leaves no trace", async () => {
+    const timings: unknown[][] = [];
+    const chain = routeChain(
+      [
+        skips("jev", new JevOffError()),
+        fails("llm", "no answer in 8 s"),
+        skips("x", new RouterSkip()),
+        decides("plan"),
+      ],
+      {
+        onTiming: (name, ms, attrs) => {
+          if (name === "router_step_ms" && ms >= 0) timings.push([attrs.step, attrs.outcome]);
+        },
+      },
+    );
+    expect(await chain.decide(input)).toEqual({
+      agents: [{ agentId: "a", score: 0.9 }],
+      strategy: "plan",
+      failures: ["llm: no answer in 8 s"],
+    });
+    expect(timings).toEqual([
+      ["jev", "skipped"],
+      ["llm", "failed"],
+      ["x", "skipped"],
+      ["plan", "decided"],
+    ]);
+    // The first step decides: no failures at all.
+    expect(await routeChain([decides("jev"), fails("llm", "never asked")]).decide(input)).toEqual({
+      agents: [{ agentId: "a", score: 0.9 }],
+      strategy: "jev",
+    });
+  });
+
+  test("no step decides: what failed goes to the rules", async () => {
+    const error = await routeChain([fails("jev", "TypeSafe answered 529"), skips("llm", new RouterSkip())])
+      .decide(input)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RouterChainEnd);
+    expect((error as RouterChainEnd).failures).toEqual(["jev: TypeSafe answered 529"]);
+  });
+});
+
 /** A fake TypeSafe endpoint: records requests, answers with scripted nouls per handle. */
 function fakeJev(
-  script: (state: Record<string, unknown>) => { nouls: Record<string, number>; needs: number; best?: string } | Error,
+  script: (
+    state: Record<string, unknown>,
+  ) => { nouls: Record<string, number>; needs: number; best?: string; everyone?: number } | Error,
 ) {
   const requests: { headers: Headers; body: Record<string, unknown> }[] = [];
   const fetcher = (async (_url: string, init: RequestInit) => {
@@ -64,6 +128,7 @@ function fakeJev(
       if (key.startsWith("agent_"))
         answers[key] = { type: "noul", noul: r.nouls[q.instructions.agent?.handle ?? ""] ?? 0 };
     }
+    if (body.questions.for_everyone) answers.for_everyone = { type: "noul", noul: r.everyone ?? 0 };
     if (body.questions.best_agent) {
       answers.best_agent = {
         type: "choice",
@@ -80,6 +145,27 @@ function fakeJev(
 const post = (fx: Fixture, body: string, threadId?: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body, threadId });
 
+describe("Jev's questions", () => {
+  test("name a message to the room in both languages, for every agent and for each one", async () => {
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0.9 }));
+    await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "e agora, vocês dois?" },
+      thread: [],
+      candidates: [cand("dev"), cand("qa")],
+    });
+    const questions = jev.requests[0]?.body.questions as {
+      for_everyone: { instructions: string };
+      agent_0: { instructions: { question: string } };
+    };
+    for (const phrase of ["everyone", "all of you", "gente", "vocês", "agentes"]) {
+      expect(questions.for_everyone.instructions).toContain(`"${phrase}"`);
+      expect(questions.agent_0.instructions.question).toContain(`"${phrase}"`);
+    }
+  });
+});
+
 describe("Jev strategy end to end", () => {
   test("one request with a Noul per agent, a need Noul and a tie-break Choice; usage billed to the platform", async () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy is green."] }) });
@@ -94,7 +180,7 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => ({ nouls: { "@dev": 0.81, "@qa": 0.2 }, needs: 0.9, best: "dev" }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "ts_secret", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "ts_secret", fetch: jev.fetcher } },
     });
     const m = await post(f, "is the deploy green?");
     await drainOutbox(f.db, handlers);
@@ -106,6 +192,7 @@ describe("Jev strategy end to end", () => {
       "agent_0",
       "agent_1",
       "best_agent",
+      "for_everyone",
       "needs_agent",
     ]);
     expect(JSON.stringify(req?.body.state)).toContain("is the deploy green?");
@@ -126,7 +213,7 @@ describe("Jev strategy end to end", () => {
       inputTokens: 1200,
       costNanoUsd: jevCostNanoUsd(1200),
     });
-    expect(jevCostNanoUsd(1_000_000)).toBe(42_000); // $0.042 per million input tokens
+    expect(jevCostNanoUsd(1_000_000)).toBe(42_000_000); // $0.042 per million input tokens
   });
 
   test("on a Jev error the LLM strategy decides, and the decision says so", async () => {
@@ -139,13 +226,16 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => new Error("down"));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     await post(f, "help with the build?");
     await drainOutbox(f.db, handlers);
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision?.strategy).toStartWith("llm (fallback:");
-    expect(decision?.selectedAgentIds).toEqual([f.agent.id]);
+    expect(decision).toMatchObject({
+      strategy: "llm:claude-haiku-5-5",
+      error: "jev: TypeSafe answered 529",
+      selectedAgentIds: [f.agent.id],
+    });
   });
 
   test("conversation continuity: a follow-up without a mention goes to the agent just spoken to", async () => {
@@ -156,7 +246,7 @@ describe("Jev strategy end to end", () => {
     }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     await post(f, "oi @dev");
     await drainOutbox(f.db, handlers);
@@ -172,7 +262,7 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => ({ nouls: { "@dev": 0.2 }, needs: 0.1 }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     const events = f.listen(f.general.id);
     const m = await post(f, "pessoal, almoço?");
@@ -184,12 +274,90 @@ describe("Jev strategy end to end", () => {
     expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
   });
 
+  test("with no Jev key the LLM strategy decides at once, under its own name, and nothing calls TypeSafe", async () => {
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema
+          ? { chunks: ['{"needs_agent":0.9,"scores":[{"handle":"dev","score":0.9}],"reason":"r"}'] }
+          : { chunks: ["ok"] },
+    });
+    const jev = fakeJev(() => ({ nouls: { "@dev": 0.9 }, needs: 0.9 }));
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper] });
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key, fetch: jev.fetcher } },
+    });
+    await post(f, "help with the build?");
+    await drainOutbox(f.db, handlers);
+    const [decision] = await f.db.select().from(schema.routingDecisions);
+    expect(decision).toMatchObject({ strategy: "llm:claude-haiku-5-5", error: null, selectedAgentIds: [f.agent.id] });
+    expect(jev.requests).toEqual([]);
+  });
+
+  test("named for who decides now: the cheap model with no key, Jev once one is saved", async () => {
+    f = await setup();
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0 }));
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], fetch: jev.fetcher });
+    await key.ready();
+    const routing = messageRouter({ ...f.jobDeps, router: { enabled: true, model: "m", jev: { key } } });
+    const llm = createLlmJudge({ gateway: f.gateway, resolveModel: async () => "m" });
+    const judge = standingJudge(
+      f.db,
+      withJudgeFallback(createJevJudge({ key, gateway: f.gateway }), llm, () => key.usable()),
+    );
+    expect([routing?.strategy.name, judge.name]).toEqual(["llm", "llm"]);
+    await key.save("ts_named_key_1", f.owner.id);
+    expect([routing?.strategy.name, judge.name]).toEqual(["jev", "jev"]);
+  });
+
+  test("out of credit: the LLM strategy decides, and Jev isn't called again for 30 minutes", async () => {
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema ? { chunks: ['{"needs_agent":0.1,"scores":[],"reason":"r"}'] } : { chunks: ["ok"] },
+    });
+    let clock = Date.now();
+    const key = createJevKey({
+      db: f.db,
+      keyWrapper: f.keyWrapper,
+      keyWrappers: [f.keyWrapper],
+      envKey: "ts_broke_key",
+      now: () => clock,
+    });
+    let calls = 0;
+    const broke = (async () => {
+      calls++;
+      return Response.json({ detail: { error_type: "billing_error", message: "No credit left" } }, { status: 402 });
+    }) as unknown as typeof fetch;
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key, fetch: broke } },
+    });
+    await post(f, "anyone around?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(1);
+    expect((await key.view()).state).toBe("no_credit");
+    await post(f, "still there?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(1);
+    clock += 30 * 60_000;
+    await post(f, "and now?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(2);
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    expect(decisions.map((d) => d.strategy)).toEqual(Array(3).fill("llm:claude-haiku-5-5"));
+    expect(decisions.map((d) => d.error).sort()).toEqual([
+      "jev: TypeSafe answered 402",
+      "jev: TypeSafe answered 402",
+      null,
+    ]);
+  });
+
   test("agents' messages never reach the router", async () => {
     f = await setup();
     const jev = fakeJev(() => ({ nouls: {}, needs: 1 }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "m", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "m", jev: { key: "k", fetch: jev.fetcher } },
     });
     await f.db.transaction((tx) =>
       insertMessage(tx, {

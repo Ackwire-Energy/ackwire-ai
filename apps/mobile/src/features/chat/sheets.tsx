@@ -10,6 +10,7 @@ import {
   useCreateMission,
   useEligibleAgents,
   useFollowThread,
+  useMe,
   useMissionControl,
   usePinMessage,
   usePins,
@@ -18,6 +19,7 @@ import {
   useThreadMutation,
   useToggleReaction,
 } from "@agenteschat/client";
+import { summaryParts } from "@agenteschat/client/lib/missions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -26,8 +28,9 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
+import { missionComputerKey } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
@@ -491,6 +494,7 @@ export function ChannelOptions({
   leading,
   agentId,
   onPins,
+  onMembers,
 }: {
   channelId: string;
   title: string;
@@ -499,6 +503,8 @@ export function ChannelOptions({
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
   onPins: () => void;
+  /** A channel: who is in it (and, for admins, adding and removing). */
+  onMembers?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -510,6 +516,9 @@ export function ChannelOptions({
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
       <ActionList
         items={[
+          ...(onMembers
+            ? [{ key: "members", icon: "members" as const, label: t("shell.members"), onPress: onMembers }]
+            : []),
           {
             key: "pins",
             icon: "pin",
@@ -565,6 +574,9 @@ export function NewMissionForm({
   const toast = useToast();
   const sheet = useSheet();
   const eligible = useEligibleAgents(orgId);
+  // On the Cloud missions wait for the workspace's own computer: nobody connects one.
+  const waitCloud = useCloudMissionWait();
+  const cloud = useEdition() === "cloud";
   const create = useCreateMission(orgId);
   const [goal, setGoal] = useState(initialGoal);
   const [picked, setPicked] = useState<string | null>(null);
@@ -612,7 +624,7 @@ export function NewMissionForm({
               key: a.agentId,
               leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
               label: a.name,
-              hint: whereText(t, a),
+              hint: waitCloud && !a.machine ? waitCloud : whereText(t, a, cloud),
               disabled: a.eligible === false,
               trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
               onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
@@ -621,7 +633,7 @@ export function NewMissionForm({
         />
       ) : eligible.isSuccess ? (
         <Text variant="small" tone="muted">
-          {t("mobile.newMission.noAgents")}
+          {waitCloud ?? t("mobile.newMission.noAgents")}
         </Text>
       ) : null}
       <Button
@@ -636,18 +648,25 @@ export function NewMissionForm({
   );
 }
 
-/** "MacBook do Walter · ligado", or why it can't do a mission for you. */
-function whereText(t: TFunction, a: MissionEligibleAgent) {
+/** "As missões começam quando o Computador da Acme ficar pronto." on the Cloud; null elsewhere. */
+function useCloudMissionWait() {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const org = useMe().data?.organizations.find((o) => o.id === orgId);
+  if (useEdition() !== "cloud") return null;
+  return t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org?.name ?? "" }) });
+}
+
+/** "MacBook do Walter · ligado", or why it can't do a mission for you; the Cloud's computer is never off. */
+function whereText(t: TFunction, a: MissionEligibleAgent, cloud: boolean) {
   if (a.eligible === false && a.reason) return t(`mobile.newMission.reason.${a.reason}`);
   if (!a.machine) return t("mobile.newMission.reason.no_computer");
-  return a.machine.online
-    ? t("mobile.newMission.computerOn", { name: a.machine.name })
-    : t("mobile.newMission.computerOff", { name: a.machine.name });
+  return t(missionComputerKey(a.machine.online, cloud), { name: a.machine.name });
 }
 
 // ── /summary of a mission ────────────────────────────────────────────────────
 
-/** Where the mission stands, from the database (only for me). */
+/** Where the mission stands (only for me), in the web card's lines: the server's `text` is English. */
 export function MissionSummaryView({ missionId }: { missionId: string }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -667,7 +686,9 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
         <ActivityIndicator color={c.muted} />
       ) : (
         <Text variant="body" tone="ink2">
-          {summary.data.text}
+          {summaryParts(summary.data)
+            .map((p) => t(`missions.summary.${p.key}`, { count: p.count, total: p.total ?? 0 }))
+            .join("\n")}
         </Text>
       )}
     </>

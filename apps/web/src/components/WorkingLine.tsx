@@ -14,7 +14,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * The working line's pieces (docs/design/telas/ConversaAgentes.html): the
+ * The working line's pieces: the
  * stacked live mini bodies of who is on it, the sentence with names in ink
  * ("Theo, Iris e mais 2 estão trabalhando…", "Dev está perguntando ao
  * Infra…") and the clock of a question that is out.
@@ -50,7 +50,7 @@ export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
 }
 
 /**
- * The card's phrase, turning (telas/CardTrabalhando.html, A): one agent on its own gets a light line
+ * The card's phrase, turning: one agent on its own gets a light line
  * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
  */
 export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {

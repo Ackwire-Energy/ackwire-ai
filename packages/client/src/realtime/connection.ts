@@ -6,6 +6,8 @@ import { steerStore } from "./steer";
  * WebSocket client for `/api/ws?orgId=` (apps/server/src/realtime/ws.ts,
  * docs/adr/0010-realtime.md). One connection per organization:
  * - subscribes per channel (ref-counted) and re-subscribes after reconnects;
+ * - says when the server confirms a channel's subscription (`onSubscribed`): its
+ *   events arrive only from then on, so what a page read before may be behind;
  * - reconnects with backoff; tells listeners so they catch up over HTTP
  *   (real-time is best effort, the database is the source of truth);
  * - pings to keep the connection alive through proxies.
@@ -55,20 +57,28 @@ const defaultTimers: Timers = {
 export const BACKOFF_MS = [500, 1000, 2000, 5000, 10_000];
 const OPEN = 1;
 
-/**
- * The socket URL for an organization. `base` is the page's location (web) or
- * the server's origin, e.g. "https://agentes.chat" (phone app).
- */
-export function realtimeUrl(base: string | { protocol: string; host: string }, orgId: string) {
+/** Where the server is: the page's location (web) or the server's origin, e.g. "https://agentes.chat" (phone app). */
+export type SocketBase = string | { protocol: string; host: string };
+
+/** A WebSocket address on the server: `path` with `params` as its query. */
+export function socketUrl(base: SocketBase, path: string, params: Record<string, string | number>) {
   const origin = typeof base === "string" ? originOf(base) : base;
   const protocol = origin.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${origin.host}/api/ws?orgId=${encodeURIComponent(orgId)}`;
+  const query = Object.entries(params)
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  return `${protocol}//${origin.host}${path}?${query}`;
+}
+
+/** The socket URL for an organization. */
+export function realtimeUrl(base: SocketBase, orgId: string) {
+  return socketUrl(base, "/api/ws", { orgId });
 }
 
 /** "https://agentes.chat/x" → { protocol: "https:", host: "agentes.chat" } (no `URL`: React Native's is partial). */
 function originOf(base: string): { protocol: string; host: string } {
   const m = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]+)/i.exec(base.trim());
-  if (!m) throw new Error(`realtimeUrl: not an absolute URL: ${base}`);
+  if (!m) throw new Error(`socketUrl: not an absolute URL: ${base}`);
   return { protocol: (m[1] as string).toLowerCase(), host: m[2] as string };
 }
 
@@ -91,6 +101,7 @@ export class RealtimeConnection {
   private readonly listeners = new Map<string, Set<EventListener>>();
   private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
   private readonly reconnectListeners = new Set<() => void>();
+  private readonly subscribedListeners = new Set<(channelId: string) => void>();
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
   private readonly userListeners = new Set<(event: UserEvent) => void>();
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
@@ -178,6 +189,17 @@ export class RealtimeConnection {
     this.reconnectListeners.add(listener);
     return () => {
       this.reconnectListeners.delete(listener);
+    };
+  }
+
+  /**
+   * The server confirmed a channel's subscription (its first, and again after every reconnect): the channel's
+   * events reach us from now on. Whatever happened there before, after a page read it, is only over HTTP.
+   */
+  onSubscribed(listener: (channelId: string) => void) {
+    this.subscribedListeners.add(listener);
+    return () => {
+      this.subscribedListeners.delete(listener);
     };
   }
 
@@ -272,6 +294,8 @@ export class RealtimeConnection {
       const set = this.listeners.get(frame.channelId);
       if (!set) return;
       for (const l of [...set]) l(frame.event);
+    } else if (frame.type === "subscribed") {
+      for (const l of this.subscribedListeners) l(frame.channelId);
     } else if (frame.type === "error") {
       for (const l of this.errorListeners) l(frame.code, frame.channelId);
     }

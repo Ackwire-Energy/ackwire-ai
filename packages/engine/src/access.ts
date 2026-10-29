@@ -1,7 +1,7 @@
 import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS } from "./browser/types";
+import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS, DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "./browser/types";
 import { caches } from "./cache";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorGrantValidator } from "./connectors/connections";
@@ -26,7 +26,11 @@ import {
 
 const { agentScopes, connectorConnections, agents } = schema;
 
-/** Built-in tools by scope (what the built-in sources offer). `ask_user` and `react` need no scope. */
+/**
+ * Built-in tools by scope (what the built-in sources offer). `ask_user` and `react` need no scope. Every
+ * built-in scope has an entry, with tools or not: the app saves an agent's access from this tree, so a
+ * scope missing here would be dropped by any save.
+ */
 export const BUILTIN_TOOLS: Record<string, string[]> = {
   "": ["ask_user", "react"],
   "context:read": ["search_context", "get_summary", "expand"],
@@ -49,6 +53,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
+  "setup:write": ["offer_connect_ai", "create_channel"],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -63,6 +68,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "computer_status",
   ],
   [BROWSER_SCOPE]: [...BROWSER_TOOLS],
+  [DESKTOP_SCOPE]: Object.keys(DESKTOP_TOOL_INFO),
 };
 
 export interface ToolRef {
@@ -106,7 +112,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   forget: { label: "Forget", description: "Archives a note when someone asks." },
   propose_instruction_change: {
     label: "Propose an instruction change",
-    description: "Suggests changing its own instructions or the org context; a person decides.",
+    description: "Suggests changing its own instructions or the org context. A person decides.",
   },
   read_artifact: { label: "Read file", description: "Reads a Drive file." },
   list_artifacts: { label: "List files", description: "Lists the Drive files it can see." },
@@ -123,7 +129,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   comment_issue: { label: "Comment on issue", description: "Comments on progress in an issue." },
   list_events: { label: "View calendar", description: "Lists events." },
   find_free_time: { label: "Find free time", description: "Looks for free slots in common." },
-  propose_event: { label: "Propose event", description: "Suggests an event; the person asking confirms." },
+  propose_event: { label: "Propose event", description: "Suggests an event. The person who asked confirms." },
   load_skill: { label: "Load skill", description: "Loads a skill's instructions." },
   read_skill_file: { label: "Read skill file", description: "Reads a reference file of a skill." },
   schedule_reminder: {
@@ -143,7 +149,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },
   suggest_forum_topic: {
     label: "Suggest forum topic",
-    description: "Suggests a discussion among agents; a person opens it.",
+    description: "Suggests a discussion among agents. A person opens it.",
   },
   open_forum_topic: {
     label: "Open forum topic",
@@ -159,6 +165,14 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     description: "Adds or rewrites a section when someone asks.",
   },
   link_to_wiki: { label: "Link wiki pages", description: "Links a page to others when someone asks." },
+  offer_connect_ai: {
+    label: "Offer to connect an AI",
+    description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+  },
+  create_channel: {
+    label: "Create channel",
+    description: "Creates a channel with people and agents for the person asking, with Undo.",
+  },
   run_code: { label: "Run code", description: "Runs Python, Node or bash in the conversation's isolated environment." },
   write_file: { label: "Write to environment", description: "Writes a file in the code environment." },
   read_file: { label: "Read from environment", description: "Reads a file from the code environment." },
@@ -174,12 +188,13 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Turn on the computer",
     description: "Turns on the agent's computer (creates it the first time).",
   },
-  computer_stop: { label: "Turn off the computer", description: "Turns off the computer; the files stay." },
+  computer_stop: { label: "Turn off the computer", description: "Turns off the computer. The files stay." },
   computer_status: {
     label: "Check the computer",
     description: "Says whether it is on, the disk used and this month's cost.",
   },
   ...BROWSER_TOOL_INFO,
+  ...DESKTOP_TOOL_INFO,
 };
 
 const humanize = (name: string) => {

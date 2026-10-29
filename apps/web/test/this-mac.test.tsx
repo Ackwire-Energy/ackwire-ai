@@ -4,28 +4,29 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { ThisMacStatus } from "@/lib/desktop";
+import { createI18n } from "@/i18n";
+import { applyDesktopDevice, type ThisMacStatus } from "@/lib/desktop";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * agentes for Mac (D79): the site in the app's window connects this Mac in one
+ * agentes for Mac (ADR 0036): the site in the app's window connects this Mac in one
  * click (the app hands over the runner's code, the site confirms it) and opens
  * the app's Preferences for what is granted on the Mac itself.
  */
 
-const win = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+const win = () => window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
 afterEach(() => {
   cleanup();
-  delete win.__agentesDesktop;
-  delete win.__TAURI_INTERNALS__;
+  delete win().__agentesDesktop;
+  delete win().__TAURI_INTERNALS__;
 });
 
 /** The app around the site: answers `this_mac` from `mac`, records every request. */
 function inTheApp(mac: { status: ThisMacStatus; code: string | null }) {
   const asked: Record<string, unknown>[] = [];
-  win.__agentesDesktop = { version: "0.6.0" };
-  win.__TAURI_INTERNALS__ = {
+  win().__agentesDesktop = { version: "0.6.0" };
+  win().__TAURI_INTERNALS__ = {
     invoke: async (cmd: string, args: { request: Record<string, unknown> }) => {
       if (cmd !== "this_mac") throw new Error(`unexpected ${cmd}`);
       asked.push(args.request);
@@ -46,8 +47,8 @@ describe("Configurações → Computadores, in the app", () => {
     fakeMachinesOf.get(api)?.addDevice("WXYZ-1234");
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
-    const card = screen().getByRole("region", { name: "Conectar um computador" });
-    expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
+    const card = screen().getByRole("region", { name: "Conectar outro computador" });
+    expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
 
     // The runner picks its token up right after the site confirms.
     const connected: ThisMacStatus = { orgs: [{ orgId: ORG_ID, machineId: "m-this", connection: "online" }] };
@@ -56,7 +57,8 @@ describe("Configurações → Computadores, in the app", () => {
       mac.status = connected;
     });
     await settle(8);
-    expect(asked).toContainEqual({ kind: "connect", orgId: ORG_ID });
+    // The organization's name goes along, for the app's own dialog before it pairs this computer.
+    expect(asked).toContainEqual({ kind: "connect", orgId: ORG_ID, orgName: "Acme" });
     expect(state.calls.find((c) => c.method === "machines.confirmDevice")?.args.slice(0, 2)).toEqual([
       ORG_ID,
       "WXYZ-1234",
@@ -99,6 +101,27 @@ describe("Configurações → Computadores, in the app", () => {
     await settle(8);
     expect(screen().getByText(/Liberar é no próprio computador/)).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Abrir Pastas" })).toBeNull();
+  });
+
+  test("agentes.chat, a server on this computer, Windows: the app says no, and no This Mac shows", async () => {
+    const asked = inTheApp({ status: { orgs: [], agentsHere: false }, code: "WXYZ-1234" });
+    const api = createFakeApi(seedState());
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    expect(screen().queryByRole("button", { name: "Usar este Mac" })).toBeNull();
+    expect(asked.some((r) => r.kind === "connect")).toBe(false);
+  });
+
+  test("this computer's own name, on Linux, in the app's language", () => {
+    const i18n = createI18n("pt-BR");
+    applyDesktopDevice(i18n, "linux");
+    expect(i18n.t("machines.thisMac.connect")).toBe("Usar este computador");
+    expect(i18n.t("machines.thisMac.connected")).toBe(
+      "Este computador está conectado. Escolha as pastas que os agentes podem usar.",
+    );
+    void i18n.changeLanguage("en");
+    expect(i18n.t("machines.thisMac.connect")).toBe("Use this computer");
+    expect(createI18n("en").t("machines.thisMac.connect")).toBe("Use this Mac");
   });
 
   test("outside the app: the download, and nothing asks the Mac", async () => {

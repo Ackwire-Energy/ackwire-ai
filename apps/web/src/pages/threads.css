@@ -1,5 +1,5 @@
 /*
- * Threads (telas/Threads.html): header, tabs, search and filters, one row per
+ * Threads: header, tabs, search and filters, one row per
  * thread in aligned columns (stacked cards on a phone, by container query),
  * the floating selection bar (Drive's) and the details panel (Rotinas').
  * Neutral selection (ink and gray); brand blue only on agents' avatars.
@@ -28,9 +28,6 @@
 }
 /* One toolbar: search, filter menus and toggles share a height (36), the pill radius and the field look. */
 .threads-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
   margin: -4px 4px 0;
   font-size: 12.5px;
@@ -44,7 +41,7 @@
   align-self: center;
 }
 
-/* ── Rows (ThreadsRefino.html "Por canal") ───────────────────────────────
+/* ── Rows ────────────────────────────────────────────────────────────────
  * Grouped by channel; one line each: who carries it, title + last line, then
  * fixed columns (tag right-aligned, people, time) so they line up row to row.
  */
@@ -328,9 +325,7 @@
   flex: 1 1 auto;
 }
 .thread-banner {
-  display: flex;
   gap: 10px;
-  align-items: flex-start;
   padding: 10px 12px;
   border-radius: var(--radius-lg);
   background: var(--sunken);
@@ -338,8 +333,6 @@
   color: var(--ink2);
 }
 .thread-banner .ac-icon {
-  flex: none;
-  margin-top: 2px;
   color: var(--muted);
 }
 .thread-banner b {

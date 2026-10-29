@@ -184,6 +184,8 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
     exec: false,
     paused: { paused: false },
     access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+    // Protocol 22: how big this computer is.
+    size: { cpus: expect.any(Number), memoryGb: expect.any(Number), diskGb: expect.any(Number) },
   });
   await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
   s.frame({ type: "agents", agents: [{ id: AGENT.id, handle: "dev", name: "Dev", look: { color: "amber" } }] });
@@ -741,16 +743,12 @@ test.if(process.platform !== "win32")(
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "signed-in"), "");
     const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
-    const s = await c.connect();
-    // The first look never delays connecting: in `hello` if it was quick, else right after as `accounts.changed`.
-    const reported = () =>
-      (s.of("accounts.changed").at(-1) as { accounts?: unknown } | undefined)?.accounts ??
-      (s.of("hello")[0] as { accounts?: unknown } | undefined)?.accounts;
-    await waitFor(() => reported() !== undefined);
-    expect(reported()).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
+    // Connects once the first look is done, so `hello` lists what it found whatever the CLIs' speed.
     expect(await c.data({ type: "accounts.list" })).toEqual({
       accounts: [{ id: existing, kind: "codex", loggedIn: true }],
     });
+    const s = await c.connect();
+    expect(s.of("hello")[0]?.accounts).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
 
     const begun = await c.data<{ loginId: string; url: string; userCode?: string }>({
       type: "account.begin",
@@ -782,6 +780,48 @@ test.if(process.platform !== "win32")(
       ok: false,
       error: { code: "bad_request" },
     });
+  },
+  20_000,
+);
+
+test.if(process.platform !== "win32")(
+  "accounts: a first look that ends after hello went out, before welcome, reaches the server on welcome",
+  async () => {
+    const { home } = pairedHome();
+    const existing = "0193ffff-0000-7000-8000-000000000003";
+    const dir = path.join(home, "accounts", "codex", existing);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    // The CLIs answer once `gate` exists: the first look is still going when hello goes out.
+    const gate = path.join(home, "gate");
+    const fakeCli = [
+      "/bin/sh",
+      "-c",
+      'while [ ! -e "$0" ]; do sleep 0.01; done; exec "$@"',
+      gate,
+      process.execPath,
+      path.join(import.meta.dir, "fake-account-cli.mjs"),
+    ];
+    const found = [{ id: existing, kind: "codex", loggedIn: true }];
+    const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
+    await waitFor(() => c.sockets.length === 1);
+    const s = c.sockets[0] as FakeSocket;
+    s.handlers.onOpen();
+    await waitFor(() => s.of("hello").length === 1);
+    expect(s.of("hello")[0]?.accounts).toBeUndefined();
+    // It ends before the server's welcome, while nothing can reach the server yet.
+    writeFileSync(gate, "");
+    expect(await c.data({ type: "accounts.list" })).toEqual({ accounts: found });
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+    await waitFor(() => s.of("accounts.changed").length > 0);
+    expect(s.of("accounts.changed")).toMatchObject([{ accounts: found }]);
+
+    // A hello that already lists them: welcome adds nothing.
+    expect(await c.data({ type: "reconnect" })).toEqual({ reconnecting: true });
+    await waitFor(() => c.sockets.length === 2);
+    const again = await c.connect();
+    expect(again.of("hello")[0]?.accounts).toMatchObject(found);
+    expect(again.of("accounts.changed")).toEqual([]);
   },
   20_000,
 );

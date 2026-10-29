@@ -1,7 +1,10 @@
 import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
-import { useTeam } from "@agenteschat/client";
+import { useAiStatus, useCatalog, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { excerpt } from "@agenteschat/client/lib/text";
 import {
   Avatar,
   Button,
@@ -22,20 +25,23 @@ import { Link } from "@tanstack/react-router";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useTheme } from "@/lib/theme";
 import "./team.css";
 
 /*
- * Equipe (telas/Organograma.html, direction Céu): the agents as live sprites in
+ * Equipe: the agents as live sprites in
  * the pixel sky, in clusters around the person responsible for them. A pixel
  * line joins agents that consulted each other in the last day; a new
  * consultation lights its line for a moment. Tap an agent for its card.
  */
 
-/** Capability keys shown as chips (context, memory and skills are on every agent: no news). */
+/** Capability keys shown as chips (context, memory, skills and workspace setup are on every agent: no news). */
 const CAPS = {
   drive: "drive",
   issues: "issues",
@@ -44,6 +50,9 @@ const CAPS = {
   forum: "message",
   wiki: "book",
   sandbox: "computer",
+  desktop: "pointer",
+  browser: "globe",
+  database: "database",
   github: "repo",
   sentry: "alert",
   linear: "layers",
@@ -52,7 +61,16 @@ const CAPS = {
   custom: "plug",
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;
-const HIDDEN_CAPS = new Set(["context", "memory", "skills"]);
+/** Abilities that are another company's service, by its connector: drawn with the service's own mark. */
+const CAP_CONNECTOR: Partial<Record<CapKey, string>> = {
+  github: "github",
+  sentry: "sentry",
+  linear: "linear",
+  gdrive: "drive",
+};
+const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
+/** "What it does" on its card: the first line of its instructions, in whole sentences while they fit. */
+const SUMMARY_MAX = 160;
 const isCap = (k: string): k is CapKey => k in CAPS;
 
 /** How long a new consultation's line stays lit, in ms. */
@@ -143,7 +161,7 @@ function puck(f: SkyFrame, x0: number, y0: number, x1: number, y1: number, at: n
 }
 
 const WHITE = pixelOf("#ffffff");
-/** The night sky of the dark theme (telas/Organograma.html). */
+/** The night sky of the dark theme. */
 const NIGHT_TONES = ["#04112b", "#071c45", "#0a2b66", "#0e3d8c", "#1452b0", "#2b74e6", "#4b93ff", "#78b4ff"];
 const starAt = (x: number, y: number) => {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -154,6 +172,9 @@ export function TeamPage() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
+  // Asked with the page, so an agent's card opens already saying whether it can work, with its services' marks.
+  useAiStatus(org.id);
+  useCatalog();
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
   return (
@@ -170,7 +191,7 @@ export function TeamPage() {
         {can(org.role, "manage_agents") && (
           <Button asChild variant="primary" icon="plus">
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-              {t("team.newAgent")}
+              {t("shell.createAgent")}
             </Link>
           </Button>
         )}
@@ -408,8 +429,19 @@ function TeamSky({ team }: { team: Team }) {
 function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const aiStatus = useAiStatus(org.id);
+  const ai = aiStateOf(aiStatus.data, agent.id);
+  const dir = useDirectory(org.id);
+  // The same plain words as its page's "What it does", from the instructions every member can read.
+  const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
+  const g = agentGrammar(t, agent.name);
+  const catalog = useCatalog();
+  const serviceOf = (k: CapKey) => {
+    const def = catalog.data?.connectors.find((c) => c.id === CAP_CONNECTOR[k]);
+    return def?.iconUrl ? def : null;
+  };
   return (
     <div className="team-card" role="dialog" aria-label={t("team.details", { name: agent.name })}>
       <Button
@@ -435,35 +467,43 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
               <PixelSpinner size={14} color={colorOf(agent)} />
               {t("team.workingNow")}
             </span>
+          ) : ai === "no_ai" ? (
+            <NoAiChip agentId={agent.id} />
           ) : (
-            <span className="team-card__status">
-              <Icon name="clock" size={14} />
-              {t("team.free")}
-            </span>
+            // Waiting (its computer away, a plan's limit reached) can't work now either: no word, never Available.
+            ai === "ready" && (
+              <span className="team-card__status">
+                <span className="team-card__dot" aria-hidden="true" />
+                {t("team.available")}
+              </span>
+            )
           )}
         </div>
       </div>
-      {agent.callFor && (
+      {summary && (
         <div className="team-card__sec">
-          <span className="team-card__eyebrow">{t("team.callFor")}</span>
-          <p className="team-card__call">{agent.callFor}</p>
+          <span className="team-card__eyebrow">{t("team.does", g)}</span>
+          <p className="team-card__call">{summary}</p>
         </div>
       )}
       <div className="team-card__sec">
-        <span className="team-card__eyebrow">{t("team.canDo")}</span>
+        <span className="team-card__eyebrow">{t("team.canDo", g)}</span>
         <div className="team-card__chips">
           {caps.length === 0 && <Chip icon="message">{t("team.onlyChat")}</Chip>}
-          {caps.map((k) =>
-            isCap(k) ? (
-              <Chip key={k} icon={CAPS[k]}>
+          {caps.map((k) => {
+            if (!isCap(k))
+              return (
+                <Chip key={k} icon="plug">
+                  {k.charAt(0).toUpperCase() + k.slice(1)}
+                </Chip>
+              );
+            const service = serviceOf(k);
+            return (
+              <Chip key={k} icon={CAPS[k]} lead={service && <ConnectorIcon def={service} label={t(`team.cap.${k}`)} />}>
                 {t(`team.cap.${k}`)}
               </Chip>
-            ) : (
-              <Chip key={k} icon="plug">
-                {k.charAt(0).toUpperCase() + k.slice(1)}
-              </Chip>
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
       <div className="team-card__acts">

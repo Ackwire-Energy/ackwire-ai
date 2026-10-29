@@ -51,7 +51,15 @@ test("an approval waits in the inbox of whoever may decide, and leaves it once d
     reply: (req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
       if (last.includes("merged")) return { chunks: ["Merge done."] };
-      return { chunks: [], toolUses: [{ name: "github_merge_pr", input: { pr: 42 } }] };
+      return {
+        chunks: [],
+        toolUses: [
+          {
+            name: "github_merge_pr",
+            input: { pr: 42, why: "CI passed and the review is done: merging ships the fix today." },
+          },
+        ],
+      };
     },
   });
   const { api, orgId, channelId, agentId } = await signedIn();
@@ -80,7 +88,16 @@ test("an agent's question waits for the person who asked; answering resolves it"
       if (last.includes("tool_result")) return { chunks: ["ok"] };
       return {
         chunks: [],
-        toolUses: [{ name: "ask_user", input: { question: "Qual ambiente?", choices: ["staging", "production"] } }],
+        toolUses: [
+          {
+            name: "ask_user",
+            input: {
+              why: "I need a person's answer before I go on: this decides what I change next.",
+              question: "Qual ambiente?",
+              choices: ["staging", "production"],
+            },
+          },
+        ],
       };
     },
   });
@@ -94,7 +111,7 @@ test("an agent's question waits for the person who asked; answering resolves it"
     source: { channelId },
     latest: { text: "Qual ambiente?", suggestions: ["staging", "production"] },
   });
-  // Asked in the channel: the question is in the main timeline, not a thread (D67).
+  // Asked in the channel: the question is in the main timeline, not a thread.
   expect(q?.source.threadId).toBeUndefined();
   const res = await api(`/questions/${q?.source.questionId}/answer`, { json: { choice: "production" } });
   expect(res.status).toBe(200);
@@ -164,10 +181,10 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   // Without a session.
   expect((await browser(t)(`/api/app/organizations/${orgId}/notifications`)).status).toBe(401);
   // Another person: not a member here; and a member can't touch someone else's notification.
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  // Invited, never accepted: signed up but not a member.
+  await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "other@example.com", role: "member" } });
   const other = browser(t);
-  await signUp(other, "other@example.com", { inviteToken: token });
+  await signUp(other, "other@example.com");
   expect((await other(`/api/app/organizations/${orgId}/notifications`)).status).toBe(403);
   expect(
     (await other(`/api/app/organizations/${orgId}/notifications/${id}/done`, { json: { done: true } })).status,

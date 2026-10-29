@@ -1,6 +1,7 @@
 /**
- * Real-environment smoke check: `bun run smoke` (reads `.env`). Never part of
- * `bun test` (not a *.test.ts file, and it talks to real services).
+ * Real-environment smoke check: `bun run smoke [--desktop-agent <handle>]`
+ * (reads `.env`). Never part of `bun test` (not a *.test.ts file, and it
+ * talks to real services).
  *
  * Needs DATABASE_URL and AGENTES_SECRET, plus ANTHROPIC_API_KEY (used as the
  * throwaway org's own key) or PLATFORM_ANTHROPIC_API_KEY. Optional:
@@ -12,7 +13,13 @@
  * print the reply and its usage record → delete the throwaway org and user.
  * With DAYTONA_API_KEY: also a tiny sandbox (no network) runs
  * `python3 -c "print(1+1)"` and is deleted.
+ * With `--desktop-agent <handle>` (or the agent's id), through the server
+ * running at PUBLIC_URL: the agent's desktop (started by watching it, if it
+ * wasn't running) watched until one framebuffer update, and its terminal's
+ * `id -un`, which must not be root, or its refusal where sessions are screened
+ * (`smoke-desktop.ts`). Without a model key, only that runs.
  */
+import { parseArgs } from "node:util";
 import {
   channelTopic,
   createDaytonaSandboxProvider,
@@ -25,7 +32,7 @@ import {
   envPlatformCredentials,
 } from "@agenteschat/adapters";
 import { loadConfig } from "@agenteschat/config";
-import { createDatabase, ensureMessagePartitions, eq, schema } from "@agenteschat/db";
+import { createDatabase, type Database, ensureMessagePartitions, eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   createAgent,
@@ -37,13 +44,21 @@ import {
   postPersonMessage,
 } from "@agenteschat/engine";
 import { createAnthropicProvider } from "@agenteschat/providers";
+import { createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
+import { createLogger } from "../src/logger";
+import { checkDesktop, signInForDesktop } from "./smoke-desktop";
 
+const desktopAgent = parseArgs({ args: process.argv.slice(2), options: { "desktop-agent": { type: "string" } } })
+  .values["desktop-agent"];
 const config = loadConfig();
 const orgKey = process.env.ANTHROPIC_API_KEY?.trim();
 const orgWorkspace = process.env.ANTHROPIC_WORKSPACE_ID?.trim() || undefined;
-if (!orgKey && !config.PLATFORM_ANTHROPIC_API_KEY) {
-  console.error("Set ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY in .env");
+const modelKey = Boolean(orgKey || config.PLATFORM_ANTHROPIC_API_KEY);
+if (!modelKey && !desktopAgent) {
+  console.error(
+    "Set ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY in .env, or check an agent's desktop only (--desktop-agent)",
+  );
   process.exit(1);
 }
 
@@ -53,12 +68,8 @@ const step = (msg: string) => console.log(`[${((Date.now() - started) / 1000).to
 
 let orgId: string | undefined;
 const userId = `smoke_${crypto.randomUUID().slice(0, 8)}`;
-try {
-  step("migrating");
-  await database.migrate();
-  await ensureMessagePartitions(database.db);
-  const db = database.db;
-
+/** The throwaway org's agent answers an @mention through the real worker loop and model. */
+async function modelSmoke(db: Database) {
   const keyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   const pubsub = createMemoryPubSub();
   const adapters = {
@@ -184,6 +195,27 @@ try {
       2,
     ),
   );
+}
+
+/** The agent's desktop and terminal through the server at PUBLIC_URL, as whoever may drive its computer. */
+async function desktopSmoke(db: Database, agent: string) {
+  const origin = new URL(config.PUBLIC_URL).origin;
+  const auth = createAuth({ db, config, log: createLogger("error"), rateLimiter: createMemoryRateLimiter() });
+  const session = await signInForDesktop({ db, auth, base: origin, origin }, agent);
+  step(`desktop: @${session.handle} through ${origin}, signed in as ${session.person}`);
+  try {
+    await checkDesktop(session, step);
+  } finally {
+    await session.signOut();
+  }
+}
+
+try {
+  step("migrating");
+  await database.migrate();
+  await ensureMessagePartitions(database.db);
+  if (modelKey) await modelSmoke(database.db);
+  else step("model: skipped (no ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY)");
   if (config.DAYTONA_API_KEY) {
     step("sandbox: creating (Daytona, no network)");
     const sandbox = createDaytonaSandboxProvider({
@@ -209,6 +241,7 @@ try {
       step("sandbox deleted");
     }
   } else step("sandbox: skipped (no DAYTONA_API_KEY)");
+  if (desktopAgent) await desktopSmoke(database.db, desktopAgent);
   step("smoke ok");
 } catch (error) {
   console.error("smoke FAILED:", error instanceof Error ? error.message : error);
@@ -217,7 +250,7 @@ try {
   try {
     if (orgId) await database.db.delete(schema.organizations).where(eq(schema.organizations.id, orgId));
     await database.db.delete(schema.users).where(eq(schema.users.id, userId));
-    step("throwaway org and user deleted");
+    if (modelKey) step("throwaway org and user deleted");
   } catch (error) {
     console.error("cleanup failed:", error instanceof Error ? error.message : error);
   }

@@ -10,19 +10,20 @@ import {
   formatTimeLeft,
   undoableNow,
 } from "@agenteschat/client/lib/actions";
-import { relativeTime } from "@agenteschat/client/lib/format";
-import { cx, Icon, type IconName } from "@agenteschat/ui";
+import { relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import { fromApiRule, ruleSentence } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
 import "./agent-actions.css";
 
 /**
- * Act with undo (ADR 0037 round 2, telas/FazerDesfazer.html "undo"): what an
+ * Act with undo (ADR 0037 round 2): what an
  * agent changed with this reply, under the message. One change: a quiet
  * sunken row with Desfazer and the time left (A). Several: "3 mudanças · há
  * 1 min" with Desfazer tudo and one row each (B). Undone: struck through,
@@ -48,6 +49,7 @@ const ICONS: Record<AgentAction["kind"], IconName> = {
   "routine.created": "routines",
   "routine.updated": "routines",
   "channel.agent_added": "channel",
+  "channel.created": "channel",
   "wiki.page_created": "page",
   "wiki.page_edited": "page",
   "thread.renamed": "thread",
@@ -66,7 +68,7 @@ function useVisibleNow(ref: RefObject<HTMLElement | null>, live: boolean) {
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)));
+    const io = new IntersectionObserver((entries) => setVisible(onScreenNow(entries) === true));
     io.observe(el);
     return () => io.disconnect();
   }, [ref]);
@@ -220,9 +222,12 @@ function Receipt({
   undoneBy: string | null;
   button: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { me } = useOrg();
-  const { context, ...values } = actionTextValues(a, t, me.user.id);
+  // A routine's schedule from its rule, in the person's language (the server's words are English).
+  const { context, ...values } = actionTextValues(a, t, me.user.id, {
+    schedule: (rule) => ruleSentence(t, i18n.language, fromApiRule(rule, toYmd(new Date())), new Date()),
+  });
   const struck = Boolean(a.undoneAt);
   return (
     <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>

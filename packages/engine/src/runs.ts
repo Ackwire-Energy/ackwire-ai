@@ -1,4 +1,7 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
+import { PROVIDERS } from "@agenteschat/providers";
+import { recordRunFinished } from "./operator-events";
+import { standingErrorDetail } from "./standing";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -6,7 +9,7 @@ export type AgentRun = typeof agentRuns.$inferSelect;
 export type RunStatus = AgentRun["status"];
 
 /**
- * Where a run's replies go (D67): asked in the main timeline (a channel, a DM
+ * Where a run's replies go: asked in the main timeline (a channel, a DM
  * or a forum post), it answers in the main timeline; asked in a thread, in
  * that thread. The run keeps `threadRootId` (its trigger, when top-level) as
  * the conversation it belongs to. The one rule for the engine, its tools and
@@ -34,6 +37,12 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
   canceled: [],
 };
 
+/** A run's error (and a routing decision's) when nobody could think: no AI connected. */
+export const NO_AI = "no_ai" as const;
+
+/** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
+const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
+
 /**
  * The stable code (and params) of a run's stored `error`, for the app to
  * word it in the person's language; the stored text stays as the fallback.
@@ -43,7 +52,7 @@ export function runErrorDetail(error: string | null | undefined): {
   errorParams?: Record<string, string>;
 } | null {
   if (!error) return null;
-  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived"];
+  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", NO_AI];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
@@ -52,6 +61,8 @@ export function runErrorDetail(error: string | null | undefined): {
     return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };
   if (error.startsWith("canceled_by:"))
     return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
+  const standing = standingErrorDetail(error);
+  if (standing) return standing;
   // Older rows hold the Portuguese texts these errors used to have: still recognized.
   if (error === "Interrupted by a server update" || error === "Interrompida por uma atualização do servidor") {
     return { errorCode: "run.interrupted", errorParams: { reason: "deploy" } };
@@ -59,7 +70,7 @@ export function runErrorDetail(error: string | null | undefined): {
   const none =
     /^Add an API key for (.+) in the workspace settings$/.exec(error) ??
     /^Configure uma chave da API da (.+) nas configurações do workspace$/.exec(error);
-  if (none) return { errorCode: "run.missing_credential", errorParams: { provider: none[1] as string } };
+  if (none) return { errorCode: "run.missing_credential", errorParams: { provider: providerNow(none[1] as string) } };
   if (
     error.startsWith("This agent's API key was revoked") ||
     error.startsWith("A chave da API deste agente foi revogada")
@@ -71,7 +82,7 @@ export function runErrorDetail(error: string | null | undefined): {
   if (wrong) {
     return {
       errorCode: "run.credential_wrong_provider",
-      errorParams: { modelProvider: wrong[1] as string, keyProvider: wrong[2] as string },
+      errorParams: { modelProvider: providerNow(wrong[1] as string), keyProvider: providerNow(wrong[2] as string) },
     };
   }
   const unregistered = /^No provider registered for (.+)$/.exec(error);
@@ -125,6 +136,7 @@ export async function transitionRun(
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
+  if (row && isTerminal(to)) await recordRunFinished(db, row);
   return row ?? null;
 }
 

@@ -68,7 +68,7 @@ export async function mailSetup(options: { composio?: boolean; imap?: boolean } 
 export type MailFixture = Awaited<ReturnType<typeof mailSetup>>;
 
 /** An IMAP mailbox `address` (iCloud preset), connected by the owner. */
-export async function imapAccount(m: MailFixture, address = "support@icloud.com") {
+export async function imapAccount(m: MailFixture, address = "support@example.com") {
   const r = await createImapAccount(m.deps, m.f.owner.id, m.f.org.id, {
     preset: "icloud",
     address,
@@ -79,7 +79,7 @@ export async function imapAccount(m: MailFixture, address = "support@icloud.com"
 }
 
 /** A Gmail mailbox through the fake Composio, already active. */
-export async function gmailAccount(m: MailFixture, address = "walt@gmail.com") {
+export async function gmailAccount(m: MailFixture, address = "team@example.com") {
   const { completeComposioConnect } = await import("../src");
   const started = await startComposioConnect(m.deps, m.f.owner.id, m.f.org.id, { provider: "gmail" });
   const link = m.composio.state.links.at(-1);

@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { userTopic } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, userTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  audienceOf,
   canTalkTo,
   createAgent,
   createOrganization,
   createRoutine,
   dispatchMentions,
   drainOutbox,
+  enablePersonalPlans,
   executeRoutineRun,
   ForbiddenError,
+  getAgentBrain,
   insertMessageWithRuns,
   NotFoundError,
   openDm,
@@ -18,9 +21,11 @@ import {
   type RouterStrategy,
   routeMessage,
   setAgentAudience,
+  setAgentBrain,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -171,7 +176,7 @@ describe("who can talk to the agent", () => {
         {
           orgId: f.org.id,
           channelId: f.general.id,
-          threadId: null, // asked in the channel, dev answers there (D67)
+          threadId: null, // asked in the channel, dev answers there
           author: { type: "agent", agentId: f.agent.id, runId: run?.id ?? "", hop: 1 },
           body: "@ops pode olhar o deploy?",
         },
@@ -208,13 +213,136 @@ describe("who can talk to the agent", () => {
       .returning();
     await executeRoutineRun(routineDeps, run?.id ?? "");
     const [after] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
-    expect(after?.active).toBe(false);
+    expect(after).toMatchObject({ active: false, pausedReason: "audience" });
     const [done] = await f.db
       .select()
       .from(schema.routineRuns)
       .where(eq(schema.routineRuns.id, run?.id ?? ""));
-    expect(done?.status).toBe("skipped");
-    expect(done?.summary).toStartWith("Paused: ");
-    expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineId === routine.id)).toBe(false);
+    expect(done).toMatchObject({ status: "skipped", code: "audience" });
+    expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(false);
+  });
+
+  test("on a personal plan only its owner widens it, accepting the terms the first time; admins narrow", async () => {
+    const { bia } = await world();
+    const caio = await addMember(f.db, f.org.id, "admin", "caio");
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "owner" })
+      .where(eq(schema.agents.id, f.agent.id));
+    const everyone = { mode: "everyone" as const, userIds: [] };
+    const some = { mode: "people" as const, userIds: [bia.id] };
+    const widen = (actor: string, to: typeof everyone | typeof some, acceptPlanTerms?: boolean) =>
+      setAgentAudience(f.db, actor, f.org.id, f.agent.id, to, { acceptPlanTerms }).catch((e) => e);
+    expect(await widen(caio.id, everyone, true)).toMatchObject({ code: "audience.plan_owner_only" });
+    const unconfirmed = await widen(f.owner.id, some);
+    expect(unconfirmed).toBeInstanceOf(ValidationError);
+    expect(unconfirmed.code).toBe("audience.plan_terms_required");
+    expect(audienceOf(await widen(f.owner.id, some, true))).toEqual(some);
+    const [accepted] = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
+    expect(accepted?.details).toMatchObject({ acceptedPlanTerms: true, to: some });
+    // Shared already: its owner adds people without being asked again; an admin can't, but narrows.
+    expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
+    expect((await widen(caio.id, some)).audienceMode).toBe("people");
+    expect(await widen(caio.id, everyone)).toBeInstanceOf(ForbiddenError);
+    // On the API nothing of this applies.
+    await f.db.update(schema.agents).set({ brain: "model" }).where(eq(schema.agents.id, f.agent.id));
+    expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
+  });
+
+  test("an agent that thinks with its owner's plan: a DM from anyone else gets the notice and starts no run", async () => {
+    const { bia } = await world();
+    const dm = await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id }); // before the plan
+    const { machineId } = await pairMachine(deps(), f.owner.id, f.org.id, {
+      name: "mac",
+      protocol: BRAIN_PROTOCOL,
+      exec: true,
+    });
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { claude: { version: "2.1.304", loggedIn: true }, detectedAt: new Date().toISOString() } })
+      .where(eq(schema.machines.id, machineId));
+    await f.db.update(schema.agents).set({ machineId }).where(eq(schema.agents.id, f.agent.id));
+    await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { brain: "claude_code" });
+    const sent = await postPersonMessage(deps(), bia.id, f.org.id, dm.id, { body: "oi" });
+    expect(sent.notices).toEqual([
+      {
+        agentId: f.agent.id,
+        text: "Dev only replies to ana.",
+        code: "audience.only",
+        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], names: ["ana"] },
+      },
+    ]);
+    await drainOutbox(f.db, f.handlers);
+    expect(await runsOf(sent.id)).toEqual([]);
+    const cara = await addMember(f.db, f.org.id, "member", "cara");
+    await expect(openDm(f.db, cara.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
+      code: "audience.only",
+    });
+  });
+});
+
+describe("where plans are personal (the server provisions the workspaces' computers)", () => {
+  afterEach(() => enablePersonalPlans(false));
+
+  test("an agent on a plan answers only its owner whatever is stored, nobody widens it, and on the API its old audience holds again", async () => {
+    const { bia } = await world();
+    const dm = await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id });
+    // Shared before plans were personal: on a plan, and everyone talks to it.
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "everyone" })
+      .where(eq(schema.agents.id, f.agent.id));
+    enablePersonalPlans();
+    const row = async () => {
+      const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+      if (!agent) throw new Error("no agent");
+      return agent;
+    };
+    expect(audienceOf(await row())).toEqual({ mode: "owner", userIds: [] });
+    expect([canTalkTo(await row(), bia.id), canTalkTo(await row(), f.owner.id), canTalkTo(await row(), null)]).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    const sent = await postPersonMessage(deps(), bia.id, f.org.id, dm.id, { body: "oi" });
+    expect(sent.notices).toMatchObject([{ code: "audience.only", text: "Dev only replies to ana." }]);
+    await drainOutbox(f.db, f.handlers);
+    expect(await runsOf(sent.id)).toEqual([]);
+
+    // Nobody lets other people in, its owner neither, terms accepted or not.
+    const everyone = { mode: "everyone" as const, userIds: [] };
+    expect(
+      await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, everyone, { acceptPlanTerms: true }).catch(
+        (e) => e,
+      ),
+    ).toMatchObject({ code: "plan.personal" });
+    expect(
+      await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, {
+        onlyOwner: false,
+        acceptPlanTerms: true,
+      }).catch((e) => e),
+    ).toMatchObject({ code: "plan.personal" });
+    expect((await getAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id)).onlyOwner).toBe(true);
+    // What was stored stays.
+    expect((await row()).audienceMode).toBe("everyone");
+
+    // Back on the API it answers everyone again.
+    await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { brain: "model" });
+    expect(canTalkTo(await row(), bia.id)).toBe(true);
+    const again = await postPersonMessage(deps(), bia.id, f.org.id, dm.id, { body: "oi de novo" });
+    expect(again.notices ?? []).toEqual([]);
+    expect((await runsOf(again.id)).length).toBe(1);
+  });
+
+  test("on a plan, the people it answered are kept aside as only its owner keeps them: they come back on the API", async () => {
+    const { bia } = await world();
+    enablePersonalPlans();
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+    const [onPlan] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    if (!onPlan) throw new Error("no agent");
+    expect(audienceOf(onPlan)).toEqual({ mode: "owner", userIds: [bia.id] });
+    expect(canTalkTo(onPlan, bia.id)).toBe(false);
+    expect((await getAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id)).onlyOwner).toBe(true);
   });
 });

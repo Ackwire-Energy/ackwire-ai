@@ -4,6 +4,7 @@ import { deflateSync } from "node:zlib";
 import { createFakeSandboxProvider } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  agentCommitEmail,
   type ConnectorDeps,
   connectorGrantValidator,
   createApiKeyConnection,
@@ -21,8 +22,10 @@ import {
   readPack,
   refRule,
   revokeComputerGitCredentials,
+  setAgentHold,
   setAgentRepositories,
   setAgentScopes,
+  setOrgStanding,
   type ToolContext,
   verifyGitToken,
   withSandbox,
@@ -375,6 +378,29 @@ describe("git proxy", () => {
     });
     expect(noScope.status).toBe(403);
   });
+
+  test("standing: a workspace on hold or suspended, or a held agent, gets no git through us", async () => {
+    const w = await world();
+    const refs = () => w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" });
+    const standing = (state: "active" | "hold" | "suspended") =>
+      setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state, reason: "Review", notice: "silent" });
+    expect((await refs()).status).toBe(200);
+    for (const state of ["hold", "suspended"] as const) {
+      await standing(state);
+      const refused = await refs();
+      expect(refused.status).toBe(403);
+      expect(await refused.text()).not.toContain("Review");
+      await standing("active");
+    }
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Spam" });
+    const held = await refs();
+    expect(held.status).toBe(403);
+    expect(await held.text()).toBe("agentes: This agent is paused for now.\n");
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null });
+    expect((await refs()).status).toBe(200);
+    // Refused before anything reached GitHub.
+    expect(w.github.calls).toHaveLength(2);
+  });
 });
 
 describe("the computer", () => {
@@ -414,7 +440,7 @@ describe("the computer", () => {
     expect(script).toContain(`url.${PUBLIC_URL}/api/git/${f.org.id}/${connection.id}/.insteadOf`);
     expect(script).toContain("https://github.com/");
     expect(script).toContain("Dev (agentes)");
-    expect(script).toContain("dev@agents.agentes.chat");
+    expect(script).toContain("dev@agents.agentes.test");
     const token = /printf %s '([^']+)' > "\$HOME\/\.config\/agentes\/git-token"/.exec(script)?.[1] ?? "";
     expect(verifyGitToken(SECRET, token)).toMatchObject({ orgId: f.org.id, agentId: f.agent.id });
     // The GitHub token is nowhere in the computer: not in commands, files or the spec.
@@ -441,6 +467,12 @@ describe("the computer", () => {
     expect(script).not.toMatch(/\bexport\b|\benv\b/);
     expect(script).toContain('chmod 600 "$HOME/.config/agentes/git-token"');
     expect(script).toContain("credential.https://agentes.test.helper");
+  });
+
+  test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on agentes.chat", () => {
+    expect(agentCommitEmail("https://agentes.chat", "theo")).toBe("theo@agents.agentes.chat");
+    expect(agentCommitEmail("https://agentes.chat/api/git/o/c/", "theo")).toBe("theo@agents.agentes.chat");
+    expect(agentCommitEmail("http://localhost:3000", "theo")).toBe("theo@agents.localhost");
   });
 
   test("git_clone runs real git in the computer; open_pull_request goes through the org's GitHub", async () => {

@@ -23,8 +23,12 @@ export interface RunnerConfig {
   brainIdleMinutes?: number;
   /** Brain turns: at most this many Claude Code processes kept alive (default 3). */
   brainMaxProcesses?: number;
-  /** ADR 0036: a home the desktop app created; `update` and `service install` refuse here. */
-  managedBy?: "desktop";
+  /**
+   * A home something else keeps: `desktop`, the desktop app's (ADR 0036);
+   * `host`, one organization's on the server's own computer (`agentes-runner
+   * host`). `pair`, `update` and `service install` refuse here.
+   */
+  managedBy?: "desktop" | "host";
   /** Protocol 9: paused by the owner; `until` null means until resumed. Absent: not paused. */
   paused?: { until: string | null };
   /** Protocol 10: folders and tools allowed on this machine (absent: derived from `exec`). */
@@ -32,6 +36,32 @@ export interface RunnerConfig {
   /** The organization this home belongs to (from the device-code pairing). */
   orgId?: string;
   orgName?: string;
+  /**
+   * `system` (`install.sh --system`, Linux): the runner is a root service and
+   * each agent works as its own OS user; the root process runs no agent work
+   * itself. Absent or `user`: everything runs as the runner's own user.
+   */
+  mode?: "user" | "system";
+  /** System mode: the uids agent users get, `[first, last]` (default `DEFAULT_AGENT_UID_RANGE`). */
+  agentUidRange?: [number, number];
+}
+
+export { SYSTEM_RUNNER_HOME } from "@agenteschat/adapters/command-policy";
+export const DEFAULT_AGENT_UID_RANGE: [number, number] = [20000, 29999];
+
+/** A uid an agent user may have (1000–59999): never a system account's, and below the ranges systemd hands out itself. */
+export const isAgentUid = (n: unknown): n is number =>
+  Number.isInteger(n) && (n as number) >= 1000 && (n as number) <= 59999;
+
+/** `[first, last]` when both are agent uids, in order. */
+function agentUidRange(first: unknown, last: unknown): [number, number] | null {
+  return isAgentUid(first) && isAgentUid(last) && first <= last ? [first, last] : null;
+}
+
+/** `20000-29999` → `[20000, 29999]`; null when it isn't a valid range. */
+export function parseUidRange(text: string): [number, number] | null {
+  const m = /^(\d{1,9})-(\d{1,9})$/.exec(text.trim());
+  return m ? agentUidRange(Number(m[1]), Number(m[2])) : null;
 }
 
 /** The file as stored: a home that isn't paired (or was unpaired) keeps only some fields. */
@@ -66,11 +96,11 @@ export function normalizeServerUrl(raw: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
 }
 
-/** `https://host` → `wss://host/api/machines/connect`. */
-export function connectUrl(server: string): string {
+/** `https://host` → `wss://host/api/machines/connect` (or `/stream`, a desktop's or terminal's data socket). */
+export function connectUrl(server: string, socket: "connect" | "stream" = "connect"): string {
   const url = new URL(server);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/machines/connect`;
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/machines/${socket}`;
   url.search = "";
   url.hash = "";
   return url.toString();
@@ -98,6 +128,8 @@ export function readStoredConfig(home = runnerHome()): StoredConfig | null {
 export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
   const access = raw.access === undefined ? undefined : parseAccess(raw.access);
   const paused = parsePaused(raw.paused);
+  const range = raw.agentUidRange;
+  const uids = Array.isArray(range) && range.length === 2 ? agentUidRange(range[0], range[1]) : null;
   return {
     ...(text(raw.server) ? { server: text(raw.server) } : {}),
     ...(text(raw.machineId) ? { machineId: text(raw.machineId) } : {}),
@@ -109,11 +141,13 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(positive(raw.taskMaxSeconds) ? { taskMaxSeconds: positive(raw.taskMaxSeconds) } : {}),
     ...(positive(raw.brainIdleMinutes) ? { brainIdleMinutes: positive(raw.brainIdleMinutes) } : {}),
     ...(positive(raw.brainMaxProcesses) ? { brainMaxProcesses: positive(raw.brainMaxProcesses) } : {}),
-    ...(raw.managedBy === "desktop" ? { managedBy: "desktop" as const } : {}),
+    ...(raw.managedBy === "desktop" || raw.managedBy === "host" ? { managedBy: raw.managedBy } : {}),
     ...(paused ? { paused } : {}),
     ...(access ? { access } : {}),
     ...(text(raw.orgId, 100) ? { orgId: text(raw.orgId, 100) } : {}),
     ...(text(raw.orgName, 200) ? { orgName: text(raw.orgName, 200) } : {}),
+    ...(raw.mode === "system" || raw.mode === "user" ? { mode: raw.mode } : {}),
+    ...(uids ? { agentUidRange: uids } : {}),
   };
 }
 
@@ -130,7 +164,7 @@ export function readConfig(home = runnerHome()): RunnerConfig | null {
 export function pairedConfig(stored: StoredConfig, file = "config.json"): RunnerConfig | null {
   if (!stored.token) return null;
   if (!stored.server || !stored.machineId || !stored.workspace) {
-    throw new Error(`${file} is incomplete; pair this computer again`);
+    throw new Error(`${file} is incomplete. Pair this computer again.`);
   }
   return {
     ...stored,

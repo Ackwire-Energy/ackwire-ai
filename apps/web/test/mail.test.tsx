@@ -6,6 +6,7 @@ setupDom();
 import type { MailAccount, RoutineInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
+import { pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeMailOf, ORG_ID, seedState } from "./fake-api";
 import { MAIL_PROVIDERS } from "./fakes/mail";
 import { renderApp, screen, settle } from "./render";
@@ -14,13 +15,14 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-/** Picks a service in "Adicionar conector" (its tile) and presses Conectar in its detail pane. */
-const pick = async (dialog: HTMLElement, name: string) => {
-  await click(within(dialog).getByRole("button", { name }));
-  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
-  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
-};
 const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+/** Opens a select and picks an option. */
+const choose = async (combobox: HTMLElement, option: string) => {
+  combobox.focus();
+  await act(async () => fireEvent.keyDown(combobox, { key: "Enter" }));
+  await click(screen().getByRole("option", { name: option }));
+  await settle();
+};
 
 /** A client with email on (Gmail/Outlook and IMAP), optionally with mailboxes already connected. */
 function mailApi(accounts: Partial<MailAccount>[] = []) {
@@ -36,6 +38,8 @@ function mailApi(accounts: Partial<MailAccount>[] = []) {
     address: `caixa${i + 1}@acme.com.br`,
     offActions: [],
     askActions: [],
+    aliases: [],
+    defaultFrom: null,
     label: `caixa${i + 1}@acme.com.br`,
     status: "active",
     lastError: null,
@@ -58,22 +62,23 @@ describe("Conectores → Email", () => {
   test("the Email group: Gmail, Outlook, iCloud and Outro email, each with how it connects", async () => {
     const { api } = mailApi();
     const dialog = await openCatalog(api);
-    // The categories are a segmented control, each with its count ("Email 4").
+    // The categories, each with its count ("Email 4").
     const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
     await click(within(cats).getByRole("radio", { name: /^Email/ }));
     const names = [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
     expect(names).toEqual(["Gmail", "Outlook", "iCloud", "Outro email", "Não achou?"]);
     const gmail = within(dialog).getByRole("button", { name: "Gmail" });
     expect(gmail.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/gmail.svg");
-    // How it connects lives in the detail pane, not on the card.
+    // How it connects lives in the service's dialog, not on the card.
     await click(gmail);
-    expect(within(dialog).getByRole("complementary", { name: "Sobre Gmail" }).textContent).toContain("Um clique");
+    const google = service("Gmail").textContent;
+    expect(google).toContain("Um clique");
+    await click(within(service("Gmail")).getByRole("button", { name: "Fechar detalhe" }));
     await click(within(dialog).getByRole("button", { name: "iCloud" }));
-    expect(within(dialog).getByRole("complementary", { name: "Sobre iCloud" }).textContent).toContain(
-      "Precisa de uma senha de app",
-    );
+    const apple = service("iCloud").textContent;
+    expect(apple).toContain("Precisa de uma senha de app");
     // No internal names in the copy.
-    expect(dialog.textContent).not.toMatch(/Composio|IMAP/);
+    expect(`${dialog.textContent} ${google} ${apple}`).not.toMatch(/Composio|IMAP/);
   });
 
   test("a server without email shows no Email group", async () => {
@@ -115,7 +120,7 @@ describe("Conectores → Email", () => {
     expect(flow().textContent).toContain("Cole a senha de app.");
     expect(state.calls.some((c) => c.method === "mail.connectImap")).toBe(false);
 
-    await type(within(flow()).getByLabelText("Endereço de email"), "ana@icloud.com");
+    await type(within(flow()).getByLabelText("Endereço de email"), "ana@example.com");
     await type(within(flow()).getByLabelText("Senha de app"), "abcd-efgh-ijkl-mnop");
     mail.nextError = "auth";
     await click(within(flow()).getByRole("button", { name: "Conectar" }));
@@ -129,15 +134,21 @@ describe("Conectores → Email", () => {
     await click(within(flow()).getByRole("button", { name: "Conectar" }));
     await settle(4);
     const connect = state.calls.filter((c) => c.method === "mail.connectImap").at(-1);
-    expect(connect?.args[1]).toEqual({ preset: "icloud", address: "ana@icloud.com", password: "[redacted]" });
+    expect(connect?.args[1]).toEqual({ preset: "icloud", address: "ana@example.com", password: "[redacted]" });
+    // Its other addresses: none found, nothing changed, straight on.
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Endereços de ana@example.com" })).toBeTruthy();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "mail.update")).toBe(false);
     // Step 2: what it does, in the standard tool review (nothing to decide: all sorted).
-    expect(screen().getByRole("dialog", { name: "O que ana@icloud.com faz" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "O que ana@example.com faz" })).toBeTruthy();
     expect(within(flow()).getByRole("button", { name: /^E-mails/ })).toBeTruthy();
     expect(within(flow()).getByRole("button", { name: /^Pastas/ })).toBeTruthy();
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     // Step 3: a level per agent.
     await settle(4);
-    expect(screen().getByRole("dialog", { name: "Quem pode usar ana@icloud.com" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Quem pode usar ana@example.com" })).toBeTruthy();
     await click(
       within(within(flow()).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", {
         name: "Ler e escrever",
@@ -156,7 +167,7 @@ describe("Conectores → Email", () => {
       [ATLAS_ID, "read"],
     ]);
     // Step 4: the rules, one agent at a time; Atlas only reads the inbox.
-    expect(screen().getByRole("dialog", { name: "Regras em ana@icloud.com" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Regras em ana@example.com" })).toBeTruthy();
     await click(
       within(within(flow()).getByRole("radiogroup", { name: "Agente" })).getByRole("radio", { name: "Atlas" }),
     );
@@ -171,18 +182,89 @@ describe("Conectores → Email", () => {
     );
     // The new row: the mailbox, active, used by 2 agents.
     const row = screen()
-      .getByRole("button", { name: "Quem usa ana@icloud.com" })
+      .getByRole("button", { name: "Quem usa ana@example.com" })
       .closest(".connected-row") as HTMLElement;
     expect(row.textContent).toContain("iCloud");
     expect(row.textContent).toContain("Ativo");
-    expect(row.textContent).toContain("Conectado como ana@icloud.com");
+    expect(row.textContent).toContain("Conectado como ana@example.com");
+  });
+
+  test("iCloud with its own domain: the sent folder's addresses come filled in, then the default From", async () => {
+    const { api, state, mail } = mailApi();
+    mail.suggested = ["suporte@acme.com.br"];
+    const dialog = await openCatalog(api);
+    await pick(dialog, "iCloud");
+    await type(within(flow()).getByLabelText("Endereço de email"), "ana@icloud.com");
+    await type(within(flow()).getByLabelText("Senha de app"), "abcd-efgh-ijkl-mnop");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(6);
+    const step = screen().getByRole("dialog", { name: "Endereços de ana@icloud.com" });
+    expect(step.textContent).toContain("Os agentes respondem pelo endereço que recebeu o email.");
+    expect(step.textContent).toContain("Endereço principal: ana@icloud.com");
+    expect(step.textContent).toContain("Achamos estes nos emails que você enviou.");
+    const others = () => within(flow()).getByRole("list", { name: "Outros endereços desta caixa" });
+    expect(others().textContent).toContain("suporte@acme.com.br");
+    // Only addresses (a whole domain isn't an address to send from).
+    await type(within(flow()).getByRole("textbox", { name: "Outros endereços desta caixa" }), "@acme.com.br");
+    await click(within(flow()).getByRole("button", { name: "Adicionar em Outros endereços desta caixa" }));
+    expect(flow().textContent).toContain("Use um email, como contato@suaempresa.com.");
+    await type(within(flow()).getByRole("textbox", { name: "Outros endereços desta caixa" }), "Vendas@acme.com.br");
+    await click(within(flow()).getByRole("button", { name: "Adicionar em Outros endereços desta caixa" }));
+    expect(others().textContent).toContain("vendas@acme.com.br");
+    await choose(within(flow()).getByRole("combobox", { name: "Emails novos saem de" }), "vendas@acme.com.br");
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "mail.update")?.args.slice(1)).toEqual([
+      mail.accounts[0]?.id,
+      { aliases: ["suporte@acme.com.br", "vendas@acme.com.br"], defaultFrom: "vendas@acme.com.br" },
+    ]);
+    expect(screen().getByRole("dialog", { name: "O que ana@icloud.com faz" })).toBeTruthy();
+  });
+
+  test("'Endereços' on a connected mailbox; an agent sends as one of them or automatically", async () => {
+    const { api, state } = mailApi([{ address: "ana@icloud.com", aliases: ["suporte@acme.com.br"] }]);
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Endereços de ana@icloud.com" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Endereços de ana@icloud.com" });
+    // Nothing changed yet: nothing to save.
+    expect(within(dialog).getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
+    const saved = within(dialog).getByRole("list", { name: "Outros endereços desta caixa" });
+    await click(within(saved).getByRole("button", { name: "Remover suporte@acme.com.br" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "mail.update")?.args.slice(1)).toEqual([
+      "mail-1",
+      { aliases: [], defaultFrom: null },
+    ]);
+    expect(screen().getByText("Endereços de ana@icloud.com salvos.")).toBeTruthy();
+    cleanup();
+
+    const other = mailApi([{ address: "ana@icloud.com", aliases: ["suporte@acme.com.br"] }]);
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: other.api });
+    await settle(10);
+    const level = screen().getByRole("radiogroup", { name: "Nível em ana@icloud.com" });
+    await click(within(level).getByRole("radio", { name: "Ler e escrever" }));
+    const row = level.closest("li") as HTMLElement;
+    await click(within(row).getByLabelText("Regras de ana@icloud.com"));
+    await settle(4);
+    const from = within(row).getByRole("combobox", { name: "Enviar como" });
+    expect(from.textContent).toContain("Automático");
+    await choose(from, "suporte@acme.com.br");
+    await click(within(row).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    const call = other.state.calls.find((c) => c.method === "mail.setAgent");
+    expect((call?.args[3] as { policy?: { fromAddress: string | null } } | undefined)?.policy?.fromAddress).toBe(
+      "suporte@acme.com.br",
+    );
   });
 
   test("each connect error has its own message", async () => {
     const { api, mail } = mailApi();
     const dialog = await openCatalog(api);
     await pick(dialog, "iCloud");
-    await type(within(flow()).getByLabelText("Endereço de email"), "ana@icloud.com");
+    await type(within(flow()).getByLabelText("Endereço de email"), "ana@example.com");
     await type(within(flow()).getByLabelText("Senha de app"), "x");
     const said: string[] = [];
     for (const code of ["imap_unreachable", "smtp_unreachable", "tls", "blocked_host", "unknown"] as const) {
@@ -199,11 +281,11 @@ describe("Conectores → Email", () => {
   test("back from Gmail (`?mail=connected`): 'O que faz' for the newest mailbox; `failed` says so", async () => {
     const { api } = mailApi([
       { address: "old@acme.com.br" },
-      { provider: "gmail", via: "composio", preset: null, address: "new@gmail.com" },
+      { provider: "gmail", via: "composio", preset: null, address: "new@example.com" },
     ]);
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected`, { api });
     await settle(8);
-    expect(screen().getByRole("dialog", { name: "O que new@gmail.com faz" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "O que new@example.com faz" })).toBeTruthy();
     cleanup();
     const other = mailApi();
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=failed`, { api: other.api });
@@ -212,10 +294,10 @@ describe("Conectores → Email", () => {
   });
 
   test("'O que faz': the standard review; reads only Consulta · Desligada, sends only Aprovação · Desligada", async () => {
-    const { api, state } = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@gmail.com" }]);
+    const { api, state } = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@example.com" }]);
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected`, { api });
     await settle(8);
-    const dialog = screen().getByRole("dialog", { name: "O que new@gmail.com faz" });
+    const dialog = screen().getByRole("dialog", { name: "O que new@example.com faz" });
     await click(within(dialog).getByRole("button", { name: /^E-mails/ }));
     const levels = (name: string) =>
       within(within(dialog).getByRole("radiogroup", { name: `Nível de ${name}` }))
@@ -243,17 +325,17 @@ describe("Conectores → Email", () => {
     const left: string[] = [];
     setNavigateAway((url) => left.push(url));
     const { api, state } = mailApi([
-      { address: "ana@icloud.com", status: "needs_reconnect" },
-      { provider: "gmail", via: "composio", preset: null, address: "bia@gmail.com", status: "needs_reconnect" },
+      { address: "ana@example.com", status: "needs_reconnect" },
+      { provider: "gmail", via: "composio", preset: null, address: "bia@example.com", status: "needs_reconnect" },
     ]);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
     const row = screen()
-      .getByRole("button", { name: "Quem usa ana@icloud.com" })
+      .getByRole("button", { name: "Quem usa ana@example.com" })
       .closest(".connected-row") as HTMLElement;
     expect(row.textContent).toContain("Precisa reconectar");
-    await click(within(row).getByRole("button", { name: "Reconectar ana@icloud.com" }));
-    const dialog = screen().getByRole("dialog", { name: "Reconectar ana@icloud.com" });
+    await click(within(row).getByRole("button", { name: "Reconectar ana@example.com" }));
+    const dialog = screen().getByRole("dialog", { name: "Reconectar ana@example.com" });
     await type(within(dialog).getByLabelText("Senha de app"), "nova-senha");
     await click(within(dialog).getByRole("button", { name: "Reconectar" }));
     await settle(4);
@@ -261,17 +343,17 @@ describe("Conectores → Email", () => {
       "mail-1",
       { password: "[redacted]" },
     ]);
-    await click(screen().getByRole("button", { name: "Reconectar bia@gmail.com" }));
+    await click(screen().getByRole("button", { name: "Reconectar bia@example.com" }));
     await settle(4);
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
   });
 
   test("Desconectar asks first", async () => {
-    const { api, state } = mailApi([{ address: "ana@icloud.com" }]);
+    const { api, state } = mailApi([{ address: "ana@example.com" }]);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
-    await click(screen().getByRole("button", { name: "Desconectar ana@icloud.com" }));
-    const confirm = screen().getByRole("dialog", { name: "Desconectar ana@icloud.com?" });
+    await click(screen().getByRole("button", { name: "Desconectar ana@example.com" }));
+    const confirm = screen().getByRole("dialog", { name: "Desconectar ana@example.com?" });
     await click(within(confirm).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "mail.disconnect")?.args[1]).toBe("mail-1");
@@ -280,16 +362,16 @@ describe("Conectores → Email", () => {
 
 describe("the agent's email rules", () => {
   test("'Enviar sem pedir aprovação' waits for 'Só enviar para'; Salvar sends level, delete and rules", async () => {
-    const { api, state } = mailApi([{ address: "ana@icloud.com" }]);
+    const { api, state } = mailApi([{ address: "ana@example.com" }]);
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
     await settle(10);
-    const level = screen().getByRole("radiogroup", { name: "Nível em ana@icloud.com" });
+    const level = screen().getByRole("radiogroup", { name: "Nível em ana@example.com" });
     await click(within(level).getByRole("radio", { name: "Ler e escrever" }));
     const row = level.closest("li") as HTMLElement;
     // Sends ask by default.
     expect(row.textContent).toContain("Enviar pede aprovação");
     await click(within(row).getByRole("switch", { name: /Pode apagar emails/ }));
-    await click(within(row).getByLabelText("Regras de ana@icloud.com"));
+    await click(within(row).getByLabelText("Regras de ana@example.com"));
     await settle(4);
     const auto = within(row).getByRole("switch", { name: /Enviar sem pedir aprovação/ });
     expect(auto.hasAttribute("disabled")).toBe(true);
@@ -329,7 +411,7 @@ describe("the agent's email rules", () => {
   });
 
   test("removing the last recipient turns 'Enviar sem pedir aprovação' off", async () => {
-    const { api, mail } = mailApi([{ address: "ana@icloud.com" }]);
+    const { api, mail } = mailApi([{ address: "ana@example.com" }]);
     await mail.client.setAgent(ORG_ID, ADA_ID, "mail-1", {
       level: "read_write",
       canDelete: false,
@@ -345,10 +427,10 @@ describe("the agent's email rules", () => {
     });
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
     await settle(10);
-    const row = screen().getByRole("radiogroup", { name: "Nível em ana@icloud.com" }).closest("li") as HTMLElement;
+    const row = screen().getByRole("radiogroup", { name: "Nível em ana@example.com" }).closest("li") as HTMLElement;
     // 4 rules: senders, window, recipients, send without asking.
-    expect(within(row).getByLabelText("Regras de ana@icloud.com").textContent).toContain("4");
-    await click(within(row).getByLabelText("Regras de ana@icloud.com"));
+    expect(within(row).getByLabelText("Regras de ana@example.com").textContent).toContain("4");
+    await click(within(row).getByLabelText("Regras de ana@example.com"));
     const auto = within(row).getByRole("switch", { name: /Enviar sem pedir aprovação/ });
     expect(auto.getAttribute("aria-checked")).toBe("true");
     const recipients = within(row).getByRole("list", { name: "Só enviar para" });
@@ -360,7 +442,7 @@ describe("the agent's email rules", () => {
 
 describe("Rotinas: quando chegar um email", () => {
   test("mailbox, inbox by default and filters; the card shows the mailbox and 'Precisa reconectar'", async () => {
-    const { api, state } = mailApi([{ address: "ana@icloud.com" }]);
+    const { api, state } = mailApi([{ address: "ana@example.com" }]);
     const created: RoutineInput[] = [];
     const real = api.routines.create;
     api.routines.create = (orgId, input) => {
@@ -374,7 +456,7 @@ describe("Rotinas: quando chegar um email", () => {
     await settle(4);
     await click(within(dialog).getByRole("radio", { name: "Email" }));
     await settle(4);
-    expect(within(dialog).getByRole("combobox", { name: "Caixa de email" }).textContent).toContain("ana@icloud.com");
+    expect(within(dialog).getByRole("combobox", { name: "Caixa de email" }).textContent).toContain("ana@example.com");
     expect(within(dialog).getByRole("combobox", { name: "Pasta" }).textContent).toContain("Caixa de entrada");
     await type(within(dialog).getByLabelText("De"), "@cliente.com");
     await click(within(dialog).getByRole("button", { name: "Adicionar em De" }));
@@ -392,7 +474,7 @@ describe("Rotinas: quando chegar um email", () => {
   });
 
   test("an email routine in the list: mail icon, the mailbox in words, 'Precisa reconectar'", async () => {
-    const { api } = mailApi([{ address: "ana@icloud.com" }]);
+    const { api } = mailApi([{ address: "ana@example.com" }]);
     const real = api.routines.list;
     api.routines.list = async (orgId) => {
       const list = await real(orgId);
@@ -418,7 +500,7 @@ describe("Rotinas: quando chegar um email", () => {
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
     const card = screen().getByRole("article", { name: "Pedidos por email" });
-    expect(card.textContent).toContain("Quando chegar um email em ana@icloud.com (Clientes)");
+    expect(card.textContent).toContain("Quando chegar um email em ana@example.com (Clientes)");
     expect(card.textContent).toContain("Precisa reconectar");
   });
 });

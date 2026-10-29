@@ -1,6 +1,7 @@
 import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { InfoHint } from "./InfoHint";
 import { SkyGlow } from "./PixelSky";
 
 /** Neutral card (`surface-raised` + `line`). State never tints it: use a Chip. */
@@ -13,29 +14,44 @@ export function Card({
   return <Tag className={cx("ac-card", padded && "ac-card--padded", className)} {...rest} />;
 }
 
-/** A card's head: the icon on a key, the title (an `h2`, with `id` for `aria-labelledby`), a quiet line and an action. */
+/**
+ * A card's head: the icon on a key, the title (an `h2`, with `id` for `aria-labelledby`), an ⓘ hint after it, a
+ * quiet line and an action.
+ */
 export function CardHeader({
   icon,
   title,
   subtitle,
   action,
   id,
+  hint,
 }: {
   icon?: IconName;
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
   id?: string;
+  /** What the card is for (plain sentences), behind an ⓘ after the title. */
+  hint?: { name: string; text: ReactNode };
 }) {
+  const heading = <h2 id={id}>{title}</h2>;
   return (
-    <div className="ac-card__head">
+    <div className={cx("ac-card__head", icon && "ac-iconline")}>
       {icon && (
         <span className="ac-card__key" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
       )}
       <div className="ac-card__heading">
-        <h2 id={id}>{title}</h2>
+        {/* Beside the h2, never in it: the heading's name stays the title alone. */}
+        {hint ? (
+          <span className="ac-hintline">
+            {heading}
+            <InfoHint name={hint.name}>{hint.text}</InfoHint>
+          </span>
+        ) : (
+          heading
+        )}
         {subtitle && <p className="ac-card__sub">{subtitle}</p>}
       </div>
       {action && <span className="ac-card__action">{action}</span>}
@@ -46,7 +62,7 @@ export function CardHeader({
 /** Help text at the bottom of a card, in a well ("O contexto da org entra antes destas instruções"). */
 export function CardFooter({ children, icon = "info" }: { children: ReactNode; icon?: IconName | null }) {
   return (
-    <p className="ac-card__foot">
+    <p className={cx("ac-card__foot", icon && "ac-iconline")}>
       {icon && <Icon name={icon} size={14} />}
       <span>{children}</span>
     </p>
@@ -135,7 +151,7 @@ export function Alert({
   return (
     <p
       role={tone === "danger" ? "alert" : "status"}
-      className={cx("ac-alert", tone === "neutral" && "ac-alert--neutral", className)}
+      className={cx("ac-alert ac-iconline", tone === "neutral" && "ac-alert--neutral", className)}
     >
       <Icon name="alert" />
       <span>{children}</span>
@@ -149,19 +165,23 @@ export function Meter({
   max,
   label,
   marks,
+  part,
 }: {
   value: number;
   max: number;
   label: string;
   /** Ticks on the track, in percent (e.g. 80 for "aviso em 80%"). */
   marks?: number[];
+  /** A part of `value` in full ink, the rest of the bar lighter (one agent's share of a plan's use). */
+  part?: number;
 }) {
   const exact = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const pct = Math.round(exact);
+  const partPct = part !== undefined && max > 0 ? Math.min(pct, Math.round((part / max) * 100)) : null;
   return (
     // biome-ignore lint/a11y/useSemanticElements: the native <meter> has a native look we never show
     <div
-      className="ac-meter"
+      className={cx("ac-meter", partPct !== null && "ac-meter--parts")}
       role="meter"
       aria-label={label}
       aria-valuemin={0}
@@ -170,6 +190,9 @@ export function Meter({
     >
       {/* Anything above zero keeps a visible sliver, so 0.9% doesn't read as empty. */}
       <div className="ac-meter__bar" style={exact > 0 ? { width: `${pct}%`, minWidth: 6 } : { width: 0 }} />
+      {partPct !== null && part !== undefined && part > 0 && (
+        <div className="ac-meter__part" style={{ width: `${partPct}%`, minWidth: 6 }} />
+      )}
       {marks?.map((m) => (
         <span key={m} className="ac-meter__mark" style={{ left: `${m}%` }} aria-hidden="true" />
       ))}
@@ -206,14 +229,19 @@ export function OptionCard({
   );
 }
 
-/** Onboarding step bars + "Passo 1 de 4 · Organização". */
+/** Step bars + "Passo 2 de 4 · Contexto": `current` (from 1) is the step under way, the ones before it are done. */
 export function Steps({ current, total, label }: { current: number; total: number; label: ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div className="ac-steps" aria-hidden="true">
         {Array.from({ length: total }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed number of bars
-          <span key={i} className="ac-steps__bar" data-done={i < current} />
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed number of bars
+            key={i}
+            className="ac-steps__bar"
+            data-done={i < current - 1}
+            data-current={i === current - 1 || undefined}
+          />
         ))}
       </div>
       <span className="ac-eyebrow">{label}</span>

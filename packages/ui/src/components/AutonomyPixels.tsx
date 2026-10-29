@@ -4,7 +4,7 @@ import type { AgentColor, AgentEyes } from "./AgentLook";
 import { reduced, token, useCanvas } from "./RunPixels";
 
 /**
- * How much a mission asks, drawn (telas/MissaoConfig.html): the mission's
+ * How much a mission asks, drawn: the mission's
  * agent from the engine, bottom left, with a glyph in its own tones: a
  * speech bubble with "?" (asks always), a shield with a shine (asks only
  * what is risky), a bolt with a motion trail (doesn't ask). 22 × 22 cells of

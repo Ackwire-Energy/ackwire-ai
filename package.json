@@ -4,8 +4,7 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "ee"
+    "packages/*"
   ],
   "scripts": {
     "dev": "bun run --filter '@agenteschat/server' --filter '@agenteschat/web' dev",
@@ -16,12 +15,18 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "check:boundaries": "bun scripts/check-boundaries.ts",
+    "check:licenses": "bun scripts/check-licenses.ts",
+    "ci:local": "bash scripts/ci-local.sh",
     "db:generate": "cd packages/db && bunx drizzle-kit generate --name",
     "docs:env": "bun run --filter '@agenteschat/config' docs",
     "smoke": "bun --env-file=.env scripts/smoke.ts",
     "eval:memory": "bun --env-file=.env packages/engine/eval/memory.ts",
     "eval:behavior": "bun --env-file=.env packages/engine/eval/behavior.ts",
     "eval:mentions": "bun --env-file=.env packages/engine/eval/mention-handoff.ts",
+    "eval:conversation": "bun --env-file=.env packages/engine/eval/conversation.ts",
+    "eval:browser": "bun --env-file=.env packages/engine/eval/browser/ab.ts",
+    "eval:browser:micro": "bun --env-file=.env packages/engine/eval/browser/micro.ts",
+    "eval:desktop:micro": "bun --env-file=.env packages/engine/eval/desktop/micro.ts",
     "eval:brain-floor": "bun apps/server/scripts/brain-floor.ts"
   },
   "devDependencies": {
@@ -29,6 +34,9 @@
     "@types/bun": "^1.4.2",
     "typescript": "^7.0.2"
   },
-  "packageManager": "bun@1.3.1",
-  "license": "UNLICENSED"
+  "patchedDependencies": {
+    "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch"
+  },
+  "packageManager": "bun@1.4.4",
+  "license": "AGPL-3.0-only"
 }

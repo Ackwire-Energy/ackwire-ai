@@ -1,3 +1,4 @@
+import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -9,6 +10,7 @@ import {
   snoozeNotification,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { ApprovalOrigin } from "./approvals";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
 const tags = ["Notifications"];
@@ -36,6 +38,11 @@ const Notification = z
       routineId: z.string().optional(),
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
+      screen: z.enum(SCREEN_KINDS).optional(),
+      agentId: z
+        .string()
+        .optional()
+        .openapi({ description: "`org_standing` to `agent_hold`: the agent held (its name in `label`)." }),
       label: z.string().optional(),
     }),
     latest: z.object({
@@ -52,6 +59,25 @@ const Notification = z
       expiresAt: z.string().optional(),
       round: z.number().int().optional(),
       rounds: z.number().int().optional(),
+      reason: z
+        .string()
+        .optional()
+        .openapi({ description: "`routine_paused`: why it paused; `routine_failed`: its run's code (both coded)." }),
+      origin: ApprovalOrigin.optional().openapi({
+        description: "`approval`: asked while nobody watched, by a routine or by unattended work.",
+      }),
+      names: z
+        .array(z.string())
+        .optional()
+        .openapi({ description: "`join_request`: the first two people who asked, in the order they asked." }),
+      holdKind: z
+        .string()
+        .optional()
+        .openapi({ description: "`org_standing` to `agent_hold`: `network` or `operator`, never the hold's reason." }),
+      cloud: z.boolean().optional().openapi({
+        description:
+          "`org_standing` on agentes.chat Cloud: the apps read `text` as the restriction, with how to contest it.",
+      }),
     }),
     readAt: z.string().nullable(),
     doneAt: z.string().nullable(),
@@ -72,7 +98,7 @@ const Counts = z.object({
 const NotificationParams = OrgParams.extend({ notificationId: z.uuid() });
 
 /**
- * The person's inbox (D46): mentions, thread replies, DMs, agents' questions,
+ * The person's inbox: mentions, thread replies, DMs, agents' questions,
  * issues, forum turns, approvals, missions, routines, reactions. Live
  * updates arrive on the WebSocket as user events (`notification.upserted`,
  * `notification.removed`, `notification.counts`).

@@ -1,6 +1,9 @@
+import { useLocalSearchParams } from "expo-router";
 import { AuthFlow } from "@/features/auth/AuthFlow";
 
-/** Entrar: the e-mail first, then the one step the server says it needs (telas/EntrarCadastro.html, C). */
+/** Entrar: the e-mail first, then the one step the server says it needs. */
 export default function SignIn() {
-  return <AuthFlow start="in" />;
+  // From an invitation ("Já tenho conta"): its e-mail, straight to the password.
+  const params = useLocalSearchParams<{ email?: string }>();
+  return <AuthFlow start="in" email={typeof params.email === "string" ? params.email : undefined} />;
 }

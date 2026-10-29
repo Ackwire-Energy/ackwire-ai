@@ -1,17 +1,17 @@
-import { useConfirmDevice } from "@agenteschat/client";
+import { useConfirmDevice, useMe } from "@agenteschat/client";
 import { Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { inDesktopApp, thisMac } from "@/lib/desktop";
+import { desktopRevealsFiles, inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
- * This Mac, in agentes for Mac (D79, telas/AppDesktop.html "Este Mac"): the
- * site knows which organizations the Mac it runs on is connected to, connects
- * it in one click (no code to read: the app hands the runner's code to the
- * site, which confirms it with the person's session) and opens the app's
- * Preferences where access is granted. Outside the app, nothing.
+ * This computer, in the agentes.chat desktop app (ADR 0036, ADR 0066): the site knows which of its
+ * organizations the computer it runs on works for, pairs it in one click (the app asks the person in its
+ * own dialog, then hands the runner's code to the site, which confirms it with the person's session; no code
+ * to read) and opens the app's Preferences where access is granted. Outside the app, and wherever agents
+ * can't work on this computer (agentes.chat, a server on this computer, Windows), nothing.
  */
 const THIS_MAC_KEY = ["desktop", "thisMac"] as const;
 /** Ask again this often while the runner picks up its token after the site confirmed. */
@@ -33,6 +33,38 @@ export function useThisMac(orgId: string, connecting = false) {
 /** Is `machineId` the Mac this app runs on? */
 export function useIsThisMac(orgId: string, machineId: string) {
   return useThisMac(orgId).data?.machineId === machineId;
+}
+
+/**
+ * Whether agents may work on this computer for this server; false until the app says so (apps from before it
+ * said nothing, and allowed it everywhere).
+ */
+export function useAgentsHere(): boolean {
+  const here = useQuery({
+    queryKey: THIS_MAC_KEY,
+    queryFn: thisMac.status,
+    enabled: inDesktopApp(),
+    select: (s) => s.agentsHere !== false,
+    meta: { quiet: true },
+  });
+  return inDesktopApp() && here.data === true;
+}
+
+/** "Show the folder": in an app that opens it (`desktopRevealsFiles`), on the server it runs on this computer. */
+export function useRevealsFiles(): boolean {
+  const local = useQuery({
+    queryKey: THIS_MAC_KEY,
+    queryFn: thisMac.status,
+    enabled: desktopRevealsFiles(),
+    select: (s) => s.local === true,
+    meta: { quiet: true },
+  });
+  return desktopRevealsFiles() && local.data === true;
+}
+
+/** An organization's name, for the app's own dialog before it pairs this computer. */
+export function useOrgName(orgId: string): string | undefined {
+  return useMe().data?.organizations.find((o) => o.id === orgId)?.name;
 }
 
 /**
@@ -58,6 +90,8 @@ export function ThisMacButton({
   const confirm = useConfirmDevice();
   const [connecting, setConnecting] = useState(false);
   const mine = useThisMac(orgId, connecting);
+  const agentsHere = useAgentsHere();
+  const orgName = useOrgName(orgId);
   const connected = Boolean(mine.data);
 
   const machineId = mine.data?.machineId ?? null;
@@ -68,7 +102,7 @@ export function ThisMacButton({
     if (machineId) onConnected?.(machineId);
   }, [connecting, connected, machineId, onConnected, toast, t]);
 
-  if (!inDesktopApp() || mine.isLoading) return null;
+  if (!agentsHere || mine.isLoading) return null;
   if (connected) {
     if (!folders) return null;
     return (
@@ -82,7 +116,7 @@ export function ThisMacButton({
   const start = async () => {
     setConnecting(true);
     try {
-      const { userCode } = await thisMac.connect(orgId);
+      const { userCode } = await thisMac.connect(orgId, orgName);
       if (userCode) await confirm.mutateAsync({ orgId, userCode });
       void qc.invalidateQueries({ queryKey: THIS_MAC_KEY });
     } catch {

@@ -12,6 +12,8 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { whenAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import {
   AutonomyPixels,
   Button,
@@ -41,7 +43,7 @@ import { COMMAND_APPROVALS, ExecutorMark } from "./MissionBits";
 import { ruleText } from "./MissionCommandCard";
 
 /**
- * "Configurações da missão" (telas/MissaoConfig.html), opened from the
+ * "Configurações da missão", opened from the
  * header's ⋯: Autonomia (three rows with the agent's pixel illustrations),
  * O que já foi liberado (the "Aprovar sempre" rules, ×), Próximas missões
  * do agente ("Usar como padrão") and, folded, Mais opções (who does the
@@ -111,6 +113,7 @@ function SettingsBody({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
+  const g = agentGrammar(t, agentName);
   const look = lookOf(dir.agentById.get(m.agentId));
   const settings = useMissionSettings(org.id, m.id);
   const setApproval = useSetCommandApproval(org.id, m.id);
@@ -157,7 +160,7 @@ function SettingsBody({
       onSuccess: () => {
         onSaved();
         toast.show(
-          t("missions.settings.defaults.updated", { name: agentName }),
+          t("missions.settings.defaults.updated", g),
           "info",
           prev ? { label: t("missions.settings.undo"), run: () => makeDefault(prev, null) } : undefined,
           t("missions.settings.defaults.updatedDetail", { value: name(next) }),
@@ -246,14 +249,14 @@ function SettingsBody({
         )}
       </SettingsSection>
 
-      <SettingsSection title={t("missions.settings.defaults.title", { name: agentName })}>
+      <SettingsSection title={t("missions.settings.defaults.title", g)}>
         <SettingRow
           title={t("missions.settings.defaults.startWith", { value: name(mode) })}
           description={
             !agentDefault
               ? undefined
               : isDefault
-                ? t("missions.settings.defaults.isDefault", { name: agentName })
+                ? t("missions.settings.defaults.isDefault", g)
                 : t("missions.settings.defaults.today", { value: name(agentDefault.commandApproval) })
           }
         >
@@ -265,7 +268,7 @@ function SettingsBody({
                 size="sm"
                 disabled={!agentDefault.canSet}
                 loading={setDefault.isPending}
-                title={agentDefault.canSet ? undefined : t("missions.settings.defaults.cannot", { name: agentName })}
+                title={agentDefault.canSet ? undefined : t("missions.settings.defaults.cannot", g)}
                 onClick={() => makeDefault(mode, agentDefault.commandApproval)}
               >
                 {t("missions.settings.defaults.use")}
@@ -273,7 +276,7 @@ function SettingsBody({
             ))}
         </SettingRow>
         {agentDefault && !isDefault && !agentDefault.canSet && (
-          <SettingNote icon="lock">{t("missions.settings.defaults.cannot", { name: agentName })}</SettingNote>
+          <SettingNote icon="lock">{t("missions.settings.defaults.cannot", g)}</SettingNote>
         )}
       </SettingsSection>
 
@@ -315,7 +318,7 @@ function SettingsBody({
               tag: e === "codex" ? t("missions.settings.executor.testing") : undefined,
               description:
                 e === "agent"
-                  ? t("missions.settings.executor.agentText", { name: agentName })
+                  ? t("missions.settings.executor.agentText", g)
                   : t(`missions.settings.executor.${e}Text` as const),
             }))}
           />
@@ -339,8 +342,14 @@ function SettingsBody({
                     label: o.label,
                     description: o.recommended ? t("brain.recommended") : undefined,
                   })),
+                  // The agent's own model when it isn't one of the list (a typed one, or "Automático").
                   ...(brainView.effectiveModel && !brainOption.models.some((o) => o.value === brainView.effectiveModel)
-                    ? [{ value: brainView.effectiveModel, label: brainView.effectiveModel }]
+                    ? [
+                        {
+                          value: brainView.effectiveModel,
+                          label: isAuto(brainView.effectiveModel) ? t("brain.auto.label") : brainView.effectiveModel,
+                        },
+                      ]
                     : []),
                 ]}
               />

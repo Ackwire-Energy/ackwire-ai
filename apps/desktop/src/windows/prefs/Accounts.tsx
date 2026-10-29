@@ -1,5 +1,5 @@
 /**
- * Preferências > Ferramentas, under the tools card (ContaClaudeBandeja.html, ADR 0041): one "Contas"
+ * Preferências > Ferramentas, under the tools card: one "Contas"
  * card per CLI found on this Mac. "Conta deste Mac" is the sign-in already in the CLI (not removable
  * here); each added account has its email, plan and "Remover"; "Adicionar conta" opens the CLI's own
  * sign-in in the browser and waits. Accounts belong to one organization's home, so with several
@@ -15,7 +15,9 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  InfoHint,
   PixelSpinner,
+  ProviderLogo,
   Segmented,
 } from "@agenteschat/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -31,8 +33,8 @@ import {
 } from "../../control/accounts";
 import { type Home, orgName } from "../../control/store";
 import { OrgTile } from "../../ui/bits";
+import { CardTitle, hintFor, PrefCard, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
-import { CardTitle, PrefCard, PrefRow } from "./shared";
 
 /** What changes between Claude Code and Codex (names stay in the strings; sites are not words). */
 const KINDS: Record<
@@ -141,7 +143,16 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
     <>
       {kinds.map((kind, i) => (
         <section key={kind} aria-busy={loaded.state === "loading" || undefined}>
-          <CardTitle>{t(KINDS[kind].title)}</CardTitle>
+          <CardTitle
+            hint={hintFor(
+              t,
+              t(KINDS[kind].title),
+              homes.length > 1 ? t("desktop.prefs.accounts.helpOrg", { org }) : t("desktop.prefs.accounts.help"),
+            )}
+          >
+            <ProviderLogo id={kind} size="xs" />
+            {t(KINDS[kind].title)}
+          </CardTitle>
           {i === 0 && homes.length > 1 && (
             <div className="dk-orgpick">
               <Segmented
@@ -206,7 +217,6 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
               );
             })}
             <PrefRow
-              desc={homes.length > 1 ? t("desktop.prefs.accounts.helpOrg", { org }) : t("desktop.prefs.accounts.help")}
               end={
                 <Button size="sm" icon="plus" disabled={loaded.state !== "ready"} onClick={() => setAdding(kind)}>
                   {t("desktop.prefs.accounts.add")}
@@ -365,6 +375,11 @@ function AddAccountDialog({
       onOpenChange={(o) => !o && onClose()}
       title={t(k.signIn)}
       description={t(k.signInLead)}
+      descriptionAside={
+        <InfoHint name={t("desktop.prefs.accounts.wrongAccountAbout")}>
+          {t("desktop.prefs.accounts.wrongAccount", { product: k.product })}
+        </InfoHint>
+      }
       closeLabel={t("desktop.common.close")}
       width={440}
     >
@@ -375,7 +390,6 @@ function AddAccountDialog({
             <p className="dk-help">{t("desktop.prefs.accounts.codeHint")}</p>
           </div>
         )}
-        <p className="dk-help">{t("desktop.prefs.accounts.wrongAccount", { product: k.product })}</p>
         <p className="dk-waitline dk-acct-wait">
           <PixelSpinner size={14} color="sky" />
           <span className="dk-shimmer">
@@ -389,7 +403,7 @@ function AddAccountDialog({
           waiting?.url ? (
             <span className="dk-help">
               {t("desktop.prefs.accounts.notOpened")}{" "}
-              <button type="button" className="dk-link" onClick={() => void openLink(waiting.url)}>
+              <button type="button" className="ac-link dk-link" onClick={() => void openLink(waiting.url)}>
                 {t("desktop.prefs.accounts.openLink")}
               </button>
             </span>
@@ -404,7 +418,7 @@ function AddAccountDialog({
   );
 }
 
-/** Codex's one-time code (`ABCD-EFGHI`) big, in Doto, as the sign-in code on the first run. */
+/** Codex's one-time code (`ABCD-EFGHI`) big, in Doto. */
 function AccountCode({ code }: { code: string }) {
   const { t } = useTranslation();
   const parts = code
@@ -415,7 +429,7 @@ function AccountCode({ code }: { code: string }) {
     <span
       className="dk-code"
       role="img"
-      aria-label={t("desktop.welcome.codeAria", { code: parts.join("").split("").join(" ") })}
+      aria-label={t("desktop.prefs.accounts.codeAria", { code: parts.join("").split("").join(" ") })}
     >
       {parts[0]}
       {parts.length > 1 && <span className="dk-code__dot">·</span>}

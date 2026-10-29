@@ -4,7 +4,7 @@ import { openSearch } from "@/lib/open-param";
 import { IssuesPage } from "@/pages/IssuesPage";
 
 /**
- * Issues: board and list (telas/Issues.dc.html). `?open=131` opens an issue's
+ * Issues: board and list. `?open=131` opens an issue's
  * details. The page scrolls in the main column like every non-chat page (the
  * chat layout clips its overflow: a tall column could not be reached).
  */

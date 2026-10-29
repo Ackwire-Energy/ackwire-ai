@@ -1,21 +1,29 @@
 import {
   type AgentQuestion,
+  type Approval,
   type MessageConsultation,
   type ThreadInfo,
   useApi,
   useApproval,
   useDecideApproval,
-  useRun,
 } from "@agenteschat/client";
-import { toolLabel, workFromSteps } from "@agenteschat/client/lib/work";
+import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Chip, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
-import { approvalRisk } from "../approvals/logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "../approvals/parts";
+import { Button, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
+import { approvalAction, approvalRisk } from "../approvals/logic";
+import {
+  ApprovalDetails,
+  ApprovalEmailLetter,
+  ApprovalFuse,
+  ApprovalMark,
+  ApprovalTraits,
+  approvalTitleText,
+  useOriginShort,
+} from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -24,95 +32,12 @@ import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { threadFaces } from "./logic";
-import { recentTurn } from "./turn";
+import { MessageText } from "./MessageText";
 
 /**
- * The cards inside a message: the steps it took (collapsed), the agent it
- * consulted, the approval it asks for, an agent's question, and the
- * link to its thread.
+ * The cards inside a message: the agent it consulted, the approval it asks for (a question, no card), an
+ * agent's question, and the link to its thread. Its tools are `ToolCalls.tsx`.
  */
-
-// ── Steps ────────────────────────────────────────────────────────────────────
-
-/**
- * "3 passos" above an agent's reply, a quiet pill; opening it loads what it did, one line per step. Right
- * after the reply took its live block's place, it fades in as the work folds away.
- */
-export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
-  const c = useColors();
-  const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false);
-  const [folding] = useState(() => recentTurn(runId, Date.now()) !== null);
-  const run = useRun(orgId, open ? runId : null);
-  const work = run.data ? workFromSteps(run.data.steps, run.data.run) : null;
-  const lines = work
-    ? [
-        ...work.narration.map((n) => ({ key: n.key, at: n.at, text: n.text, note: true })),
-        ...work.steps.map((s, i) => ({
-          key: s.key,
-          at: i + 0.5,
-          text: t(`chat.work.step.${s.kind}`, {
-            app: s.app ?? "",
-            tool: toolLabel(s.tool),
-            defaultValue: toolLabel(s.tool),
-          }),
-          note: false,
-        })),
-      ].sort((a, b) => a.at - b.at)
-    : [];
-  return (
-    <Animated.View entering={folding && !reduced ? FadeIn.duration(400) : undefined} style={styles.steps}>
-      <Pressable
-        onPress={() => {
-          tapHaptic();
-          setOpen((v) => !v);
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [styles.stp, { backgroundColor: c.sunken }, pressed && styles.pressed]}
-      >
-        <Icon name="check" size={14} color={c.muted} />
-        <Text variant="footnote" tone="muted" style={styles.medium}>
-          {t("mobile.chat.steps", { count: steps })}
-        </Text>
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={13} color={c.muted} />
-        </View>
-      </Pressable>
-      {open ? (
-        <View style={[styles.stl, { backgroundColor: c.sunken }]}>
-          {run.isError ? (
-            <Text variant="small" tone="muted" style={styles.stlNote}>
-              {t("mobile.chat.stepsFailed")}
-            </Text>
-          ) : !work ? (
-            <Text variant="small" tone="faint" style={styles.stlNote}>
-              {t("mobile.common.loading")}
-            </Text>
-          ) : lines.length === 0 ? (
-            <Text variant="small" tone="muted" style={styles.stlNote}>
-              {t("mobile.chat.stepsNone")}
-            </Text>
-          ) : (
-            lines.map((l, i) => (
-              <View
-                key={l.key}
-                style={[styles.step, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
-              >
-                {l.note ? <Icon name="chat" size={15} color={c.faint} /> : <Icon name="check" size={15} color={c.ok} />}
-                <Text variant="small" tone={l.note ? "muted" : "ink2"} style={styles.grow}>
-                  {l.text}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
-      ) : null}
-    </Animated.View>
-  );
-}
 
 // ── Consultation ─────────────────────────────────────────────────────────────
 
@@ -187,36 +112,50 @@ export function ConsultationCard({
 // ── Approval ─────────────────────────────────────────────────────────────────
 
 /**
- * "Pede sua aprovação" in the conversation (MobileConversas.html): the exact action, its values, the
- * fuse until it expires, Recusar and Aprovar (held for a second when the risk is high). After, one line
- * with what happened. Someone who can't decide sees the request and opens it.
+ * An approval in the conversation: while it waits, the agent asking (`ApprovalAsk`); after, one line with
+ * what happened.
  */
 export function ApprovalInline({ approvalId }: { approvalId: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const c = useColors();
+  const surface = useSurface();
+  const approval = useApproval(orgId, approvalId);
+  const a = approval.data;
+  if (!a) return null;
+  if (a.status === "pending") return <ApprovalAsk approval={a} />;
+  const ok = a.status === "approved";
+  return (
+    <View style={[styles.done, surface]}>
+      <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
+      <Text variant="small" tone="muted" style={styles.grow}>
+        {t(`mobile.chat.approval.${a.status}`, { title: approvalTitleText(t, a) })}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A request waiting in the conversation, as the agent asking, no card: what it said in its
+ * own words, the exact action in one line with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it
+ * whole, then Aprovar (held for a second when the risk is high), "Agora não" (the request's sheet, which
+ * asks why: a lesson for the agent) and the fuse to its expiry. Who can't decide sees who it waits for.
+ */
+function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
   const toast = useToast();
-  const surface = useSurface();
-  const raised = useSurface("e2");
-  const approval = useApproval(orgId, approvalId);
+  const reduced = useReducedMotion();
   const decide = useDecideApproval(orgId);
-  const a = approval.data;
-  if (!a) return null;
-  if (a.status !== "pending") {
-    const ok = a.status === "approved";
-    return (
-      <View style={[styles.done, surface]}>
-        <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
-        <Text variant="small" tone="muted" style={styles.grow}>
-          {t(`mobile.chat.approval.${a.status}`, { title: a.title })}
-        </Text>
-      </View>
-    );
-  }
+  const origin = useOriginShort(a);
+  const [open, setOpen] = useState(false);
   const name = dir.agentById.get(a.agentId)?.name ?? "";
   const g = genderOf(name);
   const high = approvalRisk(a) === "high";
+  const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
+  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
   const approve = () =>
     decide.mutate(
       { id: a.id, decision: "approve" },
@@ -233,31 +172,57 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
       },
     );
   return (
-    <View style={[styles.askcard, raised]}>
-      <View style={styles.label}>
-        <Icon name="shield" size={15} color={c.amber} />
-        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]}>
-          {t("mobile.chat.approval.asks")}
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={styles.ask}>
+      <MessageText body={approvalWhy(a) ?? t("approval.askPlain")} selectable={false} />
+      <View style={styles.action}>
+        <ApprovalMark approval={a} />
+        <Text variant="small" tone="ink" style={[styles.bold, styles.grow]}>
+          {approvalTitleText(t, a)}
         </Text>
-        {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
       </View>
-      <Text variant="title" style={styles.h4}>
-        {a.title}
-      </Text>
-      <View style={styles.askBody}>
-        <ApprovalTraits approval={a} />
-        <ApprovalDetails approval={a} />
-        <ApprovalSaid approval={a} name={name} />
-        <ApprovalFuse approval={a} />
-      </View>
+      {/* A connector's detail is its raw call (`tool · key=value`); its values are under "Ver detalhes". */}
+      {!a.email && a.detail && !a.connector ? (
+        <Text variant="footnote" tone="muted">
+          {a.detail}
+        </Text>
+      ) : null}
+      {origin ? (
+        <Text variant="footnote" tone="muted">
+          {origin}
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={() => {
+          tapHaptic();
+          setOpen((o) => !o);
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        hitSlop={6}
+        style={({ pressed }) => [styles.more, pressed && styles.pressed]}
+      >
+        <View style={open ? styles.flip : undefined}>
+          <Icon name="chev" size={13} color={c.muted} />
+        </View>
+        <Text variant="footnote" tone="muted" style={styles.bold}>
+          {a.email ? t("approval.seeEmail") : t("approval.seeDetails")}
+        </Text>
+      </Pressable>
+      {open ? (
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
+          {a.email ? (
+            <ApprovalEmailLetter email={a.email} />
+          ) : (
+            <>
+              <ApprovalDetails approval={a} />
+              <ApprovalTraits approval={a} />
+            </>
+          )}
+        </Animated.View>
+      ) : null}
       {a.canDecide ? (
         <View style={styles.acts}>
-          <Button
-            variant="secondary"
-            label={t("mobile.approval.refuse")}
-            onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
-          />
-          <View style={styles.grow}>
+          <View style={styles.approve}>
             {high ? (
               <HoldButton
                 label={t("mobile.approval.hold")}
@@ -269,23 +234,28 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
                 variant="primary"
                 wide
                 icon="check"
-                label={t("mobile.approval.approve")}
+                label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
                 disabled={decide.isPending}
                 onPress={approve}
               />
             )}
           </View>
+          <View style={styles.grow}>
+            <Button
+              variant="secondary"
+              wide
+              label={t("approval.notNow")}
+              onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+            />
+          </View>
         </View>
       ) : (
-        <Button
-          variant="secondary"
-          size="sm"
-          wide
-          label={t("mobile.chat.approval.see")}
-          onPress={() => router.push(`/approval/${a.id}`)}
-        />
+        <Text variant="small" tone="muted">
+          {owner ? t("approval.waitingFor", { name: owner }) : t("approval.waitingAdmin")}
+        </Text>
       )}
-    </View>
+      <ApprovalFuse approval={a} />
+    </Animated.View>
   );
 }
 
@@ -453,19 +423,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  steps: { marginTop: 4, marginBottom: 8, alignItems: "flex-start" },
-  stp: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 30,
-    paddingLeft: 9,
-    paddingRight: 11,
-    borderRadius: 15,
-  },
-  stl: { alignSelf: "stretch", marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 14 },
-  stlNote: { paddingVertical: 6 },
-  step: { flexDirection: "row", alignItems: "flex-start", gap: 9, paddingVertical: 6 },
   csBody: { paddingLeft: 40, paddingRight: 14, paddingBottom: 14, gap: 2 },
   gap: { marginTop: 8 },
   foot: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
@@ -484,12 +441,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
   },
-  askcard: { marginTop: 12, padding: 14, borderRadius: 20 },
+  // The request as the agent's next words: no card, the action and the decision under them.
+  ask: { marginTop: 4, marginBottom: 4, gap: 8 },
+  action: { flexDirection: "row", alignItems: "center", gap: 8 },
+  more: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: 28 },
+  exact: { gap: 10 },
   label: { flexDirection: "row", alignItems: "center", gap: 6 },
-  medium: { fontWeight: "500" },
-  h4: { marginTop: 6, marginBottom: 10, fontSize: 18, lineHeight: 23, letterSpacing: -0.27 },
-  askBody: { gap: 12, marginBottom: 12 },
-  acts: { flexDirection: "row", gap: 8, alignItems: "center" },
+  acts: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 4 },
+  approve: { flex: 1.5 },
   qcard: { marginTop: 12, padding: 14, borderRadius: 20 },
   qtitle: { marginTop: 5, marginBottom: 12 },
   opts: { gap: 6 },

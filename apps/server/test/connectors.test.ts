@@ -86,6 +86,135 @@ test("connectors API: catalog, API-key connection (masked), agent scopes, OAuth 
   expect(replay.headers.get("location")).toContain("connector_error=");
 });
 
+test("connectors API: the phone app's OAuth hands the code back to the app, which finishes with its session", async () => {
+  let challenge = "";
+  const http = (async (_url: string, init?: RequestInit) => {
+    const form = new URLSearchParams(String(init?.body));
+    const ok =
+      createHash("sha256")
+        .update(form.get("code_verifier") ?? "")
+        .digest("base64url") === challenge;
+    return ok
+      ? Response.json({ access_token: "gho_live", expires_in: 3600 })
+      : Response.json({ error: "bad" }, { status: 400 });
+  }) as unknown as typeof fetch;
+  t = await createTestServer({
+    http,
+    // A second person (the stranger below) signs up too.
+    env: { ALLOW_SIGNUP: "true", CONNECTOR_GITHUB_CLIENT_ID: "gh-id", CONNECTOR_GITHUB_CLIENT_SECRET: "gh-secret" },
+  });
+  // The phone app: our cookie, no Origin, the app's header.
+  const app = browser(t);
+  await signUp(app, "owner@example.com");
+  const { orgId } = await seedOrg(app);
+  const mobile = { origin: null, headers: { "x-agentes-client": "mobile" } };
+  const start = async (returnTo: string) => {
+    const res = await app(`/api/app/organizations/${orgId}/connectors/github/oauth/start`, {
+      ...mobile,
+      json: { returnTo },
+    });
+    expect(res.status).toBe(200);
+    const url = new URL(((await res.json()) as { authorizeUrl: string }).authorizeUrl);
+    challenge = url.searchParams.get("code_challenge") ?? "";
+    return url.searchParams.get("state") ?? "";
+  };
+
+  // The system browser comes back without our session: the callback only hands state and code to the app.
+  const state = await start("app:connectors");
+  const systemBrowser = browser(t);
+  const back = await systemBrowser(`/api/app/connectors/oauth/callback?state=${state}&code=abc`, { origin: null });
+  expect(back.status).toBe(302);
+  const deepLink = new URL(back.headers.get("location") ?? "");
+  expect(`${deepLink.protocol}//${deepLink.host}${deepLink.pathname}`).toBe("agenteschat://connectors/oauth");
+  expect(deepLink.searchParams.get("state")).toBe(state);
+  expect(deepLink.searchParams.get("code")).toBe("abc");
+  const none = (await (await app(`/api/app/organizations/${orgId}/connectors`, mobile)).json()) as {
+    connections: unknown[];
+  };
+  expect(none.connections).toHaveLength(0);
+
+  // Someone else can't finish it (the state stays bound to who started it, and stays usable).
+  const stranger = browser(t);
+  await signUp(stranger, "stranger@example.com");
+  const stolen = await stranger(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state, code: "abc" },
+  });
+  expect([403, 404]).toContain(stolen.status);
+
+  // The app finishes with its own session.
+  const done = await app(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state, code: "abc" },
+  });
+  expect(done.status).toBe(200);
+  expect(((await done.json()) as { connector: string }).connector).toBe("github");
+  const conns = (await (await app(`/api/app/organizations/${orgId}/connectors`, mobile)).json()) as {
+    connections: { connector: string; authType: string }[];
+  };
+  expect(conns.connections.map((c) => [c.connector, c.authType])).toEqual([["github", "oauth"]]);
+  // Once only.
+  const replay = await app(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state, code: "abc" },
+  });
+  expect(replay.status).toBe(404);
+
+  // A web authorization can't be finished through the app's route.
+  const webState = await start("/settings");
+  const crossed = await app(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state: webState, code: "abc" },
+  });
+  expect(crossed.status).toBe(404);
+
+  // Refused at the provider: the app hears why.
+  const refused = await start("app:connectors");
+  const no = await systemBrowser(`/api/app/connectors/oauth/callback?state=${refused}&error=access_denied`, {
+    origin: null,
+  });
+  expect(no.headers.get("location")).toBe("agenteschat://connectors/oauth?error=access_denied");
+
+  // Started in the desktop app's window: the browser hands it back to the app, with the organization, and the
+  // window finishes with its own session, landing where it started.
+  const desktop = await start("desktop:/org/x/settings/connectors");
+  const toDesktop = await systemBrowser(`/api/app/connectors/oauth/callback?state=${desktop}&code=abc`, {
+    origin: null,
+  });
+  const desktopLink = new URL(toDesktop.headers.get("location") ?? "");
+  expect(`${desktopLink.protocol}//${desktopLink.host}${desktopLink.pathname}`).toBe(
+    "agenteschat://desktop/connectors/oauth",
+  );
+  expect(desktopLink.searchParams.get("org")).toBe(orgId);
+  expect(desktopLink.searchParams.get("state")).toBe(desktop);
+  const stolenDesktop = await stranger(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state: desktop, code: "abc" },
+  });
+  expect([403, 404]).toContain(stolenDesktop.status);
+  const fromWindow = await app(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    ...mobile,
+    json: { state: desktop, code: "abc" },
+  });
+  expect(fromWindow.status).toBe(200);
+  expect(await fromWindow.json()).toMatchObject({ connector: "github", returnTo: "/org/x/settings/connectors" });
+  const refusedDesktop = await start("desktop:/org/x/settings/connectors");
+  const noDesktop = await systemBrowser(
+    `/api/app/connectors/oauth/callback?state=${refusedDesktop}&error=access_denied`,
+    { origin: null },
+  );
+  expect(noDesktop.headers.get("location")).toBe(
+    `agenteschat://desktop/connectors/oauth?org=${orgId}&error=access_denied`,
+  );
+
+  // A web callback without our session asks to sign in instead of failing silently.
+  const webAgain = await start("/settings");
+  const signedOut = await systemBrowser(`/api/app/connectors/oauth/callback?state=${webAgain}&code=abc`, {
+    origin: null,
+  });
+  expect(signedOut.headers.get("location")).toBe("http://localhost:3000/?connector_error=sign_in");
+});
+
 type Listed = {
   id: string;
   kind: string;
@@ -120,12 +249,14 @@ test("catalog: one list of our connectors and the one-click MCP servers, one ent
   // Ours: GitHub (API key at least) and Drive (asks for the server address).
   expect(byId("github")).toMatchObject({ kind: "catalog", category: "dev", available: true });
   expect(byId("drive")).toMatchObject({ kind: "catalog", iconUrl: "/connectors/googledrive.svg" });
-  // No icon in Simple Icons: a monogram.
-  expect(byId("canva")?.iconUrl).toBeNull();
-  // Every icon the catalog names exists in the web app.
+  // A one-color mark (Square's black) and two in their makers' colors.
+  expect(byId("square")).toMatchObject({ iconUrl: "/connectors/square.svg", brandColor: null });
+  expect(byId("paypal")).toMatchObject({ iconUrl: "/brands/paypal.svg", brandColor: null });
+  expect(byId("canva")).toMatchObject({ iconUrl: "/brands/canva.svg", brandColor: null });
+  // Every connector in the catalog has its mark, a file in the web app: none is left a monogram.
   const publicDir = new URL("../../web/public", import.meta.url).pathname;
   for (const c of connectors) {
-    if (c.iconUrl) expect(existsSync(`${publicDir}${c.iconUrl}`)).toBe(true);
+    expect([c.id, c.iconUrl !== null && existsSync(`${publicDir}${c.iconUrl}`)]).toEqual([c.id, true]);
   }
 });
 

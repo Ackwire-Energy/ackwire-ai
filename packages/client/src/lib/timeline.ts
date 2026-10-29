@@ -1,7 +1,8 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
+import { answeredNotices, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
-import { isRoutineCall, routineOfMessage } from "./routines";
+import { isRoutineCall, routineReplyOf } from "./routines";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
@@ -16,7 +17,7 @@ export function upsertMessage(list: Message[] | undefined, message: Message): Me
  * Agents reply inside the thread of the message that called them (the
  * executor posts with `threadId = root`), but the channel lists only
  * top-level messages. The channel view shows the conversation as one
- * timeline, as in the approved screen: top-level messages plus the loaded
+ * timeline: top-level messages plus the loaded
  * thread replies, in time order.
  */
 export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefined)[]): Message[] {
@@ -86,6 +87,8 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
   let lastDay = "";
   let prev: Message | null = null;
   const byId = new Map(messages.map((m) => [m.id, m]));
+  // Routine reports an agent's message already answers: they fold into it.
+  const answered = answeredNotices(messages);
   // The last message shown, across day dividers and cards (to tell a reply that lands far from its root).
   let lastShown: Message | null = null;
   for (const entry of entries) {
@@ -97,11 +100,11 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
-      // The message a routine posts to call its agent isn't shown: only the agent's answer is.
-      if (isRoutineCall(m)) continue;
-      // A routine's message always shows its own header, and nothing groups under it.
-      const routine = Boolean(routineOfMessage(m.meta));
-      const prevRoutine = Boolean(prev && routineOfMessage(prev.meta));
+      // A routine's call written as its creator, and a report the agent already told people about: not shown.
+      if (isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
+      // A routine's answer (or an automatic line: a notice) always shows its own header, and nothing groups under it.
+      const routine = Boolean(routineReplyOf(m)) || isEventLine(m.meta);
+      const prevRoutine = Boolean(prev && (routineReplyOf(prev) || isEventLine(prev.meta)));
       const root = m.threadId ? byId.get(m.threadId) : undefined;
       const away =
         root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);
@@ -116,8 +119,10 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
         : undefined;
       out.push({
         ...entry.item,
-        // A reply that quotes its root starts its own block.
-        grouped: !context && !routine && !prevRoutine && groupsWith(prev, m.author, m.createdAt),
+        // A reply that quotes its root starts its own block; a fast reply while it works shows its header
+        // ("enquanto trabalha").
+        grouped:
+          !context && !routine && !prevRoutine && !isTalkerReply(m.meta) && groupsWith(prev, m.author, m.createdAt),
         ...(context ? { context } : {}),
       });
       prev = m;

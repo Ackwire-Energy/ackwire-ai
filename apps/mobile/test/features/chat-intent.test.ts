@@ -12,7 +12,7 @@ import {
 import { agent, message } from "./fixtures";
 
 const people = [
-  { id: "me", name: "Walter Caldas" },
+  { id: "me", name: "Walter Nogueira" },
   { id: "u2", name: "Caio Souza" },
   { id: "u3", name: "Ana" },
 ];

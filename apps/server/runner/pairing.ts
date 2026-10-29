@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -122,7 +122,7 @@ export async function requestDeviceCode(
       res.status === 429 ? "network" : "internal",
       errorMessage(res.json) ??
         (res.status === 429
-          ? "Too many connection attempts from this network; try again in a few minutes"
+          ? "Too many connection attempts from this network. Try again in a few minutes."
           : `The server refused to start the connection (HTTP ${res.status})`),
     );
   }
@@ -218,7 +218,7 @@ export async function pollDeviceToken(
     } else if (word === "access_denied") {
       throw new PairingError("denied", "The connection was refused on the site");
     } else if (word === "expired_token") {
-      throw new PairingError("expired", "The code expired; start again");
+      throw new PairingError("expired", "The code expired. Start again.");
     } else if (res.status >= 500) {
       lastNetwork = `The server answered HTTP ${res.status}`;
     } else {
@@ -227,7 +227,7 @@ export async function pollDeviceToken(
     if (now() >= deadline) {
       throw lastNetwork
         ? new PairingError("network", lastNetwork)
-        : new PairingError("expired", "The code expired; start again");
+        : new PairingError("expired", "The code expired. Start again.");
     }
   }
 }
@@ -242,6 +242,61 @@ export async function devicePair(
   const code = await requestDeviceCode(server, info, opts);
   onCode(code);
   return pollDeviceToken(server, code, opts);
+}
+
+/**
+ * A code issued for this computer by whoever provisions it (ADR 0056 §10), from the file it was handed
+ * in, never a command line (any local user can read those). The file is removed as soon as it is read,
+ * so no failure after this leaves the code on disk.
+ */
+export function takeEnrollCode(file: string): string {
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch (err) {
+    throw new PairingError(
+      "internal",
+      `Couldn't read the enrollment file: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  } finally {
+    try {
+      unlinkSync(file);
+    } catch {
+      // not there, or not a file
+    }
+  }
+  const code = text.trim();
+  // Checked before it leaves: another file's contents (a config with its token) never reach the server.
+  if (!/^[\w-]{20,200}$/.test(code)) throw new PairingError("internal", `${file} doesn't hold an enrollment code`);
+  return code;
+}
+
+/**
+ * Connects with an issued code: it is confirmed already, so the first poll gets the token. A code that
+ * expired, was used or was withdrawn fails with a message about the code, since nobody confirms one.
+ */
+export async function redeemIssuedCode(
+  server: string,
+  code: string,
+  opts: Parameters<typeof pollDeviceToken>[2] = {},
+): Promise<DeviceGrant> {
+  // The server's whole lifetime for a code: it was issued earlier, so the real expiry can be sooner.
+  const issued: DeviceCode = { deviceCode: code, userCode: "", verificationUrl: "", expiresIn: 600, interval: 2 };
+  try {
+    return await pollDeviceToken(server, issued, opts);
+  } catch (err) {
+    if (!(err instanceof PairingError)) throw err;
+    if (err.code === "expired") {
+      throw new PairingError("expired", "The enrollment code expired or was already used. Issue a new one.");
+    }
+    if (err.code === "denied") {
+      throw new PairingError(
+        "denied",
+        "The enrollment code was withdrawn: a newer one replaced it, or this computer was removed",
+      );
+    }
+    throw err;
+  }
 }
 
 /** `Ação & Cia` → `acao-cia`. */

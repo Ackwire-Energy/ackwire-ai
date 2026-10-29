@@ -1,6 +1,6 @@
 /*
- * Missions in the thread (telas/ThreadContexto.html, "App mobile") and on
- * the Missões tab (telas/Threads.html): the plan card, the pinned card with
+ * Missions in the thread and on
+ * the Missões tab: the plan card, the pinned card with
  * the plan strip, one row per session, the decision and review cards, the
  * plan-change and computer lines, the files panel and the mission cards.
  * Neutral surfaces (ink and gray); blue only for the agent (avatar, the
@@ -65,7 +65,6 @@
 }
 .mi-hint {
   display: inline-flex;
-  align-items: center;
   gap: 6px;
   font-size: 12.5px;
   color: var(--faint);
@@ -88,6 +87,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   white-space: nowrap;
 }
@@ -218,7 +218,7 @@ button.mi-pill--need:hover {
 }
 .mi-plan__head h3 {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -244,7 +244,7 @@ button.mi-pill--need:hover {
   align-items: center;
   gap: 10px;
 }
-/* Proposed already investigated (FazerDesfazer.html, "mission"): the findings, the plan under a label, Ajustar / Começar, the note. */
+/* Proposed already investigated: the findings, the plan under a label, Ajustar / Começar, the note. */
 .mi-findings {
   display: flex;
   flex-direction: column;
@@ -254,15 +254,11 @@ button.mi-pill--need:hover {
   list-style: none;
 }
 .mi-finding {
-  display: flex;
-  gap: 8px;
   font-size: 14px;
   line-height: 1.45;
   color: var(--ink2);
 }
 .mi-finding > .ac-icon {
-  flex: none;
-  margin-top: 2px;
   color: var(--faint);
 }
 .mi-finding__tx {
@@ -497,6 +493,7 @@ a.mi-ref:hover code {
   gap: 8px;
   min-width: 0;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the owner's button beside them. */
 .mh__note {
   font-size: 13px;
   color: var(--ink2);
@@ -614,7 +611,6 @@ a.mi-ref:hover code {
 .mi-session__icon {
   width: 20px;
   height: 20px;
-  margin-top: 1px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -873,8 +869,6 @@ a.mi-pr:hover {
 /* One quiet line: the icon on the first line of the text (never alone above it), the
    text wraps in its own box, an action ("Ver plano") stays at the end. */
 .mi-evt {
-  display: flex;
-  align-items: flex-start;
   flex-wrap: wrap;
   gap: 4px 8px;
   margin: 4px 12px 4px var(--thread-indent, 56px);
@@ -882,10 +876,6 @@ a.mi-pr:hover {
   line-height: 18px;
   color: var(--faint);
   animation: mi-fade 0.35s var(--out) both;
-}
-.mi-evt > .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 /* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
 .mi-evt > span:first-of-type {
@@ -1032,15 +1022,9 @@ a.mi-pr:hover {
 }
 .mi-files__foot {
   flex: 1;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 12px;
   line-height: 18px;
   color: var(--faint);
-}
-.mi-files__foot .ac-icon {
-  margin-top: 2px;
 }
 .mi-md {
   font-size: 13.5px;
@@ -1058,7 +1042,7 @@ a.mi-pr:hover {
 .mi-md__h1 {
   margin: 2px -8px 6px;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 24px;
   letter-spacing: -0.03em;
   color: var(--ink);
@@ -1183,9 +1167,6 @@ a.mi-pr:hover {
   color: var(--faint);
 }
 .mi-notes {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 14px;
@@ -1194,8 +1175,6 @@ a.mi-pr:hover {
   color: var(--ink2);
 }
 .mi-notes .ac-icon {
-  flex: none;
-  margin-top: 2px;
   color: var(--faint);
 }
 .mi-field {
@@ -1331,20 +1310,8 @@ a.mi-pr:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 0;
-  border: 0;
   border-radius: 4px;
-  background: transparent;
-  font: inherit;
-  font-weight: 600;
   color: var(--ink2);
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.mi-lnk:hover {
-  text-decoration-color: var(--ink);
 }
 .mi-mc__strip {
   display: flex;
@@ -1626,10 +1593,6 @@ a.mi-pr:hover {
   height: 16px;
   flex: none;
 }
-.mi-exec__icon {
-  flex: none;
-  color: var(--ink2);
-}
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
@@ -1721,7 +1684,7 @@ a.mi-pr:hover {
   }
 }
 
-/* ---------- Configurações da missão (MissionSettings.tsx; telas/MissaoConfig.html) ---------- */
+/* ---------- Configurações da missão (MissionSettings.tsx) ---------- */
 .mi-cfg__sub {
   display: inline-flex;
   align-items: center;
@@ -1764,6 +1727,12 @@ a.mi-pr:hover {
   flex: 1 0 100%;
   flex-direction: column;
   gap: 4px;
+  padding-left: 22px;
+}
+/* The same request on this Mac: the button that shows it, under the line like the command (beside the words, the
+   taller button would sit below their middle). */
+.mi-evt__act {
+  flex: 1 0 100%;
   padding-left: 22px;
 }
 

@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { en, ptBR } from "@agenteschat/i18n";
+import { legalDocuments } from "@agenteschat/i18n/legal";
+import { leaves } from "../../../packages/i18n/test/leaves";
+import { filesNamingMakers, MAKER_WORDS, sourceFiles, withoutComments } from "../../../packages/i18n/test/maker-words";
 
-const ROOTS = [join(import.meta.dir, "..", "src"), join(import.meta.dir, "..", "..", "..", "packages", "ui", "src")];
-const files = (dir: string): string[] =>
-  readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return name === "locales" ? [] : files(path);
-    return path.endsWith(".tsx") ? [path] : [];
-  });
+const REPO = join(import.meta.dir, "..", "..", "..");
+const ROOTS = [join(import.meta.dir, "..", "src"), join(REPO, "packages", "ui", "src")];
 /** The dev-only component gallery shows sample content on purpose. */
 const SKIP_FILES = ["GalleryPage.tsx"];
 /** Brand names, keys, symbols and code that stay as they are. */
@@ -25,17 +24,16 @@ describe("no hardcoded UI text", () => {
   test("JSX text and aria-label / title / placeholder / alt literals go through t()", () => {
     const offenders: string[] = [];
     for (const root of ROOTS)
-      for (const f of files(root)) {
+      for (const f of sourceFiles(root, /\.tsx$/)) {
         if (SKIP_FILES.some((s) => f.endsWith(s))) continue;
-        const source = readFileSync(f, "utf8")
-          .replace(/\/\*[\s\S]*?\*\//g, "")
-          .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+        const source = withoutComments(readFileSync(f, "utf8"));
         const where = (i: number) => `${relative(root, f)}:${source.slice(0, i).split("\n").length}`;
         for (const m of source.matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)) {
           const text = (m[1] ?? "").trim();
-          // `=> Promise<…>`, `->`: types and arrows, not markup; a prop list after `<b />,`.
+          // `=> Promise<…>`, `->`: types and arrows, not markup; a prop list after `<b />,`; one generic type joined
+          // to the next (`Pick<…> & Partial<…>`, `Map<…> | Set<…>`).
           const prev = source[(m.index ?? 0) - 1];
-          if (prev === "=" || prev === "-" || /^[,;]/.test(text)) continue;
+          if (prev === "=" || prev === "-" || /^[,;]/.test(text) || /^[&|] *[\w.]+$/.test(text)) continue;
           // Code between generics/operators, not JSX text.
           if (!text || /=>|;|\(|\)|&&|\|\||=|\bconst\b|\breturn\b|\bnew\b|\*/.test(text) || allowed(text)) continue;
           offenders.push(`${where(m.index ?? 0)} text "${text}"`);
@@ -46,5 +44,30 @@ describe("no hardcoded UI text", () => {
         }
       }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("Claude and ChatGPT, not their makers, in what a person reads", () => {
+  /** A legal text names the company, once, beside the product people know. */
+  const MAKER = { en: "Anthropic, which makes Claude", "pt-BR": "a Anthropic, que faz o Claude" } as const;
+  const inCopy = new RegExp(MAKER_WORDS.source, "i");
+
+  // The phone's and the Mac app's own code: in their own tests, which run when only those apps change.
+  test("the copy, the terms, and the web app's, design system's and client's code", () => {
+    const copy = [
+      ...leaves(en).map(([k, v]) => [`en ${k}`, v] as const),
+      ...leaves(ptBR).map(([k, v]) => [`pt-BR ${k}`, v] as const),
+    ]
+      .filter(([, v]) => inCopy.test(String(v)))
+      .map(([k]) => k);
+    const legal = Object.entries(legalDocuments).flatMap(([kind, byLocale]) =>
+      Object.entries(byLocale)
+        .filter(([lng, doc]) => inCopy.test(JSON.stringify(doc).replaceAll(MAKER[lng as keyof typeof MAKER], "")))
+        .map(([lng]) => `${kind} ${lng}`),
+    );
+    const words = filesNamingMakers(
+      ["apps/web/src", "packages/ui/src", "packages/client/src"].map((d) => join(REPO, d)),
+    );
+    expect([...copy, ...legal, ...words.map((f) => relative(REPO, f))]).toEqual([]);
   });
 });

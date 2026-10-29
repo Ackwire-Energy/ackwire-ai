@@ -6,6 +6,7 @@ import {
   browserTrailLines,
   browserTrailPages,
   browserTrailSpanMs,
+  type ScreenKind,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -18,19 +19,20 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { stepText, useHeldTakeover } from "./BrowserCard";
+import { screenIcon, screenT } from "./screen";
 import "./browser.css";
 
 /** A step in the person's words, from the saved trail. */
-const said = (t: TFunction, s: BrowserTrailStep) =>
-  stepText(t, { id: "", tool: s.tool, detail: s.detail, running: false });
+const said = (t: TFunction, s: BrowserTrailStep, screen: ScreenKind) =>
+  stepText(t, { id: "", tool: s.tool, detail: s.detail, running: false }, screen);
 const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /**
- * Where the agent browsed, on its message after the run (telas/NavegadorDepois.html, A with
- * "Página em silhueta"; telas/NavegadorResumo.html, B): the closed card stays, still, with a drawn
+ * Where the agent browsed, on its message after the run: the closed card stays, still, with a drawn
  * page (never a picture of the real one, ADR 0040 §7), where it browsed, its steps as pixel columns
  * in the agent's tones (as a routine's runs) and how long. Opening it lists the steps by page,
- * repeats folded into one line, each site openable in the person's own browser.
+ * repeats folded into one line, each site openable in the person's own browser. On the desktop
+ * (`screen`, ADR 0062) the same card tells the apps it opened instead of the sites.
  */
 export function BrowserTrailCard({
   agentId,
@@ -39,23 +41,27 @@ export function BrowserTrailCard({
   steps,
   stopped,
   recent = false,
+  screen = "browser",
 }: {
   agentId: string;
   /** Its run: while a take over still holds the browser, the live card stands here instead. */
   runId: string | null;
   name: string;
-  /** `meta.browser.steps` (`browserTrailOf`). */
+  /** `meta.browser.steps` (`browserTrailOf`), or the desktop's (`desktopTrailOf`). */
   steps: BrowserTrailStep[];
   /** The run was stopped (`meta.canceled`): who pressed Parar, when known. */
   stopped?: { byUserId: string | null } | null;
   /** A recent message: ask the server about a take over (otherwise only what the realtime events said). */
   recent?: boolean;
+  screen?: ScreenKind;
 }) {
   const { t, i18n } = useTranslation();
+  const tt = screenT(t, screen);
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
-  const held = useHeldTakeover(agentId, runId ?? "", recent && runId !== null);
+  // A take over that holds the browser has its live card on the chat; the desktop's has its panel.
+  const held = useHeldTakeover(agentId, runId ?? "", recent && runId !== null && screen === "browser");
   const g = agentGrammar(t, name);
   const color = colorOf(dir.agentById.get(agentId));
   const last = steps.at(-1);
@@ -66,23 +72,23 @@ export function BrowserTrailCard({
   const ended = !stopped
     ? null
     : by === me.user.id
-      ? t("browser.after.stoppedByYou", { time })
+      ? tt("after.stoppedByYou", { time })
       : by && dir.memberById.get(by)
-        ? t("browser.after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
-        : t("browser.after.stoppedAt", { time });
+        ? tt("after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
+        : tt("after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
   // The site alone, short ("web.whatsapp.com" → "whatsapp.com"): the drawn page already says it browsed.
-  const site = hosts[0]?.replace(/^(www|web|m)\./, "");
+  const site = screen === "browser" ? hosts[0]?.replace(/^(www|web|m)\./, "") : hosts[0];
   const title = !site
-    ? t("browser.after.titleNoSite")
+    ? tt("after.titleNoSite")
     : hosts.length > 1
-      ? t("browser.after.titleMore", { site, count: hosts.length - 1 })
+      ? tt("after.titleMore", { site, count: hosts.length - 1 })
       : site;
   const count = t("chat.work.steps", { count: steps.length });
   const duration = formatDuration(t, browserTrailSpanMs(steps));
-  const summary = t("browser.after.summaryNoSite", { steps: count, duration });
-  const group = t("browser.inCard.group", g);
-  const toggle = open ? t("browser.after.hideSteps") : t("browser.after.showSteps");
+  const summary = tt("after.summaryNoSite", { steps: count, duration });
+  const group = tt("inCard.group", g);
+  const toggle = open ? tt("after.hideSteps") : tt("after.showSteps");
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
@@ -136,14 +142,14 @@ export function BrowserTrailCard({
       {open && (
         <ol className="brw-log brw-trail__log">
           {browserTrailPages(steps).map((p, i) => {
-            const href = browserTrailHref(p.site);
+            const href = p.link ? browserTrailHref(p.site) : null;
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: pages are a fixed list from the message
               <li key={i} className="brw-trail__page">
                 <span className="brw-trail__site">
-                  <Icon name="globe" size={14} />
+                  <Icon name={screenIcon(screen)} size={14} />
                   <span>
-                    {p.host ?? t("browser.after.noSite")}
+                    {p.host ?? tt("after.noSite")}
                     {p.path && <span className="brw-ac__path">{p.path}</span>}
                   </span>
                   {p.steps[0] && <small>{formatTime(i18n.language, p.steps[0].at)}</small>}
@@ -153,8 +159,8 @@ export function BrowserTrailCard({
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={t("browser.after.openSite", { site: p.site })}
-                      title={t("browser.after.openSite", { site: p.site })}
+                      aria-label={tt("after.openSite", { site: p.site })}
+                      title={tt("after.openSite", { site: p.site })}
                     >
                       <Icon name="external" size={14} />
                     </a>
@@ -165,17 +171,17 @@ export function BrowserTrailCard({
                     const [a, b] = line.steps;
                     if (!a) return null;
                     const text = b
-                      ? t("browser.after.pair", { a: said(t, a), b: lower(said(t, b)) })
+                      ? tt("after.pair", { a: said(t, a, screen), b: lower(said(t, b, screen)) })
                       : a.failed
-                        ? t("browser.after.failed", { step: said(t, a) })
-                        : said(t, a);
+                        ? tt("after.failed", { step: said(t, a, screen) })
+                        : said(t, a, screen);
                     return (
                       // biome-ignore lint/suspicious/noArrayIndexKey: lines are a fixed list from the message
                       <li key={j} className={a.failed ? "is-failed" : undefined}>
                         <BrowserMark kind={browserTrailKind(a)} color={color} className="brw-trail__mark" />
                         <span>{text}</span>
                         {line.times > 1 && (
-                          <b className="brw-trail__times">{t("browser.after.times", { count: line.times })}</b>
+                          <b className="brw-trail__times">{tt("after.times", { count: line.times })}</b>
                         )}
                       </li>
                     );

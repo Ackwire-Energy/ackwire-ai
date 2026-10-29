@@ -13,13 +13,18 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("Missões (Threads.html)", () => {
+describe("Missões", () => {
   test("the sidebar item opens the Threads page on the Missões tab; empty: a designed state", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api: createFakeApi() });
     await settle();
     expect(router.state.location.search).toEqual({ tab: "missions" });
     expect(screen().getByRole("heading", { level: 1, name: "Missões" })).toBeTruthy();
+    expect(document.querySelector(".list-head__sub")?.textContent).toBe(
+      "Trabalho longo de um agente no computador dele, numa thread.",
+    );
     expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();
+    // The title and New mission: what a mission is, the subtitle already says.
+    expect(document.querySelector(".ac-empty__text")).toBeNull();
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     // Missões is a tab of Threads: one sidebar item.
     expect(within(nav).getByRole("link", { name: /Threads/ })).toBeTruthy();
@@ -54,7 +59,7 @@ describe("Missões (Threads.html)", () => {
     const line = row.querySelector(".thread-row__mission") as HTMLElement;
     expect(line.textContent).toContain("Missão");
     expect(line.textContent).toContain("4 de 12 itens");
-    // The mission's agent leads the row (ThreadsRefino.html), no flag icon.
+    // The mission's agent leads the row, no flag icon.
     expect(row.querySelector(".thread-row__face .ac-avatar")).toBeTruthy();
     expect(within(row).getByText("Esperando você")).toBeTruthy();
     const plain = screen().getByRole("article", { name: "Só conversa" });
@@ -193,5 +198,19 @@ describe("Missões (Threads.html)", () => {
     ).toContain(`/agents/${ATLAS_ID}`);
     // Somebody can: no empty state.
     expect(within(dialog).queryByText("Nenhum agente pode rodar uma missão para você ainda")).toBeNull();
+  });
+
+  test("Nova missão: nobody can run one yet, said with its icon on the title's line", async () => {
+    const api = createFakeApi(seedState());
+    api.missions.eligibleAgents = async () => [];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getAllByRole("button", { name: /Nova missão/ })[0] as HTMLElement));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Nova missão" });
+    const title = within(dialog).getByText("Nenhum agente pode rodar uma missão para você ainda");
+    const line = title.parentElement as HTMLElement;
+    expect(line.classList.contains("ac-iconline")).toBe(true);
+    expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
   });
 });

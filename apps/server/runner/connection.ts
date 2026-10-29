@@ -1,5 +1,7 @@
 import {
+  type BrowserTraffic,
   HEARTBEAT_MS,
+  type MachineLoad,
   type MachineRequest,
   parseServerFrame,
   type RunnerFrame,
@@ -30,7 +32,7 @@ export type Dial = (url: string, handlers: SocketHandlers) => Socket;
 /** The global WebSocket (Node 22+ and Bun both have it). */
 export const webSocketDial: Dial = (url, handlers) => {
   if (typeof WebSocket === "undefined") {
-    throw new Error("This runtime has no WebSocket client; use Node.js 22 or newer, or Bun");
+    throw new Error("This runtime has no WebSocket client. Use Node.js 22 or newer, or Bun.");
   }
   const ws = new WebSocket(url);
   let closed = false;
@@ -74,9 +76,12 @@ export interface ConnectionOutcome {
   message: string;
 }
 
+/** `start`'s exit code when the server refuses the token (unknown or revoked): only a new token helps. */
+export const TOKEN_REFUSED_EXIT = 2;
+
 const REFUSED_EXIT: Record<Exclude<ConnectionOutcome["reason"], "stopped">, number> = {
-  invalid_token: 2,
-  revoked: 2,
+  invalid_token: TOKEN_REFUSED_EXIT,
+  revoked: TOKEN_REFUSED_EXIT,
   outdated: 3,
   replaced: 0,
 };
@@ -91,7 +96,7 @@ export interface ConnectionOptions {
   dial?: Dial;
   log?: (line: string) => void;
   random?: () => number;
-  /** Tests: run requests with a fake. */
+  /** Runs requests instead of `handleRequest` (tests: a fake; a worker: only its own agent's). */
   handler?: typeof handleRequest;
   /**
    * Background tasks (protocol 4): `hello` carries their journal, each
@@ -103,6 +108,10 @@ export interface ConnectionOptions {
   mcp?: Pick<McpBridge, "attach" | "detach" | "result"> & Partial<Pick<McpBridge, "tools">>;
   /** Protocol 7: the coding CLIs on the machine, looked up for each `hello` (cached by the caller). */
   executors?: () => RunnerInfo["executors"];
+  /** Protocol 22: the last day's load; each new summary goes out once, on the next `pong`. */
+  load?: () => MachineLoad | null;
+  /** Protocol 23: the agents' browsers' last day of traffic, the same way. */
+  browserTraffic?: () => BrowserTraffic | null;
   /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
@@ -218,6 +227,8 @@ export class RunnerConnection {
       let outcome: ConnectionOutcome | undefined;
       let heartbeatMs = HEARTBEAT_MS;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let sentLoad: MachineLoad | null = null;
+      let sentTraffic: BrowserTraffic | null = null;
 
       const send = (frame: RunnerFrame) => {
         if (finished || !socket) return;
@@ -299,10 +310,20 @@ export class RunnerConnection {
           case "task.ack":
             tasks?.ack(frame.taskId);
             return;
-          case "ping":
-            send({ type: "pong", at: frame.at });
+          case "ping": {
+            const load = opts.load?.() ?? null;
+            const traffic = opts.browserTraffic?.() ?? null;
+            send({
+              type: "pong",
+              at: frame.at,
+              ...(load && load !== sentLoad ? { load } : {}),
+              ...(traffic && traffic !== sentTraffic ? { browserTraffic: traffic } : {}),
+            });
+            sentLoad = load;
+            sentTraffic = traffic;
             arm();
             return;
+          }
           case "request": {
             const { type: _type, id, ...request } = frame;
             void runner.start(id, request as MachineRequest);

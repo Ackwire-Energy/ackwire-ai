@@ -12,6 +12,7 @@ import {
   revokeMailAccount,
   setAgentScopes,
   startComposioConnect,
+  suggestMailAddresses,
   updateMailAccount,
   ValidationError,
 } from "../src";
@@ -31,7 +32,7 @@ test("an IMAP mailbox is tested before it's saved; the password is sealed and ne
   expect(
     await createImapAccount(deps, f.owner.id, f.org.id, {
       preset: "icloud",
-      address: "a@icloud.com",
+      address: "a@example.com",
       password: "nope",
     }),
   ).toEqual({ ok: false, error: "auth" });
@@ -40,7 +41,7 @@ test("an IMAP mailbox is tested before it's saved; the password is sealed and ne
   tester.state.result = { ok: true, sentFolder: "Sent Messages" };
   const r = await createImapAccount(deps, f.owner.id, f.org.id, {
     preset: "icloud",
-    address: "Support@iCloud.com",
+    address: "Support@Example.com",
     password: "abcd-efgh-ijkl-mnop",
     label: "Suporte",
   });
@@ -48,7 +49,7 @@ test("an IMAP mailbox is tested before it's saved; the password is sealed and ne
   expect(r.account).toMatchObject({
     provider: "imap",
     via: "imap",
-    address: "support@icloud.com",
+    address: "support@example.com",
     label: "Suporte",
     status: "active",
     preset: "icloud",
@@ -57,7 +58,7 @@ test("an IMAP mailbox is tested before it's saved; the password is sealed and ne
   expect(tester.state.calls.at(-1)?.imap).toMatchObject({
     host: "imap.mail.me.com",
     smtpHost: "smtp.mail.me.com",
-    username: "support@icloud.com",
+    username: "support@example.com",
     password: "abcd-efgh-ijkl-mnop",
   });
   const [row] = await f.db.select().from(schema.mailAccounts);
@@ -70,11 +71,11 @@ test("an IMAP mailbox is tested before it's saved; the password is sealed and ne
   expect(m.box.state.opened.at(-1)?.imap?.password).toBe("abcd-efgh-ijkl-mnop");
 
   await expect(
-    createImapAccount(deps, f.owner.id, f.org.id, { preset: "icloud", address: "support@icloud.com", password: "x" }),
+    createImapAccount(deps, f.owner.id, f.org.id, { preset: "icloud", address: "support@example.com", password: "x" }),
   ).rejects.toBeInstanceOf(ConflictError);
   const member = await addMember(f.db, f.org.id, "member");
   await expect(
-    createImapAccount(deps, member.id, f.org.id, { preset: "icloud", address: "b@icloud.com", password: "x" }),
+    createImapAccount(deps, member.id, f.org.id, { preset: "icloud", address: "b@example.com", password: "x" }),
   ).rejects.toBeInstanceOf(ForbiddenError);
 });
 
@@ -120,6 +121,60 @@ test("rotating an IMAP password re-tests it and brings a mailbox back from needs
   expect(m.box.state.opened.at(-1)?.imap?.password).toBe("good-one");
 });
 
+test("a mailbox's other addresses: normalised, a default among them, pinned agents reset when one goes", async () => {
+  m = await mailSetup();
+  const { f, deps } = m;
+  const account = await imapAccount(m, "me@icloud.com");
+  expect(account).toMatchObject({ aliases: [], defaultFrom: null });
+  const r = await updateMailAccount(deps, f.owner.id, f.org.id, account.id, {
+    aliases: [" Support@Acme.com", "support@acme.com", "ME@icloud.com", "sales@acme.com"],
+    defaultFrom: "Support@acme.com",
+  });
+  expect(r).toMatchObject({
+    ok: true,
+    account: { aliases: ["support@acme.com", "sales@acme.com"], defaultFrom: "support@acme.com" },
+  });
+  await expect(
+    updateMailAccount(deps, f.owner.id, f.org.id, account.id, { defaultFrom: "ceo@acme.com" }),
+  ).rejects.toMatchObject({ code: "mail.from_not_mailbox" });
+  await expect(
+    updateMailAccount(deps, f.owner.id, f.org.id, account.id, { aliases: ["not an address"] }),
+  ).rejects.toMatchObject({ code: "mail.invalid_alias" });
+  // The main address as the default is stored as "none" (it is the default anyway).
+  expect(
+    await updateMailAccount(deps, f.owner.id, f.org.id, account.id, { defaultFrom: "me@icloud.com" }),
+  ).toMatchObject({ account: { defaultFrom: null } });
+
+  await updateMailAccount(deps, f.owner.id, f.org.id, account.id, { defaultFrom: "sales@acme.com" });
+  await giveMail(m, account.id, "read_write", { fromAddress: "sales@acme.com" });
+  // sales@ goes: the default and the agent pinned to it go back to the main address and "automatic".
+  const after = await updateMailAccount(deps, f.owner.id, f.org.id, account.id, { aliases: ["support@acme.com"] });
+  expect(after).toMatchObject({ account: { aliases: ["support@acme.com"], defaultFrom: null } });
+  expect((await getAgentMail(f.db, f.owner.id, f.org.id, f.agent.id))[0]?.policy.fromAddress).toBeNull();
+
+  const member = await addMember(f.db, f.org.id, "member");
+  await expect(updateMailAccount(deps, member.id, f.org.id, account.id, { aliases: [] })).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+});
+
+test("suggested addresses are the Froms of the sent folder's recent mail", async () => {
+  m = await mailSetup();
+  const { f, deps } = m;
+  const account = await imapAccount(m, "me@icloud.com");
+  m.box.add({ id: "s1", folder: "Sent", from: { address: "support@acme.com" }, date: "2026-10-20T10:00:00Z" });
+  m.box.add({ id: "s2", folder: "Sent", from: { address: "me@icloud.com" }, date: "2026-10-21T10:00:00Z" });
+  m.box.add({ id: "s3", folder: "Sent", from: { address: "Sales@Acme.com" }, date: "2026-10-22T10:00:00Z" });
+  m.box.add({ id: "i1", folder: "INBOX", from: { address: "ana@client.com" } });
+  expect(await suggestMailAddresses(deps, f.owner.id, f.org.id, account.id)).toEqual([
+    "sales@acme.com",
+    "support@acme.com",
+  ]);
+  // A mailbox that can't be read suggests nothing (the person types them).
+  m.box.state.failWith = new Error("down");
+  expect(await suggestMailAddresses(deps, f.owner.id, f.org.id, account.id)).toEqual([]);
+});
+
 test("Gmail through Composio: a pending row, Composio's link, then active with its address", async () => {
   m = await mailSetup();
   const { f, deps, composio } = m;
@@ -134,13 +189,13 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
 
   // Not finished at Composio yet: stays pending.
   expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
-  composio.activate("ca_1", "Walt@Gmail.com");
+  composio.activate("ca_1", "Team@Example.com");
   expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({
     provider: "gmail",
     via: "composio",
     status: "active",
-    address: "walt@gmail.com",
+    address: "team@example.com",
   });
 
   // A connection that failed at Composio goes away.
@@ -196,11 +251,20 @@ test("agent policies are normalised; sending without asking needs allowed recipi
   await expect(giveMail(m, account.id, "read", { senders: ["not an address"] })).rejects.toBeInstanceOf(
     ValidationError,
   );
+  // The agent's From is one of the mailbox's addresses.
+  await expect(giveMail(m, account.id, "read", { fromAddress: "hi@example.com" })).rejects.toMatchObject({
+    code: "mail.from_not_mailbox",
+  });
+  await updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, { aliases: ["hi@example.com"] });
   const r = await giveMail(
     m,
     account.id,
     "read",
-    { senders: ["Bob@Acme.com", "ACME.COM", "@x.org"], allowedRecipients: ["@Acme.com"], fromAddress: "Hi@iCloud.com" },
+    {
+      senders: ["Bob@Acme.com", "ACME.COM", "@x.org"],
+      allowedRecipients: ["@Acme.com"],
+      fromAddress: "Hi@Example.com",
+    },
     true,
   );
   expect(r).toMatchObject({
@@ -209,7 +273,7 @@ test("agent policies are normalised; sending without asking needs allowed recipi
     policy: {
       senders: ["bob@acme.com", "@acme.com", "@x.org"],
       allowedRecipients: ["@acme.com"],
-      fromAddress: "hi@icloud.com",
+      fromAddress: "hi@example.com",
     },
   });
   const member = await addMember(m.f.db, m.f.org.id, "member");

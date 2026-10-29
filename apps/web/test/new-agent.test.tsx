@@ -11,7 +11,6 @@ import {
   handleProblem,
   presetChannels,
   presetLevels,
-  presetModel,
   ROLE_GROUPS,
   ROLE_IDS,
   ROLE_PRESETS,
@@ -66,6 +65,36 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("link", { name: "Sair sem criar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("link", { name: "Cancelar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).toContain("Seu agente");
+    // One short lead under the title; the preview is headed by its name alone.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Escolha um ponto de partida: o resto a gente preenche.",
+    );
+    expect(document.querySelector(".newag__cap")?.textContent).toBe("Prévia");
+  });
+
+  test("what a step needs explained: the instructions' and the budget's ⓘ; the tools keep the approval line", async () => {
+    await open();
+    await startAs("QA");
+    await proceed();
+    expect(title()).toBe("O que a Iris faz");
+    const hint = (name: string) =>
+      document.getElementById(screen().getByRole("button", { name }).getAttribute("aria-describedby") ?? "")
+        ?.textContent;
+    expect(hint("Sobre O que a Iris faz")).toBe(
+      "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é da Iris.",
+    );
+    expect(document.querySelector(".newag__note")).toBeNull();
+    await proceed();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Escolha até onde a Iris vai em cada app.");
+    expect(document.querySelector(".newag__note")?.textContent).toBe(
+      "Merge, deploy e rollback sempre pedem aprovação no chat. Quem aprova é Walter.",
+    );
+    await proceed(2);
+    expect(title()).toBe("Modelo e orçamento");
+    expect(hint("Sobre Orçamento mensal")).toBe("Ao atingir o limite, a Iris para e avisa. Avisamos Walter aos 80%.");
+    expect(screen().getByText(/^Vazio: o padrão do workspace/).textContent).toBe(
+      "Vazio: o padrão do workspace (US$ 50).",
+    );
   });
 
   test("a role is required; picking one fills the rest (name, @, look, instructions, levels, channels, model)", async () => {
@@ -91,7 +120,7 @@ describe("Criar agente: steps", () => {
     expect(preview.textContent).toContain("@iris");
 
     await proceed();
-    expect(title()).toBe("O que o Iris faz");
+    expect(title()).toBe("O que a Iris faz");
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
       "Reproduz cada bug relatado antes de abrir uma tarefa.",
     );
@@ -109,30 +138,35 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("false");
 
     await proceed();
+    // "Automático" comes first and is chosen for every role; the fixed models follow.
+    const auto = screen().getByRole("button", { name: /^Automático/ });
+    expect(auto.getAttribute("aria-pressed")).toBe("true");
+    expect(auto.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
     expect(
       screen()
         .getByRole("button", { name: /^Claude Sonnet 5\.5/ })
         .getAttribute("aria-pressed"),
-    ).toBe("true");
+    ).toBe("false");
     // Real catalog prices; a model without a key can't be picked.
     expect(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }).textContent).toContain(
       "US$ 2 / 10 por milhão de tokens",
     );
     const gpt = screen().getByRole("button", { name: /^GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Adicione uma chave da OpenAI para usar");
+    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
     await click(gpt);
     expect(gpt.getAttribute("aria-pressed")).toBe("false");
 
     await proceed();
-    expect(title()).toBe("Tudo certo com o Iris?");
+    expect(title()).toBe("Tudo certo com a Iris?");
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Automático ·");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({
       name: "Iris",
       handle: "iris",
       role: "QA",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       appearance: { color: "violet", eyes: "round", accessory: "headset" },
     });
   });
@@ -233,6 +267,19 @@ describe("Criar agente: steps", () => {
     expect(title()).toBe("Qual vai ser o papel?");
   });
 
+  test("on a touch screen or at phone width, the instructions' ⌘↵ hint goes with its keys", async () => {
+    await open();
+    await startAs("PM");
+    await proceed();
+    expect(title()).toBe("O que o Theo faz");
+    const hint = document.querySelector(".newag__hint");
+    expect(hint?.querySelectorAll(":scope > kbd.ac-kbd")).toHaveLength(2);
+    expect(hint?.textContent).toContain("continua daqui");
+    const css = await Bun.file(new URL("../src/responsive.css", import.meta.url).pathname).text();
+    const touch = css.split("\n@media (max-width: 760px), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    expect(touch).toMatch(/\.newag__hint:has\(> \.ac-kbd\) \{\s*display: none;/);
+  });
+
   test("Revisar e criar: each section has Editar, which goes to its step", async () => {
     await open();
     await startAs("PM");
@@ -241,6 +288,8 @@ describe("Criar agente: steps", () => {
     expect(title()).toBe("Tudo certo com o Theo?");
     expect(content().textContent).toContain("PM · Organiza tarefas, resumos e o fórum.");
     expect(content().textContent).toContain("@theo");
+    // The title says it all: no lead, and no note under the summary.
+    expect(content().querySelector(".onb__lead, .newag__note")).toBeNull();
     await click(within(content()).getByRole("button", { name: "Editar Modelo e custo" }));
     expect(title()).toBe("Modelo e orçamento");
     await proceed();
@@ -269,6 +318,79 @@ describe("Criar agente: what gets created", () => {
     expect(puts).toHaveLength(1);
     const body = puts[0]?.args[2] as { connectors: Record<string, boolean> };
     expect(body.connectors).toEqual({ "conn-gh": true });
+  });
+
+  test("model: a fixed model can replace Automático; it is what gets created and reviewed", async () => {
+    const state = await open();
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    const sonnet = screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ });
+    await click(sonnet);
+    expect(sonnet.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    await proceed();
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Sonnet 5.5 ·");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
+  });
+
+  test("plan: with no key, Claude Code on a computer can think; the agent moves there and thinks with it", async () => {
+    const plan = (kind: "claude_code" | "codex", available: boolean) => ({
+      kind,
+      available,
+      ...(available ? {} : { reason: "not_installed" as const }),
+      experimental: kind === "codex",
+      models: [],
+      defaultModel: null,
+    });
+    const state = seedState();
+    state.credentials = [];
+    state.platformKey = false;
+    state.brainMachines = [
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    // No key: the API can't think, and Codex isn't on any computer.
+    await proceed();
+    expect(screen().getAllByText("Escolha um modelo que o workspace pode usar.").length).toBeGreaterThan(0);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Codex.*Indisponível/ })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
+    await click(claude);
+    expect(claude.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    await proceed();
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Code");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, agentId, "machine_mini"]);
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code" },
+    ]);
   });
 
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
@@ -313,6 +435,8 @@ describe("Criar agente: what gets created", () => {
         createdAt: new Date().toISOString(),
         offActions: [],
         askActions: [],
+        aliases: [],
+        defaultFrom: null,
         agents: [],
       },
     ];
@@ -351,7 +475,7 @@ describe("Criar agente: what gets created", () => {
     expect(title()).toBe("Onde trabalha e com quem");
     await click(screen().getByRole("checkbox", { name: "#general" }));
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /^João/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
     expect(
       within(audience)
         .getByRole("radio", { name: /^Todos do workspace/ })
@@ -376,7 +500,7 @@ describe("Criar agente: what gets created", () => {
     await startAs("QA");
     await proceed(3);
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
     await click(within(audience).getByRole("radio", { name: /^Só o responsável/ }));
     await click(continueButton());
     expect(title()).toBe("Onde trabalha e com quem");
@@ -401,7 +525,8 @@ describe("Criar agente: what gets created", () => {
     expect(screen().getByRole("link", { name: "Abrir perfil" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/agents/${agentId}`,
     );
-    expect(document.body.textContent).toContain("Avisos com Walter");
+    // Title, lead and the buttons: no cards after them.
+    expect(document.querySelector(".newag__born")?.nextElementSibling).toBeNull();
     // Every step is done; none can be reopened.
     expect(railStep("Papel").disabled).toBe(true);
     await click(screen().getByRole("button", { name: "Criar outro agente" }));
@@ -431,7 +556,7 @@ describe("new-agent rules", () => {
     expect(readBudget("dez").invalid).toBe(true);
   });
 
-  test("presets: levels by catalog connector, channels by name, the model family when usable", () => {
+  test("presets: levels by catalog connector, channels by name", () => {
     const items = [
       { id: "c1", def: { id: "github" } },
       { id: "c2", def: { id: "notion" } },
@@ -448,15 +573,6 @@ describe("new-agent rules", () => {
     expect(presetChannels("dev", chans)).toEqual(["1"]);
     expect(presetChannels("ops", chans)).toEqual(["3"]);
     expect(presetChannels("custom", chans)).toEqual([]);
-    const models = [
-      { id: "claude-sonnet-5-5", label: "", provider: "anthropic", inputUsdPerMTok: 2, outputUsdPerMTok: 10 },
-      { id: "claude-haiku-5-5", label: "", provider: "anthropic", inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.5 },
-      { id: "gpt-5", label: "", provider: "openai", inputUsdPerMTok: 1, outputUsdPerMTok: 10 },
-    ];
-    const anthropic = (m: { provider: string }) => m.provider === "anthropic";
-    expect(presetModel("haiku", models, anthropic)).toBe("claude-haiku-5-5");
-    expect(presetModel("opus", models, anthropic, "claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
-    expect(presetModel("sonnet", models, (m) => m.provider === "openai")).toBe("gpt-5");
   });
 
   test("roles: each one in exactly one group, with its texts in both languages and its own starter name", () => {
@@ -477,9 +593,8 @@ describe("new-agent rules", () => {
       expect(new Set(agents).size).toBe(agents.length);
       for (const g of ROLE_GROUPS) expect((dict.newAgent.roleGroups as Record<string, string>)[g.id]).toBeTruthy();
     }
-    // Money starts read-only; the assistant does volume work on the cheaper family.
+    // Money starts read-only.
     expect(ROLE_PRESETS.finance.levels).toEqual({ stripe: "read", paypal: "read", square: "read", drive: "read" });
-    expect(ROLE_PRESETS.assistant.model).toBe("haiku");
   });
 
   test("what each step needs", () => {

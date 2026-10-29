@@ -555,6 +555,15 @@ describe("MIME → MailMessage", () => {
     expect(message.attachments).toEqual([]);
   });
 
+  test("where the server delivered it: Delivered-To (repeated) and X-Original-To, lowercase", async () => {
+    const raw = crlf(
+      `Delivered-To: Suporte@Acme.com\nDelivered-To: ana@icloud.com\nX-Original-To: <suporte@acme.com>\n${PLAIN}`,
+    );
+    const message = await parseMessage(Buffer.from(raw), meta(6, { type: "text/plain" }), "INBOX", 7);
+    expect(message.deliveredTo).toEqual(["suporte@acme.com", "ana@icloud.com"]);
+    expect((await parseMessage(Buffer.from(PLAIN), meta(5), "INBOX", 7)).deliveredTo).toBeUndefined();
+  });
+
   test("HTML only → text", async () => {
     const message = await parseMessage(Buffer.from(HTML_ONLY), meta(1, { type: "text/html" }), "INBOX", 7);
     expect(message.text).toContain("Hello world");

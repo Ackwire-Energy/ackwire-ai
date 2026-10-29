@@ -1,22 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createAnthropicProvider, ProviderError } from "../src";
-
-const sse = (events: Record<string, unknown>[], tail?: string) =>
-  events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join("") + (tail ?? "");
-
-/** A fetch that records the request body and answers with a scripted SSE stream. No network. */
-function scripted(body: string, status = 200) {
-  const requests: { url: string; body: Record<string, unknown>; headers: Headers }[] = [];
-  const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
-    requests.push({
-      url: String(url),
-      body: JSON.parse(String(init?.body ?? "{}")),
-      headers: new Headers(init?.headers),
-    });
-    return new Response(body, { status, headers: { "content-type": "text/event-stream" } });
-  }) as unknown as typeof fetch;
-  return { fetcher, requests };
-}
+import { scripted, sse } from "./scripted";
 
 const start = (input: number) => ({
   type: "message_start",
@@ -146,6 +130,29 @@ describe("Anthropic adapter (scripted transport)", () => {
       outputChars: 7,
     });
   });
+});
+
+test("effort none: Haiku 5.5 thinks not at all at low effort; a model that can't stop thinking gets low", async () => {
+  const done = sse([
+    start(1),
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" },
+  ]);
+  const sent = async (model: string) => {
+    const { fetcher, requests } = scripted(done);
+    const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+    await provider.stream(
+      { model, system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 512, effort: "none" },
+      { apiKey: "k", onDelta: () => {} },
+    );
+    return requests[0]?.body as Record<string, unknown>;
+  };
+  const haiku = await sent("claude-haiku-5-5");
+  expect(haiku.thinking).toEqual({ type: "disabled" });
+  expect(haiku.output_config).toEqual({ effort: "low" });
+  const sonnet = await sent("claude-sonnet-5-5");
+  expect(sonnet).not.toHaveProperty("thinking");
+  expect(sonnet.output_config).toEqual({ effort: "low" });
 });
 
 test("a workspace id is sent as the anthropic-workspace-id header", async () => {

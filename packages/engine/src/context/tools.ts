@@ -4,6 +4,7 @@ import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
+import { personBehindCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
@@ -26,11 +27,11 @@ export function itemLabel(item: Pick<ContextItem, "kind" | "verified" | "trust">
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /**
- * Built-in tools over the organization's context (D9 layers 2–4, D13), all
+ * Built-in tools over the organization's context (ADR 0017), all
  * through the Tool Gateway: `search_context`, `get_summary`, `expand`
  * (`context:read`), `remember`, `forget` (`memory:write`). Search and
  * expand only see the run's channel and the agent's public channels,
- * resolved at call time (D11): other private channels and DMs stay out.
+ * resolved at call time (ADR 0017): other private channels and DMs stay out.
  */
 export function createContextToolSource(deps: ContextDeps): ToolSource {
   const visible = (ctx: { db: Database; orgId: string; agentId: string; channelId: string }) =>
@@ -40,7 +41,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "search_context",
       description:
-        "Search this organization's messages, summaries, decisions, facts and lessons that you can see. Use it before answering questions about past work.",
+        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, and what the team did outside (emails sent, pull requests opened, posts: kind `action`). Use it before answering questions about past work.",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -50,7 +51,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             type: "array",
             items: {
               type: "string",
-              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki"],
+              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki", "action"],
             },
           },
           limit: { type: "integer", minimum: 1, maximum: 20 },
@@ -370,13 +371,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
 }
 
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
-async function personRequester(ctx: ToolContext): Promise<string | null> {
-  const [trigger] = await ctx.db
-    .select({ authorType: messages.authorType, authorUserId: messages.authorUserId })
-    .from(messages)
-    .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
-  return trigger?.authorType === "person" ? trigger.authorUserId : null;
-}
+/** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
+const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
 
 const notRequested = {
   content: "Memory changes need a person's request in this conversation; nothing was changed.",
@@ -481,7 +477,7 @@ async function withLinked(db: Database, base: SQL | undefined, hits: ContextItem
 }
 
 /**
- * What goes into a run's prompt from memory (D9 layers 3–4), within a
+ * What goes into a run's prompt from memory (ADR 0017), within a
  * character budget: pinned items always, then the agent's own lessons and
  * notes, shared lessons, and items retrieved for the trigger message
  * (hybrid search + relevance + recency), each top hit followed by the
@@ -570,7 +566,7 @@ export async function retrieveForRun(
   const lines: string[] = [];
   let used = 0;
   for (const item of picked) {
-    // Context on demand (D65): a long item goes in cut short; `expand` opens it in full by its id.
+    // Context on demand (ADR 0043): a long item goes in cut short; `expand` opens it in full by its id.
     const room = item.pinned ? 600 : MEMORY_ITEM_CHARS;
     const content = item.content.replace(/\s+/g, " ");
     const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${content.slice(0, room)}… [more with expand]` : content} (id ${item.id})`;

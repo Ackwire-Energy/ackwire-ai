@@ -20,7 +20,7 @@ export function pushLocale(locale: string | null | undefined): PushLocale {
 }
 
 export interface PushTextInput {
-  /** Notification kind (D46). */
+  /** Notification kind. */
   kind: string;
   /** In "Esperando você". */
   waiting: boolean;
@@ -35,6 +35,10 @@ export interface PushTextInput {
   text?: string | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
+  /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
+  routine?: string | null;
+  /** `browser_handoff`: the agent's screen it is on, when not its browser. */
+  screen?: string | null;
 }
 
 interface Strings {
@@ -43,6 +47,7 @@ interface Strings {
   approvalTitle: (actor: string) => string;
   approvalBody: string;
   approvalHighRisk: (what: string) => string;
+  approvalFromRoutine: (routine: string) => string;
   questionTitle: (actor: string) => string;
   questionBody: string;
   forumTitle: string;
@@ -51,20 +56,32 @@ interface Strings {
   missionStoppedTitle: string;
   routineFailedTitle: string;
   routineFailedBody: string;
+  routinePausedTitle: string;
+  routinePausedBody: string;
+  routineStalledTitle: string;
+  routineStalledBody: (computer: string) => string;
   machineConnectedTitle: string;
+  computerReadyTitle: string;
+  computerReadyBody: string;
   browserHandoffTitle: (actor: string) => string;
   browserHandoffBody: string;
+  desktopHandoffTitle: (actor: string) => string;
+  desktopHandoffBody: string;
+  joinRequestTitle: (name: string, org: string) => string;
+  joinRequestBody: string;
   waitingTitle: string;
   openBody: string;
 }
 
-const STRINGS: Record<PushLocale, Strings> = {
+/** Exported for the test that reads every text as a phone shows it. */
+export const PUSH_STRINGS: Record<PushLocale, Strings> = {
   "pt-BR": {
     someone: "Alguém",
     anAgent: "Um agente",
     approvalTitle: (a) => `${a} precisa da sua aprovação`,
     approvalBody: "Toque para ver o pedido.",
     approvalHighRisk: (what) => `${what}. Abra o app para revisar com calma.`,
+    approvalFromRoutine: (routine) => `Rotina «${routine}»`,
     questionTitle: (a) => `${a} tem uma pergunta para você`,
     questionBody: "Toque para responder.",
     forumTitle: "Sua vez de opinar",
@@ -73,9 +90,19 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
+    routinePausedTitle: "Uma rotina foi pausada",
+    routinePausedBody: "Toque para ver o motivo.",
+    routineStalledTitle: "Uma rotina está esperando o computador",
+    routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
     machineConnectedTitle: "Um computador novo entrou na organização",
+    computerReadyTitle: "O computador do seu workspace está pronto",
+    computerReadyBody: "Abra a página de um agente para ver ao vivo.",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
+    desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
+    desktopHandoffBody: "Abra o agentes.chat num notebook para ajudar.",
+    joinRequestTitle: (name, org) => `${name} pede para entrar na ${org}`,
+    joinRequestBody: "Toque para aprovar ou recusar.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
   },
@@ -85,6 +112,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     approvalTitle: (a) => `${a} needs your approval`,
     approvalBody: "Tap to see the request.",
     approvalHighRisk: (what) => `${what}. Open the app to review it.`,
+    approvalFromRoutine: (routine) => `Routine «${routine}»`,
     questionTitle: (a) => `${a} has a question for you`,
     questionBody: "Tap to answer.",
     forumTitle: "Your turn to weigh in",
@@ -93,9 +121,19 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
+    routinePausedTitle: "A routine was paused",
+    routinePausedBody: "Tap to see why.",
+    routineStalledTitle: "A routine is waiting for its computer",
+    routineStalledBody: (c) => `It runs when ${c} is back.`,
     machineConnectedTitle: "A new computer joined the organization",
+    computerReadyTitle: "Your workspace's computer is ready",
+    computerReadyBody: "Open an agent's page to see it live.",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
+    desktopHandoffTitle: (a) => `${a} needs you on the computer`,
+    desktopHandoffBody: "Open agentes.chat on a laptop to help.",
+    joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
+    joinRequestBody: "Tap to approve or deny.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
   },
@@ -108,7 +146,7 @@ const clip = (s: string, max: number) => {
 
 /** Title and body of one push, in the device's language. */
 export function renderPush(locale: PushLocale, input: PushTextInput): { title: string; body: string } {
-  const s = STRINGS[locale];
+  const s = PUSH_STRINGS[locale];
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
   const text = input.text?.trim() || "";
   const what = input.title?.trim() || input.label?.trim() || "";
@@ -117,9 +155,14 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     body: clip(body, PUSH_BODY_MAX),
   });
   switch (input.kind) {
-    case "approval":
-      if (input.highRisk) return out(s.approvalTitle(actor), s.approvalHighRisk(clip(what || s.approvalBody, 120)));
-      return out(s.approvalTitle(actor), what || s.approvalBody);
+    case "approval": {
+      // Asked by a routine while nobody watched: its name leads, so the person knows where it comes from.
+      const routine = input.routine?.trim();
+      const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);
+      if (input.highRisk)
+        return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(what || s.approvalBody, 120))));
+      return out(s.approvalTitle(actor), from(what || s.approvalBody));
+    }
     case "agent_question":
       return out(s.questionTitle(actor), text || s.questionBody);
     case "forum_turn":
@@ -133,12 +176,25 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.missionStoppedTitle, what || s.openBody);
     case "routine_failed":
       return out(s.routineFailedTitle, what || s.routineFailedBody);
+    case "routine_paused":
+      // Its name only: the app says why, in the person's words.
+      return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "routine_stalled":
+      // The computer's name (what the person calls it), else the routine's.
+      return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
+    case "computer_ready":
+      return out(s.computerReadyTitle, s.computerReadyBody);
     case "browser_handoff":
-      // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste").
+      // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste"). A desktop doesn't
+      // open on the phone: its body says where it does.
+      if (input.screen === "desktop") return out(s.desktopHandoffTitle(actor), text || s.desktopHandoffBody);
       return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
+    case "join_request":
+      // The name the person typed, never their note: approving happens in the app, never from the notification.
+      return out(s.joinRequestTitle(input.title?.trim() || s.someone, input.label?.trim() || ""), s.joinRequestBody);
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

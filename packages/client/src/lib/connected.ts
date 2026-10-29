@@ -3,6 +3,13 @@ import type { Connection, ConnectorDef, CustomServer } from "../api/types";
 import { exposedTools, sameServer, toolsToReview } from "./custom-tools";
 import { connectorName } from "./scopes";
 
+/** A one-color mark the web app serves, drawn in its brand color. Only a file of ours by name, never any URL. */
+export const CONNECTOR_MARK = /^\/connectors\/[a-z0-9-]+\.svg$/;
+/** A mark in its maker's colors the web app serves, drawn as it is. */
+export const OWN_MARK = /^\/brands\/[a-z0-9-]+\.svg$/;
+/** A server's own icon, as the backend keeps and serves it behind the session (never the server's URL). */
+export const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
+
 /**
  * One row of "Conectados", whatever the kind: a catalog connection (GitHub
  * with our scopes) or an MCP server connected by address (a one-click
@@ -15,6 +22,8 @@ export interface ConnectedItem {
   label: string;
   /** The catalog entry (also the preset a custom server came from): icon, scopes. */
   def: ConnectorDef | null;
+  /** A server's own icon (`/api/app/connector-icons/…`), shown when the catalog has none for it. */
+  image?: string | null;
   /** "acme" (the account), or the server's host. */
   account: string | null;
   createdAt: string;
@@ -42,6 +51,7 @@ export function fromConnection(c: Connection, catalog: ConnectorDef[]): Connecte
     custom: false,
     label: def?.label ?? c.label,
     def,
+    image: null,
     account: c.accountLabel,
     createdAt: c.createdAt,
     tools: def?.tools.length ?? 0,
@@ -58,6 +68,7 @@ export function fromServer(s: CustomServer, catalog: ConnectorDef[]): ConnectedI
     custom: true,
     label: s.label,
     def: catalog.find((d) => d.kind === "remote_mcp" && sameServer(d.serverUrl, s.serverUrl)) ?? null,
+    image: s.iconUrl ?? null,
     account: host(s.serverUrl),
     createdAt: s.createdAt,
     tools: exposedTools(s).length,

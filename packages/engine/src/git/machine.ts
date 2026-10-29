@@ -9,15 +9,15 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { activeConnections } from "../connectors/connections";
 import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machine-hub";
-import { MachineOfflineError, MachinePausedError } from "../machines";
+import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { grantedScopeKeys } from "../tools/scopes";
-import { GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
+import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
 
 /**
- * Git on a connected machine through our proxy (ADR 0024 addendum, D35):
+ * Git on a connected machine through our proxy (ADR 0024 addendum):
  * the server issues the proxy credential for that machine and agent, and the
  * runner clones or updates the agent's checkouts in its own folder
  * (`repos/<owner>/<name>`) with `git.sync` (protocol 11). Only our
@@ -40,7 +40,7 @@ export const PRE_TURN_SYNC_SECONDS = 20;
 /** Why git can't run on the machine now (said to the agent), or null. */
 export function machineGitUnavailable(status: MachineStatus | null, orgId: string): Error | null {
   if (!status || status.orgId !== orgId) {
-    return new Error("Your connected computer was removed; ask an admin or your owner to choose another one.");
+    return new Error(REMOVED_COMPUTER_MESSAGE);
   }
   if (!status.online) return new MachineOfflineError(status.name);
   if (status.paused) return new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
@@ -85,7 +85,7 @@ export async function machineGitSetup(
   });
   return {
     proxy: { base: gitProxyBase(deps.git.publicUrl, orgId, connection.id), token },
-    author: { name: `${agent.name} (agentes)`, email: `${agent.handle}@agents.agentes.chat` },
+    author: { name: `${agent.name} (agentes)`, email: agentCommitEmail(deps.git.publicUrl, agent.handle) },
     agent: { id: agent.id, handle: agent.handle, name: agent.name },
   };
 }

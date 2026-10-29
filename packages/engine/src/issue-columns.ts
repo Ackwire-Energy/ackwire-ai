@@ -10,7 +10,7 @@ const { issueColumns, issues, issueActivity } = schema;
 /** The stages a board column can sit in, in board order (canceled stays out of the board). */
 export const BOARD_STAGES: readonly IssueStatus[] = ["todo", "in_progress", "in_review", "done", "canceled"];
 
-/** A board column (D55). `name` null: the stage's own name, in the reader's language. */
+/** A board column. `name` null: the stage's own name, in the reader's language. */
 export interface IssueColumnView {
   id: string;
   stage: IssueStatus;

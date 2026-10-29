@@ -1,12 +1,14 @@
 import {
   activeRunsIn,
   addChannelMember,
+  answerNow,
   createChannel,
   joinChannel,
   listChannelMembers,
   listChannels,
   listMessages,
   listWorkingRuns,
+  openConsultationsIn,
   postPersonMessage,
   requireChannelAccess,
 } from "@agenteschat/engine";
@@ -14,6 +16,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
+  aiStatusDeps,
   body,
   createAppRouter,
   errors,
@@ -96,6 +99,9 @@ export function chatRoutes(deps: AppDeps) {
                     .openapi({ description: "What it works on: the thread's title, else its first message (≤ 80)." }),
                   pendingMessageIds: z.array(z.uuid()).openapi({
                     description: "Messages sent to it while it works that it hasn't read yet.",
+                  }),
+                  background: z.boolean().openapi({
+                    description: "A routine's work in the background: people's messages never go to it.",
                   }),
                 })
                 .openapi("WorkingRun"),
@@ -238,10 +244,30 @@ export function chatRoutes(deps: AppDeps) {
                 createdAt: z.string(),
                 pendingMessageIds: z.array(z.uuid()).openapi({
                   description:
-                    "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read.",
+                    "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read (or handed on: `agent.run.redispatched`).",
+                }),
+                background: z.boolean().openapi({
+                  description: "A routine's work in the background: people's messages never go to it.",
                 }),
               }),
             ),
+            consults: z
+              .array(
+                z.object({
+                  runId: z
+                    .uuid()
+                    .openapi({ description: "The asking run (it may have ended: the answer wakes the agent)." }),
+                  agentId: z.uuid(),
+                  consultedAgentId: z.uuid(),
+                  channelId: z.uuid(),
+                  threadId: z.uuid().nullable(),
+                  since: z.string(),
+                }),
+              )
+              .openapi({
+                description:
+                  "Questions agents asked from here (`ask_agent`) still without an answer: the working line says one agent is asking another until `agent.consulted`.",
+              }),
           }),
         ),
         ...errors,
@@ -250,13 +276,17 @@ export function chatRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
       await requireChannelAccess(db, c.get("user").id, orgId, channelId);
-      const runs = await activeRunsIn(db, orgId, channelId);
+      const [runs, consults] = await Promise.all([
+        activeRunsIn(db, orgId, channelId),
+        openConsultationsIn(db, orgId, channelId),
+      ]);
       return c.json(
         {
           runs: runs.map((r) => ({
             ...r,
             status: r.status as "queued" | "running" | "waiting_approval" | "waiting_input",
           })),
+          consults: consults.map((q) => ({ ...q, since: q.since.toISOString() })),
         },
         200,
       );
@@ -351,7 +381,7 @@ export function chatRoutes(deps: AppDeps) {
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
       const started = performance.now();
       const message = await postPersonMessage(
-        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge },
+        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
         user.id,
         orgId,
         channelId,
@@ -362,6 +392,39 @@ export function chatRoutes(deps: AppDeps) {
       // post → `message.created` published (the commit and the event happen inside postPersonMessage).
       c.header("server-timing", `created;dur=${(performance.now() - started).toFixed(1)}`);
       return c.json(message, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/messages/{messageId}/answer-now",
+      tags,
+      security,
+      summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
+      description:
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (a personal plan answers only its owner). Pressed again, it returns the runs that answer it.",
+      request: { params: OrgParams.extend({ messageId: z.uuid() }) },
+      responses: {
+        200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),
+        429: errorResponse("Too many requests"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const user = c.get("user");
+      // It sends the message again, in effect: the same limit as posting.
+      const limit = await adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      const result = await answerNow(
+        { ...aiStatusDeps(deps), db, pubsub: adapters.pubsub, router: deps.extras?.router ?? null },
+        user.id,
+        orgId,
+        messageId,
+      );
+      deps.wakeWorkers?.();
+      return c.json(result, 200);
     },
   );
 

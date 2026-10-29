@@ -1,4 +1,5 @@
 import { useMissionList, useNotifications } from "@agenteschat/client";
+import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import { router } from "expo-router";
 import { useMemo } from "react";
@@ -35,8 +36,12 @@ import {
   waitingVerbKey,
 } from "./waiting";
 
-/** Everything waiting on you, in the strip's order (requests, missions, questions). */
+/**
+ * Everything waiting on you, in the strip's order (requests, missions, questions). A request's title is in
+ * words ("Salvar um rascunho de resposta para…", "Ver stack trace do evento"), never the tool's raw name.
+ */
 export function useWaitingItems(): { items: WaitingItem[]; refetch: () => Promise<unknown> } {
+  const { t } = useTranslation();
   const orgId = useOrgId();
   const approvals = useWaitingApprovals();
   const missions = useMissionList(orgId, { status: "waiting_you" });
@@ -44,11 +49,11 @@ export function useWaitingItems(): { items: WaitingItem[]; refetch: () => Promis
   const items = useMemo(
     () =>
       waitingItems({
-        approvals,
+        approvals: approvals.map((a) => ({ ...a, title: approvalTitle(t, a) })),
         missions: missionsWaiting(missions.data?.missions ?? []),
         questions: openQuestions(inbox.data?.pages.flatMap((p) => p.items) ?? []),
       }),
-    [approvals, missions.data, inbox.data],
+    [approvals, missions.data, inbox.data, t],
   );
   return { items, refetch: () => Promise.allSettled([missions.refetch(), inbox.refetch()]) };
 }
@@ -58,11 +63,12 @@ const openWaitingActivity = () =>
   router.navigate({ pathname: "/activity", params: { filter: "waiting", at: String(Date.now()) } });
 
 /**
- * "Esperando você" (MobileRefinos.html, B + C) on top of Conversas and Threads. Closed: a dark ink strip, full
+ * "Esperando você" on top of Conversas and Threads. Closed: a dark ink strip, full
  * width, like a live activity: the first item's agent (moving), "Theo precisa do seu ok · expira em 46 min" and
  * the count, with two copies of the strip peeking out under it while more wait. Tapped, it springs
  * open into the card: who asks and the kind, the title, the fuse, Revisar, and "e mais N esperando você"
- * (Atividade on Esperando). Tapping the strip again, or scrolling the list (`open` is the screen's), closes it.
+ * (Atividade on Esperando). Tapping the card opens the request, like Revisar; scrolling the list (`open` is the
+ * screen's) closes it.
  * Nothing waiting: nothing.
  */
 export function WaitingStrip({
@@ -93,13 +99,7 @@ export function WaitingStrip({
       >
         {open ? (
           <Animated.View key="card" {...fade}>
-            <WaitingCard
-              item={first}
-              rest={stack.rest}
-              faces={stack.faces}
-              stacked={stack.stacked}
-              onClose={() => onOpenChange(false)}
-            />
+            <WaitingCard item={first} rest={stack.rest} faces={stack.faces} stacked={stack.stacked} />
           </Animated.View>
         ) : (
           <Animated.View key="pill" {...fade}>
@@ -187,13 +187,11 @@ function WaitingCard({
   rest,
   faces,
   stacked,
-  onClose,
 }: {
   item: WaitingItem;
   rest: number;
   faces: string[];
   stacked: boolean;
-  onClose: () => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -215,11 +213,10 @@ function WaitingCard({
       ) : null}
       <View style={[styles.card, surface]}>
         <Pressable
-          onPress={onClose}
+          onPress={review}
           accessibilityRole="button"
           accessibilityLabel={line}
-          accessibilityState={{ expanded: true }}
-          style={styles.cardTap}
+          style={({ pressed }) => [styles.cardTap, pressed && styles.pressed]}
         >
           <View style={styles.hd}>
             <AgentFace agentId={item.agentId} size={22} />

@@ -1,11 +1,13 @@
 import { resources as shared } from "@agenteschat/i18n";
+import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import i18next, { type i18n as I18n } from "i18next";
 import { initReactI18next } from "react-i18next";
+import type { Platform } from "../control/platform";
 import { desktopEn } from "./keys.en";
-import { desktopPtBR } from "./keys.pt-BR";
+import { type DesktopTranslations, desktopPtBR } from "./keys.pt-BR";
 
+export type { AppLocale };
 /** pt-BR is the default, English the alternative (same as the web and the phone). */
-export type AppLocale = "pt-BR" | "en";
 export const DEFAULT_LOCALE: AppLocale = "pt-BR";
 
 export const DESKTOP_STRINGS: Record<AppLocale, object> = { "pt-BR": desktopPtBR, en: desktopEn };
@@ -27,12 +29,7 @@ export function withDesktopKeys(resources: Record<string, Record<string, object>
 
 /** The Mac's languages (most preferred first) mapped to ours: "pt-PT" → pt-BR, "en-GB" → en, else pt-BR. */
 export function pickLocale(tags: readonly (string | null | undefined)[]): AppLocale {
-  for (const tag of tags) {
-    const t = (tag ?? "").toLowerCase();
-    if (t.startsWith("pt")) return "pt-BR";
-    if (t.startsWith("en")) return "en";
-  }
-  return DEFAULT_LOCALE;
+  return appLocale(tags) ?? DEFAULT_LOCALE;
 }
 
 export function systemLocale(): AppLocale {
@@ -40,13 +37,18 @@ export function systemLocale(): AppLocale {
   return pickLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
 }
 
-export function createDesktopI18n(lng: AppLocale = systemLocale()): I18n {
+/** This computer's name in `lng` ("Mac", "PC", "computador"). */
+export const deviceName = (lng: AppLocale, platform: Platform) =>
+  (DESKTOP_STRINGS[lng] as DesktopTranslations).device[platform];
+
+/** `{{device}}` is filled in for every string, so callers never pass it. */
+export function createDesktopI18n(lng: AppLocale = systemLocale(), platform: Platform = "mac"): I18n {
   const instance = i18next.createInstance();
   void instance.use(initReactI18next).init({
     resources: withDesktopKeys(shared),
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    interpolation: { escapeValue: false, defaultVariables: { device: deviceName(lng, platform) } },
     initAsync: false,
     returnNull: false,
   });

@@ -4,6 +4,7 @@ import { caches } from "./cache";
 import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { isRoutineRoomKey } from "./routine-brief";
 
 const { messages, channelMembers, channels, contextItems } = schema;
 
@@ -149,7 +150,7 @@ export function registerReindexSource(kind: SearchKind, list: (db: Database, org
   extraSources.set(kind, list);
 }
 
-/** Channels an agent can see: the ones it belongs to (resolved at query time, D11). */
+/** Channels an agent can see: the ones it belongs to (resolved at query time, ADR 0017). */
 export async function agentVisibleChannels(db: Database, orgId: string, agentId: string): Promise<string[]> {
   return caches.scopes.getOrLoad(`${orgId}:${agentId}:visible`, () => loadAgentChannels(db, orgId, agentId)) as Promise<
     string[]
@@ -169,18 +170,27 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
  * Channels an agent's explicit search (`search_context`, `expand`) may read:
  * its public channels plus the run's own channel. Other private channels and
  * DMs it belongs to stay out, so a question in one place can't pull private
- * conversations from another.
+ * conversations from another. A routine's room (ADR 0053 §4) is read only by
+ * that routine's own runs: never by another routine's run or a conversation's.
  */
 export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
   const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
     db
-      .select({ id: channelMembers.channelId, visibility: channels.visibility, kind: channels.kind })
+      .select({
+        id: channelMembers.channelId,
+        visibility: channels.visibility,
+        kind: channels.kind,
+        dmKey: channels.dmKey,
+      })
       .from(channelMembers)
       .innerJoin(channels, eq(channels.id, channelMembers.channelId))
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
-  )) as { id: string; visibility: string; kind: string }[];
+  )) as { id: string; visibility: string; kind: string; dmKey: string | null }[];
   return rows
-    .filter((r) => r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel"))
+    .filter(
+      (r) =>
+        r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
+    )
     .map((r) => r.id);
 }
 
@@ -238,7 +248,7 @@ export interface HitSource {
   author: { type: "person" | "agent"; id: string; name: string } | null;
 }
 
-/** Adds where a message hit lives and who wrote it, so the app can jump to it. */
+/** Adds where a message hit lives and who wrote it (an action hit: the agent that did it), so the app can jump to it. */
 export async function describeHits<H extends SearchHit>(
   db: Database,
   orgId: string,
@@ -262,7 +272,26 @@ export async function describeHits<H extends SearchHit>(
         .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids)))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
+  // The team's outside actions (ADR 0064): the agent that did it.
+  const actionIds = hits.filter((h) => h.kind === "action").map((h) => h.sourceId);
+  const actionRows = actionIds.length
+    ? await db
+        .select({ id: schema.teamActions.id, agentId: schema.teamActions.agentId, agentName: schema.agents.name })
+        .from(schema.teamActions)
+        .leftJoin(schema.agents, eq(schema.agents.id, schema.teamActions.agentId))
+        .where(and(eq(schema.teamActions.orgId, orgId), inArray(schema.teamActions.id, actionIds)))
+    : [];
+  const actionsById = new Map(actionRows.map((r) => [r.id, r]));
   return hits.map((h) => {
+    const a = h.kind === "action" ? actionsById.get(h.sourceId) : undefined;
+    if (a) {
+      return {
+        ...h,
+        messageId: null,
+        threadId: null,
+        author: { type: "agent" as const, id: a.agentId, name: a.agentName ?? "" },
+      };
+    }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
     const author =

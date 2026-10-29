@@ -1,0 +1,1667 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "agentes.chat operator API",
+    "version": "test",
+    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056)."
+  },
+  "servers": [
+    {
+      "url": "/api/operator/v1"
+    }
+  ],
+  "security": [
+    {
+      "operator": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "operator": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "This server's `OPERATOR_API_TOKEN`."
+      }
+    },
+    "schemas": {
+      "OperatorHealth": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "version": {
+            "type": "string"
+          },
+          "botCheck": {
+            "$ref": "#/components/schemas/OperatorBotCheck"
+          }
+        },
+        "required": ["ok", "version", "botCheck"]
+      },
+      "OperatorBotCheck": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["off", "ok", "unreachable", "secret_refused"],
+            "description": "`off` without both Turnstile keys. While `unreachable` (this server can't reach Cloudflare) or `secret_refused` (Cloudflare refuses `TURNSTILE_SECRET_KEY`), every request goes through unchecked."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it took this state."
+          },
+          "blocked": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Networks refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`), each counted once: an IPv4 address, or an IPv6 /64. Any client can claim its page couldn't load it, so read it beside `passed`."
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tokens Cloudflare passed in the last 10 minutes. When the widget is down for everyone, `blocked` rises while this falls. Clients claiming it is down don't move it."
+          },
+          "testing": {
+            "type": "boolean",
+            "description": "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets. They refuse real tokens, and the one that passes takes a public dummy token from anyone. Right only on a test server."
+          }
+        },
+        "required": ["state", "since", "blocked", "passed", "testing"],
+        "description": "The bot check before public forms (ADR 0075)."
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "invalid_request",
+                "description": "Stable: the app translates it."
+              },
+              "message": {
+                "type": "string",
+                "example": "name: Required",
+                "description": "English fallback."
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Values for the translated message (names, limits…)."
+              }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["error"]
+      },
+      "OperatorOrgPage": {
+        "type": "object",
+        "properties": {
+          "orgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrgSummary"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`cursor` for the next page; null on the last one."
+          }
+        },
+        "required": ["orgs", "next"]
+      },
+      "OperatorOrgSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/OperatorStandingState"
+          },
+          "members": {
+            "type": "integer"
+          },
+          "agents": {
+            "type": "integer",
+            "description": "Not archived."
+          }
+        },
+        "required": ["id", "name", "createdAt", "standing", "members", "agents"]
+      },
+      "OperatorStandingState": {
+        "type": "string",
+        "enum": ["active", "hold", "suspended"],
+        "description": "`active`; `hold`: its agents stop (no model, computer, routine or invitation), people still read and write; `suspended`: the workspace refuses everything to everyone, and its runs and tasks stop at once."
+      },
+      "OperatorOrg": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/OperatorStanding"
+          },
+          "admins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/components/schemas/Role"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the account was created."
+                },
+                "lastSeenAt": {
+                  "type": ["string", "null"],
+                  "description": "Last time they had this workspace open."
+                }
+              },
+              "required": ["userId", "email", "name", "role", "createdAt", "lastSeenAt"]
+            },
+            "description": "Owners and admins, owners first."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "integer"
+              },
+              "agents": {
+                "type": "integer",
+                "description": "Not archived."
+              },
+              "channels": {
+                "type": "integer",
+                "description": "Channels and forums, not archived; no direct messages."
+              },
+              "machines": {
+                "type": "integer",
+                "description": "Connected computers."
+              },
+              "invitations": {
+                "type": "integer",
+                "description": "Pending: neither accepted nor expired."
+              }
+            },
+            "required": ["members", "agents", "channels", "machines", "invitations"]
+          }
+        },
+        "required": ["id", "name", "createdAt", "standing", "admins", "counts"]
+      },
+      "OperatorStanding": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/OperatorStandingState"
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "The operator's own note: never shown to the workspace."
+          },
+          "notice": {
+            "$ref": "#/components/schemas/OperatorStandingNotice"
+          },
+          "changedAt": {
+            "type": ["string", "null"],
+            "description": "When `state` last changed; null: never."
+          }
+        },
+        "required": ["state", "reason", "note", "notice", "changedAt"]
+      },
+      "OperatorStandingNotice": {
+        "type": "string",
+        "enum": ["shown", "silent"],
+        "description": "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it. Use `silent` only when an authority's order forbids telling them."
+      },
+      "Role": {
+        "type": "string",
+        "enum": ["owner", "admin", "member"]
+      },
+      "OperatorUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "blockedAt": {
+            "type": ["string", "null"],
+            "description": "Since when it is blocked (`PUT /users/{userId}/block`)."
+          },
+          "blockedReason": {
+            "type": ["string", "null"]
+          },
+          "orgs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orgId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/components/schemas/Role"
+                },
+                "joinedAt": {
+                  "type": "string"
+                },
+                "lastSeenAt": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["orgId", "name", "role", "joinedAt", "lastSeenAt"]
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {
+                  "type": ["string", "null"]
+                },
+                "userAgent": {
+                  "type": ["string", "null"]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": ["ip", "userAgent", "createdAt"]
+            },
+            "description": "Its 10 newest sessions on record, newest first. Signing out deletes a session."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "emailVerified",
+          "createdAt",
+          "blockedAt",
+          "blockedReason",
+          "orgs",
+          "sessions"
+        ]
+      },
+      "OperatorAgentHold": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "boolean"
+          },
+          "heldAt": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["held", "heldAt", "reason"]
+      },
+      "OperatorUserBlock": {
+        "type": "object",
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          },
+          "blockedAt": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "sessionsRevoked": {
+            "type": "integer",
+            "description": "Sessions deleted by this call (0 when unblocking)."
+          }
+        },
+        "required": ["blocked", "blockedAt", "reason", "sessionsRevoked"]
+      },
+      "OperatorEventPage": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorEvent"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`after` for the next call; the same value when there was nothing new, null only before any event."
+          }
+        },
+        "required": ["events", "next"]
+      },
+      "OperatorEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+          },
+          "orgId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "userId": {
+            "type": ["string", "null"],
+            "description": "The person the event is about or who acted."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["id", "at", "type", "orgId", "userId", "data"]
+      },
+      "OperatorReview": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["run", "task", "session"]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string",
+            "description": "At most 12000 bytes of UTF-8."
+          }
+        },
+        "required": ["kind", "id", "orgId", "agentId", "text"]
+      },
+      "OperatorMachineRequestPage": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorMachineRequest"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`cursor` for the next page; null on the last one."
+          }
+        },
+        "required": ["requests", "next"]
+      },
+      "OperatorMachineRequest": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "owner": {
+            "type": ["object", "null"],
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["userId", "email"],
+            "description": "Its first owner."
+          },
+          "provisioning": {
+            "$ref": "#/components/schemas/OperatorProvisioning"
+          }
+        },
+        "required": ["orgId", "orgName", "createdAt", "owner", "provisioning"]
+      },
+      "OperatorProvisioning": {
+        "type": ["object", "null"],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["preparing", "waiting", "problem", "ready"]
+          },
+          "step": {
+            "type": ["string", "null"],
+            "enum": ["reserving", "starting", "installing", "connecting", null]
+          },
+          "stage": {
+            "type": ["string", "null"],
+            "description": "With `preparing`: the stage you gave."
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": ["capacity", null]
+          },
+          "since": {
+            "type": ["string", "null"],
+            "description": "When this state (and step or reason) began."
+          },
+          "requestedAt": {
+            "type": "string",
+            "description": "When its people started waiting: the computer's last removal, else the workspace's creation."
+          },
+          "expectedReadyAt": {
+            "type": ["string", "null"],
+            "description": "With `preparing`: the earliest ready time you gave in this wait."
+          },
+          "specs": {
+            "$ref": "#/components/schemas/OperatorMachineSpecs"
+          }
+        },
+        "required": ["state", "step", "stage", "reason", "since", "requestedAt", "expectedReadyAt", "specs"],
+        "description": "What you last said about it; null: nothing yet."
+      },
+      "OperatorMachineSpecs": {
+        "type": ["object", "null"],
+        "properties": {
+          "cpus": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1024
+          },
+          "memoryGb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 65536
+          },
+          "diskGb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": ["cpus", "memoryGb", "diskGb"],
+        "description": "What the workspace is told it gets."
+      },
+      "OperatorIssuedMachine": {
+        "type": "object",
+        "properties": {
+          "machineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enrollCode": {
+            "type": "string",
+            "description": "Single use. The computer redeems it at `POST /api/machines/device/token` (`{ deviceCode }`) on the public address, like a confirmed connection code. Never log it."
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": ["machineId", "enrollCode", "expiresAt"]
+      },
+      "OperatorMachine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["connected", "host", "managed"]
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "The workspace's own computer, the one you issue."
+          },
+          "name": {
+            "type": "string"
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": ["string", "null"]
+          },
+          "runnerVersion": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "kind", "managed", "name", "online", "lastSeenAt", "runnerVersion", "protocol"]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The token works and this server answers, with its bot check's state",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorHealth"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Find workspaces, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 320,
+              "description": "An org id, part of its name, or part of a member's email; any case."
+            },
+            "required": false,
+            "description": "An org id, part of its name, or part of a member's email; any case.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "createdAfter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OperatorStandingState"
+                },
+                {
+                  "description": "Only the workspaces in this standing."
+                }
+              ]
+            },
+            "required": false,
+            "description": "Only the workspaces in this standing.",
+            "name": "standing",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrgPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One workspace: its owners and admins, and how much is in it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrg"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One account: its workspaces and newest sessions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/standing": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Hold, suspend or restore a workspace",
+        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), and it is a request again once active. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "$ref": "#/components/schemas/OperatorStandingState"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "notice": {
+                    "$ref": "#/components/schemas/OperatorStandingNotice"
+                  }
+                },
+                "required": ["state", "reason", "notice"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorStanding"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/agents/{agentId}/hold": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Hold one agent, or let it go",
+        "description": "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. On agentes.chat Cloud it reads the hold's kind with how to contest it (`network` for a reason starting with `network.`, else `operator`), and the agent's responsible person and the workspace's owners and admins get a notice, replaced when it is held again for another kind and closed when the agent is let go. At once in this process, within 5 seconds in the others.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "agentId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "held": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["held"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAgentHold"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{userId}/block": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Block an account, or let it back",
+        "description": "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces. On agentes.chat Cloud the refused sign-in reads the block's kind, never its reason: `abuse` for `abuse.resignup`, `legal` for `legal_hold`, else `other`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "blocked": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["blocked"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorUserBlock"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "What happened on this instance, oldest first, as metadata",
+        "description": "Recorded only while the operator API is on, and kept 90 days. Paging never skips an event: one is served only once its transaction, and every transaction that began before it, has ended.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "`next` of the previous page; absent: from the oldest event kept (90 days). One from before the database was restored from a dump is refused (400 `stale_cursor`): start again without it and skip the event ids you already have."
+            },
+            "required": false,
+            "description": "`next` of the previous page; absent: from the oldest event kept (90 days). One from before the database was restored from a dump is refused (400 `stale_cursor`): start again without it and skip the event ids you already have.",
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review/{kind}/{id}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "What one run, task or screened session did, as one redacted text block",
+        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), the prompt, command and output (a task), or the text a person in control of an agent's screen had on it (a session of `desktop_control.ended`, on a server with `SESSION_SCREENING`: from memory only, until 10 minutes after the segment ended, then 404). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["run", "task", "session"]
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Why it is read (a sample, a report, a case): kept in the `content.viewed` event."
+            },
+            "required": true,
+            "description": "Why it is read (a sample, a report, a case): kept in the `content.viewed` event.",
+            "name": "reason",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Who reads it: an operator, or the service that samples."
+            },
+            "required": true,
+            "description": "Who reads it: an operator, or the service that samples.",
+            "name": "operator",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorReview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/machine-requests": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Workspaces waiting for their computer, oldest first",
+        "description": "Active workspaces whose computer isn't ready (one on hold or suspended is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorMachineRequestPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/provisioning": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Say how far the workspace's computer is",
+        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": ["preparing", "waiting", "problem"],
+                    "description": "`ready` is not yours to set: it comes with the computer's first hello."
+                  },
+                  "step": {
+                    "type": "string",
+                    "enum": ["reserving", "starting", "installing", "connecting"],
+                    "description": "With `preparing`: reserving, starting, installing or connecting; ignored otherwise."
+                  },
+                  "stage": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["capacity", "approval"],
+                    "description": "With `waiting`: capacity; ignored otherwise. `approval`, from an older client, reads as capacity."
+                  },
+                  "expectedReadyAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one, or a report without one, leaves it as it is, so people see the wait run over."
+                  },
+                  "etaSeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 604800,
+                    "description": "From an older client, in place of `expectedReadyAt`: read as that many seconds from now."
+                  },
+                  "specs": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/OperatorMachineSpecs"
+                      },
+                      {
+                        "description": "Kept from before when absent."
+                      }
+                    ]
+                  }
+                },
+                "required": ["state"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The workspace isn't active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The computer is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "The workspace's computer, and a code for it to connect with",
+        "description": "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`) unless the workspace is active.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorIssuedMachine"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The workspace isn't active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The workspace's computers, its own and the ones its people connected",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "machines": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OperatorMachine"
+                      }
+                    }
+                  },
+                  "required": ["machines"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines/{machineId}": {
+      "delete": {
+        "tags": ["Operator"],
+        "summary": "Take the workspace's computer away",
+        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now (one held or suspended waits for none). 404 when the workspace has no such managed computer (also when it was already removed).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "machineId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

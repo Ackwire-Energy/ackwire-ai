@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Button, Dialog, DialogFooter, DialogSearchList, Input } from "../src";
+import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, InfoHint, Input } from "../src";
 
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -35,6 +35,40 @@ describe("Dialog", () => {
     expect(within(dialog).getByRole("button", { name: "Fechar" })).toBeTruthy();
   });
 
+  test("opened with nothing pressed (from a link, by itself): the dialog holds the focus, not its close button", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar">
+        <Input aria-label="Chave" />
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(document.activeElement).toBe(dialog);
+  });
+
+  test("from the dialog itself, Shift+Tab goes round to its last control that takes the focus", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar">
+        <Input aria-label="Chave" />
+        <DialogFooter>
+          <Button>Salvar chave</Button>
+          <Button disabled>Remover</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    await act(async () => fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true }));
+    expect(document.activeElement).toBe(body().getByRole("button", { name: "Salvar chave" }));
+  });
+
+  test("a field that takes the focus on its own keeps it", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Renomear" closeLabel="Fechar">
+        <Input aria-label="Nome" autoFocus />
+      </Dialog>,
+    );
+    expect(document.activeElement).toBe(body().getByRole("textbox", { name: "Nome" }));
+  });
+
   test("Escape closes it and focus returns to the trigger", async () => {
     render(<Harness />);
     const trigger = body().getByRole("button", { name: "Ajustar orçamento" });
@@ -48,11 +82,124 @@ describe("Dialog", () => {
     expect(document.activeElement === trigger).toBe(true);
   });
 
+  test("its head: the face on the title's line, its actions and close in one row of actions", () => {
+    render(
+      <Dialog
+        open
+        onOpenChange={() => {}}
+        title="Computador da Ada"
+        subtitle="Ao vivo"
+        leading={<span className="ac-avatar">A</span>}
+        actions={<Button size="sm">Assumir o controle</Button>}
+        closeLabel="Fechar"
+      >
+        <p>Tela</p>
+      </Dialog>,
+    );
+    const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
+    expect([...head.children].map((c) => c.className)).toEqual([
+      "ac-dialog__lead",
+      "ac-dialog__titles",
+      "ac-dialog__acts ac-acts",
+    ]);
+    const acts = head.querySelector(".ac-dialog__acts") as HTMLElement;
+    expect([...acts.children].map((c) => c.textContent || c.getAttribute("aria-label"))).toEqual([
+      "Assumir o controle",
+      "Fechar",
+    ]);
+    expect(head.querySelector(".ac-dialog__lead > .ac-avatar")).not.toBeNull();
+  });
+
+  test("beside a title alone, its close sits on the title's capitals' middle (with a line under it, on the pair's)", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar Banco de dados" closeLabel="Fechar">
+        <p>Passos</p>
+      </Dialog>,
+    );
+    const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
+    expect(head.querySelector(".ac-dialog__title + .ac-dialog__acts")).not.toBeNull();
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    // On the middle an app measured for its title's face, --cap-mid without one.
+    expect(css).toContain(
+      "\n.ac-dialog__title + .ac-dialog__acts {\n  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));\n}",
+    );
+    // Nothing else moves the row: a transform beside the translate would be merged away by the build.
+    const moved = [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)].filter(
+      ([, selector, rule]) => /ac-dialog__acts(?![\w-])/.test(selector ?? "") && /transform/.test(rule ?? ""),
+    );
+    expect(moved).toEqual([]);
+  });
+
   test("the close button closes it", async () => {
     render(<Harness />);
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Ajustar orçamento" })));
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Fechar" })));
     expect(body().queryByRole("dialog")).toBeNull();
+  });
+
+  test("an ⓘ at the end of the description's line stays out of it: the dialog is described by the sentence alone", () => {
+    render(
+      <Dialog
+        open
+        onOpenChange={() => {}}
+        title="Entre no Claude pelo navegador"
+        description="Entre com a conta que quer adicionar."
+        descriptionAside={<InfoHint name="Sobre a conta errada">Saia do Claude lá e tente de novo.</InfoHint>}
+        closeLabel="Fechar"
+      >
+        <DialogBody>Esperando você entrar…</DialogBody>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { description: "Entre com a conta que quer adicionar." });
+    const info = within(dialog).getByRole("button", { name: "Sobre a conta errada" });
+    // Outside the description element, since a browser reads a button's name inside it as part of the description
+    // (the test library's own description leaves it out, so it can't tell), but on the sentence's line, after it.
+    const description = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toBe("Entre com a conta que quer adicionar.");
+    expect(description?.contains(info)).toBe(false);
+    expect(info.closest(".ac-dialog__desc")?.textContent).toStartWith("Entre com a conta que quer adicionar.");
+  });
+
+  test("a toast over it takes its own clicks, even one that removes it; a press on the scrim still closes it", async () => {
+    let closes = 0;
+    render(
+      <>
+        <div className="ac-toasts">
+          <div className="ac-toast">
+            Salvo <button type="button">Dispensar</button>
+          </div>
+        </div>
+        <Dialog open onOpenChange={() => closes++} title="Orçamento mensal" closeLabel="Fechar">
+          <Input aria-label="Limite mensal (US$)" defaultValue="40" />
+        </Dialog>
+      </>,
+    );
+    // Radix listens for presses outside a tick after it opens.
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    const toast = document.querySelector(".ac-toast") as HTMLElement;
+    const dismiss = toast.querySelector("button") as HTMLButtonElement;
+    // As in a browser once the toast's own click handler ran: the toast is gone before the click reaches the page.
+    toast.parentElement?.addEventListener("click", () => toast.remove());
+    await act(async () => {
+      fireEvent.pointerDown(dismiss);
+      fireEvent.click(dismiss);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(toast.isConnected).toBe(false);
+    expect(closes).toBe(0);
+    const scrim = document.querySelector(".ac-dialog__scrim") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(scrim);
+      fireEvent.click(scrim);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(closes).toBe(1);
+    // A modal dialog turns the page's pointer events off; a toast turns its own back on.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css.split("\n.ac-toast {")[1]?.split("}")[0]).toContain("pointer-events: auto");
   });
 
   test("searchable list variant filters and shows the empty message", async () => {
@@ -90,5 +237,23 @@ describe("Dialog", () => {
     await act(async () => fireEvent.change(search, { target: { value: "deploy" } }));
     expect(body().queryAllByRole("listitem")).toHaveLength(0);
     expect(body().getByText("Nada encontrado com “deploy”.")).toBeTruthy();
+  });
+});
+
+describe("Dialog without a footer", () => {
+  test("its body is the last thing in it, and then keeps the dialog's own edge under its last item", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar" width={480}>
+        <DialogBody>
+          <Button>Chave de API</Button>
+        </DialogBody>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(dialog.lastElementChild?.classList.contains("ac-dialog__body")).toBe(true);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\n\.ac-dialog__body:last-child \{\s*padding-bottom: 20px;/);
+    // On a phone, the sheet's own 16 px.
+    expect(css).toMatch(/@media \(max-width: 640px\) \{[^@]*\.ac-dialog__body:last-child \{\s*padding-bottom: 16px;/);
   });
 });

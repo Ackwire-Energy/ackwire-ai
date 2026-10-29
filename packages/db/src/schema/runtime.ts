@@ -131,6 +131,18 @@ export const agentRuns = pgTable(
      * (`resolveBrain`). Null for the model brain.
      */
     brainSessionId: text(),
+    /**
+     * Background work (a routine's run): it holds no conversation's slot. People's messages
+     * never join it and it never joins theirs; it posts no final reply (only cards and `hand_off`),
+     * and its computer session is never carried to the conversation's next run.
+     */
+    background: boolean().notNull().default(false),
+    /**
+     * The brain this run actually thinks with (`model`, `claude_code`, `codex`): the agent's, a
+     * mission's override or a fallback. Null until its first turn. Shared code reads this, never
+     * the agent's stored brain.
+     */
+    brain: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -215,11 +227,18 @@ export const usageRecords = pgTable(
      */
     partial: boolean().notNull().default(false),
     /**
-     * Who pays: `org` (its own key) or `platform` (our keys: the platform model
-     * key, or internal services such as the Jev router). Org usage reports
-     * keep platform-billed rows apart.
+     * Who pays: `org` (its own key) or `platform` (the server's own keys: the
+     * platform model key, or internal services such as Jev, with this server's
+     * TypeSafe key). Org usage reports keep platform-billed rows apart.
      */
     billedTo: text().notNull().default("org"),
+    /**
+     * A plan row's computer and the account it spent (`machine_accounts.id`; null with a computer: that
+     * computer's own sign-in). Null on API rows, and on plan rows from before accounts were recorded.
+     * No foreign keys: the history outlives a removed account or computer.
+     */
+    machineId: uuid(),
+    brainAccountId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -286,14 +305,18 @@ export const routingDecisions = pgTable(
     orgId: uuid().notNull(),
     channelId: uuid().notNull(),
     messageId: uuid().notNull(),
-    /** Strategy name, e.g. `llm` (core) or another implementation's name. */
+    /**
+     * Who decided (ADR 0074): `jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`, `none` (nobody could read
+     * it), `no_ai`, a mention's judge, or another implementation's name.
+     */
     strategy: text().notNull(),
     candidates: jsonb().$type<{ agentId: string; score: number }[]>().notNull(),
     /** Need-any-agent probability, when the strategy reports one. */
     needsAgentScore: real(),
     selectedAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Code's markers first (`follow-up`), then the deciding step's words after its name (`jev: …`). */
     reason: text(),
-    /** Set when the strategy failed; nobody is picked. */
+    /** The router's steps that failed before one decided (`jev: TypeSafe answered 529`), or `no_ai`. */
     error: text(),
     usageRecordId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -311,7 +334,7 @@ export const approvalStatusEnum = pgEnum("approval_status", [
 ]);
 
 /**
- * A sensitive action an agent wants to take (D4, docs/adr/0015). Bound to the
+ * A sensitive action an agent wants to take (docs/adr/0015). Bound to the
  * exact action: `action_hash` = SHA-256 of the canonical JSON of (tool,
  * scope, connection, params); only that is ever executed. Who may decide:
  * the agent's owner (`owner_user_id`, snapshot at creation) and org admins.
@@ -343,6 +366,13 @@ export const approvals = pgTable(
     /** Human summary, e.g. "Merge PR #42 into main". */
     title: text().notNull(),
     detail: text().notNull().default(""),
+    /** The agent's own reason, required on every request (ADR 0053): what it found and why this action. */
+    why: text().notNull().default(""),
+    /**
+     * Asked while nobody was watching (ADR 0053): `{ kind: "routine" | "unattended", routineId?,
+     * routineName? }`. The card and the notification say so. Null when a person was behind the run.
+     */
+    origin: jsonb().$type<Record<string, unknown>>(),
     status: approvalStatusEnum().notNull().default("pending"),
     ownerUserId: text(),
     decidedByUserId: text(),
@@ -413,7 +443,7 @@ export const agentActions = pgTable(
 );
 
 /**
- * What an agent may do: one row per granted scope (D7, docs/adr/0015).
+ * What an agent may do: one row per granted scope (docs/adr/0015, 0016).
  * `connection_id` null = a built-in tool scope (e.g. `context:read`);
  * otherwise a scope of one org connector connection (e.g. `github:pr.merge`).
  * The Tool Gateway checks this table on every call; prompts never matter.

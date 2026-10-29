@@ -13,7 +13,7 @@ import {
   type ToolSource,
   verifyRunToolToken,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { answerSteering, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { missionRunner, pairedMachine, RUNNER, type TaskStartRequest } from "./mission-helpers";
 import { fakeGithub } from "./tool-fixtures";
@@ -98,6 +98,8 @@ async function runningRun(threadRootId?: string) {
     })
     .returning();
   if (!run) throw new Error("no run");
+  // A later runningRun's "hi", the same person writing again, may go into this run.
+  answerSteering(f, run);
   return run;
 }
 
@@ -172,7 +174,11 @@ describe("runner MCP bridge (ADR 0032)", () => {
       error: { code: "tool.not_allowed" },
     });
 
-    const merge = await runner.call(token, "github_merge_pr", { repo: "a/b", pr: 3 });
+    const merge = await runner.call(token, "github_merge_pr", {
+      repo: "a/b",
+      pr: 3,
+      why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+    });
     expect(merge.ok && merge.text).toContain("Waiting for a person to approve");
     expect(gh.executed).toHaveLength(1);
     const [approval] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, run.id));
@@ -310,7 +316,7 @@ describe("mission tools through the bridge", () => {
         runId: run.id,
       }),
     );
-    // A big connector stands as its directory (D58), so the list stays under the cap; the mission tools are there.
+    // A big connector stands as its directory (ADR 0043), so the list stays under the cap; the mission tools are there.
     expect(listed.ok && listed.tools.length).toBeLessThanOrEqual(MCP_TOOLS_MAX);
     expect(names(listed)).toEqual(
       expect.arrayContaining(["update_plan", "report", "complete_mission", "ads_find_tools", "ads_use_tool"]),

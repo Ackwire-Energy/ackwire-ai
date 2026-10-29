@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR, resources } from "../src/index";
+import { leaves } from "./leaves";
 
-/** Every leaf key ("chat.work.steps_one") and its value. */
-function leaves(obj: unknown, prefix = ""): [string, unknown][] {
-  if (obj === null || typeof obj !== "object") return [[prefix, obj]];
-  return Object.entries(obj as Record<string, unknown>).flatMap(([k, v]) => leaves(v, prefix ? `${prefix}.${k}` : k));
-}
 /** Plural forms differ by language ("_one"/"_other" vs others): compare the base key. */
 const base = (k: string) => k.replace(/_(zero|one|two|few|many|other)$/, "");
 
@@ -23,6 +19,29 @@ describe("locales", () => {
       .filter(([k, v]) => typeof v !== "string" || (v.trim() === "" && !EMPTY_OK.some((re) => re.test(k))))
       .map(([k]) => k);
     expect(empty).toEqual([]);
+  });
+});
+
+describe("menu paths", () => {
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [ptBR, en]) {
+      const paths = leaves(tree)
+        .map(([, v]) => String(v))
+        .filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(4);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
+    }
+  });
+});
+
+describe("examples in one-line fields", () => {
+  test("fit a 360px phone's field: one email address, a short database address", () => {
+    for (const tree of [ptBR, en]) {
+      for (const s of [tree.onboarding.team.placeholder, tree.members.emailsPlaceholder]) expect(s).not.toContain(",");
+      // The database field holds about 38 characters of its 16px text at 360px.
+      expect(tree.database.urlPlaceholder.length).toBeLessThanOrEqual(36);
+    }
   });
 });
 

@@ -9,7 +9,11 @@
  * Manual, never in CI (it calls the real model and costs a little):
  *
  *   bun run eval:behavior [--only id,id] [--model claude-sonnet-5-5] [--judge jev|llm] [--judge-model claude-haiku-5-5]
- *                         [--no-judge] [--max-turns 12] [--concurrency 5] [--tools-on-demand]
+ *                         [--no-judge] [--max-turns 12] [--concurrency 5] [--tools-on-demand] [--repeat 3]
+ *
+ * `--repeat N` runs every case N times; a case passes when most of its runs pass, and each check is reported
+ * by its own majority (a model and a judge both vary from run to run: one run alone can't tell a regression
+ * from noise).
  *
  * Needs `ANTHROPIC_API_KEY` (in `.env`). `EVAL_AGENT_MODEL` / `EVAL_JUDGE_MODEL`
  * override the models. Cases: `behavior-cases.json`, plus
@@ -36,7 +40,7 @@ const only = arg("only")?.split(",");
 const agentModel = arg("model") ?? process.env.EVAL_AGENT_MODEL;
 const judgeModel = arg("judge-model") ?? process.env.EVAL_JUDGE_MODEL ?? "claude-haiku-5-5";
 const useJudge = !process.argv.includes("--no-judge");
-/** Tools on demand (D65) as in production: run it with and without to compare tokens and behavior. */
+/** Tools on demand (ADR 0043) as in production: run it with and without to compare tokens and behavior. */
 const toolsOnDemand = process.argv.includes("--tools-on-demand");
 const jevKey = process.env.TYPESAFE_API_KEY || undefined;
 const judgeKind = arg("judge") ?? "jev";
@@ -51,6 +55,7 @@ let llmNano = 0;
 const agreement = { same: 0, total: 0 };
 const maxToolTurns = Number(arg("max-turns") ?? 12);
 const concurrency = Math.max(1, Number(arg("concurrency") ?? process.env.EVAL_CONCURRENCY ?? 5));
+const repeat = Math.max(1, Math.floor(Number(arg("repeat") ?? 1)));
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey) {
@@ -67,7 +72,7 @@ const local = await load("behavior-cases.local.json");
 const cases = [...(await load("behavior-cases.json")), ...local].filter((c) => !only || only.includes(c.id));
 const judgeLabel = !useJudge ? "off" : gradeWithJev ? "jev" : judgeModel;
 console.log(
-  `${cases.length} cases (${local.length} local) · agent model ${agentModel ?? "per case"} · judge ${judgeLabel} · addressees ${jevKey ? "jev" : "llm"} · max ${maxToolTurns} turns · ${concurrency} at a time`,
+  `${cases.length} cases (${local.length} local)${repeat > 1 ? ` × ${repeat} runs` : ""} · agent model ${agentModel ?? "per case"} · judge ${judgeLabel} · addressees ${jevKey ? "jev" : "llm"} · max ${maxToolTurns} turns · ${concurrency} at a time`,
 );
 if (!jevKey)
   console.log(
@@ -78,6 +83,8 @@ console.log("");
 interface CaseReport {
   id: string;
   title: string;
+  /** Which run of the case (`--repeat`), from 1. */
+  attempt: number;
   pass: boolean;
   checks: CheckResult[];
   run: Omit<CaseRun, "system"> | null;
@@ -111,7 +118,7 @@ let totalNano = 0;
 let judgeNano = 0;
 
 /** One case, isolated (its own in-memory database and fakes); output buffered, printed when it ends. */
-async function evalCase(c: BehaviorCase): Promise<CaseReport> {
+async function evalCase(c: BehaviorCase, attempt: number): Promise<CaseReport> {
   const out: string[] = [];
   const started = performance.now();
   let run: CaseRun | null = null;
@@ -151,19 +158,21 @@ async function evalCase(c: BehaviorCase): Promise<CaseReport> {
   totalNano += nano;
   const pass = checks.every((k) => k.pass);
   const { system, ...rest } = run ?? ({} as CaseRun);
-  out.unshift(`${pass ? "PASS" : "FAIL"} ${c.id} · ${c.title} · US$ ${(nano / 1e9).toFixed(4)}`);
+  const runLabel = repeat > 1 ? ` (run ${attempt}/${repeat})` : "";
+  out.unshift(`${pass ? "PASS" : "FAIL"} ${c.id}${runLabel} · ${c.title} · US$ ${(nano / 1e9).toFixed(4)}`);
   if (run) {
     const approval = run.approvals.length ? ` · approval: ${run.approvals.join(", ")}` : "";
     out.push(
       `  tools: ${run.calls.map((t) => t.name).join(", ") || "(none)"}${approval} · runs: ${run.status.join(", ")}`,
     );
-    out.push(`  reply: ${clip((run.noReply ? "NO_REPLY" : run.reply).replace(/\s+/g, " "), 240)}`);
+    out.push(`  reply: ${clip((run.noReply ? "(silent)" : run.reply).replace(/\s+/g, " "), 240)}`);
   }
   for (const k of checks) out.push(`  ${k.pass ? "ok  " : "FAIL"} ${k.id}: ${k.detail}`);
   console.log(`${out.join("\n")}\n`);
   return {
     id: c.id,
     title: c.title,
+    attempt,
     pass,
     checks,
     run: run ? rest : null,
@@ -173,19 +182,37 @@ async function evalCase(c: BehaviorCase): Promise<CaseReport> {
   };
 }
 
-// A small pool: `concurrency` cases at a time; reports keep the cases' order.
+// A small pool: `concurrency` runs at a time; reports keep the cases' order (each case's runs together).
+const jobs = cases.flatMap((c) => Array.from({ length: repeat }, (_, k) => ({ c, attempt: k + 1 })));
 const wallStarted = performance.now();
-const reports: CaseReport[] = new Array(cases.length);
+const reports: CaseReport[] = new Array(jobs.length);
 let next = 0;
 await Promise.all(
-  Array.from({ length: Math.min(concurrency, cases.length) }, async () => {
-    while (next < cases.length) {
+  Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
+    while (next < jobs.length) {
       const i = next++;
-      reports[i] = await evalCase(cases[i] as BehaviorCase);
+      const job = jobs[i] as { c: BehaviorCase; attempt: number };
+      reports[i] = await evalCase(job.c, job.attempt);
     }
   }),
 );
 const wallMs = Math.round(performance.now() - wallStarted);
+
+type Tally = { pass: number; total: number };
+const majority = (m: Tally) => m.pass * 2 > m.total;
+const tally = (m: Tally | undefined, pass: boolean): Tally => ({
+  pass: (m?.pass ?? 0) + (pass ? 1 : 0),
+  total: (m?.total ?? 0) + 1,
+});
+
+/** Per case: how many of its runs passed (it passes when most did), and each check's own count. */
+const byCase = new Map<string, Tally & { title: string; checks: Map<string, Tally> }>();
+for (const r of reports) {
+  const m = byCase.get(r.id) ?? { title: r.title, pass: 0, total: 0, checks: new Map<string, Tally>() };
+  Object.assign(m, tally(m, r.pass));
+  for (const k of r.checks) m.checks.set(k.id, tally(m.checks.get(k.id), k.pass));
+  byCase.set(r.id, m);
+}
 
 // Totals per criterion.
 const byCriterion = new Map<string, { pass: number; total: number }>();
@@ -196,9 +223,19 @@ for (const r of reports)
     if (k.pass) m.pass++;
     byCriterion.set(k.id, m);
   }
-const passed = reports.filter((r) => r.pass).length;
+const passed = [...byCase.values()].filter(majority).length;
+if (repeat > 1) {
+  console.log(`── per case (passes when most of its ${repeat} runs pass; checks that failed most runs)`);
+  for (const [id, m] of byCase) {
+    const failing = [...m.checks].filter(([, k]) => !majority(k)).map(([k, t]) => `${k} ${t.pass}/${t.total}`);
+    console.log(
+      `  ${majority(m) ? "PASS" : "FAIL"} ${id.padEnd(46)} ${m.pass}/${m.total}${failing.length ? ` · ${failing.join(", ")}` : ""}`,
+    );
+  }
+}
+const runsPassed = reports.filter((r) => r.pass).length;
 console.log(
-  `── ${passed}/${reports.length} cases passed · ${(wallMs / 1000).toFixed(0)} s · US$ ${(totalNano / 1e9).toFixed(4)} (grading ${judgeLabel}: US$ ${(judgeNano / 1e9).toFixed(4)})`,
+  `── ${passed}/${byCase.size} cases passed${repeat > 1 ? ` (${runsPassed}/${reports.length} runs)` : ""} · ${(wallMs / 1000).toFixed(0)} s · US$ ${(totalNano / 1e9).toFixed(4)} (grading ${judgeLabel}: US$ ${(judgeNano / 1e9).toFixed(4)})`,
 );
 if (compareLlm)
   console.log(
@@ -231,10 +268,17 @@ writeFileSync(
       maxToolTurns,
       concurrency,
       toolsOnDemand,
+      repeat,
       tokens,
       wallMs,
       passed,
-      total: reports.length,
+      total: byCase.size,
+      byCase: Object.fromEntries(
+        [...byCase].map(([id, m]) => [
+          id,
+          { title: m.title, pass: m.pass, total: m.total, passed: majority(m), checks: Object.fromEntries(m.checks) },
+        ]),
+      ),
       costUsd: totalNano / 1e9,
       criteria: Object.fromEntries(byCriterion),
       cases: reports,
@@ -244,4 +288,4 @@ writeFileSync(
   ),
 );
 console.log(`\nreport: ${file}`);
-process.exit(passed === reports.length ? 0 : 1);
+process.exit(passed === byCase.size ? 0 : 1);

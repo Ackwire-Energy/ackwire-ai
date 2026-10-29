@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
+import type { AuthConfig, OrgStanding } from "../api/types";
 import { MAX_UPLOAD_MB } from "./files";
+import { endSentence } from "./text";
 
 /**
  * Server error codes the app says in the person's language (the server's
@@ -16,6 +18,7 @@ const KNOWN = {
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
   "machine.pairing_invalid": "errors.machine.pairingInvalid",
+  "machine.pairing_off": "errors.machine.pairingOff",
   "machine.target_offline": "errors.machine.targetOffline",
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
@@ -64,7 +67,125 @@ const KNOWN = {
   "run.not_continuable": "errors.run.notContinuable",
   "run.agent_busy": "errors.run.agentBusy",
   "run.continue_forbidden": "errors.run.continueForbidden",
+  "run.not_restartable": "errors.run.notRestartable",
+  "routine.too_frequent": "errors.routine.tooFrequent",
+  "routine.too_many": "errors.routine.tooMany",
+  "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
+  "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
+  "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
+  "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
+  "plan.personal": "aiAccounts.errors.planPersonal",
+  "machine.managed": "computerSetup.managedNotRemovable",
+  "machine.managed_access": "computerSetup.managedAccess",
+  "join.link_closed": "errors.join.linkClosed",
+  "join.full": "errors.join.full",
+  "join.rate_limited": "errors.join.rateLimited",
+  "join.link_busy": "errors.join.linkBusy",
+  "join.member": "errors.join.member",
+  "join.denied": "errors.join.denied",
+  "join.answered": "errors.join.answered",
+  "join.expired": "errors.join.expired",
+  "join.code_wrong": "errors.join.codeWrong",
+  "join.code_expired": "errors.join.codeExpired",
+  "join.code_tries": "errors.join.codeTries",
+  "join.code_limit": "errors.join.codeLimit",
+  "join.code_wait": "errors.join.codeWait",
+  "join.code_needed": "errors.join.codeNeeded",
+  "invitation.ask_to_join": "errors.invitation.askToJoin",
+  human_check: "errors.humanCheck",
+  human_check_blocked: "errors.humanCheckBlocked",
+  // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
+  jev_key_invalid: "jev.steps.invalid",
 } as const;
+
+/** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
+/** Where a restriction on agentes.chat Cloud is contested. */
+export const LEGAL_EMAIL = "legal@agentes.chat";
+
+/** The reason agentes.chat Cloud's automatic hold is set with: it reads as the review line, never "on hold: review". */
+const REVIEW_REASON = "review";
+
+/**
+ * Reasons agentes.chat Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
+ * of its own, and `ended` holds a workspace whose plan ended, a billing matter.
+ */
+const UNCONTESTED: ReadonlySet<string> = new Set([REVIEW_REASON, "ended"]);
+
+/**
+ * What the server says of a restriction besides its code: the reason the workspace is told, and on agentes.chat
+ * Cloud `cloud` (`"true"` in a run's values, which are text) with a held agent's or a blocked account's kind.
+ */
+export interface RestrictionFacts {
+  reason?: unknown;
+  kind?: unknown;
+  cloud?: unknown;
+}
+
+/**
+ * A restriction in the person's words, the one place the apps pick it: a workspace on hold or suspended and a held
+ * agent (the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`…), a refused
+ * workspace (`org.create_refused`) and a blocked account (`ACCOUNT_BLOCKED`). On agentes.chat Cloud the line of its
+ * kind, with the Terms section and how to contest it. Elsewhere the words it always had. Null for any other code.
+ */
+export function restrictionLine(
+  t: TFunction,
+  code: string | null | undefined,
+  facts?: RestrictionFacts | null,
+): string | null {
+  const cloud = facts?.cloud === true || facts?.cloud === "true";
+  const reason = typeof facts?.reason === "string" ? facts.reason.trim() : "";
+  const kind = facts?.kind;
+  const email = { email: LEGAL_EMAIL };
+  const contested = (line: string) =>
+    cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
+  switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
+    case "org.paused":
+      if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);
+      return reason ? contested(t("standing.onHold", { reason })) : t("standing.paused");
+    case "org.suspended":
+      return reason ? contested(t("standing.suspendedFor", { reason })) : t("standing.suspended");
+    case "agent.paused":
+      if (cloud && kind === "network") return t("standing.cloud.agentNetwork", email);
+      if (cloud && kind === "operator") return t("standing.cloud.agentOperator", email);
+      return t("standing.agentPaused");
+    case "org.create_refused":
+      return cloud ? t("standing.cloud.createRefused", email) : t("standing.createRefused");
+    case ACCOUNT_BLOCKED:
+      if (cloud && kind === "abuse") return t("standing.cloud.blockedAbuse", email);
+      if (cloud && kind === "legal") return t("standing.cloud.blockedLegal", email);
+      return contested(t("auth.accountBlocked"));
+    default:
+      return null;
+  }
+}
+
+/** The hold banner's line: the reason when the workspace is told one, else what a refused run says. Null unless on hold. */
+export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
+  if (standing?.state !== "hold") return null;
+  return restrictionLine(t, "org.paused", standing);
+}
+
+/** The suspended screen's line: why, when the workspace is told, else that it is closed for now. */
+export function suspendedText(t: TFunction, standing: Pick<OrgStanding, "reason" | "cloud"> | null | undefined) {
+  const told = standing?.reason ? restrictionLine(t, "org.suspended", standing) : null;
+  return told ?? t("standing.screen.text");
+}
+
+/**
+ * Where a workspace on hold or suspended asks for help: the server's address (`SUPPORT_EMAIL`), else "ask the
+ * people who run this server" (`support.ask`). On the Cloud nobody else runs it, so without an address, nothing.
+ * Nothing either until `auth-config` answers.
+ */
+export function supportLineOf(
+  config: Pick<AuthConfig, "supportEmail" | "workspaceComputer"> | undefined,
+): { email: string } | "ask" | null {
+  if (!config) return null;
+  if (config.supportEmail) return { email: config.supportEmail };
+  return config.workspaceComputer ? null : "ask";
+}
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */
 export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
@@ -75,11 +196,38 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
+/**
+ * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
+ * since the server says those in English. Null for anything else (the caller keeps its own words).
+ */
+export function knownErrorText(t: TFunction, error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const restriction = restrictionLine(t, error.code, error.params);
+  if (restriction) return restriction;
+  const key = KNOWN[error.code as keyof typeof KNOWN];
+  if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+  return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
+}
+
+/**
+ * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
+ * in the person's words: too many tries, a blocked account and the bot check by their codes, else its own message.
+ */
+export function authErrorText(
+  t: TFunction,
+  refusal: { status: number; code?: string; message: string } & RestrictionFacts,
+): string {
+  if (refusal.status === 429) return t("auth.tooManyTries");
+  const { kind, cloud } = refusal;
+  const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message, { kind, cloud }));
+  return known ?? (refusal.message || t("common.unknownError"));
+}
+
 /** Translated text for a failed request. */
 export function errorText(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
-    const key = KNOWN[error.code as keyof typeof KNOWN];
-    if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+    const known = knownErrorText(t, error);
+    if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");
   }

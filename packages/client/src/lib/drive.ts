@@ -2,7 +2,7 @@ import type { Artifact, ArtifactKind } from "../api/types";
 import { ARTIFACT_KINDS } from "./artifacts";
 import { daysBetween } from "./format";
 
-/** The Drive's arrangement (docs/design/telas/Drive.html). */
+/** The Drive's arrangement. */
 export type DriveView = "grid" | "list";
 export type DriveWho = "all" | "agents" | "people";
 export type DriveGroup = "date" | "channel" | "author" | "none";

@@ -69,7 +69,7 @@ export function StatusChip({ status }: { status: IssueStatus }) {
 }
 
 /**
- * Tarefas (telas/Tarefas.html; issues in the code): agents working now, the
+ * Tarefas (issues in the code): agents working now, the
  * org's board (custom columns in fixed stages, drag between and inside them)
  * or a list, a details panel.
  */
@@ -795,7 +795,7 @@ function NewIssueDialog({
             </Field>
           </div>
           {agent && (
-            <p className="issue-agent-note">
+            <p className="issue-agent-note ac-iconline">
               <Icon name="shield" size={14} />
               {t("issues.form.agentStarts", agentGrammar(t, agent.name))}
             </p>

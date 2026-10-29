@@ -6,6 +6,7 @@ import { deleteAccount } from "@/features/account";
 import { Card, HoldButton, Icon, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
+import { deleteBlockedText } from "./logic";
 
 /**
  * Apagar conta (App Store 5.1.1(v)): what goes and what stays, then a hold.
@@ -64,15 +65,7 @@ export function DeleteAccountScreen() {
           <Card>
             <View style={styles.list}>
               <Text variant="body" tone="danger">
-                {t("mobile.account.deleteSoleOwner")}
-              </Text>
-              {blocked.length > 0 ? (
-                <Text variant="small" tone="muted">
-                  {t("mobile.delete.which", { names: blocked.join(", ") })}
-                </Text>
-              ) : null}
-              <Text variant="small" tone="muted">
-                {t("mobile.delete.how")}
+                {deleteBlockedText(t, blocked)}
               </Text>
             </View>
           </Card>
@@ -82,9 +75,6 @@ export function DeleteAccountScreen() {
           holdLabel={t("mobile.delete.holding")}
           onConfirm={() => void confirm()}
         />
-        <Text variant="caption" tone="faint" style={styles.center}>
-          {t("mobile.delete.note")}
-        </Text>
       </ScrollView>
     </View>
   );
@@ -96,5 +86,4 @@ const styles = StyleSheet.create({
   list: { padding: 14, gap: 10 },
   item: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1 },
-  center: { textAlign: "center" },
 });

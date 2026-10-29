@@ -143,7 +143,7 @@ export function IssueDialog({ issue: i, onClose }: { issue: Issue; onClose: () =
 }
 
 /**
- * An issue's details (telas/Issues.html): source, status and who, the agent's
+ * An issue's details: source, status and who, the agent's
  * work (live steps, or "stalled" with "Pedir para continuar"), "Pedir a um
  * agente", description, criteria (who checked them), links and activity.
  * The page has its own header and aside; the dialog shows the fields on top.
@@ -231,7 +231,7 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
 }
 
 /**
- * The forum around an issue (D45): its sub-issues, the topics that evaluate
+ * The forum around an issue: its sub-issues, the topics that evaluate
  * it ("Em avaliação no fórum" / "Avaliado", with the mini track) and, while
  * open, "Avaliar no fórum" (the new-topic dialog, prefilled, format plan).
  */
@@ -442,7 +442,7 @@ function AskAgent({ issue }: { issue: Issue }) {
         {avatar({ type: "agent", id: agent.id }, "sm")}
         <span className="issue-ask__text">
           <b>{t("issues.askTitle", { to: g.to, name: agent.name })}</b>
-          <span className="small muted">{t("issues.askText", { The: g.The, name: agent.name })}</span>
+          <span className="small muted">{t("issues.askText", g)}</span>
         </span>
       </div>
       <div className="issue-ask__actions">

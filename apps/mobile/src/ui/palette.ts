@@ -9,7 +9,7 @@ import {
 
 /**
  * The phone app's colors (pure: no React Native import, so it is unit-tested). The design system's tokens,
- * with the light theme made native like iOS (MobileIntencional.html, feedback 2026-10-18): white lists and
+ * with the light theme made native like iOS: white lists and
  * chat, the grouped gray only where iOS groups (profile, Atividade, sheets) with white cards on it, lighter
  * fills, darker secondary text and lighter hairlines. The dark theme stays the tokens'.
  */
@@ -24,6 +24,10 @@ export interface AppColors extends ThemeColors {
   amber: string;
   /** A small tag's fill (chips, states). */
   chip: string;
+  /** Unread: the row's dot, the same red as the tab bar's badge (the system red). */
+  badge: string;
+  /** A sheet's grabber where we draw it (Android; iOS draws its own), the system's tone for it. */
+  grabber: string;
 }
 
 /** Light, native: what changes from the tokens. */
@@ -60,10 +64,43 @@ export function appColors(scheme: Scheme): AppColors {
       bubble: darkTokens.raised,
       amber: "#e8ac4c",
       chip: darkTokens.sunken,
+      badge: "#ff453a",
+      grabber: "rgba(235, 235, 245, 0.3)",
     };
   }
   const base = { ...lightTokens, ...NATIVE_LIGHT };
-  return { ...base, grouped: "#f2f2f7", bubble: "#eef0f3", amber: "#b26a00", chip: "rgba(120, 120, 128, 0.1)" };
+  return {
+    ...base,
+    grouped: "#f2f2f7",
+    bubble: "#eef0f3",
+    amber: "#b26a00",
+    chip: "rgba(120, 120, 128, 0.1)",
+    badge: "#ff3b30",
+    grabber: "rgba(60, 60, 67, 0.3)",
+  };
+}
+
+/** A card inside a dark sheet: one step above the sheet, as the sheet is one above the screen. */
+const DARK_SHEET_CARD = "#292928";
+
+/**
+ * The colors inside a form sheet. In dark the sheet is lifted one step above the screen behind it (the dark
+ * page's own color made the two read as one) and its cards one more, as the system's own sheets do. Light
+ * keeps the grouped gray with white cards on it, which already stands apart from the dimmed white screen.
+ */
+export function sheetColors(colors: AppColors, scheme: Scheme): AppColors {
+  if (scheme !== "dark") return colors;
+  return {
+    ...colors,
+    bg: colors.raised,
+    grouped: colors.raised,
+    surface: colors.raised,
+    raised: DARK_SHEET_CARD,
+    raised2: DARK_SHEET_CARD,
+    surfaceRaised: DARK_SHEET_CARD,
+    // Android's "glass" plates (round buttons) are opaque: a card's tone, so they don't vanish into the sheet.
+    glassSolid: DARK_SHEET_CARD,
+  };
 }
 
 /** Light elevations are softer (a hairline and a short shadow, like iOS); dark keeps the tokens'. */

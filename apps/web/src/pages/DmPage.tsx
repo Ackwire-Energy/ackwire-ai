@@ -1,16 +1,18 @@
 import type { DmTarget } from "@agenteschat/client";
 import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Avatar, BrainIcon, Button } from "@agenteschat/ui";
+import { isAuto } from "@agenteschat/client/lib/providers";
+import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { agentBrainLine } from "@/components/AgentBrain";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -53,28 +55,36 @@ export function DmPage({ target }: { target: DmTarget }) {
   if (!dm.data || dir.loading) return <ChannelSkeleton />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
-  const model = agent ? (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model) : "";
+  const model = !agent
+    ? ""
+    : isAuto(agent.model)
+      ? t("brain.auto.label")
+      : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
-  const brainLine = agent ? agentBrainLine(t, agent, model) : null;
+  const thinks = agent ? brainLine(t, agent.brain, model, owner?.name.split(" ")[0]) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">
       <NavToggle />
       {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-        <h1 className="channel__title">
+        <h1 className={agent || person ? "channel__title ac-captop" : "channel__title"}>
           {name}
           {agent && <AudienceChip agent={agent} />}
         </h1>
         {agent && (
           <span className="channel__topic">
             {owner ? t("dm.subtitle", { role, owner: owner.name }) : t("dm.subtitleNoOwner", { role })}
-            {brainLine?.text && (
+            {thinks?.text && (
               <>
                 {" · "}
-                <span className="channel__brain">
-                  <BrainIcon kind={brainLine.kind} size={14} />
-                  {brainLine.text}
+                <span className="channel__brain ac-iconline">
+                  {thinks.mark ? (
+                    <ProviderLogo id={thinks.mark} size="xs" />
+                  ) : (
+                    <BrainIcon kind={thinks.kind} size={14} />
+                  )}
+                  {thinks.text}
                 </span>
               </>
             )}
@@ -82,6 +92,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
+      {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>
   );
@@ -102,7 +113,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         dmAgentId: agent?.id,
         dmPersonId: person?.userId,
         locked: agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
-        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
+        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : undefined,
         emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
         suggestions: agent ? greetingSuggestions(t, agent.role) : [],
       }}

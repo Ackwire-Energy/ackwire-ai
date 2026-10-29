@@ -1,11 +1,12 @@
-import type { ChannelEvent, ConsultationStatus } from "../api/types";
+import type { ChannelEvent, ConsultationStatus, OpenConsult } from "../api/types";
 
 /**
  * An agent asking another agent, live (`agent.consulting` → `agent.consulted`):
  * the working line says "Dev está perguntando ao Infra… 0:12", then "Infra
- * respondeu. Dev está escrevendo…". Kept apart from the runs: the asking run
- * pauses while it waits (`run.finished` waiting_input) and leaves the run
- * store, but the question is still out.
+ * respondeu. Dev está escrevendo…". Kept apart from the runs: `ask_agent` never
+ * waits, so the asking turn says what it asked and ends while the question is
+ * still out; the line stays until the answer (or the server says it's gone:
+ * `reconcileConsults`, on load and reconnect).
  */
 export type LiveConsultStatus = "asking" | ConsultationStatus;
 
@@ -42,13 +43,32 @@ const drop = (state: ConsultsState, runId: string) => {
 const dropIfBack = (state: ConsultsState, runId: string) =>
   state[runId] && state[runId].status !== "asking" ? drop(state, runId) : state;
 
+/**
+ * The answer came back as a notice that woke another run of the asker (the asking run had ended):
+ * that run writing (or posting) is the asker writing, so the "respondeu" line of the agent there goes.
+ */
+const dropBackOf = (state: ConsultsState, agentId: unknown, channelId: unknown) => {
+  if (typeof agentId !== "string" || typeof channelId !== "string") return state;
+  const gone = Object.values(state).filter(
+    (c) => c.status !== "asking" && c.agentId === agentId && c.channelId === channelId,
+  );
+  return gone.reduce((s, c) => drop(s, c.runId), state);
+};
+
 export function applyConsultEvent(
   state: ConsultsState,
   event: ChannelEvent | { type: string },
   now = Date.now(),
 ): ConsultsState {
   // Some run events (`agent.tool`, `run.canceled`) live outside `ChannelEvent`: read them loosely.
-  const e = event as unknown as { type: string; runId?: unknown; status?: unknown; tool?: unknown };
+  const e = event as unknown as {
+    type: string;
+    runId?: unknown;
+    status?: unknown;
+    tool?: unknown;
+    agentId?: unknown;
+    channelId?: unknown;
+  };
   switch (e.type) {
     case "agent.consulting": {
       const ev = event as Extract<ChannelEvent, { type: "agent.consulting" }>;
@@ -84,30 +104,91 @@ export function applyConsultEvent(
       };
     }
     case "message.created": {
-      const runId = (event as Extract<ChannelEvent, { type: "message.created" }>).message?.agentRunId;
-      return runId ? drop(state, runId) : state;
+      const message = (event as Extract<ChannelEvent, { type: "message.created" }>).message;
+      const runId = message?.agentRunId;
+      if (!runId) return state;
+      // "I asked; I'll tell you when the answer comes": the question is still out.
+      const next = dropIfBack(state, runId);
+      return message.author.type === "agent" ? dropBackOf(next, message.author.id, message.channelId) : next;
     }
     // Its words are arriving: the reply's own row takes over.
     case "agent.delta":
     case "agent.typing":
-      return typeof e.runId === "string" ? dropIfBack(state, e.runId) : state;
+      return typeof e.runId === "string" ? dropBackOf(dropIfBack(state, e.runId), e.agentId, e.channelId) : state;
     case "agent.tool":
       // Another tool after the answer: the line says that tool now.
-      return typeof e.runId === "string" && e.tool && e.tool !== "ask_agent" ? dropIfBack(state, e.runId) : state;
+      return typeof e.runId === "string" && e.tool && e.tool !== "ask_agent"
+        ? dropBackOf(dropIfBack(state, e.runId), e.agentId, e.channelId)
+        : state;
+    // The asking turn ended (or paused): a question still out stays on the line until its answer
+    // (`agent.consulted`), which wakes the agent even after its turn ended.
     case "run.canceled":
-      return typeof e.runId === "string" ? drop(state, e.runId) : state;
+      return typeof e.runId === "string" ? dropIfBack(state, e.runId) : state;
     case "agent.run":
     case "run.finished": {
       if (typeof e.runId !== "string") return state;
-      // Pausing to wait for the answer (waiting_input) is the consultation itself.
-      if (e.status === "failed" || e.status === "done" || e.status === "canceled") return drop(state, e.runId);
-      if (e.status === "waiting_input" || e.status === "waiting_approval") return dropIfBack(state, e.runId);
+      if (["failed", "done", "canceled", "waiting_input", "waiting_approval"].includes(String(e.status)))
+        return dropIfBack(state, e.runId);
       return state;
     }
     default:
       return state;
   }
 }
+
+/**
+ * The server's questions still out in a channel (`GET …/active-runs`, on load and reconnect): they
+ * show (after a reload too, with their real clock), and an "asking" line the server no longer has
+ * (answered while we weren't listening) goes. Lines heard after the request went out stay
+ * (`askedAt`): the server's answer may predate them.
+ */
+export function reconcileConsults(
+  state: ConsultsState,
+  channelId: string,
+  open: OpenConsult[],
+  askedAt: number,
+  now = Date.now(),
+): ConsultsState {
+  const out: ConsultsState = {};
+  for (const [runId, c] of Object.entries(state)) {
+    const gone = c.channelId === channelId && c.status === "asking" && c.at < askedAt;
+    if (!gone || open.some((o) => o.runId === runId)) out[runId] = c;
+  }
+  for (const o of open) {
+    const known = out[o.runId];
+    if (known && known.status !== "asking") continue;
+    const since = Date.parse(o.since);
+    out[o.runId] = {
+      runId: o.runId,
+      agentId: o.agentId,
+      consultedAgentId: o.consultedAgentId,
+      channelId: o.channelId,
+      threadId: o.threadId,
+      status: "asking",
+      since: Number.isNaN(since) ? (known?.since ?? now) : since,
+      at: now,
+    };
+  }
+  return out;
+}
+
+/**
+ * Questions still out, as the server last said (`agents.activeRuns` publishes them): each live view
+ * seeds its line from here with `reconcileConsults`.
+ */
+type ConsultSeed = (channelId: string, open: OpenConsult[], askedAt: number) => void;
+const seeds = new Set<ConsultSeed>();
+export const consultSeeds = {
+  publish(channelId: string, open: OpenConsult[], askedAt: number) {
+    for (const fn of seeds) fn(channelId, open, askedAt);
+  },
+  subscribe(fn: ConsultSeed) {
+    seeds.add(fn);
+    return () => {
+      seeds.delete(fn);
+    };
+  },
+};
 
 /** The consultations to show in a channel now, oldest first (stale ones left out). */
 export function consultsIn(state: ConsultsState, channelId: string, now = Date.now()): LiveConsult[] {

@@ -118,16 +118,21 @@ describe("live row and Parar", () => {
     await ev({ type: "agent.delta", ...ids, seq: 2, text: "Deu 2." });
     await settle(3);
     const row = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    const heads = within(row).getAllByRole("button", { name: /Rodando código|Rodou/ });
-    expect(heads).toHaveLength(2);
+    // One line while it works: what it does now and the steps; a click opens every call.
+    const head = row.querySelector(".ac-tools__head") as HTMLElement;
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(head.textContent).toContain("Rodando código…");
+    expect(head.textContent).toContain("2 passos");
+    await act(async () => fireEvent.click(head));
+    const lines = () => [...row.querySelectorAll<HTMLElement>("button.ac-tools__row")];
+    expect(lines()).toHaveLength(2);
     // t2 still runs: open, with its code.
-    expect(heads[1]?.getAttribute("aria-expanded")).toBe("true");
+    expect(lines()[1]?.getAttribute("aria-expanded")).toBe("true");
     expect(within(row).getByLabelText("Código (python)").textContent).toBe("print(2)");
-    await ev({ type: "agent.tool", ...ids, tool: null });
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t2" });
     await settle(2);
-    const done = within(row).getAllByRole("button", { name: /Rodou/ });
-    expect(done.at(-1)?.textContent).toBe("Rodou 1 linha de python · saída 2 B");
-    expect(done.at(-1)?.getAttribute("aria-expanded")).toBe("false");
+    expect(lines().at(-1)?.textContent).toContain("Rodou 1 linha de python · saída 2 B");
+    expect(lines().at(-1)?.getAttribute("aria-expanded")).toBe("false");
   });
 
   test("Parar: one click on the composer's stop, then 'Parado por você · Continuar'; text kept", async () => {

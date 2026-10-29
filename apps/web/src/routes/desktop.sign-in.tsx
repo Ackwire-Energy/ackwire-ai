@@ -4,7 +4,7 @@ import { DesktopSignInPage } from "@/pages/DesktopSignInPage";
 
 const PROVIDERS: SignInProvider[] = ["google", "github", "apple"];
 
-/** The Mac app's social sign-in, in the browser (D79): the app opens this here instead of loading it. */
+/** The Mac app's social sign-in, in the browser (ADR 0036): the app opens this here instead of loading it. */
 export const Route = createFileRoute("/desktop/sign-in")({
   validateSearch: (
     search: Record<string, unknown>,

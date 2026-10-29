@@ -211,7 +211,7 @@ export const threads = pgTable(
 
 /**
  * A person's explicit choice about a thread (the phone app's "Seguir"). No
- * row: they follow the threads they started or wrote in (D46). `following`
+ * row: they follow the threads they started or wrote in. `following`
  * true adds them (notified of replies, replies count as unread in the
  * channel); false mutes them even where they wrote. Keyed by the root
  * message (no foreign key to the partitioned `messages`).

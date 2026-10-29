@@ -2,16 +2,19 @@ import {
   type Adapters,
   createFakeEmailSender,
   createFakePushSender,
+  createFakeWebPushSender,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   type DatabaseDriver,
+  type HumanCheck,
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
   type SandboxProvider,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -20,17 +23,20 @@ import {
   createFakeScheduleReader,
   createLocalKeyWrapper,
   drainOutbox,
+  type EmailArt,
   type FakeScheduleAnswers,
   type McpConnect,
   type ResolveHost,
   type ToolSource,
 } from "@agenteschat/engine";
+import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
 import { type AppleTokenRevoker, createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
 import { createMachineSockets } from "../src/realtime/machines";
+import { createStreamSockets } from "../src/realtime/streams";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
 
 export const ORIGIN = "http://localhost:3000";
@@ -78,6 +84,16 @@ export async function createTestServer(
     mail?: MailAdapters;
     /** Fake database driver (ADR 0039); absent = no database connector. */
     databases?: DatabaseDriver;
+    /** Where emails get their pictures; absent = linked from `PUBLIC_URL`. */
+    emailArt?: EmailArt;
+    /** Fake TypeSafe (checks of the Jev key). */
+    jevFetch?: typeof fetch;
+    /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
+    humanCheck?: HumanCheck;
+    /** The server's own file store's kind (`disk`, `postgres`, `s3`); it keeps files in memory either way. */
+    platformKind?: string;
+    /** Browser push (ADR 0071); absent = a fake that records, null = off. */
+    webPush?: WebPushSender | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -89,7 +105,8 @@ export async function createTestServer(
   const log = createLogger("error");
   const email = createFakeEmailSender();
   const push = createFakePushSender();
-  const platformBlobs = createMemoryBlobStore();
+  const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
+  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),
@@ -101,8 +118,10 @@ export async function createTestServer(
     email,
     platformBlobs,
     push,
+    webPush,
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
+    humanCheck: options.humanCheck ?? null,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -110,7 +129,7 @@ export async function createTestServer(
     db,
     config,
     adapters,
-    modelProviders: { anthropic: provider, openai: provider },
+    modelProviders: Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])),
     toolSources: options.toolSources,
     mcpConnect: options.mcpConnect,
     http: options.http,
@@ -123,9 +142,20 @@ export async function createTestServer(
     judge: createFakeJudge(options.judge),
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
     toolsOnDemand: false,
+    emailArt: options.emailArt,
+    jevFetch: options.jevFetch,
   });
+  // As at boot: the saved Jev key is read before anything serves.
+  await engine.jevKey.ready();
   const { handlers } = engine;
-  const auth = createAuth({ db, config, log, emailDelivers: true });
+  const auth = createAuth({
+    db,
+    config,
+    log,
+    emailDelivers: true,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition: "selfhost",
     version: "test",
@@ -149,6 +179,9 @@ export async function createTestServer(
         appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
         browserLive: engine.browserLive,
+        router: engine.router,
+        streams: engine.streams,
+        jevKey: engine.jevKey,
       },
     },
     log,
@@ -161,11 +194,13 @@ export async function createTestServer(
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db, auth, config, broker: engine.streams }),
   });
   return {
     db,
     close: async () => {
       await engine.machineHub.stop();
+      engine.streams.stop();
       await close();
     },
     config,
@@ -174,6 +209,7 @@ export async function createTestServer(
     embeddings,
     email,
     push,
+    webPush,
     platformBlobs,
     engine,
     app,
@@ -193,6 +229,20 @@ export function listen(t: TestServer) {
     fetch: (req, srv) => t.realtime.fetch(req, srv, (r) => t.app.fetch(r)),
     websocket: t.realtime.websocket,
   });
+}
+
+/** A WebSocket upgrade's HTTP status, for refused connections (a plain request with the upgrade headers). */
+export async function upgradeStatus(url: string, headers: Record<string, string>) {
+  const res = await fetch(url.replace("ws://", "http://"), {
+    headers: {
+      ...headers,
+      connection: "Upgrade",
+      upgrade: "websocket",
+      "sec-websocket-version": "13",
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+    },
+  });
+  return res.status;
 }
 
 /** Minimal browser over `app.request`: keeps cookies and sends our Origin. */
@@ -228,13 +278,36 @@ export function browser(t: TestServer) {
 
 export type Browser = ReturnType<typeof browser>;
 
-export async function signUp(b: Browser, email: string, options: { inviteToken?: string } = {}) {
+export async function signUp(b: Browser, email: string) {
   const res = await b("/api/auth/sign-up/email", {
     json: { email, password: "correct horse battery", name: email.split("@")[0] },
-    headers: options.inviteToken ? { "x-invite-token": options.inviteToken } : undefined,
   });
   if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
   return res;
+}
+
+/**
+ * Someone joins `orgId` the way people do (ADR 0068): `admin` invites the address by email, a new browser signs
+ * up with it (the invitation opens sign-up on this closed server) and accepts. `as`: an account already signed in
+ * with that address accepts instead.
+ */
+export async function joinByInvitation(
+  t: TestServer,
+  admin: Browser,
+  orgId: string,
+  email: string,
+  options: { role?: "member" | "admin"; as?: Browser } = {},
+) {
+  const invited = await admin(`/api/app/organizations/${orgId}/invitations`, {
+    json: { email, role: options.role ?? "member" },
+  });
+  if (invited.status !== 201) throw new Error(`invite failed: ${invited.status} ${await invited.text()}`);
+  const token = ((await invited.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  const b = options.as ?? browser(t);
+  if (!options.as) await signUp(b, email);
+  const accepted = await b(`/api/app/invitations/${token}/accept`, { json: {} });
+  if (accepted.status !== 200) throw new Error(`accept failed: ${accepted.status} ${await accepted.text()}`);
+  return b;
 }
 
 /**
@@ -267,7 +340,7 @@ export async function pairComputer(
   return (await token.json()) as { machineId: string; token: string; name: string; org: { id: string; name: string } };
 }
 
-/** Owner with an organization, a credential and an agent `@dev` in #general. */
+/** Owner with an organization, a credential and an agent `@dev` in #general (a fixed model, not Automático). */
 export async function seedOrg(b: Browser) {
   const created = (await (
     await b("/api/app/organizations", { json: { name: "Acme", context: "Acme builds rockets." } })
@@ -283,7 +356,13 @@ export async function seedOrg(b: Browser) {
   ).json()) as { id: string };
   const agent = (await (
     await b(`/api/app/organizations/${orgId}/agents`, {
-      json: { name: "Dev", handle: "dev", credentialId: credential.id, monthlyBudgetUsd: 50 },
+      json: {
+        name: "Dev",
+        handle: "dev",
+        model: "claude-sonnet-5-5",
+        credentialId: credential.id,
+        monthlyBudgetUsd: 50,
+      },
     })
   ).json()) as { id: string };
   await b(`/api/app/organizations/${orgId}/channels/${created.generalChannelId}/members`, {

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { modelChoices, suggestModel } from "@agenteschat/client/lib/providers";
+import { modelChoices } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
@@ -128,14 +128,14 @@ describe("Detalhes do canal: membros", () => {
     state.channelMembers[GENERAL_ID]?.push({ type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     let dialog = await openDetails();
-    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    expect(dialog.textContent).toContain("Entra na conversa por conta própria");
     const menu = await openMenu("Atlas");
     expect(
       within(menu)
-        .getByRole("menuitemradio", { name: /^Sozinho/ })
+        .getByRole("menuitemradio", { name: /^Por conta própria/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(menu).getByRole("menuitemradio", { name: /^Quando chamado/ }));
+    await click(within(menu).getByRole("menuitemradio", { name: /^Quando alguém chama/ }));
     await settle(4);
     const put = state.calls.find((c) => c.method === "agents.setChannels");
     expect(put?.args[1]).toBe(ATLAS_ID);
@@ -230,7 +230,7 @@ describe("models by provider and the default key", () => {
   ];
   const cred = { id: "k", provider: "anthropic", label: "A", keyHint: "1", createdAt: "", revokedAt: null };
 
-  test("availability comes from the keys (or the server's flag); suggested model per provider", () => {
+  test("availability comes from the keys (or the server's flag)", () => {
     expect(modelChoices(models, [cred], false).map(([p, c]) => [p, c.map((x) => x.available)])).toEqual([
       ["anthropic", [true]],
       ["openai", [false]],
@@ -238,8 +238,6 @@ describe("models by provider and the default key", () => {
     expect(
       modelChoices([{ ...models[1], available: true } as (typeof models)[number]], [], false)[0]?.[1][0]?.available,
     ).toBe(true);
-    expect(suggestModel(models, "anthropic")).toBe("claude-sonnet-5-5");
-    expect(suggestModel(models, "openai")).toBe("gpt-5");
   });
 
   test("Criar agente: model cards by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
@@ -248,15 +246,18 @@ describe("models by provider and the default key", () => {
     await proceed(4);
     const models = screen().getByRole("group", { name: "Modelo" });
     const cards = within(models).getAllByRole("button");
-    expect(cards.map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
-      "Anthropic",
-      "Anthropic",
-      "Anthropic",
+    // "Automático" first and chosen, then the models by provider.
+    expect(cards[0]?.querySelector(".newag__model-head b")?.textContent).toBe("Automático");
+    expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(cards.slice(1).map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
+      "Claude",
+      "Claude",
+      "Claude",
       "OpenAI",
     ]);
     const gpt = within(models).getByRole("button", { name: /GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Adicione uma chave da OpenAI para usar");
+    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });
@@ -288,7 +289,7 @@ describe("agent questions (ask_user)", () => {
       meta: { question },
       createdAt: new Date().toISOString(),
     });
-    // Asked in the channel (D67): the question has no thread, so the receipt follows the run that answers m-1.
+    // Asked in the channel: the question has no thread, so the receipt follows the run that answers m-1.
     const asked = state.messages.find((m) => m.id === "m-1");
     if (asked)
       asked.receipts = { seenBy: [], pickedBy: [], handled: [{ agentId: ADA_ID, runId: "r-q", status: "running" }] };
@@ -319,7 +320,7 @@ describe("agent questions (ask_user)", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("o login está devolvendo 401")) as HTMLElement;
     expect(root.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada; Ada está esperando sua resposta",
+      "Vista por Ada. Ada está esperando sua resposta",
     );
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");

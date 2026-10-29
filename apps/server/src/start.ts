@@ -1,16 +1,18 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   type Adapters,
   createComposioClient,
   createComposioMailConnector,
   createDaytonaSandboxProvider,
+  createDiskBlobStore,
   createExpoPushSender,
   createImapConnectionTester,
   createImapMailConnector,
   createImapPoller,
   createLogEmailSender,
   createMemoryPresence,
+  createMemoryPubSub,
   createMemoryRateLimiter,
   createMillionSendSender,
   createPostgresBlobStore,
@@ -18,29 +20,54 @@ import {
   createPostgresPubSub,
   createPostgresSearchResolver,
   createS3BlobStore,
+  createSmtpEmailSender,
+  createTurnstileCheck,
+  createWebPushSender,
+  type EmailSender,
   envPlatformCredentials,
+  type KeyWrapper,
   MAIL_PRESETS,
   type MailAdapters,
   postgresJsNotifier,
+  type WebPushSender,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
-import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
 import {
+  createDatabase,
+  type Database,
+  type DatabaseHandle,
+  ensureMessagePartitions,
+  MigrationMismatchError,
+} from "@agenteschat/db";
+import {
+  adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
+  defaultEmailFrom,
   drainLocalRuns,
+  emailArtFor,
   enableCaches,
+  enableOperatorEvents,
+  enablePersonalPlans,
   isBlockedAddress,
   resolveHostDns,
+  retireHostTokens,
+  setRestrictionNotices,
+  vapidKeys,
+  vapidSubject,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
+import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
-import { createLogger } from "./logger";
+import { checkHumanCheckAtBoot } from "./http/human-check";
+import { createLogger, type Logger } from "./logger";
+import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
+import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
+import { startTelemetry } from "./telemetry";
 import { version } from "./version";
 import { startWorkers } from "./workers";
 
@@ -50,15 +77,21 @@ const RUN_DRAIN_MS = 20_000;
 export interface StartOptions {
   edition: Edition;
   modules?: AgentesModule[];
+  /**
+   * Answer only requests addressed to this server's own names (`127.0.0.1:<PORT>`, `localhost:<PORT>`
+   * and `PUBLIC_URL`'s host), with a 421 for any other: native mode listens on loopback, where a web
+   * page that points a name of its own at 127.0.0.1 (DNS rebinding) would otherwise reach it.
+   */
+  ownHostsOnly?: boolean;
 }
 
 /**
  * Boots an agentes.chat server: config → database → migrations → adapters
  * (core defaults, then module overrides) → HTTP + WebSocket → workers.
- * Shared by the self-hosted entrypoint (`src/main.ts`) and the Cloud
- * entrypoint in the private `agentes-chat-cloud` repo; only `modules` differ.
+ * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
+ * that adds public modules (ADR 0002); only `modules` differ.
  */
-export async function startServer({ edition, modules = [] }: StartOptions) {
+export async function startServer({ edition, modules = [], ownHostsOnly = false }: StartOptions) {
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
@@ -72,37 +105,34 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   const log = createLogger(config.LOG_LEVEL);
   log.info("starting agentes.chat", { version, edition, config: redactConfig(config) });
+  if (config.NODE_ENV === "production" && config.PUBLIC_URL === "http://localhost:3000") {
+    log.warn(
+      "PUBLIC_URL is http://localhost:3000 (the default): only a browser on this machine, at exactly that address, can sign in and save. Set PUBLIC_URL to the address people open (e.g. https://chat.example.com): sign-in cookies, the browser origin allowed to make changes (CSRF) and the links in emails all come from it, so from any other address sign-in and saving fail with bad_origin.",
+    );
+  }
 
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
-  if (config.RUN_MIGRATIONS_ON_BOOT) {
-    log.info("applying database migrations");
-    try {
-      await database.migrate();
-    } catch (error) {
-      if (error instanceof MigrationMismatchError) {
-        // Never re-run or skip a changed migration against a real database.
-        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
-        process.exit(1);
-      }
-      throw error;
-    }
-  }
-  await ensureMessagePartitions(database.db);
+  await prepareDatabase(database, log, config.RUN_MIGRATIONS_ON_BOOT);
+  // Best effort: a replica that boots before the migrations ran (RUN_MIGRATIONS_ON_BOOT=false) still starts.
+  await retireHostTokens(database.db, config.HOST_COMPUTER_TOKEN).then(
+    (retired) =>
+      retired > 0 && log.info("this server's computer: tokens of an earlier HOST_COMPUTER_TOKEN retired", { retired }),
+    (error: unknown) => log.warn("couldn't check this server's computer's tokens", { error: String(error) }),
+  );
 
+  // Browser push's VAPID key is sealed with the installation's key wrappers, read once modules had their
+  // say (`resolved`, ADR 0071).
+  const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
+  let resolved: Adapters | null = null;
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
-    pubsub: await createPostgresPubSub(postgresJsNotifier(database.client)),
+    // PGlite (native mode) is one process: nothing to tell other replicas.
+    pubsub: database.client ? await createPostgresPubSub(postgresJsNotifier(database.client)) : createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
-    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    keyWrapper: localKeyWrapper,
     legacyKeyWrappers: [],
-    email: config.MILLIONSEND_API_KEY
-      ? createMillionSendSender({
-          apiKey: config.MILLIONSEND_API_KEY,
-          from: config.EMAIL_FROM,
-          replyTo: config.EMAIL_REPLY_TO,
-        })
-      : createLogEmailSender((line, data) => log.info(line, data)),
+    email: emailSender(config, log),
     platformCredentials: envPlatformCredentials({
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
@@ -117,23 +147,82 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
       : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
+    webPush: webPushSender(
+      config,
+      database.db,
+      () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])],
+      log,
+    ),
     mail: mailAdapters(config),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
+    // agentes.chat Cloud's bot check (ADR 0075), only with both keys: without them nothing reaches Cloudflare.
+    humanCheck:
+      config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY
+        ? createTurnstileCheck({
+            siteKey: config.TURNSTILE_SITE_KEY,
+            secretKey: config.TURNSTILE_SECRET_KEY,
+            hostnames: [new URL(config.PUBLIC_URL).hostname],
+            log,
+          })
+        : null,
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
+  log.info("transactional email", { sender: defaults.email.id });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
+  log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version };
-  const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
-    anthropic: createAnthropicProvider(),
-    openai: createOpenAIProvider(),
-  });
+  const { adapters, modelProviders, overridden } = await resolveAdapters(
+    modules,
+    base,
+    defaults,
+    createModelProviders(),
+  );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  resolved = adapters;
+  try {
+    await checkHumanCheckAtBoot(adapters.humanCheck, log);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
   const ctx: ModuleContext = { ...base, adapters };
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // Where workspaces get their computer from this server, an agent on a plan answers only its owner.
+  enablePersonalPlans(config.MACHINE_PROVISIONING === "external");
+  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
+  setRestrictionNotices(config.PUBLIC_URL);
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  if (config.OPERATOR_API_TOKEN) {
+    enableOperatorEvents();
+    // Before the API serves a page: a caller restarting after a restore must find these rows first.
+    const adopted = await adoptRestoredOperatorEvents(database.db);
+    if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
+  const webDir = resolve(config.WEB_DIR);
+  const emailArt = await emailArtFor(config.PUBLIC_URL, existsSync(webDir) ? webDir : undefined, config.EMAIL_ART);
+  const because = {
+    attach: "EMAIL_ART=attach",
+    blocked: "PUBLIC_URL's host is private",
+    unreachable: "PUBLIC_URL's host didn't resolve, until a restart",
+  };
+  const pictures = {
+    from: emailArt.base ?? "attached to each message",
+    ...(emailArt.attached && { because: because[emailArt.attached] }),
+  };
+  // A failed lookup attaches them for the whole run, though the host may well be public.
+  if (emailArt.attached === "unreachable") log.warn("email pictures", pictures);
+  else log.info("email pictures", pictures);
+  if (!existsSync(join(webDir, "email", "logo-ink.png"))) {
+    log.warn("emails' pictures not found: their logo and art won't show", { dir: join(webDir, "email") });
+  }
   const engine = buildEngine({
     db: database.db,
     config,
@@ -141,7 +230,11 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     modelProviders,
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
     onRunProfile: (p) => log.debug("run profile", p),
+    emailArt,
+    log,
   });
+  // The saved Jev key, before anything calls Jev (vision reads it synchronously).
+  await engine.jevKey.ready();
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -151,11 +244,19 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
+    desktops: engine.desktops,
     log,
   });
+  const telemetry = startTelemetry({ db: database.db, config, log });
 
-  const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
-  const webDir = resolve(config.WEB_DIR);
+  const auth = createAuth({
+    db: database.db,
+    config,
+    log,
+    emailDelivers: adapters.email.delivers,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition,
     version,
@@ -174,6 +275,10 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         browserLive: engine.browserLive,
+        streams: engine.streams,
+        talker: engine.talker,
+        router: engine.router,
+        jevKey: engine.jevKey,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
       },
@@ -192,14 +297,49 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
+  const publicUrl = new URL(config.PUBLIC_URL);
+  const ownHosts = ownHostsOnly
+    ? new Set([`127.0.0.1:${config.PORT}`, `localhost:${config.PORT}`, publicUrl.host])
+    : null;
+  /**
+   * A 421 for a name not its own; and a page opened at another of its own names goes to `PUBLIC_URL`,
+   * the only origin that sign-in and saving accept. Temporary: `PUBLIC_URL` changes with Tailscale.
+   */
+  const ownHostAnswer = (req: Request) => {
+    const host = req.headers.get("host") ?? "";
+    if (!ownHosts || host === publicUrl.host) return null;
+    if (!ownHosts.has(host)) return new Response("This server answers only at its own address.\n", { status: 421 });
+    if (req.method !== "GET" || !req.headers.get("accept")?.includes("text/html")) return null;
+    const { pathname, search } = new URL(req.url);
+    return Response.redirect(new URL(pathname + search, publicUrl).href, 302);
+  };
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
-    fetch: (req, srv) => realtime.fetch(req, srv, (r) => app.fetch(r)),
+    // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
+    // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
+    idleTimeout: 120,
+    fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+  const operator = serveOperatorApi({
+    db: database.db,
+    config,
+    version,
+    log,
+    pubsub: adapters.pubsub,
+    hub: engine.machineHub,
+    emails: adapters.email.delivers,
+    humanCheck: adapters.humanCheck,
+    sessions: engine.sessions,
+  });
+  if (operator) {
+    log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
+  }
+  if (engine.sessions) log.info("session screening on: screens are read while people are in control (ADR 0076)");
 
   for (const module of modules) await module.onStart?.(ctx);
 
@@ -208,14 +348,20 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     if (stopping) return;
     stopping = true;
     log.info("shutting down", { signal });
-    // No new jobs; HTTP stops taking requests (the new deploy serves them).
+    // No new jobs; HTTP stops taking requests (the new deploy serves them). Not awaited: the
+    // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
-    await server.stop();
-    // Runners reconnect to the next instance.
+    telemetry.stop();
+    void server.stop();
+    void operator?.stop();
+    // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
+    engine.streams.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
+    // Browser tabs, left open so they saw those runs finish, reconnect to the next instance.
+    await server.stop(true);
     for (const module of modules) await module.onStop?.();
     await adapters.pubsub.close?.();
     await database.close();
@@ -227,18 +373,95 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   return { server, config };
 }
 
-/** Our bucket (S3_*) when configured, else Postgres. */
+/**
+ * The database steps of boot, shared with `main.ts migrate`: pending
+ * migrations (unless `migrate` is false), then the upcoming `messages`
+ * partitions. Exits 1 when the database's migrations don't match this build.
+ */
+export async function prepareDatabase(database: DatabaseHandle, log: Logger, migrate = true) {
+  if (migrate) {
+    log.info("applying database migrations");
+    try {
+      await database.migrate();
+    } catch (error) {
+      if (error instanceof MigrationMismatchError) {
+        // Never re-run or skip a changed migration against a real database.
+        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
+        process.exit(1);
+      }
+      throw error;
+    }
+  }
+  await ensureMessagePartitions(database.db);
+}
+
+/** MillionSend (or another Resend-compatible API) when keyed, else SMTP when `SMTP_URL` is set, else only the log. */
+function emailSender(config: Config, log: Logger): EmailSender {
+  const from = config.EMAIL_FROM ?? defaultEmailFrom(config.PUBLIC_URL);
+  const replyTo = config.EMAIL_REPLY_TO;
+  if (config.MILLIONSEND_API_KEY) {
+    return createMillionSendSender({
+      apiKey: config.MILLIONSEND_API_KEY,
+      baseURL: config.MILLIONSEND_API_URL,
+      from,
+      replyTo,
+    });
+  }
+  if (config.SMTP_URL) return createSmtpEmailSender({ url: config.SMTP_URL, from, replyTo });
+  return createLogEmailSender((line, data) => log.info(line, data));
+}
+
+/** Our bucket (S3_*) when configured, else a folder on this server (FILES_DIR), else Postgres. */
 function platformBlobStore(config: Config, db: Database) {
   const { S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY } = config;
-  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) return createPostgresBlobStore(db);
+  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) {
+    return config.FILES_DIR ? createDiskBlobStore(config.FILES_DIR) : createPostgresBlobStore(db);
+  }
   return createS3BlobStore({
     endpoint: S3_ENDPOINT,
     region: config.S3_REGION,
     bucket: S3_BUCKET,
     accessKeyId: S3_ACCESS_KEY_ID,
     secretAccessKey: S3_SECRET_ACCESS_KEY,
-    pathStyle: false,
+    pathStyle: config.S3_PATH_STYLE,
   });
+}
+
+/** At most one log line this often about push services refusing this server's signature. */
+const WEB_PUSH_REFUSED_LOG_MS = 10 * 60_000;
+
+/**
+ * Browser push, unless `WEB_PUSH=off`. Endpoints come from browsers, so hosts on our own network are refused;
+ * a DNS that doesn't answer is a failure to retry (`resolveHostDns` throws), never a refused host.
+ */
+function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[], log: Logger): WebPushSender | null {
+  if (config.WEB_PUSH === "off") return null;
+  const sender = createWebPushSender({
+    vapid: () => vapidKeys(db, wrappers(), config),
+    checkHost: async (host) => {
+      const addresses = await resolveHostDns(host);
+      if (addresses.length === 0) throw new Error(`no address for ${host}`);
+      return !addresses.some(isBlockedAddress);
+    },
+  });
+  // A push service refusing the signature (401/403) keeps the subscription (ADR 0071) and is the operator's to
+  // see: for a while after the key changed it's expected, all the time it's this server's key or contact.
+  let loggedAt = 0;
+  return {
+    id: sender.id,
+    async send(message) {
+      const result = await sender.send(message);
+      if (result.unauthorized && Date.now() - loggedAt > WEB_PUSH_REFUSED_LOG_MS) {
+        loggedAt = Date.now();
+        log.warn("a browser's push service refused this server's Web Push signature", {
+          pushService: new URL(message.endpoint).host,
+          error: result.error,
+          contact: vapidSubject(config),
+        });
+      }
+      return result;
+    },
+  };
 }
 
 /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */

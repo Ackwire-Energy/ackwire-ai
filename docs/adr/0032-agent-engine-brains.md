@@ -1,8 +1,7 @@
 # 0032. One agent engine, swappable brains (model, Claude Code, Codex)
 
-- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag)
+- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen)
 - Date: 2026-10-17
-- Planning: D38 (revision of 2026-10-17)
 - Extends: ADR 0008 (agent runs), ADR 0015 (Tool Gateway and approvals), ADR 0025 (connected computers and the runner), ADR 0029 (missions), ADR 0030 (runner isolation)
 
 ## Context
@@ -67,7 +66,7 @@ Blocking decisions and reviews in missions use the same pause/resume.
 ### 5. Choosing the brain
 
 - Per agent: **Modelo (API)** (default), **Claude Code no <computador>**, **Codex no <computador>**, each with a model (`--model opus|sonnet|…`, `-m <model>`; `--fallback-model` for Claude Code). Only what the computer has is offered (runner detection, protocol 7). A mission can override the agent's brain and model.
-- The agent keeps its audience (D31). Choosing a plan brain shows a clear warning that the subscription is personal and that answering other people with it may go against the provider's terms; the person confirms and owns the risk. We don't block it.
+- The agent keeps its audience. Choosing a plan brain shows a clear warning that the subscription is personal and that answering other people with it may go against the provider's terms; the person confirms and owns the risk. We don't block it.
 - **Fallback, by what exists**: when the computer is offline, the executor isn't logged in, or the plan limit is hit:
   - if a model credential exists (the platform key on the Cloud, or an org/default key), the turn runs on the model brain and the reply carries a quiet note ("respondi pela API: o Claude Code no mac está offline"); that turn counts against the agent's budget;
   - if no model credential exists (a self-hosted install running only on plans), the agent says it is unavailable ("o Claude Code no mac está offline; respondo quando ele voltar") and the message waits in the run queue until the computer is back.
@@ -145,7 +144,7 @@ A mission's main session is simply the agent's run in the mission thread with th
 ### Codex (block 6)
 
 - Same `brain.turn` op: the runner's dispatch sends `kind: "codex"` to `handleCodexBrainTurn` (`apps/server/runner/brain-codex.ts`): `codex exec --json` per turn (`resume <thread_id>` next turns; our session → Codex thread in `<runner home>/brain/codex-threads.json`), JSONL → `BrainEvent`, our MCP bridge as `mcp_servers.agenteschat_agentes` (`agentes-runner mcp --run <runId>`, token in the env), relayed for the run while the turn lasts. Not on Windows yet. `CODEX_MIN_VERSION` (0.163.0) is kept in the runner and the engine.
-- Engine side: `CodexBrain` over `hubBrainLink` (`brain.turn` through the hub, events from `brainTopic`); availability errors are retryable (fallback). Default model: the catalog's recommended OpenAI model (`gpt-6-sol`).
+- Engine side: `CodexBrain` over `hubBrainLink` (`brain.turn` through the hub, events from `brainTopic`); availability errors are retryable (fallback). Default model: the catalog's recommended OpenAI model (`gpt-6.1-sol`).
 
 ### Missions on the engine (block 4; the only path)
 
@@ -153,7 +152,7 @@ A mission's main session is simply the agent's run in the mission thread with th
 - **Main session = runs** (`createMissionEngine`, `tellMainSession`): every wake-up of the main session (proposal, Start, a person's word, accepted suggestions, decisions, reviews, an item's end, the inbox) posts the notice in the home thread and starts a run in the same transaction (one run per agent and notice; or joins the run working there). One plan prompt and one start prompt (`planPrompt`, `START_PROMPT`), the same for every brain. A blocking `ask_decision` or a `request_review` returns `data.pause` with the decision's or review's id: the run waits (`waiting_input`, pending call with `waitId`), and the answer resumes it (`resumeRunWithResult`) with the text as the tool result; with nothing waiting, the answer starts a turn. Merge, deploy and rollback are the main session's `request_approval`, an ordinary ADR 0015 approval of its run.
 - **Item work** stays machine tasks (own session, branch or subfolder; runner `task.start` with the mission, always in work mode), started by the run with `start_task`, with the restricted mission gateway (`createMissionBridgeToolSource`: `report`, `update_plan`, `ask_decision`, `request_review`, `upload_artifact`, `get_context`, `permission_prompt`; `request_approval` is not listed, so the gateway refuses it as unknown). An item's end is a notice for the main session ("waiting for a decision/review" when it stopped on one); the main session's own tasks (the sandbox `start_task`) end like any of its wake-ups.
 - **Gates**: paused, closed or no computer → the text waits in `missions.inbox` (`deliverMissionInbox` sends the main session's part as one notice and resumes item sessions as tasks); the stuck-loop guard counts wake-ups for every brain; stop, close and a new executor before Start cancel the agent's runs in the thread (tokens revoked).
-- **Deleted (2026-10-17): the flag and the old path.** `MISSIONS_ON_ENGINE` is gone; so are executor tasks for the main session (plan and work modes of `task.start` for it, `task.start.mission.mode`), the agent-mode-only wake and inbox code, `send_to_mission` and the brief's "route and relay" branch, the duplicated plan/start prompts, the task-bound mission approvals (`createMissionApproval`, `onMissionApprovalDecided`, job `mission.approval_decided`) and the open-missions migration (`mission.engine_migrate`). We are in MVP with no customers: missions open before the deploy are not migrated and may stop or need a new message; approvals left with `run_id` null are not drained. Unused columns (`machine_tasks.waiting_for` for main sessions, `approvals.mission_task_id`) stay; committed migrations don't change.
+- **Deleted (2026-10-17): the flag and the old path.** `MISSIONS_ON_ENGINE` is gone; so are executor tasks for the main session (plan and work modes of `task.start` for it, `task.start.mission.mode`), the agent-mode-only wake and inbox code, `send_to_mission` and the brief's "route and relay" branch, the duplicated plan/start prompts, the task-bound mission approvals (`createMissionApproval`, `onMissionApprovalDecided`, job `mission.approval_decided`) and the open-missions migration (`mission.engine_migrate`). Missions open before this change are not migrated and may stop or need a new message; approvals left with `run_id` null are not drained. Unused columns (`machine_tasks.waiting_for` for main sessions, `approvals.mission_task_id`) stay; committed migrations don't change.
 
 ### Known limits
 

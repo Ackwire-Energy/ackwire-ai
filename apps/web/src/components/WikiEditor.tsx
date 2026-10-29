@@ -1,38 +1,10 @@
 import type { WikiPageSummary } from "@agenteschat/client";
+import { prefixLines, wikiQuery, wrapSelection } from "@agenteschat/client/lib/wiki";
 import { Button, Kbd, modKey, Segmented } from "@agenteschat/ui";
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Markdown } from "@/lib/markdown";
 import { useWikiLinkRenderer } from "./WikiLinks";
-
-/** `[[que` right before the caret (no `]]` yet): the link being typed. */
-export function wikiQuery(text: string, caret: number): { start: number; query: string } | null {
-  const before = text.slice(0, caret);
-  const at = before.lastIndexOf("[[");
-  if (at < 0) return null;
-  const query = before.slice(at + 2);
-  if (/[\]\n[]/.test(query) || query.length > 80) return null;
-  return { start: at, query };
-}
-
-/** Wraps the selection (or inserts a placeholder) and returns the new text and selection. */
-export function wrapSelection(text: string, start: number, end: number, before: string, after = before, empty = "") {
-  const selected = text.slice(start, end) || empty;
-  const next = text.slice(0, start) + before + selected + after + text.slice(end);
-  return { text: next, start: start + before.length, end: start + before.length + selected.length };
-}
-
-/** Prefixes each selected line ("## ", "- ", "- [ ] "). */
-export function prefixLines(text: string, start: number, end: number, prefix: string) {
-  const lineStart = text.lastIndexOf("\n", start - 1) + 1;
-  const block = text.slice(lineStart, end);
-  const prefixed = block
-    .split("\n")
-    .map((l) => (l.startsWith(prefix) ? l : prefix + l))
-    .join("\n");
-  const next = text.slice(0, lineStart) + prefixed + text.slice(end);
-  return { text: next, start: start + prefix.length, end: lineStart + prefixed.length };
-}
 
 type Mode = "write" | "preview" | "split";
 

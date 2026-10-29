@@ -1,4 +1,4 @@
-/* Equipe (telas/Organograma.html, Céu): the agents in the pixel sky, grouped by their person. */
+/* Equipe: the agents in the pixel sky, grouped by their person. */
 .page.team {
   max-width: 1240px;
   gap: 20px;
@@ -13,7 +13,7 @@
 .team-head h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -187,7 +187,7 @@
 .team-card__title h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 30px;
   letter-spacing: -0.02em;
@@ -207,6 +207,15 @@
 }
 .team-card__status[data-busy] {
   color: var(--ink);
+}
+.team-card__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.team-card__title > .noai-chip {
+  align-self: flex-start;
 }
 .team-card__sec {
   display: flex;

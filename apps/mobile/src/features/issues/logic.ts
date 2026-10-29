@@ -3,7 +3,7 @@ import { toYmd } from "@agenteschat/client/lib/format";
 import { isOpen, STATUSES } from "@agenteschat/client/lib/issues";
 
 /**
- * Tasks ("Tarefas", internally issues) on the phone (MobileDriveIssues.html, Tarefas.html): the list by stage
+ * Tasks ("Tarefas", internally issues) on the phone: the list by stage
  * and board column, its filters and counts, the row's state line, the column picker, and the new task's due
  * date choices. The status follows the web's rules: nobody marks an issue
  * "committed"; it moves by itself (in progress when an agent starts, in review when it links a PR),
@@ -23,6 +23,18 @@ export function issueState(i: Pick<Issue, "status" | "work">): IssueState {
   if (i.status === "in_review") return "review";
   if (i.status === "in_progress") return "progress";
   return "todo";
+}
+
+/**
+ * The state a row in the list still says. The list is grouped by status, so "A fazer", "Em andamento",
+ * "Em revisão", "Feita" and "Cancelada" are already its section; only what happens inside one shows
+ * (working, waiting on you, stalled, a PR in review).
+ */
+export function listState(i: Pick<Issue, "status" | "work" | "pullRequests">): IssueState | null {
+  const state = issueState(i);
+  if (state === "running" || state === "waiting" || state === "stalled") return state;
+  if (state === "review" && latestPr(i)) return state;
+  return null;
 }
 
 /** The agent on it waits on a person (an approval, an answer): the dark strip on top and "Com você". */
@@ -48,7 +60,7 @@ export function passesFilter(
   }
 }
 
-/** The counts on the "Abertas" and "Com você" chips (the others show none, as in the prototype). */
+/** The counts on the "Abertas" and "Com você" chips (the others show none, as designed). */
 export function filterCounts(list: Pick<Issue, "status" | "work" | "assignee">[], meId: string | null) {
   return {
     open: list.filter((i) => passesFilter(i, "open", meId)).length,

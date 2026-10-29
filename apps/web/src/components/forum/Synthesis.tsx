@@ -90,7 +90,7 @@ function DecisionBody({ s }: { s: ForumDecisionCards }) {
               </div>
               <div className="forum-pcr__col">
                 {p.pros.map((x) => (
-                  <span key={x}>
+                  <span key={x} className="ac-iconline">
                     <Icon name="plus" size={14} />
                     {x}
                   </span>
@@ -98,7 +98,7 @@ function DecisionBody({ s }: { s: ForumDecisionCards }) {
               </div>
               <div className="forum-pcr__col">
                 {p.cons.map((x) => (
-                  <span key={x}>
+                  <span key={x} className="ac-iconline">
                     <Icon name="dash" size={14} />
                     {x}
                   </span>
@@ -329,7 +329,7 @@ function SuggestedIssues({ topic }: { topic: ForumTopicDetail }) {
 }
 
 /**
- * The synthesis as a card (telas/Forum.html), decision or plan: who wrote it,
+ * The synthesis as a card, decision or plan: who wrote it,
  * what changed in version 2+ (with the previous version a click away), the
  * headline, the format's sections, suggested issues to approve, where it went
  * (the Drive document, back to the origin) and "Salvar na wiki".
@@ -398,7 +398,7 @@ export function SynthesisCard({ topic }: { topic: ForumTopicDetail }) {
             <div>
               <button
                 type="button"
-                className="forum-vlink"
+                className="ac-link forum-vlink"
                 aria-expanded={showPrev}
                 onClick={() => setShowPrev((x) => !x)}
               >

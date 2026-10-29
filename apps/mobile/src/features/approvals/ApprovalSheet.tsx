@@ -8,14 +8,21 @@ import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { approvalRisk } from "./logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "./parts";
+import { approvalAction, approvalRisk } from "./logic";
+import {
+  ApprovalDetails,
+  ApprovalEmailLetter,
+  ApprovalFuse,
+  ApprovalSaid,
+  ApprovalTraits,
+  approvalTitleText,
+  useOriginShort,
+} from "./parts";
 
 /**
- * A request, from anywhere (deep link `approval/<id>`): who asks, the exact
- * action, what it affects, the details table, what the agent said before and
- * the amber fuse (MobileIntencional.html). High risk takes a hold; refusing
- * can say why ("ajuda o agente a aprender").
+ * A request, from anywhere (deep link `approval/<id>`): who asks, the action
+ * in words, the action itself (the whole email, else the detail and every value, whole), what the agent said, what it affects and the amber fuse. High risk
+ * takes a hold; refusing can say why ("ajuda o agente a aprender").
  */
 export function ApprovalSheet({
   id,
@@ -42,6 +49,7 @@ export function ApprovalSheet({
   const name = agent?.name ?? "";
   const g = genderOf(name);
   const channel = a ? channels.data?.find((x) => x.id === a.channelId) : undefined;
+  const origin = useOriginShort({ origin: a?.origin ?? null });
 
   const done = (decision: "approve" | "refuse") => {
     if (!a) return;
@@ -90,10 +98,11 @@ export function ApprovalSheet({
                 : channel
                   ? t("mobile.approval.asksIn", { channel: channel.name })
                   : t("mobile.approval.asksYou")}
+              {!refusing && origin ? ` · ${origin}` : ""}
             </Text>
           </View>
         </View>
-        <Text variant="title2">{a.title}</Text>
+        <Text variant="title2">{approvalTitleText(t, a)}</Text>
         {refusing ? (
           <>
             <TextArea
@@ -116,14 +125,21 @@ export function ApprovalSheet({
           </>
         ) : (
           <>
-            {a.detail ? (
-              <Text variant="body" tone="ink2" style={styles.detail}>
-                {a.detail}
-              </Text>
-            ) : null}
-            <ApprovalTraits approval={a} />
-            <ApprovalDetails approval={a} max={6} />
+            {a.email ? (
+              <ApprovalEmailLetter email={a.email} full />
+            ) : (
+              <>
+                {/* A connector's detail is its raw call (`tool · key=value`); its values are in the table, in words. */}
+                {a.detail && !a.connector ? (
+                  <Text variant="body" tone="ink2" style={styles.detail}>
+                    {a.detail}
+                  </Text>
+                ) : null}
+                <ApprovalDetails approval={a} max={Number.POSITIVE_INFINITY} long />
+              </>
+            )}
             <ApprovalSaid approval={a} name={name} />
+            <ApprovalTraits approval={a} />
             {pending ? (
               <>
                 <ApprovalFuse approval={a} />
@@ -141,7 +157,9 @@ export function ApprovalSheet({
                           variant="primary"
                           wide
                           icon="check"
-                          label={t("mobile.approval.approve")}
+                          label={
+                            approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")
+                          }
                           disabled={decide.isPending}
                           onPress={() => done("approve")}
                         />

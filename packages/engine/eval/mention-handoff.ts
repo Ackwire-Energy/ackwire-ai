@@ -1,5 +1,5 @@
 /**
- * Mention hand-off eval (D49): when an agent's message @mentions another
+ * Mention hand-off eval (ADR 0034): when an agent's message @mentions another
  * agent, is it handing that agent something to do now (it gets a run) or only
  * naming it (no run)? Scores every case with the production judge and the
  * production threshold (`mentionThreshold`, 0.6).
@@ -137,7 +137,7 @@ let judge: Judge;
 if (which === "jev") {
   const apiKey = process.env.TYPESAFE_API_KEY;
   if (!apiKey) throw new Error("TYPESAFE_API_KEY is missing (or run with --judge llm)");
-  judge = createJevJudge({ apiKey, gateway: noUsage, timeoutMs: 10_000 });
+  judge = createJevJudge({ key: apiKey, gateway: noUsage, timeoutMs: 10_000 });
 } else {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");

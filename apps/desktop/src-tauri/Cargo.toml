@@ -1,7 +1,8 @@
 [package]
 name = "agentes-desktop"
 version = "0.5.5"
-description = "agentes: the menu bar app that lets agents use this computer (ADR 0036)"
+description = "agentes.chat for macOS, Windows and Linux: the Cloud, your own server, and agents on this computer"
+license = "AGPL-3.0-only"
 edition = "2021"
 rust-version = "1.77.2"
 publish = false
@@ -14,21 +15,38 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "unstable"] }
 tauri-plugin-shell = "2"
 tauri-plugin-autostart = "2"
-tauri-plugin-single-instance = "2"
+# A second launch (a link on Windows and Linux arrives as one) reaches the running app.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
+# 2.10 names the bundle the app came in (`{{bundle_type}}` in the update address): a Linux deb isn't sent the AppImage.
+tauri-plugin-updater = "2.10"
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The server here's secrets (local_server.rs): the owner key's SHA-256, base64 for the generated values.
+sha2 = "0.10"
+base64 = "0.22"
+
+[target.'cfg(unix)'.dependencies]
+# SIGTERM for the server here's graceful stop.
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# tauri-plugin-deep-link 2.6.2 fills rust-ini's ParseOption with the two fields 0.21.1 has; 0.21.3 added two
+# more, so it doesn't build against it (0.21.2 is yanked). Drop the pin once the plugin sets all four.
+rust-ini = "=0.21.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The notch window (src/notch.rs): its level, Spaces and frame, and finding the notch.
 objc2 = "0.6"
+# The window buttons placed again the moment AppKit moves them (main_window.rs `follow_lights`).
+block2 = "0.6"
 
 [profile.release]
 codegen-units = 1

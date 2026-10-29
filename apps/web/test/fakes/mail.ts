@@ -17,6 +17,8 @@ export interface FakeMail {
   nextError: MailConnectError | null;
   /** Per agent, per mailbox. */
   agentMail: Map<string, Map<string, AgentMailbox>>;
+  /** What `suggestedAddresses` answers (the mailbox's sent folder). */
+  suggested: string[];
 }
 
 export const MAIL_PROVIDERS: MailProviders = {
@@ -62,6 +64,7 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
     providers: { composio: false, imap: false, presets: [] },
     nextError: null,
     agentMail: new Map(),
+    suggested: [],
     client: undefined as unknown as ApiClient["mail"],
   };
   const find = (id: string) => {
@@ -100,6 +103,8 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
         status: "active",
         offActions: [],
         askActions: [],
+        aliases: [],
+        defaultFrom: null,
         lastError: null,
         preset: input.preset === "custom" ? null : input.preset,
         createdAt: now().toISOString(),
@@ -119,11 +124,18 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
       if (input.label) a.label = input.label;
       if (input.offActions) a.offActions = [...input.offActions];
       if (input.askActions) a.askActions = [...input.askActions];
+      if (input.aliases) a.aliases = input.aliases.map((x) => x.toLowerCase()).filter((x) => x !== a.address);
+      if (input.defaultFrom !== undefined) a.defaultFrom = input.defaultFrom === a.address ? null : input.defaultFrom;
       if (input.password) {
         a.status = "active";
         a.lastError = null;
       }
       return clone(a);
+    },
+    suggestedAddresses: async (orgId, accountId) => {
+      log("mail.suggestedAddresses", orgId, accountId);
+      find(accountId);
+      return [...fake.suggested];
     },
     disconnect: async (orgId, accountId) => {
       log("mail.disconnect", orgId, accountId);

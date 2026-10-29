@@ -4,19 +4,27 @@ import path from "node:path";
 import {
   type AgentScope,
   type FileEntry,
+  isStreamId,
+  isTerminalSize,
   MAX_INLINE_FILE_BYTES,
   type MachineErrorCode,
+  type MachineOp,
   type MachineReplies,
   type MachineRequest,
   type RunnerAccess,
   type RunnerFrame,
   type RunnerTools,
+  STEER_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
 import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
+import type { CodexAppServers } from "./brain-codex-app";
+import { routeWithPlan } from "./brain-route";
 import type { BrowserManager } from "./browser";
+import type { DesktopManager } from "./desktop";
+import type { DesktopSessions } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
@@ -24,10 +32,25 @@ import type { McpTaskInfo } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
+import { openDesktopStream } from "./rfb";
+import type { Spawn } from "./scope-gate";
 import { agentSecrets, handleSecret } from "./secrets";
+import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
+import type { Terminals } from "./terminal";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
+/**
+ * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
+ * would otherwise keep people from watching or taking control, or a person in control from being screened
+ * (`desktop.text`). Short, and capped per agent on both sides.
+ */
+const PEOPLE_OPS: ReadonlySet<string> = new Set([
+  "stream.open",
+  "desktop.session.status",
+  "desktop.session.stop",
+  "desktop.text",
+]);
 export const MAX_LIST_ENTRIES = 5000;
 
 /** Ops that start new work: refused while the owner paused the computer (protocol 9). Reads of status, output and cancel still go. */
@@ -39,10 +62,66 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "push",
   "task.start",
   "brain.turn",
+  "brain.route",
   "git.sync",
   "browser.act",
+  "browser.batch",
+  "browser.capture",
   "browser.stream.start",
+  "desktop.session.start",
+  "desktop.look",
+  "desktop.act",
+  "desktop.capture",
+  "desktop.apps",
 ]);
+
+/**
+ * System mode: where each op runs. `machine`: the root process answers it
+ * (the computer's accounts and access settings; pause is checked there
+ * before anything is routed). `agent`: the request's agent's worker, as that
+ * agent's own OS user (`supervisor.ts`). Typed over every op, so a new op
+ * doesn't compile until someone decides where it runs.
+ */
+export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
+  exec: "agent",
+  read: "agent",
+  write: "agent",
+  list: "agent",
+  push: "agent",
+  secret: "agent",
+  account: "machine",
+  "task.start": "agent",
+  "task.status": "agent",
+  "task.cancel": "agent",
+  "task.output": "agent",
+  "brain.turn": "agent",
+  "brain.steer": "agent",
+  // As the agent's own user: the account folder is lent to it, as for a turn.
+  "brain.route": "agent",
+  "git.sync": "agent",
+  "mission.worktree": "agent",
+  "access.request": "machine",
+  "access.reduce": "machine",
+  "browser.act": "agent",
+  "browser.stop": "agent",
+  "browser.stream.start": "agent",
+  "browser.stream.stop": "agent",
+  "browser.input": "agent",
+  "browser.batch": "agent",
+  "browser.capture": "agent",
+  // Root's: a stream's data socket needs the machine token, which no worker holds, and a desktop's password file
+  // must be one its agent can't rewrite.
+  "desktop.session.start": "machine",
+  "desktop.session.stop": "machine",
+  "desktop.session.status": "machine",
+  "stream.open": "machine",
+  // The helper runs as the agent's own user, in its worker; the worker asks the supervisor for the desktop.
+  "desktop.look": "agent",
+  "desktop.act": "agent",
+  "desktop.capture": "agent",
+  "desktop.apps": "agent",
+  "desktop.text": "agent",
+};
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
 type AccessReduceOp = Extract<MachineRequest, { op: "access.reduce" }>;
@@ -54,6 +133,8 @@ export interface HandlerContext {
   exec: boolean;
   /** The machine token (authenticates `push` uploads). */
   token: string;
+  /** The server this computer is paired with: `push` uploads go there (`uploadUrl`). */
+  server?: string;
   fetch?: FetchLike;
   /** Where each agent's secrets live (ADR 0027); without it the machine keeps none. */
   secretsDir?: string;
@@ -72,15 +153,26 @@ export interface HandlerContext {
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
-   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`).
+   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`), or
+   * by app-server process.
    */
   codex?: {
     runnerHome: string;
     mcp?: { socketPath: string; command: string[] };
     runs: Map<string, McpTaskInfo>;
+    /** Protocol 15: long-lived `codex app-server`s (turns take messages mid-turn); without it, `codex exec`. */
+    app?: CodexAppServers;
+    /** System mode, in a worker: the account folders lent to this agent (`accounts` is root's). */
+    accounts?: { accountDir(kind: "claude_code" | "codex", id: string): string | null };
+    /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+    spawn?: Spawn;
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
+  /** System mode: this process is root and answers only the `machine` ops of `OP_ROUTES` itself. */
+  systemMode?: () => boolean;
+  /** System mode: runs an `agent` op in its agent's worker; without it those ops are refused. */
+  workers?: { run(req: MachineRequest, scope: RequestScope): Promise<unknown> };
   /**
    * Protocol 10: what the machine allows. With it, absolute paths inside the
    * agent's allowed folders are accepted and each tool needs to be on;
@@ -98,6 +190,14 @@ export interface HandlerContext {
   browser?: BrowserManager;
   /** Protocol 13: the computer brains' accounts (ADR 0041); without it the runner refuses `account`. */
   accounts?: AccountManager;
+  /** Protocol 18: the agents' desktops (ADR 0058); without it the runner refuses `desktop.session.*`. */
+  desktops?: DesktopSessions;
+  /** Protocol 18: terminals people open as an agent; without it the runner refuses terminal streams. */
+  terminals?: Terminals;
+  /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
+  streams?: DataSockets;
+  /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
+  desktopUse?: DesktopManager;
 }
 
 export interface RequestScope {
@@ -125,6 +225,8 @@ const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   codex: "Codex",
   commands: "Commands",
   browser: "Browser",
+  desktop: "The desktop",
+  terminal: "The terminal",
 };
 
 /** Whether a tool is on: from the machine's access (protocol 10), or `exec` for a runner without it. */
@@ -179,7 +281,7 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
   for (const file of secrets.files) {
     const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
     if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {
-      throw new RunnerError("bad_request", `${requested} holds a secret; it stays on this computer`);
+      throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
     }
   }
 }
@@ -275,15 +377,39 @@ async function doList(
   return { entries };
 }
 
+export const PAUSED = "The owner paused this computer. Nothing new starts here until it's resumed.";
+
+/** Protocol 18: a stream that is new work (control of a desktop, a terminal); watching one that runs isn't. */
+const workStream = (req: MachineRequest) =>
+  req.op === "stream.open" && (req.kind === "terminal" || req.mode === "control");
+
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
-  if (NEW_WORK_OPS.has(req.op) && ctx.paused?.()) {
-    throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+  if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+  if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
+    if (!ctx.workers) {
+      throw new RunnerError(
+        "not_allowed",
+        "This computer runs each agent as its own user, and its runner can't do that yet. Update the runner on this computer.",
+      );
+    }
+    // An op this runner doesn't know (`OP_ROUTES` has no row) goes nowhere.
+    if (OP_ROUTES[req.op] !== "agent") throw new RunnerError("bad_request", `Unknown op ${String(req.op)}`);
+    const out = await ctx.workers.run(req, scope);
+    // The account's folder is root's to mark: what the worker's turn found out is told here.
+    if (req.op === "brain.turn") signedOut(ctx, req, (out as Partial<MachineReplies["brain.turn"]> | null)?.final);
+    return out;
   }
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
   // Protocol 13: accounts belong to the machine, not to an agent.
   if (req.op === "account") return handleAccount(ctx, req);
+  // Protocol 15: messages for a turn already running (never new work: a paused computer still takes them).
+  if (req.op === "brain.steer") return doBrainSteer(ctx, req);
+  if (req.op === "desktop.session.start" || req.op === "desktop.session.stop" || req.op === "desktop.session.status") {
+    return handleDesktop(ctx, req);
+  }
+  if (req.op === "stream.open") return handleStream(ctx, req, scope);
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -297,6 +423,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   }
   if (
     req.op === "browser.act" ||
+    req.op === "browser.batch" ||
+    req.op === "browser.capture" ||
     req.op === "browser.stop" ||
     req.op === "browser.stream.start" ||
     req.op === "browser.stream.stop" ||
@@ -304,10 +432,30 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   ) {
     return handleBrowser(ctx, req, scope);
   }
+  if (
+    req.op === "desktop.look" ||
+    req.op === "desktop.act" ||
+    req.op === "desktop.capture" ||
+    req.op === "desktop.apps" ||
+    req.op === "desktop.text"
+  ) {
+    return handleDesktopUse(ctx, req);
+  }
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   switch (req.op) {
     case "brain.turn":
       return doBrainTurn(ctx, req, scope, secrets);
+    case "brain.route":
+      // Never the agent's secrets: the route reads other people's messages.
+      requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
+      if (!req.agent) throw new RunnerError("bad_request", "A route runs for an agent");
+      return routeWithPlan(req, {
+        accounts: ctx.accounts ?? ctx.codex?.accounts,
+        brains: ctx.brains,
+        codexApp: ctx.codex?.app,
+        tasks: ctx.tasks,
+        signal: scope.signal,
+      });
     case "git.sync":
       // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
       if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
@@ -327,7 +475,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       // The runner's own git in the agent's folder (like `git.sync`). Making a folder is new work; removing one isn't.
       if (!req.agent) throw new RunnerError("bad_request", "A mission's folder belongs to an agent");
       if (req.action === "ensure" && ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+        throw new RunnerError("paused", PAUSED);
       }
       return missionWorktree(ctx.workspaceReal, req);
     case "exec":
@@ -344,6 +492,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       return pushPath({
         workspaceReal: ctx.workspaceReal,
         token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
         path: requireString(req.path, "path"),
         url: requireString(req.url, "url"),
         uploadId: requireString(req.uploadId, "uploadId"),
@@ -358,7 +507,104 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
 }
 
 /**
- * Protocol 12: the agent's browser (ADR 0040). Needs the machine's browser
+ * Protocol 18: the agent's desktop (ADR 0058). Starting it needs the
+ * machine's desktop switch; stopping it and asking about it always go.
+ */
+function handleDesktop(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "desktop.session.start" | "desktop.session.stop" | "desktop.session.status" }>,
+) {
+  const desktops = ctx.desktops;
+  if (!desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
+  if (!req.agent) throw new RunnerError("bad_request", "A desktop belongs to an agent");
+  switch (req.op) {
+    case "desktop.session.stop":
+      return desktops.stop(req.agent);
+    case "desktop.session.status": {
+      const status = desktops.status(req.agent);
+      return { ...status, streams: status.streams + (ctx.terminals?.count(req.agent.id) ?? 0) };
+    }
+    case "desktop.session.start":
+      requireTool(ctx, "desktop");
+      return desktops.ensure(req.agent);
+  }
+}
+
+/**
+ * Protocol 21: the agent uses its own desktop (ADR 0062). That runs commands
+ * as the agent (its desktop has a terminal), so it needs the machine's
+ * desktop switch and its commands switch. Protocol 25's `desktop.text` goes
+ * through the same helper, behind the same switches.
+ */
+function handleDesktopUse(
+  ctx: HandlerContext,
+  req: Extract<
+    MachineRequest,
+    { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" | "desktop.text" }
+  >,
+) {
+  const desktop = ctx.desktopUse;
+  if (!desktop) throw new RunnerError("desktop_unavailable", "This runner doesn't serve desktop use");
+  if (!req.agent) throw new RunnerError("bad_request", "A desktop belongs to an agent");
+  requireTool(ctx, "desktop");
+  requireTool(ctx, "commands");
+  switch (req.op) {
+    case "desktop.look":
+      return desktop.look(req.agent);
+    case "desktop.act":
+      return desktop.act(req.agent, req.action, req.settle === true, { folder: ctx.workspaceReal, grants: ctx.grants });
+    case "desktop.capture":
+      return desktop.capture(req.agent, req.region);
+    case "desktop.apps":
+      return desktop.apps(req.agent);
+    case "desktop.text":
+      return desktop.text(req.agent);
+  }
+}
+
+/**
+ * Protocol 18: one viewer of the agent's desktop or one terminal as the agent
+ * (ADR 0058 §11), each behind its machine switch; answered once its data
+ * socket got `stream.ready`, while the bytes go on flowing over it.
+ */
+async function handleStream(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "stream.open" }>,
+  scope: RequestScope,
+): Promise<MachineReplies["stream.open"]> {
+  const { agent, streamId } = req;
+  const streams = ctx.streams;
+  if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
+  if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
+  const dial = () => streams.dial(streamId, req.kind, scope.signal);
+  if (req.kind === "desktop") {
+    requireTool(ctx, "desktop");
+    if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
+    if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
+    // One that isn't running starts when the server says so, and stays on; never on a paused computer.
+    if (req.start === true && !ctx.desktops.status(agent).running) {
+      if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+      await ctx.desktops.ensure(agent);
+    }
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
+  } else if (req.kind === "terminal") {
+    requireTool(ctx, "terminal");
+    if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");
+    if (!isTerminalSize(req.cols, req.rows))
+      throw new RunnerError("bad_request", "The terminal's size is out of bounds");
+    await ctx.terminals.open(agent, { cols: req.cols, rows: req.rows }, dial);
+  } else {
+    throw new RunnerError("bad_request", "A stream shows a desktop or a terminal");
+  }
+  return { opened: true };
+}
+
+/** Protocol 18: the agent's Chrome goes on its desktop only while the machine's desktop switch is on too. */
+const onDesktop = (ctx: HandlerContext, req: { desktop?: unknown }) => req.desktop === true && toolOn(ctx, "desktop");
+
+/**
+ * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
+ * `browser.capture` from protocol 17 (ADR 0054). Needs the machine's browser
  * switch on; stopping (the browser, its live view) always goes, so Stop works
  * even after the switch went off.
  */
@@ -366,7 +612,16 @@ async function handleBrowser(
   ctx: HandlerContext,
   req: Extract<
     MachineRequest,
-    { op: "browser.act" | "browser.stop" | "browser.stream.start" | "browser.stream.stop" | "browser.input" }
+    {
+      op:
+        | "browser.act"
+        | "browser.batch"
+        | "browser.capture"
+        | "browser.stop"
+        | "browser.stream.start"
+        | "browser.stream.stop"
+        | "browser.input";
+    }
   >,
   scope: RequestScope,
 ) {
@@ -380,7 +635,13 @@ async function handleBrowser(
       return browser.streamStop(req.agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(req.agent, ctx.workspaceReal, req, scope.signal);
+      return browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+    case "browser.batch":
+      requireTool(ctx, "browser");
+      return browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+    case "browser.capture":
+      requireTool(ctx, "browser");
+      return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
     case "browser.stream.start":
       requireTool(ctx, "browser");
       return browser.streamStart(req.agent, req.mode);
@@ -404,9 +665,15 @@ async function handleAccount(
   switch (req.action) {
     case "begin":
       if (ctx.paused?.()) {
-        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+        throw new RunnerError("paused", PAUSED);
       }
-      return accounts.begin(req.kind, requireString(req.loginId, "loginId"), req.again === true);
+      return accounts.begin(
+        req.kind,
+        requireString(req.loginId, "loginId"),
+        req.again === true,
+        req.email === undefined ? undefined : requireString(req.email, "email"),
+        req.provider === undefined ? undefined : requireString(req.provider, "provider"),
+      );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
       await accounts.code(requireString(req.loginId, "loginId"), requireString(req.aad, "aad"), req.box);
@@ -417,6 +684,8 @@ async function handleAccount(
       await accounts.cancel(requireString(req.loginId, "loginId"));
       return {};
     case "list":
+      // Protocol 19: usage looked up in the background; what it finds comes as `accounts.changed`.
+      if (Array.isArray(req.fresh)) accounts.probeUsage(req.fresh.filter((id) => typeof id === "string"));
       return { accounts: await accounts.list() };
     case "remove":
       await accounts.remove(req.kind, requireString(req.accountId, "accountId"));
@@ -464,23 +733,69 @@ async function doBrainTurn(
   return { runId, final };
 }
 
+const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 /**
- * A turn in an account that was refused (`not_logged_in`) or is gone
- * (`account_missing`): its CLI is asked again and the server hears the answer
- * either way (`accounts.changed`). The machine is the only one that says an
- * account is signed out or gone; a passing failure leaves it as it was.
+ * `brain.steer` (protocol 15): messages for the request's agent's turn of
+ * `runId` in progress (Claude Code reads them at its next tool boundary; a
+ * Codex turn on its app-server at its next model request, `turn/steer`).
+ * A Codex turn run by `codex exec` can't take any: `unsupported`.
  */
-function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { type: string; code?: string }) {
-  if (!req.account || final.type !== "error") return;
-  if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  ctx.accounts?.invalidate();
-  ctx.accounts?.refresh(true).catch(() => undefined);
+function doBrainSteer(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "brain.steer" }>,
+): MachineReplies["brain.steer"] | Promise<MachineReplies["brain.steer"]> {
+  if (!req.agent) throw new RunnerError("bad_request", "Steering belongs to an agent's turn");
+  const runId = requireString(req.runId, "runId");
+  const session = requireString(req.session, "session");
+  if (!Array.isArray(req.messages) || req.messages.length === 0 || req.messages.length > STEER_LIMITS.messages) {
+    throw new RunnerError("bad_request", `Between 1 and ${STEER_LIMITS.messages} messages`);
+  }
+  const messages = req.messages.map((m) => {
+    if (typeof m?.uuid !== "string" || !STEER_UUID.test(m.uuid)) throw new RunnerError("bad_request", "Invalid uuid");
+    if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
+    return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
+  });
+  if (ctx.codex?.runs.has(runId)) {
+    return ctx.codex.app
+      ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
+      : { status: "unsupported", reason: "Codex reads messages only between turns" };
+  }
+  if (!ctx.brains) return { status: "unsupported", reason: "This runner runs no brain turns" };
+  return ctx.brains.steer(String(req.agent.id), { runId, session, messages });
 }
 
 /**
- * The Codex branch of `brain.turn`: `codex exec --json` per turn
- * (`brain-codex.ts`). While it runs, its MCP server (`mcp --run <runId>`,
- * the run's server token in its env) is relayed for the run.
+ * A turn in an account that was refused (`not_logged_in`) or is gone
+ * (`account_missing`): its CLI is asked again (a key, or a folder root can't
+ * run, is marked refused) and the server hears the answer either way
+ * (`accounts.changed`). The machine is the only one that says an account is
+ * signed out or gone; a passing failure leaves it as it was.
+ */
+function signedOut(
+  ctx: HandlerContext,
+  req: { kind?: unknown; account?: unknown },
+  final: { type: string; code?: string } | undefined,
+) {
+  const accounts = ctx.accounts;
+  if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
+  if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
+  const kind = req.kind === "codex" ? "codex" : "claude_code";
+  void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
+    .catch(() => undefined)
+    .then(() => {
+      accounts.invalidate();
+      return accounts.refresh(true);
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * The Codex branch of `brain.turn`: on the session's `codex app-server`
+ * (`brain-codex-app.ts`; its bridge is the process's, relayed for this run),
+ * else `codex exec --json` per turn (`brain-codex.ts`), whose MCP server
+ * (`mcp --run <runId>`, the run's server token in its env) is relayed for the
+ * run. This run's entry also marks it a Codex run for `brain.steer`.
  */
 async function doCodexTurn(
   ctx: HandlerContext,
@@ -514,7 +829,9 @@ async function doCodexTurn(
         ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
         ...(codex.mcp ? { mcp: codex.mcp } : {}),
         ...(ctx.grants ? { grants: ctx.grants } : {}),
-        ...(ctx.accounts ? { accounts: ctx.accounts } : {}),
+        ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+        ...(codex.app ? { app: codex.app } : {}),
+        ...(codex.spawn ? { spawn: codex.spawn } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {
@@ -596,6 +913,12 @@ function describeOp(req: MachineRequest): string {
       return `task.output ${String(req.taskId ?? "")}`;
     case "brain.turn":
       return `brain.turn ${String(req.runId ?? "")} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
+    case "brain.steer":
+      // Never the text: how many messages, for which run.
+      return `brain.steer ${String(req.runId ?? "")} (${Array.isArray(req.messages) ? req.messages.length : 0} messages)`;
+    case "brain.route":
+      // Never the prompt: other people's messages.
+      return `brain.route (${String(req.kind ?? "")}${req.account ? ", an account" : ""})`;
     case "git.sync": {
       const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
       return `git.sync ${repos || "(existing checkouts)"}`;
@@ -611,10 +934,29 @@ function describeOp(req: MachineRequest): string {
       const nav = ["open", "goto", "navigate"].includes(command) ? ` ${first.slice(0, 120)}` : "";
       return `browser.act ${command}${nav}`;
     }
+    case "browser.batch": {
+      // The commands only (`click, eval, wait, snapshot`): never their arguments.
+      const commands = Array.isArray(req.commands) ? req.commands.map((c) => String(c?.command ?? "")) : [];
+      return `browser.batch ${commands.join(", ").slice(0, 200)}`;
+    }
     case "browser.stream.start":
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
       return `browser.input ${Array.isArray(req.events) ? req.events.length : 0} events`;
+    case "stream.open":
+      return req.kind === "terminal"
+        ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
+        : `stream.open desktop (${String(req.mode)})`;
+    case "desktop.act": {
+      // The kind and where it lands, its key, app or path; never typed text.
+      const a: Record<string, unknown> = isRecordLike(req.action) ? req.action : {};
+      const at = (v: unknown) => (isRecordLike(v) ? String(v.ref ?? `${String(v.x)},${String(v.y)}`).slice(0, 20) : "");
+      const what = a.kind === "drag" ? `${at(a.from)} → ${at(a.to)}` : String(a.key ?? a.app ?? a.path ?? at(a.at));
+      const text = typeof a.text === "string" ? ` (${a.text.length} characters)` : "";
+      return `desktop.act ${String(a.kind).slice(0, 20)}${what ? ` ${what.slice(0, 120)}` : ""}${text}`;
+    }
+    case "desktop.capture":
+      return `desktop.capture${req.region ? " (a region)" : ""}`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:
@@ -663,14 +1005,22 @@ export class RequestRunner {
       this.reply(id, { ok: false, error: { code: "bad_request", message: "Duplicate request id" } });
       return Promise.resolve();
     }
-    if (this.inflight.size >= this.maxConcurrent) {
+    if (this.inflight.size >= this.maxConcurrent && !PEOPLE_OPS.has(req.op)) {
       this.reply(id, { ok: false, error: { code: "internal", message: "busy" } });
       return Promise.resolve();
     }
     const controller = new AbortController();
     this.inflight.set(id, controller);
-    // A browser command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
-    const timed = req.op === "browser.act" || req.op === "browser.input";
+    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
+    const timed =
+      req.op === "browser.act" ||
+      req.op === "browser.batch" ||
+      req.op === "browser.capture" ||
+      req.op === "browser.input" ||
+      req.op === "desktop.look" ||
+      req.op === "desktop.act" ||
+      req.op === "desktop.capture" ||
+      req.op === "desktop.text";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));

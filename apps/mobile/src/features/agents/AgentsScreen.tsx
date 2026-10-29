@@ -1,6 +1,7 @@
-import { useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import { useAiStatus, useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +21,7 @@ import { agoText, workTitle } from "./work";
 const LIVE_ROWS = 8;
 
 /**
- * Agentes (MobileIntencional.html, "Aba Agentes"): the team in Conversas' rows, who needs you first.
+ * Agentes: the team in Conversas' rows, who needs you first.
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"). Tapping an agent
@@ -101,6 +102,9 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
   const when = useWhen();
   const now = useNow();
   const { agent: a, work: w, approval, computer } = l;
+  const ai = useAiStatus(useOrgId());
+  // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
+  const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
   const sub = approval
@@ -111,7 +115,9 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       ? workTitle(t, w)
       : computer !== undefined
         ? t("mobile.outage.rowWaiting", { computer })
-        : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
+        : noAi
+          ? t("noAi.chip")
+          : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
   return (
     <ListRow
       onPress={() => router.push(`/agent/${a.id}`)}
@@ -150,7 +156,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       sub={
         approval ? (
           <View style={styles.work}>
-            <Icon name="shield" size={13} color={c.amber} />
+            <Icon name="wait" size={13} color={c.amber} />
             <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
               {sub}
             </Text>
@@ -169,6 +175,13 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
               {sub}
             </Text>
           </View>
+        ) : noAi ? (
+          <View style={styles.work}>
+            <Icon name="bolt" size={13} color={c.amber} />
+            <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
+              {sub}
+            </Text>
+          </View>
         ) : sub ? (
           <Text variant="small" tone="muted" numberOfLines={1} style={LIST_PREVIEW}>
             {sub}
@@ -181,7 +194,8 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
 
 const styles = StyleSheet.create({
   l1: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
-  name: { flexShrink: 0, maxWidth: "70%" },
+  // The name stays whole; a long role gives way (a share of an unsized box measured as almost nothing: "Re…").
+  name: { flexShrink: 0 },
   role: { flexShrink: 1, minWidth: 0 },
   work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0, marginTop: 2 },
   medium: { fontWeight: "500" },

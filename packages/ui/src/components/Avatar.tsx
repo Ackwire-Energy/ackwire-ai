@@ -2,6 +2,7 @@ import { type HTMLAttributes, useLayoutEffect, useRef } from "react";
 import type { Expression } from "../agent/engine.js";
 import { addLiveAgent, drawLive, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
+import { initialsOf } from "../names";
 import { type AgentAppearance, appearanceStyle } from "./AgentLook";
 
 export type AvatarKind = "person" | "agent";
@@ -9,7 +10,8 @@ export type AvatarKind = "person" | "agent";
 /**
  * The agent symbol's state: `idle` blinks now and then, `thinking` looks
  * around (with a halo), `writing` has dash eyes (with a halo), `waiting`
- * looks up at you (waiting on a person's decision, no halo).
+ * looks up at you (waiting on a person's decision, no halo). The halo shows
+ * only without the tile (`xs`, `xl`): in a tile the moving face says it.
  */
 export type AgentState = "idle" | "thinking" | "writing" | "waiting";
 
@@ -36,7 +38,7 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   /** Agents only: plays the face started by `playAgentReaction(reactionKey, …)` (a message id). */
   reactionKey?: string;
   /**
-   * The tile (telas/RefinoUI.html): a rounded square with a hairline, the
+   * The tile: a rounded square with a hairline, the
    * agent standing in its own pixel sky. On by default; off for the 18px
    * receipts (`xs`) and the 112px hero (`xl`), where the agent stands on the
    * page's own sky.
@@ -102,14 +104,6 @@ function AgentBody({
     if (live.current) drawLive(live.current, typeof performance === "object" ? performance.now() / 1000 : 0);
   }, [color, eyes, accessory, state, expression, framed]);
   return <canvas className="ac-avatar__canvas" ref={canvas} />;
-}
-
-/** 1–2 letters: "Ada" → "A", "Atlas" → "At" when asked; "Marina Souza" → "MS". */
-export function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
-  return `${parts[0]?.[0] ?? ""}${parts[parts.length - 1]?.[0] ?? ""}`.toUpperCase();
 }
 
 /**

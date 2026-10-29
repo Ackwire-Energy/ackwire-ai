@@ -50,6 +50,18 @@ export class ValidationError extends Error {
   }
 }
 
+/** Too many of something for now (HTTP 429). */
+export class TooManyError extends Error {
+  constructor(
+    message: string,
+    readonly code: string = "rate_limited",
+    readonly params?: ErrorParams,
+  ) {
+    super(message);
+    this.name = "TooManyError";
+  }
+}
+
 /** The agent reached its monthly budget. Checked before every model call. */
 export class BudgetExceededError extends Error {
   constructor(
@@ -64,6 +76,9 @@ export class BudgetExceededError extends Error {
 
 /** No usable provider credential (none configured, revoked, or no platform key in this edition). */
 export class MissingCredentialError extends Error {
+  /** A job that hits it fails at once: retrying can't add a key (the outbox reads this flag). */
+  readonly retryable = false;
+
   constructor(message = "This agent has no usable provider credential") {
     super(message);
     this.name = "MissingCredentialError";

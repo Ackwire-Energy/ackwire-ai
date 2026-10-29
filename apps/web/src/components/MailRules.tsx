@@ -1,8 +1,7 @@
-import type { MailPolicy } from "@agenteschat/client";
+import type { MailAccount, MailPolicy } from "@agenteschat/client";
 import { useMailFolders } from "@agenteschat/client";
-import { canSendWithoutAsking, isAddress, normalizePolicy } from "@agenteschat/client/lib/mail";
-import { CheckboxPill, Field, Icon, Input, Switch } from "@agenteschat/ui";
-import { useState } from "react";
+import { AUTO_FROM, canSendWithoutAsking, mailboxAddresses, normalizePolicy } from "@agenteschat/client/lib/mail";
+import { CheckboxPill, Field, Icon, Input, Select, Switch } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
 import { useOrg } from "@/components/org-context";
@@ -22,28 +21,26 @@ export function rulesCount(p: MailPolicy) {
 /**
  * The rules for one mailbox: folders (none = all), senders, a time window,
  * recipients, the daily send cap, "Enviar sem pedir aprovação" (only with
- * recipients) and the From alias.
+ * recipients) and "Enviar como" (automatic, or one of the mailbox's addresses).
  */
 export function MailRulesPanel({
-  accountId,
-  address,
+  account,
   policy,
   onChange,
   disabled,
 }: {
-  accountId: string;
-  address: string;
+  account: Pick<MailAccount, "id" | "address" | "aliases" | "defaultFrom">;
   policy: MailPolicy;
   onChange: (policy: MailPolicy) => void;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const accountId = account.id;
   const folders = useMailFolders(org.id, accountId);
   const set = (next: Partial<MailPolicy>) => onChange(normalizePolicy({ ...policy, ...next }));
   const id = (name: string) => `mail-${name}-${accountId}`;
-  const [from, setFrom] = useState(policy.fromAddress ?? "");
-  const fromInvalid = from.trim() !== "" && !isAddress(from);
+  const addresses = mailboxAddresses(account);
   const unlocked = canSendWithoutAsking(policy);
   const numberOrNull = (v: string) => {
     const n = Number.parseInt(v, 10);
@@ -142,7 +139,7 @@ export function MailRulesPanel({
           </span>
         </label>
         {policy.sendWithoutAsking && policy.senders.length === 0 && (
-          <p className="sandbox-warning small" role="note">
+          <p className="sandbox-warning small ac-iconline" role="note">
             <Icon name="alert" size={16} />
             {t("mail.agent.warning")}
           </p>
@@ -150,20 +147,16 @@ export function MailRulesPanel({
         <Field
           label={t("mail.rule.from")}
           id={id("from")}
-          help={t("mail.rule.fromHelp", { address })}
-          error={fromInvalid ? t("mail.rule.fromInvalid") : undefined}
+          help={t("mail.rule.fromHelp", { address: account.defaultFrom ?? account.address })}
         >
-          <Input
-            type="email"
-            inputMode="email"
+          <Select
             disabled={disabled}
-            value={from}
-            placeholder={address}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              const v = e.target.value.trim();
-              if (v === "" || isAddress(v)) set({ fromAddress: v === "" ? null : v.toLowerCase() });
-            }}
+            value={policy.fromAddress ?? AUTO_FROM}
+            onValueChange={(v) => set({ fromAddress: v === AUTO_FROM ? null : v })}
+            options={[
+              { value: AUTO_FROM, label: t("mail.rule.fromAuto") },
+              ...addresses.map((a) => ({ value: a, label: a })),
+            ]}
           />
         </Field>
       </section>

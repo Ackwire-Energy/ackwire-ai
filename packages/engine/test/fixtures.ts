@@ -12,8 +12,10 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
+import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
+  type AgentRun,
   type ArtifactDeps,
   addChannelMember,
   type ContextDeps,
@@ -30,6 +32,7 @@ import {
   createFakeScheduleReader,
   createFindAgentToolSource,
   createForumToolSource,
+  createHandOffToolSource,
   createIssueToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
@@ -54,6 +57,7 @@ import {
   type ToolSource,
   zonedParts,
 } from "../src";
+import { listenLiveSteering } from "../src/live-steer";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
 
@@ -126,6 +130,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `hand_off` tool (background runs: routines). */
+    handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
     chatTools?: boolean;
@@ -153,7 +159,7 @@ export async function setup(
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;
-    /** Tools on demand (D65): the judge picks the tool groups each run lists. */
+    /** Tools on demand (ADR 0043): the judge picks the tool groups each run lists. */
     toolsOnDemand?: boolean;
   } = {},
 ) {
@@ -183,11 +189,11 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
-  // New agents get their computer by default (D61); tests that use it grant it themselves.
+  // New agents get their computer by default; tests that use it grant it themselves.
   await db
     .delete(schema.agentScopes)
     .where(
-      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use')`,
+      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use', 'desktop:use')`,
     );
   await addChannelMember(db, owner.id, org.id, general.id, { agentId: agent.id });
 
@@ -198,7 +204,8 @@ export async function setup(
   const gateway = createModelGateway({
     db,
     keyWrappers: [keyWrapper],
-    providers: { anthropic: provider, openai: openaiProvider },
+    // Every provider but OpenAI answers through `provider`.
+    providers: { ...Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])), openai: openaiProvider },
     platformCredentials: options.platform ?? noPlatformCredentials,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
   });
@@ -257,6 +264,7 @@ export async function setup(
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent ? [createAskAgentToolSource({ pubsub }), createFindAgentToolSource()] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
@@ -336,3 +344,11 @@ export async function setup(
 }
 
 export type Fixture = Awaited<ReturnType<typeof setup>>;
+
+/**
+ * What the executor of a run set to `running` by hand would do: answer a message steered into the run at once
+ * (no turn takes it here, so it stays in the run's inbox). Unanswered, posting that message waits out
+ * `LIVE_STEER_WAIT_MS`, 3 s of real time.
+ */
+export const answerSteering = (f: Fixture, run: AgentRun) =>
+  listenLiveSteering(f, run, null, { take: async () => [], onRead: () => {} });

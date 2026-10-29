@@ -5,11 +5,19 @@ dist/
 .env.*
 !.env.example
 *.log
+# Backups as SELF_HOSTING.md takes them.
+*.dump
+files-*.tar.gz
 .DS_Store
 coverage/
-.claude/
+# Claude Code's local state stays out; the project's rules in .claude/rules/ are tracked.
+.claude/*
+!.claude/rules/
 *.local.json
 packages/engine/eval/out/
+packages/engine/scripts/out/
 
 # Design prototypes stay local (never in the repo).
 docs/design/telas/
+*.keystore
+*.jks

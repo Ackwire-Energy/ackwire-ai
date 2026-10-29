@@ -4,7 +4,7 @@ import { cx } from "../cx";
 import type { AgentColor, AgentEyes } from "./AgentLook";
 
 /**
- * A routine's runs in pixels (telas/Rotinas.html): each run is a dithered
+ * A routine's runs in pixels: each run is a dithered
  * column in the agent's own tones on a 2px grid. Height is the run's cost
  * (`weight`, 0–1, a share of the priciest recent run); nothing new is a
  * stub; a failure a column in the danger tone; a skip a short warm one.
@@ -100,7 +100,10 @@ function drawWorking(ctx: CanvasRenderingContext2D, x0: number, w: number, rows:
     }
 }
 
-/** Runs a draw function: once (reduced motion, nothing moving) or about 12 times a second while mounted. */
+/**
+ * Runs a draw function: once (reduced motion, nothing moving) or about 12 times a second while mounted, and again as
+ * the theme changes: what it draws reads the theme's colors, and a still one would keep the old ones.
+ */
 export function useCanvas(
   draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, t: number) => void,
   moving: boolean,
@@ -120,6 +123,14 @@ export function useCanvas(
     }, 80);
     return () => clearInterval(timer);
   });
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext?.("2d");
+    if (!canvas || !ctx || typeof MutationObserver === "undefined") return;
+    const theme = new MutationObserver(() => fn.current(ctx, canvas, performance.now() / 1000));
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => theme.disconnect();
+  }, []);
   return ref;
 }
 
@@ -318,8 +329,64 @@ export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
   return <canvas ref={ref} className="ac-run-key" width={3} height={5} />;
 }
 
+/** A day of an agent's month: its runs and how many failed. */
+export interface MonthDay {
+  day: number;
+  runs: number;
+  failed: number;
+}
+
 /**
- * An agent's browser steps in pixels (telas/NavegadorResumo.html, B): one dithered column per
+ * An agent's month in pixels (its Atividade tab): a dithered column per day in the agent's tones, as tall as
+ * that day's runs over the busiest day's; a day with a failure wears a cap in the danger tone; a day without
+ * runs, and every day to come, is a dot on the line. Decorative: the caller gives the words.
+ */
+export function MonthRuns({
+  days,
+  today,
+  perDay,
+  color = "sky",
+  className,
+}: {
+  /** Days in the month. */
+  days: number;
+  /** Today's day of the month: later days are still to come. */
+  today: number;
+  /** Only the days with runs. */
+  perDay: readonly MonthDay[];
+  color?: AgentColor;
+  className?: string;
+}) {
+  const ROWS = 40;
+  const ref = useCanvas((ctx, canvas) => {
+    const w = Math.max(days * 3, Math.round(canvas.clientWidth / CELL) || days * 8);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== ROWS) canvas.height = ROWS;
+    const p = paletteFor(canvas, color);
+    ctx.clearRect(0, 0, w, ROWS);
+    const byDay = new Map(perDay.map((d) => [d.day, d]));
+    const max = Math.max(1, ...perDay.map((d) => d.runs));
+    const slot = w / days;
+    const colW = Math.max(2, Math.floor(slot * 0.62));
+    const base = ROWS - 1;
+    for (let d = 1; d <= days; d++) {
+      const x0 = Math.round((d - 1) * slot + (slot - colW) / 2);
+      const day = byDay.get(d);
+      if (d > today || !day || day.runs === 0) {
+        ctx.fillStyle = p.dot;
+        ctx.fillRect(x0 + Math.floor(colW / 2), base, 1, 1);
+        continue;
+      }
+      const h = Math.max(2, Math.round((day.runs / max) * (ROWS - 5)));
+      column(ctx, x0, colW, h, base, p.ok);
+      if (day.failed > 0) column(ctx, x0, colW, 2, base - h - 1, p.failed);
+    }
+  }, false);
+  return <canvas ref={ref} className={cx("ac-month-runs", className)} />;
+}
+
+/**
+ * An agent's browser steps in pixels: one dithered column per
  * step in the agent's tones, as a routine's runs. The height says what it was: an open the whole
  * column, reading most of it, an action a stub, a print two cells; a failure the whole column in
  * the danger tone.
@@ -406,7 +473,7 @@ export function BrowserMark({
 }
 
 /**
- * Acceptance criteria as pixel blocks (telas/Issues.html): one block per
+ * Acceptance criteria as pixel blocks: one block per
  * criterion, done ones dithered in the assignee's tones (an agent's color;
  * a person or nobody: neutral ink), open ones a dotted outline.
  */
@@ -546,7 +613,7 @@ export function planCellPixel(
 }
 
 /**
- * A mission's plan as a pixel strip (telas/ThreadContexto.html): one square
+ * A mission's plan as a pixel strip: one square
  * cell per checklist item, all the same size, in the agent's own tones. To do
  * is a faint solid cell, doing an animated dithered one, done a full dithered
  * one, waiting for a person a faint cell outlined in the agent's mid tone
@@ -615,7 +682,7 @@ export function PlanStrip({
 }
 
 /**
- * A request's fuse (telas/Aprovacoes.html): a pixel line along the bottom of
+ * A request's fuse: a pixel line along the bottom of
  * its holder (`position: relative`) that burns down to the deadline. What is
  * left (`left`, 0–1) is in the agent's tones with a flickering edge; the
  * spent part is a sparse dotted trail.
@@ -666,7 +733,7 @@ export function ExpiryFuse({
 }
 
 /**
- * A thin edge of the agent's pixel sky (telas/NavegadorNoChat.html, header "Céu"): two rows
+ * A thin edge of the agent's pixel sky: two rows
  * of its tones drifting slowly along the top of a card, its identity there. `muted` greys
  * it (a person is in control). Decorative.
  */
@@ -685,7 +752,8 @@ export function SkyStrip({
     const w = Math.max(8, Math.ceil(canvas.clientWidth / 3) || 120);
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== 2) canvas.height = 2;
-    const surface = token(canvas, "--raised", "#ffffff");
+    // Its holder's own ground: inside a raised container (a dialog) the strip itself reads one step up (`--raised-2`).
+    const surface = token(canvas.parentElement ?? canvas, "--raised", "#ffffff");
     const dark = document.documentElement.dataset.theme === "dark";
     const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
     const pal = dark
@@ -722,7 +790,7 @@ const PAGE_BLOCKS: [number, number, number, number][] = [
 ];
 
 /**
- * The agent's browser after it closed (telas/NavegadorDepois.html, "Página em silhueta"): the
+ * The agent's browser after it closed: the
  * shape of a page, never the real one, fading into the agent's tone toward the bottom. Still.
  */
 export function PageSilhouette({ color = "sky", className }: { color?: AgentColor; className?: string }) {

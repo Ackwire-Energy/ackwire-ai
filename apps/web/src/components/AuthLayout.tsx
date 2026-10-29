@@ -1,25 +1,28 @@
 import { Logo } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { AuthHorizon } from "@/components/Sky";
+import "./auth.css";
 
 /**
- * Sign in, sign up and new password (telas/EntrarCadastro.html, C): one calm
- * question at a time in a narrow column, the logo on top and the sky's
- * horizon at the bottom.
+ * Sign in, sign up and new password: one calm question at a time in a narrow
+ * column, the logo on top and the sky's horizon at the bottom.
  */
 export function AuthShell({ children }: { children: ReactNode }) {
+  const col = useRef<HTMLElement>(null);
   return (
     <div className="auth">
-      <AuthHorizon />
+      <AuthHorizon clear={() => [col.current]} />
       <span className="auth__logo">
         <Logo size={24} />
       </span>
-      <main className="auth__col">{children}</main>
+      <main className="auth__col" ref={col}>
+        {children}
+      </main>
     </div>
   );
 }
 
-/** Centered card of telas/Convite and Onboarding. */
+/** Centered card of the invitation and onboarding pages. */
 export function CenteredLayout({ narrow, children }: { narrow?: boolean; children: ReactNode }) {
   return (
     <div className="center">

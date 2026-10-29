@@ -7,13 +7,15 @@
  * - `POST …/storage/migrate` (start or resume) and `GET …/storage/migrate` (status) → StorageMigration
  * The mock never reaches a bucket. A bucket named with "negado" fails the
  * write step; with "lista" the list step; with "instavel" the copy stops at
- * half once (resume continues).
+ * half once (resume continues). Where the server keeps files itself is
+ * `platform` (its disk, no folder, unless a test says otherwise).
  */
 import type {
   ApiClient,
   S3Input,
   StorageConfig,
   StorageMigration,
+  StoragePlatform,
   StorageStep,
   StorageTestResult,
 } from "@agenteschat/client";
@@ -24,14 +26,14 @@ const TOTAL = 120;
 const sig = (s: S3Input) => JSON.stringify([s.endpoint, s.region, s.bucket, s.prefix ?? "", s.pathStyle]);
 const hint = (v: string | undefined, prev?: string) => (v ? v.slice(-4) : (prev ?? ""));
 
-export function createMockStorage(): ApiClient["storage"] {
+export function createMockStorage(platform: () => StoragePlatform | undefined = () => undefined): ApiClient["storage"] {
   const configs = new Map<string, StorageConfig>();
   const passed = new Map<string, string>();
   const flakyDone = new Set<string>();
   const get = (orgId: string) => {
     let c = configs.get(orgId);
     if (!c) {
-      c = { kind: "agentes", s3: null, migration: null };
+      c = { kind: "agentes", s3: null, migration: null, platform: platform() ?? { kind: "disk", folder: null } };
       configs.set(orgId, c);
     }
     return c;

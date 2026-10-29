@@ -35,6 +35,8 @@ const settings = async (state = seedState(), api = createFakeApi(state)) => {
 describe("Configurações → Skills", () => {
   test("the library: name, description, source, version and how many agents use it", async () => {
     const { section } = await settings();
+    // The card's head is its title and Install: what a skill is lives in Settings' own line above it.
+    expect(section().querySelector("#sec-skills")?.parentElement?.textContent).toBe("SkillsInstalar skill");
     const rows = within(section()).getAllByRole("button", { name: /Revisão de PR|Relatório semanal|Atendimento/ });
     expect(rows.map((r) => r.textContent)).toEqual(["Revisão de PR", "Relatório semanal", "Atendimento"]);
     const review = rows[0]?.closest(".skill-row") as HTMLElement;
@@ -45,6 +47,16 @@ describe("Configurações → Skills", () => {
     expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Criada aqui");
     expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Em agentes novos");
     expect((rows[2]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Enviada");
+    // GitHub is named by its own mark, the connector catalog's; the other sources keep their icons.
+    const chip = (name: string) =>
+      [...section().querySelectorAll(".skill-row .ac-chip")].find((c) => c.textContent === name) as HTMLElement;
+    const github = chip("GitHub").querySelector<HTMLElement>(".connector-icon__mark");
+    expect(github?.style.getPropertyValue("--connector-icon")).toBe('url("/connectors/github.svg")');
+    expect(chip("GitHub").querySelector("svg.ac-icon")).toBeNull();
+    for (const name of ["Criada aqui", "Enviada"]) {
+      expect(chip(name).querySelector(".connector-icon")).toBeNull();
+      expect(chip(name).querySelector("svg.ac-icon")).not.toBeNull();
+    }
   });
 
   test("detail: rendered body, files (scripts need a sandbox), remove names the agents", async () => {
@@ -54,7 +66,7 @@ describe("Configurações → Skills", () => {
     const sheet = screen().getByRole("dialog", { name: "Revisão de PR" });
     // The sheet title and the body's own heading.
     expect(within(sheet).getAllByRole("heading", { name: "Revisão de PR" }).length).toBeGreaterThanOrEqual(2);
-    expect(sheet.querySelector("pre.md__code code")?.textContent).toBe("bun test");
+    expect(sheet.querySelector("pre.code-card__code code")?.textContent).toBe("bun test");
     const files = within(sheet).getByRole("navigation", { name: "Arquivos" });
     // Scripts run on the agent's PC; old imports kept them as ignored.
     const script = within(files).getByText("scripts/lint.sh").closest(".skill-file") as HTMLElement;
@@ -98,6 +110,8 @@ describe("Configurações → Skills", () => {
     await click(within(section()).getByRole("button", { name: "Instalar skill" }));
     dialog = screen().getByRole("dialog", { name: "Instalar skill" });
     await pickTab(within(dialog).getByRole("tab", { name: "Enviar .zip" }));
+    // What the .zip holds, nothing about its scripts: they can run on the agent's computer, as its sheet says.
+    expect(within(dialog).getByText(/^Um \.zip/).textContent).toBe("Um .zip com o SKILL.md na raiz.");
     expect(dialog.querySelector('input[type="file"]')?.className).toContain("ac-visually-hidden");
     const file = new File([new Uint8Array([80, 75, 3, 4])], "suporte.zip", { type: "application/zip" });
     await act(async () => {

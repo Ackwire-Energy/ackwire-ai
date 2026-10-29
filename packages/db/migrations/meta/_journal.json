@@ -610,6 +610,223 @@
       "when": 1792583051860,
       "tag": "0086_mission_worktree",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1792720912880,
+      "tag": "0087_run_background",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1792732262676,
+      "tag": "0088_routines_unattended",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1792799371683,
+      "tag": "0089_blobs_person_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1792800091667,
+      "tag": "0090_import_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1792813616839,
+      "tag": "0091_operator_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1792816161896,
+      "tag": "0092_org_standing",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792818524301,
+      "tag": "0093_user_block_agent_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792820665374,
+      "tag": "0094_managed_machines",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792842956318,
+      "tag": "0095_handoff_screen",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792842961842,
+      "tag": "0096_desktop_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792848909133,
+      "tag": "0097_ai_accounts_people",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792851366514,
+      "tag": "0098_setup_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1792851370991,
+      "tag": "0099_host_computer",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792856168749,
+      "tag": "0100_usage_plan_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792866168749,
+      "tag": "0101_team_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792898767185,
+      "tag": "0102_usage_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792906167604,
+      "tag": "0103_usage_report_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1792913238586,
+      "tag": "0104_provisioning_ready_time",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1792913258591,
+      "tag": "0105_drop_eta_seconds",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1792913278591,
+      "tag": "0106_mail_account_aliases",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1792984793302,
+      "tag": "0107_claude_chatgpt_labels",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1792986583857,
+      "tag": "0108_join_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1793009197474,
+      "tag": "0109_provisioning_stage",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1793022721235,
+      "tag": "0110_idle_provisioning",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1793044666107,
+      "tag": "0111_drop_provisioning_delayed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1793109327884,
+      "tag": "0112_machine_browser_traffic",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1793124307757,
+      "tag": "0113_join_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1793124416186,
+      "tag": "0114_instance_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1793126782034,
+      "tag": "0115_connector_server_icon",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1793131440058,
+      "tag": "0116_web_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1793134118058,
+      "tag": "0117_push_device_session",
+      "breakpoints": true
     }
   ]
 }

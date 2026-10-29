@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Checkbox, CheckboxPill, Field, Input, Radio, RadioGroup, TabPanel, Tabs } from "../src";
+import { Checkbox, CheckboxPill, Chip, Field, Input, Radio, RadioCard, RadioGroup, TabPanel, Tabs } from "../src";
 
 const body = () => within(document.body);
 
@@ -93,6 +93,40 @@ describe("Radio", () => {
     await act(async () => fireEvent.click(b as HTMLElement));
     expect(b?.getAttribute("aria-checked")).toBe("true");
     expect(a?.getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+describe("RadioCard", () => {
+  test("its chip rides on the title's line, and the description takes the card's whole width under both", async () => {
+    render(
+      <RadioGroup value="s3" onValueChange={() => {}} aria-label="Onde ficam os arquivos">
+        <RadioCard
+          value="disk"
+          id="disk"
+          checked={false}
+          title="Este servidor"
+          description="Os arquivos ficam no disco dele."
+          aside={<Chip icon="check">Em uso</Chip>}
+        />
+      </RadioGroup>,
+    );
+    const head = document.querySelector(".ac-option__head");
+    expect([...(head?.children ?? [])].map((c) => c.className)).toEqual(["ac-option__title", "ac-option__aside"]);
+    expect(head?.nextElementSibling?.className).toBe("ac-option__desc");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-option__text:has(> .ac-option__head)")).toContain("flex: 1;");
+    expect(rule(".ac-option__head")).toContain("display: flex;");
+    expect(rule(".ac-option__aside")).toContain("display: flex;");
+    // On a narrow card (a decision's three options) the chip drops under the title instead of leaving the card: the
+    // row wraps, the title can shrink to its longest word, and the dropped chip starts under it with no gap between.
+    expect(rule(".ac-option__head")).toContain("flex-wrap: wrap;");
+    expect(rule(".ac-option__head")).not.toMatch(/\n\s*(row-)?gap:/);
+    expect(rule(".ac-option__head > .ac-option__title")).toContain("flex: 1 1 0;");
+    expect(rule(".ac-option__aside")).not.toContain("margin-left");
+    expect(rule(".ac-option__desc")).toContain("text-wrap: pretty;");
+    // An option that can't be picked dims; its "Em breve" stays clear.
+    expect(rule(".ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc)")).toContain("opacity: 0.55;");
   });
 });
 

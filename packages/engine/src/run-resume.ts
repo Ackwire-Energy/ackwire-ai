@@ -1,26 +1,68 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 import type { ToolResult } from "./brains/types";
+import { deliverNotice, publishDelivery } from "./delivery";
+import type { Message } from "./messages";
+import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
+import { missStaleRoutineRun } from "./routine-firing";
+import { holdsMessages } from "./run-hold";
+import { type AgentRun, replyThreadOf } from "./runs";
 
-const { agentRuns } = schema;
+const { agentRuns, messages } = schema;
+
+/**
+ * Agents talking back and forth (answers, notes, late results): a notice at
+ * this hop or beyond no longer starts a run of its own (it is written, and
+ * read by the agent's next run there). Stops two agents waking each other
+ * forever; a person posting starts again from hop 0.
+ */
+export const NOTICE_WAKE_MAX_HOP = 4;
+
+/** A wait the run stopped waiting on (`waits.ts` `detachWait`): its result comes later as a notice. */
+export interface DetachedWait {
+  waitId: string;
+  /** `browser_handoff`, `consultation`… */
+  kind: string;
+  /** Who the late notice is from, as the agent reads it ("Your request for help in the browser"). */
+  from: string;
+  at: string;
+}
 
 /** The part of a run's transcript these helpers read and write (the engine's `Transcript`). */
-interface StoredTranscript {
+export interface StoredTranscript {
   pending?: {
-    calls: { toolUseId: string; name: string; waitId?: string; result?: { content: string; isError: boolean } }[];
+    calls: {
+      toolUseId: string;
+      name: string;
+      waitId?: string;
+      approvalId?: string;
+      questionId?: string;
+      secretRequestId?: string;
+      bridged?: boolean;
+      result?: { content: string; isError: boolean };
+    }[];
   };
   waitingForBrain?: { kind: string; machineId: string; code: string; waitId?: string };
   consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
+  /** Waits it stopped waiting on (`detachWait`): their results come as notices. */
+  detachedWaits?: DetachedWait[];
   [key: string]: unknown;
 }
 
 /**
- * A run paused on a mission's own wait (a blocking `ask_decision`, a
- * `request_review`: the tool returned `data.pause` with the decision's or
- * review's id) gets its answer: the waiting call's result is set and the run
- * is queued again; the engine resumes it like after an approval (model
- * brain: the tool result; computer brain: the text in its session). Null:
- * the run doesn't wait on that id (anymore).
+ * A run paused on a wait (a mission's blocking `ask_decision` or
+ * `request_review`, help in the browser, another agent's answer: the tool
+ * returned `data.pause` with the wait's id) gets its result: the waiting
+ * call's result is set and the run is queued again; the engine resumes it
+ * like after an approval (model brain: the tool result; computer brain: the
+ * text in its session).
+ *
+ * A wait the run stopped waiting on (a person wrote meanwhile: `detachWait`)
+ * gets its result as a notice instead (`late`, default a `wait_result` with
+ * the result's text), once: to the run while it is still active, else to its
+ * conversation (`deliverNoticeToRun`). Null: the run doesn't wait on that id
+ * (anymore), nor stopped waiting on it.
  */
 export async function resumeRunWithResult(
   db: Database,
@@ -30,18 +72,30 @@ export async function resumeRunWithResult(
     result: ToolResult;
     /** An agent it consulted (`ask_agent`): its reply's `meta.consulted` card. */
     consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null };
+    /** The notice when the wait was detached (default: a `wait_result` with the result's text). */
+    late?: Omit<Notice, "refs">;
+    /** Publishes a late notice (none: written only; the agent reads it all the same). */
+    pubsub?: PubSub;
   },
-): Promise<{ runId: string } | null> {
+): Promise<{ runId: string; notice?: Message } | null> {
   const resumed = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status, transcript: agentRuns.transcript })
-      .from(agentRuns)
-      .where(eq(agentRuns.id, input.runId))
-      .for("update");
-    if (!row || (row.status !== "waiting_input" && row.status !== "waiting_approval")) return null;
+    const [row] = await tx.select().from(agentRuns).where(eq(agentRuns.id, input.runId)).for("update");
+    if (!row) return null;
     const t = row.transcript as StoredTranscript | null;
-    const call = t?.pending?.calls.find((c) => c.waitId === input.waitId && !c.result);
-    if (!t || !call) return null;
+    const waiting = row.status === "waiting_input" || row.status === "waiting_approval";
+    const call = waiting ? t?.pending?.calls.find((c) => c.waitId === input.waitId && !c.result) : undefined;
+    if (!t || !call) {
+      // Not waiting on it (anymore): a wait it stopped waiting on gets its result as a notice, once.
+      const detached = t?.detachedWaits?.find((d) => d.waitId === input.waitId);
+      if (!detached || (await lateNoticeSent(tx, row, input.waitId))) return null;
+      const delivered = await deliverNoticeToRun(tx, row, {
+        kind: input.late?.kind ?? "wait_result",
+        text: input.late?.text ?? input.result.content,
+        from: input.late?.from ?? detached.from,
+        refs: { waitId: input.waitId, runId: row.id },
+      });
+      return { runId: row.id, delivered };
+    }
     call.result = { content: input.result.content, isError: input.result.isError === true };
     if (input.consulted) t.consulted = [...(t.consulted ?? []), input.consulted];
     await tx
@@ -52,12 +106,94 @@ export async function resumeRunWithResult(
       orgId: row.orgId,
       kind: "agent_run.execute",
       payload: { runId: row.id },
-      dedupeKey: `agent_run.execute:${row.id}:wait:${input.waitId}`,
+      // Per call: the run may wait on the same id again later (a browser tool while the person still holds it).
+      dedupeKey: `agent_run.execute:${row.id}:wait:${input.waitId}:${call.toolUseId}`,
       maxAttempts: 4,
     });
-    return { runId: row.id };
+    return { runId: row.id, delivered: null };
   });
-  return resumed;
+  if (!resumed) return null;
+  if (!resumed.delivered) return { runId: resumed.runId };
+  await publishDelivery(input.pubsub, resumed.delivered).catch(() => {});
+  return { runId: resumed.runId, notice: resumed.delivered.message };
+}
+
+/**
+ * The late notice of a detached wait is already written (a sweep resuming
+ * again, two results racing). Looked up on the messages: the run's own
+ * transcript may be rewritten by its executor meanwhile.
+ */
+async function lateNoticeSent(tx: Executor, run: AgentRun, waitId: string) {
+  const [sent] = await tx
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        eq(messages.authorAgentId, run.agentId),
+        sql`${messages.meta}->'notice'->'refs'->>'waitId' = ${waitId}`,
+      ),
+    )
+    .limit(1);
+  return Boolean(sent);
+}
+
+const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "waiting_input"];
+
+/**
+ * A notice for one run (another agent's answer, a late result): while the
+ * run is still active it reads it at its next step (queued on that run, in
+ * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
+ * joins the agent's run there or starts one, unless agents already went back
+ * and forth up to `NOTICE_WAKE_MAX_HOP` (then it is only written, and read by
+ * the agent's next run there). In the caller's transaction; publish with
+ * `publishDelivery` after the commit.
+ */
+export async function deliverNoticeToRun(
+  tx: Executor,
+  run: Pick<
+    AgentRun,
+    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "trigger"
+  >,
+  notice: Notice,
+): Promise<{ message: Message; runs: AgentRun[] }> {
+  const [current] = await tx
+    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, run.id))
+    .for("update");
+  // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
+  // notice wakes the agent in a run of its own instead.
+  const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
+  const delivered = await deliverNotice(tx, {
+    orgId: run.orgId,
+    agentId: run.agentId,
+    channelId: run.channelId,
+    threadId: replyThreadOf(run),
+    hop: run.hop,
+    notice,
+    body: forPeople(notice),
+    wake: active ? false : run.hop < NOTICE_WAKE_MAX_HOP,
+    trigger: run.trigger === "dm" ? "dm" : "mention",
+  });
+  if (active) {
+    await tx
+      .update(agentRuns)
+      .set({ pendingMessageIds: sql`array_append(${agentRuns.pendingMessageIds}, ${delivered.message.id}::uuid)` })
+      .where(eq(agentRuns.id, run.id));
+  }
+  return delivered;
+}
+
+/**
+ * What people see of a notice (a compact card; the agent reads `notice.text`):
+ * the same words without `@handle`s, so another agent's words never mention
+ * (and start) an agent.
+ */
+function forPeople(notice: Notice) {
+  const text = `${notice.from ? `${notice.from}: ` : ""}${notice.text}`;
+  return text.replace(/(^|[^\w@.])@(?=[a-zA-Z0-9])/g, "$1").slice(0, 40_000);
 }
 
 /**
@@ -65,20 +201,30 @@ export async function resumeRunWithResult(
  * computer brain (no model credential to fall back on) are queued again.
  * Found by `agent_runs.waiting_machine_id` (indexed, set only while a run
  * waits for its computer); one job per wait (`waitingForBrain.waitId`), so
- * reconnects while the job is still queued don't add more.
+ * reconnects while the job is still queued don't add more. A routine's run
+ * whose slot is more than 12 hours old doesn't run late: it is missed
+ * (`missStaleRoutineRun`, ADR 0053 §6.4). Returns the runs queued again.
  */
-export async function resumeRunsWaitingForMachine(db: Executor, machineId: string): Promise<string[]> {
+export async function resumeRunsWaitingForMachine(
+  db: Database,
+  machineId: string,
+  options: { pubsub?: PubSub; now?: Date } = {},
+): Promise<string[]> {
   const rows = await db
     .select({
       id: agentRuns.id,
       orgId: agentRuns.orgId,
+      background: agentRuns.background,
       waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
     .limit(200);
+  const resumed: string[] = [];
   for (const r of rows) {
+    if (r.background && (await missStaleRoutineRun({ db, pubsub: options.pubsub }, r.id, options.now))) continue;
+    resumed.push(r.id);
     await enqueue(db, {
       orgId: r.orgId,
       kind: "agent_run.execute",
@@ -88,5 +234,5 @@ export async function resumeRunsWaitingForMachine(db: Executor, machineId: strin
       maxAttempts: 4,
     });
   }
-  return rows.map((r) => r.id);
+  return resumed;
 }

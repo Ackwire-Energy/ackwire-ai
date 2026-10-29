@@ -1,21 +1,18 @@
 # 0035. Mobile app: Expo + React Native with shared logic
 
-- Status: Accepted (in progress on branch `feature/mobile-app`)
+- Status: Accepted
 - Date: 2026-10-17
-- Planning: D50
-- Extends: ADR 0007 (keys never reach clients), D46 (notifications)
+- Extends: ADR 0007 (keys never reach clients), the in-app notifications (`packages/engine/src/notifications.ts`)
 
 ## Context
 
 We want a phone app with the same identity and behavior as the web. Today all client logic (API types and client, TanStack queries, realtime, i18n, formatting and domain helpers) lives inside `apps/web`. The private API (`/api/app/*`) assumes a browser: a same-origin cookie session, and a CSRF check that refuses state-changing requests whose `Origin` is not ours. A native app sends no `Origin`. There is no push, no in-app account deletion and no Sign in with Apple, all of which the stores require.
 
-The approved flows and look are in `docs/design/telas/Mobile.html`.
-
 ## Decision
 
 **1. Expo + React Native in `apps/mobile`. Logic is shared, UI is not.**
 - Screens and components are native (Expo Router, `View`/`Text`) and follow the same design system. No react-native-web or universal UI kit.
-- Nothing runs on the developer's machine. Verification runs in CI (lint, typecheck, unit tests on pure logic). Builds and device installs go through EAS (`.github/workflows/mobile.yml`, needs the `EXPO_TOKEN` secret).
+- Verification runs in CI (lint, typecheck, unit tests on pure logic). Builds and device installs go through EAS (`.github/workflows/mobile.yml`, needs the `EXPO_TOKEN` secret).
 
 **2. Shared packages.** The web imports them too and must not change behavior.
 - `@agenteschat/client` (`packages/client`): API types, `ApiError`, the HTTP client, query keys, query options and the React Query hooks, realtime (`RealtimeConnection`, frames, streams, consultations), and the DOM-free helpers from `apps/web/src/lib`. React is allowed (hooks run on both platforms). DOM, `react-dom`, `window`, `document`, `localStorage` and `@agenteschat/ui` are not, and a guard test enforces this. Platform effects come in as options (for example `onAgentReaction` instead of calling `playAgentReaction`).
@@ -36,7 +33,7 @@ The approved flows and look are in `docs/design/telas/Mobile.html`.
 **4. Push notifications.**
 - `push_devices` (migration 0066; per user, not per org: `user_id`, `token`, `platform` ios|android, `locale`, timestamps) with `POST /api/app/push/devices` (upsert, 204; the token moves to whoever is signed in; 10 devices per person, 30 registrations an hour) and `DELETE /api/app/push/devices/:token` (204, own tokens only).
 - Delivery goes through the outbox as a `push.send` job, via a `PushSender` adapter (Expo Push API; a fake in tests). Unregistered tokens are removed.
-- What pushes (D46 kinds): everything in "Esperando você" (approval, agent question, forum turn), mention, DM from a person, and mission or routine stopped or failed. Muted or read items do not push. Grouped items push once per group while unread.
+- What pushes (notification kinds): everything in "Esperando você" (approval, agent question, forum turn), mention, DM from a person, and mission or routine stopped or failed. Muted or read items do not push. Grouped items push once per group while unread.
 - Push text is the one exception to "server strings in English": the OS shows it as is. A small catalog (`push-messages.ts`, pt-BR and en, picked by the device locale) renders it. The payload carries `{ orgId, kind, notificationId, channelId?, threadId?, approvalId?, missionId? }` for the deep link.
 - A high-risk approval is never approved from the notification. It opens the app, which asks to hold.
 

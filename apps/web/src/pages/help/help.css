@@ -1,0 +1,14 @@
+/* A help page (HelpPage): the Terms' bar and reading column (`legal.css`), with sections and commands to copy. */
+.help__doc h2 {
+  margin-top: 16px;
+  font-size: 18px;
+  line-height: 24px;
+  scroll-margin-top: 24px;
+}
+.help__doc li + li {
+  margin-top: 6px;
+}
+.help__foot {
+  display: flex;
+  gap: 16px;
+}

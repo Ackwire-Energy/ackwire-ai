@@ -2,11 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D5 and roadmap step 2. Extends 0008.
+- Extends 0008.
 
 ## Decision
 
-A person's message without mentions enqueues `message.posted`; the handler calls `routeMessage` when `ROUTER_ENABLED`. Agent messages never go through the router (D5 default).
+A person's message without mentions enqueues `message.posted`; the handler calls `routeMessage` when `ROUTER_ENABLED`. Agent messages never go through the router (changed by ADR 0034).
 
 1. **Candidates are chosen by code**: active agents that are members of the channel with `channel_members.auto_reply = true`. Nothing else can be picked.
 2. **A `RouterStrategy` only scores them**: `decide({ orgId, channel, message, thread, candidates }) → { agents: [{ agentId, score }], needsAgent?, reason?, usageRecordId? }`. It never adds candidates or grants anything.
@@ -14,8 +14,16 @@ A person's message without mentions enqueues `message.posted`; the handler calls
 4. Runs are created with the shared `createAgentRuns` helper (trigger `router`), the same one mentions use.
 5. **Every decision is stored** in `routing_decisions` (unique per message): strategy name, every candidate's score, the need-any-agent score, who was picked, the reason, the usage record. That makes strategies comparable later.
 
-**Core strategy (`llm`)**: one structured-output call through `gateway.complete` (kind `router`, billed to the org's credential), `effort: "low"`, JSON Schema output whose `handle` field is an enum of the candidates. The model is `organization_settings.router_model` or the deployment's `ROUTER_MODEL`. Message text is wrapped as data. Malformed output means nobody answers.
+**Core strategy (`llm`)**: one structured-output call through `gateway.complete` (kind `router`, billed to the org's credential), `effort: "low"`, JSON Schema output whose `handle` field is an enum of the candidates. The model is `organization_settings.router_model` or the deployment's `ROUTER_MODEL`. Message text is wrapped as data. Malformed output means nobody answers. Since ADR 0074 it is the organization's small model on any of its keys, with the least thinking it allows, and malformed output is a failure.
 
-**Failures**: transient errors rethrow (outbox retry); permanent ones (no credential, rejected request) or the final attempt store a decision with `error` and pick nobody.
+**Failures**: transient errors rethrow (outbox retry); permanent ones (no credential, rejected request) or the final attempt store a decision with `error` and pick nobody. Replaced by ADR 0074: a failing step is noted in `error` and the next one decides in the same job, and rules in code end the chain.
 
-**Other strategies** plug in through `JobDeps.router.strategy`. Planned: an optional external classifier (TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone`, one question per candidate plus "does this need any agent?"), enabled by env only, never required, and recording its usage like every other model call.
+**Other strategies** plug in through `JobDeps.router.strategy`. Planned: an optional external classifier (TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone`, one question per candidate plus "does this need any agent?"), enabled by env only (or, since ADR 0073, by the key the installation's owner adds in Settings), never required, and recording its usage like every other model call. Since ADR 0074 it is the first step of the router's chain.
+
+## Addendum (2026-10-20): up to four agents
+
+Since ADR 0034 (2026-10-17) policy picks at most `DEFAULT_ROUTER_POLICY.maxAgents` (4, `packages/engine/src/router.ts`) instead of 2, so a message to the room can wake several agents; an agent's own message still brings in at most one.
+
+## Addendum (2026-10-28): one agent unless it is for every agent
+
+Up to four agents meant every agent that could help took a question with one answer: "how many subscriptions today?" woke the PM and the researcher, who ran the same query and posted the same list. Each step now also says `for_everyone`, the probability that the message speaks to all the agents and each one has its own answer (the small model and the plan in the answer schema, Jev as a Noul with two or more candidates). `selectAgents` picks the best agent alone unless it is at least `FOR_EVERYONE_THRESHOLD` (0.5); then up to `maxAgents`. A step that doesn't say means one.

@@ -37,6 +37,43 @@ describe("buttons and kbd", () => {
     expect(b.querySelector(".ac-btn__kbd")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("no keyboard hints on a touch screen or at phone width, wherever the kit draws one", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const narrow = css.split("\n@media (max-width: 760px), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    const hidden = narrow.split("{").at(-2)?.split("}").at(-1) ?? "";
+    for (const hint of [
+      ".ac-btn__kbd",
+      ".ac-btn > .ac-kbd",
+      ".ac-composer__send-text .ac-kbd",
+      ".ac-searchfield__hint",
+      ".ac-palette .ac-kbd",
+      ".ac-mo__kbd",
+    ])
+      expect(hidden).toContain(hint);
+    expect(narrow).toMatch(/\.ac-mo__kbd \{\s*display: none;/);
+    // The send choice's line of keys goes with them.
+    expect(css).toMatch(
+      /@media \(max-width: 760px\), \(hover: none\), \(pointer: coarse\) \{\s*\.ac-composer-choice__hint \{\s*display: none;/,
+    );
+  });
+
+  test("a Button that toggles stays pushed in while on (aria-pressed), hovered or not; a ghost one keeps its plate", async () => {
+    render(<Button aria-pressed>Teclado</Button>);
+    expect(body().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("true");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) =>
+      new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+    const pressed = rule('.ac-btn[aria-pressed="true"]');
+    expect(pressed).toContain("background: var(--sunken)");
+    expect(pressed).toContain("color: var(--ink)");
+    expect(pressed).toContain("inset 0 0 0 1px var(--line)");
+    expect(rule('.ac-btn--ghost[aria-pressed="true"]')).toContain("background: var(--plate)");
+    // At the hover's weight, after it, so a pressed button stays pushed in under the pointer; before the focus ring.
+    const at = (selector: string) => css.lastIndexOf(`\n${selector} {`);
+    expect(at(".ac-btn:hover")).toBeLessThan(at('.ac-btn[aria-pressed="true"]'));
+    expect(at('.ac-btn[aria-pressed="true"]')).toBeLessThan(at(".ac-btn:focus-visible"));
+  });
+
   test("Kbd is a <kbd>", () => {
     const { container } = render(<Kbd>esc</Kbd>);
     expect(container.querySelector("kbd.ac-kbd")?.textContent).toBe("esc");
@@ -53,6 +90,24 @@ describe("buttons and kbd", () => {
     const b = body().getByRole("button", { name: "Cancelar" });
     b.focus();
     expect(document.activeElement).toBe(b);
+  });
+
+  test("off, a button is a faint plate over what it sits on, so its shape shows on the dark page too", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const off = css.split('\n.ac-btn[disabled],\n.ac-btn[aria-disabled="true"] {').at(-1)?.split("}")[0] ?? "";
+    expect(off).toContain("background: var(--plate)");
+    expect(off).not.toContain("var(--sunken)");
+  });
+
+  test("a chosen option looks the same in both themes and never moves, so a row of options keeps its words on one line", async () => {
+    const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
+    // One recipe, in the block both themes share: held down into the page, and neither theme redefines it.
+    const defining = [...tokens.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, , rule]) => (rule ?? "").includes("--chosen-"))
+      .map(([, selector]) => (selector ?? "").trim().replace(/\s+/g, " "));
+    expect(defining).toEqual([":root, [data-theme]"]);
+    expect(tokens).toContain("--chosen-bg: var(--sunken);");
+    expect(tokens).toContain("--chosen-lift: none;");
   });
 });
 

@@ -1,16 +1,17 @@
 import { Button, Chip } from "@agenteschat/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
-import type { UpdateCheck } from "../../hooks";
+import { type UpdateCheck, useLocalServer } from "../../hooks";
+import { CardTitle, PrefCard, PrefHead } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
-import { CardTitle, PrefCard, PrefHead } from "./shared";
 
 /**
- * Updates (ADR 0036 §9): one click installs the signed update and reopens the app. When that can't
- * happen (a release without the updater bundle, a failed download) the manual steps come back.
+ * Updates (ADR 0036 §9): one click downloads the signed update, with its progress and Cancel, installs it and
+ * reopens the app. When that can't happen (a release without the updater bundle, a failed or stalled download, a
+ * Linux package) the download and, on a Mac, the manual steps come back.
  */
 export function Updates({ update }: { update: UpdateCheck }) {
   const { t, i18n } = useTranslation();
@@ -18,20 +19,30 @@ export function Updates({ update }: { update: UpdateCheck }) {
   const toast = useToast();
   const { latest, available, required } = update.state;
   const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState<{ got: number; total: number | null } | null>(null);
   const [manual, setManual] = useState(false);
+  const local = useLocalServer();
+  useEffect(() => host.onUpdateProgress((got, total) => setProgress({ got, total })), [host]);
 
   const install = async () => {
     setInstalling(true);
+    setProgress(null);
     try {
-      // true: the app is about to reopen as the new version; keep the button busy until then.
+      // true: the app is about to reopen as the new version; the card stays until then.
       if (await host.installUpdate()) return;
       setManual(true);
-    } catch {
-      toast(t("desktop.prefs.updates.installFailed"), "alert");
-      setManual(true);
+    } catch (e) {
+      // Cancel: nothing was installed, and Update and reopen is back.
+      if (e !== "cancelled") {
+        toast(t("desktop.prefs.updates.installFailed"), "alert");
+        setManual(true);
+      }
     }
     setInstalling(false);
   };
+  const percent = progress?.total ? Math.min(100, Math.floor((progress.got / progress.total) * 100)) : 0;
+  // Whole: it installs now (seconds), and there is nothing left to cancel.
+  const whole = percent === 100;
 
   const checkNow = async () => {
     const result = await update.check();
@@ -41,7 +52,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
 
   return (
     <>
-      <PrefHead title={t("desktop.prefs.updates.title")} lead={t("desktop.prefs.updates.lead")} />
+      <PrefHead title={t("desktop.prefs.updates.title")} />
       <PrefCard>
         <div className="dk-ver">
           <span className="dk-ver__big ac-num">{update.version ?? "…"}</span>
@@ -68,6 +79,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
                   })
                 : t("desktop.prefs.updates.neverChecked")}
             </small>
+            {local.run && <small className="dk-help">{t("desktop.server.updatesWithApp")}</small>}
           </span>
           <Button size="sm" loading={update.checking} onClick={() => void checkNow()}>
             {t("desktop.prefs.updates.checkNow")}
@@ -79,23 +91,51 @@ export function Updates({ update }: { update: UpdateCheck }) {
         <>
           {!manual && (
             <PrefCard padded>
-              <div className="dk-ver__acts">
-                <Button variant="primary" icon="download" loading={installing} onClick={() => void install()}>
-                  {t("desktop.prefs.updates.install")}
-                </Button>
-                <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
-              </div>
+              {installing ? (
+                <div className="dk-upd" aria-live="polite">
+                  <div className="dk-upd__line">
+                    <span className="dk-upd__label">
+                      {whole ? t("desktop.prefs.updates.installing") : t("desktop.prefs.updates.downloading")}
+                    </span>
+                    {!whole && (
+                      <Button className="dk-upd__cancel" onClick={() => void host.cancelUpdate().catch(() => {})}>
+                        {t("desktop.common.cancel")}
+                      </Button>
+                    )}
+                  </div>
+                  <div
+                    className="dk-bar"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progress?.total ? percent : undefined}
+                    aria-label={t("desktop.prefs.updates.downloading")}
+                  >
+                    <span style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <div className="dk-ver__acts">
+                  <Button variant="primary" icon="download" onClick={() => void install()}>
+                    {t("desktop.prefs.updates.install")}
+                  </Button>
+                </div>
+              )}
             </PrefCard>
           )}
           {manual && (
             <>
               <CardTitle>{t("desktop.prefs.updates.howTitle")}</CardTitle>
               <PrefCard padded>
-                <ol className="dk-steps-list">
-                  <li>{t("desktop.prefs.updates.step1")}</li>
-                  <li>{t("desktop.prefs.updates.step2")}</li>
-                  <li>{t("desktop.prefs.updates.step3")}</li>
-                </ol>
+                {host.platform === "mac" ? (
+                  <ol className="dk-steps-list">
+                    <li>{t("desktop.prefs.updates.step1")}</li>
+                    <li>{t("desktop.prefs.updates.step2")}</li>
+                    <li>{t("desktop.prefs.updates.step3")}</li>
+                  </ol>
+                ) : (
+                  <p className="dk-help">{t("desktop.prefs.updates.installerNote")}</p>
+                )}
                 <div className="dk-ver__acts">
                   <Button variant="primary" icon="download" onClick={() => void host.openExternal(latest.url)}>
                     {t("desktop.prefs.updates.download", { version: latest.version })}

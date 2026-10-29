@@ -13,6 +13,7 @@ import {
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -42,13 +43,14 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ThisMacButton } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { CommandApprovalSelect, executorOptions } from "./MissionBits";
 import "./missions.css";
 
 /**
- * The mission dialogs (Threads.html): "Nova missão" (objective, agent, where
+ * The mission dialogs: "Nova missão" (objective, agent, where
  * it lives, the computer it runs on), closing it (Concluída / Cancelada,
  * "Salvar decisões e lições na wiki"), and "Compartilhar" (who can decide or
  * comment, handing it over; the computer never moves by itself).
@@ -74,6 +76,9 @@ export function NewMissionDialog({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  // On the Cloud every agent works on the workspace's own computer: missions wait for it, nobody connects one.
+  const cloud = useComputerEdition(org.id) === "cloud";
+  const waitWords = t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) });
   const api = useApi();
   const dir = useDirectory(org.id);
   const toast = useToast();
@@ -180,22 +185,23 @@ export function NewMissionDialog({
         </div>
         {none ? (
           <div className="mi-notes mi-agent-empty" role="status">
-            <span>
-              <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
+            <span className="ac-iconline">
+              <Icon name="computer" size={14} />
+              <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
-            <span>{t("missions.new.noEligibleText")}</span>
-            {/* agentes for Mac: this Mac first, then the agent points at it (D79). */}
-            <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />
-            {setupAgent && (
+            <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
+            {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
+            {!cloud && <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />}
+            {setupAgent && !cloud && (
               <Link
-                className="mi-lnk"
+                className="ac-link mi-lnk"
                 to="/org/$orgId/agents/$agentId"
                 params={{ orgId: org.id, agentId: setupAgent.id }}
                 search={{ tab: "settings", sec: "computer" }}
                 onClick={() => onOpenChange(false)}
               >
                 <Icon name="settings" size={14} />
-                {t("missions.new.connectComputer", { name: setupAgent.name })}
+                {t("missions.new.connectComputer", agentGrammar(t, setupAgent.name))}
               </Link>
             )}
           </div>
@@ -218,7 +224,9 @@ export function NewMissionDialog({
                           computer: a.machine.name,
                           state: a.machine.online ? t("missions.online") : t("missions.offline"),
                         })
-                      : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
+                      : cloud && (a.reason ?? "no_computer") === "no_computer"
+                        ? waitWords
+                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
                   leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
                 }))}
               />
@@ -243,18 +251,22 @@ export function NewMissionDialog({
                   <span className="mi-blocked__text">
                     <b>{a.name}</b>
                     <span>
-                      {t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
+                      {cloud && (a.reason ?? "no_computer") === "no_computer"
+                        ? waitWords
+                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
                     </span>
                   </span>
-                  <Link
-                    className="mi-lnk"
-                    to="/org/$orgId/agents/$agentId"
-                    params={{ orgId: org.id, agentId: a.id }}
-                    search={{ tab: "settings", sec: "computer" }}
-                    onClick={() => onOpenChange(false)}
-                  >
-                    {t("missions.new.connect")}
-                  </Link>
+                  {!cloud && (
+                    <Link
+                      className="ac-link mi-lnk"
+                      to="/org/$orgId/agents/$agentId"
+                      params={{ orgId: org.id, agentId: a.id }}
+                      search={{ tab: "settings", sec: "computer" }}
+                      onClick={() => onOpenChange(false)}
+                    >
+                      {t("missions.new.connect")}
+                    </Link>
+                  )}
                 </li>
               ))}
           </ul>
@@ -269,7 +281,7 @@ export function NewMissionDialog({
               options={executorOptions(t, agent.executors, agent.name, agent.id)}
             />
             {agent.codexTooOld && (
-              <span className="mi-hint">
+              <span className="mi-hint ac-iconline">
                 <Icon name="info" size={14} />
                 {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
               </span>
@@ -310,18 +322,18 @@ export function NewMissionDialog({
               <span className="mi-hint">{t("missions.new.dmWith", { name: agent?.name ?? "" })}</span>
             )}
           </div>
-          <span className="mi-hint">
+          <span className="mi-hint ac-iconline">
             <Icon name="thread" size={14} />
-            {t("missions.new.homeHint", { name: agent?.name ?? "" })}
+            {t("missions.new.homeHint", agentGrammar(t, agent?.name ?? ""))}
           </span>
         </div>
         {machine && !machine.online && (
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <MachineIcon machineId={machine.id} />
             <span>{t("missions.new.offline", { name: machine.name })}</span>
           </div>
         )}
-        <div className="mi-notes">
+        <div className="mi-notes ac-iconline">
           <Icon name="bolt" size={14} />
           <span>
             {t("missions.new.commandHint")} <code className="mi-mono">{MISSION_COMMAND}</code>
@@ -463,7 +475,7 @@ export function CloseMissionDialog({
           <Switch id={wikiId} checked={wiki} onCheckedChange={setWiki} />
         </div>
         {mission.runningTasks > 0 && (
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="stop" size={14} />
             <span>
               {t("missions.close.running", {
@@ -508,6 +520,7 @@ export function ShareMissionDialog({
   const [lend, setLend] = useState(true);
   const [busy, setBusy] = useState(false);
   const lendId = useId();
+  const executor = executorName(mission.executor, dir.agentById.get(mission.agentId)?.name ?? "");
   const list = people.data;
   const taken = new Set([list?.owner?.userId, ...(list?.participants ?? []).map((p) => p.userId)].filter(Boolean));
   const query = q.trim().toLowerCase();
@@ -698,7 +711,7 @@ export function ShareMissionDialog({
             ))}
           </ul>
           {list && list.participants.length === 0 && <p className="mi-hint">{t("missions.share.onlyOwner")}</p>}
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="lock" size={14} />
             <span>{t("missions.share.seeing")}</span>
           </div>
@@ -715,7 +728,8 @@ export function ShareMissionDialog({
         width={480}
         title={t("missions.share.handTitle", { name: handing?.name ?? "" })}
         description={t("missions.share.handText", {
-          executor: executorName(mission.executor, dir.agentById.get(mission.agentId)?.name ?? ""),
+          executor,
+          article: agentGrammar(t, executor).article,
           name: handing?.name ?? "",
         })}
         closeLabel={t("common.cancel")}
@@ -730,7 +744,7 @@ export function ShareMissionDialog({
               <Switch id={lendId} checked={lend} onCheckedChange={setLend} />
             </div>
           )}
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="info" size={14} />
             <span>{t("missions.share.handNote")}</span>
           </div>

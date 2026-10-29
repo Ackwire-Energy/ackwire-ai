@@ -2,7 +2,7 @@ import { type GitProxyDeps, handleGitProxy } from "@agenteschat/engine";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 
 /**
- * The git proxy for agents' computers (D35, docs/adr/0024-git-proxy.md):
+ * The git proxy for agents' computers (docs/adr/0024-git-proxy.md):
  * `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/{info/refs|git-upload-pack|git-receive-pack}`.
  * No session cookie: the computer signs in with its own short-lived git
  * credential (HTTP Basic). Bodies are passed through as bytes.

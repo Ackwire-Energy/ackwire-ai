@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { light as lightTokens } from "@agenteschat/tokens";
-import { nextRoutine, upcomingDay, waitingCardOf } from "../../src/features/activity/logic";
+import { nextRoutine, sortWaiting, upcomingDay, waitingCardOf } from "../../src/features/activity/logic";
 import type { WorkItem } from "../../src/features/agents/logic";
 import type { ConversationRow } from "../../src/features/chats/logic";
 import {
@@ -31,6 +31,7 @@ const work = (key: string, agentId: string, over: Partial<WorkItem> = {}): WorkI
   missionId: null,
   plan: null,
   since: at(30),
+  waiting: false,
   ...over,
 });
 
@@ -202,6 +203,22 @@ describe("Atividade: cards and what comes next", () => {
       expiresAt: null,
       action: "answer",
     });
+  });
+
+  test("someone asking to join: the newest name (no actor, not a member yet), Revisar, after the rest", () => {
+    const join = notification({
+      id: "j",
+      kind: "join_request",
+      waiting: true,
+      actors: [],
+      count: 2,
+      latest: { title: "Ana Souza" },
+      updatedAt: at(1),
+    });
+    expect(waitingCardOf(join)).toEqual({ kind: "join", title: "Ana Souza", expiresAt: null, action: "review" });
+    const approval = notification({ id: "a", kind: "approval", waiting: true, updatedAt: at(30) });
+    const question = notification({ id: "q", kind: "agent_question", waiting: true, updatedAt: at(60) });
+    expect(sortWaiting([join, approval, question]).map((n) => n.id)).toEqual(["q", "a", "j"]);
   });
 
   test("the next routine: active, ahead, the soonest", () => {

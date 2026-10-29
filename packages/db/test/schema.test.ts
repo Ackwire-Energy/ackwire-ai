@@ -29,7 +29,7 @@ describe("migrations", () => {
         select t.table_name from information_schema.tables t
         where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
           and t.table_name not like 'messages\\_%'
-          and t.table_name not in ('users', 'sessions', 'accounts', 'verifications', 'organizations', 'waitlist_entries', 'push_devices')
+          and t.table_name not in ('users', 'sessions', 'accounts', 'verifications', 'organizations', 'waitlist_entries', 'push_devices', 'instance_telemetry', 'instance_secrets', 'instance_push')
           and not exists (
             select 1 from information_schema.columns c
             where c.table_name = t.table_name and c.column_name = 'org_id'

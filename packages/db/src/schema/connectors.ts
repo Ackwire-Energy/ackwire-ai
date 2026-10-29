@@ -4,7 +4,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * An organization's connection to an MCP server (layer 1 of D7: the org
+ * An organization's connection to an MCP server (layer 1 of ADR 0016: the org
  * connects once; agents get subsets of its scopes in `agent_scopes`).
  * `connector` is a key of the catalog in `@agenteschat/engine`
  * (`CONNECTOR_CATALOG`), which maps each tool to one of our scopes.
@@ -35,6 +35,8 @@ export const connectorConnections = pgTable(
     reviewedAt: timestamp({ withTimezone: true }),
     /** MCP-native OAuth: the client registered with the server's authorization server (`oauth_clients`). */
     oauthClientId: uuid(),
+    /** Custom servers: the server's own icon, kept by us (`/api/app/connector-icons/…`); null = a monogram. */
+    icon: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

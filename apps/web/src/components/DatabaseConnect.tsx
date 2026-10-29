@@ -38,10 +38,12 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { DatabaseRulesPanel } from "@/components/DatabaseRules";
+import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { POSTGRES_MARK } from "@/lib/brands";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -57,10 +59,10 @@ const DB_LEVELS: Level[] = ["none", "read"];
 export function DatabaseIcon({ size = "md" }: { size?: "md" | "lg" }) {
   return (
     <span
-      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--mono`}
+      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--brand`}
       aria-hidden="true"
     >
-      <Icon name="database" />
+      <img className="connector-icon__img" src={POSTGRES_MARK} alt="" />
     </span>
   );
 }
@@ -95,12 +97,7 @@ export function DatabaseConnectFlow({
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={
-        <span className="cflow__title">
-          <DatabaseIcon size="lg" />
-          <span>{title}</span>
-        </span>
-      }
+      title={<FlowTitle tile={<DatabaseIcon size="lg" />}>{title}</FlowTitle>}
       closeLabel={t("common.close")}
       width={620}
       className="cflow"

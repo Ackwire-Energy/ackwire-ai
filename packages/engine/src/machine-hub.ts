@@ -26,7 +26,14 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
-import { syncMachineAccounts } from "./machine-accounts";
+import {
+  accountsToRemove,
+  forgetRemovedAccount,
+  type MachineAccountRef,
+  storeOwnUsage,
+  syncMachineAccounts,
+} from "./machine-accounts";
+import { onManagedMachineHello, type ReadyEmailDeps } from "./machine-provisioning";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -52,6 +59,7 @@ import {
   publishMachineUpdated,
 } from "./machines";
 import { enqueue } from "./outbox";
+import { assertCanWork, standingRefusal } from "./standing";
 
 const { machines, machineRpc } = schema;
 
@@ -120,6 +128,8 @@ export interface MachineStatus {
   id: string;
   orgId: string;
   name: string;
+  /** `managed`: the workspace's own computer (ADR 0056 §10), always on. */
+  kind?: string;
   online: boolean;
   execAllowed: boolean;
   os: string;
@@ -187,6 +197,8 @@ export interface MachineHubDeps {
   brainIdleMs?: number;
   /** A cross-replica caller checks this often that the replica it asked still holds the socket (default 5 s). */
   rpcLivenessMs?: number;
+  /** The server sends email: the workspace's own computer, ready after a long wait, is emailed to its owners. */
+  readyEmail?: Omit<ReadyEmailDeps, "machines"> | null;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -216,8 +228,10 @@ type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string
 
 /**
  * Requests that start something new on the machine: refused while it is
- * paused (ADR 0036 §6). Following running work (a task's output, canceling
- * it), cleaning up and reducing access still go through.
+ * paused (ADR 0036 §6), its workspace isn't active or the agent is held
+ * (`standing.ts`).
+ * Following running work (a task's output, canceling it), cleaning up and
+ * reducing access still go through.
  */
 export function isNewWork(request: MachineRequest) {
   switch (request.op) {
@@ -225,11 +239,22 @@ export function isNewWork(request: MachineRequest) {
     case "task.cancel":
     case "task.output":
     case "access.reduce":
+    // A person's message for a turn already running (live steering).
+    case "brain.steer":
     // The owner managing the brains' accounts (ADR 0041) isn't agent work.
     case "account":
+    // Ending an agent's desktop, or asking about it (ADR 0058).
+    case "desktop.session.stop":
+    case "desktop.session.status":
+    // Screening a person still in control after a hold or a pause began (ADR 0076).
+    case "desktop.text":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";
+    // Watching a desktop isn't (the runner starts one that isn't running, and it stays on); taking control of it
+    // or a terminal is work on it.
+    case "stream.open":
+      return request.kind === "terminal" || request.mode === "control";
     default:
       return true;
   }
@@ -332,11 +357,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     return true;
   };
 
-  /** Starts a task through this socket (resuming one after an interruption). */
+  /** Starts a task through this socket (resuming one after an interruption); not in a paused workspace or for a held agent. */
   const localStarter =
     (conn: MachineConnection): LocalTaskStarter =>
     (input) => {
-      const call: TaskCall = async (_machineId, request) => callLocal(conn, await withAgentName(conn.orgId, request));
+      const call: TaskCall = async (_machineId, request) => {
+        if (conn.orgId) await assertCanWork(db, conn.orgId, input.agent.id);
+        return callLocal(conn, await withAgentName(conn.orgId, request));
+      };
       return startMachineTask({ db, pubsub, call }, input);
     };
 
@@ -366,14 +394,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (conn.machineId || conn.authing) return;
     conn.authing = true;
     if (frame.protocol < MIN_RUNNER_PROTOCOL) {
-      return refuse(conn, "outdated", "This runner is too old; install the latest one.", MACHINE_CLOSE.outdated);
+      return refuse(conn, "outdated", "This runner is too old. Install the latest one.", MACHINE_CLOSE.outdated);
     }
     const machine = await authenticateMachine(db, frame.token);
     if (!machine) {
       return refuse(
         conn,
         "invalid_token",
-        "This computer's token is not valid (it may have been removed); pair it again.",
+        "This computer's token isn't valid. It may have been removed. Pair it again.",
         MACHINE_CLOSE.invalidToken,
       );
     }
@@ -395,6 +423,11 @@ export function createMachineHub(deps: MachineHubDeps) {
       await closeConn(old);
     }
     const now = new Date();
+    // Protocol 19: the own sign-ins' usage it knows, over the last known (a runner that just started knows none).
+    const ownUsage = { ...(machine.executors?.ownUsage ?? {}), ...(frame.ownUsage ?? {}) };
+    // In single-user mode the agents' own code runs as the runner's user and can send any hello: system mode
+    // is believed only from a computer's first hello, and from one that has said so ever since.
+    const system = frame.mode === "system" && (machine.lastSeenAt === null || machine.executors?.mode === "system");
     await db
       .update(machines)
       .set({
@@ -409,12 +442,19 @@ export function createMachineHub(deps: MachineHubDeps) {
         workspace: frame.workspace,
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
-        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found.
-        ...(frame.executors || frame.browser
+        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
+        // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058);
+        // protocol 21: whether agents can use their desktops (ADR 0062).
+        ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
           ? {
               executors: {
                 ...(frame.executors ?? {}),
                 ...(frame.browser ? { browser: frame.browser } : {}),
+                ...(frame.desktop ? { desktop: frame.desktop } : {}),
+                ...(frame.terminal ? { terminal: frame.terminal } : {}),
+                ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
+                ...(system ? { mode: "system" as const } : {}),
+                ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
                 detectedAt: now.toISOString(),
               },
             }
@@ -423,6 +463,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         pausedUntil: conn.pause?.until ? new Date(conn.pause.until) : null,
         // Protocol 10: what the machine allows (an older runner reports nothing: unknown).
         access: frame.access ?? null,
+        // Protocol 22: its size (an older runner says nothing: kept, unknown if it never did).
+        ...(frame.size ? { size: frame.size } : {}),
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
@@ -435,9 +477,24 @@ export function createMachineHub(deps: MachineHubDeps) {
         connectionId: conn.connectionId,
       })
       .catch(() => undefined);
+    // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
+    // Stored before `welcome`: what the runner found since `hello` comes once it is welcomed (`accounts.changed`)
+    // and must land after this older list, never under it.
+    const removed =
+      frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts
+        ? await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) => {
+            deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) });
+            return [];
+          })
+        : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
+    // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
+    const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
+    await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
+      deps.log?.warn("managed machine hello failed", { machineId: machine.id, error: String(error) }),
+    );
     // Protocol 9: the agents that use this computer, for the desktop app.
     if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
     if (frame.protocol >= BROWSER_PROTOCOL) browserHooks.connected?.(machine.id);
@@ -456,12 +513,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (frame.protocol >= PAUSE_PROTOCOL) {
       await publishMachineUpdated(pubsub, machine.orgId, machine.id, { paused: conn.pause, access: true });
     }
-    // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
-    if (frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts) {
-      await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) =>
-        deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) }),
-      );
-    }
+    removeAccounts(conn, removed);
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
         (error) => deps.log?.warn("task reconcile failed", { machineId: machine.id, error: String(error) }),
@@ -476,6 +528,21 @@ export function createMachineHub(deps: MachineHubDeps) {
             deps.log?.warn("mission reconnect failed", { machineId: machine.id, error: String(error) }),
           ),
       );
+    }
+  }
+
+  /**
+   * Accounts whose row is a tombstone (removed while the computer was off, or
+   * their person left) that the runner still has: signed out and deleted
+   * there now, then the row goes. A failure leaves it for the next hello.
+   */
+  function removeAccounts(conn: MachineConnection, refs: MachineAccountRef[]) {
+    const { machineId, orgId } = conn;
+    if (!machineId || !orgId) return;
+    for (const ref of refs) {
+      void callLocal(conn, { op: "account", action: "remove", kind: ref.kind, accountId: ref.id })
+        .then(() => forgetRemovedAccount(db, orgId, ref.id))
+        .catch((error) => deps.log?.warn("account removal failed", { machineId, error: String(error) }));
     }
   }
 
@@ -522,16 +589,24 @@ export function createMachineHub(deps: MachineHubDeps) {
     return agent ? { ...request, agent: { ...scope, name: agent.name } } : request;
   }
 
+  /** Bridge calls of work already on the machine stop with its workspace (`standing.ts`). */
+  async function refused(conn: MachineConnection) {
+    const refusal = conn.orgId ? await standingRefusal(db, conn.orgId) : null;
+    return refusal ? { ok: false as const, error: { code: refusal.code, message: refusal.message } } : null;
+  }
+
   /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
   function mcpCall(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.call" }>) {
     const machineId = conn.machineId as string;
-    const run = hooks.mcp
-      ? hooks.mcp(machineId, frame)
-      : Promise.resolve({
-          ok: false as const,
-          error: { code: "mission.unavailable", message: "Missions are not available on this server." },
-        });
-    void run
+    const run = async () =>
+      (await refused(conn)) ??
+      (hooks.mcp
+        ? hooks.mcp(machineId, frame)
+        : {
+            ok: false as const,
+            error: { code: "mission.unavailable", message: "Missions are not available on this server." },
+          });
+    void run()
       .catch((error: unknown) => ({
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
@@ -549,13 +624,15 @@ export function createMachineHub(deps: MachineHubDeps) {
   /** `mcp.list` (protocol 8): answered with `mcp.tools`; never blocks other frames. */
   function mcpList(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.list" }>) {
     const machineId = conn.machineId as string;
-    const run = hooks.mcpList
-      ? hooks.mcpList(machineId, frame)
-      : Promise.resolve({
-          ok: false as const,
-          error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
-        });
-    void run
+    const run = async () =>
+      (await refused(conn)) ??
+      (hooks.mcpList
+        ? hooks.mcpList(machineId, frame)
+        : {
+            ok: false as const,
+            error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
+          });
+    void run()
       .catch((error: unknown) => ({
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
@@ -570,13 +647,25 @@ export function createMachineHub(deps: MachineHubDeps) {
       );
   }
 
-  async function touch(conn: MachineConnection) {
+  /**
+   * A `pong`: `last_seen_at` at most every 40 s, and the day's load (protocol 22) or its agents' browsers'
+   * traffic (protocol 23) whenever the runner has a new one.
+   */
+  async function touch(conn: MachineConnection, { load, browserTraffic }: Extract<RunnerFrame, { type: "pong" }>) {
     conn.lastPong = Date.now();
-    if (!conn.machineId || Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
+    if (!conn.machineId) return;
+    if (!load && !browserTraffic && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
     conn.lastSeenWrite = Date.now();
+    const now = new Date();
+    const at = now.toISOString();
     await db
       .update(machines)
-      .set({ lastSeenAt: new Date(), online: true })
+      .set({
+        lastSeenAt: now,
+        online: true,
+        ...(load ? { load: { ...load, at } } : {}),
+        ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
+      })
       .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
       .catch(() => undefined);
   }
@@ -824,6 +913,19 @@ export function createMachineHub(deps: MachineHubDeps) {
         });
         return;
       }
+      if (event.type === "machine.accounts" && typeof event.machineId === "string") {
+        // New tombstones (a person left): the runner here removes them now (outside the publisher's call stack).
+        const conn = local.get(event.machineId);
+        const { machineId, orgId } = conn ?? {};
+        if (!conn || !machineId || !orgId || conn.protocol < ACCOUNTS_PROTOCOL) return;
+        queueMicrotask(
+          () =>
+            void accountsToRemove(db, orgId, machineId)
+              .then((refs) => removeAccounts(conn, refs))
+              .catch(() => undefined),
+        );
+        return;
+      }
       if (event.type === "machine.agents" && typeof event.orgId === "string") {
         // The org's agents changed: its machines here list them again (outside the publisher's call stack).
         for (const conn of local.values()) {
@@ -841,7 +943,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     }),
   );
 
-  return {
+  const hub = {
     replicaId,
 
     /** A socket opened on `/api/machines/connect`: it has `HELLO_TIMEOUT_MS` to say `hello`. */
@@ -890,7 +992,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       // The agent browser's live view (ADR 0040): straight to the viewers in memory.
       else if (frame.type === "browser.frame") browserHooks.frame?.(conn.machineId, frame);
       else if (frame.type === "browser.stream.ended") browserHooks.streamEnded?.(conn.machineId, frame);
-      else if (frame.type === "pong") await touch(conn);
+      else if (frame.type === "pong") await touch(conn, frame);
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
       } else if (frame.type === "mcp.call") {
@@ -922,9 +1024,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         if (conn.machineId && conn.orgId) {
           const machineId = conn.machineId;
           const orgId = conn.orgId;
-          await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) =>
-            deps.log?.warn("account sync failed", { machineId, error: String(error) }),
-          );
+          const remove = await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) => {
+            deps.log?.warn("account sync failed", { machineId, error: String(error) });
+            return [];
+          });
+          removeAccounts(conn, remove);
+          if (frame.ownUsage) {
+            await storeOwnUsage({ db, pubsub }, orgId, machineId, frame.ownUsage).catch((error) =>
+              deps.log?.warn("own usage failed", { machineId, error: String(error) }),
+            );
+          }
         }
       } else if (frame.type === "access.changed") {
         const machineId = conn.machineId;
@@ -959,10 +1068,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     ): Promise<MachineReplies[Op]> {
       const conn = local.get(machineId);
       if (conn) {
-        // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
-        if (isNewWork(request) && pauseActive(conn.pause)) {
-          const row = await getMachineById(db, machineId);
-          if (row) await assertNotPaused(db, row);
+        if (isNewWork(request)) {
+          // A workspace on hold or suspended, or a held agent, starts nothing (`standing.ts`).
+          if (conn.orgId) await assertCanWork(db, conn.orgId, request.agent?.id);
+          // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
+          if (pauseActive(conn.pause)) {
+            const row = await getMachineById(db, machineId);
+            if (row) await assertNotPaused(db, row);
+          }
         }
         return callLocal(conn, await withAgentName(conn.orgId, request), options);
       }
@@ -971,7 +1084,10 @@ export function createMachineHub(deps: MachineHubDeps) {
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
         throw new MachineOfflineError(row.name);
       }
-      if (isNewWork(request)) await assertNotPaused(db, row);
+      if (isNewWork(request)) {
+        await assertCanWork(db, row.orgId, request.agent?.id);
+        await assertNotPaused(db, row);
+      }
       const named = await withAgentName(row.orgId, request);
       return callRemote({ ...row, connectedReplica: row.connectedReplica }, named, options);
     },
@@ -986,6 +1102,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         id: row.id,
         orgId: row.orgId,
         name: row.name,
+        kind: row.kind,
         online,
         execAllowed: row.execAllowed,
         os: row.os,
@@ -1032,6 +1149,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       }
     },
   };
+  return hub;
 }
 
 export type MachineHub = ReturnType<typeof createMachineHub>;

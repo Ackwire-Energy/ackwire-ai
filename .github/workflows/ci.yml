@@ -1,100 +1,618 @@
 name: CI
 
-# All verification runs here, never on the developer's machine.
-# Manual only (Actions minutes cost money): run it from the Actions tab or `gh workflow run ci.yml --ref main`.
+# All verification runs here.
+# Only on demand (every run is paid by the minute): `gh workflow run CI --ref <branch>` or "Run
+# workflow" in Actions. A `v*` tag still runs on its own and publishes the image, since pushing a tag
+# is already a deliberate release. Pull requests and pushes to main start nothing. A manual run or a
+# release tag checks everything.
+#
+# Runners are GitHub's standard hosted ones (the plan's included minutes come first); a third-party
+# runner service cost more than the speed it bought. Everything runs on x64: on ARM the backend
+# shards took 2.5x as long (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image
+# builds on ARM, natively.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  APP_IMAGE: ghcr.io/agentes-chat/agentes
+  BACKUP_IMAGE: ghcr.io/agentes-chat/backup
+
+# A newer push supersedes a running check of the same branch or PR (on main only the newest
+# commit's image matters); a release tag's run is never cancelled.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  check:
+  changes:
+    name: What changed
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter reads a pull request's files from the API
+    outputs:
+      code: ${{ steps.groups.outputs.code }}
+      shared: ${{ steps.groups.outputs.shared }}
+      backend: ${{ steps.groups.outputs.backend }}
+      web: ${{ steps.groups.outputs.web }}
+      mobile: ${{ steps.groups.outputs.mobile }}
+      desktop: ${{ steps.groups.outputs.desktop }}
+      image: ${{ steps.groups.outputs.image }}
+      docker: ${{ steps.groups.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
-      # A manual run checks everything (the groups below stay so a filter can come back later).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Changed files
+        id: filter
+        if: github.event_name != 'workflow_dispatch' && github.ref_type != 'tag'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - "**"
+              - "!docs/**"
+              - "!*.md"
+              - "!**/README.md"
+            shared:
+              - "packages/**"
+              - "package.json"
+              - "bun.lock"
+              - "bunfig.toml"
+              - "tsconfig*.json"
+              - ".env.example"
+              - ".github/workflows/ci.yml"
+            backend:
+              - "apps/server/**"
+              - "install.sh"
+            web:
+              - "apps/web/**"
+            mobile:
+              - "apps/mobile/**"
+            desktop:
+              - "apps/desktop/**"
+            docker:
+              - "Dockerfile"
+              - ".dockerignore"
+              - "docker-compose*.yml"
+              - "deploy/backup/**"
+      # A group counts only when code changed, not just docs or READMEs. The image holds the server
+      # and the web app.
       - name: What runs
-        id: changed
+        id: groups
+        env:
+          ALL: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+          CODE: ${{ steps.filter.outputs.code }}
+          CHANGES: ${{ steps.filter.outputs.changes || '[]' }}
         run: |
-          for g in shared backend web mobile desktop; do echo "$g=true" >> "$GITHUB_OUTPUT"; done
-      - uses: oven-sh/setup-bun@v2
+          changed() { [ "$ALL" = true ] || { [ "$CODE" = true ] && jq -e --arg g "$1" 'any(.[]; . == $g)' <<<"$CHANGES" >/dev/null; }; }
+          for g in code shared backend web mobile desktop docker; do
+            if changed "$g"; then echo "$g=true"; else echo "$g=false"; fi >> "$GITHUB_OUTPUT"
+          done
+          if changed shared || changed backend || changed web || changed docker; then echo image=true; else echo image=false; fi >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  check:
+    name: Lint, boundaries, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A tag publishes exactly the version /api/health reports; a tag that disagrees with
+      # apps/server/package.json is refused before anything runs.
+      - name: Tag must match the server version
+        if: github.ref_type == 'tag'
+        run: test "v$(jq -r .version apps/server/package.json)" = "$GITHUB_REF_NAME"
+      - &setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-      - name: Cache Bun downloads
-        uses: actions/cache@v4
+      - &cache-bun
+        name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-
-      - run: bun install --frozen-lockfile
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
+      - &install
+        run: bun install --frozen-lockfile
       - name: Lint and format
         run: bun run lint
-      - name: Boundaries (core must not import cloud/ or ee/)
+      - name: Shell scripts
         if: success() || failure()
-        run: bun run check:boundaries
+        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh scripts/*.sh
+      # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
+      # the secrets job, which docs-only changes run too.
+      - name: Boundaries check's own test
+        if: success() || failure()
+        run: bun test scripts/check-boundaries.test.ts
+      - name: Dependency licenses (no GPL, AGPL, source-available or unlicensed packages)
+        if: success() || failure()
+        run: |
+          bun test scripts/check-licenses.test.ts
+          bun run check:licenses
       - name: Typecheck
         if: success() || failure()
-        shell: bash
+        run: bun run typecheck 2>&1 | tee typecheck.log
+      - name: Build web and server
+        if: success() || failure()
+        run: bun run build
+      # A schema change without its migration fails here (drizzle-kit only diffs, no database). The
+      # timeout covers drizzle-kit asking whether a column was renamed, which it can't in CI.
+      - name: Migrations are up to date with the schema
+        if: success() || failure()
+        timeout-minutes: 2
         run: |
-          set -o pipefail
-          bun run typecheck 2>&1 | tee typecheck.log
-      # Two processes: the browser-DOM tests (web app, design system) never share one with the
-      # backend tests (PGlite, servers). In one process the first PGlite database after the DOM
-      # files sometimes never came up, and the whole step hung until the timeout.
-      - name: Test (backend)
-        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true')
-        # The backend suite takes about 15 minutes on a runner (2026-10-20) and grows.
-        timeout-minutes: 25
-        shell: bash
-        run: |
-          set -o pipefail
-          bun test packages/adapters packages/config packages/db packages/engine packages/modules packages/providers packages/client packages/i18n packages/tokens apps/server 2>&1 | tee test.log
-      - name: Test (web and design system)
-        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.web == 'true' || steps.changed.outputs.mobile == 'true' || steps.changed.outputs.desktop == 'true')
-        timeout-minutes: 10
-        shell: bash
-        env:
-          SHARED: ${{ steps.changed.outputs.shared }}
-          WEB: ${{ steps.changed.outputs.web }}
-          MOBILE: ${{ steps.changed.outputs.mobile }}
-          DESKTOP: ${{ steps.changed.outputs.desktop }}
-        run: |
-          set -o pipefail
-          # Only the groups whose code changed (shared packages change them all).
-          paths=()
-          if [ "$SHARED" = true ] || [ "$WEB" = true ]; then paths+=(apps/web packages/ui); fi
-          if [ "$SHARED" = true ] || [ "$MOBILE" = true ]; then paths+=(apps/mobile/test); fi
-          if [ "$SHARED" = true ] || [ "$DESKTOP" = true ]; then paths+=(apps/desktop/test); fi
-          bun test "${paths[@]}" 2>&1 | tee -a test.log
+          bun run db:generate ci-drift-check
+          git status --porcelain -- packages/db/migrations
+          test -z "$(git status --porcelain -- packages/db/migrations)"
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()
-        shell: bash
         run: |
-          {
-            echo '### Typecheck errors'; echo '```'; grep -E 'error TS' typecheck.log 2>/dev/null | head -80 || true; echo '```'
-            echo '### Failed tests'; echo '```'; grep -E '\(fail\)|error:' test.log 2>/dev/null | head -80 || true; echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### Typecheck errors'; echo '```'; grep -E 'error TS' typecheck.log 2>/dev/null | head -80 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ci-logs
-          path: |
-            typecheck.log
-            test.log
+          name: ci-logs-check
+          path: typecheck.log
           if-no-files-found: ignore
           retention-days: 7
-      - name: Build web and server
-        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true' || steps.changed.outputs.web == 'true')
-        run: bun run build
-      - name: Isolated new-event test (diagnostic, non-blocking)
-        if: always() && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.web == 'true')
-        continue-on-error: true
+
+  # The backend suite (PGlite, servers) on two runners at once. packages/engine is four fifths of it
+  # (731 of 935 s on a runner, 2026-10-20), split by file name; the globs together cover every file.
+  test-backend:
+    name: Test (backend ${{ matrix.shard }}/2)
+    needs: changes
+    if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            paths: packages/engine/test/[a-m]*.test.ts
+          - shard: 2
+            paths: >-
+              packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
+              packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
+              apps/server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      # About 9 minutes for shard 1 and 7 for shard 2 on a private-repo runner (2026-10-20), and growing.
+      - name: Test
+        timeout-minutes: 20
+        run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
+      - &keep-test-errors
+        name: Keep errors
+        if: always()
+        run: |
+          { echo '### Failed tests'; echo '```'; grep -E '\(fail\)|error:|Unhandled error' test.log 2>/dev/null | head -80 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-logs-backend-${{ matrix.shard }}
+          path: test.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The browser-DOM tests (web app, design system) never share a process with the backend tests
+  # (PGlite, servers): in one process the first PGlite database after the DOM files sometimes never
+  # came up. The phone and desktop tests (no DOM) get a process of their own too: a React update left
+  # over from a DOM file can land after the DOM is detached and fail whichever file runs next.
+  test-web:
+    name: Test (web, design system, phone, desktop)
+    needs: changes
+    if: >-
+      needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
+      needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SHARED: ${{ needs.changes.outputs.shared }}
+      WEB: ${{ needs.changes.outputs.web }}
+      MOBILE: ${{ needs.changes.outputs.mobile }}
+      DESKTOP: ${{ needs.changes.outputs.desktop }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      # About 3 minutes on a runner (2026-10-20).
+      - name: Test (web and design system)
+        if: env.SHARED == 'true' || env.WEB == 'true'
+        timeout-minutes: 10
+        run: bun test apps/web packages/ui 2>&1 | tee test.log
+      # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
+      # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
+      - name: Test (new event dialog, alone)
+        if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
         timeout-minutes: 3
         env:
           RUN_NEW_EVENT: "1"
-        run: test -f apps/web/test/new-event.test.tsx && bun test --timeout 20000 apps/web/test/new-event.test.tsx || true
+        run: bun test --timeout 20000 apps/web/test/new-event.test.tsx 2>&1 | tee -a test.log
+      - name: Test (phone and desktop apps)
+        if: (success() || failure()) && (env.SHARED == 'true' || env.MOBILE == 'true' || env.DESKTOP == 'true')
+        timeout-minutes: 5
+        run: |
+          # Only the apps whose code changed (shared packages change both).
+          paths=()
+          if [ "$SHARED" = true ] || [ "$MOBILE" = true ]; then paths+=(apps/mobile/test); fi
+          if [ "$SHARED" = true ] || [ "$DESKTOP" = true ]; then paths+=(apps/desktop/test); fi
+          bun test "${paths[@]}" 2>&1 | tee -a test.log
+      - *keep-test-errors
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-logs-web
+          path: test.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The desktop app's Rust tests (src-tauri): the server here's folder and secrets, its copies, what runs after an
+  # exit, the setup's limits and Cancel, where links and frames open, Tailscale's output. Unix tests, so Linux is
+  # enough (the Desktop workflow's server smoke covers the Windows stop). The build wants the web view's files, the
+  # icons and the two sidecars: stand-ins here.
+  test-desktop-rust:
+    name: Test (desktop, Rust)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - *setup-bun
+      - *cache-bun
+      - *install
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+      - name: Stand-ins for what the app bundles
+        working-directory: apps/desktop
+        run: |
+          mkdir -p dist src-tauri/binaries
+          printf '<!doctype html>\n' > dist/index.html
+          for bin in agentes-runner agent-browser; do
+            install -m 755 /dev/null "src-tauri/binaries/$bin-x86_64-unknown-linux-gnu"
+          done
+          bun scripts/icons.ts
+          bun run tauri icon app-icon.png
+      - name: Rust tests
+        working-directory: apps/desktop/src-tauri
+        run: cargo test
+
+  # Whole-history secret scan with the pinned gitleaks image (the GitHub action needs a license key
+  # for organization repos; the CLI does not), and the boundaries check: no cloud/ or ee/ imports, no
+  # internal notes in public files. Every change runs this job, docs included; the check needs no install.
+  secrets:
+    name: Secret scan and boundaries
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Bun first: the boundaries check below still runs when the scan fails.
+      - *setup-bun
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --exit-code 1 /repo
+      - name: Boundaries (no cloud/ or ee/ imports, no internal notes in public files)
+        if: success() || failure()
+        run: bun run check:boundaries
+
+  # The image as self-hosters run it: the docker-compose.yml at the repository root with this
+  # commit's image, a .env with only the three values it asks for, migrations on boot, the health
+  # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
+  # (sign-up is closed by default), the web app, the runner download and install.sh at /install,
+  # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
+  # and the backup profile: a dump and its restore.
+  # amd64 only, nothing pushed.
+  # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
+  # backup image): code changes are the tests' job, and every push to main still runs it.
+  # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
+  # would crowd main's out of the repository's cache quota.
+  compose:
+    name: Image boots with docker compose
+    needs: changes
+    if: >-
+      needs.changes.outputs.image == 'true' &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AGENTES_IMAGE: agentes:ci
+      AGENTES_BACKUP_IMAGE: agentes-backup:ci
+      URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: ${{ env.AGENTES_IMAGE }}
+          cache-from: type=gha,scope=app-amd64
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=app-amd64,mode=max' || '' }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/backup
+          load: true
+          tags: ${{ env.AGENTES_BACKUP_IMAGE }}
+          cache-from: type=gha,scope=backup-amd64
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=backup-amd64,mode=max' || '' }}
+      - name: Boot and use it
+        run: |
+          docker image ls "$AGENTES_IMAGE"
+          printf 'AGENTES_SECRET=%s\nPOSTGRES_PASSWORD=%s\nPUBLIC_URL=%s\n' \
+            "$(openssl rand -base64 48)" "$(openssl rand -hex 16)" "$URL" > .env
+          PASSWORD=$(openssl rand -hex 12)
+          docker compose up -d
+          healthy() {
+            for _ in $(seq 90); do
+              curl -fs "$URL/api/health" > health.json && return 0
+              sleep 2
+            done
+            return 1
+          }
+          signup() {
+            curl -s -o /dev/null -w '%{http_code}' -H "Origin: $URL" -H 'Content-Type: application/json' \
+              -d "{\"name\":\"CI\",\"email\":\"$1\",\"password\":\"$PASSWORD\"}" "${@:2}" "$URL/api/auth/sign-up/email"
+          }
+          healthy
+          jq -e '.status == "ok" and .edition == "selfhost"' health.json
+          test "$(signup owner@ci.invalid -c cookies.txt)" = 200
+          curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.user.email == "owner@ci.invalid"'
+          curl -fs -b cookies.txt -H "Origin: $URL" -H 'Content-Type: application/json' -d '{"name":"CI"}' \
+            "$URL/api/app/organizations" | jq -e '.generalChannelId'
+          test "$(signup second@ci.invalid)" = 403
+          # Separate commands: bash -e ignores a failure on the left of &&.
+          curl -fs "$URL/" -o index.html
+          grep -q 'id="root"' index.html
+          curl -fs "$URL/runner/agentes-runner.mjs" -o runner.mjs
+          test "$(head -1 runner.mjs)" = '#!/usr/bin/env node'
+          curl -fs "$URL/install" | cmp - install.sh
+          # New containers on the same volumes, migrations first: the organization must still be there.
+          docker compose down
+          docker compose run --rm agentes migrate
+          docker compose up -d
+          healthy
+          curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
+          docker compose run --rm -T agentes telemetry > report.json
+          jq -e '.report == 1 and .install == "docker" and .host.container and .people.total == 1' report.json
+      # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
+      # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
+      - name: Back up and restore
+        run: |
+          printf 'S3_ENDPOINT=http://s3:8080\nS3_PROVIDER=Rclone\nS3_ACCESS_KEY_ID=ci-key\nS3_SECRET_ACCESS_KEY=ci-secret\nS3_BACKUP_BUCKET=backups\n' >> .env
+          docker compose run -d --name s3 --entrypoint sh backup -c \
+            'mkdir -p /tmp/s3/backups && exec rclone serve s3 --auth-key ci-key,ci-secret --addr :8080 /tmp/s3'
+          docker compose run --rm backup now
+          name=$(docker compose run --rm -T backup list | awk '{print $NF}')
+          docker compose run --rm -T backup fetch "$name" > ci.dump
+          docker compose exec -T postgres createdb -U agentes restored
+          docker compose exec -T postgres pg_restore -U agentes -d restored --exit-on-error < ci.dump
+          docker compose exec -T postgres psql -U agentes -d restored -tAc 'select email from users' | grep -x owner@ci.invalid
+      - name: Logs
+        if: failure()
+        run: docker compose logs --no-color
+
+  # Images publish only from a green run on main or a version tag, so a tag a deployment tracks can
+  # never point at a build the tests rejected. main → :edge (moving head); version tags → :1.2.3,
+  # :1.2 and :latest (metadata-action adds :latest to semver tags by itself). While the repository
+  # is private only tags publish: an edge image per push to main costs about 10 runner minutes, and
+  # public repositories run them free. The backup service's image ships on the same tags, so the
+  # standalone compose file needs no build context.
+  #
+  # Each platform builds on its own native runner (Bun under QEMU emulation is slow and fragile) and
+  # pushes by digest only; publish then stitches the digests into one tag per image.
+  build:
+    name: Image (${{ matrix.slug }})
+    needs: [changes, check, test-backend, test-web, secrets, compose]
+    if: >-
+      github.event_name == 'push' && needs.changes.outputs.image == 'true' &&
+      (github.ref_type == 'tag' || !github.event.repository.private) &&
+      !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            slug: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            slug: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Labels only here (they link the package to this repository); tags are applied to the merged
+      # manifest in publish.
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ${{ env.APP_IMAGE }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        id: app
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=${{ env.APP_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=app-${{ matrix.slug }}
+          cache-to: type=gha,scope=app-${{ matrix.slug }},mode=max
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        id: backup
+        with:
+          context: deploy/backup
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=${{ env.BACKUP_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=backup-${{ matrix.slug }}
+          cache-to: type=gha,scope=backup-${{ matrix.slug }},mode=max
+      - name: Export the digests
+        env:
+          DIGEST: ${{ steps.app.outputs.digest }}
+          BACKUP_DIGEST: ${{ steps.backup.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests/app /tmp/digests/backup
+          touch "/tmp/digests/app/${DIGEST#sha256:}" "/tmp/digests/backup/${BACKUP_DIGEST#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digests-${{ matrix.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish the images
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ${{ env.APP_IMAGE }}
+          tags: |
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Create the multi-arch manifests
+        working-directory: /tmp/digests
+        env:
+          META: ${{ steps.meta.outputs.json }}
+        run: |
+          app=() backup=()
+          for tag in $(jq -r '.tags[]' <<<"$META"); do app+=(-t "$tag"); backup+=(-t "$BACKUP_IMAGE:${tag##*:}"); done
+          for digest in app/*; do app+=("$APP_IMAGE@sha256:${digest#app/}"); done
+          for digest in backup/*; do backup+=("$BACKUP_IMAGE@sha256:${digest#backup/}"); done
+          docker buildx imagetools create "${app[@]}"
+          docker buildx imagetools create "${backup[@]}"
+          docker buildx imagetools inspect "$(jq -r '.tags[0]' <<<"$META")"
+
+  # A version tag's GitHub release carries that version's install.sh, from a green run only, so
+  # `…/releases/download/v1.2.3/install.sh` is an installer the tests passed.
+  release-install:
+    name: Release install.sh
+    needs: [changes, check, test-backend, test-web, secrets, compose]
+    if: >-
+      github.ref_type == 'tag' && !cancelled() &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Attach install.sh to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 ||
+            gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
+          gh release upload "$TAG" install.sh --clobber
+
+  # A version tag's release also carries agentes.chat without Docker (ADR 0060 §2): one package per
+  # computer (macOS and Linux, x64 and arm64), each with the Bun install.sh pins, and native.json, signed
+  # with the desktop updater's key, which the installer checks before it downloads anything. After
+  # release-install, which makes the release.
+  release-native:
+    name: Release the native packages
+    needs: [changes, check, test-backend, test-web, secrets, compose, release-install]
+    if: >-
+      github.ref_type == 'tag' && !cancelled() &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      - name: Build the packages
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bun scripts/native-package.ts packages --version "${TAG#v}" --out "$RUNNER_TEMP/native"
+      - name: Sign native.json
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          bun run tauri signer sign "$RUNNER_TEMP/native/native.json"
+          test -s "$RUNNER_TEMP/native/native.json.sig"
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd "$RUNNER_TEMP/native"
+          gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
+
+  # The one check to require once branch protection is on: red when any job failed or was
+  # cancelled; a skipped job is fine (nothing it covers changed). A draft gets no result at all.
+  done:
+    name: CI result
+    if: always() && github.event.pull_request.draft != true
+    needs:
+      [changes, check, test-backend, test-web, test-desktop-rust, secrets, compose, build, publish, release-install, release-native]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

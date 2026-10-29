@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { CHROME_MAX_SCALE, Icon, PressScale, systemText, Text, useLivePaused, useTheme, useToast, weights } from "@/ui";
+import { CHROME_MAX_SCALE, Icon, PillButton, systemText, Text, useLivePaused, useTheme, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -26,7 +26,7 @@ import {
 } from "./actions";
 
 /**
- * What the agent changed with this reply (ADR 0037 round 2, FazerDesfazer.html, MobileIntencional.html):
+ * What the agent changed with this reply (ADR 0037 round 2):
  * one change is a sunken row with a raised Desfazer and the time left under the sentence (system font) (A); two or more are a group with "N mudanças · há X" and
  * Desfazer tudo (B). Undone rows are struck through with "Desfeito por …" and Refazer; past the window
  * they stay as plain history. Optimistic, rolled back with a toast when the server refuses.
@@ -252,28 +252,16 @@ function RowButton({
   onRedo: () => void;
 }) {
   const { t } = useTranslation();
-  const { colors, shadows } = useTheme();
   if (!v.button) return null;
   const redo = v.button === "redo";
   const label = redo ? t("agentActions.redo") : t("agentActions.undo");
   if (big)
     return (
-      <PressScale
-        to={0.95}
-        haptic={false}
+      <PillButton
+        label={label}
         onPress={redo ? onRedo : onUndo}
-        accessibilityRole="button"
         accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
-        hitSlop={6}
-        style={[styles.u, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
-      >
-        <RNText
-          maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("footnote", weights.semibold), styles.uText, { color: colors.ink }]}
-        >
-          {label}
-        </RNText>
-      </PressScale>
+      />
     );
   return (
     <Pressable onPress={redo ? onRedo : onUndo} accessibilityRole="button" hitSlop={8}>
@@ -302,8 +290,6 @@ const styles = StyleSheet.create({
   oneText: { fontSize: 14.5, lineHeight: 19 },
   left: { marginTop: 1, fontVariant: ["tabular-nums"] },
   tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  u: { height: 32, paddingHorizontal: 13, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  uText: { fontSize: 14 },
   undoneBy: { marginTop: 2 },
   group: { marginTop: 12, borderRadius: 16, overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 12 },

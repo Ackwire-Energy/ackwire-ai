@@ -9,7 +9,16 @@ beforeEach(async () => {
       if (last.includes("tool_result")) return { chunks: [/answered: ([a-z]+)/.exec(last)?.[1] ?? "?"] };
       return {
         chunks: [],
-        toolUses: [{ name: "ask_user", input: { question: "Qual ambiente?", choices: ["staging", "production"] } }],
+        toolUses: [
+          {
+            name: "ask_user",
+            input: {
+              why: "I need a person's answer before I go on: this decides what I change next.",
+              question: "Qual ambiente?",
+              choices: ["staging", "production"],
+            },
+          },
+        ],
       };
     },
   });
@@ -24,7 +33,7 @@ test("questions API: the card's answer resumes the agent; a second answer is a c
     owner(`/api/app/organizations/${orgId}${path}`, init);
   await api(`/channels/${channelId}/messages`, { json: { body: "@dev deploy it" } });
   await t.drain();
-  // Asked in the channel: the card is in the main timeline (D67).
+  // Asked in the channel: the card is in the main timeline.
   const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
     messages: { body: string; meta: { questionId?: string; question?: { status: string } } }[];
   };

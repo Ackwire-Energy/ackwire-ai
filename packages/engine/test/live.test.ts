@@ -87,18 +87,28 @@ describe("receipts", () => {
     const picked = await post(f, "is the deploy broken?");
     const none = await post(f, "good morning all");
     await drainOutbox(f.db, handlers);
+    // Who picked, never what the model said.
+    const decidedBy = { step: "model" as const, model: "claude-haiku-5-5", provider: "anthropic" };
     expect(await receiptOf(f, picked.id)).toEqual({
       seenBy: [f.agent.id],
       pickedBy: [f.agent.id],
       handled: [{ agentId: f.agent.id, runId: expect.any(String), status: "done" }],
       blocked: [],
+      decidedBy,
     });
-    expect(await receiptOf(f, none.id)).toEqual({ seenBy: [f.agent.id], pickedBy: [], handled: [], blocked: [] });
+    expect(await receiptOf(f, none.id)).toEqual({
+      seenBy: [f.agent.id],
+      pickedBy: [],
+      handled: [],
+      blocked: [],
+      decidedBy,
+    });
     const routed = events.filter((e) => e.type === "message.routed");
     expect(routed).toContainEqual(
       expect.objectContaining({ messageId: none.id, seenBy: [f.agent.id], pickedBy: [], strategy: "router" }),
     );
     expect(JSON.stringify(routed)).not.toContain("score");
+    expect(JSON.stringify(routed)).not.toContain("chit-chat");
 
     const off = await post(f, "router is off now");
     await drainOutbox(f.db, f.handlers); // fixture handlers: router disabled
@@ -164,7 +174,18 @@ describe("receipts when no new run starts", () => {
         const last = JSON.stringify(req.messages.at(-1)?.content);
         if (last.includes("tool_result")) return { chunks: ["Ok"] };
         if (last.includes("deploy it"))
-          return { chunks: [], toolUses: [{ name: "ask_user", input: { question: "Which environment?" } }] };
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: {
+                  why: "I need a person's answer before I go on: this decides what I change next.",
+                  question: "Which environment?",
+                },
+              },
+            ],
+          };
         return { chunks: ["Done."] };
       },
     });
@@ -173,7 +194,7 @@ describe("receipts when no new run starts", () => {
     const [run] = await f.db.select().from(schema.agentRuns);
     expect(run?.status).toBe("waiting_input");
     const events = f.listen(f.general.id);
-    // Asked in the channel, the question is there too (D67): the answer is the next message there.
+    // Asked in the channel, the question is there too: the answer is the next message there.
     const answer = await post(f, "staging @dev");
     expect(typeof answer.meta.answersQuestionId).toBe("string");
     expect(await receiptOf(f, answer.id)).toMatchObject({

@@ -1,0 +1,86 @@
+import type { TFunction } from "i18next";
+import type { AiAccounts, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
+
+/** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
+export interface PlanAccount<A extends MachineAccount> {
+  /** The first login's id. */
+  key: string;
+  /** Oldest first. They share the account's label, kind, plan and owner. */
+  logins: A[];
+  /** The agents that think with any of them. */
+  usedBy: string[];
+  /** The newest usage any of them reported: they share the plan's limits. */
+  usage: PlanUsage | null;
+  signedOut: A[];
+}
+
+const newest = (usages: (PlanUsage | null)[]) =>
+  usages.reduce<PlanUsage | null>(
+    (best, u) => (u && (!best || Date.parse(u.at) > Date.parse(best.at)) ? u : best),
+    null,
+  );
+
+/**
+ * The logins of one account together, as the server tells them apart: the same computer, owner, CLI and plan, and
+ * the same email (any case) or key's last 4. Never the label, which any rename can repeat. A login whose email or
+ * key the viewer can't see (another person's) is a row of its own.
+ */
+export function groupPlans<A extends MachineAccount & { machineId?: string }>(
+  accounts: readonly A[],
+): PlanAccount<A>[] {
+  const groups = new Map<string, A[]>();
+  for (const a of accounts) {
+    const identity = a.provider ? a.keyHint : a.email?.toLowerCase();
+    const key = identity ? JSON.stringify([a.machineId ?? null, a.ownerId, a.kind, a.provider, identity]) : a.id;
+    groups.set(key, [...(groups.get(key) ?? []), a]);
+  }
+  return [...groups.values()].map((logins) => ({
+    key: logins[0]?.id ?? "",
+    logins,
+    usedBy: logins.flatMap((l) => l.usedBy),
+    usage: newest(logins.map((l) => l.usage)),
+    signedOut: logins.filter((l) => l.status === "signed_out"),
+  }));
+}
+
+/** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */
+export interface OwnSignInRow {
+  key: string;
+  machineId: string;
+  computer: string;
+  kind: MachineAccountKind;
+  /** The plan the CLI reported (`max`, `pro`…), as it said it. */
+  plan: string | null;
+  usage: PlanUsage | null;
+}
+
+/** The viewer's computers' own sign-ins, Claude Code first on each computer (the computers' order kept). */
+export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
+  const out: OwnSignInRow[] = [];
+  for (const c of view?.computers ?? []) {
+    for (const kind of ["claude_code", "codex"] as const) {
+      const own = c.own?.[kind];
+      if (!own) continue;
+      out.push({
+        key: `${c.machineId}:${kind}`,
+        machineId: c.machineId,
+        computer: c.name,
+        kind,
+        plan: own.plan ?? null,
+        usage: own.usage ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+/** The plan's name as people know it ("Max", "Pro"): the CLI's word with a capital, or nothing. */
+export const planWordOf = (plan: string | null) =>
+  plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
+
+/**
+ * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on
+ * someone else's, that computer's ("MacBook's account").
+ */
+export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
+  mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });

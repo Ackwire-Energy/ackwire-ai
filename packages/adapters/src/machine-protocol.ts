@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 14;
+export const MACHINE_PROTOCOL_VERSION = 25;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -116,6 +116,214 @@ export const ACCOUNTS_PROTOCOL = 13;
  * starts a mission on an older runner.
  */
 export const MISSION_WORKTREE_PROTOCOL = 14;
+/**
+ * From this protocol on (live steering): `brain.steer` hands messages to a
+ * Claude Code turn in progress (stream-json user lines on its stdin, read at
+ * its next tool boundary), and the turn reports which it read
+ * (`brain.event` `steer_read`). Older runners would drop the unknown op: the
+ * server never sends it to them (their turns read new messages at the end).
+ * A Codex turn on the runner's `codex app-server` takes them too (`turn/steer`,
+ * read at its next model request); one run by `codex exec` answers
+ * `unsupported` (no new protocol number: the reply already says what it can).
+ */
+export const STEER_PROTOCOL = 15;
+/**
+ * From this protocol on (ADR 0053 §3): a Codex `brain.turn` honours
+ * `permissions` and `keepAlive`. `plan`: a read-only sandbox without network;
+ * `work`: a workspace sandbox without network where each command or file
+ * approval Codex asks (`approvalPolicy: "untrusted"`) is answered by the same
+ * command policy as Claude Code's permission prompt. `keepAlive: false` (a
+ * background turn) leaves no app-server behind. Claude Code's `plan` turns read
+ * only on our prompt tool, with no settings files. An older runner would run
+ * Codex with no approvals and the network on, and its Claude Code `plan` reads
+ * secrets and loads the project's settings files: the server never sends it a
+ * Codex turn nor a Claude Code `plan` turn (`runner_outdated`).
+ */
+export const BRAIN_PROFILES_PROTOCOL = 16;
+/**
+ * From this protocol on (ADR 0054): `browser.batch` runs several browser
+ * commands in one round trip (an action, the wait for the page to settle and
+ * the look after it), and `browser.capture` returns the page as a JPEG with
+ * its elements numbered and boxed. Older runners get the same commands one
+ * `browser.act` at a time, and no images: targets are then found on the
+ * page's text only.
+ */
+export const BROWSER_FAST_PROTOCOL = 17;
+/**
+ * From this protocol on (ADR 0058): the agent's desktop and a terminal on its
+ * computer. `hello.desktop` and `hello.terminal` say whether the runner can
+ * serve them; the person turns them on on the machine (`access.tools.desktop`,
+ * `access.tools.terminal`). `desktop.session.*` starts, stops and reports an
+ * agent's desktop. `stream.open` makes the runner dial one data socket
+ * (`/api/machines/stream`) for one viewer of a desktop (raw RFB) or one
+ * terminal (its bytes), so a busy screen never delays this socket. The server
+ * never sends these to an older runner.
+ */
+export const DESKTOP_PROTOCOL = 18;
+
+/**
+ * Every agent desktop's size: viewers scale it, they never resize it. 900 tall
+ * so the agent's Chrome, maximized under the panel, still shows a page about
+ * 800 tall, like the headless one the screen layer was measured on (ADR 0054).
+ */
+export const DESKTOP_SIZE = { width: 1280, height: 900 } as const;
+
+/** Protocol 21: the largest parts of a `desktop.act`. */
+export const DESKTOP_LIMITS = {
+  /** Characters typed or filled in one action. */
+  text: 4000,
+  /** A key combination (`ctrl+shift+t`). */
+  key: 64,
+  /** A path to open, or an app's desktop entry id. */
+  path: 1024,
+  pauseMs: 10_000,
+} as const;
+
+/** Protocol 21: where a desktop action lands: an element of the last look, or a point on the screen (pixels). */
+export type DesktopPoint = { ref: string } | { x: number; y: number };
+
+/** Protocol 21: one action on the agent's desktop. */
+export type DesktopAction =
+  | { kind: "click" | "double_click" | "right_click" | "hover" | "focus" | "check" | "uncheck"; at: DesktopPoint }
+  | { kind: "drag"; from: DesktopPoint; to: DesktopPoint }
+  /** The element's whole text: set and read back where it takes text that way, else selected and typed over. */
+  | { kind: "fill"; at: DesktopPoint; text: string }
+  /** Into the element (clicked first), or wherever the focus is. */
+  | { kind: "type"; text: string; at?: DesktopPoint }
+  /** Opens the element's list and picks the option named `value`. */
+  | { kind: "select"; at: { ref: string }; value: string }
+  /** Key names joined by `+`: `ctrl+s`, `Enter`, `alt+F4`. */
+  | { kind: "press"; key: string }
+  /** Over the element, else over the active window. */
+  | { kind: "scroll"; direction: "up" | "down" | "left" | "right"; pixels: number; at?: DesktopPoint }
+  /** An app by its desktop entry id (`thunar.desktop`, as `desktop.apps` lists it). */
+  | { kind: "launch"; app: string }
+  /** A file in the agent's folder (a relative path), or an absolute one in its home or a folder allowed for it. */
+  | { kind: "open_file"; path: string }
+  | { kind: "pause"; ms: number };
+
+/** Protocol 21: a part of the screen, in pixels. */
+export interface DesktopRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Protocol 21: the agent's desktop as screen text (lines `observeSnapshot` reads), its refs, app and window. */
+export interface DesktopLookReply {
+  snapshot: string;
+  refs: Record<string, { role: string; name: string }>;
+  /** `desktop://<app>/<main|dialog>`: the app in front, and whether its window is a dialog. */
+  address: string;
+  /** The active window's title. */
+  title: string;
+  screen: { width: number; height: number };
+}
+
+/** Protocol 21: the attribute of the agent browser's window in a look (one line: `browser_do` drives it). */
+export const DESKTOP_AGENT_BROWSER = "agent browser: use browser_do";
+
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export const SCREEN_KINDS = ["browser", "desktop"] as const;
+export type ScreenKind = (typeof SCREEN_KINDS)[number];
+/**
+ * From this protocol on: plan usage, read by the CLIs without touching any
+ * token. Accounts carry `usage` (`RunnerAccountInfo.usage`); `hello` and
+ * `accounts.changed` carry the computer's own sign-ins' (`ownUsage`). It comes
+ * from the turns (`rate_limit_event`, Codex's `account/rateLimits/updated`)
+ * and from probes `list` asks for (`fresh`). The server never sends `fresh`
+ * to an older runner.
+ */
+export const PLAN_USAGE_PROTOCOL = 19;
+/**
+ * From this protocol on: coding plans as key accounts on Claude Code (ADR
+ * 0059). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
+ * starts no CLI: the runner makes the folder and a key the browser seals the
+ * plan's key to, and `code` hands it over (kept in the folder,
+ * `provider.json`, mode 600). Turns in that folder think through the
+ * endpoint the runner's own copy of the plans names. Accounts say their
+ * `provider` and the key's last 4 (`keyHint`); a key its maker refused reads
+ * as signed out. In system mode `agents` names each agent's `account`, whose
+ * folder belongs to that agent's user only while it thinks with it. The
+ * server never sends `provider` to an older runner.
+ */
+export const PLAN_KEYS_PROTOCOL = 20;
+/**
+ * From this protocol on (ADR 0062): the agent uses its own desktop.
+ * `desktop.look` reads what it shows as screen text, `desktop.act` does one
+ * action, waits for the screen to settle and looks again, `desktop.capture`
+ * returns a JPEG with the look's elements boxed, `desktop.apps` lists the apps
+ * it can start. `hello.desktopUse` says whether the runner serves it: only
+ * where each agent works as its own OS user. The server never sends these to
+ * an older runner.
+ */
+export const DESKTOP_USE_PROTOCOL = 21;
+/**
+ * From this protocol on: how big the computer is and how busy it gets.
+ * `hello.size` gives the machine's logical CPUs and memory, the disk of its
+ * workspace, and `limit` when the runner may use less (a container's limits);
+ * a `pong` carries `load`, the last day's summary, after each new sample (every
+ * `LOAD_SAMPLE_MS`). Nothing new goes to the runner, so an older one simply
+ * sends neither: its size and load are unknown.
+ */
+export const MACHINE_STATS_PROTOCOL = 22;
+
+/**
+ * Protocol 22: a computer's size (`hello.size`), rounded: the whole machine's, which its load is
+ * measured against, and `limit` when the process may use less of it (a container's CPU or memory limit).
+ */
+export interface MachineSize {
+  cpus: number;
+  memoryGb: number;
+  diskGb: number;
+  limit?: { cpus: number; memoryGb: number };
+}
+
+/**
+ * Protocol 22: how busy a computer got over the last day (`pong.load`): the 5-minute load average per
+ * logical CPU (1 = every CPU busy) and the share of memory in use (0 to 1), average and highest over
+ * `hours` of samples.
+ */
+export interface MachineLoad {
+  loadAvg: number;
+  loadPeak: number;
+  memoryAvg: number;
+  memoryPeak: number;
+  hours: number;
+}
+
+/** How often a computer's load is sampled (protocol 22). */
+export const LOAD_SAMPLE_MS = 5 * 60_000;
+
+/**
+ * From this protocol on: how much data the agents' browsers send and receive.
+ * A `pong` carries `browserTraffic`, the last day's sum, after each new sample
+ * (every `LOAD_SAMPLE_MS`), counted from the network events of the Chromes the
+ * runner started, never from the rest of the machine. Nothing new goes to the
+ * runner, so an older one simply never says.
+ */
+export const BROWSER_TRAFFIC_PROTOCOL = 23;
+
+/** Protocol 23: what the agents' browsers sent (`up`) and received (`down`), in bytes, over the last `hours`. */
+export interface BrowserTraffic {
+  up: number;
+  down: number;
+  hours: number;
+}
+
+/**
+ * From this protocol on (ADR 0076): `desktop.text`, the text on an agent's
+ * screen, read on the computer (tesseract, as the agent's own user) from a
+ * capture like `desktop.capture`'s, for screening a person in control on
+ * agentes.chat Cloud. The image never leaves the computer. A screen whose
+ * capture didn't change since the last read answers `same`. Served where
+ * desktop use is (`desktop_unavailable` without tesseract). The server never
+ * sends it to an older runner.
+ */
+export const DESKTOP_TEXT_PROTOCOL = 25;
+/** The most text one `desktop.text` answers (characters). */
+export const DESKTOP_TEXT_MAX = 16_000;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -140,7 +348,48 @@ export interface RunnerAccountInfo {
   email?: string;
   /** `pro`, `max`, `team`, `plus`… as the CLI says. */
   plan?: string;
+  /** Protocol 19: the plan's usage limits, as last seen. */
+  usage?: PlanUsage;
+  /** Protocol 20: a key account's coding plan (`zai`, `kimi`…); absent for the CLI's own sign-in. */
+  provider?: string;
+  /** Protocol 20: the last 4 characters of a key account's key. */
+  keyHint?: string;
 }
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: PlanWindowKind;
+  /** `other`: what the provider calls it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+export type PlanWindowKind = "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+export const PLAN_WINDOW_KINDS: readonly PlanWindowKind[] = [
+  "five_hour",
+  "seven_day",
+  "seven_day_opus",
+  "seven_day_sonnet",
+  "monthly",
+  "other",
+];
+
+/** Protocol 19: a plan's usage limits as the CLI or the provider said them (`at`), during a turn or by a probe. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (cleared when it allows one again). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
+/** The computer's own sign-ins' usage (protocol 19), by brain. */
+export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
+
+/** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
+export const OWN_USAGE_ID: Record<AccountKind, string> = { claude_code: "own:claude_code", codex: "own:codex" };
+
+export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 
 /** Where a sign-in is: waiting for the person, done (signed in), failed or expired (folder removed). */
 export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
@@ -154,19 +403,40 @@ export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
  * expires after `ACCOUNT_LOGIN_TTL_MS`.
  */
 export type AccountRequest =
-  /** `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure. */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean }
+  /**
+   * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
+   * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
+   * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
+   */
+  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
-  | { action: "list" }
+  /**
+   * Protocol 19: `fresh`, accounts (ids, or `OWN_USAGE_ID`s) whose usage to look up now: the runner
+   * answers at once, probes in the background and sends `accounts.changed` when it knows more.
+   */
+  | { action: "list"; fresh?: string[] }
   | { action: "remove"; kind: AccountKind; accountId: string };
 
 export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
+/** A coding plan's id as the wire carries it (the runner and the server check it against their plans). */
+export const isPlanProviderWord = (v: unknown): v is string =>
+  typeof v === "string" && /^[a-z][a-z0-9_-]{0,19}$/.test(v);
+
 /** Accounts per machine: the runner adds no more, and a list this long is never taken as complete by the server. */
 export const MAX_MACHINE_ACCOUNTS = 100;
 /** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
 export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
+
+/**
+ * An email a sign-in may name as its account: letters, digits and `._+-` only, never first in either part.
+ * On Windows the CLI starts through the shell, so an address with `&`, `%`, `"` or `(` would run commands.
+ */
+export const isLoginEmail = (v: unknown): v is string =>
+  typeof v === "string" &&
+  v.length <= 254 &&
+  /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}@[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]*)+$/.test(v);
 
 /** The `agent-browser` release the runner and the desktop app ship (ADR 0040 §2). */
 export const AGENT_BROWSER_VERSION = "0.39.1";
@@ -195,7 +465,10 @@ export const BROWSER_LIMITS = {
   /** A `browser.act` command name, and its arguments as JSON characters. */
   command: 64,
   args: 64 * 1024,
+  /** Commands in one `browser.batch` (protocol 17). */
+  batchCommands: 40,
   url: 2048,
+  title: 300,
   message: 500,
 } as const;
 
@@ -210,6 +483,126 @@ export interface RunnerBrowserInfo {
   /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
   reason?: string;
 }
+
+/** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
+export interface RunnerDesktopInfo {
+  available: boolean;
+  /** Why it isn't available, for people (what to install). */
+  reason?: string;
+  /** The desktops' size in pixels (both or neither). */
+  width?: number;
+  height?: number;
+}
+
+/** `hello.terminal` (protocol 18): whether people can open a terminal on this machine. */
+export interface RunnerTerminalInfo {
+  available: boolean;
+  reason?: string;
+}
+
+/** `hello.desktopUse` (protocol 21): whether agents can use their desktops here; `reason` says what is missing. */
+export type RunnerDesktopUseInfo = RunnerTerminalInfo;
+
+/** Desktop and terminal streams (protocol 18): sizes, rates, caps and timeouts. */
+export const STREAM_LIMITS = {
+  /** The server waits this long for the runner's data socket after `stream.open`. */
+  openTimeoutMs: 20_000,
+  /** A data socket's `stream.hello` must come this soon. */
+  helloTimeoutMs: 10_000,
+  /** Both sides ping this often: an idle desktop sends nothing, and proxies drop idle sockets. */
+  pingMs: 30_000,
+  /** Bytes queued to a viewer before its stream closes as too slow. */
+  viewerBufferedMax: 8 << 20,
+  /** Bytes queued on the runner's data socket before it stops reading from the desktop. */
+  runnerBufferedMax: 4 << 20,
+  /** Terminal output queued beyond this is dropped, with a marker. */
+  terminalBufferMax: 1 << 20,
+  /** A viewer's frame, and how many bytes a second a viewer may send. */
+  clientFrameMax: 1 << 20,
+  clientBytesPerSecond: 512 << 10,
+  viewersPerDesktop: 4,
+  terminalsPerAgent: 3,
+  terminalsPerMachine: 10,
+  terminalIdleMs: 30 * 60_000,
+  terminalMaxMs: 12 * 3_600_000,
+  /** Streams a person may open in a minute. */
+  opensPerMinute: 30,
+  /** The server checks this often that whoever has an open stream may still have it. */
+  accessRecheckMs: 30_000,
+  /** A terminal's size, inclusive. */
+  cols: [20, 400],
+  rows: [5, 200],
+} as const;
+
+/**
+ * Close codes of desktop and terminal streams (protocol 18): the viewer's
+ * socket (`/api/desktop`, `/api/terminal`) and the runner's data socket
+ * (`/api/machines/stream`). A stream that ends closes both sides.
+ */
+export const STREAM_CLOSE = {
+  normal: 1000,
+  /** The server restarts: open again. */
+  restarting: 1001,
+  internal: 1011,
+  /** A side doesn't keep up: its backlog passed the limit. */
+  tooSlow: 1013,
+  badRequest: 4400,
+  /** Data socket: a bad token, or another machine's stream. */
+  badToken: 4401,
+  /** Viewer: not allowed, or no longer. */
+  forbidden: 4403,
+  /** Viewer: no such agent, or no computer (or desktop) for it. Data socket: no such stream (ended, or served already). */
+  notFound: 4404,
+  /** Data socket: no `stream.hello` in time. Viewer: the computer didn't open the stream in time (retry). */
+  late: 4408,
+  /** Viewer: someone else is in control of the desktop. */
+  hidden: 4409,
+  /** Viewer: control isn't this person's (any more): open again as a watcher. */
+  controlEnded: 4410,
+  /** Viewer: too many streams, or opened too often. */
+  tooMany: 4429,
+  /** Viewer: the computer refused; the reason is its error code (or `machine_paused`, `runner_outdated`). */
+  refused: 4502,
+  /** Viewer: the computer is offline, or its socket is on another server (retry). */
+  unreachable: 4503,
+} as const;
+
+/**
+ * What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. An older
+ * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
+ * (ADR 0058 §16).
+ */
+export type StreamRequest =
+  | { kind: "desktop"; mode: "watch" | "control" }
+  | { kind: "terminal"; cols: number; rows: number };
+
+/**
+ * `stream.open` (protocol 18): one viewer of the request's agent's desktop
+ * (`watch` logs in with the view-only password, `control` with the full one),
+ * or one terminal as the agent. `streamId` (32 random bytes, base64url) names
+ * the stream on the data socket. `start` (a desktop): one that isn't running
+ * starts first; without it the runner refuses `desktop_off`, as runners before
+ * it did. The server leaves it out while the agent may start nothing (held).
+ */
+export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean };
+
+/**
+ * A data socket's first frame (runner → server, text): the machine's token
+ * and the stream it serves. The server answers `{"type":"stream.ready"}` or
+ * closes the socket.
+ */
+export interface StreamHello {
+  type: "stream.hello";
+  token: string;
+  streamId: string;
+}
+
+/**
+ * Text frames on a stream once it is ready (binary frames are the bytes): a
+ * terminal's new size (viewer → runner) and how its shell ended (runner →
+ * viewer).
+ */
+export type StreamControl = { type: "resize"; cols: number; rows: number } | { type: "exit"; code: number | null };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -270,6 +663,8 @@ export interface BrowserFrameMetadata {
   pageScaleFactor?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
+  /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
+  title?: string;
 }
 
 /** Where an agent's checkouts live inside its folder. */
@@ -518,7 +913,38 @@ export type WireBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean };
+  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
+  | { type: "steer_read"; uuids: string[] };
+
+/**
+ * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
+ * Each has its own `uuid` (a UUID the engine maps to its message); `urgent`
+ * ("Parar e mandar") asks the CLI to read it now, moving the running tool to
+ * the background. Support is what Claude Code's `system/init` says it can do
+ * (`msg_lifecycle_v1` for any message, `interrupt_send_now_v1` for urgent
+ * ones); a turn that can't take an urgent one answers `unsupported` (the
+ * engine stops and restarts the turn instead).
+ */
+export interface BrainSteerRequest {
+  runId: string;
+  /** The turn's session (as in its `brain.turn`): with the request's agent, it names the process. */
+  session: string;
+  messages: Array<{ uuid: string; text: string; urgent?: boolean }>;
+}
+
+/**
+ * `accepted`: written to the turn (their `uuid`s; read later, `steer_read`).
+ * `unsupported`: this turn can't take messages mid-turn (an older CLI, a
+ * one-shot process, Codex run as `codex exec`), or not urgent ones (no `now` on that CLI). `no_turn`: no turn of that
+ * run runs now.
+ */
+export type BrainSteerReply =
+  | { status: "accepted"; accepted: string[] }
+  | { status: "unsupported" | "no_turn"; reason?: string };
+
+/** Most messages and characters per message in one `brain.steer`. */
+export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
 
 /**
  * `brain.turn` (protocol 8, ADR 0032): one conversational turn of an agent
@@ -541,11 +967,14 @@ export interface BrainTurnRequest {
   prompt: string;
   /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
   mcp: { token: string; url?: string };
-  /** Keep one process per (agent, session) alive between turns (default true). */
+  /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
-  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`). */
+  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
   personalMcp?: boolean;
-  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
+  /**
+   * The turn's permission profile (ADR 0053 §3): `work` (default) edits and asks a person (or the server's
+   * rules) for the rest; `plan` reads only. Codex honours it from `BRAIN_PROFILES_PROTOCOL` on.
+   */
   permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;
@@ -561,6 +990,45 @@ export const BRAIN_LIMITS = {
   doneText: 100_000,
   message: 2000,
 } as const;
+
+/**
+ * From this protocol on (ADR 0074): `brain.route`, a person's own Claude or
+ * ChatGPT plan picking who answers their message nobody mentioned. Claude
+ * Code or Codex answers once with every tool off, nothing of the folder or
+ * its owner loaded and no session kept, in a temporary folder, as the
+ * request's agent's user. A sign-in with a key is refused. While that
+ * sign-in's folder has a process open (a turn, or the one kept after it) the
+ * answer is `busy` at once. The server never sends it to an older runner.
+ */
+export const ROUTE_PROTOCOL = 24;
+/** The runner kills a route's CLI after this long. */
+export const ROUTE_TIMEOUT_MS = 30_000;
+/** Largest `brain.route` fields (characters; the schema as JSON). */
+export const ROUTE_LIMITS = { system: 8000, prompt: 32_000, schema: 8000 } as const;
+
+/** `brain.route` (protocol 24): one answer in `schema`'s shape from the account's CLI. */
+export interface BrainRouteRequest {
+  kind: AccountKind;
+  /** The account folder (`accounts/<kind>/<id>`); absent: the computer's own sign-in. */
+  account?: string;
+  system: string;
+  /** Read by the CLI on its standard input. */
+  prompt: string;
+  /** JSON Schema of the answer. */
+  schema: Record<string, unknown>;
+}
+
+/** What a route answers: the CLI's answer as a JSON object, or `busy` while that sign-in has a process open. */
+export type BrainRouteReply =
+  | {
+      json: Record<string, unknown>;
+      /** The model that answered, as the CLI reports it. */
+      model: string;
+      /** Every input token it read (cache included); `cacheRead` and `cacheWrite` say how much was cache. */
+      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+      durationMs: number;
+    }
+  | { busy: true };
 
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
 export interface RunnerTask {
@@ -637,6 +1105,8 @@ export interface MachineAgent {
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
+  /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
+  account?: string;
 }
 
 /** The pause state (protocol 9). `until` null: paused until the owner resumes. */
@@ -654,6 +1124,10 @@ export interface RunnerTools {
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
   browser?: boolean;
+  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0058). Absent = off. */
+  desktop?: boolean;
+  /** Protocol 18: terminals people open as an agent (ADR 0058). Absent = off. */
+  terminal?: boolean;
 }
 
 /** A folder allowed on the machine beyond the agents' own folders, and which agents use it (protocol 10). */
@@ -703,6 +1177,21 @@ export interface RunnerInfo {
   browser?: RunnerBrowserInfo;
   /** Protocol 13: the accounts on the machine (ADR 0041). */
   accounts?: RunnerAccountInfo[];
+  /** Protocol 18: whether the agents' desktops can run here (ADR 0058). */
+  desktop?: RunnerDesktopInfo;
+  /** Protocol 18: whether people can open a terminal here. */
+  terminal?: RunnerTerminalInfo;
+  /** Protocol 21: whether agents can use their own desktops here (ADR 0062). */
+  desktopUse?: RunnerDesktopUseInfo;
+  /**
+   * Protocol 18: `system` when each agent works as its own OS user (ADR 0058 §10); absent, every agent
+   * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
+   */
+  mode?: "system";
+  /** Protocol 19: the usage of the computer's own sign-ins (no account folder). */
+  ownUsage?: OwnPlanUsage;
+  /** Protocol 22: how big the computer is. */
+  size?: MachineSize;
 }
 
 export interface FileEntry {
@@ -749,6 +1238,10 @@ export type MachineRequest = (
   | { op: "task.output"; taskId: string; tail: number }
   /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
   | ({ op: "brain.turn" } & BrainTurnRequest)
+  /** Protocol 15: messages for a brain turn in progress (live steering). */
+  | ({ op: "brain.steer" } & BrainSteerRequest)
+  /** Protocol 24: a plan picks who answers a message (ADR 0074); the request's agent is the one it is lent to. */
+  | ({ op: "brain.route" } & BrainRouteRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
   /** Protocol 14: the mission's worktree (ADR 0044). */
@@ -788,6 +1281,12 @@ export type MachineRequest = (
       allowedDomains?: string[];
       /** The conversation the command is for (`/org/…/c/…`): the desktop app's "Ver" opens it. */
       link?: string;
+      /**
+       * Protocol 18: the agent's Chrome belongs on its desktop (ADR 0058 §7). The runner
+       * starts it there (the desktop first), or moves it there or back at a command that
+       * may start Chrome, never while someone watches it or a person's turn is open.
+       */
+      desktop?: boolean;
     }
   /** Protocol 12: close the agent's browser session (Stop, idle). */
   | { op: "browser.stop" }
@@ -796,7 +1295,48 @@ export type MachineRequest = (
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
+  /**
+   * Protocol 17: several `browser.act` commands in one round trip, run back to
+   * back in the agent's session (nothing else in between), each with the
+   * same checks. Stops at the first failure of a command without `tolerate`.
+   */
+  | {
+      op: "browser.batch";
+      commands: BrowserBatchCommand[];
+      allowedDomains?: string[];
+      link?: string;
+      /** Protocol 18: as on `browser.act`. */
+      desktop?: boolean;
+    }
+  /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
+  | { op: "browser.capture"; allowedDomains?: string[] }
+  /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
+  | { op: "desktop.session.start" }
+  /** Protocol 18: ends the agent's desktop, and its browser on it. */
+  | { op: "desktop.session.stop" }
+  | { op: "desktop.session.status" }
+  /** Protocol 18: answered once the data socket for `streamId` got `stream.ready`. */
+  | ({ op: "stream.open" } & StreamOpenRequest)
+  /** Protocol 21: what the agent's desktop shows now (it starts when it isn't running). */
+  | { op: "desktop.look" }
+  /** Protocol 21: one action on the agent's desktop; with `settle`, the screen settles and the answer has a look. */
+  | { op: "desktop.act"; action: DesktopAction; settle: boolean }
+  /** Protocol 21: a JPEG of the screen, or of a region of it at its own size. */
+  | { op: "desktop.capture"; region?: DesktopRegion }
+  /** Protocol 21: the apps the agent can start. */
+  | { op: "desktop.apps" }
+  /** Protocol 25: the text on the agent's screen, read on the computer. */
+  | { op: "desktop.text" }
 ) & { agent?: AgentScope };
+
+/** One command of a `browser.batch` (protocol 17). */
+export interface BrowserBatchCommand {
+  command: string;
+  args: string[];
+  timeoutSeconds: number;
+  /** Its failure doesn't stop the batch (a wait that may time out, a settle check). */
+  tolerate?: boolean;
+}
 
 export type MachineOp = MachineRequest["op"];
 
@@ -813,6 +1353,8 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.cancel",
   "task.output",
   "brain.turn",
+  "brain.steer",
+  "brain.route",
   "git.sync",
   "mission.worktree",
   "access.request",
@@ -822,6 +1364,17 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.stream.start",
   "browser.stream.stop",
   "browser.input",
+  "browser.batch",
+  "browser.capture",
+  "desktop.session.start",
+  "desktop.session.stop",
+  "desktop.session.status",
+  "stream.open",
+  "desktop.look",
+  "desktop.act",
+  "desktop.capture",
+  "desktop.apps",
+  "desktop.text",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -867,6 +1420,8 @@ export interface MachineReplies {
   "task.output": { lines: string[]; truncated: boolean };
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
+  "brain.steer": BrainSteerReply;
+  "brain.route": BrainRouteReply;
   "git.sync": { repos: GitSyncRepo[] };
   /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
@@ -881,6 +1436,55 @@ export interface MachineReplies {
   /** Events sent to the page. */
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
+  /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
+  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[] };
+  /**
+   * The page as a JPEG (base64), its size in pixels, the page's size in CSS
+   * pixels, and its numbered elements with their boxes (CSS pixels).
+   */
+  "browser.capture": {
+    data: string;
+    width: number;
+    height: number;
+    viewport: { width: number; height: number };
+    marks: BrowserCaptureMark[];
+    url?: string;
+  };
+  /** `started`: it wasn't running (a fresh desktop: whatever the agent saw on it before is gone). */
+  "desktop.session.start": { display: number; width: number; height: number; startedAt: string; started: boolean };
+  /** `false`: it wasn't running. */
+  "desktop.session.stop": { stopped: boolean };
+  /** `streams`: the agent's open desktop and terminal streams. */
+  "desktop.session.status": { running: boolean; startedAt?: string; lastUsedAt?: string; streams: number };
+  "stream.open": { opened: true };
+  "desktop.look": DesktopLookReply;
+  /** `look` with `settle`; `settled: false`: the screen kept changing until the wait's cap. */
+  "desktop.act": { look?: DesktopLookReply; settled?: boolean };
+  /**
+   * A JPEG (base64) of the screen, or of `region` at its own size; the last look's elements and their boxes,
+   * in screen pixels.
+   */
+  "desktop.capture": {
+    data: string;
+    width: number;
+    height: number;
+    screen: { width: number; height: number };
+    region: DesktopRegion | null;
+    marks: BrowserCaptureMark[];
+  };
+  /** The apps a person could start from the menu: what `launch` takes, and their names. */
+  "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
+  /** The screen's text (trimmed, `DESKTOP_TEXT_MAX` at most), or `same`: the capture didn't change since the last read. */
+  "desktop.text": { text: string } | { same: true };
+}
+
+/** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
+export interface BrowserCaptureMark {
+  ref: string;
+  number: number;
+  role: string;
+  name?: string;
+  box: { x: number; y: number; width: number; height: number };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -906,6 +1510,24 @@ export type MachineErrorCode =
    * whose top level is outside the agent's folder is `outside_workspace`.
    */
   | "not_git"
+  /**
+   * The agent's browser isn't open (never opened, idle shutdown, Stop): a
+   * stream can't start until a command opens it. Older runners say
+   * `bad_request` instead.
+   */
+  | "browser_closed"
+  /**
+   * Protocol 18: desktops can't run on this computer at all; the message says what is missing. Protocol 21:
+   * desktop use can't run here either, or the agent's desktop went away mid-use (it starts again on the next one).
+   */
+  | "desktop_unavailable"
+  /** Protocol 18: the agent's desktop isn't running (a viewer never starts it). */
+  | "desktop_off"
+  /** Protocol 18: the computer already runs as many desktops as its memory allows. */
+  | "desktop_busy"
+  | "terminal_unavailable"
+  /** Protocol 18: the agent's (or the computer's) streams of that kind are at their cap. */
+  | "too_many_streams"
   | "bad_request"
   | "internal";
 
@@ -945,7 +1567,11 @@ export type RunnerFrame =
   | { type: "output"; id: string; stream: "stdout" | "stderr"; chunk: string }
   | { type: "result"; id: string; ok: true; data: unknown }
   | { type: "result"; id: string; ok: false; error: { code: MachineErrorCode; message: string } }
-  | { type: "pong"; at: number }
+  /**
+   * Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed);
+   * protocol 23: `browserTraffic` the same way.
+   */
+  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -982,8 +1608,11 @@ export type RunnerFrame =
   | { type: "runner.state"; paused: RunnerPause }
   /** Protocol 10: what the machine allows changed (the person granted, removed, or turned a tool on or off). */
   | { type: "access.changed"; access: RunnerAccess }
-  /** Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in done, a status changed). */
-  | { type: "accounts.changed"; accounts: RunnerAccountInfo[] }
+  /**
+   * Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in
+   * done, a status changed). Protocol 19: or their usage did (`ownUsage`: the computer's own sign-ins').
+   */
+  | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -1013,7 +1642,7 @@ export const MCP_TOOLS_MAX = 200;
 /** Largest `mcp.call` arguments (JSON characters). */
 export const MCP_ARGS_MAX_CHARS = 64 * 1024;
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";
 const cut = (v: unknown, max: number) => (isString(v) ? v.slice(0, max) : undefined);
 const fileList = (v: unknown) =>
@@ -1096,13 +1725,66 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
+    const usage = parsePlanUsage(a.usage);
+    const provider = isPlanProviderWord(a.provider) ? a.provider : undefined;
+    const keyHint = isString(a.keyHint) && /^[\x21-\x7e]{1,4}$/.test(a.keyHint) ? a.keyHint : undefined;
     out.push({
       id: a.id,
       kind: a.kind,
       loggedIn: a.loggedIn === true,
       ...(email ? { email } : {}),
       ...(plan ? { plan } : {}),
+      ...(usage ? { usage } : {}),
+      ...(provider ? { provider } : {}),
+      ...(keyHint ? { keyHint } : {}),
     });
+  }
+  return out;
+}
+
+const isoOf = (v: unknown) =>
+  isString(v) && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined;
+
+/** A usage snapshot (protocol 19), checked: known window kinds only, percentages 0–100, short labels. */
+export function parsePlanUsage(v: unknown): PlanUsage | undefined {
+  if (!isObject(v) || !Array.isArray(v.windows)) return undefined;
+  const at = isoOf(v.at);
+  if (!at) return undefined;
+  const windows: PlanWindow[] = [];
+  for (const w of v.windows.slice(0, PLAN_USAGE_LIMITS.windows)) {
+    const kind = isObject(w) ? PLAN_WINDOW_KINDS.find((k) => k === w.kind) : undefined;
+    const used = isObject(w) ? finite(w.usedPercent) : undefined;
+    if (!isObject(w) || !kind || used === undefined) continue;
+    const label = isString(w.label)
+      ? w.label
+          .replace(/\p{Cc}/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, PLAN_USAGE_LIMITS.label)
+      : "";
+    const resetsAt = isoOf(w.resetsAt);
+    windows.push({
+      kind,
+      ...(label ? { label } : {}),
+      usedPercent: Math.round(Math.min(100, Math.max(0, used))),
+      ...(resetsAt ? { resetsAt } : {}),
+    });
+  }
+  return {
+    windows,
+    ...(v.limited === true ? { limited: true } : {}),
+    source: v.source === "probe" ? "probe" : "turn",
+    at,
+  };
+}
+
+/** `ownUsage` (protocol 19): one snapshot per brain at most. */
+export function parseOwnUsage(v: unknown): OwnPlanUsage | undefined {
+  if (!isObject(v)) return undefined;
+  const out: OwnPlanUsage = {};
+  for (const kind of ACCOUNT_KINDS) {
+    const usage = parsePlanUsage(v[kind]);
+    if (usage) out[kind] = usage;
   }
   return out;
 }
@@ -1166,6 +1848,14 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
       };
+    case "steer_read": {
+      if (!Array.isArray(v.uuids)) return null;
+      const uuids = v.uuids
+        .filter(isString)
+        .slice(0, STEER_LIMITS.messages * 4)
+        .map((u) => u.slice(0, 64));
+      return uuids.length ? { type: "steer_read", uuids } : null;
+    }
     default:
       return null;
   }
@@ -1207,6 +1897,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       if (!isString(f.token) || !isString(f.version) || typeof f.protocol !== "number") return null;
       const paused = parsePause(f.paused);
       const access = parseAccess(f.access);
+      const size = parseMachineSize(f.size);
       return {
         type: "hello",
         token: f.token,
@@ -1230,6 +1921,12 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(access ? { access } : {}),
         ...(isObject(f.browser) ? { browser: parseBrowserInfo(f.browser) } : {}),
         ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
+        ...(isObject(f.desktop) ? { desktop: parseDesktopInfo(f.desktop) } : {}),
+        ...(isObject(f.terminal) ? { terminal: parseAvailability(f.terminal) } : {}),
+        ...(isObject(f.desktopUse) ? { desktopUse: parseAvailability(f.desktopUse) } : {}),
+        ...(f.mode === "system" ? { mode: "system" as const } : {}),
+        ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
+        ...(size ? { size } : {}),
       };
     }
     case "browser.frame": {
@@ -1241,6 +1938,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       if (seq === undefined || !m || width === undefined || height === undefined) return null;
       const scale = finite(m.pageScaleFactor);
       const url = cut(m.url, BROWSER_LIMITS.url);
+      const title = cut(m.title, BROWSER_LIMITS.title);
       return {
         type: "browser.frame",
         agentId: f.agentId.slice(0, 64),
@@ -1251,6 +1949,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           deviceHeight: height,
           ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
           ...(url !== undefined ? { url } : {}),
+          ...(title ? { title } : {}),
         },
       };
     }
@@ -1274,8 +1973,11 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const access = parseAccess(f.access);
       return access ? { type: "access.changed", access } : null;
     }
-    case "accounts.changed":
-      return Array.isArray(f.accounts) ? { type: "accounts.changed", accounts: parseAccounts(f.accounts) } : null;
+    case "accounts.changed": {
+      if (!Array.isArray(f.accounts)) return null;
+      const ownUsage = parseOwnUsage(f.ownUsage);
+      return { type: "accounts.changed", accounts: parseAccounts(f.accounts), ...(ownUsage ? { ownUsage } : {}) };
+    }
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);
@@ -1303,8 +2005,12 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         };
       }
       return null;
-    case "pong":
-      return typeof f.at === "number" ? { type: "pong", at: f.at } : null;
+    case "pong": {
+      if (typeof f.at !== "number") return null;
+      const load = parseMachineLoad(f.load);
+      const browserTraffic = parseBrowserTraffic(f.browserTraffic);
+      return { type: "pong", at: f.at, ...(load ? { load } : {}), ...(browserTraffic ? { browserTraffic } : {}) };
+    }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;
       const line = cut(f.line, TASK_LIMITS.line);
@@ -1817,6 +2523,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       codex: t.codex === true,
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
+      ...(t.desktop === true ? { desktop: true } : {}),
+      ...(t.terminal === true ? { terminal: true } : {}),
     },
   };
 }
@@ -1832,6 +2540,90 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
   };
+}
+
+/** A whole number from `min` to `max`. */
+export const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+
+/** A small JSON text frame, parsed; null when it is too long or not JSON. */
+const smallJson = (raw: string, max: number): unknown => {
+  if (raw.length > max) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+/** `hello.terminal` (protocol 18), `hello.desktopUse` (21) and the part `hello.desktop` shares with them, cut. */
+export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
+  const reason = cut(v.reason, BROWSER_LIMITS.message);
+  return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };
+}
+
+const between = (v: unknown, min: number, max: number): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+
+/** `hello.size` (protocol 22): sane numbers, else none; a `limit` that isn't sane is left out. */
+export function parseMachineSize(v: unknown): MachineSize | null {
+  if (!isObject(v) || !inRange(v.cpus, [1, 4096])) return null;
+  if (!between(v.memoryGb, 0, 1 << 16) || !between(v.diskGb, 0, 1 << 24)) return null;
+  const l = v.limit;
+  const limit =
+    isObject(l) && inRange(l.cpus, [1, v.cpus]) && between(l.memoryGb, 0, v.memoryGb)
+      ? { limit: { cpus: l.cpus, memoryGb: l.memoryGb } }
+      : {};
+  return { cpus: v.cpus, memoryGb: v.memoryGb, diskGb: v.diskGb, ...limit };
+}
+
+/** `pong.load` (protocol 22): sane numbers, else none. */
+export function parseMachineLoad(v: unknown): MachineLoad | null {
+  if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
+  if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
+  return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
+}
+
+/** `pong.browserTraffic` (protocol 23): whole bytes up to 1e15 and at most 24 hours, else none. */
+export function parseBrowserTraffic(v: unknown): BrowserTraffic | null {
+  if (!isObject(v) || !inRange(v.up, [0, 1e15]) || !inRange(v.down, [0, 1e15]) || !between(v.hours, 0, 24)) {
+    return null;
+  }
+  return { up: v.up, down: v.down, hours: v.hours };
+}
+
+/** `hello.desktop` (protocol 18), cut; a size only when both sides are sane. */
+export function parseDesktopInfo(v: Record<string, unknown>): RunnerDesktopInfo {
+  const size = inRange(v.width, [1, 8192]) && inRange(v.height, [1, 8192]) ? { width: v.width, height: v.height } : {};
+  return { ...parseAvailability(v), ...size };
+}
+
+/** A stream's id as `stream.open` and `stream.hello` carry it: 32 random bytes in base64url. */
+export const isStreamId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{43}$/.test(v);
+
+/** A data socket's `stream.hello` (server side); null when it isn't one. The token is checked by the caller. */
+export function parseStreamHello(raw: string): StreamHello | null {
+  const f = smallJson(raw, 512);
+  if (!isObject(f) || f.type !== "stream.hello" || !isStreamId(f.streamId)) return null;
+  if (!isString(f.token) || !f.token.startsWith(MACHINE_TOKEN_PREFIX) || f.token.length > 200) return null;
+  return { type: "stream.hello", token: f.token, streamId: f.streamId };
+}
+
+/** A terminal's size within `STREAM_LIMITS` (whole columns and rows). */
+export const isTerminalSize = (cols: unknown, rows: unknown) =>
+  inRange(cols, STREAM_LIMITS.cols) && inRange(rows, STREAM_LIMITS.rows);
+
+/** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
+export function parseStreamControl(raw: string): StreamControl | null {
+  const f = smallJson(raw, 200);
+  if (!isObject(f)) return null;
+  if (f.type === "resize") {
+    return isTerminalSize(f.cols, f.rows) ? { type: "resize", cols: f.cols as number, rows: f.rows as number } : null;
+  }
+  if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
+    return { type: "exit", code: f.code as number | null };
+  }
+  return null;
 }
 
 const BROWSER_MODIFIERS_MAX = 15;

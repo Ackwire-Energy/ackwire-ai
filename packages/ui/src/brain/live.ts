@@ -1,8 +1,8 @@
 /**
  * Living engines: one shared loop draws every engine portrait on screen from
- * the portrait engine (portrait.js), about 11 times a second like the
- * prototype. Only visible portraits are drawn; with reduced motion each one is
- * drawn once, still (and again when what it shows changes).
+ * the portrait engine (portrait.js), about 11 times a second. Only visible
+ * portraits are drawn; with reduced motion each one is drawn once, still (and
+ * again when what it shows changes).
  */
 import { type BrainAgentLook, type BrainPortraitKind, type BrainPortraitState, drawBrain } from "./portrait.js";
 

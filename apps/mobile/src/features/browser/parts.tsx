@@ -1,7 +1,7 @@
 import {
+  ApiError,
   type BrowserFrame,
   type BrowserInputEvent,
-  type BrowserLiveUnavailable,
   clickEvents,
   createBrowserLiveConnection,
   fitFrame,
@@ -10,16 +10,18 @@ import {
   keyEvents,
   textEvent,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { openRefusalKey } from "@agenteschat/client/lib/sites";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Icon, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
-import { LIVE_KEYS, type LiveKey } from "./logic";
+import { LIVE_KEYS, type LiveKey, type PageGap } from "./logic";
 
 /** Why the page can't be shown: the server's reason, or the stream ended / not allowed. */
-export type Unavailable = BrowserLiveUnavailable | "ended" | null;
+export type Unavailable = PageGap | null;
 
 /** The page as a picture; a tap on it clicks the page (only for the person in control). */
 export function FrameView({
@@ -69,7 +71,7 @@ export function FrameView({
 const KEYCAP: Record<LiveKey, string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
 
 /**
- * Typing into the page (NavegadorCardScroll.html, 4): one quiet field like the composer, whole text into
+ * Typing into the page: one quiet field like the composer, whole text into
  * the page's focused field (tap it on the page first). The lock hides it and makes it a password field,
  * so the phone offers the saved passwords; the keyboard button shows the special keys; send is round.
  */
@@ -159,12 +161,91 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
   );
 }
 
+/**
+ * The address of the agent's browser while a person is in control of its page full screen: the site
+ * opens there (a closed browser starts, to sign in ahead of time); a refusal (outside the agent's sites,
+ * not an address, a page that didn't load) is said under the field, as on the web.
+ */
+export function AddressBar({
+  name,
+  cloud,
+  onOpen,
+}: {
+  name: string;
+  /** The workspace's own computer: its refusals never say it is off. */
+  cloud: boolean;
+  /** Opens the typed address; rejects with the server's refusal. */
+  onOpen: (url: string) => Promise<unknown>;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const go = async () => {
+    const typed = url.trim();
+    if (!typed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onOpen(typed);
+      setUrl("");
+    } catch (e) {
+      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), agentGrammar(t, name)));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const ready = url.trim().length > 0 && !busy;
+  return (
+    <View style={styles.typeWrap}>
+      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
+        <Icon name="globe" size={16} color={c.muted} />
+        <TextInput
+          value={url}
+          onChangeText={(v) => {
+            setUrl(v);
+            setError(null);
+          }}
+          placeholder={t("browser.inCard.goPlaceholder")}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={t("browser.inCard.goLabel")}
+          style={[styles.input, { color: c.ink }]}
+          keyboardType="url"
+          textContentType="URL"
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={2048}
+          returnKeyType="go"
+          onSubmitEditing={() => void go()}
+        />
+        <Pressable
+          onPress={() => void go()}
+          disabled={!ready}
+          accessibilityRole="button"
+          accessibilityLabel={t("browser.inCard.go")}
+          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 }]}
+        >
+          <Icon name="right" size={16} color={c.bg} />
+        </Pressable>
+      </View>
+      {error ? (
+        <Text variant="caption" tone="danger" accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export interface LiveState {
   frame: BrowserFrame | null;
   unavailable: Unavailable;
   controllerUserId: string | null;
   /** The handoff the last status carried (undefined until a status arrives). */
   handoff: { controllerUserId: string | null } | null | undefined;
+  /** Someone else is in control: no page reaches this view until they hand it back. */
+  hidden: boolean;
   sendInput: (events: BrowserInputEvent[]) => void;
 }
 
@@ -179,6 +260,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
   const [controllerUserId, setControllerUserId] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
+  const [hidden, setHidden] = useState(false);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
@@ -193,9 +275,13 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
         setFrame(f);
       },
       onStatus: (st) => {
-        setUnavailable(null);
+        // Every retry on a closed browser gets a status first: only a frame says it's open again.
+        setUnavailable((u) => (u === "closed" || u === "ended" ? u : null));
         setControllerUserId(st.controllerUserId);
         setHandoff(st.handoff ? { controllerUserId: st.handoff.controllerUserId } : null);
+        setHidden(st.hidden);
+        // What the person in control does isn't ours to keep on screen either.
+        if (st.hidden) setFrame(null);
       },
       onUnavailable: (reason) => setUnavailable(reason),
       onEnded: () => setUnavailable("ended"),
@@ -217,13 +303,18 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       offStatus();
       live.close();
       liveRef.current = null;
+      // Unwatched, the rest goes stale (the last frame stays as the card's picture).
+      setUnavailable(null);
+      setControllerUserId(null);
+      setHandoff(undefined);
+      setHidden(false);
     };
   }, [connection, agentId, enabled]);
 
   const sendInput = useCallback((events: BrowserInputEvent[]) => {
     liveRef.current?.sendInput(events);
   }, []);
-  return { frame, unavailable, controllerUserId, handoff, sendInput };
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput };
 }
 
 const styles = StyleSheet.create({

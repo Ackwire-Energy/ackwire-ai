@@ -1,5 +1,5 @@
 /*
- * Page layout of the approved screens (docs/design/telas), as classes.
+ * Page layout of the app's screens, as classes.
  * Only structure and spacing: colors, shapes and type come from tokens and
  * the @agenteschat/ui components.
  */
@@ -17,236 +17,7 @@ p {
   overflow-wrap: anywhere;
 }
 
-/* Sign in / sign up (telas/EntrarCadastro.html, C): one calm question at a time, the sky's horizon below */
-.auth {
-  position: relative;
-  isolation: isolate;
-  min-height: 100vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
-  min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-  padding: 96px 16px 30vh;
-  background: var(--bg);
-}
-.auth__horizon {
-  position: fixed;
-  inset: auto 0 0 0;
-  height: 34vh;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-.auth__logo {
-  position: absolute;
-  top: 24px;
-  left: 28px;
-}
-.auth__col {
-  width: 100%;
-  max-width: 460px;
-  margin: auto 0;
-}
-.auth__form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.auth__ask {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
-.auth__ask .ac-avatar {
-  flex: none;
-}
-.auth__bubble {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  padding: 16px 20px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
-  box-shadow: var(--card-shadow);
-  animation: auth-in 0.3s var(--out) both;
-}
-.auth__title {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  text-wrap: pretty;
-}
-.auth__lead {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--muted);
-}
-.auth__step {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  animation: auth-in 0.36s var(--out) 0.06s both;
-}
-@keyframes auth-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.auth__field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.auth__big.ac-input {
-  height: 56px;
-  padding: 0 18px;
-  border-radius: 16px;
-  font-size: 17px;
-}
-.auth__pass {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.auth__pass .auth__big.ac-input {
-  padding-right: 56px;
-}
-.auth__eye {
-  position: absolute;
-  right: 10px;
-}
-.auth__who {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  max-width: 100%;
-  height: 32px;
-  padding: 0 6px 0 12px;
-  border-radius: 10px;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  font-size: 13.5px;
-  color: var(--ink);
-}
-.auth__who-email {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.auth__who-change,
-.auth__fix,
-.auth__quiet {
-  border: 0;
-  font: inherit;
-  cursor: pointer;
-}
-.auth__who-change {
-  flex: none;
-  padding: 3px 7px;
-  border-radius: 7px;
-  background: none;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.auth__who-change:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.auth__fix {
-  align-self: flex-start;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 9px;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  animation: auth-in 0.25s var(--out) both;
-}
-.auth__fix:hover {
-  background: var(--plate);
-}
-.auth__quiet {
-  align-self: center;
-  padding: 6px 10px;
-  border-radius: 9px;
-  background: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-.auth__quiet:hover {
-  color: var(--ink);
-  background: var(--plate);
-}
-.auth__who-change:focus-visible,
-.auth__fix:focus-visible,
-.auth__quiet:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.auth__help {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.auth__help--ok {
-  color: var(--ok);
-}
-.auth__help--bad {
-  color: var(--danger);
-}
-/* A new password's length in pixels: one cell per character up to the 8 needed */
-.auth__meter {
-  display: inline-flex;
-  gap: 3px;
-}
-.auth__meter i {
-  width: 10px;
-  height: 6px;
-  border-radius: 2px;
-  background: var(--line2);
-  transition: background 0.2s;
-}
-.auth__meter i[data-on] {
-  background: var(--ink);
-}
-.auth__meter[data-done] i {
-  background: var(--ok);
-}
-.auth__caps {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-.auth__error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--danger);
-}
+/* Sign in / sign up: components/auth.css. The "ou" divider stays here: the connect flow uses it too. */
 .auth__or {
   display: flex;
   align-items: center;
@@ -261,67 +32,8 @@ p {
   height: 1px;
   background: var(--line);
 }
-.auth-social {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.auth-social__btn.ac-btn {
-  justify-content: flex-start;
-  gap: 12px;
-  padding-left: 16px;
-}
-.auth-social__mark {
-  width: 20px;
-  height: 20px;
-  flex: none;
-}
-.auth-social__label {
-  flex: 1;
-  text-align: left;
-}
-.auth-social__last {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--surface-sunken);
-  color: var(--muted);
-}
-.auth__fine {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 18px;
-  color: var(--faint);
-  text-align: center;
-  text-wrap: balance;
-}
-.auth__fine a {
-  color: var(--muted);
-}
-/* "Já tem conta? Entrar" under a form (the invitation page) */
-.auth__foot {
-  margin: 8px 0 0;
-  text-align: center;
-  color: var(--ink-muted);
-}
-@media (max-width: 560px) {
-  .auth {
-    padding-top: 80px;
-  }
-  .auth__logo {
-    left: 16px;
-  }
-  .auth__title {
-    font-size: 19px;
-  }
-}
 
-/* Centered single card (telas/Convite, Onboarding) */
+/* Centered single card */
 .center {
   min-height: 100vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
@@ -398,6 +110,57 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
+/* The AI picker's plans and the key's makers: three tiles in the setup's column and in the dialog, two at 390px
+   wide; each a mark and its name on one line, centred on the mark, chosen or not ("OpenCode Go" is the longest). */
+.grid-options--plans {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.grid-options--plans > .ac-option {
+  align-items: center;
+  gap: 10px;
+  padding-inline: 10px;
+}
+.grid-options--plans .ac-option__title {
+  font-size: 14px;
+}
+/* A one-line tile's check sits in its middle, as its mark and its name do. */
+.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
+  top: calc(50% - 9px);
+}
+/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.grid-options--plans > .ac-option.ai-picker__key::after {
+  /* Browsers without the lh unit: the page's 22px line. */
+  top: calc(var(--space-3) + 11px - 9px);
+}
+/* Behind @supports: a declaration holding var() parses even where lh is unknown, so as a second `top` it would
+   replace the fallback there and then compute to auto. */
+@supports (top: 1lh) {
+  .grid-options--plans > .ac-option.ai-picker__key::after {
+    top: calc(var(--space-3) + 0.5lh - 9px);
+  }
+}
+/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
+   nothing comes between an option and its steps. */
+.grid-options--plans > .ai-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.ai-picker__or {
+  grid-column: 1 / -1;
+  margin: 6px 0 -2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
+.grid-options--plans > .ai-picker__key {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
+.grid-options--plans > .ai-key__ours {
+  grid-column: 1 / -1;
+}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -432,7 +195,7 @@ p {
   border-radius: var(--radius-sm);
 }
 
-/* Workspace shell (telas/Sidebar + main) */
+/* Workspace shell */
 .shell {
   position: relative;
   display: flex;
@@ -447,7 +210,7 @@ p {
 }
 /*
  * The work area is its own surface (`--pane`: white in light, the page in dark), beside the sidebar's paper
- * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (telas/RefinoUI.html: no
+ * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (no
  * gray panel around the work).
  */
 .shell__main {
@@ -464,24 +227,9 @@ p {
   flex-direction: column;
   overflow: hidden;
 }
+/* Every page sits on the same white as the conversations: no grayer desk. */
 /*
- * Pages that aren't a conversation (telas/Cards.html "B · Mesa"): the work area is a paper a shade
- * darker, so the cards on it stand out. Conversations stay white. A page laid out like a chat but not
- * one (the calendar) says so with `--desk`.
- */
-:root,
-[data-theme="light"] {
-  --desk: #f5f5f2;
-}
-[data-theme="dark"] {
-  --desk: #0b0b0a;
-}
-.shell__main:not(.shell__main--chat),
-.shell__main--desk {
-  --pane: var(--desk);
-}
-/*
- * The work area beside the sidebar: an app-wide notice on top when there is one (telas/ComputadorOffline.html),
+ * The work area beside the sidebar: an app-wide notice on top when there is one,
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
@@ -597,18 +345,12 @@ p {
   color: var(--ink-muted);
 }
 .outage-dialog__hint {
-  display: flex;
-  gap: 8px;
   margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   font-size: 13px;
   color: var(--ink-muted);
-}
-.outage-dialog__hint .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 
 /* The agent's one card while it waits for its computer (instead of repeated messages). */
@@ -622,9 +364,6 @@ p {
   background: var(--surface-sunken);
 }
 .waitcard__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 600;
 }
 .waitcard__top .ac-icon {
@@ -634,6 +373,7 @@ p {
   color: var(--success);
 }
 .waitcard p {
+  gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
@@ -812,12 +552,36 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The label grows from nothing (`flex: 1`), so a long agent role would take the whole row and hide the name: it gets
+   at most half, on one line (the row's title has it whole). */
 .sidebar__item-meta {
   font-size: 12px;
   color: var(--ink-muted);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar__channel-icon {
   color: var(--ink-muted);
+}
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+.sidebar__channel-abbr {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__item:has(> .sidebar__channel-abbr) > .sidebar__channel-icon {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__channel-abbr {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink-muted);
+}
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+  color: var(--ink);
 }
 .sidebar__foot {
   margin-top: auto;
@@ -827,7 +591,6 @@ p {
 }
 .sidebar__user {
   display: flex;
-  align-items: center;
   gap: 10px;
   width: 100%;
   padding: 4px 8px 4px 4px;
@@ -839,6 +602,10 @@ p {
   text-align: left;
   cursor: pointer;
 }
+/* A name alone centres on the face; with the budget under it the card is an `.ac-faceline`. */
+.sidebar__user:not(.ac-faceline) {
+  align-items: center;
+}
 .sidebar__user:hover {
   background: var(--surface);
 }
@@ -846,16 +613,17 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Two tight lines, as in the workspace header above: the name, then the budget. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
+  line-height: 18px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -866,12 +634,18 @@ p {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  line-height: 16px;
 }
+.sidebar__usage-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+/* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background: var(--surface-sunken);
+  background: var(--line2);
   overflow: hidden;
 }
 .sidebar__usage-bar {
@@ -905,7 +679,7 @@ p {
   }
 }
 
-/* Page container (telas/Aprovacoes, Agente, Membros, NovoAgente) */
+/* Page container */
 .page {
   max-width: 920px;
   margin: 0 auto;
@@ -950,7 +724,7 @@ p {
 .list-head h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -1035,7 +809,7 @@ p {
   gap: var(--space-3);
 }
 
-/* Channel (telas/Main) */
+/* Channel */
 .channel__header {
   display: flex;
   flex-wrap: wrap;
@@ -1045,11 +819,14 @@ p {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
+/* Its reset at no weight, so a rise to the face's top (`.ac-captop`) wins it. */
+:where(.channel__title) {
+  margin: 0;
+}
 .channel__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -1059,18 +836,19 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
+   whatever else the header holds. A name that doesn't rise stays centred on the face. */
+.channel__header > .ac-avatar:has(+ div > .ac-captop),
+.channel__header > .ac-avatar + div:has(> .ac-captop) {
+  align-self: flex-start;
+}
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
-/* The engine line: the icon sits with the first line when the text wraps. */
 .profile-card__brain {
   display: inline-flex;
-  align-items: flex-start;
   gap: 6px;
   vertical-align: top;
-}
-.profile-card__brain > .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .channel__messages {
   flex: 1;
@@ -1082,7 +860,7 @@ p {
   gap: 4px;
   padding: 16px 8px 24px;
 }
-/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages; the same author
+/* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;
@@ -1121,19 +899,25 @@ p {
 }
 /* "O Theo só responde a Walter.": muted, only for me. */
 .channel__notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 4px 24px;
   padding: 4px 12px;
   font-size: 13px;
   color: var(--ink-muted);
 }
-.channel__notice .ac-icon {
-  flex: none;
+/* The role, then a lock when not everyone can talk to the agent (the tooltip says who). */
+.sidebar__item-meta--audience {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.sidebar__item-meta .audience-chip--compact {
-  font-size: 11px;
+.sidebar__item-meta--audience > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__lock {
+  display: inline-flex;
+  flex: none;
 }
 /* First-message suggestions in an empty conversation: neutral buttons that wrap */
 .channel__suggestions {
@@ -1254,8 +1038,22 @@ p {
   display: flex;
   flex-direction: column;
 }
+/*
+ * A list row led by a face beside its two lines (a member: the name, the email): the face on the name's 22px line, as
+ * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle. A name alone (an
+ * agent in Settings › Computers) stays centred with the rest of the row.
+ */
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
+  align-items: flex-start;
+}
+.ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) > :not(.ac-avatar, .list-col) {
+  align-self: center;
+}
 
-/* Memory (telas/Memoria) and proposals (telas/Propostas) */
+/* Memory and proposals */
 .tabs-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1332,13 +1130,10 @@ p {
   gap: 6px;
 }
 .evidence li {
-  display: flex;
-  gap: var(--space-2);
   font-size: 14px;
   line-height: 20px;
 }
 .evidence .ac-icon {
-  margin-top: 2px;
   color: var(--ink-muted);
 }
 
@@ -1765,25 +1560,463 @@ p {
   padding: 0;
   background: none;
 }
+/* Tables: a quiet box with a hairline, the header on a soft band, rows split by hairlines, numbers aligned
+   (right, tabular figures; the parser decides the side). A wide table scrolls inside its box. */
 .md__table {
   overflow: auto;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .md__table table {
   border-collapse: collapse;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
 }
 .md__table th,
 .md__table td {
   /* Whole words in cells: a wide table scrolls inside its box instead of breaking "coluna" into "colu/na". */
   overflow-wrap: normal;
   min-width: 8ch;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  vertical-align: top;
+}
+.md__table th {
+  background: var(--plate);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.md__table tr:last-child td {
+  border-bottom: 0;
 }
 
-/* ---------- Drive (docs/design/telas/Drive.html) ----------
- * A grid of real previews (or a list), quick filters, groups, a details panel
- * beside it (a sheet on phones), multi-select with a glass bar, drop to upload. */
+/* Fenced code: the language, copy and full screen on top; colors from
+   the shared highlighter. The full screen viewer grows out of the card (CodeBlock.tsx). */
+.code-card {
+  margin: 2px 0;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.code-card__top {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 0 5px 0 14px;
+}
+.code-card__lang {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+.code-card__code,
+.code-viewer__code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--ink2);
+  tab-size: 2;
+}
+.code-card__code {
+  padding: 0 16px 14px;
+  overflow-x: auto;
+  max-height: 420px;
+}
+.md .code-card code,
+.md .code-viewer code {
+  padding: 0;
+  font-size: inherit;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+}
+/* Copy: the icon turns into a check and "Copiado" slides out beside it. */
+.code-card__copy.ac-btn {
+  gap: 0;
+  padding: 0 8px;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.code-card__copied {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    max-width 0.28s var(--out),
+    opacity 0.2s,
+    margin 0.28s var(--out);
+}
+.code-card__copy[data-done="true"] {
+  color: var(--ok);
+}
+.code-card__copy[data-done="true"] .code-card__copied {
+  max-width: 80px;
+  margin-left: 6px;
+  opacity: 1;
+}
+.code-viewer {
+  height: min(720px, calc(100dvh - 48px));
+}
+.code-viewer .ac-dialog__head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.code-viewer__body.ac-dialog__body {
+  flex: 1 1 auto;
+  padding: 12px 0 20px;
+}
+.code-viewer__code {
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre;
+  counter-reset: code-line;
+}
+.code-viewer__code[data-wrap="true"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-line--numbered {
+  display: block;
+  padding: 0 20px 0 56px;
+  text-indent: -40px;
+}
+.code-line--numbered::before {
+  counter-increment: code-line;
+  content: counter(code-line);
+  display: inline-block;
+  width: 28px;
+  margin-right: 12px;
+  text-align: right;
+  text-indent: 0;
+  color: var(--faint);
+  opacity: 0.6;
+  user-select: none;
+}
+.code-tok--keyword {
+  color: var(--code-keyword);
+}
+.code-tok--string {
+  color: var(--code-string);
+}
+.code-tok--number {
+  color: var(--code-number);
+}
+.code-tok--function {
+  color: var(--code-function);
+}
+.code-tok--comment {
+  color: var(--faint);
+  font-style: italic;
+}
+.code-tok--inserted {
+  color: var(--ok);
+}
+.code-tok--deleted {
+  color: var(--danger);
+}
+/* Charts in messages: the code card's box; clean shapes with a
+   fine dither inside (ChartBlock.tsx paints the cells). */
+.chart-card {
+  position: relative;
+  margin: 2px 0;
+  max-width: 560px;
+  border-radius: 16px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.chart-card--pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  color: var(--faint);
+  font-size: 13.5px;
+}
+.chart-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 6px 4px 16px;
+}
+.chart-card__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chart-card__titles b {
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.chart-card__titles small {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--faint);
+}
+.chart-card__body {
+  padding: 8px 16px 16px;
+}
+.chart-viewer__body.ac-dialog__body {
+  gap: 20px;
+  padding: 16px 24px 24px;
+}
+.chart-cells {
+  display: block;
+  image-rendering: pixelated;
+}
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: var(--ink);
+  color: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.chart-tip[data-on="true"] {
+  opacity: 1;
+}
+.chart-tip[data-below="true"] {
+  transform: translate(-50%, 24px);
+}
+/* Bars: label · rounded bar on a light rail · value. */
+.chart-bars {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.chart-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 36%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  transition: opacity 0.15s;
+}
+.chart-bars[data-big="true"] .chart-bar {
+  gap: 14px;
+  font-size: 14px;
+}
+.chart-bar[data-dim="true"] {
+  opacity: 0.55;
+}
+.chart-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+}
+.chart-bar__rail {
+  position: relative;
+  border-radius: 5px;
+  background: var(--plate);
+}
+.chart-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  border-radius: 5px;
+  transition: width 0.6s var(--out);
+}
+.chart-bar__value {
+  min-width: 44px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Line: a smooth vector line over a dithered area. */
+.chart-line__plot {
+  position: relative;
+}
+.chart-line__plot svg {
+  position: relative;
+  display: block;
+}
+.chart-line__area {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s 0.2s;
+}
+.chart-line__area[data-shown="true"] {
+  opacity: 1;
+}
+.chart-line__grid {
+  stroke: var(--line);
+  stroke-dasharray: 2 4;
+}
+.chart-line__cursor {
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 3;
+}
+.chart-line__stroke {
+  transition: stroke-dashoffset 0.7s var(--out);
+}
+.chart-line__point {
+  opacity: 0;
+  transition: opacity 0.2s 0.5s;
+}
+.chart-line__point[data-shown="true"] {
+  opacity: 1;
+}
+.chart-line__x {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 2px 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend i,
+.chart-pie__legend i {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 2px;
+}
+/* Pie: a round ring (the mask keeps the edges clean), the total inside, the legend beside. */
+.chart-pie {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.chart-pie__ring {
+  position: relative;
+  flex: none;
+}
+.chart-pie__ring canvas {
+  width: 100%;
+  height: 100%;
+  -webkit-mask: radial-gradient(circle closest-side, transparent 57%, #000 57.6%, #000 99%, transparent 100%);
+  mask: radial-gradient(circle closest-side, transparent 57%, #000 57.6%, #000 99%, transparent 100%);
+}
+.chart-pie__total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chart-pie__total small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.chart-pie__legend {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.chart-pie__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-pie__legend span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+}
+.chart-pie__legend b {
+  font-variant-numeric: tabular-nums;
+}
+/* A big number with its line beside it. */
+.chart-number {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.chart-number__value {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.chart-number[data-big="true"] .chart-number__value {
+  font-size: 72px;
+}
+.chart-number__delta {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}
+.chart-number__spark {
+  flex: 1;
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar__fill,
+  .chart-line__stroke,
+  .chart-line__area,
+  .chart-line__point {
+    transition: none;
+  }
+}
+:root {
+  --code-keyword: #7a3fd1;
+  --code-string: #1f7a45;
+  --code-number: #b05a00;
+  --code-function: #0b62c9;
+}
+[data-theme="dark"] {
+  --code-keyword: #c29bff;
+  --code-string: #7fd4a0;
+  --code-number: #f0b35a;
+  --code-function: #79b8ff;
+}
+
+/* ── Drive: pages/drive.css. The previews (the agent's Arquivos tab), the kind tag and the selection bar
+ * (Threads) stay here. ── */
 .drive {
   max-width: 1120px;
   display: grid;
@@ -1791,194 +2024,6 @@ p {
   align-items: start;
   gap: 0 20px;
   padding-bottom: 96px;
-}
-.drive__main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.drive-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-.drive-head__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.drive-head__title h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.drive-head__sub {
-  margin: 6px 0 0;
-  max-width: 60ch;
-  color: var(--muted);
-}
-.drive-head__actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Icon-only items are square inside the track. */
-.drive-view .ac-seg__item {
-  width: calc(var(--seg-h) - 2 * var(--seg-in));
-  padding: 0;
-  justify-content: center;
-}
-
-.drive-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: -6px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.drive-count {
-  font-size: 12.5px;
-  color: var(--faint);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-/* Groups. */
-.drive-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-.drive-group__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  margin: 0 2px 10px;
-  color: var(--ink2);
-}
-.drive-group__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.005em;
-}
-.drive-group__stack {
-  display: inline-flex;
-  margin-left: 2px;
-}
-.drive-group__stack > * + * {
-  margin-left: -5px;
-}
-.drive-group__stack > * {
-  box-shadow: 0 0 0 2px var(--bg);
-}
-
-/* A button whose hit area covers its card or row (the checkbox and menu sit above it). */
-.drive-hit {
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  min-width: 0;
-}
-.drive-hit::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-.drive-hit:focus-visible {
-  outline: none;
-}
-.drive-card:has(.drive-hit:focus-visible),
-.drive-row:has(.drive-hit:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-
-/* Grid cards. */
-.drive-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
-  gap: 14px;
-}
-.drive-card {
-  position: relative;
-  min-width: 0;
-  padding: 7px;
-  border-radius: var(--radius-xl);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  transition:
-    transform 0.22s var(--spring),
-    box-shadow 0.2s var(--out);
-}
-.drive-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--e2), var(--top);
-}
-.drive-card--open,
-.drive-card--selected {
-  background: var(--chosen-bg);
-  box-shadow: var(--chosen-shadow);
-  transform: var(--chosen-lift);
-}
-.drive-card__body {
-  padding: 10px 6px 4px;
-  min-width: 0;
-}
-.drive-card__title {
-  display: block;
-  width: 100%;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-card__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-top: 5px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.drive-card__name,
-.drive-card__where {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-card__name {
-  flex: none;
-  max-width: 45%;
-}
-.drive-card__where::before {
-  content: "·";
-  margin-right: 6px;
-  color: var(--faint);
-}
-.drive-card__when {
-  margin-left: auto;
-  flex: none;
-  color: var(--faint);
-  white-space: nowrap;
 }
 .drive-card__kind {
   position: absolute;
@@ -1992,9 +2037,8 @@ p {
   max-width: calc(100% - 64px);
   padding: 0 9px 0 7px;
   border-radius: var(--radius-full);
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
-  backdrop-filter: blur(10px) saturate(1.5);
+  /* Solid, not glass: one per card, and a blur on each would cost on every scroll frame. */
+  background: var(--glass-solid);
   box-shadow:
     0 0 0 1px var(--line),
     0 2px 6px -2px rgba(0, 0, 0, 0.15);
@@ -2008,35 +2052,6 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.drive-check {
-  position: relative;
-  z-index: var(--z-lifted);
-}
-.drive-card .drive-check {
-  position: absolute;
-  top: 15px;
-  left: 15px;
-  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  transform: scale(0.85);
-  transition:
-    opacity 0.15s,
-    transform 0.2s var(--spring);
-}
-.drive-card:hover .drive-check,
-.drive-card:focus-within .drive-check,
-.drive--selecting .drive-card .drive-check,
-.drive-card .drive-check[data-state="checked"] {
-  opacity: 1;
-  transform: none;
-}
-@media (hover: none) {
-  .drive-card .drive-check {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 /* Previews: scale with their box (container units). */
 .drive-pv {
   position: relative;
@@ -2227,7 +2242,7 @@ p {
 .drive-pv__hero {
   padding: 6cqw 6cqw 3cqw;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 6.4cqw;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -2302,261 +2317,6 @@ p {
   display: none;
 }
 
-/* List. */
-.drive-table {
-  overflow: hidden;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
-.drive-table .drive-group__head {
-  margin: 0;
-  padding: 14px 16px 6px;
-}
-.drive-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.drive-table__head,
-.drive-row {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1fr) 108px 40px;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-}
-.drive-table__head {
-  padding-top: 10px;
-  padding-bottom: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--faint);
-}
-.drive-row {
-  position: relative;
-  border-top: 1px solid var(--line);
-  transition: background 0.12s;
-}
-.drive-row > .drive-check {
-  justify-self: center;
-}
-.drive-row:hover {
-  background: color-mix(in srgb, var(--sunken) 55%, transparent);
-}
-.drive-row--open,
-.drive-row--selected {
-  background: color-mix(in srgb, var(--sunken) 85%, transparent);
-}
-.drive-row--open::before,
-.drive-row--selected::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--ink);
-}
-.drive-row__name {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.drive-row__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.drive-row__title {
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-row__sub {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12.5px;
-  color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.drive-row__mobile {
-  display: none;
-}
-.drive-row__who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 13.5px;
-  color: var(--ink2);
-}
-.drive-row__who span,
-.drive-row__where,
-.drive-row__when {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-row__where,
-.drive-row__when {
-  font-size: 13.5px;
-  color: var(--muted);
-}
-.drive-row__more {
-  position: relative;
-  z-index: var(--z-lifted);
-}
-
-/* Details (in the shared details dialog). */
-.drive-details__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.drive-details__actions > .ac-btn--primary {
-  flex: 1 1 auto;
-}
-.drive-author {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.drive-author b,
-.drive-author small {
-  display: block;
-}
-.drive-author b {
-  font-weight: 650;
-}
-.drive-author small {
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.drive-versions {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-}
-.drive-versions li {
-  position: relative;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-  padding: 6px 6px 10px 2px;
-  border-radius: 12px;
-}
-.drive-versions li::before {
-  content: "";
-  position: absolute;
-  left: 10px;
-  top: 24px;
-  bottom: -6px;
-  width: 1.5px;
-  background: var(--line2);
-}
-.drive-versions li:last-child::before {
-  display: none;
-}
-.drive-versions__node {
-  position: relative;
-  z-index: var(--z-raised);
-  width: 12px;
-  height: 12px;
-  margin: 5px 0 0 3px;
-  border-radius: 50%;
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1.5px var(--faint);
-}
-.drive-versions__current .drive-versions__node {
-  background: var(--ink);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent);
-}
-.drive-versions__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.drive-versions__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 13.5px;
-}
-.drive-versions__note {
-  margin-top: 1px;
-  font-size: 13px;
-  color: var(--ink2);
-}
-.drive-versions__who {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--faint);
-}
-.drive-where {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--sunken);
-  font: inherit;
-  font-size: 13.5px;
-  color: inherit;
-  text-align: left;
-}
-button.drive-where {
-  cursor: pointer;
-}
-button.drive-where:hover {
-  background: color-mix(in srgb, var(--sunken) 70%, var(--plate));
-}
-button.drive-where:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.drive-where__icon {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--raised);
-  box-shadow: var(--e1);
-  color: var(--muted);
-}
-.drive-where__text {
-  min-width: 0;
-  flex: 1;
-}
-.drive-where__text b {
-  display: block;
-  font-weight: 600;
-}
-.drive-where__text small {
-  display: block;
-  font-size: 12px;
-  color: var(--faint);
-}
-
 /* Selection: a glass bar that floats at the bottom of the page. */
 .drive-selbar {
   position: sticky;
@@ -2590,217 +2350,9 @@ button.drive-where:focus-visible {
   background: var(--line2);
 }
 
-/* Drop anywhere on the page. */
-.drive-drop {
-  position: relative;
-}
-.drive-dropzone {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-dialog);
-  display: flex;
-  padding: 16px;
-  background: color-mix(in srgb, var(--bg) 55%, transparent);
-  -webkit-backdrop-filter: blur(10px) saturate(1.3);
-  backdrop-filter: blur(10px) saturate(1.3);
-  pointer-events: none;
-}
-.drive-dropzone__in {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  border: 2px dashed var(--line2);
-  border-radius: 28px;
-  text-align: center;
-}
-.drive-dropzone__icon {
-  width: 76px;
-  height: 76px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 24px;
-  background: var(--raised);
-  box-shadow: var(--e3), var(--top);
-  color: var(--ink);
-}
-.drive-dropzone__icon .ac-icon {
-  width: 32px;
-  height: 32px;
-}
-.drive-dropzone__in b {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(26px, 4vw, 36px);
-  letter-spacing: -0.03em;
-}
-.drive-dropzone__in span {
-  max-width: 44ch;
-  color: var(--muted);
-}
-
-/* Upload progress (glass, bottom right). */
-.drive-uploads {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: var(--z-floating);
-  width: 360px;
-  max-width: calc(100vw - 32px);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 16px;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  backdrop-filter: blur(18px) saturate(1.6);
-  box-shadow: var(--e3);
-}
-.drive-uploads__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.drive-uploads__head b {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-}
-.drive-uploads ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.drive-uploads__row {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 4px 10px;
-  align-items: center;
-  font-size: 13px;
-}
-.drive-uploads__name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-uploads__status {
-  font-size: 12px;
-  color: var(--faint);
-}
-.drive-uploads__track {
-  grid-column: 2 / 4;
-  position: relative;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-}
-.drive-uploads__track i {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  border-radius: 4px;
-  background: var(--ink);
-}
-.drive-uploads__row[data-status="sending"] .drive-uploads__track i {
-  width: 40%;
-}
-.drive-uploads__row[data-status="done"] .drive-uploads__track i {
-  width: 100%;
-  background: var(--ok);
-}
-.drive-uploads__row[data-status="done"] > .ac-icon {
-  color: var(--ok);
-}
-.drive-uploads__row[data-status="failed"] .drive-uploads__status {
-  color: var(--danger);
-}
-
-/* Trash. */
-.drive-note {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  font-size: 13.5px;
-  color: var(--muted);
-}
-.drive-trash {
-  overflow: hidden;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
-.drive-trash__row {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto auto;
-  gap: 14px;
-  align-items: center;
-  padding: 10px 12px;
-  border-top: 1px solid var(--line);
-}
-.drive-trash__row:first-child {
-  border-top: 0;
-}
-.drive-trash__icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: var(--sunken);
-  color: var(--muted);
-}
-.drive-trash__text {
-  min-width: 0;
-}
-.drive-trash__text b,
-.drive-trash__text small {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-trash__text b {
-  display: block;
-  font-weight: 600;
-}
-.drive-trash__text small {
-  font-size: 12.5px;
-  color: var(--faint);
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .drive-group {
-    animation: drive-in 0.3s var(--out) both;
-  }
   .drive-selbar {
     animation: drive-in 0.3s var(--spring) both;
-  }
-  .drive-dropzone {
-    animation: drive-in 0.18s var(--out) both;
-  }
-  .drive-dropzone__icon {
-    animation: drive-bob 1.6s var(--out) infinite alternate;
-  }
-  .drive-uploads__row[data-status="sending"] .drive-uploads__track i {
-    animation: drive-track 1.2s ease-in-out infinite;
   }
 }
 @keyframes drive-in {
@@ -2813,59 +2365,10 @@ button.drive-where:focus-visible {
     transform: none;
   }
 }
-@keyframes drive-bob {
-  to {
-    transform: translateY(-8px);
-  }
-}
-@keyframes drive-track {
-  from {
-    left: -40%;
-  }
-  to {
-    left: 100%;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .drive-card,
-  .drive-card .drive-check,
-  .drive-row {
-    transition: none;
-  }
-  .drive-card:hover {
-    transform: none;
-  }
-}
-
-@media (max-width: 980px) {
-  .drive-table__head,
-  .drive-row {
-    grid-template-columns: 40px minmax(0, 2.4fr) minmax(0, 1.2fr) 96px 40px;
-  }
-  .drive-table__head .drive-row__where,
-  .drive-row__where {
-    display: none;
-  }
-}
 @media (max-width: 720px) {
   .drive {
     padding-left: 16px;
     padding-right: 16px;
-  }
-  .drive-head {
-    align-items: flex-start;
-  }
-  .drive-head__actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .drive-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .drive-card {
-    padding: 5px;
-    border-radius: 16px;
   }
   .drive-card__kind {
     top: 11px;
@@ -2874,28 +2377,6 @@ button.drive-where:focus-visible {
   }
   .drive-card__kind > span {
     display: none;
-  }
-  .drive-card .drive-check {
-    top: 11px;
-    left: 11px;
-  }
-  .drive-card__where {
-    display: none;
-  }
-  .drive-table__head {
-    display: none;
-  }
-  .drive-row {
-    grid-template-columns: 34px minmax(0, 1fr) 34px;
-    gap: 10px;
-    padding: 8px;
-  }
-  .drive-row__who,
-  .drive-row__when {
-    display: none;
-  }
-  .drive-row__mobile {
-    display: inline;
   }
   .drive-selbar {
     align-self: stretch;
@@ -2912,22 +2393,9 @@ button.drive-where:focus-visible {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .drive-uploads {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    width: auto;
-    max-width: none;
-  }
-  .drive-trash__row {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
-  }
-  .drive-trash__row .ac-chip {
-    display: none;
-  }
 }
 
-/* ── Issues, routines, calendar (telas/Issues, Issue, Rotinas, Calendario) ── */
+/* ── Issues, routines, calendar ── */
 .grid-fields--3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
 }
@@ -2951,6 +2419,11 @@ button.drive-where:focus-visible {
   color: var(--ink2);
   cursor: pointer;
 }
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its line. */
+.ac-hintline:has(> .ac-field__label) {
+  font-size: 13px;
+  line-height: 18px;
+}
 /* Participant / member picker inside forms */
 .people-picker {
   display: flex;
@@ -2964,7 +2437,7 @@ button.drive-where:focus-visible {
 }
 
 /*
- * Markdown inside chat messages, styled for reading (telas/RefinoUI.html, "Nova leitura"): line breaks
+ * Markdown inside chat messages, styled for reading: line breaks
  * kept (white-space from .ac-msg__text), 14px between paragraphs, 8px into a list and between its items,
  * a heading opens a section, bold marks without shouting, links in the text's own color.
  */
@@ -3134,12 +2607,10 @@ button.drive-where:focus-visible {
   margin: 0;
   padding: 0;
 }
-/* Icon, text and the level control line up on the name's row; long tool lists stay at two lines. */
+/* An `.ac-faceline`: the tile, the name's capitals and the level control start at one top; long tool lists stay at
+   two lines. */
 .level-row {
-  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
@@ -3172,14 +2643,14 @@ button.drive-where:focus-visible {
 .level-row__asks .ac-chip {
   margin-left: 0;
 }
-.level-note,
 .level-legend__asks {
   display: flex;
   align-items: center;
+}
+.level-legend__asks {
   gap: 6px;
   margin: 0;
 }
-.level-note .ac-icon,
 .level-legend__asks .ac-icon {
   flex: none;
   width: 15px;
@@ -3187,6 +2658,7 @@ button.drive-where:focus-visible {
 }
 .level-matrix {
   overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
@@ -3240,6 +2712,7 @@ button.drive-where:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
@@ -3415,14 +2888,22 @@ button.drive-where:focus-visible {
   align-items: center;
   gap: 4px;
 }
+/* The same insets and gap as the workspace header's button, so both cards line up. */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px 10px 10px;
+  gap: var(--space-2);
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
+/* The person's face about as tall as its two lines (32px). */
+.sidebar__me > .sidebar__user > .ac-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
 
-/* Settings (telas/Configuracoes.html): a grouped left sub-nav + one section. */
+/* Settings: a grouped left sub-nav + one section. */
 .settings {
   display: flex;
   gap: 40px;
@@ -3502,14 +2983,15 @@ button.drive-where:focus-visible {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
-/* Hover is a tint; the current page is a raised key (never the same look). */
+/* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
+   and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
-  box-shadow: var(--card-key);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   color: var(--ink);
   font-weight: 600;
 }
@@ -3668,6 +3150,7 @@ button.drive-where:focus-visible {
     margin: 0 -16px;
     padding: 2px 16px 6px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .settings__group-label {
     display: none;
@@ -3697,6 +3180,7 @@ button.drive-where:focus-visible {
   gap: 8px;
   align-items: center;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
 .computer-error {
   display: flex;
   align-items: center;
@@ -3705,7 +3189,6 @@ button.drive-where:focus-visible {
   color: var(--ink);
 }
 .computer-error .ac-icon {
-  flex: none;
   color: var(--ink-muted);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -3723,7 +3206,7 @@ button.drive-where:focus-visible {
 }
 
 /*
- * "Adicionar conector" (telas/CatalogoConectores.html, B+C): a gallery with a big title, search and one
+ * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
  * when connected); a tile opens the detail pane beside the grid (a bottom sheet on phones).
  */
@@ -3731,11 +3214,13 @@ button.drive-where:focus-visible {
   height: min(740px, calc(100dvh - 48px));
 }
 .catalog .ac-dialog__head {
-  padding: 24px 24px 14px 28px;
+  padding: 24px 28px 14px;
+  /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
+  --title-cap-mid: 0.88px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -3750,20 +3235,80 @@ button.drive-where:focus-visible {
 .catalog__search {
   max-width: 360px;
 }
-/* The categories: one line that scrolls sideways (never wraps). */
-.catalog__filters {
-  align-self: flex-start;
-}
 .catalog__body {
   position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
   border-top: 1px solid var(--line);
 }
-.catalog__body[data-pane] {
-  grid-template-columns: minmax(0, 1fr) 340px;
+/* The categories beside the grid: one per line, the count at the end; a rule under "Conectados". */
+.catalog__cats {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--line);
+}
+.catalog__cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px 10px 10px 3px;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.catalog__cat:hover {
+  background: var(--plate-soft);
+}
+.catalog__cat:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.catalog__cat[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+  font-weight: 600;
+}
+.catalog__cat[data-rule] {
+  position: relative;
+  margin-bottom: 13px;
+}
+.catalog__cat[data-rule]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -8px;
+  height: 1px;
+  background: var(--line);
+}
+.catalog__cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog__cat-count {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* The row of categories is for phones only. */
+.catalog__filters {
+  display: none;
 }
 .catalog__list {
   min-height: 0;
@@ -3834,12 +3379,6 @@ button.drive-where:focus-visible {
 .catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-}
-.catalog-feat__card[aria-pressed="true"],
-.catalog-tile[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--top);
 }
 .catalog-feat__card {
   position: relative;
@@ -3944,117 +3483,130 @@ button.drive-where:focus-visible {
   height: 12px;
   stroke-width: 2.4;
 }
-/* The detail pane. */
-.catalog-detail {
-  position: relative;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
+/*
+ * A service over the catalog (ServiceDialog): the brand's pixel sky on top, the icon on its edge, the name in the
+ * display face; what agents could do on a sunken plate; how it connects beside Conectar at the foot.
+ */
+.ac-dialog.catalog-svc {
+  overflow: hidden;
+}
+/* Behind the head (z-index -1 inside the dialog's own stacking context): the head's icon overlaps its edge. */
+.catalog-svc .catalog-feat__sky {
+  order: -1;
+  z-index: -1;
+  flex: none;
+  height: 112px;
+  margin: 0;
+}
+.catalog-svc .ac-dialog__head {
   flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  background: var(--side, var(--surface-sunken));
-  border-left: 1px solid var(--line);
-  animation: catalog-pane 0.24s var(--out);
+  gap: 14px;
+  margin-top: -36px;
+  padding: 0 24px 4px;
 }
-.catalog-detail:focus {
-  outline: none;
-}
-@keyframes catalog-pane {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-.catalog-detail__close {
+.catalog-svc .ac-dialog__acts {
   position: absolute;
   top: 12px;
   right: 12px;
+  /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
+  translate: none;
 }
-.catalog-detail .connector-icon--lg {
-  width: 56px;
-  height: 56px;
-  border-radius: 17px;
-  font-size: 20px;
+.catalog-svc .ac-dialog__lead .connector-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 19px 19px 19px 5px;
+  font-size: 22px;
+  background: var(--raised);
+  box-shadow:
+    0 0 0 4px var(--surface-raised),
+    inset 0 0 0 1px var(--line2),
+    var(--e1);
 }
-.catalog-detail__name {
-  margin: 0;
+.catalog-svc .ac-dialog__title {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 28px;
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: -0.025em;
 }
-.catalog-detail__desc,
-.catalog-detail__text {
-  margin: 4px 0 0;
-  color: var(--ink-muted);
-  font-size: 14px;
+.catalog-svc .ac-dialog__desc {
+  padding: 0 24px;
+  color: var(--ink2);
 }
-.catalog-detail__text {
-  margin: 0;
-  font-size: 13px;
+.catalog-svc__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 24px;
 }
-.catalog-detail__part {
-  align-self: stretch;
+.catalog-svc__part {
+  padding: 14px 16px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.catalog-detail__h {
+.catalog-svc__h {
   margin: 0 0 8px;
   font-size: 12.5px;
   font-weight: 650;
   color: var(--ink-muted);
 }
-.catalog-detail__caps {
+.catalog-svc__caps {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.catalog-detail__caps li {
-  display: flex;
-  align-items: flex-start;
   gap: 8px;
-  font-size: 13.5px;
-  color: var(--ink2);
 }
-.catalog-detail__caps .ac-icon {
-  margin-top: 3px;
+.catalog-svc__caps li {
+  font-size: 14px;
+  color: var(--ink);
+}
+.catalog-svc__caps .ac-icon {
+  color: var(--ok);
+}
+.catalog-svc__caps li[data-asks] .ac-icon {
+  color: var(--warn);
+}
+.catalog-svc__text {
+  margin: 0;
   color: var(--ink-muted);
+  font-size: 13.5px;
 }
-.catalog-detail__act {
-  align-self: stretch;
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.catalog-detail__how {
+.catalog-svc__act {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-size: 12.5px;
-  color: var(--faint);
-  text-align: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+}
+.catalog-svc__how {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.catalog-svc__how[data-ok] .ac-icon {
+  color: var(--ok);
 }
 @media (max-width: 760px) {
-  .catalog__body[data-pane] {
+  .catalog__body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .catalog-detail {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    max-height: 75%;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 20px 20px 0 0;
-    box-shadow: var(--e3);
-    animation-name: catalog-sheet;
+  .catalog__cats {
+    display: none;
+  }
+  .catalog__filters {
+    display: flex;
+    align-self: flex-start;
+    max-width: 100%;
   }
   .catalog__tools,
   .catalog__list {
@@ -4063,6 +3615,7 @@ button.drive-where:focus-visible {
   }
   .catalog .ac-dialog__head {
     padding: 20px 16px 12px;
+    --title-cap-mid: 0.51px;
   }
   .catalog .ac-dialog__title {
     font-size: 24px;
@@ -4070,15 +3623,12 @@ button.drive-where:focus-visible {
   .catalog__search {
     max-width: none;
   }
-}
-@keyframes catalog-sheet {
-  from {
-    transform: translateY(24px);
-    opacity: 0;
+  .catalog-svc__act {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .catalog-detail,
   .catalog-feat__card,
   .catalog-tile {
     animation: none;
@@ -4086,7 +3636,7 @@ button.drive-where:focus-visible {
   }
 }
 
-/* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
+/* A connector's one-color brand icon as a mask in its color, a mark in its own colors, or a monogram. */
 .connector-icon {
   flex: none;
   width: 36px;
@@ -4118,6 +3668,26 @@ button.drive-where:focus-visible {
   background: var(--connector-color, var(--ink));
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
+}
+/* A mark in its maker's own colors (PostgreSQL's, PayPal's, Canva's), which a mask would flatten to one color. */
+.connector-icon__img {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+}
+/* A service in a chip: its bare mark in the box of the chip's icons, a little smaller since it fills its square. */
+.ac-chip > .connector-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: none;
+  background: transparent;
+  font-size: 8px;
+}
+.ac-chip > .connector-icon > .connector-icon__mark,
+.ac-chip > .connector-icon > .connector-icon__img {
+  width: 12px;
+  height: 12px;
 }
 
 /* Settings → Conectores: one row per connected service. */
@@ -4183,6 +3753,17 @@ button.drive-where:focus-visible {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+/* The tile, centred on the title's line, rises to its capitals' middle, as the dialog's close does. A title that wraps
+   takes `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+.cflow__title > :first-child {
+  translate: 0 calc(-1 * var(--title-cap-mid));
+}
+.cflow__title:has(> .ac-captop) {
+  align-items: flex-start;
+}
+.cflow__title:has(> .ac-captop) > :first-child {
+  translate: none;
 }
 .cflow__steps {
   display: flex;
@@ -4461,6 +4042,11 @@ button.drive-where:focus-visible {
   border: 0;
   min-width: 0;
 }
+/* A legend sits outside the fieldset's flex flow, so the gap above doesn't reach it. */
+.mail-rules__group > legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
 .mail-rules__unit {
   display: flex;
   align-items: center;
@@ -4507,7 +4093,7 @@ button.drive-where:focus-visible {
   box-shadow: none;
 }
 
-/* Connector tool review (telas/ConectorFerramentas.html): one grouped list, pending decisions first. */
+/* Connector tool review: one grouped list, pending decisions first. */
 .tr-body {
   gap: 24px;
 }
@@ -4667,17 +4253,12 @@ button.drive-where:focus-visible {
 }
 /* The mark sits on the first line (centered on its 18px line box), so wrapped text never pushes it down. */
 .tr-row__why {
-  display: flex;
-  align-items: flex-start;
   gap: 7px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
   margin-top: 1px;
   min-width: 0;
-}
-.tr-row__why .ac-toolpx-spark {
-  margin-top: 4px;
 }
 .tr-row__why span {
   min-width: 0;
@@ -4701,6 +4282,7 @@ button.drive-where:focus-visible {
   border-radius: var(--control-r-sm);
   font-weight: 600;
   font-size: var(--control-fs-sm);
+  line-height: normal;
   background: var(--raised);
   color: var(--ink);
   box-shadow: var(--e1), var(--top);
@@ -4761,7 +4343,7 @@ button.drive-where:focus-visible {
 .tr-done__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   letter-spacing: -0.03em;
   line-height: 1.08;
@@ -4933,35 +4515,14 @@ button.drive-where:focus-visible {
 }
 
 /*
- * Route transitions: only the main column moves (opacity + 4 px), 160 ms.
- * View Transitions where supported; otherwise the page fades in on mount.
- * Nothing moves with prefers-reduced-motion.
+ * Route transitions: only the main column moves (opacity + 4 px), 160 ms, as each page's main mounts.
+ * No View Transitions: the browser freezes the whole page while the new one renders, so the
+ * sidebar's sliding pill stopped halfway and jumped. Nothing moves with prefers-reduced-motion.
  */
-.shell__main {
-  view-transition-name: page;
-}
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-}
 @media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(page) {
-    animation: page-out 120ms ease-in both;
-  }
-  ::view-transition-new(page) {
+  /* A thread opening in the side panel has its own entrance. */
+  .shell__main:not(.thread-panel__chat) {
     animation: page-in 160ms ease-out both;
-  }
-  @supports not (view-transition-name: page) {
-    .shell__main {
-      animation: page-in 160ms ease-out both;
-    }
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
   }
 }
 @keyframes page-in {
@@ -4972,14 +4533,6 @@ button.drive-where:focus-visible {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@keyframes page-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
   }
 }
 /* "Carregando mensagens anteriores…": floats over the top, takes no space (no jump). */
@@ -5006,10 +4559,19 @@ button.drive-where:focus-visible {
   white-space: nowrap;
 }
 /*
- * No content-visibility on messages: it implies paint containment and clipped
- * the floating action bar. Room at the top so the first row's bar isn't cut
- * by the scroll container.
+ * Long conversations: the browser skips laying out and painting rows far off screen. That implies
+ * paint containment, which would clip the floating action bar (it sits above the row), so a row
+ * being hovered, focused, tapped open or with a menu open renders normally; so does a reply still
+ * streaming. Room at the top so the first row's bar isn't cut by the scroll container.
  */
+.channel__messages .ac-msg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}
+.channel__messages .ac-msg:is(:hover, :focus-within, .ac-msg--streaming),
+.channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]) {
+  content-visibility: visible;
+}
 .channel__messages {
   padding-top: 28px;
 }
@@ -5059,10 +4621,16 @@ button.drive-where:focus-visible {
   }
 }
 
-/* Sidebar 2026-10: soft pill for the active item (one indicator slides between items), neutral badges. */
+/* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
+   white with a hairline, painted on the item itself (no sliding); counts are plain numbers. */
 .sidebar {
   position: relative;
   background: var(--side);
+  /* The chosen item and the ⌘K field: the page's white in light; a lighter step of the paper in dark. */
+  --side-active: var(--pane);
+}
+[data-theme="dark"] .sidebar {
+  --side-active: color-mix(in srgb, var(--ink) 7%, var(--side));
 }
 /* Light: the paper and the white work area meet on a hairline (dark keeps the step in tone; the drawer has its shadow). */
 @media (min-width: 761px) {
@@ -5071,27 +4639,9 @@ button.drive-where:focus-visible {
   }
 }
 .sidebar > *,
-.sidebar__scroll > *:not(.sidebar__indicator) {
+.sidebar__scroll > * {
   position: relative;
   z-index: 1;
-}
-.sidebar__indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border-radius: var(--control-r-md);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .sidebar__indicator {
-    transition:
-      transform 0.32s var(--spring),
-      width 0.2s var(--out),
-      height 0.2s var(--out);
-  }
 }
 /* Nav items are default controls of the ruler (40, r12). */
 .sidebar__item {
@@ -5106,12 +4656,25 @@ button.drive-where:focus-visible {
 .sidebar__item:hover {
   background: var(--plate);
 }
-.sidebar__item[data-status="active"] {
-  background: transparent;
-  font-weight: 600;
-}
+/* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
+   (an agent's row in its color). Rounded like any item. */
+.sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
-  background: transparent;
+  background-color: var(--side-active);
+  background-image: var(--sel-sky, none);
+  background-position: right center;
+  background-size: auto 100%;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 600;
+  transition: none;
+}
+[data-theme="dark"] .sidebar__item[data-status="active"] {
+  background-image: var(--sel-sky-dark, none);
+}
+/* The icon rail is too narrow for a horizon. */
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
+  background-image: none;
 }
 .sidebar__label {
   font-size: 11.5px;
@@ -5119,17 +4682,14 @@ button.drive-where:focus-visible {
   color: var(--faint);
 }
 .sidebar__unread {
-  background: var(--raised);
-  color: var(--ink);
-  box-shadow: var(--e1);
+  background: none;
+  color: var(--muted);
+  box-shadow: none;
   font-weight: 650;
 }
-/* The workspace header: a raised card with the org's name. */
+/* The workspace header: the org's name, no card (a soft fill on hover). */
 .sidebar__org {
-  padding: 6px;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  border-radius: 12px;
 }
 .sidebar__org-name {
   font-size: 15.5px;
@@ -5146,10 +4706,11 @@ button.drive-where:focus-visible {
   padding: 0 10px 0 var(--control-px-md);
   border: 0;
   border-radius: var(--control-r-md);
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--field-line);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--faint);
   cursor: pointer;
   text-align: left;
@@ -5175,12 +4736,23 @@ button.drive-where:focus-visible {
 .sidebar__jump-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   margin-top: -8px;
 }
+/* The same 40px tile as the field beside it (a bare icon looked smaller than the field). */
 .sidebar__collapse.ac-btn {
   flex: none;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--control-r-md);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
+}
+.sidebar__collapse.ac-btn:hover {
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .sidebar {
@@ -5204,15 +4776,7 @@ button.drive-where:focus-visible {
   letter-spacing: var(--track-tight);
 }
 
-/* "Lembrete" next to the agent's name on a reminder message. */
-/* A routine's message: one line saying whom it called; its instructions open on demand. */
-.msg-routine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin: 2px 0 0;
-}
+/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
 .msg-reminder {
   display: inline-flex;
   align-items: center;
@@ -5240,14 +4804,10 @@ button.drive-where:focus-visible {
   align-self: flex-start;
 }
 .sandbox-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   color: var(--ink);
 }
 .sandbox-warning .ac-icon {
-  flex: none;
   color: var(--warn);
 }
 
@@ -5272,6 +4832,7 @@ button.drive-where:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .live-code-toggle__btn:hover {
@@ -5700,53 +5261,40 @@ button.drive-where:focus-visible {
   }
 }
 
-/* Live work in a reply: narration lines and tool calls, stacked like a mini timeline. */
-.live-work {
+/* What a reply said and read before its first tool call (its tools go in the ToolBlock, ToolCalls.tsx). */
+.live-work-notes {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 2px 0 6px;
-  padding-left: 12px;
-  border-left: 2px solid var(--line);
 }
 .live-work__say {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
 }
-.live-call {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* A call's logo in the tool block: the connector's mark or one of our icons, a 20px tile (18px in its head). */
+.ac-tools .connector-icon,
+.tool-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 1;
 }
-.live-call__head {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  margin: 0;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: var(--radius-item);
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink2);
-  cursor: pointer;
-}
-button.live-call__head:hover {
-  background: var(--plate);
-}
-.live-call__head:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-call__head--static {
-  cursor: default;
+.tool-logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
 }
-.live-call__head .ac-icon {
-  color: var(--faint);
+.ac-tools__logos .connector-icon,
+.ac-tools__logos .tool-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
 }
 /* "Parar": a small round icon button (stop square in a circle); a danger tint only on hover. */
 .run-status {
@@ -5813,6 +5361,7 @@ button.live-call__head:hover {
   font: inherit;
   font-size: 12.5px;
   font-weight: 650;
+  line-height: normal;
   color: var(--ink);
   cursor: pointer;
   transition: transform 0.18s var(--spring);
@@ -5840,10 +5389,8 @@ button.live-call__head:hover {
   color: var(--ink2);
   font-weight: 600;
 }
-/* "Leu seu recado · …" inside the work: a well, like the prototype's mark. */
+/* "Leu seu recado · …" inside the work: a well, like the design's mark. */
 .live-work__steer {
-  display: flex;
-  align-items: center;
   gap: 7px;
   width: max-content;
   max-width: 100%;
@@ -5873,14 +5420,13 @@ button.live-call__head:hover {
 }
 /* Editing a routine still read in UTC: a quiet hint under the zone. */
 .routine-utc-hint {
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   margin: -4px 0 0;
   color: var(--ink2);
 }
-/* The activity bar while someone works: a compact glass pill (avatar · words · dots | Parar). */
+/* The activity bar while someone works: a compact pill (avatar · words · dots | Parar). Solid: a blur
+   here would redo itself on every frame of the streaming text behind it. */
 .ac-typing[data-active="true"] {
   width: fit-content;
   max-width: 100%;
@@ -5889,13 +5435,6 @@ button.live-call__head:hover {
   border-radius: var(--radius-full);
   background: var(--glass-solid);
   box-shadow: var(--e1), var(--top);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .ac-typing[data-active="true"] {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(14px) saturate(1.5);
-    backdrop-filter: blur(14px) saturate(1.5);
-  }
 }
 /* An agent in its browser: the whole pill opens the live view; "No navegador" says so. */
 .ac-typing[data-browser="true"] {
@@ -5916,847 +5455,7 @@ button.live-call__head:hover {
   white-space: nowrap;
 }
 
-/* ── Calendário (v2): header, views, side panel ── */
-.cal-page {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: var(--bg);
-}
-.cal-page__header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  padding: 16px 20px 12px;
-}
-.cal-page__title {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  min-width: 0;
-  margin-right: 4px;
-}
-.cal-page__title .page-title {
-  margin: 0;
-}
-.cal-page__range {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink2);
-}
-.cal-page__spacer {
-  flex: 1 1 0;
-}
-.cal-page__new .ac-kbd {
-  margin-left: 6px;
-  background: color-mix(in srgb, currentColor 16%, transparent);
-  color: inherit;
-  box-shadow: none;
-}
-/* Compact buttons on a track: corners stay concentric (button radius + the 2px inset). */
-.cal-nav {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: calc(var(--control-r-sm) + 2px);
-  background: var(--sunken);
-}
-.cal-page__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  padding: 0 20px 16px;
-}
-.cal-page[data-panel] .cal-page__body {
-  grid-template-columns: minmax(0, 1fr) 272px;
-}
-.cal-page__main {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Week / day grid */
-.cal-week {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  overflow: hidden;
-}
-.cal-week__head,
-.cal-week__bars,
-.cal-week__body {
-  display: grid;
-  grid-template-columns: var(--gutter, 48px) repeat(var(--cols), minmax(0, 1fr));
-}
-.cal-week__head {
-  border-bottom: 1px solid var(--line);
-}
-.cal-week__gutter {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
-  font-size: 11px;
-}
-.cal-week__day {
-  display: flex;
-  justify-content: center;
-  padding: 8px 4px;
-}
-.cal-week__daybtn {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  border: 0;
-  padding: 2px 6px;
-  border-radius: var(--radius-item);
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  cursor: pointer;
-}
-.cal-week__daybtn:focus-visible {
-  outline: none;
-  box-shadow: var(--field-ring);
-}
-.cal-week__dow {
-  font-size: 11.5px;
-  text-transform: capitalize;
-}
-.cal-week__num {
-  display: inline-grid;
-  place-items: center;
-  min-width: 30px;
-  height: 30px;
-  padding: 0 6px;
-  border-radius: var(--radius-full);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.cal-week__daybtn[aria-pressed="true"] .cal-week__num {
-  box-shadow: inset 0 0 0 1.5px var(--line2);
-}
-.cal-week__day[data-today] .cal-week__num {
-  background: var(--ink);
-  color: var(--bg);
-  box-shadow: none;
-}
-.cal-week__bars {
-  border-bottom: 1px solid var(--line);
-  padding: 4px 0;
-}
-.cal-week__barlane {
-  grid-column: 2 / -1;
-  display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  grid-auto-rows: 24px;
-  gap: 2px 0;
-}
-.cal-week__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.cal-week__body {
-  position: relative;
-}
-.cal-week__hours {
-  display: flex;
-  flex-direction: column;
-}
-.cal-week__hour {
-  position: relative;
-  height: var(--hour-px);
-}
-/* Centered on its hour line, never wrapping. */
-.cal-week__hour-label {
-  position: absolute;
-  top: 0;
-  right: 6px;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  font-size: 11px;
-  line-height: 1;
-  color: var(--muted);
-}
-.cal-week__col {
-  position: relative;
-  height: calc(var(--hour-px) * 24);
-  border-left: 1px solid var(--line);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--hour-px) - 1px),
-    var(--line) calc(var(--hour-px) - 1px),
-    var(--line) var(--hour-px)
-  );
-  cursor: crosshair;
-  touch-action: pan-y;
-}
-.cal-week__col[data-today] {
-  background-color: var(--plate-soft);
-}
-.cal-week__ghost {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  border-radius: var(--radius-item);
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  box-shadow: inset 0 0 0 1.5px var(--ink2);
-  pointer-events: none;
-}
-.cal-week__now {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--danger);
-  pointer-events: none;
-  z-index: 2;
-}
-.cal-week__now::before {
-  content: "";
-  position: absolute;
-  left: -5px;
-  top: -4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--danger);
-}
-.cal-week__empty {
-  position: absolute;
-  left: var(--gutter, 48px);
-  right: 0;
-  top: calc(var(--hour-px) * 10);
-  margin: 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-/* Items: neutral cards, a left color by source */
-.cal-chip {
-  --cal-accent: var(--ink2);
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-  border: 0;
-  border-radius: var(--radius-item);
-  background: var(--raised);
-  box-shadow:
-    inset 3px 0 0 var(--cal-accent),
-    var(--e1);
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-}
-.cal-chip[data-source="person"] {
-  --cal-accent: var(--ink2);
-}
-.cal-chip[data-source="routine"] {
-  --cal-accent: var(--line2);
-  background: var(--sunken);
-  color: var(--ink2);
-  box-shadow: inset 3px 0 0 var(--cal-accent);
-}
-.cal-chip[data-source="deadline"] {
-  --cal-accent: var(--warn);
-}
-.cal-chip:hover {
-  box-shadow:
-    inset 3px 0 0 var(--cal-accent),
-    var(--e2);
-}
-.cal-chip[aria-pressed="true"] {
-  background: var(--chosen-bg);
-  box-shadow:
-    inset 3px 0 0 var(--cal-accent),
-    var(--chosen-shadow);
-  transform: var(--chosen-lift);
-}
-.cal-chip:focus-visible {
-  outline: none;
-  box-shadow:
-    inset 3px 0 0 var(--cal-accent),
-    var(--field-ring);
-}
-.cal-chip--block {
-  position: absolute;
-  padding: 4px 6px 4px 9px;
-  touch-action: none;
-  z-index: 1;
-}
-.cal-chip--bar {
-  align-items: center;
-  margin: 0 2px;
-  padding: 0 6px 0 9px;
-  height: 22px;
-}
-.cal-chip--line {
-  align-items: center;
-  width: 100%;
-  padding: 2px 6px 2px 9px;
-  min-height: 22px;
-  font-size: 12px;
-  box-shadow: inset 3px 0 0 var(--cal-accent);
-  background: transparent;
-}
-.cal-chip--line:hover {
-  background: var(--plate-soft);
-  box-shadow: inset 3px 0 0 var(--cal-accent);
-}
-.cal-chip--skeleton {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  pointer-events: none;
-}
-.cal-chip__avatar {
-  flex: none;
-  margin-top: 1px;
-}
-.cal-chip__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.cal-chip--line .cal-chip__text {
-  flex-direction: row-reverse;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.cal-chip__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.cal-chip__time {
-  font-size: 11.5px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.cal-chip__repeat {
-  flex: none;
-  margin-top: 2px;
-  color: var(--muted);
-}
-.cal-chip__resize {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 6px;
-  cursor: ns-resize;
-}
-/* Routine runs as pixel marks (RunMarks): a quiet button, in the flow by default */
-.cal-marks {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 2px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  cursor: pointer;
-}
-.cal-marks__pixels {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-}
-.cal-marks__text {
-  font-size: 12px;
-  color: var(--muted);
-}
-.cal-marks:hover,
-.cal-marks[aria-pressed="true"] {
-  background: var(--plate-soft);
-}
-.cal-marks:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.cal-marks__more {
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 600;
-}
-/* In the day/week grid: their own lane on the column's right (events end before it), stacked down from the run's time */
-.cal-week__marks {
-  position: absolute;
-  right: 0;
-  z-index: 2;
-  width: 16px;
-  justify-content: center;
-}
-.cal-week__marks .cal-marks__pixels {
-  flex-direction: column;
-}
-/* In a month cell: one row under the events */
-.cal-month__marks {
-  padding: 3px 4px;
-}
-.cal-month__marks .cal-marks__pixels {
-  flex-wrap: nowrap;
-}
-/* In the agenda: one quiet line among the events */
-.cal-agenda__marks {
-  padding: 4px 6px;
-}
-.cal-runs {
-  list-style: none;
-  margin: 2px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.cal-runs__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-.cal-runs__avatar {
-  flex: none;
-  margin-top: 1px;
-}
-.cal-runs__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.cal-runs__name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.cal-runs__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  margin-top: 2px;
-}
-
-/* Routines that run often: one lane each, as on the Rotinas horizon */
-.cal-week__bars--routines {
-  padding: 0;
-}
-/* The day columns run through the routines too, so each line sits under its days. */
-.cal-week__bars--routines .cal-week__barlane {
-  grid-auto-rows: auto;
-  row-gap: 0;
-  padding: 6px 0;
-  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px);
-  background-size: calc(100% / var(--cols)) 100%;
-}
-.cal-week__gutter--top {
-  align-items: flex-start;
-  padding-top: 12px;
-}
-.cal-band {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  margin: 0;
-  padding: 3px 0 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.cal-band:hover,
-.cal-band[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--sunken) 50%, transparent);
-}
-.cal-band:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.cal-band__label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 20px;
-  padding: 0 10px;
-}
-.cal-band__label b {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-}
-.cal-band:hover .cal-band__label b {
-  color: var(--ink);
-}
-.cal-band__cadence {
-  flex: none;
-  font-size: 12px;
-  color: var(--faint);
-  white-space: nowrap;
-}
-.cal-band__track {
-  position: relative;
-  display: block;
-  height: 30px;
-}
-
-/* Details popover */
-.cal-pop.ac-popover {
-  width: min(320px, 90vw);
-  padding: 14px;
-}
-.cal-details {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.cal-details .ac-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.cal-details__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.cal-details__row {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  overflow-wrap: anywhere;
-}
-.cal-details__people {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-}
-.cal-details__actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-.cal-details__actions .ac-link {
-  margin-right: auto;
-}
-
-/* Month */
-.cal-month {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  overflow: hidden;
-}
-.cal-month__head,
-.cal-month__grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-.cal-month__head span {
-  padding: 8px;
-  text-transform: capitalize;
-}
-.cal-month__grid {
-  flex: 1 1 auto;
-  grid-auto-rows: minmax(96px, 1fr);
-  border-top: 1px solid var(--line);
-}
-.cal-month__cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 4px;
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.cal-month__cell:nth-child(7n) {
-  border-right: 0;
-}
-.cal-month__cell[data-other] {
-  background: color-mix(in srgb, var(--sunken) 50%, transparent);
-}
-.cal-month__cell[data-other] .cal-month__num {
-  color: var(--faint);
-}
-.cal-month__num {
-  align-self: flex-start;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--ink2);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.cal-month__num[aria-pressed="true"] {
-  box-shadow: inset 0 0 0 1.5px var(--line2);
-}
-.cal-month__cell[data-today] .cal-month__num {
-  background: var(--ink);
-  color: var(--bg);
-}
-.cal-month__more {
-  align-self: flex-start;
-  border: 0;
-  padding: 2px 6px;
-  border-radius: var(--radius-item);
-  background: transparent;
-  color: var(--ink2);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.cal-month__more:hover {
-  background: var(--plate-soft);
-}
-.cal-more.ac-popover {
-  width: 260px;
-  padding: 10px;
-}
-.cal-more__title {
-  margin: 0 0 6px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.cal-more__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Agenda */
-.cal-agenda {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-}
-.cal-agenda__day {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1);
-}
-.cal-agenda__date {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0;
-  font-size: inherit;
-  font-weight: inherit;
-}
-.cal-agenda__num {
-  font-size: 18px;
-  font-weight: 600;
-}
-.cal-agenda__date[data-today] .cal-agenda__num {
-  display: inline-grid;
-  place-items: center;
-  min-width: 30px;
-  height: 30px;
-  border-radius: var(--radius-full);
-  background: var(--ink);
-  color: var(--bg);
-}
-.cal-agenda__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.cal-agenda__empty {
-  margin: 48px auto;
-  text-align: center;
-}
-
-/* Side panel */
-.cal-side {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 2px 2px 12px;
-}
-.cal-side__section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cal-side__title {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.cal-side__note {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--faint);
-}
-.cal-mini__head {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.cal-mini__title {
-  flex: 1;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.cal-mini__grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  margin-top: 4px;
-}
-.cal-mini__dow {
-  text-align: center;
-  font-size: 11px;
-  color: var(--faint);
-  text-transform: uppercase;
-}
-.cal-mini__day {
-  height: 30px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--ink2);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.cal-mini__day:hover {
-  background: var(--plate-soft);
-}
-.cal-mini__day[data-other] {
-  color: var(--faint);
-}
-.cal-mini__day[data-busy] {
-  font-weight: 700;
-  color: var(--ink);
-}
-.cal-mini__day[aria-pressed="true"] {
-  background: var(--chosen-bg);
-  box-shadow: var(--chosen-shadow);
-}
-.cal-mini__day[data-today] {
-  background: var(--ink);
-  color: var(--bg);
-}
-.cal-mini__day:focus-visible {
-  outline: none;
-  box-shadow: var(--field-ring);
-}
-.cal-upcoming {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-/* Series prompt and the event form */
-.cal-series {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 24px 8px;
-}
-.cal-series__option.ac-btn {
-  justify-content: flex-start;
-}
-.cal-form__switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ink2);
-  cursor: pointer;
-}
-.cal-form__when {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
-}
-.cal-form__repeat {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-@media (max-width: 640px) {
-  .cal-page__header,
-  .cal-page__body {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .cal-agenda__day {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .cal-form__when {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* ── Calendário: pages/calendar.css ── */
 
 /* The sidebar never gets crushed by a wide page: full width, or an icon rail (`data-rail`: tablets, or the person shrank it). */
 .sidebar {
@@ -6811,7 +5510,7 @@ button.live-call__head:hover {
   padding: 0;
   gap: 0;
 }
-/* The bell's badge bumps when a notification arrives (telas/Notificacoes.html). */
+/* The bell's badge bumps when a notification arrives. */
 .sidebar__bump {
   animation: sidebar-bump 0.5s var(--spring);
 }
@@ -6980,6 +5679,11 @@ button.live-call__head:hover {
 .members-stack:hover {
   background: var(--plate-soft);
 }
+/* In a row of actions its faces are what shows: its plate reaches into the gap, as a ghost button's does. */
+.ac-acts > .members-stack {
+  padding-right: var(--ghost-plate);
+  margin-right: calc(-1 * var(--ghost-plate));
+}
 .members-stack:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
@@ -7083,7 +5787,7 @@ button.live-call__head:hover {
   color: var(--muted);
 }
 
-/* ---------- The pixel sky in the app (docs/design/telas/CeuNoApp.html) ----------
+/* ---------- The pixel sky in the app ----------
  * The sky is the agents' world: the same blue in both themes, ink on it is
  * the deep sky ink. It shows only where the subject is the agents. */
 :root {
@@ -7221,21 +5925,14 @@ button.live-call__head:hover {
   text-shadow: 0 1px 6px rgba(4, 32, 63, 0.6);
 }
 
-/* Sidebar: the workspace's little sky, working agents, the horizon */
+/* Sidebar: the workspace's header, working agents, the horizon */
 .sidebar__org {
   position: relative;
   overflow: hidden;
-  min-height: 56px;
-  /* The whole card is the menu button: no inset, so every pixel of it opens the menu. */
+  min-height: 48px;
+  /* The whole header is the menu button: no inset, so every pixel of it opens the menu. */
   padding: 0;
-  border-radius: 14px;
-  /* The sky is light tones faded from this surface, so the text keeps the theme's own ink. */
-  border: 1px solid var(--line);
-  background: var(--sunken);
   color: var(--ink);
-}
-.sidebar__org > :not(.ac-sky) {
-  position: relative;
 }
 .sidebar__org .sidebar__org-button,
 .sidebar__org .sidebar__org-button > .ac-icon,
@@ -7244,7 +5941,7 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button {
   align-self: stretch;
-  padding: 8px 12px 8px 10px;
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
 .sidebar__org .sidebar__org-meta {
@@ -7252,13 +5949,17 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button:hover,
 .sidebar__org .ac-btn:hover {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--plate);
 }
 .sidebar__item[data-busy="true"] {
   position: relative;
   overflow: hidden;
 }
-.sidebar__item[data-busy="true"] > :not(.sidebar__trail):not(.sidebar__glow) {
+/*
+ * Above the trail and the glow. Zero specificity (`:where`): the collapsed rail hides the name with
+ * `position: absolute`, and this must not bring it back into the row (it pushed the avatar off center).
+ */
+.sidebar__item[data-busy="true"] > :where(:not(.sidebar__trail, .sidebar__glow)) {
   position: relative;
 }
 .sidebar__trail,
@@ -7289,21 +5990,38 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
-/* The whole card is the account button (no inner margin it doesn't answer to). */
+/*
+ * The workspace's sky (Sky.tsx WorkspaceSky): behind the header, from the sidebar's top edge to the header's
+ * foot (16px of the sidebar's padding + the 48px header), edge to edge but for the hairline against the page.
+ */
+.sidebar__top {
+  position: relative;
+  isolation: isolate;
+}
+.workspace-sky {
+  position: absolute;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.workspace-sky--side {
+  top: -16px;
+  left: -12px;
+  right: -11px;
+  height: 64px;
+}
+/* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
   border-radius: 12px;
-  background: var(--glass-solid);
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 8px 20px -12px rgba(0, 0, 0, 0.35);
 }
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .sidebar__me,
-  .sidebar__busy {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-  }
+.sidebar__me > .sidebar__user:hover {
+  background: var(--plate);
+}
+/* "Criar agente": a plain row (a ghost button), not a raised one. */
+.sidebar__create.ac-btn {
+  justify-content: flex-start;
+  color: var(--ink2);
+  font-weight: 500;
 }
 .sidebar[data-rail="true"] .sidebar__org {
   min-height: 0;
@@ -7548,9 +6266,16 @@ button.live-call__head:hover {
     display: none;
   }
 }
-/* The computer's portrait (IconesComputador.html) sits on the surface, no tile. */
+/* The computer's portrait sits on the surface, no tile. */
 .machine-row__icon {
   flex: none;
+}
+/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. The drawing
+   starts at the row's edge like any other lead: centred, the narrow tower would leave a gap before it. */
+.machine-row__pic {
+  display: flex;
+  flex: none;
+  width: 48px;
 }
 .machine-row__name {
   font-weight: 600;
@@ -7565,26 +6290,32 @@ button.live-call__head:hover {
   font-size: 12.5px;
   word-break: break-all;
 }
-/* A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the corner. */
+/*
+ * A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the
+ * corner, beside the code rather than over it, so a command wider than a phone never runs under it.
+ */
 .machine-command {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
   border-radius: var(--control-r-md);
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .machine-command__code {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  padding: 10px 44px 10px 12px;
+  padding: 10px 8px 10px 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
   scrollbar-width: thin;
 }
 .machine-command__copy {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  flex: none;
+  margin: 4px 4px 0 0;
 }
 .machine-pair__steps {
   display: flex;
@@ -7612,6 +6343,33 @@ button.live-call__head:hover {
   gap: 8px;
   margin: 0;
   font-weight: 600;
+}
+/* Abrir no celular: the QR code stays dark on white in both themes (cameras read that best), then the steps. */
+.phone-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.phone-code__qr {
+  width: 216px;
+  height: 216px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr[data-loading] {
+  display: grid;
+  place-items: center;
+}
+.phone-code__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.phone-code .machine-pair__steps {
+  align-self: stretch;
 }
 a.machine-row__name:hover {
   text-decoration: underline;
@@ -7666,6 +6424,10 @@ a.machine-row__name:hover {
   gap: 8px;
   min-width: 0;
 }
+/* "SHA-256" and its ⓘ keep their width: the hash gives way. */
+.machine-connect__sha > .ac-hintline {
+  flex: none;
+}
 .machine-connect__hash {
   flex: 1;
   min-width: 0;
@@ -7677,100 +6439,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores (Computadores.html): the two kinds, the cloud card, your computers, each agent's. */
-.computers-kinds {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-@media (max-width: 900px) {
-  .computers-kinds {
-    grid-template-columns: 1fr;
-  }
-}
-.computers-kind {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-/* Runs to the card's edges (no white frame around it), fading into the card below. */
-.computers-kind__pic {
-  display: flex;
-  justify-content: center;
-  margin: -20px -20px 0;
-  padding: 26px 0 2px;
-  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
-  background: linear-gradient(180deg, var(--plate), transparent);
-}
-.computers-kind__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 300;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.computers-kind__points {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--ink2);
-  font-size: 13.5px;
-}
-.computers-kind__points li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.computers-kind__points .ac-icon {
-  margin-top: 3px;
-  color: var(--ok);
-}
-.computers-kind__head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-/* The numbers behind the ⓘ: one line each, the icon then the count. */
-.computers-kind__info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 8px;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink2);
-}
-.computers-kind__info li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.computers-kind__info .ac-icon {
-  color: var(--muted);
-}
-.computers-kind__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-height: 44px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.computers-kind__foot > .ac-btn {
-  flex: none;
-}
+/* Configurações → Computadores: the cloud card, your computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -7784,19 +6453,104 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
-.computers-note {
+/* The workspace's computer on its cards (here and on the setup's Computer step): its drawing, not its box, takes its
+   row, so the drawing starts on the card's padding line, as far from the card's top as its words from the other edges,
+   and the words beside it centre on the drawing. */
+.setup-card .computers-card__head > .ac-computer,
+.onb__workspace-computer .ac-computer {
+  margin-block: calc(-1 * var(--art-top)) calc(-1 * var(--art-bottom));
+}
+/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
+.setup-progress {
+  margin: 0;
+}
+.setup-progress--line {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/* The wait in words: the time left, then who hears when it's ready, the size. */
+.setup-wait {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-eta {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.setup-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/*
+ * One edge for the wait's words, its icons hanging in a column before it (an icon line's 14 px icon and 8 px gap): the
+ * steps' bar, the step and the time left start where the icon lines' words do, in the computer's window, on setup's
+ * Computer step and on Settings › Computers. Wrapped, a line keeps its phrases whole: the step's own words where they
+ * fit, the rest by the copy's no-break spaces.
+ */
+:is(.setup-wait, .setup-card) > :is(.setup-progress:not(.ac-iconline), .setup-eta) {
+  margin-left: 22px;
+}
+:is(.setup-wait, .setup-card) > * {
+  text-wrap: pretty;
+}
+/*
+ * A problem's line ends on a phrase its no-break spaces keep whole ("We're on it."): `pretty` would take it for a
+ * short last line and pull the sentence before's last word under it, so this line wraps plainly.
+ */
+:is(.setup-wait, .setup-card) > .setup-progress--line[data-phase="problem"] {
+  text-wrap: wrap;
+}
+.setup-progress .ac-eyebrow > span {
+  display: inline-block;
+}
+/* Settings › Computers' card: its last line's baseline as far over its foot as its drawing starts under its top. */
+.setup-card > p:last-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+@supports (top: 1lh) {
+  .setup-card > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
+.hold-banner .outage__text {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  white-space: normal;
+}
+/* Where to write for help: the address reads as part of the sentence. */
+.support-line a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
+.suspended-page .support-line {
+  display: block;
+  margin-top: 6px;
+}
+.suspended-page__others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.suspended-page__others > h2 {
+  flex-basis: 100%;
+}
+.computers-note {
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--plate);
   color: var(--ink-muted);
-}
-.computers-note .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .computers-empty {
   display: flex;
@@ -7839,7 +6593,7 @@ a.machine-row__name:hover {
   font-size: 12.5px;
 }
 
-/* The computer page (PastasComputador.html, view "computer"). */
+/* The computer page. */
 .machine-page__back {
   align-self: flex-start;
 }
@@ -7856,17 +6610,14 @@ a.machine-row__name:hover {
   min-width: 0;
   gap: 6px;
 }
-/* The facts line up under the name, past the portrait (96px + the 18px gap). */
+/*
+ * The facts start at the card's edge, under the portrait, as on Configurações → Computadores: a portrait is as wide
+ * as its drawing (a tower half a laptop's), so an indent past it lines up with nothing.
+ */
 .machine-page__facts {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-left: 114px;
-}
-@media (max-width: 640px) {
-  .machine-page__facts {
-    padding-left: 0;
-  }
 }
 /* Agents using the computer: one row each (face, name, what it may use), to its page. */
 .machine-page__agents {
@@ -7876,7 +6627,16 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
+.machine-page__agent-row {
+  display: flex;
+  align-items: center;
+}
+.machine-page__agent-row + .machine-page__agent-row {
+  border-top: 1px solid var(--line);
+}
 .machine-page__agent {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -7885,8 +6645,9 @@ a.machine-row__name:hover {
   text-decoration: none;
   transition: background 0.12s;
 }
-.machine-page__agent + .machine-page__agent {
-  border-top: 1px solid var(--line);
+.machine-page__screen {
+  flex: none;
+  margin-right: 10px;
 }
 .machine-page__agent:hover {
   background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
@@ -7983,7 +6744,7 @@ a.machine-row__name:hover {
   text-underline-offset: 2px;
 }
 
-/* ---------- Onboarding (docs/design/telas/OnboardingEtapas.html) ----------
+/* ---------- Onboarding ----------
  * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
  * on top for the progress and the sky as a horizon at its bottom; on the right,
  * one calm screen per step hosted by an agent of the team. */
@@ -8029,13 +6790,13 @@ a.machine-row__name:hover {
 .onb__steps li {
   position: relative;
 }
-/* The thread joining the markers, filled up to where you are. */
+/* The thread joining the markers, filled up to where you are: 4px from each, the markers centred in 52px steps. */
 .onb__steps li:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 21px;
-  top: 40px;
-  bottom: -8px;
+  top: 42px;
+  bottom: -10px;
   width: 2px;
   border-radius: 1px;
   background: var(--line2);
@@ -8127,241 +6888,7 @@ a.machine-row__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Progress at the top of the rail: a line of text over a strip of pixel sky. */
-.onb__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0 10px;
-}
-.onb__progress-text {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.onb__progress-count {
-  font-weight: 500;
-  color: var(--faint);
-}
-.onb__progress-sky {
-  position: relative;
-  display: block;
-  height: 27px;
-  overflow: hidden;
-  border-radius: 9px 9px 9px 3px;
-  background: var(--sunken);
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    var(--e1);
-}
-.onb__progress-sky .ac-sky {
-  position: absolute;
-  inset: 0;
-}
-.onb__main {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-/* One calm column per step, centered: the host asks, the answer, one big action. */
-.onb__body {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  width: 100%;
-  max-width: 600px;
-  margin: auto 0;
-  padding: 48px clamp(16px, 4vw, 32px) 64px;
-  animation: onb-in 0.36s var(--out) both;
-}
-@keyframes onb-in {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.onb__back {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  margin: -16px 0 -8px -8px;
-  padding: 0 10px 0 6px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--faint);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.onb__back:hover:not(:disabled) {
-  background: var(--plate);
-  color: var(--ink);
-}
-.onb__back:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.onb__ask {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
-.onb__host {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 2px;
-}
-/* A host agent that just arrived pops in. */
-.onb__host[data-fresh] .ac-avatar {
-  animation: onb-pop 0.5s var(--spring) both;
-}
-@keyframes onb-pop {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.onb__host-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--faint);
-}
-.onb__bubble {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  padding: 16px 20px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
-  box-shadow: var(--card-shadow);
-  animation: onb-in 0.3s var(--out) 0.08s both;
-}
-.onb__intro {
-  margin: 0 0 4px;
-  font-size: 14px;
-  color: var(--muted);
-}
-.onb__ask .onb__title {
-  font-family: inherit;
-  font-size: 21px;
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-}
-.onb__ask .onb__lead {
-  margin-top: 4px;
-  font-size: 14px;
-}
-.onb__answer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: onb-in 0.36s var(--out) 0.12s both;
-}
-.onb__ws {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.onb__big.ac-input {
-  height: var(--control-h-lg);
-  font-size: 17px;
-}
-textarea.onb__big.ac-input {
-  height: auto;
-  font-size: 16px;
-  line-height: 1.5;
-}
-.onb__help {
-  margin: 0;
-  padding: 0 4px;
-  font-size: 13px;
-  color: var(--faint);
-}
-.onb__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.onb__link:hover {
-  color: var(--ink);
-  text-decoration-color: currentColor;
-}
-.onb__starters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.onb__starter {
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--line2);
-}
-.onb__money {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
-  color: var(--muted);
-  font-size: 14px;
-}
-.onb__money[data-invalid] {
-  box-shadow:
-    var(--card-well-shadow),
-    0 0 0 1px var(--danger);
-}
-.onb__money input {
-  width: 48px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 650;
-  text-align: right;
-  outline: none;
-}
-/* The step's action: one big button; "Pular esta etapa" right under it. */
-.onb__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  animation: onb-in 0.36s var(--out) 0.16s both;
-}
-.onb__actions > .ac-btn--ghost {
-  align-self: center;
-}
+/* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
   display: flex;
   flex-direction: column;
@@ -8376,12 +6903,17 @@ textarea.onb__big.ac-input {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* The step title's type, also read by the line that sets its ⓘ (new-agent.css). */
+:root {
+  --onb-title-size: clamp(30px, 4vw, 42px);
+  --onb-title-leading: 1.08;
+}
 .onb__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(30px, 4vw, 42px);
-  line-height: 1.08;
+  font-weight: var(--font-display-weight, 300);
+  font-size: var(--onb-title-size);
+  line-height: var(--onb-title-leading);
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
@@ -8390,296 +6922,14 @@ textarea.onb__big.ac-input {
   max-width: 62ch;
   color: var(--muted);
 }
-.onb__label {
-  font-size: 13px;
-  font-weight: 600;
-}
-.onb__error {
-  color: var(--danger);
-}
-.onb__logo {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1.5px dashed var(--line2);
-  border-radius: 16px 16px 16px 4px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  overflow: hidden;
-}
-.onb__logo:hover {
-  background: var(--plate);
-}
-.onb__logo:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.onb__logo-letter {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(180deg, #4b93ff, #2b74e6);
-  color: #fff;
-  font-size: 22px;
-  font-weight: 700;
-}
-.onb__choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-  gap: 10px;
-}
-.onb__choice {
-  position: relative;
-  padding: 16px;
-  gap: 6px;
-}
-.onb__choice[aria-disabled="true"] {
-  cursor: default;
-  opacity: 0.6;
-}
-.onb__tag {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--plate);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-.onb__ic {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 4px;
-  border-radius: 12px 12px 12px 4px;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-/* The computer step's portraits (IconesComputador.html), on the card. */
-.onb__art {
-  display: block;
-  margin-bottom: 4px;
-}
-.onb__status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
-  overflow-wrap: anywhere;
-}
-/* Import step: the source's mark, the drop zone, what was found and what stays behind. */
-.onb__source-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  object-fit: contain;
-}
-.onb__drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 26px 16px;
-  border: 1.5px dashed var(--line2);
-  border-radius: var(--radius-lg);
-  background: var(--field-bg);
-  color: var(--ink);
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    background-color 0.15s,
-    border-color 0.15s;
-}
-.onb__drop[data-over],
-.onb__drop:hover {
-  border-color: var(--line-strong);
-  background: var(--raised);
-}
-.onb__drop:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.onb__note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-.onb__note svg {
-  flex: none;
-  margin-top: 2px;
-}
-.onb__import-file {
-  font-size: 15px;
-  overflow-wrap: anywhere;
-}
-.onb__group {
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.onb__found,
-.onb__left-out {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.onb__found-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 6px;
-  border-radius: 12px;
-}
-.onb__found-row:hover {
-  background: var(--plate);
-}
-.onb__found-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  cursor: pointer;
-}
-.onb__left-out {
-  gap: 8px;
-}
-.onb__left-out li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  overflow-wrap: anywhere;
-}
-.onb__emails {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 46px;
-  padding: 8px;
-  border-radius: 12px;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  cursor: text;
-}
-.onb__emails:focus-within {
-  box-shadow:
-    inset 0 0 0 1px var(--line2),
-    var(--field-ring);
-}
-.onb__emails-input {
-  flex: 1;
-  min-width: min(100%, 180px);
-  padding: 4px 6px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  outline: none;
-}
-.onb__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 2px 2px 2px 4px;
-  border-radius: 999px;
-  background: var(--raised);
-  box-shadow: var(--e1);
-  font-size: 13px;
-}
-.onb__chip[data-invalid] {
-  box-shadow: 0 0 0 1px var(--danger);
-}
-.onb__chip-email {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.onb__chip-bad {
-  padding-right: 2px;
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 600;
-}
-.onb__welcome {
-  position: relative;
-  min-height: 220px;
-  padding: 24px;
-  border-radius: 24px;
-  overflow: hidden;
-  background: #2b74e6;
-  color: var(--sky-ink);
-  isolation: isolate;
-}
-.onb__welcome-text {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: fit-content;
-  max-width: 52ch;
-}
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
 }
-.onb__welcome-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 30px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.onb__welcome-lead {
-  margin: 0;
-  color: var(--sky-ink2);
-  font-weight: 500;
-}
-.onb__crew {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-}
-.onb__summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-.onb__summary dd {
-  margin: 0;
-}
-.onb__stat {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 22px;
-  overflow-wrap: anywhere;
-}
-/* Phone: the rail is a compact step bar (numbers only, no guide). */
+/* Phone: the rail is a compact step bar (numbers only, no guide); the page's height left goes to the step. */
 @media (max-width: 760px) {
   .onb {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
   }
   .onb__rail {
     position: relative;
@@ -8695,7 +6945,6 @@ textarea.onb__big.ac-input {
     min-width: 0;
     flex: 1;
   }
-  .onb__progress,
   .onb__horizon {
     display: none;
   }
@@ -8706,11 +6955,22 @@ textarea.onb__big.ac-input {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .onb__step {
     width: auto;
     min-height: 0;
     padding: 4px;
+  }
+  /* The setup's seven steps beside the logo at 390px: 28px steps 3px apart, and 2px around them for the current
+     one's ring, reaching past the strip's edges. Criar agente and the landing's card keep the shared strip. */
+  .onb:not(.newag) .onb__steps {
+    gap: 3px;
+    margin-inline: -2px;
+    padding: 2px;
+  }
+  .onb:not(.newag) .onb__step {
+    padding: 2px;
   }
   .onb__step-text {
     position: absolute;
@@ -8721,16 +6981,15 @@ textarea.onb__big.ac-input {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .onb__body {
-    margin: 0;
-    padding-top: 24px;
-  }
-  .onb__ask .onb__title {
-    font-size: 18px;
+}
+/* Narrower, they fit beside the logo's mark alone. */
+@media (max-width: 384px) {
+  .onb__brand .ac-logo > :not(.ac-logo__mark) {
+    display: none;
   }
 }
 
-/* ---------- Criar agente (docs/design/telas/NovoAgente.html) ----------
+/* ---------- Criar agente ----------
  * The onboarding's shell (`.onb`: the rail on the sidebar surface, its steps
  * and horizon) with a live preview of the agent on the right. The page is the
  * scroll container: the rail, the preview and the bar at the bottom stick. */
@@ -8756,7 +7015,7 @@ textarea.onb__big.ac-input {
 }
 .newag__rail-title b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -8888,8 +7147,6 @@ textarea.onb__big.ac-input {
   font-weight: 500;
 }
 .newag__note {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin: 12px 0 0;
   padding: 12px 14px;
@@ -8897,10 +7154,6 @@ textarea.onb__big.ac-input {
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
-}
-.newag__note svg {
-  flex: none;
-  margin-top: 2px;
 }
 .newag__note b {
   color: var(--ink);
@@ -8910,14 +7163,6 @@ textarea.onb__big.ac-input {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-.newag__chip .connector-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  box-shadow: none;
-  background: transparent;
-  font-size: 8px;
 }
 .newag__pills {
   display: flex;
@@ -8990,14 +7235,10 @@ textarea.onb__big.ac-input {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* An `.ac-faceline` with room above it for the face's hat: the name's capitals at the face's top. */
 .newag__role-top {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
   min-height: 58px;
-}
-.newag__role .newag__role-agent {
-  margin-top: 18px;
+  padding-top: 18px;
 }
 .newag__role-name {
   display: flex;
@@ -9005,7 +7246,7 @@ textarea.onb__big.ac-input {
 }
 .newag__role-name b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -9325,6 +7566,9 @@ textarea.onb__big.ac-input {
   font-size: 15px;
 }
 .newag__model-prov {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   color: var(--faint);
   font-size: 12px;
@@ -9421,6 +7665,7 @@ textarea.onb__big.ac-input {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     transform 0.18s var(--spring),
@@ -9438,352 +7683,7 @@ textarea.onb__big.ac-input {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-/* Review */
-.newag__review {
-  gap: 0;
-  padding: 6px 18px;
-}
-.newag__rv {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-}
-.newag__rv:first-child {
-  border-top: 0;
-}
-.newag__rv-k {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 2px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.newag__rv-v {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.newag__quote {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  color: var(--ink2);
-  font-size: 13.5px;
-  white-space: pre-line;
-}
-/* The preview: the agent, live */
-.newag__aside {
-  position: sticky;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  height: 100dvh;
-  padding: 38px 0 16px;
-  box-sizing: border-box;
-}
-.newag__cap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.newag__pv {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 22px;
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-}
-.newag__pv-cover {
-  position: relative;
-  flex: none;
-  height: 148px;
-  overflow: hidden;
-  isolation: isolate;
-  transition: height 0.45s var(--out);
-}
-.newag__pv[data-big] .newag__pv-cover {
-  height: 236px;
-}
-.newag__pv-cover .newag__pv-agent {
-  position: absolute;
-  left: 50%;
-  bottom: -4px;
-  width: 74px;
-  height: 74px;
-  transform: translateX(-50%);
-}
-.newag__pv[data-big] .newag__pv-agent {
-  bottom: 4px;
-  width: 104px;
-  height: 104px;
-}
-.newag__pv-state {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
-  background: var(--sky-glass);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 0 0 1px var(--sky-line);
-  color: var(--sky-ink);
-  font-size: 11.5px;
-  font-weight: 650;
-}
-.newag__pv-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 14px 16px 16px;
-  overflow: auto;
-}
-.newag__pv-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.newag__pv-name {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.newag__pv-name b {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 26px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-.newag__pv-name b[data-placeholder] {
-  color: var(--faint);
-}
-.newag__pv-name > span {
-  color: var(--muted);
-  font-size: 13px;
-}
-.newag__pv-role {
-  display: none;
-}
-.newag__pv-toggle {
-  display: none;
-}
-.newag__pv-instr {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin: 0;
-  color: var(--ink2);
-  font-size: 13px;
-}
-.newag__pv-sec {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.newag__pv-label {
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.newag__empty {
-  color: var(--faint);
-  font-size: 12.5px;
-}
-.newag__asks {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12.5px;
-}
-/* The created moment: the agent on its own sky */
-.newag--done .newag__main {
-  width: 100%;
-  max-width: 900px;
-  padding: 38px clamp(18px, 3.4vw, 40px) 32px;
-}
-.newag__content--done {
-  max-width: none;
-}
-.newag__born {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 440px;
-  padding: 30px;
-  overflow: hidden;
-  border-radius: 26px;
-  color: var(--sky-ink);
-  isolation: isolate;
-}
-.newag__born-agent {
-  position: absolute;
-  top: 50%;
-  right: 9%;
-  transform: translateY(-58%);
-}
-.newag__born-agent .ac-avatar {
-  width: 150px;
-  height: 150px;
-}
-.newag__born-text {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: fit-content;
-  max-width: 52ch;
-}
-.newag__born-title {
-  margin: 0;
-  max-width: 12ch;
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(34px, 4.4vw, 52px);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-}
-.newag__born-title:focus {
-  outline: none;
-}
-.newag__born-lead {
-  margin: 0;
-  max-width: 40ch;
-  color: var(--sky-ink2);
-  font-weight: 500;
-}
-.newag__born-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-.newag__on-sky.ac-btn {
-  background: var(--sky-glass);
-  color: var(--sky-ink);
-  box-shadow:
-    0 0 0 1px var(--sky-line),
-    0 8px 20px -10px rgba(4, 32, 63, 0.5);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-.newag__on-sky.ac-btn--primary {
-  background: linear-gradient(180deg, #0b2d55, #04203f);
-  color: #eef7ff;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 8px 20px -8px rgba(4, 32, 63, 0.7);
-}
-.newag__nexts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-.newag__next {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px;
-}
-.newag__next b {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-}
-.newag__next span {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-/* Under 1100px the preview is a compact card above the form (details on demand). */
-@media (max-width: 1100px) {
-  .newag__work {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
-  .newag__aside {
-    position: relative;
-    order: -1;
-    height: auto;
-    max-width: 660px;
-    padding: 22px 0 0;
-  }
-  .newag__cap,
-  .newag__pv-state,
-  .newag__pv-wide {
-    display: none;
-  }
-  .newag__main {
-    min-height: 0;
-    padding-top: 20px;
-  }
-  .newag__pv {
-    flex-direction: row;
-    align-items: stretch;
-    border-radius: 20px;
-  }
-  .newag__pv-cover,
-  .newag__pv[data-big] .newag__pv-cover {
-    width: 120px;
-    height: auto;
-    min-height: 76px;
-  }
-  .newag__pv-cover .newag__pv-agent,
-  .newag__pv[data-big] .newag__pv-agent {
-    bottom: -7px;
-    width: 46px;
-    height: 46px;
-  }
-  .newag__pv-body {
-    flex: 1;
-    gap: 8px;
-    padding: 12px 14px;
-  }
-  .newag__pv-body > .newag__pv-sec,
-  .newag__pv-body > .newag__pv-instr {
-    display: none;
-  }
-  .newag__pv[data-open] .newag__pv-body > .newag__pv-sec {
-    display: flex;
-  }
-  .newag__pv[data-open] .newag__pv-body > .newag__pv-instr {
-    display: -webkit-box;
-  }
-  .newag__pv-name b {
-    font-size: 22px;
-  }
-  .newag__pv-role,
-  .newag__pv-toggle {
-    display: inline;
-  }
-  .newag__pv-toggle.ac-btn {
-    display: inline-flex;
-  }
-}
+/* Review, the live preview and the created moment: pages/new-agent.css. */
 /* Under 820px the rail is a step bar on top (only the current step's name). */
 @media (max-width: 820px) {
   .newag {
@@ -9821,6 +7721,7 @@ textarea.onb__big.ac-input {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
     padding: 2px;
   }
@@ -9855,13 +7756,9 @@ textarea.onb__big.ac-input {
     clip: auto;
     white-space: nowrap;
   }
-  .newag__work {
-    padding: 0 16px;
-  }
   .newag__roles,
   .newag__models,
-  .newag__grid2,
-  .newag__nexts {
+  .newag__grid2 {
     grid-template-columns: minmax(0, 1fr);
   }
   .newag__tips {
@@ -9869,6 +7766,7 @@ textarea.onb__big.ac-input {
     margin: 14px -16px 0;
     padding: 2px 16px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .newag__tip {
@@ -9877,30 +7775,6 @@ textarea.onb__big.ac-input {
   }
   .newag__tip span {
     display: none;
-  }
-  .newag__rv {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .newag__rv-k {
-    grid-column: 1 / -1;
-    padding: 0;
-  }
-  .newag__rv-v {
-    grid-column: 1;
-  }
-  .newag__born {
-    min-height: 520px;
-    padding: 22px;
-  }
-  .newag__born-agent {
-    top: 26%;
-    left: 50%;
-    right: auto;
-    transform: translate(-50%, -50%);
-  }
-  .newag__born-agent .ac-avatar {
-    width: 108px;
-    height: 108px;
   }
   .newag__foot {
     bottom: 10px;
@@ -9927,18 +7801,9 @@ textarea.onb__big.ac-input {
   .newag .level-row__choice {
     width: 100%;
   }
-  .newag__pv-cover,
-  .newag__pv[data-big] .newag__pv-cover {
-    width: 92px;
-    min-height: 68px;
-  }
-  .newag--done .newag__main {
-    padding: 20px 16px 24px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .newag__content > *,
-  .newag__pv-cover,
   .newag__role,
   .newag__model,
   .newag__tip,
@@ -9948,23 +7813,6 @@ textarea.onb__big.ac-input {
   .newag__check {
     animation: none;
     transition: none;
-  }
-}
-
-/* Settings → Usage: one agent's spend against its budget (admins only). */
-.usage-agent__meter {
-  flex: 0 0 160px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.usage-agent__meter .ac-meter {
-  flex: 1;
-  height: 6px;
-}
-@media (max-width: 640px) {
-  .usage-agent__meter {
-    flex-basis: 96px;
   }
 }
 
@@ -10000,13 +7848,16 @@ textarea.onb__big.ac-input {
   min-width: 0;
 }
 
-/* ---------- The agent page (docs/design/telas/AgentePerfil.html) ----------
+/* ---------- The agent page ----------
  * The agent alive on its own-color sky, its numbers, sticky tabs, inline
  * editing and one save bar that sticks to the bottom while something is
  * unsaved. Cards stay neutral; only the cover and running states use color. */
 .agp {
+  /* Open sky: the page is the cover's width; what is under it keeps a gutter. */
+  --agp-gutter: 40px;
+  max-width: none;
   gap: 0;
-  padding-bottom: 24px;
+  padding: 0 0 24px;
 }
 .agp-hero {
   display: flex;
@@ -10014,12 +7865,10 @@ textarea.onb__big.ac-input {
 }
 .agp-cover {
   position: relative;
-  height: 128px;
-  border-radius: 24px;
+  height: 176px;
   overflow: hidden;
   isolation: isolate;
   background: var(--sunken);
-  box-shadow: var(--e1);
 }
 .agp-cover__sky {
   position: absolute;
@@ -10031,97 +7880,43 @@ textarea.onb__big.ac-input {
   width: 100%;
   height: 100%;
 }
-/* telas/AgenteTopo.html, D: the agent in the middle, over the cover's edge, cut out by a ring of the page. */
+/* The agent on the cover's left edge, cut out by a ring of the page. */
 .agp-face {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 96px;
-  height: 96px;
-  margin: -48px auto 0;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 var(--agp-gutter);
   /* The avatar's own tile (radius 30%) is the face: the ring follows it. */
   border-radius: 30%;
-  box-shadow:
-    0 0 0 5px var(--bg),
-    var(--e1);
+  box-shadow: 0 0 0 6px var(--bg);
 }
 .agp-face .ac-avatar {
   width: 100%;
   height: 100%;
 }
-/*
- * telas/AgenteFundo.html, B: the agent's page sits on a grayer desk (full page and the panel beside its DM),
- * and who the agent is (cover, face, name, how it works) lives in one white card, so it never blends
- * with the cards of the tabs.
- */
-:root,
-[data-theme="light"] {
-  --agp-desk: #efefec;
-}
-[data-theme="dark"] {
-  --agp-desk: #080807;
-}
-.shell__main:not(.shell__main--chat):has(> .agp),
-.thread-panel--wide {
-  --pane: var(--agp-desk);
-  --bg: var(--agp-desk);
-  --surface: var(--agp-desk);
-}
+/* Who the agent is (cover, face, name) is no card: it sits on the page's own white. */
 .agp-idcard {
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
-  box-shadow: var(--card-shadow);
 }
-/* Concentric with the card. */
-.agp-idcard .agp-cover {
-  border-radius: calc(var(--radius-section) - 8px);
-  box-shadow: none;
-}
-.agp-idcard .agp-face {
-  box-shadow:
-    0 0 0 5px var(--surface-raised),
-    var(--e1);
-}
-.agp-idcard .agp-work {
-  padding-top: 14px;
-}
-/* The three cells are part of the card: a hairline above them, no card of their own. */
-.agp-idcard .agp-workcard {
-  padding: 6px 0 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-/* The tabs as a segmented control under the card, centered; it sticks to the top while the page scrolls. */
-.agp-tabs .ac-tabs--seg {
-  position: sticky;
-  top: 8px;
-  z-index: var(--z-sticky);
-  display: flex;
-  width: max-content;
-  margin: 16px auto 0;
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    inset 0 1px 2px rgba(0, 0, 0, 0.06),
-    0 6px 16px -10px rgba(0, 0, 0, 0.25);
+/* How it works under the name, where the overview's side column is gone (AgentPage: workInAside). */
+.agp-hero__work {
+  padding: 18px var(--agp-gutter) 0;
 }
 .agp-ident {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 10px 4px 0;
-  text-align: center;
+  padding: 12px var(--agp-gutter) 0;
 }
 .agp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 300;
+  font-size: 40px;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.03em;
   overflow-wrap: anywhere;
@@ -10155,7 +7950,7 @@ textarea.onb__big.ac-input {
   color: var(--sky-ink);
 }
 
-/* Como trabalha (telas/AgenteTopo.html, D): three cells in one card, no shadow, a hairline; the numbers below. */
+/* Como trabalha: three cells in one card, no shadow, a hairline; the numbers below. */
 .agp-work {
   display: flex;
   flex-direction: column;
@@ -10163,11 +7958,8 @@ textarea.onb__big.ac-input {
   padding-top: 16px;
 }
 .agp-workcard {
-  padding: 6px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
-  /* Raised off the page (white in light) so it reads as one card. */
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  padding: 4px 0;
+  border-block: 1px solid var(--line);
 }
 .agp-cells {
   display: grid;
@@ -10177,7 +7969,7 @@ textarea.onb__big.ac-input {
   position: relative;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 14px;
-  align-items: center;
+  align-items: start;
   gap: 10px;
   min-width: 0;
   padding: 10px 10px 10px 12px;
@@ -10210,14 +8002,22 @@ textarea.onb__big.ac-input {
   width: 1px;
   background: var(--line);
 }
+/*
+ * The key on its label's 16px line, in the label's type so the capitals are the label's: an icon's middle on their
+ * middle (an `.ac-iconline` lead's place), a logo tile's top at their top (an `.ac-faceline` picture's).
+ */
 .agp-cell__key {
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 10px 10px 10px 3px;
-  background: var(--sunken);
-  color: var(--ink2);
+  color: var(--muted);
+  font-size: 12px;
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+.agp-cell__key:has(> .ac-brand) {
+  translate: 0 calc(8px - var(--cap-top));
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -10262,6 +8062,7 @@ textarea.onb__big.ac-input {
   line-height: 17px;
 }
 .agp-cell__chev {
+  align-self: center;
   color: var(--faint);
 }
 .agp-workcard__foot {
@@ -10304,9 +8105,6 @@ textarea.onb__big.ac-input {
 }
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.4;
@@ -10314,10 +8112,6 @@ textarea.onb__big.ac-input {
 .agp-wdlg__note b {
   color: var(--ink);
   font-weight: 600;
-}
-.agp-wdlg__note > .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .agp-wdlg__link {
   display: inline-flex;
@@ -10340,7 +8134,7 @@ textarea.onb__big.ac-input {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa" (telas/QuemPensa.html "C"): the opened brain's settings full width, a small label above each. */
+/* "Quem pensa": the opened brain's settings full width, a small label above each. */
 .agp-brainfield {
   display: flex;
   flex-direction: column;
@@ -10366,28 +8160,41 @@ textarea.onb__big.ac-input {
 .agp-brainsel .newag__sel-value {
   gap: 10px;
 }
-/* The card's foot: "Se o … desligar, responder pela API" and what it does now, the switch at the end. */
+/*
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ */
 .agp-brainoff {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  min-width: 0;
+  font-size: 13.5px;
   line-height: 1.35;
+}
+.agp-brainoff label {
   cursor: pointer;
 }
 .agp-brainoff b {
-  font-size: 13.5px;
   font-weight: 600;
 }
-.agp-brainoff span {
-  color: var(--muted);
-  font-size: 12.5px;
+/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
+.agp-brainshare {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-/* "Adicionar conta": the provider's own sign-in, in numbered steps. */
+/* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
+.agp-planoffer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
+   sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
+   out of one (an agent's brain, Settings). */
 .agp-addacct {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  text-wrap: pretty;
 }
 .agp-addacct:focus {
   outline: none;
@@ -10402,18 +8209,24 @@ textarea.onb__big.ac-input {
   font-size: 15px;
   font-weight: 650;
 }
+/*
+ * A step (an `.ac-iconline`): its number centred on the title's 14/20 line. Its words take the row and what acts on it
+ * (a button, the wait) goes under them, in their column, at every width: right under the words it answers, never
+ * across the row from them. As far under them as a field is under its title, nearer than the next group.
+ */
 .agp-addacct__step {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px 12px;
+  font-size: 14px;
+  line-height: 20px;
 }
 .agp-addacct__step > i {
-  flex: none;
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
-  margin-top: 1px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
@@ -10432,7 +8245,8 @@ textarea.onb__big.ac-input {
   font-size: 14px;
   font-weight: 600;
 }
-.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code) {
+/* The lines under a title; the title's own line (with its ⓘ) keeps the step's 14/20. */
+.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code):not(.ac-hintline) {
   font-size: 13px;
   line-height: 1.4;
   color: var(--muted);
@@ -10445,9 +8259,11 @@ textarea.onb__big.ac-input {
   gap: 8px;
   margin: 4px 0;
 }
+/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel, in English and in
+   Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 160px;
+  min-width: 102px;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -10465,9 +8281,21 @@ textarea.onb__big.ac-input {
   font-weight: 600;
   color: var(--faint);
 }
-@media (max-width: 640px) {
-  .agp-addacct__step {
-    flex-wrap: wrap;
+.agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - 32px);
+}
+.agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: 32px;
+}
+/* With no number, the words are the step's whole row and the title's capitals are its top. */
+.agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+  flex-basis: 100%;
+  /* Browsers without the lh unit: the step's 20px line. */
+  margin-top: calc(var(--cap-top) - 10px);
+}
+@supports (top: 1lh) {
+  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+    margin-top: calc(var(--cap-top) - 0.5lh);
   }
 }
 
@@ -10476,9 +8304,10 @@ textarea.onb__big.ac-input {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  margin: 14px -8px 0;
-  padding: 0 8px;
+  margin: 18px 0 0;
+  padding: 0 calc(var(--agp-gutter) - 12px);
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(14px);
@@ -10494,6 +8323,13 @@ textarea.onb__big.ac-input {
   gap: 7px;
   height: 48px;
   white-space: nowrap;
+}
+/* Inside the sideways scroller: the tab and its underline stay within it (1px past the edge made it scroll up and down). */
+.agp-tabs .ac-tab {
+  margin-bottom: 0;
+}
+.agp-tabs .ac-tab[data-state="active"]::after {
+  bottom: 0;
 }
 .agp-badge {
   display: inline-flex;
@@ -10515,7 +8351,11 @@ textarea.onb__big.ac-input {
   color: var(--warn);
 }
 .agp-view {
-  padding-top: 22px;
+  /* Room under the tabs before the first card, and the same 16px between whatever a tab stacks. */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px var(--agp-gutter) 0;
   animation: agp-in 0.3s var(--out) both;
 }
 @keyframes agp-in {
@@ -10530,27 +8370,71 @@ textarea.onb__big.ac-input {
 }
 .agp-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   align-items: start;
-  gap: 18px;
+  gap: 24px;
 }
+/* Each section is the root card (hairline, cut corner) on the page: in dark the dense text no longer
+   floats on the near-black, every block has a face of its own. */
 .agp-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
 }
 .agp-card.ac-card {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
-  min-width: 0;
-  --card-pad: 18px;
 }
+/* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {
   box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--card-shadow);
+    var(--card-shadow),
+    inset 2px 0 0 var(--ink);
+}
+/* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
+.agp-aside__work {
+  padding: 20px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
+}
+.agp-aside__h {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.agp-aside .agp-work {
+  padding-top: 0;
+}
+.agp-aside .agp-workcard {
+  padding: 0;
+  border-block: 0;
+  background: none;
+  box-shadow: none;
+}
+.agp-aside .agp-cells {
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 -12px;
+}
+.agp-aside .agp-cell + .agp-cell::before {
+  display: none;
+}
+.agp-aside .agp-workcard__foot {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+}
+.agp-aside .agp-numbers {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.agp-aside .agp-number {
+  font-size: 14px;
+  white-space: normal;
+  text-align: left;
 }
 .agp-changed {
   display: inline-flex;
@@ -10596,8 +8480,6 @@ textarea.onb__big.ac-input {
   white-space: nowrap;
 }
 .agp-readonly {
-  display: flex;
-  align-items: center;
   gap: 10px;
   margin: 0 0 14px;
   padding: 10px 14px;
@@ -10605,9 +8487,6 @@ textarea.onb__big.ac-input {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font-size: 13px;
-}
-.agp-readonly svg {
-  flex: none;
 }
 .agp-ro {
   display: flex;
@@ -10629,16 +8508,10 @@ textarea.onb__big.ac-input {
 }
 .agp-prose {
   margin: 0;
-  color: var(--ink2);
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
-}
-.agp-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 .agp-instructions.ac-input {
   min-height: 300px;
@@ -10662,15 +8535,9 @@ textarea.onb__big.ac-input {
 }
 /* "N ações pedem sua aprovação antes · Ver": one line, the lock on the first line of text. */
 .agp-asks {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   line-height: 20px;
-}
-.agp-asks .ac-icon {
-  flex: none;
-  margin-top: 3px;
 }
 .agp-asks__t {
   min-width: 0;
@@ -10753,10 +8620,8 @@ textarea.onb__big.ac-input {
   flex-direction: column;
   gap: 8px;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the button in the row's middle. */
 .agp-attn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--raised);
@@ -10771,6 +8636,9 @@ textarea.onb__big.ac-input {
 .agp-attn__t b {
   font-weight: 600;
 }
+.agp-attn > .ac-btn {
+  align-self: center;
+}
 .agp-attn__t span {
   color: var(--muted);
   font-size: 12.5px;
@@ -10782,10 +8650,8 @@ textarea.onb__big.ac-input {
   padding: 0;
   list-style: none;
 }
+/* An `.ac-faceline`: the title's capitals at the tile's top, the time in the row's middle. */
 .agp-li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   min-width: 0;
   padding: 11px 0;
   border-top: 1px solid var(--line);
@@ -10813,12 +8679,13 @@ textarea.onb__big.ac-input {
 }
 .agp-li__t span,
 .agp-li__when {
-  color: var(--muted);
+  color: var(--ink2);
   font-size: 12.5px;
 }
 .agp-li__when {
   flex: none;
-  color: var(--faint);
+  align-self: center;
+  color: var(--muted);
   white-space: nowrap;
 }
 .agp-kv {
@@ -10832,7 +8699,7 @@ textarea.onb__big.ac-input {
   gap: 6px;
 }
 .agp-k {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -10859,7 +8726,7 @@ textarea.onb__big.ac-input {
   width: 12px;
   height: 12px;
 }
-/* RepositoriosAgente.html: which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
+/* Which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
 .level-row__below {
   flex-basis: 100%;
   min-width: 0;
@@ -10920,7 +8787,7 @@ textarea.onb__big.ac-input {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list (telas/RepositoriosDialogo.html, B). */
+/* "Todos os repositórios" on top of the list. */
 .agp-repodialog__all {
   flex: 1;
   display: flex;
@@ -11029,45 +8896,84 @@ textarea.onb__big.ac-input {
   align-items: center;
   gap: 8px;
 }
-/* Memória */
-.agp-tiles {
+/*
+ * Atividade: the month (NumerosAgente C). Runs per day in pixels on the left, the numbers as its legend on
+ * the right; no cards, a hairline under it like the page's other sections.
+ */
+.agp-month {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
 }
-.agp-tiles--four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.agp-tile {
+.agp-month__chart {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
 }
-.agp-tile small {
+.agp-month__cap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.agp-month__cap b {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.agp-month__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.agp-month__legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 9px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+.agp-month__legend dt {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
 }
-.agp-tile b {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 300;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.agp-tile span {
+.agp-month__legend dt .ac-icon {
   color: var(--faint);
-  font-size: 12px;
 }
+.agp-month__legend dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.agp-month__legend dd small {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.agp-month__meter {
+  grid-column: 1 / -1;
+}
+@media (max-width: 900px) {
+  .agp-month {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+/* Memória */
 .agp-why {
   margin: 0;
   color: var(--muted);
@@ -11134,8 +9040,6 @@ textarea.onb__big.ac-input {
   overflow-wrap: anywhere;
 }
 .agp-run__fail {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   color: var(--danger);
   font-size: 12.5px;
@@ -11229,7 +9133,7 @@ textarea.onb__big.ac-input {
 .agp-spent__top b {
   font-family: var(--font-display);
   font-size: 30px;
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.02em;
 }
@@ -11244,7 +9148,7 @@ textarea.onb__big.ac-input {
   align-items: center;
   gap: 12px;
 }
-/* The computer's portrait (IconesComputador.html), on the surface. */
+/* The computer's portrait, on the surface. */
 .agp-pc__logo {
   flex: none;
 }
@@ -11265,8 +9169,9 @@ textarea.onb__big.ac-input {
 .agp-secrets h3 {
   margin: 0;
 }
-.agp-danger.ac-card {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+/* The danger zone is a section like the others (no box on the agent's page): its icon says it. */
+.agp-danger.ac-card .ac-card__key {
+  color: var(--danger);
 }
 .agp-dz {
   display: flex;
@@ -11440,7 +9345,7 @@ textarea.onb__big.ac-input {
   min-width: 0;
 }
 
-/* The memory mark (telas/ReacoesAgente.html): same height as a pill, another shape (not an emoji anyone can add) */
+/* The memory mark: same height as a pill, another shape (not an emoji anyone can add) */
 .msg-mem__sep {
   width: 1px;
   height: 16px;
@@ -11563,7 +9468,7 @@ textarea.onb__big.ac-input {
   }
 }
 
-/* ── The agent's identity, compact (telas/PerfilAgente.html): the agent on its color beside name and role;
+/* ── The agent's identity, compact: the agent on its color beside name and role;
    then the colors, and the eyes and what it wears as one sliding row each (Carousel). ── */
 .agp-id {
   display: flex;
@@ -11592,16 +9497,17 @@ textarea.onb__big.ac-input {
 .agp-look {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+/* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   min-width: 0;
 }
 .agp-look__row .newag__swatch {
@@ -11622,10 +9528,6 @@ textarea.onb__big.ac-input {
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
-  }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
   }
 }
 
@@ -11683,7 +9585,7 @@ html[data-menu-overlay] .shell {
   margin-left: var(--space-2);
 }
 
-/* ── Sidebar (telas/SidebarAPartirDaD.html, option 5) ─────────────
+/* ── Sidebar ──────────────────────────────────────────────────────
    The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
    categories that open and close; closed, one shows only the open page's row and a count.
    The icon rail ignores the headers. */
@@ -11693,7 +9595,7 @@ html[data-menu-overlay] .shell {
 .sidebar__section {
   gap: 2px;
 }
-/* Rows (telas/SidebarLinhas.html, "B · Mais ar"): 36px, 14px text; 18px muted icons 9px in, the 24px
+/* Rows: 36px, 14px text; 18px muted icons 9px in, the 24px
    avatar (accessories need 24) 6px from the edge on three sides, centred on the icons, every name in
    one column. */
 .sidebar:not([data-rail="true"]) .sidebar__item {
@@ -11858,7 +9760,7 @@ html[data-menu-overlay] .shell {
   display: flex;
 }
 
-/* A streaming answer: each word fades in as it is revealed (Mensagens.html, the `.w` words); still with reduced motion. */
+/* A streaming answer: each word fades in as it is revealed; still with reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   .ac-word {
     animation: ac-word-in 280ms ease-out both;
@@ -11870,84 +9772,15 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* ── Messages fluidity (telas/Mensagens.html, option C) ── */
+/* ── Messages fluidity ── */
 
-/* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
-.live-call__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-.live-call[data-s="stop"] .live-call__head {
-  color: var(--faint);
-  text-decoration: line-through;
-  text-decoration-color: var(--line2);
-}
-/* When the answer is done the steps fold into "3 passos" (same element: it closes smoothly). */
-.live-work-fold {
-  display: grid;
-  grid-template-rows: 1fr;
-}
-.live-work-fold > .live-work {
-  min-height: 0;
-  overflow: hidden;
-}
-.live-work-fold[data-folded] {
-  grid-template-rows: 0fr;
-  opacity: 0;
-}
-.live-work-fold[data-folded] > .live-work {
-  margin: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work-fold {
-    transition:
-      grid-template-rows 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 0.3s;
-  }
-}
-.live-work__sum {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: max-content;
-  height: 24px;
-  margin: 2px 0 4px -6px;
-  padding: 0 8px 0 6px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-.live-work__sum:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.live-work__sum:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.live-work__chev {
-  transition: transform 0.2s;
-}
-.live-work__sum[aria-expanded="true"] .live-work__chev {
-  transform: rotate(90deg);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .live-work__sum {
-    animation: ac-fade-in 0.4s ease-out both;
-  }
-}
-
-/* Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler". */
+/*
+ * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
+ * At the right edge like "Visto": on the left, the agent's face read as the author of my next message.
+ */
 .msg-steer {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   min-height: 20px;
   margin: 4px 0 0;
@@ -12017,6 +9850,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink);
   white-space: nowrap;
   cursor: pointer;
@@ -12060,9 +9894,6 @@ html[data-menu-overlay] .shell {
 
 /* Above the box when the connection drops, then "Conectado de novo". */
 .channel__conn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-height: 30px;
   margin: 0 4px 6px;
   padding: 4px 10px;
@@ -12118,7 +9949,7 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* Arquivos on the agent's page (telas/AgenteArquivos.html, A): the Drive's preview, title, one line, Abrir. */
+/* Arquivos on the agent's page: the Drive's preview, title, one line, Abrir. */
 .agp-file {
   display: flex;
   align-items: center;
@@ -12158,8 +9989,388 @@ html[data-menu-overlay] .shell {
   text-decoration: underline;
 }
 .agp-files__note {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 12px 0 0;
+}
+
+/* The chosen option's panel under the picker, in groups 16px apart: its head (the name's capitals at its mark's top,
+   the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in
+   a well, who signs in, the steps, then its foot. */
+.ai-panel {
+  gap: 16px;
+  text-wrap: pretty;
+}
+.ai-panel > .ac-setnote {
+  margin: 0;
+}
+/*
+ * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
+ * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
+ * mark's. The option cards start their 12px of padding before the text's column, so their words are on it too. The
+ * wait's well spans the panel from the mark's edge to the buttons', its words still on the text's column. A note
+ * inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ */
+.ai-panel--plan {
+  --lead: 30px;
+  --text-edge: calc(var(--lead) + 12px);
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline,
+.ai-panel--plan .ai-panel__row > .ac-setnote {
+  gap: 12px;
+}
+.ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline > :first-child,
+.ai-panel--plan .ai-panel__row > .ac-setnote > :first-child {
+  margin-inline: calc((var(--lead) - 14px) / 2);
+}
+.ai-panel--plan .agp-addacct__step > i {
+  margin-inline: calc((var(--lead) - 20px) / 2);
+}
+/* A step's title, an option's and the foot's line break into lines of a length, never onto a word or two alone. */
+.ai-panel--plan :is(.agp-addacct__text b, .ac-option__title, .ac-card__foot) {
+  text-wrap: balance;
+}
+.ai-panel--plan > :not(.ai-panel__head, .ai-panel__wait, .ai-panel__row, .agp-addacct, .ac-iconline),
+.ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline) {
+  margin-left: var(--text-edge);
+}
+.ai-panel--plan > .grid-options {
+  margin-left: calc(var(--text-edge) - var(--space-3));
+}
+/* The account cards keep the chosen card's check clear in both states, so choosing one never rewraps a title and the
+   two cards keep their height. */
+.ai-panel--plan > .grid-options--sm .ac-option__title {
+  padding-right: 22px;
+}
+.ai-panel__head {
+  flex-wrap: wrap;
+  gap: 12px;
+  /* Its hairline runs edge to edge, as the foot's does. */
+  margin-inline: calc(-1 * var(--card-pad));
+  padding: 0 var(--card-pad) 16px;
+  border-bottom: 1px solid var(--line);
+  line-height: 20px;
+}
+/* The computer's wait in a well, sunk into its card in both themes: here, and on the setup's Computer step. */
+.ai-panel__wait,
+.onb__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+/* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
+.ai-panel__wait {
+  padding: 12px var(--text-edge);
+  /* Short lines: wrapped, they break into two of a length. */
+  text-wrap: balance;
+}
+.onb__wait {
+  padding: 12px 14px;
+}
+/*
+ * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
+ * its 12px: their first capitals that far under what is above, their last baseline that far over what is below
+ * (`--cap-top` and `--cap-mid` place a line's capitals in its box).
+ */
+.ai-panel__wait > p:first-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-top: calc(var(--cap-top) - 11px);
+}
+.ai-panel__wait > p:last-child {
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+.ai-panel--plan > .ac-setnote {
+  /* The note's 18px line. */
+  margin-block: calc(var(--cap-top) - 9px) calc(var(--cap-top) - 2 * var(--cap-mid) - 9px);
+}
+@supports (top: 1lh) {
+  .ai-panel__wait > p:first-child {
+    margin-top: calc(var(--cap-top) - 0.5lh);
+  }
+  .ai-panel__wait > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+  .ai-panel--plan > .ac-setnote {
+    margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* The Computer step's lines are the well's own, at its gap. */
+.onb__wait > .setup-wait {
+  display: contents;
+}
+/* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
+   face and mark centre on it. */
+.ai-panel__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ai-panel__who > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.ai-panel__who > [data-state="done"] {
+  color: var(--ink);
+}
+.ai-panel__each {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ai-panel__title {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ai-panel__title > b {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.ai-panel__title > span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* For whom: as tall as the head's mark, so it centres on the mark's middle. */
+.ai-panel__agent {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  height: var(--lead);
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/* What went wrong and its button (Try again): the note in the button's middle, beside it or on the line above it. */
+.ai-panel__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.ai-panel__row > .ac-setnote {
+  flex: 1 1 240px;
+  margin: 0;
+}
+/* Its two actions (an account already there): one under the other when they don't fit, and a long email ends in "…"
+   (the note above says it whole). */
+.ai-panel__row > .ac-acts {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  min-width: 0;
+}
+.ai-panel__row > .ac-acts > .ac-btn {
+  max-width: 100%;
+}
+/* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
+   gap), as a step's button goes under its words. Before the plan's panel's rules, whose text column wins there. */
+.agp-addacct > .ai-panel__row > .ac-setnote {
+  flex-basis: 100%;
+}
+.agp-addacct > .ai-panel__row > :not(.ac-setnote) {
+  margin-left: 22px;
+}
+/* In a plan's panel the row's action is its sign-in's state: under the note's words, on the text's column, as a
+   step's button. */
+.ai-panel--plan .ai-panel__row > .ac-setnote {
+  flex-basis: 100%;
+}
+.ai-panel--plan .ai-panel__row > :not(.ac-setnote) {
+  margin-left: var(--text-edge);
+}
+.ai-panel__use {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A step's button goes under its words, on the text's column. */
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: var(--text-edge);
+}
+/* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+   text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+.ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+  gap: calc((var(--lead) - 14px) / 2 + 12px);
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+  margin-left: calc((var(--lead) - 14px) / 2);
+}
+/* At phone width for whom goes under the name, on the text's column. */
+@media (max-width: 640px) {
+  .ai-panel__agent {
+    flex-basis: calc(100% - var(--text-edge));
+    height: auto;
+    margin-left: var(--text-edge);
+  }
+  .ai-panel__agent > .ac-select {
+    flex: 1;
+  }
+}
+/* Who thinks (the setup, after a plan): each agent and what it thinks with. */
+.ai-who__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-who__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.ai-who__name {
+  flex: 0 0 72px;
+  font-weight: 600;
+}
+.ai-who__thinks {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* A plan's mark beside its name and facts: the name's capitals at the mark's top, its actions in the row's middle. */
+.ai-accounts__row {
+  align-items: flex-start;
+}
+.ai-accounts__row > .ac-acts {
+  align-self: center;
+}
+.ai-accounts__name {
+  font-weight: 600;
+}
+.ai-accounts__row .ac-planmeter {
+  margin-top: 4px;
+  max-width: 320px;
+}
+/* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
+   now, and Jev's key under it for the installation's owner. */
+.who-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.who-head > .ac-link,
+.jev__foot {
+  font-size: 13px;
+  line-height: 18px;
+}
+.who-line,
+.jev__foot {
+  margin: 0;
+}
+.who-line {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.jev {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jev:focus {
+  outline: none;
+}
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state on the tile's middle. */
+.jev__head,
+.jev__key {
+  align-items: flex-start;
+}
+/* The tile is 30px, at the row's top. */
+.jev__head > .ac-chip {
+  translate: 0 calc(15px - 50%);
+}
+.jev__key > .ac-acts {
+  align-self: center;
+}
+/* On a phone the name and its line wrap, so the state stays on their row. */
+.jev__head > .list-col {
+  flex-basis: 0;
+}
+/* A fact breaks between facts, never inside one ("US$ 0,13"). */
+.jev__fact {
+  white-space: nowrap;
+}
+.jev__title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+.jev__body {
+  flex-direction: column;
+  align-items: stretch;
+}
+.jev__body > .ac-btn {
+  align-self: flex-start;
+}
+/* Why Jev helps: an icon, the reason in bold and its few words, a line each. */
+.jev-why {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.jev-why .ac-icon {
+  color: var(--ink2);
+}
+.jev-why b {
+  font-weight: 600;
+}
+/* Under the key's field: where it is kept, or why it wasn't saved. */
+.jev-steps__below {
+  margin: 0;
+}
+/* On a phone the key's field takes its row, so its placeholder fits, and Save and Cancel go under it together. */
+@media (max-width: 640px) {
+  .jev-steps .agp-addacct__paste .ac-input {
+    flex-basis: 100%;
+  }
+}
+/* "Picking who answers": the receipt's clock where its check goes once an agent has seen the message. */
+.ac-receipt__clock {
+  display: inline-flex;
+  padding: 0 2px;
+}
+.ac-receipt__clock .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+/* Leading a receipt's line under its message, the icon's 2px of padding reach out, so the icon starts on the text's
+   edge, as the words do. */
+.ac-msg__foot .ac-receipt > :is(.ac-receipt__check, .ac-receipt__clock):first-child {
+  margin-inline-start: -2px;
+}
+/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
+.who-by {
+  margin-top: 4px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
 }

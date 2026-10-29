@@ -139,7 +139,7 @@
     padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 8px;
   }
   .channel__header > .ac-btn,
-  .channel__header > .members-stack {
+  .channel__header > .ac-acts {
     flex: none;
   }
   .channel__title {
@@ -161,9 +161,8 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
   }
   .channel__messages .ac-msg {
+    --msg-inline: 12px;
     gap: 10px;
-    padding-right: 12px;
-    padding-left: 12px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
@@ -205,23 +204,6 @@
   }
 }
 
-/* Calendar: the side panel goes under the grid when there's no room beside it. */
-@media (max-width: 900px) {
-  .cal-page[data-panel] .cal-page__body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(360px, 1fr) auto;
-    overflow-y: auto;
-  }
-  .cal-page[data-panel] .cal-side {
-    overflow: visible;
-  }
-}
-@media (max-width: 640px) {
-  .cal-page__header {
-    padding-top: 12px;
-  }
-}
-
 /* Centered card pages on a phone (invite, onboarding) */
 @media (max-width: 640px) {
   .center {
@@ -237,18 +219,21 @@
     height: auto;
     min-height: var(--control-h-md);
   }
-  /* Keyboard shortcuts mean nothing on a touch screen. */
-  .sidebar__jump .ac-kbd,
-  .cal-page__new .ac-kbd {
-    display: none;
-  }
 }
 @media (max-width: 760px), (pointer: coarse) {
   .wiki-editor__text {
     font-size: 16px;
   }
+  /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
+     follow its keys goes with them. */
+  .sidebar__jump .ac-kbd,
+  .titlebar__search .ac-kbd,
+  .wiki-suggest .ac-kbd,
+  .newag__hint:has(> .ac-kbd) {
+    display: none;
+  }
 }
-/* Onboarding: clear the notch and home bar (viewport-fit=cover); the e-mail chips field stays at 16px. */
+/* Onboarding: clear the notch (viewport-fit=cover); the home bar and the e-mail chips field: pages/onboarding.css. */
 .onb {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
@@ -256,14 +241,6 @@
 @media (max-width: 760px) {
   .onb__rail {
     padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-  }
-  .onb__body {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
-  }
-}
-@media (max-width: 760px), (pointer: coarse) {
-  .onb__emails-input {
-    font-size: 16px;
   }
 }
 /* Phones: a long composer placeholder ends in "…" instead of wrapping into a half-hidden second line. */
@@ -274,7 +251,7 @@
     white-space: nowrap;
   }
 }
-/* Agent page: one column below the desktop; the numbers leave the sky (they render under it). */
+/* Agent page: one column below the desktop (AgentPage moves "Como trabalha" under the name there). */
 @media (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
@@ -291,6 +268,7 @@
     margin: 0 -16px;
     padding: 2px 16px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .agp-subnav::-webkit-scrollbar {
@@ -305,14 +283,20 @@
   }
 }
 @media (max-width: 760px) {
-  .agp-tabs .ac-tabs {
-    margin: 12px -16px 0;
+  /* The cover stays edge to edge: the page's own padding (above) is the gutter under it. */
+  .agp {
+    --agp-gutter: 16px;
+    padding: 0 0 28px;
   }
 }
 @media (max-width: 640px) {
   .agp-cover {
-    height: 104px;
-    border-radius: 20px;
+    height: 120px;
+  }
+  .agp-face {
+    width: 88px;
+    height: 88px;
+    margin-top: -44px;
   }
   .agp-name {
     font-size: 32px;
@@ -333,20 +317,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles,
-  .agp-tiles--four {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -354,6 +324,7 @@
   .agp-toolbar .ac-seg {
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .agp-run {
@@ -383,7 +354,8 @@
 /* The agent page in the panel beside its DM: the same narrow rules (above and in layout.css), by the
    panel's width instead of the screen's. */
 .agp--panel {
-  padding: 20px 16px 24px;
+  --agp-gutter: 20px;
+  padding: 0 0 24px;
 }
 @container agp-side (max-width: 1100px) {
   .agp-cols {
@@ -401,6 +373,7 @@
     margin: 0 -16px;
     padding: 2px 16px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .agp-subnav::-webkit-scrollbar {
@@ -415,14 +388,18 @@
   }
 }
 @container agp-side (max-width: 760px) {
-  .agp-tabs .ac-tabs {
-    margin: 12px -16px 0;
+  .agp {
+    --agp-gutter: 16px;
   }
 }
 @container agp-side (max-width: 640px) {
   .agp-cover {
-    height: 104px;
-    border-radius: 20px;
+    height: 120px;
+  }
+  .agp-face {
+    width: 88px;
+    height: 88px;
+    margin-top: -44px;
   }
   .agp-name {
     font-size: 32px;
@@ -443,20 +420,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-tiles,
-  .agp-tiles--four {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .agp-tile {
-    padding: 10px 12px;
-  }
-  .agp-tile b {
-    font-size: 24px;
-  }
-  .agp-tile span {
-    display: none;
-  }
   .agp-quick {
     margin-left: 0;
   }
@@ -464,6 +427,7 @@
   .agp-toolbar .ac-seg {
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .agp-run {
@@ -499,18 +463,11 @@
   .agp-brainrows__sel {
     width: 100%;
   }
-  .agp-addacct__step {
-    flex-wrap: wrap;
-  }
   .level-row__below {
     padding-left: 0;
   }
   .agp-id {
     flex-direction: column;
-  }
-  .agp-look__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
   }
 }
 
@@ -527,6 +484,10 @@
   }
   .outage__crew {
     display: none;
+  }
+  /* The setup notice names no one: its faces are who waits for the computer. */
+  .setup-notice .outage__crew {
+    display: inline-flex;
   }
   .outage__acts {
     flex-basis: 100%;

@@ -2,6 +2,7 @@ import type { BrowserHandoff } from "@agenteschat/client";
 import {
   handoffFuse,
   handoffMinutesLeft,
+  handoffScreen,
   isWaitingHandoff,
   keys,
   useApi,
@@ -14,23 +15,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "../AgentAvatar";
+import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { BrowserCard } from "./BrowserCard";
 import { useBrowserCardRequest } from "./open";
 import "./browser.css";
-
-/** Re-renders every `ms` while `on` (a countdown). */
-export function useTick(on: boolean, ms = 15_000) {
-  const [, setNow] = useState(0);
-  useEffect(() => {
-    if (!on) return;
-    const id = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(id);
-  }, [on, ms]);
-}
 
 /** The newest view of a request: what the cache heard (an action, the realtime event), else the card's meta. */
 export function useCurrentHandoff(orgId: string, handoff: BrowserHandoff) {
@@ -47,8 +40,9 @@ export function useCurrentHandoff(orgId: string, handoff: BrowserHandoff) {
 
 /**
  * An agent asks a person for help in its browser (`browser_ask_person`,
- * ADR 0040 §6): the request, the time left, "Abrir" to the live view; who is
- * helping; and how it ended. Same family as the approval card.
+ * ADR 0040 §6) or on its desktop (`desktop_ask_person`, ADR 0058): the
+ * request, the time left, "Abrir" to the live view; who is helping; and how
+ * it ended. Same family as the approval card.
  */
 export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const { t, i18n } = useTranslation();
@@ -62,7 +56,8 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const g = agentGrammar(t, name);
   const waiting = isWaitingHandoff(current);
   const active = current.status === "active";
-  useTick(waiting);
+  // The minutes left move on.
+  useNow(waiting ? 15_000 : false);
   const mineInControl = active && current.controllerUserId === me.user.id;
   const helper = current.controllerUserId ? dir.memberById.get(current.controllerUserId)?.name : undefined;
   const people = [current.requestedForUserId, agent?.ownerUserId ?? null]
@@ -72,11 +67,14 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const settled = !waiting && !active;
   const status = current.status === "pending" ? "expired" : current.status;
   const minutes = handoffMinutesLeft(current);
-  // The agent's browser opens right here, under the request (telas/NavegadorNoChat.html, A).
+  const onDesktop = handoffScreen(current) === "desktop";
+  // The agent's browser opens right here, under the request; a request on its screen, in the computer dialog.
   const [here, setHere] = useState(false);
+  const openComputer = useOpenComputer();
+  const show = () => (onDesktop ? openComputer(current.agentId) : setHere(true));
   const take = () =>
     actions.takeControl.mutate(current.id, {
-      onSuccess: () => setHere(true),
+      onSuccess: show,
       onError: (err) =>
         toast.show(
           (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"),
@@ -85,22 +83,23 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
     });
   // A notification asked for this request: take it (or show it, when it's already mine).
   const asked = useBrowserCardRequest({ handoffId: current.id });
-  const latest = useRef({ take, waiting });
-  latest.current = { take, waiting };
+  const latest = useRef({ take, waiting, show });
+  latest.current = { take, waiting, show };
   useEffect(() => {
     if (asked === null) return;
     if (latest.current.waiting) latest.current.take();
-    else setHere(true);
+    else latest.current.show();
   }, [asked]);
-  const showBrowser = (here && (waiting || active)) || mineInControl;
+  const showBrowser = !onDesktop && ((here && (waiting || active)) || mineInControl);
   const time = current.resolvedAt ? formatTime(i18n.language, current.resolvedAt) : "";
+  const screenIcon = onDesktop ? "computer" : "globe";
   return (
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
       <div
         className={settled ? "brw-rq brw-rq--settled" : "brw-rq"}
         role="group"
-        aria-label={t("browser.card.group", g)}
+        aria-label={onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g)}
       >
         <span className="brw-rq__face">
           <AgentAvatar
@@ -151,10 +150,10 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
         <div className="brw-rq__body">
           <div className="brw-exact">
             <span className="brw-exact__ic">
-              <Icon name="globe" size={16} />
+              <Icon name={screenIcon} size={16} />
             </span>
             <span className="brw-exact__t">
-              <b>{t("browser.card.where", g)}</b>
+              <b>{onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g)}</b>
               {agent?.handle && <small>@{agent.handle}</small>}
             </span>
           </div>
@@ -162,8 +161,13 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             <div className="brw-rq__res brw-rq__res--ok">
               <Icon name="check" size={16} />
               {current.controllerUserId === me.user.id
-                ? t("browser.card.doneByYou", { time, ...g, agent: name })
-                : t("browser.card.doneBy", { ...g, time, agent: name, name: helper ?? "" })}
+                ? t(onDesktop ? "desktop.card.doneByYou" : "browser.card.doneByYou", { time, ...g, agent: name })
+                : t(onDesktop ? "desktop.card.doneBy" : "browser.card.doneBy", {
+                    ...g,
+                    time,
+                    agent: name,
+                    name: helper ?? "",
+                  })}
             </div>
           )}
           {status === "failed" && settled && (
@@ -189,7 +193,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           )}
           {waiting && !showBrowser && (
             <div className="brw-rq__acts">
-              <Button variant="primary" icon="globe" loading={actions.takeControl.isPending} onClick={take}>
+              <Button variant="primary" icon={screenIcon} loading={actions.takeControl.isPending} onClick={take}>
                 {t("browser.inCard.openHere")}
               </Button>
               <span className="brw-rq__hint">{t("browser.inCard.openHereHint")}</span>
@@ -197,8 +201,8 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           )}
           {active && !showBrowser && (
             <div className="brw-rq__acts">
-              <Button icon="globe" onClick={() => setHere(true)}>
-                {t("browser.card.watch")}
+              <Button icon={screenIcon} onClick={show}>
+                {onDesktop && mineInControl ? t("agentComputer.open") : t("browser.card.watch")}
               </Button>
             </div>
           )}

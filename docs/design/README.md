@@ -1,17 +1,15 @@
 # Design do agentes
 
-Fonte de verdade visual para o frontend. Cópia local dos artifacts:
-- Design system: https://claude.ai/artifact/JfRTQEvU939ZrDxVioM84m
-- Telas e fluxos (protótipo navegável): https://claude.ai/artifact/THb3AuEuGX8Ng3qPXumVVa (o anterior saiu do acesso)
+Fonte de verdade visual para o frontend.
 
 ## Conteúdo
-- `refresh-2026-10.md`: o design system atual (tokens, componentes, movimento), a partir de `telas/Componentes.dc.html` (aprovado). `telas/Componentes-proposta1.dc.html` foi substituído.
+- `refresh-2026-10.md`: o design system atual (tokens, componentes, movimento).
 - `design-system/README.md`: regras de uso (cor, forma, tipo, voz). Leia primeiro.
 - `design-system/tokens.json` e `tokens.css`: tokens (claro/escuro via `data-theme`).
 - `design-system/bundle.css`: estilos de referência dos componentes (classes `ac-*`).
 - `design-system/<Componente>.md`: diretrizes por componente.
-- `telas/*.dc.html`: cada tela do protótipo (HTML + lógica de estado em `renderVals()`); `Sidebar.dc.html` e `Select.dc.html` são componentes compartilhados.
 - `icons/`: ícones próprios (grid 20px, traço 1.6) e o símbolo do logo.
+- `desktop/`: o papel de parede dos desktops dos agentes (`render.sh` gera os PNGs que o runner leva, ADR 0058 §15).
 
 ## Regras que não podem quebrar
 - Azul (`agent`) só na identidade dos agentes: avatar, símbolo do logo, anel de "trabalhando", cursor de streaming.

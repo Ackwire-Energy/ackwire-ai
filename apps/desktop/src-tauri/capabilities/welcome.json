@@ -1,19 +1,25 @@
 {
   "identifier": "welcome",
-  "description": "First run and adding an organization: sign-in by code, folders, tools, start at login.",
+  "description": "The first run and \"Add a server…\": the servers this app opens, what discovery found, the link waiting, choosing a server (the main window opens there), and running agentes.chat on this computer (setting it up and cancelling it, Tailscale's state for reach).",
   "windows": ["welcome"],
   "permissions": [
     "core:default",
     "allow-runners-list",
     "allow-runner-send",
-    "allow-runner-add",
-    "allow-runner-remove",
-    "allow-open-external",
-    "allow-pick-folder",
+    "allow-servers-get",
+    "allow-server-choose",
+    "allow-discover",
+    "allow-link-take",
     "allow-show-window",
     "allow-hide-window",
     "allow-app-info",
-    "allow-autostart-get",
-    "allow-autostart-set"
+    "allow-local-server-status",
+    "allow-local-server-install",
+    "allow-local-server-cancel",
+    "allow-local-server-reach-stop",
+    "allow-local-server-start",
+    "allow-local-server-diagnostics",
+    "allow-tailscale-status",
+    "allow-tailscale-open"
   ]
 }

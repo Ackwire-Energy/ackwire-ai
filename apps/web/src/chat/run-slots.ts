@@ -1,7 +1,7 @@
 import type { LiveRun } from "@agenteschat/client";
 
 /**
- * One block per agent answer, from "pensando" to the final message (telas/Mensagens.html, "Um bloco só"):
+ * One block per agent answer, from "pensando" to the final message:
  * the live blocks sit at the end of the conversation (your new messages go above them), each under a key
  * that never changes while it lives. A "pensando…" guessed on send hands its key to the real run that
  * replaces it, and the final message is rendered under the same key, so React keeps the element: no

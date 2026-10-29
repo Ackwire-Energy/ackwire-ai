@@ -22,8 +22,17 @@
       "types": "./src/computer/portrait.d.ts",
       "default": "./src/computer/portrait.js"
     },
+    "./brand/marks": "./src/brand/marks.ts",
+    "./sfx": "./src/sfx/synth.ts",
+    "./sky/engine": "./src/sky/engine.ts",
     "./sky/math": "./src/sky/math.ts",
+    "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
+    "./sky/workspace": "./src/sky/workspace.ts",
+    "./diff": "./src/diff.ts",
+    "./names": "./src/names.ts",
+    "./plan-state": "./src/plan-state.ts",
+    "./recurrence": "./src/recurrence.ts",
     "./timezones": "./src/timezones.ts"
   },
   "scripts": {
@@ -34,7 +43,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "radix-ui": "^1.8.1"
   },

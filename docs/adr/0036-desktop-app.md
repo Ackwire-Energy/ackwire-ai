@@ -1,16 +1,14 @@
 # 0036. Desktop app: Tauri in the menu bar, the runner as its child process
 
-- Status: Accepted (not built yet)
+- Status: Accepted; its menu-bar-first model, "the runner ships and starts in every install" and §11's "the main window loads agentes.chat only" are superseded by ADR 0066 (one app for agentes.chat and your own server, a plain client first)
 - Date: 2026-10-17
-- Planning: D51
 - Extends: ADR 0025 (connected computers), ADR 0029 (missions and background tasks), ADR 0030 (isolation), ADR 0035 (shared client packages)
-- Prototype: `docs/design/telas/AppBandeja.html` (awaiting approval)
 
 ## Context
 
 A computer joins an organization through `agentes-runner`, a JavaScript file run by Node 22+ or Bun. It is installed with a shell one-liner, paired with a code created on the site, and kept alive as an OS service (launchd, systemd user unit, Task Scheduler). Settings live in `~/.agentes-runner/config.json` and are edited by hand. `agentes-runner update` downloads the latest `.mjs` from our server.
 
-That works for developers and servers. It does not work for the people the product is for (teams in general, not only developers): they don't have Node, don't open a terminal, can't see what the agents are doing on their computer, can't pause them, and have no place to grant access. "Permissions only widen on the machine" (machine folder access, `PastasComputador.html`) currently means "copy this command into a terminal".
+That works for developers and servers. It does not work for the people the product is for (teams in general, not only developers): they don't have Node, don't open a terminal, can't see what the agents are doing on their computer, can't pause them, and have no place to grant access. "Permissions only widen on the machine" (machine folder access) currently means "copy this command into a terminal".
 
 ## Decision
 
@@ -49,7 +47,7 @@ That works for developers and servers. It does not work for the people the produ
 ### 4. Single instance; no migration
 
 - One runner per OS user and runner home: a lock file (`~/.agentes-runner/runner.lock` with PID, checked for liveness) taken by `start` and `app`. A second one exits with a clear message. Tauri's single-instance plugin keeps one app.
-- The app never adopts a terminal install. We are building the MVP with a single user, so there is no migration: to move a computer to the app, disconnect it and connect again from the app.
+- The app never adopts a terminal install, and there is no migration: to move a computer to the app, disconnect it and connect again from the app.
 - Homes the app creates carry `"managedBy": "desktop"`; there `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two modes can't fight over the same home.
 
 ### 4b. More than one organization on one computer
@@ -76,7 +74,7 @@ The code is now created by the computer, like OAuth's device flow, and the perso
 ### 6. Pause
 
 - `pause { until }` sets a runner state (`paused`, `until`), persisted so a restart keeps it, and the runner reports it to the server (protocol 9: a `runner.state` message and the field in `hello`).
-- The server treats a paused machine like an offline one for new work: new ops and new tasks are refused with `machine_paused` (with `until`), and the agent says in the chat that the owner paused the computer. Work already running finishes. Agents whose engine is this computer's Claude Code (D38) follow the choice already stored on the agent (`agents.brainFallback`): with fallback on they answer through the API model, with it off they say the computer is paused and wait. Nothing new to configure.
+- The server treats a paused machine like an offline one for new work: new ops and new tasks are refused with `machine_paused` (with `until`), and the agent says in the chat that the owner paused the computer. Work already running finishes. Agents whose engine is this computer's Claude Code (ADR 0032) follow the choice already stored on the agent (`agents.brainFallback`): with fallback on they answer through the API model, with it off they say the computer is paused and wait. Nothing new to configure.
 - The web shows "Pausado até 16:24" on the computer page.
 
 ### 7. Activity log
@@ -86,7 +84,7 @@ The code is now created by the computer, like OAuth's device flow, and the perso
 
 ### 8. Folders and tools on the machine (v0.2, protocol 10)
 
-The machine-side access model from `PastasComputador.html`, built in the runner and shown in the app and on the site.
+The machine-side access model, built in the runner and shown in the app and on the site.
 
 - **Config** (`config.json`, per organization home): `access: { folders: [{ path, agents: [agentId] }], tools: { claude, codex, commands } }`. Defaults for a new pairing from the app: no folders, `claude` on only if the person chose it at first run, `codex` likewise, `commands` off. A terminal pairing keeps today's behaviour (`--no-exec` → `commands` off, otherwise on).
 - **Enforcement in the runner:** a request's paths stay relative to the agent's folder, or may be absolute when inside a folder allowed for that agent (`not_allowed` otherwise; symlinks resolved before checking). `exec` and `shell` tasks need `commands`; `claude`/`codex` tasks and brain turns need their tool. Claude Code and Codex get each allowed folder of that agent (`--add-dir` / Codex's writable roots). System folders (`/`, the home itself, `/System`, `/Library`…) are refused when adding.
@@ -99,25 +97,26 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 
 - The app checks `GET /api/desktop/latest?target=darwin&arch=<arch>` every 6 hours and at start: `{ version, url, sha256, notes, publishedAt, minVersion? }`. When newer, the tray shows "Versão nova" and Preferences → Atualizações shows the notes and "Atualizar e reabrir". Below `minVersion`, or when a runner reports `outdated`, it says "Atualize para continuar".
 - "Atualizar e reabrir" runs the Tauri updater (`update_install`): it reads `GET /api/desktop/update?target=…&arch=…&current=…` (Tauri's format; 204 when the release has no updater bundle), downloads `agentes_<version>_universal.app.tar.gz` through our download route, checks its minisign signature against the public key built into the app, replaces the app, stops the runners as when quitting, and relaunches. The private updater key lives only in the `TAURI_SIGNING_PRIVATE_KEY` secret (and an offline backup): losing it means no further automatic updates.
+- Update and reopen shows the download with Cancel. Nothing is installed until the download is whole, and a download that receives nothing for 60 seconds fails into the manual way. The check gets 30 seconds, and Check now 15.
 - Fallback (an old release without the bundle, a failed download): the download link and the three manual steps (quit, delete, install); pairing and settings live in `~/.agentes-runner`, so nothing is lost. Builds from before the updater (0.1.x, ad-hoc signed) update by hand once.
 - **Where builds live.** This repository's CI publishes a GitHub Release (private). The server reads it with a fine-grained token (`DESKTOP_RELEASES_TOKEN`, read-only contents on this repo; without it the endpoints answer 404): `GET /api/desktop/latest` (cached 5 minutes) and `GET /api/desktop/download/{version}/{file}` (streams the asset). The site's download button and the page's SHA-256 come from the same release.
 - Since the runner ships inside the app, installing a new app updates the runner.
 
 ### 10. Signing and notarization (macOS)
 
-- Since 2026-10-19 macOS builds are signed with a Developer ID Application certificate, with the hardened runtime, and notarized by Apple (App Store Connect API key); the ticket is stapled to the app. The bundled runner (a compiled Bun binary) is signed with the same entitlements (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`); a signed and notarized Bun binary was checked to run and be accepted before switching.
+- Since 2026-10-19 macOS builds are signed with our Developer ID Application certificate, with the hardened runtime, and notarized by Apple (App Store Connect API key); the ticket is stapled to the app. The bundled runner (a compiled Bun binary) is signed with the same entitlements (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`); a signed and notarized Bun binary was checked to run and be accepted before switching.
 - CI secrets: `APPLE_CERTIFICATE` (.p12, base64), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The build fails without them; it verifies the signature, the stapled ticket and Gatekeeper (`spctl`) before publishing.
-- The Developer ID certificate expires on 2027-02-01: renew it before then (apps already notarized keep opening; new builds need the new one).
+- Renew the Developer ID certificate before it expires (apps already notarized keep opening; new builds need the new one).
 - The identity is now the same on every build, so macOS stops asking again for Documents/Desktop/Downloads access after an update.
 - Windows (later): SmartScreen's "Mais informações → Executar assim mesmo" until we sign.
-- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
+- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
 
 ### 11. Security
 
 - The machine token stays in `config.json` (mode 600, folder 700). The web view never receives it; Tauri capabilities allow only our sidecar, autostart, notifications, the folder dialog and opening our own URLs. No general filesystem or shell access from the web view.
 - A click in the app is an action on the machine, so the rule "access only widens on the machine" holds. The server can show and reduce, never grant.
 - The control channel exists only between the app and its child.
-- The web view loads only the app's own bundle, with a strict CSP. It never loads agentes.chat or any remote page with access to the app's commands; the site opens in the person's browser. *Amended 2026-10-21 (D79):* the main window does load agentes.chat, with no app command and no Mac access: its capability (`main.json`, remote https://agentes.chat only) allows dragging and zooming the window and one bridge command, `this_mac`, which Rust checks and rebuilds before relaying to the popover: which organizations this Mac is in, connecting it to one (the site confirms the runner's code with its own session; the token stays with the runner), and opening Preferences on Folders or Tools. Granting access still happens only in the app's own windows. The app's own windows (popover, welcome, Preferences, notch) keep the rule above.
+- The web view loads only the app's own bundle, with a strict CSP. It never loads agentes.chat or any remote page with access to the app's commands; the site opens in the person's browser. *Amended 2026-10-21:* the main window does load agentes.chat, with no app command and no Mac access: its capability (`main.json`, remote https://agentes.chat only) allows dragging and zooming the window and one bridge command, `this_mac`, which Rust checks and rebuilds before relaying to the popover: which organizations this Mac is in, connecting it to one (the site confirms the runner's code with its own session; the token stays with the runner), and opening Preferences on Folders or Tools. Granting access still happens only in the app's own windows. The app's own windows (popover, welcome, Preferences, notch) keep the rule above. *Amended 2026-10-26:* the sign-in page can ask `this_mac` for `servers`, which only shows the app's own first-run window (the same as Servers › Add a server…); the page passes nothing, and the person picks and confirms the server there. The app says it takes it (`window.__agentesDesktop.servers`), so the link stays hidden on older apps. *Amended 2026-10-27:* the app's plugins add a click script to every page that takes `target="_blank"` links and asks over IPC, which the main window may not do. The opener's is off; the shell plugin's can't be turned off, so the site sends those links to `window.open` first (`routeNewWindowLinks`), and `on_new_window` routes them: a page of the server to the window, anything else to the browser. *Amended 2026-10-27 (connectors):* a connector's OAuth started in the main window opens the provider in the browser, which has no session of ours, so it used to land on the site signed out. The window starts it with `returnTo: "desktop:" + path` (only when the app says it takes the return, `window.__agentesDesktop.connectorReturn`); the callback hands `org`, `state` and `code` to `agenteschat://desktop/connectors/oauth`, `deep_link.rs` opens `/desktop/connector` with only those fields in the main window on the server open now (never the welcome window), and the page finishes with the window's session (`POST …/connectors/oauth/complete`, the phone app's route: the state stays bound to the person who started it, so a code that reaches someone else's app is refused), then lands where it started with `?connected=`. *Amended 2026-10-27 (files):* Settings › Storage's "Show the folder" asks `this_mac` for `files` on the server the app runs here. The page passes nothing: Rust refuses it from any other page and marks that server's own page `local`, and the popover, which also refuses it without `local`, shows `files` in its folder (the folder itself until the first upload) in Finder or the file manager. The app says it takes it (`window.__agentesDesktop.files`), so the button stays hidden on older apps.
 - Without Apple notarization, the OS doesn't vouch for the download: someone could pass around a fake "agentes". The app is downloaded only from agentes.chat over HTTPS, and the page shows the SHA-256 of each build. Signed, verified updates come with notarization.
 - Not new, but now reachable by non-technical people: commands run as the person's OS user (ADR 0030). Safe defaults matter more: no extra folders, commands off, and Claude Code on only when found and chosen at first run.
 
@@ -129,7 +128,7 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 
 ## Resolved in review (2026-10-17)
 
-- Updates: built and released by this repository's CI (macOS only for now); served through our server because the repo is private (section 9). Manual (delete the old app, install the new one) until notarization brings the automatic updater.
+- Updates: built and released by this repository's CI (macOS only for now); served through our server (section 9). Manual (delete the old app, install the new one) until notarization brings the automatic updater.
 - Connecting: one device-code flow for the app and the terminal; the old site-created code goes away (section 5).
 - Several organizations and several agents per computer: yes (section 4b).
 - Pause with brain-engine agents: the agent's existing fallback choice decides (section 6).

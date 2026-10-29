@@ -16,8 +16,10 @@ const files = (dir: string): string[] =>
   });
 
 const FORBIDDEN: [RegExp, string][] = [
-  [/\bwindow\s*[.[]/, "window"],
+  // After a dot it is a property path ("aiAccounts.usage.window.five_hour"), never the global.
+  [/(?<!\.)\bwindow\s*[.[]/, "window"],
   [/\btypeof\s+window\b/, "window"],
+  [/\bglobalThis\.window\b/, "window"],
   [/\bdocument\s*[.[]/, "document"],
   [/\btypeof\s+document\b/, "document"],
   [/\blocalStorage\b/, "localStorage"],

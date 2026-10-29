@@ -31,7 +31,7 @@ export interface NotchHelp {
 }
 
 /**
- * What the notch shows (telas/NotchAgente.html): a person needed wins, even paused (as the tray's
+ * What the notch shows: a person needed wins, even paused (as the tray's
  * dot); then paused; then work; nothing going on hides it.
  */
 export interface NotchState {
@@ -133,13 +133,4 @@ export function oldestStart(work: readonly NotchWork[]): number | null {
     if (Number.isFinite(at) && (oldest === null || at < oldest)) oldest = at;
   }
   return oldest;
-}
-
-/** "0:41", "2:14", "1:05:09": how long, ticking. */
-export function elapsedClock(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = String(total % 60).padStart(2, "0");
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }

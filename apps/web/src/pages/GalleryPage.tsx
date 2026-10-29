@@ -3,12 +3,15 @@ import {
   Avatar,
   AvatarStack,
   Button,
+  Card,
+  CardHeader,
   Checkbox,
   CheckboxPill,
   Chip,
   Composer,
   CountBadge,
   Dialog,
+  DialogBody,
   DialogFooter,
   DialogSearchList,
   Diff,
@@ -17,6 +20,7 @@ import {
   Field,
   FilterToggle,
   Icon,
+  InfoHint,
   Input,
   iconNames,
   Logo,
@@ -32,6 +36,7 @@ import {
   SearchField,
   Select,
   Steps,
+  Switch,
   TabPanel,
   Tabs,
   Toolbar,
@@ -43,7 +48,7 @@ import { useTheme } from "@/lib/theme";
 
 /*
  * Development-only gallery (`/dev/gallery`). The sample content below is
- * the demo copy of the approved screens and is not shipped: the route is
+ * the design's demo copy and is not shipped: the route is
  * unreachable in production builds.
  */
 
@@ -70,6 +75,9 @@ export function GalleryPage() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [pressed, setPressed] = useState("qa");
+  const [checkFirst, setCheckFirst] = useState(true);
+  const [hintDialog, setHintDialog] = useState(false);
+  const about = (label: string) => t("common.about", { label });
   const items = ["Ler código e issues", "Abrir e comentar PRs", "Fazer merge"].filter((i) =>
     i.toLowerCase().includes(q.toLowerCase()),
   );
@@ -128,6 +136,63 @@ export function GalleryPage() {
         </div>
       </Section>
 
+      <Section title="InfoHint">
+        <div className="grid-fields">
+          <Field
+            label="Fuso horário"
+            id="g-zone"
+            hint={{ name: about("Fuso horário"), text: "Rotinas, lembretes e o calendário seguem este fuso." }}
+          >
+            <Input defaultValue="America/Sao_Paulo" />
+          </Field>
+        </div>
+        <div className="row">
+          <span className="ac-hintline">
+            <label htmlFor="g-check-first">Agentes conferem o que o time já fez</label>
+            <InfoHint name={about("Agentes conferem o que o time já fez")} id="g-check-first-hint">
+              Antes de agir, o agente procura se alguém do time já fez o mesmo e avisa no lugar de repetir.
+            </InfoHint>
+          </span>
+          <Switch
+            id="g-check-first"
+            checked={checkFirst}
+            onCheckedChange={setCheckFirst}
+            aria-describedby="g-check-first-hint"
+          />
+          <Button onClick={() => setHintDialog(true)}>Abrir num diálogo</Button>
+        </div>
+        <Card padded>
+          <CardHeader
+            icon="key"
+            title="Seu plano do Claude"
+            hint={{
+              name: about("Seu plano do Claude"),
+              text: "A conta fica no computador do workspace, e só ele usa.",
+            }}
+          />
+        </Card>
+        <Dialog
+          open={hintDialog}
+          onOpenChange={setHintDialog}
+          title="Novo agente"
+          closeLabel={t("common.close")}
+          width={440}
+        >
+          <DialogBody>
+            <Field
+              label="Orçamento mensal (US$)"
+              id="g-hint-budget"
+              hint={{
+                name: about("Orçamento mensal"),
+                text: "No limite, o agente para e avisa quem é responsável por ele.",
+              }}
+            >
+              <Input defaultValue="40" />
+            </Field>
+          </DialogBody>
+        </Dialog>
+      </Section>
+
       <Section title="Toolbar · SearchField · FilterToggle">
         <Toolbar
           label="Filtros"
@@ -174,7 +239,7 @@ export function GalleryPage() {
             id="g-r2"
             checked={radio === "own"}
             title="Chave da Acme"
-            description="Use sua conta da Anthropic."
+            description="Use a sua chave do Claude."
           />
         </RadioGroup>
         <div className="grid-options grid-options--sm">

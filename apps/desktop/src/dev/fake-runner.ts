@@ -18,7 +18,8 @@ import {
   parseControlIn,
 } from "@agenteschat/adapters/runner-control";
 
-const SERVER = "https://agentes.chat";
+/** Agents work here only for a server of the person's own (the Cloud has a computer of its own). */
+export const FAKE_SERVER = "https://agentes.tail1234.ts.net";
 const VERSION = "0.1.0";
 const MACHINE_PROTOCOL = 10;
 
@@ -49,7 +50,7 @@ export const ACME_AGENTS = [
   agent("ag_bento", "Bento", "amber", "round", "cap"),
   agent("ag_ada", "Ada", "green", "happy", "none"),
 ];
-export const HIMETRICA_AGENTS = [
+export const HORIZONTE_AGENTS = [
   agent("ag_lia", "Lia", "rose", "round", "flower"),
   agent("ag_nino", "Nino", "teal", "dots", "beanie"),
 ];
@@ -146,16 +147,16 @@ export function acmeSeed(): FakeOrgSeed {
 }
 
 /** A 24×24 PNG: a white "H" on coral. */
-const HIMETRICA_LOGO =
+const HORIZONTE_LOGO =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAALElEQVR42mP4n+1FFcQwatDAGgQHpEiNGkShQXjAABk0Gmu0N2i0PBrsBgEAgBRBMV74eN0AAAAASUVORK5CYII=";
 
-export function himetricaSeed(): FakeOrgSeed {
-  const [lia, nino] = HIMETRICA_AGENTS;
+export function horizonteSeed(): FakeOrgSeed {
+  const [lia, nino] = HORIZONTE_AGENTS;
   return {
-    org: { id: "org_himetrica", name: "Himetrica" },
-    slug: "himetrica",
-    logo: HIMETRICA_LOGO,
-    agents: HIMETRICA_AGENTS,
+    org: { id: "org_horizonte", name: "Horizonte" },
+    slug: "horizonte",
+    logo: HORIZONTE_LOGO,
+    agents: HORIZONTE_AGENTS,
     jobs: [
       {
         id: "j3",
@@ -169,7 +170,7 @@ export function himetricaSeed(): FakeOrgSeed {
       },
     ],
     access: {
-      folders: [{ path: "/Users/voce/Projects/Himetrica/site", agents: ["ag_lia", "ag_nino"] }],
+      folders: [{ path: "/Users/voce/Projects/Horizonte/site", agents: ["ag_lia", "ag_nino"] }],
       tools: { claude: true, codex: false, commands: true },
     },
     activity: [
@@ -191,7 +192,7 @@ export function himetricaSeed(): FakeOrgSeed {
         where: "site",
         result: "failed",
       },
-      { at: minutesAgo(60 * 23), kind: "pair", summary: "connected to Himetrica", result: "ok" },
+      { at: minutesAgo(60 * 23), kind: "pair", summary: "connected to Horizonte", result: "ok" },
     ],
     requests: [],
   };
@@ -200,7 +201,7 @@ export function himetricaSeed(): FakeOrgSeed {
 /** Organizations a fake sign-in can land in, in order. */
 const SIGN_IN_POOL: (() => FakeOrgSeed)[] = [
   acmeSeed,
-  himetricaSeed,
+  horizonteSeed,
   () => ({
     org: { id: `org_${rid()}`, name: "Estúdio Norte" },
     slug: "estudio-norte",
@@ -234,6 +235,9 @@ export class FakeRunner {
     },
   ];
   private logins = new Map<string, { kind: RunnerAccountInfo["kind"]; doneAt: number }>();
+
+  /** The server this home is paired with (the server here's homes point at its loopback address). */
+  server = FAKE_SERVER;
 
   constructor(
     readonly homeId: string,
@@ -345,7 +349,7 @@ export class FakeRunner {
               this.emit({
                 kind: "pair.code",
                 userCode: code,
-                verificationUrl: `${SERVER}/conectar?code=${code}`,
+                verificationUrl: `${FAKE_SERVER}/conectar?code=${code}`,
                 expiresAt: new Date(Date.now() + 600_000).toISOString(),
               }),
             500,
@@ -486,7 +490,7 @@ export class FakeRunner {
     const s = this.seed;
     return {
       paired: !!s,
-      server: SERVER,
+      server: this.server,
       org: s ? { ...s.org, ...(s.logo ? { logoEtag: `"${s.org.id}.png"` } : {}) } : undefined,
       machine: s ? { id: `m_${this.homeId}`, name: this.machineName } : undefined,
       connection: this.connection,

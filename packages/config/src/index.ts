@@ -1,7 +1,22 @@
+import { createECDH } from "node:crypto";
 import { type Config, configSchema, envVars } from "./schema";
 
 export { connectorOAuthApps, githubAppConfig } from "./connectors";
 export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./schema";
+
+/** agentes.chat's own servers: their legal pages are their own. */
+const OFFICIAL_HOSTS = new Set(["app.agentes.chat", "agentes.chat", "www.agentes.chat"]);
+
+/** Whether a VAPID public key (an uncompressed P-256 point) belongs to this private key (`d`), both base64url. */
+function vapidPairMatches(publicKey: string, privateKey: string): boolean {
+  try {
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(privateKey.replace(/=+$/, ""), "base64url"));
+    return ecdh.getPublicKey().equals(Buffer.from(publicKey.replace(/=+$/, ""), "base64url"));
+  } catch {
+    return false;
+  }
+}
 
 export class ConfigError extends Error {
   constructor(public readonly issues: string[]) {
@@ -28,7 +43,49 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       }),
     );
   }
-  return result.data;
+  const config = result.data;
+  if (config.HOST_COMPUTER_TOKEN && config.ALLOW_SIGNUP) {
+    throw new ConfigError([
+      "HOST_COMPUTER_TOKEN can't be set with ALLOW_SIGNUP=true: this server's computer runs agents on the machine itself, so people join only by invitation",
+    ]);
+  }
+  // Its requests are read only through the operator API: without it every workspace would wait forever.
+  if (config.MACHINE_PROVISIONING === "external" && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["MACHINE_PROVISIONING=external needs OPERATOR_API_TOKEN"]);
+  }
+  // The screen's text leaves only through the operator API's review door: without it nobody could read it.
+  if (config.SESSION_SCREENING && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["SESSION_SCREENING needs OPERATOR_API_TOKEN"]);
+  }
+  if (config.MACHINE_PROVISIONING === "external" && config.HOST_COMPUTER_TOKEN) {
+    throw new ConfigError([
+      "HOST_COMPUTER_TOKEN can't be set with MACHINE_PROVISIONING=external: every workspace gets its own computer, and no other computer joins it",
+    ]);
+  }
+  // Half a pair means the bot check was meant to be on: it never runs quietly off.
+  if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
+    throw new ConfigError(["TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY go together: set both, or neither"]);
+  }
+  // A key pair or nothing (ADR 0071): half a pair can't sign.
+  if (Boolean(config.WEB_PUSH_VAPID_PUBLIC_KEY) !== Boolean(config.WEB_PUSH_VAPID_PRIVATE_KEY)) {
+    throw new ConfigError([
+      "WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_VAPID_PRIVATE_KEY go together: set both or neither",
+    ]);
+  }
+  // Halves of two pairs would get every push refused, with nothing at boot to say why.
+  if (
+    config.WEB_PUSH_VAPID_PUBLIC_KEY &&
+    config.WEB_PUSH_VAPID_PRIVATE_KEY &&
+    !vapidPairMatches(config.WEB_PUSH_VAPID_PUBLIC_KEY, config.WEB_PUSH_VAPID_PRIVATE_KEY)
+  ) {
+    throw new ConfigError(["WEB_PUSH_VAPID_PUBLIC_KEY isn't the public half of WEB_PUSH_VAPID_PRIVATE_KEY"]);
+  }
+  const site = new URL(config.PUBLIC_URL);
+  if (OFFICIAL_HOSTS.has(site.hostname)) {
+    config.TERMS_URL ??= `${site.origin}/terms`;
+    config.PRIVACY_URL ??= `${site.origin}/privacy`;
+  }
+  return config;
 }
 
 /** Returns a copy of the config safe to log: secret values are masked. */

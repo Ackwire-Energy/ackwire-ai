@@ -1,10 +1,21 @@
 // A fake `claude` for brain tests: speaks stream-json in and out like
 // `claude -p --input-format stream-json --output-format stream-json`.
-// Each start appends its argv and $CLAUDE_CONFIG_DIR to $FAKE_CLAUDE_LOG (one JSON line).
+// Each start appends its argv, $CLAUDE_CONFIG_DIR, its folder, $ANTHROPIC_API_KEY,
+// $ANTHROPIC_AUTH_TOKEN and its `--settings` file's `env` to $FAKE_CLAUDE_LOG
+// (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
-// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate.
-import { appendFileSync, existsSync, writeFileSync } from "node:fs";
+// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
+// "RATE" says the 5-hour window is at 84%; "STEER…" and "BGSELF" below (live
+// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN (as an
+// agent's shell could print it), "KEY401" is refused by the endpoint and retries for good
+// (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
+// as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
+// "hang": never).
+// With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
+// `structured_output` gives the schema's first handle 0.9, and a line with the system prompt and the
+// prompt in the log. "SLOW_ROUTE" never answers, "BAD_ROUTE" answers no JSON.
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
@@ -12,34 +23,193 @@ const args = process.argv.slice(2);
 const log = process.env.FAKE_CLAUDE_LOG;
 if (log) {
   const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
-  appendFileSync(log, `${JSON.stringify({ pid: process.pid, args, configDir })}\n`);
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN ?? null;
+  const baseUrl = process.env.ANTHROPIC_BASE_URL ?? null;
+  const at = args.indexOf("--settings");
+  let settingsEnv = null;
+  try {
+    settingsEnv = at >= 0 ? (JSON.parse(readFileSync(args[at + 1], "utf8")).env ?? null) : null;
+  } catch {}
+  appendFileSync(
+    log,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, baseUrl, settingsEnv })}\n`,
+  );
 }
 const flag = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
+if (flag("--json-schema") !== undefined) {
+  await route();
+  process.exit(0);
+}
+
+async function route() {
+  let prompt = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) prompt += chunk;
+  const system = readFileSync(flag("--system-prompt-file"), "utf8");
+  if (log) appendFileSync(log, `${JSON.stringify({ pid: process.pid, route: true, system, prompt })}\n`);
+  if (prompt.includes("SLOW_ROUTE")) await new Promise((resolve) => setTimeout(resolve, 120_000));
+  if (prompt.includes("BAD_ROUTE")) {
+    process.stdout.write("Sorry, I can't help with that.\n");
+    return;
+  }
+  const schema = JSON.parse(flag("--json-schema"));
+  const handle = schema.properties?.scores?.items?.properties?.handle?.enum?.[0];
+  const answer = { needs_agent: 0.9, scores: handle ? [{ handle, score: 0.9 }] : [], reason: "a fake route" };
+  process.stdout.write(
+    `${JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      duration_ms: 3847,
+      result: JSON.stringify(answer),
+      structured_output: answer,
+      usage: { input_tokens: 2, cache_read_input_tokens: 2597, cache_creation_input_tokens: 0, output_tokens: 750 },
+      modelUsage: { "claude-haiku-5-5": { inputTokens: 2, outputTokens: 750 } },
+    })}\n`,
+  );
+}
 const session = flag("--resume") ?? flag("--session-id") ?? "none";
 if (flag("--resume") && process.env.FAKE_CLAUDE_NO_SESSION) {
   process.stderr.write(`No conversation found with session ID: ${session}\n`);
   process.exit(1);
 }
 const out = (o) => process.stdout.write(`${JSON.stringify({ ...o, session_id: session })}\n`);
-out({ type: "system", subtype: "init", model: flag("--model") ?? "claude-sonnet" });
+// $FAKE_CLAUDE_VERSION: the version its init line says (logs only).
+const version = process.env.FAKE_CLAUDE_VERSION;
+// $FAKE_CLAUDE_CAPS: its init `capabilities`, comma-separated (unset: none, an old CLI that can't be steered).
+// With msg_lifecycle_v1 each line with a `uuid` says `command_lifecycle` queued → started (read) → completed.
+const caps = process.env.FAKE_CLAUDE_CAPS ? process.env.FAKE_CLAUDE_CAPS.split(",") : null;
+const lifecycle = caps?.includes("msg_lifecycle_v1") === true;
+// $FAKE_CLAUDE_NO_RESULT_UUIDS: results never list what they read (only the lifecycle says it).
+const resultUuids = !process.env.FAKE_CLAUDE_NO_RESULT_UUIDS;
+const lifecycleOf = (uuid, state) => {
+  if (lifecycle && uuid) out({ type: "command_lifecycle", command_uuid: uuid, state });
+};
+// Claude Code says `init` as each turn starts.
+const init = () =>
+  out({
+    type: "system",
+    subtype: "init",
+    model: flag("--model") ?? "claude-sonnet",
+    ...(version ? { claude_code_version: version } : {}),
+    ...(caps ? { capabilities: caps } : {}),
+  });
+init();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let turns = 0;
-let chain = Promise.resolve();
+// Lines wait here: a turn may read the ones sent while it runs ("STEER"), the rest start the next turns.
+const queue = [];
+let wake = null;
+let closed = false;
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
-  chain = chain.then(() => answer(line));
+  let control = null;
+  try {
+    control = JSON.parse(line);
+  } catch {}
+  if (control?.type === "control_request") return answerControl(control);
+  queue.push(line);
+  try {
+    lifecycleOf(JSON.parse(line).uuid, "queued");
+  } catch {}
+  wake?.();
 });
 rl.on("close", () => {
-  chain.then(() => process.exit(0));
+  closed = true;
+  wake?.();
 });
+const waitForLine = (ms) =>
+  new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    wake = () => {
+      clearTimeout(t);
+      resolve();
+    };
+  }).finally(() => {
+    wake = null;
+  });
+(async () => {
+  for (;;) {
+    const line = queue.shift();
+    if (line !== undefined) await answer(line);
+    else if (closed) process.exit(0);
+    else await waitForLine(60_000);
+  }
+})();
 
 async function answer(line) {
   const msg = JSON.parse(line);
   const prompt = String(msg.message?.content ?? "");
+  const read = msg.uuid ? [msg.uuid] : [];
+  lifecycleOf(msg.uuid, "started");
+  if (turns > 0) init();
+  let steered = "";
+  let moved = false;
   turns++;
+  // "STEER": a tool runs, then the messages sent meanwhile are read at its boundary (same turn).
+  // "STEERLATE": the turn ends before reading them (they start the next turn).
+  // "STEERDROP": they vanish unread and nothing waits (a CLI that lost them).
+  // "STEERBG": the tool runs as task bg1; a "now" message moves it to the background and is read at once;
+  // after the result the task ends and the CLI runs a turn of its own ("background finished").
+  // "STEERBGHANG": the moved task never ends.
+  if (prompt.includes("STEER")) {
+    const bg = prompt.includes("STEERBG");
+    if (bg) {
+      out({
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "s1", name: "Bash", input: { command: "make" } }] },
+        parent_tool_use_id: null,
+      });
+      out({ type: "system", subtype: "task_started", task_id: "bg1", tool_use_id: "s1", is_backgrounded: false });
+    }
+    if (queue.length === 0) await waitForLine(3000);
+    if (prompt.includes("STEERDROP")) queue.length = 0;
+    else if (!prompt.includes("STEERLATE")) {
+      moved = bg && queue.some((l) => JSON.parse(l).priority === "now");
+      if (!bg) {
+        out({
+          type: "assistant",
+          message: { content: [{ type: "tool_use", id: "s1", name: "Bash", input: { command: "make" } }] },
+          parent_tool_use_id: null,
+        });
+      }
+      if (moved) out({ type: "system", subtype: "task_updated", task_id: "bg1", patch: { is_backgrounded: true } });
+      out({
+        type: "user",
+        message: {
+          content: [{ type: "tool_result", tool_use_id: "s1", content: moved ? "moved to the background" : "built" }],
+        },
+        parent_tool_use_id: null,
+      });
+      while (queue.length) {
+        const m = JSON.parse(queue.shift());
+        if (m.uuid) read.push(m.uuid);
+        lifecycleOf(m.uuid, "started");
+        steered += ` +${m.priority ?? "-"}/${m.origin?.kind ?? "-"}: ${m.message?.content ?? ""}`;
+      }
+      // Read before the turn ends (the lifecycle says so first).
+      await sleep(50);
+    }
+  }
+  // "BGSELF": the model starts a task in the background itself; it ends after the turn, and the CLI
+  // runs a turn of its own then, nobody asking ("stray").
+  if (prompt.includes("BGSELF")) {
+    out({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id: "b1", name: "Bash", input: { command: "serve" } }] },
+      parent_tool_use_id: null,
+    });
+    out({ type: "system", subtype: "task_started", task_id: "self1", tool_use_id: "b1", is_backgrounded: true });
+    out({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "b1", content: "running in the background" }] },
+      parent_tool_use_id: null,
+    });
+  }
   const marker = log ? path.join(path.dirname(log), "crashed") : "";
   if (prompt.includes("CRASH") && marker && !existsSync(marker)) {
     writeFileSync(marker, "");
@@ -52,6 +222,17 @@ async function answer(line) {
     process.exit(3);
   }
   if (prompt.includes("SLOW")) await sleep(300);
+  if (prompt.includes("RATE")) {
+    out({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "allowed_warning",
+        rateLimitType: "five_hour",
+        utilization: 0.84,
+        resetsAt: 1900000000,
+      },
+    });
+  }
   if (prompt.includes("LIMIT")) {
     out({ type: "rate_limit_event", rate_limit_info: { status: "rejected", resetsAt: 1900000000 } });
     out({
@@ -61,6 +242,19 @@ async function answer(line) {
       result: "You've hit your limit",
       usage: { input_tokens: 0, output_tokens: 0 },
     });
+    return;
+  }
+  if (prompt.includes("KEY401")) {
+    out({
+      type: "system",
+      subtype: "api_retry",
+      attempt: 1,
+      max_retries: 10,
+      retry_delay_ms: 600,
+      error_status: 401,
+      error: "authentication_failed",
+    });
+    await sleep(60_000);
     return;
   }
   if (prompt.includes("AUTH")) {
@@ -73,7 +267,10 @@ async function answer(line) {
     });
     return;
   }
-  for (const text of ["Hello ", "world"]) {
+  const said = prompt.includes("ECHOKEY")
+    ? [`token ${process.env.ANTHROPIC_AUTH_TOKEN} `, "printed"]
+    : ["Hello ", "world"];
+  for (const text of said) {
     out({
       type: "stream_event",
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
@@ -107,8 +304,73 @@ async function answer(line) {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: `echo ${turns}: ${prompt}`,
+    result: prompt.includes("ECHOKEY") ? said.join("") : `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
+    ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),
+    ...(version ? { queued_turn_count: queue.length } : {}),
+  });
+  for (const uuid of read) lifecycleOf(uuid, "completed");
+  // "STEERBGHANG": the moved task never ends (a server): no notice, no turn of its own, ever.
+  if (moved && prompt.includes("STEERBGHANG")) {
+    // nothing
+  }
+  // "STEERBGSLOW": the moved task ends 800 ms after the result.
+  else if (moved) await turnOfItsOwn("bg1", "background finished", 0, prompt.includes("STEERBGSLOW") ? 800 : 100);
+  // Its own turn takes 300 ms ("BGSELFSTUCK": never ends).
+  if (prompt.includes("BGSELF")) await turnOfItsOwn("self1", "stray", prompt.includes("BGSELFSTUCK") ? 60_000 : 300);
+}
+
+/** A control request on stdin, answered at once (`get_usage` as $FAKE_CLAUDE_USAGE says). */
+function answerControl(req) {
+  const reply = (subtype, body) =>
+    process.stdout.write(
+      `${JSON.stringify({ type: "control_response", response: { subtype, request_id: req.request_id, ...body } })}\n`,
+    );
+  const mode = process.env.FAKE_CLAUDE_USAGE ?? "";
+  if (req.request?.subtype === "initialize") return reply("success", { response: { commands: [] } });
+  if (req.request?.subtype !== "get_usage") return reply("error", { error: "not supported" });
+  if (mode === "hang") return;
+  if (mode === "error") return reply("error", { error: "get_usage failed" });
+  if (mode === "signed_out") {
+    return reply("success", { response: { subscription_type: null, rate_limits_available: false, rate_limits: null } });
+  }
+  reply("success", {
+    response: {
+      subscription_type: "max",
+      rate_limits_available: true,
+      rate_limits: {
+        five_hour: { utilization: 42, resets_at: "2030-01-01T15:40:00.000Z" },
+        seven_day: { utilization: 81.6, resets_at: "2030-01-04T10:00:00.000Z" },
+        seven_day_opus: { utilization: 12, resets_at: null },
+        seven_day_sonnet: null,
+        model_scoped: [{ display_name: "Fable", utilization: 5, resets_at: null }],
+        extra_usage: { is_enabled: false, monthly_limit: null, used_credits: null, utilization: null },
+      },
+      behaviors: null,
+    },
+  });
+}
+
+/** A background task ends `after` ms on: its notice starts a turn nobody sent (it answers `text`, `ms` later). */
+async function turnOfItsOwn(taskId, text, ms = 0, after = 100) {
+  await sleep(after);
+  out({ type: "system", subtype: "task_updated", task_id: taskId, patch: { status: "completed" } });
+  out({ type: "system", subtype: "task_notification", task_id: taskId, status: "completed" });
+  init();
+  out({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    parent_tool_use_id: null,
+  });
+  out({ type: "assistant", message: { content: [{ type: "text", text }] }, parent_tool_use_id: null });
+  await sleep(ms);
+  out({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: text,
+    usage: { input_tokens: 3, output_tokens: 2 },
+    ...(version ? { queued_turn_count: queue.length } : {}),
   });
 }

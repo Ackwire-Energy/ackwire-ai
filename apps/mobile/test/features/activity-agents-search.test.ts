@@ -1,12 +1,44 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, WorkingRun } from "@agenteschat/client";
-import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
-import { agoOf, busyAgents, canUse, spendOf, teamLines, workingNow } from "../../src/features/agents/logic";
+import type { AgentAccess, AppNotification, WorkingRun } from "@agenteschat/client";
+import { resources } from "@agenteschat/i18n";
+import i18next from "i18next";
+import {
+  activitySections,
+  dayGroupOf,
+  emojisOf,
+  type SayWords,
+  subtitleOf,
+  whoOf,
+} from "../../src/features/activity/logic";
+import {
+  agoOf,
+  busyAgents,
+  busyChannels,
+  canUse,
+  spendOf,
+  teamLines,
+  workingNow,
+} from "../../src/features/agents/logic";
+import { featureKeysEn } from "../../src/features/i18n/keys.en";
+import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { filterResults, fold, isEmpty, matches, searchCounts, searchResults } from "../../src/features/search/logic";
+import { withMobileKeys } from "../../src/i18n/merge";
 import { agent, mission, notification } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
 const ago = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
+
+/** Says coded words as the screen does, in pt-BR. */
+async function sayer(): Promise<SayWords> {
+  const i18n = i18next.createInstance();
+  await i18n.init({
+    lng: "pt-BR",
+    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
+    interpolation: { escapeValue: false },
+  });
+  const tt = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return (w, otherwise = "") => tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
+}
 
 describe("Atividade", () => {
   const items = [
@@ -59,19 +91,61 @@ describe("Atividade", () => {
     ).toEqual({ first: "Theo", second: "Ana", more: 1, total: 3 });
   });
 
-  test("the line under the title", () => {
+  test("the line under the title", async () => {
+    const say = await sayer();
     expect(
       subtitleOf(
         notification({ id: "r", kind: "reaction", latest: { quote: "a campanha bateu a meta", emojis: ["🎉"] } }),
+        say,
       ),
     ).toBe("a campanha bateu a meta");
-    expect(subtitleOf(notification({ id: "a", kind: "approval", latest: { title: "Publicar o ajuste" } }))).toBe(
+    expect(subtitleOf(notification({ id: "a", kind: "approval", latest: { title: "Publicar o ajuste" } }), say)).toBe(
       "Publicar o ajuste",
     );
     expect(emojisOf(notification({ id: "r", kind: "reaction", latest: { emojis: ["🎉", "👏"] } }))).toEqual([
       "🎉",
       "👏",
     ]);
+  });
+
+  test("a routine's trouble in the person's words, never the server's English", async () => {
+    const say = await sayer();
+    const routine = (kind: AppNotification["kind"], latest: AppNotification["latest"]) =>
+      subtitleOf(notification({ id: kind, kind, source: { routineId: "rt1", label: "Sentry diário" }, latest }), say);
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "budget_exceeded" })).toBe(
+      "O orçamento do mês acabou",
+    );
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "creator_no_access" })).toBe(
+      "Não pôde contar: quem criou não pode mais escrever ali",
+    );
+    // A code the app doesn't know, or none: the plain failure.
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "brand_new" })).toBe("Não deu certo");
+    expect(routine("routine_failed", { title: "Sentry diário", text: "It failed several times" })).toBe(
+      "Não deu certo",
+    );
+    expect(routine("routine_paused", { title: "Sentry diário", reason: "agent_not_in_channel" })).toBe(
+      "Pausada: o agente não está mais no canal",
+    );
+  });
+
+  test("an approval asked while nobody watched says who asked before the action", async () => {
+    const say = await sayer();
+    const approval = (origin: AppNotification["latest"]["origin"]) =>
+      subtitleOf(
+        notification({
+          id: "a",
+          kind: "approval",
+          waiting: true,
+          latest: { title: "Fazer merge do PR #42", text: "Os testes passaram e a correção é pequena.", origin },
+        }),
+        say,
+      );
+    expect(approval({ kind: "routine", routineId: "rt1", routineName: "Revisar PRs" })).toBe(
+      "Pedido pela rotina «Revisar PRs» enquanto ninguém acompanhava · Fazer merge do PR #42",
+    );
+    expect(approval({ kind: "unattended" })).toBe("Pedido enquanto ninguém acompanhava · Fazer merge do PR #42");
+    // A person was there: only the action.
+    expect(approval(undefined)).toBe("Fazer merge do PR #42");
   });
 });
 
@@ -109,6 +183,35 @@ describe("who is working", () => {
     );
     expect(work.map((w) => w.key)).toEqual(["m:m1", "r:r1", "r:r5"]);
     expect([...busyAgents(work)]).toEqual(["dev", "nina", "theo"]);
+  });
+
+  test("a run stopped on a person is marked waiting (it isn't counted as working)", () => {
+    const work = workingNow(
+      [
+        run("r1", "nina", "running", "t9"),
+        run("r5", "theo", "waiting_approval", null, ago(3), { channelId: "d1", channelKind: "dm", channelName: null }),
+        run("r6", "lisa", "waiting_input", null, ago(4), { channelId: "d2", channelKind: "dm", channelName: null }),
+      ],
+      [mission({ id: "m1", agentId: "dev", threadId: "t1" })],
+    );
+    expect(work.map((w) => [w.key, w.waiting])).toEqual([
+      ["m:m1", false],
+      ["r:r1", false],
+      ["r:r5", true],
+      ["r:r6", true],
+    ]);
+  });
+
+  test("a routine's background run is never working (no row, the DM doesn't say trabalhando)", () => {
+    const work = workingNow(
+      [
+        run("bg", "nina", "running", null, ago(1), { channelId: "d1", channelKind: "dm", background: true }),
+        run("r1", "dev", "running", "t1"),
+      ],
+      [],
+    );
+    expect(work.map((w) => w.key)).toEqual(["r:r1"]);
+    expect([...busyChannels(work)]).toEqual(["c1"]);
   });
 
   test("a run says what it works on, else where it is", () => {
@@ -270,7 +373,7 @@ describe("Busca", () => {
       hits: [file, { ...file, kind: "message", sourceId: "m1", channelIds: ["c"] }],
     });
     expect(r.files.map((h) => h.sourceId)).toEqual(["f1"]);
-    expect(searchCounts(r)).toEqual({ all: 3, chats: 1, messages: 1, files: 1 });
+    expect(searchCounts(r)).toEqual({ all: 3, chats: 1, team: 0, messages: 1, files: 1 });
     const onlyFiles = filterResults(r, "files");
     expect(onlyFiles.files).toHaveLength(1);
     expect(onlyFiles.actions.length + onlyFiles.agents.length + onlyFiles.messages.length).toBe(0);
@@ -286,5 +389,29 @@ describe("Busca", () => {
         hits: [file],
       }).files,
     ).toEqual([]);
+  });
+
+  test("the team's actions (ADR 0064): only those that open where they happened, with their own chip", () => {
+    const action = {
+      kind: "action" as const,
+      sourceId: "a1",
+      channelIds: ["c"],
+      title: "open_pull_request",
+      snippet: "GitHub · Nova tela de login",
+      score: 1,
+      createdAt: "",
+      author: { type: "agent" as const, id: "ada", name: "Ada" },
+    };
+    const r = searchResults("nova", {
+      actionLabels: { newConversation: "x", newTask: "y", newAgent: "z" },
+      agents: [],
+      channels: [],
+      dms: [],
+      hits: [action, { ...action, sourceId: "a2", channelIds: [] }],
+    });
+    expect(r.team.map((h) => h.sourceId)).toEqual(["a1"]);
+    expect(searchCounts(r)).toMatchObject({ all: 1, team: 1 });
+    expect(filterResults(r, "team").team).toHaveLength(1);
+    expect(filterResults(r, "messages").team).toEqual([]);
   });
 });

@@ -1,11 +1,20 @@
-import type { Adapters, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
+import {
+  type Adapters,
+  type BrainTurnRequest,
+  type S3Fetch,
+  type SandboxProvider,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   agentScopeFromDb,
+  authorizeStream,
+  type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  computerTurnProfile,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -19,11 +28,15 @@ import {
   createConnectorToolSource,
   createContextToolSource,
   createDatabaseToolSource,
+  createDesktopControl,
+  createDesktopToolSource,
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
+  createHandOffToolSource,
   createIssueToolSource,
   createJevJudge,
+  createJevKey,
   createJobHandlers,
   createLlmJudge,
   createMachineHub,
@@ -32,33 +45,49 @@ import {
   createMissionRunToolSource,
   createMissionToolSource,
   createModelGateway,
+  createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
+  createSessionScreening,
+  createSetupToolSource,
   createSkillToolSource,
+  createStreamBroker,
+  createTalker,
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
+  type EmailArt,
+  emailArtAt,
   type GitProxyDeps,
   hubBrainLink,
+  type JobDeps,
   type Judge,
   type MailDeps,
   type McpConnect,
+  messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
+  recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  smallModelFor,
+  standingJudge,
+  streamClosed,
   type ToolSource,
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+
+/** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
+export const NO_TERMINAL = "no_terminal";
 
 export interface EngineOptions {
   db: Database;
@@ -90,8 +119,11 @@ export interface EngineOptions {
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   /** Tests: this process's replica id for the machine hub (default: random). */
   replicaId?: string;
-  /** Tools on demand (D65; default on). Tests turn it off: every granted tool is listed. */
+  /** Tools on demand (ADR 0043; default on). Tests turn it off: every granted tool is listed. */
   toolsOnDemand?: boolean;
+  /** Where emails get their pictures (`emailArtFor` at boot); default: linked from `PUBLIC_URL`'s `/email/`. */
+  emailArt?: EmailArt;
+  log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
 /**
@@ -133,22 +165,47 @@ export function buildEngine(o: EngineOptions) {
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
     },
   };
-  // Semantic judgments (stop requests, hand-offs, permission changes): Jev when its platform key is
-  // set, with the org's cheap model as fallback; the cheap model alone otherwise.
+  // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
+  const jevKey = createJevKey({
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    envKey: config.TYPESAFE_API_KEY,
+    fetch: o.jevFetch,
+  });
+  // The small model that routes and judges on an organization's keys (ADR 0074): the deployment's own on a
+  // Claude or an OpenAI key, the catalog's routing pick on the others.
+  const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
+  // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
+  // with the org's small model as fallback.
   if (!context.judge) {
-    const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
-    context.judge = config.TYPESAFE_API_KEY
-      ? withJudgeFallback(
-          createJevJudge({
-            apiKey: config.TYPESAFE_API_KEY,
-            gateway,
-            timeoutMs: config.JEV_TIMEOUT_MS,
-            fetch: o.jevFetch,
-          }),
-          llmJudge,
-        )
-      : llmJudge;
+    const llmJudge = createLlmJudge({
+      gateway,
+      resolveModel: (orgId) => smallModelFor({ db, gateway }, orgId, smallModels),
+    });
+    context.judge = withJudgeFallback(
+      createJevJudge({
+        key: jevKey,
+        gateway,
+        timeoutMs: config.JEV_TIMEOUT_MS,
+        visionModel: config.JEV_VISION_MODEL,
+        fetch: o.jevFetch,
+      }),
+      llmJudge,
+      () => jevKey.usable(),
+    );
   }
+  // Screenshots go only to Jev's vision model: with a fake judge (tests) nothing looks at them.
+  const vision = o.judge ? undefined : () => jevKey.usable();
+  // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
+  context.judge = standingJudge(db, context.judge);
+  // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
+  const talker = createTalker({
+    db,
+    pubsub: adapters.pubsub,
+    gateway,
+    resolveModel: (orgId) => resolveSummaryModel(context, orgId),
+  });
   const connectorDeps = {
     db,
     keyWrappers,
@@ -165,10 +222,15 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
-  // Code sandbox (D30): cloud computers only when a provider is configured (Daytona in the Cloud);
+  // Code sandbox (ADR 0021): cloud computers only when a provider is configured (Daytona in the Cloud);
   // connected machines (ADR 0025) always, through the hub that holds their sockets.
   const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
-  const machineHub = createMachineHub({ db, pubsub: adapters.pubsub, replicaId: o.replicaId });
+  const machineHub = createMachineHub({
+    db,
+    pubsub: adapters.pubsub,
+    replicaId: o.replicaId,
+    readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
+  });
   const sandbox: SandboxDeps = {
     db,
     provider: sandboxProvider,
@@ -180,7 +242,7 @@ export function buildEngine(o: EngineOptions) {
     },
     autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
     archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
-    // Git through our proxy (D35): the computer never gets a GitHub token.
+    // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
   };
@@ -211,9 +273,15 @@ export function buildEngine(o: EngineOptions) {
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // Background runs (routines) speak only through it.
+      createHandOffToolSource({ pubsub: adapters.pubsub }),
+      // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
+      createPassToolSource(),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
+      // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo.
+      createSetupToolSource({ pubsub: adapters.pubsub }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
@@ -243,7 +311,20 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
       }),
       // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
-      createBrowserToolSource({ machines: { hub: machineHub }, pubsub: adapters.pubsub }),
+      // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+      createBrowserToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision,
+      }),
+      // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
+      createDesktopToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision,
+      }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({
@@ -261,13 +342,41 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
+  // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
+  const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
+  // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
+  // its access checked again while open; control changing hands closes the views it hides. Where sessions are
+  // screened no terminal opens: a shell nobody screens would be the way around it.
+  const streams = createStreamBroker({
+    db,
+    hub: machineHub,
+    authorize: async (input) =>
+      sessions && input.request.kind === "terminal"
+        ? { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL }
+        : authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    recheck: (stream) => recheckStream(db, stream),
+    onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
+    onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
+    log: o.log,
+  });
+  const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
-  /** A mission run's command policy (plan before Start and while a write item is live, work otherwise; ADR 0044). */
-  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) =>
-    (await missionTurnPermissions(db, turn)) ?? undefined;
+  /**
+   * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
+   * keeps its own (plan before Start, while a write item is live and for a run news from a routine or
+   * another agent woke there, work otherwise; ADR 0044); any other
+   * run follows who is behind it, read again every turn (`computerTurnProfile`: `plan` for a routine that
+   * only reads and for unattended runs, `work` for an `act` routine and a person's run). Its own branches
+   * are agentes/<handle>/… (what the git proxy accepts).
+   */
+  const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
+    (await missionTurnPermissions(db, turn)) ?? {
+      mode: await computerTurnProfile(db, turn),
+      branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
+    };
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
@@ -278,30 +387,29 @@ export function buildEngine(o: EngineOptions) {
         signal,
       },
     );
+  // A background run (a routine's) keeps no computer process alive after its turn.
   const brains: RunExecutorDeps["brains"] = {
-    claude_code: (_agent, _run, setup) =>
+    claude_code: (_agent, run, setup) =>
       createClaudeCodeBrain({
         hub: machineHub,
         pubsub: adapters.pubsub,
         agentScope,
         mcpToken: () => setup.mcpToken(),
-        // Outside missions: its own branches are agentes/<handle>/… (what the git proxy accepts).
-        permissions: async (turn) =>
-          (await missionPermissions(turn)) ?? {
-            mode: "work" as const,
-            branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
-          },
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
-    codex: (_agent, _run, setup) =>
+    codex: (_agent, run, setup) =>
       new CodexBrain({
         link: brainLink,
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
   };
-  const handlers = createJobHandlers({
+  const jobDeps: JobDeps = {
     db,
     gateway,
     pubsub: adapters.pubsub,
@@ -309,12 +417,17 @@ export function buildEngine(o: EngineOptions) {
     context,
     search: adapters.search,
     email: adapters.email,
+    emailArt: o.emailArt ?? emailArtAt(config.PUBLIC_URL),
     push: adapters.push,
+    // Browsers (ADR 0071): full text, encrypted to the browser.
+    webPush: adapters.webPush,
+    // A push not waiting on the person holds while they have the app open (ADR 0071 §7).
+    presence: adapters.presence,
     storage,
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
-    // Tools on demand (D65): each run lists what the judge expects it to need; the rest behind `find_tools`.
+    // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     brains,
     machines: machineHub,
@@ -326,16 +439,19 @@ export function buildEngine(o: EngineOptions) {
     onRunProfile: o.onRunProfile,
     router: {
       enabled: config.ROUTER_ENABLED,
-      model: config.ROUTER_MODEL,
-      cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
+      model: smallModels.anthropic,
+      cheapModels: { openai: smallModels.openai },
+      // The author's own plan on their computer, where the server isn't the Cloud's (ADR 0074).
+      plans: { hub: machineHub, publicUrl: config.PUBLIC_URL },
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
-      // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
-      ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"
-        ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
+      // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
+      ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
+        ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
         : {}),
     },
-  });
+  };
+  const handlers = createJobHandlers(jobDeps);
   // Mail accounts, inbound mail and polling (routes and workers).
   const mail: MailDeps = {
     db,
@@ -349,6 +465,8 @@ export function buildEngine(o: EngineOptions) {
     tools,
     context,
     handlers,
+    /** The same router as `message.posted`'s, for "Responder agora" (null: routing is off). */
+    router: messageRouter(jobDeps),
     connectorDeps,
     storage,
     artifacts,
@@ -356,7 +474,14 @@ export function buildEngine(o: EngineOptions) {
     gitProxy,
     machineHub,
     browserLive,
+    streams,
+    /** Screened sessions (ADR 0076), for the operator API's review door; null where nothing is screened. */
+    sessions,
+    desktops,
     mail,
+    talker,
+    /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
+    jevKey,
   };
 }
 

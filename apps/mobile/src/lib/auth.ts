@@ -1,25 +1,54 @@
 import { expoClient } from "@better-auth/expo/client";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
-import { API_URL, SCHEME, STORAGE_PREFIX } from "@/config";
+import i18n from "i18next";
+import { SCHEME, STORAGE_PREFIX } from "@/config";
+import { serverUrl } from "./server";
 
 /**
  * Better Auth for the app (ADR 0035 §3): the session cookie lives in SecureStore (Expo plugin), social
- * sign-in goes through the system browser and comes back on `agenteschat://`.
+ * sign-in goes through the system browser and comes back on `agenteschat://`. Every request says the app's
+ * language in `Accept-Language`, as the web's does: an account made here keeps it, and its first emails come in it.
  */
-export const authClient = createAuthClient({
-  baseURL: API_URL,
-  basePath: "/api/auth",
-  fetchOptions: { headers: { "X-Agentes-Client": "mobile" } },
-  plugins: [expoClient({ scheme: SCHEME, storagePrefix: STORAGE_PREFIX, storage: SecureStore })],
-});
+const createClient = (server: string) =>
+  createAuthClient({
+    baseURL: server,
+    basePath: "/api/auth",
+    fetchOptions: {
+      headers: { "X-Agentes-Client": "mobile" },
+      onRequest: (request) => {
+        if (i18n.language) request.headers.set("accept-language", i18n.language);
+      },
+    },
+    plugins: [expoClient({ scheme: SCHEME, storagePrefix: STORAGE_PREFIX, storage: SecureStore })],
+  });
+
+let current = { server: serverUrl(), client: createClient(serverUrl()) };
+
+/** The current server's client: a new one once the server changes. */
+export function authClient() {
+  if (current.server !== serverUrl()) current = { server: serverUrl(), client: createClient(serverUrl()) };
+  return current.client;
+}
+
+/**
+ * Forgets the stored cookie and session without asking the server, for leaving a server nobody is signed in
+ * to: the Expo plugin clears both as a sign-out starts, and this one's request is cancelled before it is sent.
+ */
+export async function forgetSession(): Promise<void> {
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await authClient()
+    .signOut({ fetchOptions: { signal: cancelled.signal } })
+    .catch(() => {});
+}
 
 let cookie = "";
 
 /** The session cookie, read fresh from SecureStore (and kept for the synchronous callers). */
 export async function readCookie(): Promise<string> {
   try {
-    cookie = await authClient.getCookie();
+    cookie = await authClient().getCookie();
   } catch {
     cookie = "";
   }

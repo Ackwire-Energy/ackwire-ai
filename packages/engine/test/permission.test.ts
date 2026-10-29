@@ -19,7 +19,14 @@ const reply = (req: ModelRequest) => {
     return {
       chunks: [],
       toolUses: [
-        { name: "request_permission", input: { permission: "browser:use", reason: "Open the landing page." } },
+        {
+          name: "request_permission",
+          input: {
+            why: "I need a person's answer before I go on: this decides what I change next.",
+            permission: "browser:use",
+            reason: "Open the landing page.",
+          },
+        },
       ],
     };
   return { chunks: ["Feito."] };

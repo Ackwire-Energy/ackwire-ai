@@ -25,6 +25,8 @@ describe("pixel marks", () => {
     const mark = container.querySelector(".ac-pixdone") as HTMLElement;
     expect(mark.getAttribute("aria-hidden")).toBe("true");
     expect(mark.style.getPropertyValue("--px")).toBe("4px");
+    // Its size for the aim at the capitals' middle in a line of text.
+    expect(mark.style.getPropertyValue("--mark-size")).toBe("14px");
     rerender(<PixelDone label="Feito" />);
     expect(body().getByRole("img", { name: "Feito" })).toBeTruthy();
   });
@@ -34,6 +36,7 @@ describe("pixel marks", () => {
     const mark = container.querySelector(".ac-pixstop") as HTMLElement;
     expect(mark.querySelectorAll("span")).toHaveLength(1);
     expect(mark.style.getPropertyValue("--stop-side")).toBe("10px");
+    expect(mark.style.getPropertyValue("--mark-size")).toBe("13px");
     expect(mark.hasAttribute("data-animated")).toBe(true);
     expect(mark.getAttribute("aria-hidden")).toBe("true");
     rerender(<PixelStop dim />);

@@ -41,7 +41,7 @@ export function ConversationListScreen({ kind }: { kind: ListKind }) {
               {t("mobile.common.loading")}
             </Text>
           ) : rows.length === 0 ? (
-            <EmptyState title={t("mobile.chats.empty")} />
+            <EmptyState icon="chat" title={t("mobile.chats.empty")} />
           ) : (
             rows.map((r, i) => (
               <ConversationRowView

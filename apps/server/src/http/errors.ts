@@ -7,6 +7,7 @@ import {
   MachineRequestError,
   MissingCredentialError,
   NotFoundError,
+  TooManyError,
   ValidationError,
 } from "@agenteschat/engine";
 import type { Hook } from "@hono/zod-openapi";
@@ -50,7 +51,7 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
     if (!result.success) {
       const message = result.error.issues
         .map((i) => `${i.path.length > 0 ? i.path.join(".") : "body"}: ${i.message}`)
-        .join("; ");
+        .join(". ");
       return apiError(c, 400, "invalid_request", message);
     }
   };
@@ -62,6 +63,7 @@ export function domainErrorResponse(error: unknown, c: Context) {
   if (error instanceof NotFoundError) return apiError(c, 404, error.code, error.message, error.params);
   if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message, error.params);
   if (error instanceof ValidationError) return apiError(c, 400, error.code, error.message, error.params);
+  if (error instanceof TooManyError) return apiError(c, 429, error.code, error.message, error.params);
   if (error instanceof BudgetExceededError) {
     return apiError(c, 402, "budget_exceeded", error.message, { agentId: error.agentId });
   }

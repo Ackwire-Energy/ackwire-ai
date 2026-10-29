@@ -65,7 +65,7 @@ export interface DeviceDeps {
 /** One address holds too many pending codes (the route answers 429). */
 export class DeviceCodeLimitError extends Error {
   constructor() {
-    super("Too many pending connection codes from this address; wait a few minutes and try again.");
+    super("Too many pending connection codes from this address. Wait a few minutes and try again.");
     this.name = "DeviceCodeLimitError";
   }
 }
@@ -117,7 +117,7 @@ export async function startDeviceCode(
   requester: DeviceRequester,
 ) {
   if (input.protocol !== undefined && input.protocol < MIN_RUNNER_PROTOCOL) {
-    throw new ValidationError("This runner is too old; download the latest one", "machine.outdated");
+    throw new ValidationError("This runner is too old. Download the latest one.", "machine.outdated");
   }
   const now = nowOf(deps);
   const ip = requester.ip.slice(0, 100);
@@ -236,7 +236,8 @@ export async function pollDeviceToken(deps: DeviceDeps, deviceCode: string): Pro
   if (!issued) return { ok: false, error: "expired_token" };
   await recordAudit(deps.db, {
     orgId: issued.machine.orgId,
-    actor: { type: "person", id: row.confirmedByUserId },
+    // Nobody confirmed a code the operator's provisioner issued (ADR 0056 §10).
+    actor: row.confirmedByUserId ? { type: "person", id: row.confirmedByUserId } : { type: "system", id: null },
     action: "machine.paired",
     target: { type: "machine", id: issued.machine.id },
     details: { name: issued.machine.name, hostname: issued.machine.hostname, os: issued.machine.os },
@@ -285,7 +286,7 @@ async function pendingCode(db: Database, userCode: string, now: Date) {
 }
 
 const notFound = () =>
-  new NotFoundError("This code is unknown or expired; start again on the computer", "machine.device_not_found");
+  new NotFoundError("This code is unknown or expired. Start again on the computer.", "machine.device_not_found");
 
 /**
  * What the confirm page shows (`GET /api/app/machines/device/{userCode}`), for
@@ -318,7 +319,8 @@ async function reconnectTarget(
     .select()
     .from(machines)
     .where(and(eq(machines.id, machineId), ...(orgId ? [eq(machines.orgId, orgId)] : [])));
-  if (!machine) return null;
+  // The workspace's own computer comes back only through its provisioner's code, never as someone's computer.
+  if (!machine || machine.kind === "managed") return null;
   const member = await getMembership(db, actorId, machine.orgId);
   if (!member || !can(member.role, "post")) return null;
   if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;

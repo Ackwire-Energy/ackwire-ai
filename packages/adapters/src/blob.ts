@@ -4,9 +4,10 @@
  * checks, or streams the bytes itself when a store can't sign.
  *
  * Implementations: S3-compatible buckets (`createS3BlobStore`: Cloudflare R2,
- * AWS S3, MinIO, Wasabi…), Postgres (`createPostgresBlobStore`, the fallback
- * when no bucket is configured) and memory (tests). Google Drive and OneDrive
- * (OAuth into a folder the org picks) are planned behind the same interface.
+ * AWS S3, MinIO, Wasabi…), a folder on the server's disk (`createDiskBlobStore`),
+ * Postgres (`createPostgresBlobStore`, the fallback when neither is configured)
+ * and memory (tests). Google Drive and OneDrive (OAuth into a folder the org
+ * picks) are planned behind the same interface.
  */
 export interface BlobStore {
   /** `s3`, `postgres`, `memory`… */
@@ -16,6 +17,8 @@ export interface BlobStore {
   delete(key: string): Promise<void>;
   /** Keys under `prefix`, at most `limit` (default 1000). */
   list(prefix: string, limit?: number): Promise<string[]>;
+  /** Everything under the folder `prefix` (ends with `/`) at once, folders included, where the store can. */
+  deletePrefix?(prefix: string): Promise<void>;
   /**
    * A short-lived URL that downloads the object, or null when this store
    * can't sign (the server streams it instead).

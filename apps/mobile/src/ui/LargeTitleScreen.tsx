@@ -5,7 +5,7 @@ import { Platform, type RefreshControlProps, StyleSheet, View } from "react-nati
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
-import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
+import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
@@ -31,7 +31,7 @@ export interface LargeTitleScreenProps {
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
   onScrollBeginDrag?: () => void;
   /**
-   * The grouped gray background (Atividade, settings-like screens) with white cards on it; lists and chat
+   * The grouped gray background (settings-like screens) with white cards on it; the tabs, lists and chat
    * stay on the plain (white, in light) background.
    */
   grouped?: boolean;
@@ -39,11 +39,12 @@ export interface LargeTitleScreenProps {
 
 /**
  * A tab's root screen (Conversas, Agentes, Atividade): the large title in Funnel Display is part of the
- * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's, and like the
- * prototype). We draw it rather than using the native large title: on iOS 26 inside the system tabs the
- * native one stayed expanded while the list scrolled under it. The bar is clear over the large title and
- * turns into the system glass (iOS 26 scroll edge; a blur before; opaque on Android) once content passes
- * under it. Agents inside stop moving while the screen is not showing.
+ * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's). We draw it
+ * rather than using the native large title: on iOS 26 inside the system tabs the native one stayed
+ * expanded while the list scrolled under it. The bar is clear over the large title and
+ * turns into the system glass (iOS 26 scroll edge; a blur before; on Android a fade into the screen's color
+ * under the floating buttons) once content passes under it. Agents inside stop moving while the screen is not
+ * showing.
  */
 export function LargeTitleScreen({
   title,
@@ -99,8 +100,14 @@ export function LargeTitleScreen({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
-          <View style={backdrop && IOS ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
-            {backdrop ? <View style={StyleSheet.absoluteFill}>{backdrop}</View> : null}
+          {/* The art reaches up behind the clear bar and the status bar on both platforms (no band above it). */}
+          <View style={backdrop ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
+            {/* As the agent's cover: it lags behind the list, and stretches into the gap a pull-down opens. */}
+            {backdrop ? (
+              <CoverParallax y={y} style={StyleSheet.absoluteFill}>
+                {backdrop}
+              </CoverParallax>
+            ) : null}
             <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
               <Text variant="display" accessibilityRole="header" numberOfLines={1}>
                 {title}
@@ -116,7 +123,7 @@ export function LargeTitleScreen({
           {children}
         </Animated.ScrollView>
       </LivePause>
-      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
+      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} tone={grouped ? colors.grouped : colors.bg} />
     </View>
   );
 }

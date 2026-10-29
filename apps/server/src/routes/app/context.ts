@@ -1,6 +1,7 @@
 import type { Adapters } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
+import type { AiStatusDeps } from "@agenteschat/engine";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { type Auth, type SessionUser, sessionUser } from "../../auth";
@@ -118,3 +119,10 @@ export const OrgParams = z.object({ orgId: z.uuid().openapi({ param: { name: "or
 export const noContent = { 204: { description: "Done" } };
 
 export const iso = (d: Date | null) => (d ? d.toISOString() : null);
+
+/** What the AI status reads (`ai-status.ts`): the gateway's key check and the computers' status. */
+export function aiStatusDeps(deps: AppDeps): AiStatusDeps {
+  const gateway = deps.extras?.context?.gateway;
+  if (!gateway) throw new Error("The model gateway isn't configured on this server");
+  return { db: deps.db, gateway, machines: deps.extras?.sandbox?.machines?.hub ?? null };
+}

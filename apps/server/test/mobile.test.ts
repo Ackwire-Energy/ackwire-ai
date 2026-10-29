@@ -159,6 +159,56 @@ describe("push devices", () => {
     expect((await fromApp(browser(t), "/api/app/push/devices", { json: { token: TOKEN } })).status).toBe(401);
   });
 
+  test("stale: which shown notifications aren't open and unread for you anymore", async () => {
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    await fromApp(owner, "/api/app/push/devices", { json: { token: TOKEN, platform: "ios", locale: "en" } });
+    const userId = (await t.db.select().from(schema.pushDevices))[0]?.userId ?? "";
+    const other = browser(t);
+    await signUp(other, "other@example.com");
+    await fromApp(other, "/api/app/push/devices", {
+      json: { token: "ExponentPushToken[phone-of-other-01]", platform: "ios", locale: "en" },
+    });
+    const otherId = (await t.db.select().from(schema.pushDevices)).find((d) => d.userId !== userId)?.userId ?? "";
+
+    const now = Date.now();
+    const insert = async (key: string, values: Partial<typeof schema.notifications.$inferInsert> = {}) => {
+      const [row] = await t.db
+        .insert(schema.notifications)
+        .values({ orgId, userId, kind: "mention", groupKey: `mention:${key}`, ...values })
+        .returning();
+      return row?.id ?? "";
+    };
+    const open = await insert("open");
+    const read = await insert("read", { readAt: new Date(now) });
+    const done = await insert("done", { doneAt: new Date(now) });
+    const snoozed = await insert("snoozed", { snoozedUntil: new Date(now + 3600_000) });
+    const woke = await insert("woke", { snoozedUntil: new Date(now - 60_000) });
+    const notMine = await insert("theirs", { userId: otherId });
+    const missing = crypto.randomUUID();
+
+    const ask = (b: Browser, ids: unknown) => fromApp(b, "/api/app/push/stale", { json: { ids } });
+    const res = await ask(owner, [open, read, done, snoozed, woke, notMine, missing]);
+    expect(res.status).toBe(200);
+    const { stale } = (await res.json()) as { stale: string[] };
+    expect(stale.sort()).toEqual([read, done, snoozed, notMine, missing].sort());
+    // The other person's own notification is open for them.
+    expect(await (await ask(other, [notMine])).json()).toEqual({ stale: [] });
+
+    expect((await ask(owner, ["not-an-id"])).status).toBe(400);
+    expect(
+      (
+        await ask(
+          owner,
+          Array.from({ length: 101 }, () => crypto.randomUUID()),
+        )
+      ).status,
+    ).toBe(400);
+    expect((await fromApp(browser(t), "/api/app/push/stale", { json: { ids: [open] } })).status).toBe(401);
+  });
+
   test("a mention reaches the phone through the outbox", async () => {
     t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
     const owner = browser(t);

@@ -5,7 +5,7 @@ import { keys } from "../api/keys";
 import type { BrowserHandoff } from "../api/types";
 
 /**
- * A take over held in a conversation (ADR 0040 §6, telas/NavegadorNoChat.html): "Assumir" turns
+ * A take over held in a conversation (ADR 0040 §6): "Assumir" turns
  * the run's browser card into the control, and the card must outlive the run's live block (the
  * run pauses while the person drives, and may even end). It stays on the run's last saved message,
  * else (the run posted nothing there) at the end of the conversation the run answers in. Shared by

@@ -26,10 +26,10 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, usdToNanoUsd } from "@agenteschat/providers";
+import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, Role } from "./schemas";
+import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -53,6 +53,9 @@ const Settings = z
     teamSize: z.enum(["solo", "small", "medium", "large"]).nullable(),
     defaultAgentBudgetUsd: z.number().optional().openapi({
       description: "Monthly budget of every agent without its own. Admins only (absent for members).",
+    }),
+    actionCheck: z.boolean().openapi({
+      description: "Agents check what the team already did before acting outside (ADR 0064). On by default.",
     }),
   })
   .openapi("OrgSettings");
@@ -113,6 +116,10 @@ const AgentDetail = z
     defaultBudgetUsd: z.number().optional().openapi({ description: "Admins only: the workspace default budget." }),
     tokensThisMonth: z.number(),
     runsThisMonth: z.number(),
+    failuresThisMonth: z.number(),
+    runsByDay: z
+      .array(z.object({ day: z.number(), runs: z.number(), failed: z.number() }))
+      .openapi({ description: "This month's runs and failures per day (UTC); only days with runs." }),
     pendingApprovals: z.number(),
     channels: z.array(AgentChannel),
     createdAt: z.string(),
@@ -203,7 +210,7 @@ export function managementRoutes(deps: AppDeps) {
             name: z.string().trim().min(1).max(100).optional(),
             context: z.string().max(20_000).optional(),
             defaultCredentialId: z.uuid().nullable().optional(),
-            defaultCredentialIds: z.record(z.enum(["anthropic", "openai"]), z.uuid().nullable()).optional(),
+            defaultCredentialIds: z.partialRecord(ProviderId, z.uuid().nullable()).optional(),
             routerModel: ModelId.nullable().optional(),
             summaryModel: ModelId.nullable().optional(),
             timezone: z.string().max(64).optional(),
@@ -214,6 +221,7 @@ export function managementRoutes(deps: AppDeps) {
               .max(1_000_000)
               .optional()
               .openapi({ description: "Monthly budget of every agent without its own." }),
+            actionCheck: z.boolean().optional(),
           }),
         ),
       },
@@ -553,8 +561,8 @@ export function managementRoutes(deps: AppDeps) {
             available: usable(m.provider),
             recommended: usable(m.provider) && m.recommended === true,
             cheap: m.cheap === true,
-            inputUsdPerMTok: m.prices.input / 1000,
-            outputUsdPerMTok: m.prices.output / 1000,
+            inputUsdPerMTok: pricesAt(m).input / 1000,
+            outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
           providers: providerIds.map((id) => ({
             id,
@@ -603,6 +611,8 @@ export function managementRoutes(deps: AppDeps) {
             : {}),
           tokensThisMonth: d.month.tokens,
           runsThisMonth: d.month.runs,
+          failuresThisMonth: d.month.failures,
+          runsByDay: d.month.byDay,
           pendingApprovals: d.pendingApprovals,
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,
@@ -803,7 +813,7 @@ export function managementRoutes(deps: AppDeps) {
             totalUsd: z.number(),
             platformBilled: z
               .object({ calls: z.number(), costUsd: z.number() })
-              .openapi({ description: "Calls our platform pays for (e.g. the router's Jev model); not in the total." }),
+              .openapi({ description: "Calls the server pays for (Jev), not in the total." }),
             byKind: z.array(
               z.object({
                 kind: z.enum(["agent", "router", "embedding", "summary", "sandbox"]),

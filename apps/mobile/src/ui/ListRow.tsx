@@ -14,7 +14,7 @@ export const LIST_INSET = 14 + LIST_AVATAR + GAP;
 const IOS = Platform.OS === "ios";
 
 /**
- * A row's second line, readable (MobileIntencional.html `.cr .l2 p`): 15.5/21 on iOS (Android keeps its
+ * A row's second line, readable: 15.5/21 on iOS (Android keeps its
  * 14/20 body medium). For any text that sits in that line (a preview, what an agent is doing).
  */
 export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15.5, lineHeight: 21 } : { lineHeight: 20 };
@@ -34,11 +34,13 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   over?: ReactNode;
   /** Line 2 (a string is drawn in the readable secondary color, up to two lines). */
   sub?: ReactNode;
+  /** Lines of a string `sub` (default 2, 0: all of it). */
+  subLines?: number;
   /** On the right of line 2 (a count badge, a state). */
   trailing?: ReactNode;
   /** A hairline above, inset to the text column (every row but the first). */
   divider?: boolean;
-  /** A small ink dot left of the avatar (unread). */
+  /** A red dot on the right, centered on the row (unread), as messaging apps do. */
   dot?: boolean;
   /** Something new in it: the name bold, the time and the preview darker. */
   unread?: boolean;
@@ -47,7 +49,7 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
 }
 
 /**
- * One full-width row of a list (MobileConversas.html, readable per MobileIntencional.html): no card, the
+ * One full-width row of a list: no card, the
  * 52pt avatar, the semibold 17 name and the time on line 1, the preview (15.5/21, two lines) with a badge or
  * state on line 2, hairlines inset to the text, about 82pt tall. Unread: bold name, darker time and preview.
  * Conversas, Atividade and Agentes use it.
@@ -59,6 +61,7 @@ export function ListRow({
   time,
   over,
   sub,
+  subLines = 2,
   trailing,
   divider = false,
   dot = false,
@@ -77,7 +80,6 @@ export function ListRow({
       ]}
     >
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-      {dot ? <View style={[styles.dot, { backgroundColor: c.ink }]} /> : null}
       <View style={styles.avatar}>{leading}</View>
       <View style={styles.tx}>
         <View style={styles.l1}>
@@ -104,7 +106,7 @@ export function ListRow({
           <View style={styles.l2}>
             <View style={styles.grow}>
               {typeof sub === "string" ? (
-                <Text variant="small" tone={unread ? "ink2" : "muted"} numberOfLines={2} style={LIST_PREVIEW}>
+                <Text variant="small" tone={unread ? "ink2" : "muted"} numberOfLines={subLines} style={LIST_PREVIEW}>
                   {sub}
                 </Text>
               ) : (
@@ -115,6 +117,7 @@ export function ListRow({
           </View>
         ) : null}
       </View>
+      {dot ? <View style={[styles.dot, { backgroundColor: c.badge }]} /> : null}
     </Pressable>
   );
 }
@@ -130,7 +133,7 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  dot: { position: "absolute", left: 3, top: "50%", marginTop: -4, width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
   l1: { flexDirection: "row", alignItems: "center", gap: 6 },

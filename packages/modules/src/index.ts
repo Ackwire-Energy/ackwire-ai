@@ -7,9 +7,8 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 /**
  * Which build of agentes.chat is running.
  * - `selfhost`: the open-source server, started by `apps/server/src/main.ts`.
- * - `cloud`: our hosted service, started from the private `agentes-chat-cloud`
- *   repository (this repository is its `core/` submodule), which adds
- *   cloud-only modules (billing, plan limits, platform key, KMS, Redis).
+ * - `cloud`: our hosted service: this same server, with Cloud-only behavior
+ *   switched on by environment variables (ADR 0002 §5).
  */
 export type Edition = "selfhost" | "cloud";
 
@@ -29,8 +28,11 @@ export interface AdapterOverrides extends Partial<Adapters> {
 }
 
 /**
- * Extension point that lets the Cloud edition and `ee/` add behaviour without
- * the core ever importing them. The core only knows this interface.
+ * Extension point that lets optional modules (Cloud-only behavior among them)
+ * add behaviour without the core ever importing them. The core only knows
+ * this interface. Modules are public code: outside contributions come in under
+ * the AGPL with no contributor license agreement, so nothing private may run
+ * in this process (ADR 0002 §5).
  *
  * Rule enforced by `bun run check:boundaries`: nothing under `apps/` or
  * `packages/` may import `@agenteschat/cloud` or `@agenteschat/ee`.

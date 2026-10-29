@@ -1,6 +1,8 @@
-import { useAgentDetail, useSettings, useUsage } from "@agenteschat/client";
-import { audienceSummary } from "@agenteschat/client/lib/audience";
+import { type AgentAudience, useAgentDetail, useSettings, useUsage } from "@agenteschat/client";
+import { answersOthers, audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
+import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
+import { planOf } from "@agenteschat/client/lib/plans";
 import {
   type AgentAppearance,
   Avatar,
@@ -15,16 +17,19 @@ import {
   Input,
   Meter,
   randomAppearance,
+  SettingNote,
 } from "@agenteschat/ui";
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerPanel, CLOUD } from "@/components/AgentComputer";
 import { BudgetField, LookRows, NO_OWNER, OwnerSelect, usd } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
+import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
 import { BLANK_LOOK } from "@/lib/new-agent";
@@ -98,6 +103,7 @@ export function SettingsTab({
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
+  const edition = useComputerEdition(org.id);
   const dir = useDirectory(org.id);
   const { agent, g, viewer, draft, saved, set, can, changes, errors, ownerFirst, openWork } = useAgentEdit();
   const admin = viewer === "admin";
@@ -115,6 +121,21 @@ export function SettingsTab({
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
   const look = draft.look;
+  // On a personal plan (ADR 0059 §5) only its owner lets more people in, and accepts the provider's terms once.
+  const plan = engineOfBrain(agent.brain?.kind);
+  // A coding plan's account: its maker's own words in the warning.
+  const maker = agent.brain?.kind === "claude_code" ? planOf(agent.brain.provider)?.maker : undefined;
+  const [asking, setAsking] = useState<AgentAudience | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const chooseAudience = (next: AgentAudience) => {
+    if (plan !== "agent" && audienceWidens(saved.audience, next, agent.ownerUserId)) {
+      if (agent.ownerUserId !== me.user.id) return setBlocked(true);
+      if (!answersOthers(saved.audience, agent.ownerUserId) && !answersOthers(draft.audience, agent.ownerUserId))
+        return setAsking(next);
+    }
+    setBlocked(false);
+    set("audience", next);
+  };
   return (
     <>
       <ReadOnlyNote />
@@ -331,11 +352,29 @@ export function SettingsTab({
                 <AudienceChoice
                   compact
                   value={draft.audience}
-                  onChange={(a) => set("audience", a)}
+                  onChange={chooseAudience}
                   ownerUserId={ownerId}
                   agentName={agent.name}
                   idPrefix="agp-audience"
                 />
+                {blocked && (
+                  <SettingNote icon="lock" live>
+                    {t("aiAccounts.share.ownerOnly", { ...g, owner: ownerFirst ?? "" })}
+                  </SettingNote>
+                )}
+                {asking && plan !== "agent" && (
+                  <SharePlanDialog
+                    agentName={agent.name}
+                    brain={plan}
+                    {...(maker ? { maker } : {})}
+                    everyone={asking.mode === "everyone"}
+                    onAccept={() => {
+                      set("audience", asking);
+                      setAsking(null);
+                    }}
+                    onKeep={() => setAsking(null)}
+                  />
+                )}
                 {errors.audience && (
                   <span className="newag__err" role="alert">
                     <Icon name="info" size={14} />
@@ -407,14 +446,15 @@ export function SettingsTab({
                 admin={admin}
                 machine={CLOUD}
                 machineNote={
-                  can("machine") ? (
+                  // The Cloud's agents all work on the workspace's own computer: nothing to pick.
+                  can("machine") && edition === "selfhost" ? (
                     <Button
                       size="sm"
                       icon="computer"
                       onClick={() => openWork("computer")}
                       style={{ alignSelf: "flex-start" }}
                     >
-                      {t("agentPage.work.open.computer")}
+                      {t("agentPage.work.open.computer", g)}
                     </Button>
                   ) : undefined
                 }
