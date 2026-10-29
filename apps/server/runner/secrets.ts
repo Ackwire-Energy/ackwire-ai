@@ -23,7 +23,11 @@ interface Stored {
   target: { kind: "env" } | { kind: "file"; path: string };
   value: string;
   deliveredAt: string;
+  requestId?: string;
+  order?: string;
 }
+
+type Staged = Extract<SecretRequest, { action: "deliver" }>;
 
 const REQUEST_ID = /^[a-zA-Z0-9-]{8,64}$/;
 /** Keys of requests nobody answered (expired, canceled) are dropped after this. */
@@ -34,7 +38,14 @@ async function pruneKeys(keysDir: string) {
   for (const name of names) {
     const file = path.join(keysDir, name);
     const st = await stat(file).catch(() => null);
-    if (st && Date.now() - st.mtimeMs > STALE_KEY_MS) await rm(file, { force: true });
+    if (!st || Date.now() - st.mtimeMs <= STALE_KEY_MS) continue;
+    const staged = path.join(path.dirname(keysDir), "staged", name);
+    const stagedStat = await stat(staged).catch(() => null);
+    // A committed delivery can wait for the machine to reconnect before the
+    // outbox activates it. Keep its key while the staged box is recoverable.
+    if (stagedStat && Date.now() - stagedStat.mtimeMs <= 7 * 24 * STALE_KEY_MS) continue;
+    await rm(file, { force: true });
+    if (stagedStat) await rm(staged, { force: true });
   }
 }
 
@@ -67,6 +78,36 @@ const keyFile = (dir: string, requestId: string) => {
   if (!REQUEST_ID.test(requestId)) throw new RunnerError("bad_request", "Invalid request id");
   return path.join(dir, "keys", requestId);
 };
+const stagedFile = (dir: string, requestId: string) => {
+  if (!REQUEST_ID.test(requestId)) throw new RunnerError("bad_request", "Invalid request id");
+  return path.join(dir, "staged", requestId);
+};
+const canceledFile = (dir: string, requestId: string) => path.join(dir, "canceled", path.basename(stagedFile(dir, requestId)));
+const orderFile = (dir: string, name: string) => {
+  if (!SECRET_NAME.test(name)) throw new RunnerError("bad_request", "Invalid secret name");
+  return path.join(dir, "orders", name);
+};
+async function latestOrder(dir: string, name: string, stored: Stored | undefined) {
+  const persisted = await readFile(orderFile(dir, name), "utf8").catch((err) => {
+    if (errnoCode(err) === "ENOENT") return "";
+    throw err;
+  });
+  return persisted > (stored?.order ?? "") ? persisted : (stored?.order ?? "");
+}
+async function writeOrder(dir: string, name: string, order: string) {
+  const file = orderFile(dir, name);
+  await ensureDir(path.dirname(file));
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, order, { mode: 0o600 });
+  await rename(tmp, file);
+}
+async function cancelStaged(dir: string, requestId: string) {
+  const marker = canceledFile(dir, requestId);
+  await ensureDir(path.dirname(marker));
+  await writeFile(marker, "", { mode: 0o600 });
+  await rm(keyFile(dir, requestId), { force: true });
+  await rm(stagedFile(dir, requestId), { force: true });
+}
 
 /** `agentes-secret|v1|<request>|<org>|<name>|<target>`: the server's AAD must name this request, secret and target. */
 function checkAad(aad: string, requestId: string, name: string, target: Stored["target"]) {
@@ -83,6 +124,9 @@ function checkAad(aad: string, requestId: string, name: string, target: Stored["
   }
 }
 
+const secretQueues = new Map<string, Promise<void>>();
+
+/** Serialize an agent's secret mutations, including activation against removal. */
 export async function handleSecret(
   root: string,
   agent: AgentScope | undefined,
@@ -91,6 +135,24 @@ export async function handleSecret(
 ): Promise<MachineReplies["secret"]> {
   if (!agent) throw new RunnerError("bad_request", "Secrets belong to an agent");
   const dir = dirOf(root, agent);
+  const previous = secretQueues.get(dir) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  secretQueues.set(dir, current);
+  await previous;
+  try {
+    return await handleSecretLocked(dir, workspaceReal, req);
+  } finally {
+    release();
+    if (secretQueues.get(dir) === current) secretQueues.delete(dir);
+  }
+}
+
+async function handleSecretLocked(
+  dir: string,
+  workspaceReal: string,
+  req: SecretRequest,
+): Promise<MachineReplies["secret"]> {
   switch (req.action) {
     case "keypair": {
       const file = keyFile(dir, req.requestId);
@@ -129,26 +191,89 @@ export async function handleSecret(
         if (touchesGitInternals(target.path, resolved.abs)) {
           throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
         }
-        await mkdir(path.dirname(resolved.abs), { recursive: true });
-        await writeFile(resolved.abs, value, { mode: 0o600 });
-        await chmod(resolved.abs, 0o600).catch(() => undefined);
+      }
+      // Before the server commits, keep only ciphertext and never expose the
+      // value to commands, browser use, or files in the workspace.
+      const staged = stagedFile(dir, req.requestId);
+      await ensureDir(path.dirname(staged));
+      const payload = JSON.stringify(req);
+      try {
+        await writeFile(staged, payload, { flag: "wx", mode: 0o600 });
+      } catch (err) {
+        if (errnoCode(err) !== "EEXIST" || (await readFile(staged, "utf8")) !== payload) throw err;
+        // A lost stage reply may be retried with the same sealed box.
+      }
+      return { size: Buffer.byteLength(value) };
+    }
+    case "activate": {
+      if (!req.order || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
+        throw new RunnerError("bad_request", "Invalid secret delivery order");
+      if (await stat(canceledFile(dir, req.requestId)).then(() => true, (err) => {
+        if (errnoCode(err) === "ENOENT") return false;
+        throw err;
+      })) return { superseded: true };
+      const staged = stagedFile(dir, req.requestId);
+      let delivery: Staged;
+      try {
+        delivery = JSON.parse(await readFile(staged, "utf8")) as Staged;
+      } catch (err) {
+        if (errnoCode(err) !== "ENOENT") throw err;
+        // An activation reply can be lost after the store was written.
+        const secrets = await readStore(dir);
+        const own = secrets.find((s) => s.requestId === req.requestId);
+        const current = own ? secrets.filter((s) => s.name === own.name).at(-1) : null;
+        if (own && (await latestOrder(dir, own.name, current ?? undefined)) > req.order) {
+          await cancelStaged(dir, req.requestId);
+          return { superseded: true };
+        }
+        if (own && current?.requestId === req.requestId) return { size: Buffer.byteLength(own.value) };
+        throw new RunnerError("not_found", "This request has no staged secret");
+      }
+      if (delivery.action !== "deliver" || delivery.requestId !== req.requestId)
+        throw new RunnerError("bad_request", "Invalid staged secret");
+      const file = keyFile(dir, req.requestId);
+      const privateKey = await readFile(file, "utf8");
+      const value = await openSecret(privateKey, delivery.box, delivery.aad);
+      const target: Stored["target"] =
+        delivery.target.kind === "file" ? { kind: "file", path: delivery.target.path } : { kind: "env" };
+      checkAad(delivery.aad, delivery.requestId, delivery.name, target);
+      const current = (await readStore(dir)).filter((s) => s.name === delivery.name).at(-1);
+      if ((await latestOrder(dir, delivery.name, current ?? undefined)) > req.order) {
+        await cancelStaged(dir, req.requestId);
+        return { superseded: true };
+      }
+      let fileTarget: string | null = null;
+      if (target.kind === "file") {
+        const resolved = await resolveInWorkspace(workspaceReal, target.path);
+        if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
+        if (touchesGitInternals(target.path, resolved.abs)) {
+          throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
+        }
         target.path = resolved.rel;
+        fileTarget = resolved.abs;
       }
       await ensureDir(dir);
+      await writeOrder(dir, delivery.name, req.order);
       const before = await readStore(dir);
-      const next = before.filter((s) => s.name !== req.name);
-      next.push({ name: req.name, target, value, deliveredAt: new Date().toISOString() });
+      const next = before.filter((s) => s.name !== delivery.name);
+      next.push({ name: delivery.name, target, value, deliveredAt: new Date().toISOString(), requestId: req.requestId, order: req.order });
       // A replacement can move a secret to another file or to the environment.
       // Keep every old file in the store (and therefore in file guards and
-      // redaction) until its plaintext has actually been removed.
+      // redaction) until its plaintext has been overwritten or removed.
       const livePaths = new Set(next.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])));
-      const oldFiles = before.filter(
-        (s) => s.name === req.name && s.target.kind === "file" && !livePaths.has(s.target.path),
-      );
+      const oldFiles = before.filter((s) => s.name === delivery.name && s.target.kind === "file");
+      const filesToRemove = oldFiles.filter((s) => s.target.kind === "file" && !livePaths.has(s.target.path));
       await writeStore(dir, [...oldFiles, ...next]);
+      // The DB already guards the file path, and the store records the value
+      // before any workspace write that might fail halfway through.
+      if (fileTarget) {
+        await mkdir(path.dirname(fileTarget), { recursive: true });
+        await writeFile(fileTarget, value, { mode: 0o600 });
+        await chmod(fileTarget, 0o600).catch(() => undefined);
+      }
       if (oldFiles.length > 0) {
         let allRemoved = true;
-        for (const old of oldFiles) {
+        for (const old of filesToRemove) {
           if (old.target.kind !== "file") continue;
           try {
             const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
@@ -162,16 +287,21 @@ export async function handleSecret(
         if (allRemoved) await writeStore(dir, next);
       }
       await rm(file, { force: true });
+      await rm(staged, { force: true });
       return { size: Buffer.byteLength(value) };
     }
     case "discard":
       await rm(keyFile(dir, req.requestId), { force: true });
+      await rm(stagedFile(dir, req.requestId), { force: true });
       return {};
     case "remove": {
       const secrets = await readStore(dir);
-      const gone = secrets.filter((s) => s.name === req.name);
+      const selected = (s: Stored) => s.name === req.name &&
+        (!req.requestIds || (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
+          (req.throughOrder !== undefined && (s.order ?? "") <= req.throughOrder));
+      const gone = secrets.filter(selected);
       const otherPaths = new Set(
-        secrets.flatMap((s) => (s.name !== req.name && s.target.kind === "file" ? [s.target.path] : [])),
+        secrets.flatMap((s) => (!selected(s) && s.target.kind === "file" ? [s.target.path] : [])),
       );
       for (const old of gone) {
         if (old.target.kind !== "file" || otherPaths.has(old.target.path)) continue;
@@ -181,8 +311,11 @@ export async function handleSecret(
       if (gone.length > 0)
         await writeStore(
           dir,
-          secrets.filter((s) => s.name !== req.name),
+          secrets.filter((s) => !selected(s)),
         );
+      for (const requestId of req.requestIds ?? []) {
+        await cancelStaged(dir, requestId);
+      }
       return {};
     }
     default:
