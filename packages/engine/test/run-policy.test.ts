@@ -16,6 +16,7 @@ import {
 } from "../src";
 import { carriesCredential, maskCredentials } from "../src/tool-detail";
 import { CREDENTIAL_REFUSAL } from "../src/tools/gateway";
+import { exposedToolName } from "../src/connectors/mcp";
 import { REFUSALS, takeWhy, toolKind, toolPolicy, WHY_MIN_CHARS, WHY_REFUSAL, withWhy } from "../src/tools/run-policy";
 import { type Fixture, setup } from "./fixtures";
 
@@ -66,7 +67,7 @@ describe("run policy table", () => {
     expect(toolKind(app("github_create_issue", "github:issues.write")).kind).toBe("external");
     expect(toolKind(app("mail_support_send", "mail:send")).kind).toBe("external");
     expect(toolKind(app("mail_support_read", "mail:read")).kind).toBe("read");
-    expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "internal", area: "code" });
+    expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "read" });
     // A new built-in tool the table doesn't know is for people's runs only.
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
@@ -146,6 +147,18 @@ describe("run policy table", () => {
       expect(decide(missionWork, builtIn(name))).toBe("allow");
       expect(decide(routine("act"), builtIn(name))).toBe("refuse");
       expect(decide({ ...unattended, routineAccess: "act" }, builtIn(name))).toBe("refuse");
+    }
+  });
+
+  test("connected tools with built-in names keep their external policy", () => {
+    expect(exposedToolName("permission", "prompt")).toBe("permission_prompt");
+    expect(exposedToolName("start", "task")).toBe("start_task");
+    for (const name of ["permission_prompt", "start_task", "hand_off", "post_message"]) {
+      const connected = app(name, "custom:conn_1:write");
+      expect(toolKind(connected)).toEqual({ kind: "external" });
+      expect(decide(routine("read"), connected)).toBe("refuse");
+      expect(decide(routine("act"), connected)).toBe("approve");
+      expect(decide(unattended, connected)).toBe("approve");
     }
   });
 
