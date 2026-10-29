@@ -176,17 +176,20 @@ function keepSelection(ranges: Range[]) {
 /**
  * A menu at a point: the right click of the desktop app. The same items as `Menu`, open at once under the
  * pointer (no grow-in), flipped at the window's edges, closed by Esc, a click outside, scrolling the page or
- * leaving the window. Give it a new `key` for each opening so it is placed again.
+ * leaving the window. Give it a new `key` for each opening so it is placed again. Given a box (`width`, `height`),
+ * it opens beside the box instead, under it or over it, never on it.
  */
 export function MenuAt({
   at,
   onClose,
   label,
+  align = "start",
   children,
 }: {
-  at: { x: number; y: number };
+  at: { x: number; y: number; width?: number; height?: number };
   onClose: () => void;
   label?: string;
+  align?: "start" | "end";
   children: ReactNode;
 }) {
   // Read before the menu takes focus (the first render), put back when it goes.
@@ -213,13 +216,20 @@ export function MenuAt({
       <DropdownMenu.Trigger asChild>
         <span
           aria-hidden="true"
-          style={{ position: "fixed", left: at.x, top: at.y, width: 0, height: 0, pointerEvents: "none" }}
+          style={{
+            position: "fixed",
+            left: at.x,
+            top: at.y,
+            width: at.width ?? 0,
+            height: at.height ?? 0,
+            pointerEvents: "none",
+          }}
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           className="ac-menu ac-menu--dropdown ac-menu--at"
-          align="start"
+          align={align}
           side="bottom"
           sideOffset={2}
           collisionPadding={8}

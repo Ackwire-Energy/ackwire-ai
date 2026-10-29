@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "../testing/dom";
 
 setupDom();
@@ -746,6 +746,101 @@ describe("Message aside and foot", () => {
     }
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     expect(css).toContain(".ac-msg__aside:empty,\n.ac-msg__foot:empty {\n  display: none;\n}");
+  });
+});
+
+describe("Message on touch", () => {
+  /** A phone (touch points, no hover) or a computer with a mouse. */
+  const device = (touch: boolean) => {
+    const media = spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: touch && query.includes("hover: none"),
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    const points = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: touch ? 5 : 0 });
+    return () => {
+      media.mockRestore();
+      if (points) Object.defineProperty(navigator, "maxTouchPoints", points);
+      else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+    };
+  };
+  const row = (onReply: () => void) => (
+    <Message
+      author="João"
+      time="10:43"
+      grouped
+      menu={{ label: "Ações da mensagem de João", items: <MenuItem onSelect={onReply}>Responder</MenuItem> }}
+    >
+      <MessageText>Os rótulos ficam com o verde antigo?</MessageText>
+      <button type="button">Conectar</button>
+    </Message>
+  );
+
+  test("a tap on the row opens its actions in a menu off the row and lights the row; a control keeps its own tap", async () => {
+    const restore = device(true);
+    try {
+      let replied = 0;
+      const { container } = render(row(() => replied++));
+      const article = container.querySelector("article") as HTMLElement;
+      await act(async () => fireEvent.click(body().getByRole("button", { name: "Conectar" })));
+      expect(body().queryByRole("menu")).toBeNull();
+      await act(async () => fireEvent.click(container.querySelector(".ac-msg__text") as HTMLElement));
+      const menu = body().getByRole("menu", { name: "Ações da mensagem de João" });
+      expect(article.getAttribute("data-menu-open")).toBe("true");
+      // On the page, not in the row: a list's containment would make a fixed anchor the row's.
+      expect(article.contains(menu)).toBe(false);
+      await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "Responder" })));
+      expect(replied).toBe(1);
+      expect(body().queryByRole("menu")).toBeNull();
+      expect(article.hasAttribute("data-menu-open")).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("with a mouse a click opens nothing: the row's bar has the actions", async () => {
+    const restore = device(false);
+    try {
+      const { container } = render(row(() => {}));
+      await act(async () => fireEvent.click(container.querySelector(".ac-msg__text") as HTMLElement));
+      expect(body().queryByRole("menu")).toBeNull();
+      expect(container.querySelector("article")?.hasAttribute("data-menu-open")).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("on touch the bar is the keyboard's, the lit row is a step above a hover, and the menu's targets are 40px", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const block = (media: string) =>
+      [...css.matchAll(new RegExp(`@media \\(${media}\\) \\{((?:[^{}]*\\{[^{}]*\\})*[^{}]*)\\}`, "g"))]
+        .map((m) => m[1] ?? "")
+        .join("\n");
+    const rule = (selector: string, sheet = css) =>
+      [...sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").replace(/\s+/g, " ").trim() === selector)
+        .map((m) => (m[2] ?? "").replace(/\s+/g, " ").trim())
+        .join(" ");
+    // A hover a tap leaves behind, or a tap on a control in the row, never shows the bar on the text; Tab still does,
+    // and so does a picker or a dialog opened from it.
+    expect(
+      rule(
+        '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible)) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))',
+        block("hover: none"),
+      ),
+    ).toBe("opacity: 0; pointer-events: none;");
+    expect(rule(".ac-msg:hover")).toBe("background: var(--plate-soft);");
+    expect(rule('.ac-msg[data-menu-open="true"]')).toBe("background: var(--plate);");
+    expect(css.indexOf('.ac-msg[data-menu-open="true"]')).toBeGreaterThan(css.indexOf(".ac-msg:hover {"));
+    expect(rule(".ac-menu__item", block("pointer: coarse"))).toBe("min-height: 40px;");
+    expect(rule(".ac-menu__reaction", block("pointer: coarse"))).toBe("width: 40px; height: 40px;");
   });
 });
 

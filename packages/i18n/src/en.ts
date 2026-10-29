@@ -1022,7 +1022,7 @@ export const en: Translations = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
-    receipt: "Nobody will answer: no AI connected",
+    receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
   connectAi: {

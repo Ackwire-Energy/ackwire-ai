@@ -1,6 +1,8 @@
-import { type HTMLAttributes, type ReactNode, useId } from "react";
+import { type HTMLAttributes, type MouseEvent, type ReactNode, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { MenuAt } from "./Menu";
 
 export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   /** The avatar element. Omitted for grouped (continuation) messages. */
@@ -35,23 +37,33 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   aside?: ReactNode;
   /** A line under the message, the same on a first and a grouped one (e.g. a receipt with words). */
   foot?: ReactNode;
+  /**
+   * The row's actions on touch, which has no hover: a tap on the row (not on a link or a button in it) opens these
+   * items (`MenuReactions`, `MenuItem`…) in a menu beside the row, under it or over it, never on its text, and lights
+   * the row while it is open. A mouse or a keyboard gets the row's bar (`.ac-msg__actions`) instead.
+   */
+  menu?: { label: string; items: ReactNode };
 }
 
-/** Taps on these keep doing their own thing (the bar stays as it is). */
+/** Taps on these keep doing their own thing (no menu opens). */
 const INTERACTIVE = "a[href], button, input, textarea, select, label, summary, [role='button'], [tabindex='0']";
 
-/**
- * Touch screens have no hover: tapping a message (not a link or button in it)
- * focuses the row, which reveals its action bar (Reagir, Responder, …) the
- * same way keyboard focus does. Tapping another message moves it there.
- */
-function revealActionsOnTap(row: HTMLElement, target: EventTarget) {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return;
-  if (target instanceof Element && target !== row && target.closest(INTERACTIVE)) return;
-  if (!row.querySelector(".ac-msg__actions")) return;
-  if (!row.hasAttribute("tabindex")) row.tabIndex = -1;
-  row.focus({ preventScroll: true });
+/** The touch menu's height with a person's actions: with less room over and under the row, it opens at the tap. */
+const MENU_ROOM = 240;
+
+/** Where a tap opens the row's menu: beside the row's part on screen, or at the tap. Null: not a touch tap on it. */
+function menuPlace(e: MouseEvent<HTMLElement>) {
+  if (typeof window.matchMedia !== "function") return null;
+  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return null;
+  const row = e.currentTarget;
+  // The menu's own taps bubble here through its portal.
+  if (!(e.target instanceof Element) || !row.contains(e.target)) return null;
+  if (e.target !== row && e.target.closest(INTERACTIVE)) return null;
+  const box = row.getBoundingClientRect();
+  const top = Math.max(box.top, 0);
+  const bottom = Math.min(box.bottom, window.innerHeight);
+  if (Math.max(top, window.innerHeight - bottom) < MENU_ROOM) return { x: e.clientX, y: e.clientY };
+  return { x: box.left, y: top, width: box.width, height: bottom - top };
 }
 
 /** A chat line: avatar, author, time and text. Agents are told apart by the avatar only. */
@@ -70,19 +82,21 @@ export function Message({
   stacked,
   aside,
   foot,
+  menu,
   className,
   onClick,
   ...rest
 }: MessageProps) {
   const tipId = useId();
   const noteId = useId();
+  const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
   const tip = meta ? (
     <span className="ac-msg__meta ac-msg__tip" role="tooltip" id={tipId}>
       {meta}
     </span>
   ) : null;
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the tap only reveals the action bar, which keyboard focus already reveals
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the tap opens on touch what the row's bar has for a keyboard
     <article
       className={cx(
         "ac-msg",
@@ -93,9 +107,11 @@ export function Message({
         className,
       )}
       aria-busy={streaming || undefined}
+      data-menu-open={menuAt ? "true" : undefined}
       onClick={(e) => {
         onClick?.(e);
-        revealActionsOnTap(e.currentTarget, e.target);
+        const place = menu ? menuPlace(e) : null;
+        if (place) setMenuAt(place);
       }}
       {...rest}
     >
@@ -143,6 +159,15 @@ export function Message({
         {children}
         {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>
+      {menu &&
+        menuAt &&
+        // On the page itself: the row's containment (a list's `content-visibility`) would place a fixed box in it.
+        createPortal(
+          <MenuAt at={menuAt} onClose={() => setMenuAt(null)} label={menu.label} align="end">
+            {menu.items}
+          </MenuAt>,
+          document.body,
+        )}
     </article>
   );
 }
