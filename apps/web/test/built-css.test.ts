@@ -148,7 +148,7 @@ test("the built stylesheet keeps touch's bar for the keyboard only, and the lit 
   const css = await builtCss();
   const kit = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
   const hidden =
-    '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible)) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))';
+    '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write))) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))';
   const [built, source] = [mediaRules(css, "hover", "none"), mediaRules(kit, "hover", "none")];
   expect(declarations(source, hidden)).toEqual([
     ["opacity", "0"],
@@ -158,11 +158,14 @@ test("the built stylesheet keeps touch's bar for the keyboard only, and the lit 
   const lit = '.ac-msg[data-menu-open="true"]';
   expect(declarations(kit, lit).length).toBeGreaterThan(0);
   expect(declarations(css, lit)).toEqual(expect.arrayContaining(declarations(kit, lit)));
-  // The menu's reactions are 40px targets on touch, as its items are.
+  // The menu's reactions are 40px targets on touch, as its items are, and the last one's two icons sit side by side.
   expect(declarations(touchRules(kit), ".ac-menu__reaction").length).toBeGreaterThan(0);
   expect(declarations(touchRules(css), ".ac-menu__reaction")).toEqual(
     expect.arrayContaining(declarations(touchRules(kit), ".ac-menu__reaction")),
   );
+  const more = ".ac-menu__reaction--more";
+  expect(declarations(kit, more).length).toBeGreaterThan(0);
+  expect(declarations(css, more)).toEqual(expect.arrayContaining(declarations(kit, more)));
 });
 
 test("no rule sets translate, rotate or scale beside transform: the build's minifier drops or merges them", async () => {

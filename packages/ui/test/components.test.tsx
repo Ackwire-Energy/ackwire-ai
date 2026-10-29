@@ -22,6 +22,7 @@ import {
   Logo,
   Menu,
   MenuItem,
+  MenuReactions,
   Message,
   MessageText,
   Meter,
@@ -546,6 +547,35 @@ describe("Menu", () => {
     expect(picked).toBe("out");
     expect(body().queryByRole("menu")).toBeNull();
   });
+
+  test("quick reactions end with a cell that opens every emoji", async () => {
+    let picked = "";
+    let more = 0;
+    render(
+      <Menu trigger={<Button>Mensagem</Button>} label="Ações">
+        <MenuReactions
+          label="Reagir"
+          emojis={["👍", "🎉"]}
+          onPick={(emoji) => (picked = emoji)}
+          more={{ label: "Adicionar reação", onSelect: () => more++ }}
+        />
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Mensagem" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const cells = within(body().getByRole("group", { name: "Reagir" })).getAllByRole("menuitem");
+    expect(cells.map((c) => c.getAttribute("aria-label") ?? c.textContent)).toEqual(["👍", "🎉", "Adicionar reação"]);
+    // The add-reaction pill's own two icons.
+    expect([...(cells[2]?.querySelectorAll("svg") ?? [])].map((svg) => svg.getAttribute("aria-hidden"))).toEqual([
+      "true",
+      "true",
+    ]);
+    await act(async () => fireEvent.click(cells[2] as HTMLElement));
+    expect(more).toBe(1);
+    expect(picked).toBe("");
+    expect(body().queryByRole("menu")).toBeNull();
+  });
 });
 
 describe("Logo, Icon, Meter", () => {
@@ -802,6 +832,86 @@ describe("Message on touch", () => {
     }
   });
 
+  /** The row's box on a screen `height` tall, 390 wide; and the box its menu opens beside (the menu's hidden anchor). */
+  const layout = (article: HTMLElement) => {
+    const own = Object.getOwnPropertyDescriptor(window, "innerHeight");
+    return {
+      place(height: number, top: number, bottom: number) {
+        Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+        article.getBoundingClientRect = () =>
+          ({ left: 0, right: 390, top, bottom, width: 390, height: bottom - top, x: 0, y: top }) as DOMRect;
+      },
+      anchor() {
+        const style = (document.body.querySelector('span[aria-haspopup="menu"]') as HTMLElement).style;
+        return [style.left, style.top, style.width, style.height];
+      },
+      restore() {
+        if (own) Object.defineProperty(window, "innerHeight", own);
+        else delete (window as { innerHeight?: number }).innerHeight;
+      },
+    };
+  };
+
+  test("the menu opens beside a long row while the larger side holds its reactions and most of two items, else at the tap", async () => {
+    const restore = device(true);
+    const { container } = render(row(() => {}));
+    const article = container.querySelector("article") as HTMLElement;
+    const screen = layout(article);
+    const tap = () =>
+      act(async () =>
+        fireEvent.click(container.querySelector(".ac-msg__text") as HTMLElement, { clientX: 120, clientY: 400 }),
+      );
+    try {
+      // A long reply at the end of a phone's list: 140px over it, so the menu opens over it and scrolls.
+      screen.place(667, 140, 600);
+      await tap();
+      expect(screen.anchor()).toEqual(["0px", "140px", "390px", "460px"]);
+      await act(async () => fireEvent.keyDown(body().getByRole("menu"), { key: "Escape" }));
+      expect(body().queryByRole("menu")).toBeNull();
+      // 139px over it and under it: the row fills the screen.
+      screen.place(667, 139, 528);
+      await tap();
+      expect(screen.anchor()).toEqual(["120px", "400px", "0px", "0px"]);
+    } finally {
+      screen.restore();
+      restore();
+    }
+  });
+
+  test("the menu stays with its row when the page resizes (a keyboard going down) or the row moves, and goes with it", async () => {
+    const restore = device(true);
+    const { container } = render(row(() => {}));
+    const article = container.querySelector("article") as HTMLElement;
+    const screen = layout(article);
+    const frames = () => act(() => new Promise((done) => setTimeout(done, 60)));
+    try {
+      screen.place(500, 300, 340);
+      await act(async () => fireEvent.click(container.querySelector(".ac-msg__text") as HTMLElement));
+      expect(screen.anchor()).toEqual(["0px", "300px", "390px", "40px"]);
+      screen.place(844, 560, 600);
+      await act(async () => window.dispatchEvent(new Event("resize")));
+      await frames();
+      expect(body().getByRole("menu", { name: "Ações da mensagem de João" })).toBeTruthy();
+      expect(screen.anchor()).toEqual(["0px", "560px", "390px", "40px"]);
+      screen.place(844, 520, 560);
+      await act(async () => container.dispatchEvent(new Event("scroll")));
+      await frames();
+      expect(screen.anchor()).toEqual(["0px", "520px", "390px", "40px"]);
+      // With no event at all: a row above drawn at its own height again.
+      screen.place(844, 575, 615);
+      await frames();
+      expect(screen.anchor()).toEqual(["0px", "575px", "390px", "40px"]);
+      expect(article.getAttribute("data-menu-open")).toBe("true");
+      screen.place(844, 900, 940);
+      await frames();
+      expect(body().queryByRole("menu")).toBeNull();
+      expect(article.hasAttribute("data-menu-open")).toBe(false);
+    } finally {
+      screen.restore();
+      restore();
+    }
+  });
+
   test("with a mouse a click opens nothing: the row's bar has the actions", async () => {
     const restore = device(false);
     try {
@@ -828,11 +938,11 @@ describe("Message on touch", () => {
         .filter((m) => (m[1] ?? "").replace(/\s+/g, " ").trim() === selector)
         .map((m) => (m[2] ?? "").replace(/\s+/g, " ").trim())
         .join(" ");
-    // A hover a tap leaves behind, or a tap on a control in the row, never shows the bar on the text; Tab still does,
-    // and so does a picker or a dialog opened from it.
+    // A hover a tap leaves behind, a tap on a control in the row or in a field one types in (`:focus-visible` after a
+    // tap too), never shows the bar on the text; Tab still does, and so does a picker or a dialog opened from it.
     expect(
       rule(
-        '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible)) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))',
+        '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write))) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))',
         block("hover: none"),
       ),
     ).toBe("opacity: 0; pointer-events: none;");

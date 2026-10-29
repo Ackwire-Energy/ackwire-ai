@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type MouseEvent, type ReactNode, useId, useState } from "react";
+import { type HTMLAttributes, type MouseEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
@@ -48,21 +48,29 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
 /** Taps on these keep doing their own thing (no menu opens). */
 const INTERACTIVE = "a[href], button, input, textarea, select, label, summary, [role='button'], [tabindex='0']";
 
-/** The touch menu's height with a person's actions: with less room over and under the row, it opens at the tap. */
-const MENU_ROOM = 240;
+/**
+ * The touch menu's reactions and most of two items (130px), 2px off the row and 8px inside the window. A row with less
+ * room over and under it fills the screen, and the menu opens at the tap; with more, beside the row, and the rest of
+ * its items scroll.
+ */
+const MENU_ROOM = 140;
 
-/** Where a tap opens the row's menu: beside the row's part on screen, or at the tap. Null: not a touch tap on it. */
-function menuPlace(e: MouseEvent<HTMLElement>) {
-  if (typeof window.matchMedia !== "function") return null;
-  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return null;
-  const row = e.currentTarget;
+/** A tap on touch on the row itself, not on a link or a button in it. */
+function touchTap(e: MouseEvent<HTMLElement>) {
+  if (typeof window.matchMedia !== "function") return false;
+  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return false;
   // The menu's own taps bubble here through its portal.
-  if (!(e.target instanceof Element) || !row.contains(e.target)) return null;
-  if (e.target !== row && e.target.closest(INTERACTIVE)) return null;
+  if (!(e.target instanceof Element) || !e.currentTarget.contains(e.target)) return false;
+  return e.target === e.currentTarget || !e.target.closest(INTERACTIVE);
+}
+
+/** Where the row's menu opens: beside the row's part on screen, or at the tap (`tap`, in the row). Null: off screen. */
+function menuPlace(row: HTMLElement, tap: { x: number; y: number }) {
   const box = row.getBoundingClientRect();
   const top = Math.max(box.top, 0);
   const bottom = Math.min(box.bottom, window.innerHeight);
-  if (Math.max(top, window.innerHeight - bottom) < MENU_ROOM) return { x: e.clientX, y: e.clientY };
+  if (bottom < top) return null;
+  if (Math.max(top, window.innerHeight - bottom) < MENU_ROOM) return { x: box.left + tap.x, y: box.top + tap.y };
   return { x: box.left, y: top, width: box.width, height: bottom - top };
 }
 
@@ -89,7 +97,26 @@ export function Message({
 }: MessageProps) {
   const tipId = useId();
   const noteId = useId();
+  const row = useRef<HTMLElement>(null);
+  const tap = useRef({ x: 0, y: 0 });
   const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
+  const menuOpen = Boolean(menu) && menuAt !== null;
+  useEffect(() => {
+    if (!menuOpen) return;
+    // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
+    // page, the list scrolls, or a row above changes height (one that held focus is drawn again a frame after the tap,
+    // `content-visibility`).
+    let frame = requestAnimationFrame(function follow() {
+      const next = row.current && menuPlace(row.current, tap.current);
+      setMenuAt((at) =>
+        at && next && at.x === next.x && at.y === next.y && at.width === next.width && at.height === next.height
+          ? at
+          : next,
+      );
+      frame = requestAnimationFrame(follow);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [menuOpen]);
   const tip = meta ? (
     <span className="ac-msg__meta ac-msg__tip" role="tooltip" id={tipId}>
       {meta}
@@ -98,6 +125,7 @@ export function Message({
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the tap opens on touch what the row's bar has for a keyboard
     <article
+      ref={row}
       className={cx(
         "ac-msg",
         agent && "ac-msg--agent",
@@ -107,11 +135,13 @@ export function Message({
         className,
       )}
       aria-busy={streaming || undefined}
-      data-menu-open={menuAt ? "true" : undefined}
+      data-menu-open={menuOpen ? "true" : undefined}
       onClick={(e) => {
         onClick?.(e);
-        const place = menu ? menuPlace(e) : null;
-        if (place) setMenuAt(place);
+        if (!menu || !touchTap(e)) return;
+        const box = e.currentTarget.getBoundingClientRect();
+        tap.current = { x: e.clientX - box.left, y: e.clientY - box.top };
+        setMenuAt(menuPlace(e.currentTarget, tap.current));
       }}
       {...rest}
     >
@@ -163,7 +193,7 @@ export function Message({
         menuAt &&
         // On the page itself: the row's containment (a list's `content-visibility`) would place a fixed box in it.
         createPortal(
-          <MenuAt at={menuAt} onClose={() => setMenuAt(null)} label={menu.label} align="end">
+          <MenuAt at={menuAt} onClose={() => setMenuAt(null)} follows label={menu.label} align="end">
             {menu.items}
           </MenuAt>,
           document.body,

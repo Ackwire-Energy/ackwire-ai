@@ -1416,6 +1416,16 @@ textarea.ac-input {
 .ac-menu__reaction[data-highlighted] {
   background: var(--surface-sunken);
 }
+/* Every emoji: the add-reaction pill's two icons and colors (`.ac-react--add`). */
+.ac-menu__reaction--more {
+  grid-auto-flow: column;
+  place-content: center;
+  gap: 2px;
+  color: var(--faint);
+}
+.ac-menu__reaction--more[data-highlighted] {
+  color: var(--ink);
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;
@@ -6373,8 +6383,9 @@ button.ac-tools__row:focus-visible {
 /* Touch: hover-only actions and small controls. */
 @media (hover: none) {
   /* A tap opens the row's menu beside the row (Message.tsx `menu`), so the bar is the keyboard's here: a hover a tap
-     leaves behind, or a tap on a control in the row, would put it on the text. */
-  .ac-msg:is(:hover, :focus-within):not(:has(:focus-visible))
+     leaves behind, or a tap on a control in the row, would put it on the text. A field one types in is :focus-visible
+     after a tap too, so it doesn't count (`:read-write`). */
+  .ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write)))
   .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"])) {
     opacity: 0;
     pointer-events: none;

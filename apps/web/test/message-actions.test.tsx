@@ -200,13 +200,31 @@ describe("message action bars", () => {
     const points = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
     Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
     try {
-      await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+      const state = seedState();
+      // A file with no words.
+      state.messages.push({
+        id: "m-file",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      });
+      await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
       await settle(8);
       const tap = (id: string) =>
         click(document.querySelector(`article[data-message-id="${id}"] .ac-msg__text`) as HTMLElement);
       await tap("m-1");
       const menu = screen().getByRole("menu", { name: "Ações da mensagem de João" });
-      expect(within(menu).getByRole("group", { name: "Reagir" })).toBeTruthy();
+      // The quick reactions, then every emoji, as the bar's Reagir has.
+      const reactions = within(menu).getByRole("group", { name: "Reagir" });
+      expect(
+        within(reactions)
+          .getAllByRole("menuitem")
+          .map((c) => c.getAttribute("aria-label") ?? c.textContent),
+      ).toEqual(["👍", "🎉", "👀", "✅", "❤️", "Adicionar reação"]);
       const items = (m: HTMLElement) =>
         within(m)
           .getAllByRole("menuitem")
@@ -215,7 +233,21 @@ describe("message action bars", () => {
       // What the bar and its "…" have, as the desktop app's right click lists it.
       expect(items(menu)).toEqual(["Responder", "Copiar texto", "Copiar link", "Salvar na wiki"]);
       expect(document.querySelector('article[data-message-id="m-1"]')?.getAttribute("data-menu-open")).toBe("true");
-      await act(async () => fireEvent.keyDown(menu, { key: "Escape" }));
+      await click(within(reactions).getByRole("menuitem", { name: "Adicionar reação" }));
+      await settle(1);
+      expect(screen().queryByRole("menu")).toBeNull();
+      const picker = screen().getByRole("dialog", { name: "Emojis" });
+      await click(within(picker).getByRole("button", { name: "rocket" }));
+      await settle(3);
+      expect(state.calls.find((c) => c.method === "chat.react")?.args).toEqual([ORG_ID, "m-1", "🚀"]);
+      expect(screen().queryByRole("dialog", { name: "Emojis" })).toBeNull();
+      await tap("m-file");
+      // No words: nothing to copy or to save, as on the phone app.
+      expect(items(screen().getByRole("menu", { name: "Ações da mensagem de João" }))).toEqual([
+        "Responder",
+        "Copiar link",
+      ]);
+      await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
       expect(screen().queryByRole("menu")).toBeNull();
       await tap("m-2");
       const agent = screen().getByRole("menu", { name: "Ações da mensagem de Ada" });

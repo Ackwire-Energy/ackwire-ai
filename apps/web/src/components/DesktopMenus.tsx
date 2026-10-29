@@ -119,8 +119,16 @@ export function MenuEntries({ entries, onRun }: { entries: MenuEntry[]; onRun?: 
     if (e.kind === "separator") return <MenuSeparator key={key} />;
     if (e.kind === "header") return <MenuHeading key={key}>{e.label}</MenuHeading>;
     if (e.kind === "reactions") {
-      const pick = e.pick;
-      return <MenuReactions key={key} label={e.label} emojis={e.emojis} onPick={(emoji) => run(() => pick(emoji))()} />;
+      const { pick, more } = e;
+      return (
+        <MenuReactions
+          key={key}
+          label={e.label}
+          emojis={e.emojis}
+          onPick={(emoji) => run(() => pick(emoji))()}
+          more={more && { label: more.label, onSelect: run(more.run) }}
+        />
+      );
     }
     return (
       <MenuItem key={key} icon={e.icon} danger={e.danger} disabled={e.disabled} onSelect={run(e.run)}>

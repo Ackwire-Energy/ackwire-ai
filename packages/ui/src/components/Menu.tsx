@@ -177,17 +177,20 @@ function keepSelection(ranges: Range[]) {
  * A menu at a point: the right click of the desktop app. The same items as `Menu`, open at once under the
  * pointer (no grow-in), flipped at the window's edges, closed by Esc, a click outside, scrolling the page or
  * leaving the window. Give it a new `key` for each opening so it is placed again. Given a box (`width`, `height`),
- * it opens beside the box instead, under it or over it, never on it.
+ * it opens beside the box instead, under it or over it, never on it. `follows`: the owner keeps `at` on what the menu
+ * belongs to as it moves, so scrolling or resizing doesn't close it.
  */
 export function MenuAt({
   at,
   onClose,
+  follows,
   label,
   align = "start",
   children,
 }: {
   at: { x: number; y: number; width?: number; height?: number };
   onClose: () => void;
+  follows?: boolean;
   label?: string;
   align?: "start" | "end";
   children: ReactNode;
@@ -203,14 +206,16 @@ export function MenuAt({
       onClose();
     };
     window.addEventListener("blur", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", onScroll, true);
+    if (!follows) {
+      window.addEventListener("resize", close);
+      window.addEventListener("scroll", onScroll, true);
+    }
     return () => {
       window.removeEventListener("blur", close);
       window.removeEventListener("resize", close);
       window.removeEventListener("scroll", onScroll, true);
     };
-  }, [onClose]);
+  }, [onClose, follows]);
   return (
     <DropdownMenu.Root open onOpenChange={(open) => !open && onClose()} modal={false}>
       <DropdownMenu.Trigger asChild>
@@ -233,6 +238,8 @@ export function MenuAt({
           side="bottom"
           sideOffset={2}
           collisionPadding={8}
+          // Following, placed again each frame: Radix can't see a point (0 by 0) move.
+          updatePositionStrategy={follows ? "always" : "optimized"}
           aria-label={label}
           // Radix names the menu after its trigger, here a hidden point with no text: the label names it instead.
           {...(label ? { "aria-labelledby": undefined } : {})}
@@ -251,10 +258,13 @@ export function MenuReactions({
   emojis,
   onPick,
   label,
+  more,
 }: {
   emojis: readonly string[];
   onPick: (emoji: string) => void;
   label: string;
+  /** A last cell that opens every emoji, drawn as the add-reaction pill under a message (`.ac-react--add`). */
+  more?: { label: string; onSelect: () => void };
 }) {
   return (
     <DropdownMenu.Group className="ac-menu__reactions" aria-label={label}>
@@ -263,6 +273,16 @@ export function MenuReactions({
           {emoji}
         </DropdownMenu.Item>
       ))}
+      {more && (
+        <DropdownMenu.Item
+          className="ac-menu__reaction ac-menu__reaction--more"
+          aria-label={more.label}
+          onSelect={more.onSelect}
+        >
+          <Icon name="smile" size={14} />
+          <Icon name="plus" size={14} />
+        </DropdownMenu.Item>
+      )}
     </DropdownMenu.Group>
   );
 }

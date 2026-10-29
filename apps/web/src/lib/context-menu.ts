@@ -12,7 +12,14 @@ export type MenuEntry =
   | { kind: "item"; id: string; label: string; icon?: IconName; danger?: boolean; disabled?: boolean; run: () => void }
   | { kind: "header"; label: string }
   | { kind: "separator" }
-  | { kind: "reactions"; label: string; emojis: readonly string[]; pick: (emoji: string) => void };
+  | {
+      kind: "reactions";
+      label: string;
+      emojis: readonly string[];
+      pick: (emoji: string) => void;
+      /** A last cell for every emoji (our menu only). */
+      more?: { label: string; run: () => void };
+    };
 
 /** Our menu (with icons and the reactions row) or the system's. */
 export type MenuLook = "ours" | "system";
