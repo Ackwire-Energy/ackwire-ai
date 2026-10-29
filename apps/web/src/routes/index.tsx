@@ -14,7 +14,8 @@ export const Route = createFileRoute("/")({
     search.open === "jev" ? { open: "jev" as const } : {},
   beforeLoad: async ({ context, search }) => {
     const me = await context.queryClient.ensureQueryData(meQuery(context.api));
-    if (!me) throw redirect({ to: "/login", ...(search.open ? { search: { redirect: `/?open=${search.open}` } } : {}) });
+    if (!me)
+      throw redirect({ to: "/login", ...(search.open ? { search: { redirect: `/?open=${search.open}` } } : {}) });
     const landing = landingFor(me, storage.get(STORAGE_KEYS.lastOrg));
     if ("to" in landing) throw redirect({ to: landing.to });
     if (search.open === "jev") {

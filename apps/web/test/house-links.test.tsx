@@ -33,7 +33,7 @@ describe("links read as ours, never the browser's blue", () => {
       for (const lang of ["en", "pt-BR"] as const) {
         await renderPage(<HelpPage slug={slug} lang={lang} />, { api: createFakeApi(seedState({ me: null })) });
         await settle();
-        for (const a of document.querySelectorAll(".lp-help__doc a")) {
+        for (const a of document.querySelectorAll(".help__doc a")) {
           expect({ slug, lang, className: a.className }).toEqual({ slug, lang, className: "ac-link" });
           seen++;
         }
