@@ -1464,3 +1464,309 @@
 .brw-ac.is-full .brw-log {
   min-height: 0;
 }
+
+/* ---------- in the conversation: the page in a frame of the agent's color ---------- */
+/* The page always in view; the frame's top says where it is and what it does now (its steps on hover);
+   Assumir, Parar and full screen show over the page on hover. In control, the frame turns graphite. */
+.brw-ac.brw-mf {
+  max-width: 640px;
+  padding: 0 5px 5px;
+  border-radius: 18px 18px 18px 6px;
+  overflow: visible;
+  box-shadow: none;
+  background: linear-gradient(135deg, var(--mf-a), var(--mf-b));
+  background-size: 200% 200%;
+}
+.brw-ac.brw-mf.is-working {
+  animation:
+    brw-grow-in 0.24s var(--out),
+    brw-mf-sheen 6s ease-in-out infinite;
+}
+@keyframes brw-mf-sheen {
+  50% {
+    background-position: 100% 100%;
+  }
+}
+.brw-ac.brw-mf.is-control {
+  background: linear-gradient(135deg, #3a3a3c, #1c1c1e);
+}
+.brw-mf__top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 6px 4px 8px;
+  color: #fff;
+  font-size: 13px;
+}
+.brw-mf__site {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.brw-mf__site b {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-mf__site .brw-ac__path {
+  color: rgba(255, 255, 255, 0.72);
+}
+/* A site's icon (or its letter): one 18px tile, centered on the line by its box, not by the glyph. */
+.brw-site-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.brw-site-icon img {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+.brw-site-icon--letter {
+  color: #111;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.brw-mf__top canvas {
+  filter: brightness(0) invert(1);
+}
+.brw-mf__now {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 55%;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  outline: none;
+}
+.brw-mf__now > span:not(.brw-mf__hist) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-mf__now:focus-visible {
+  box-shadow: 0 0 0 2px #fff;
+}
+.brw-mf__acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.brw-mf__acts .ac-btn--ghost {
+  color: rgba(255, 255, 255, 0.85);
+}
+/* The page and what goes under it, inside the frame. */
+.brw-mf > :not(.brw-mf__top) {
+  background: var(--raised);
+}
+.brw-mf > .brw-mf__top + * {
+  border-top-left-radius: 13px;
+  border-top-right-radius: 13px;
+  overflow: hidden;
+}
+/* Concentric with the frame (its radius minus the 5px inset): round bottom right, the cut corner bottom left. */
+.brw-mf > :last-child:not(.brw-mf__top) {
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 13px;
+  overflow: hidden;
+}
+.brw-mf .brw-ac__stage {
+  padding: 0;
+  background: none;
+}
+.brw-mf .brw-ac__page {
+  border-radius: 0;
+  box-shadow: none;
+  max-height: none;
+}
+/* Its steps, newest first, on hover (or focus) of what it does now. */
+.brw-mf__hist {
+  position: absolute;
+  top: 100%;
+  right: -6px;
+  z-index: 20;
+  padding-top: 8px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: top right;
+  transition:
+    opacity 0.18s,
+    transform 0.25s var(--spring, ease),
+    visibility 0s 0.18s;
+}
+.brw-mf__now:hover .brw-mf__hist,
+.brw-mf__now:focus-visible .brw-mf__hist {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 0.18s 0.12s,
+    transform 0.3s var(--spring, ease) 0.12s,
+    visibility 0s 0.12s;
+}
+.brw-mf__hist ol {
+  width: 300px;
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--glass, var(--raised));
+  backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: var(--e3, var(--e2));
+  color: var(--ink2);
+}
+.brw-mf__hist li {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: normal;
+}
+.brw-mf__hist li > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-mf__hist li.is-now {
+  background: var(--plate);
+  color: var(--ink);
+  font-weight: 500;
+}
+.brw-mf__hist li.is-now > span {
+  white-space: normal;
+}
+.brw-mf__hist li small {
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.brw-mf__hist canvas {
+  filter: none;
+}
+/* Assumir, Parar and full screen, over the page on hover. */
+.brw-mf__over {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--glass, var(--raised));
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: var(--e2);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s var(--out);
+}
+.brw-mf:hover .brw-mf__over,
+.brw-mf__over:focus-within,
+.brw-mf__over.is-pinned {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: none) {
+  .brw-mf__over {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brw-ac.brw-mf.is-working {
+    animation: none;
+  }
+}
+
+/* After the run: the frame closed into its top, a light band of the agent's color that opens to the steps. */
+/* The same size as the tools block under it ("Ver o que ele fez": .ac-tools), so the two bars line up. */
+.brw-ac.brw-trail.brw-mf-end,
+.brw-ac.brw-trail.brw-mf-end.is-open {
+  max-width: 560px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: color-mix(in srgb, var(--mf-a) 14%, var(--raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mf-a) 25%, transparent);
+}
+.brw-mf-end__row {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px 0 12px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.brw-mf-end__row:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  border-radius: inherit;
+}
+.brw-mf-end__row > b {
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-mf-end__row > .ac-run-strip {
+  flex: none;
+  align-self: center;
+}
+.brw-mf-end__sum {
+  flex: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.brw-mf-end__chev {
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.22s var(--spring, ease);
+}
+.brw-mf-end.is-open .brw-mf-end__chev {
+  transform: rotate(180deg);
+}
+.brw-mf-end__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px 39px;
+}
+.brw-ac.brw-mf-end .brw-mf-end__log {
+  margin: 0 5px 5px;
+  border-top: 0;
+  border-radius: calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) 2px;
+  background: var(--raised);
+}
