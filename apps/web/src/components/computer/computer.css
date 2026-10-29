@@ -112,12 +112,16 @@
 /*
  * The agent's page: in control its tools take the line's place (8 px over the 48 px field). In the window the line
  * keeps their room in every state, out of the page's stage, not the window's, so the page stays where it is when they
- * come and the window keeps the screen's size.
+ * come and the window keeps the screen's size. A closed browser has no page to keep in place: while the line has
+ * nothing to say, its sky takes that room too, as far from the window's foot as from its sides.
  */
 @media (min-width: 721px) {
   .cmp-body:has(> .brw-ac.is-surface) > .cmp-steps-row {
     height: calc(var(--control-h-lg) + 8px);
   }
+}
+.cmp-body:has(> .brw-ac.is-surface.is-closed) > .cmp-steps-row:empty {
+  display: none;
 }
 /* In control the line under the screen is the keys' (`.dsk-line`), and the steps don't show. */
 .cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
