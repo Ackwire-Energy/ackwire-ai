@@ -53,6 +53,10 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const status = (["approved", "refused", "expired"] as const).find((s) => s === rest);
     if (status) return t(`audit.change.approval.${status}`);
   }
+  if (area === "member") {
+    const what = (["joined", "left", "role_changed"] as const).find((s) => s === rest);
+    if (what) return t(`audit.change.member.${what}`);
+  }
   const last = (rest.split("_").at(-1) ?? "").replace("cancelled", "canceled");
   const verb = VERBS.find((v) => v === last) ?? "other";
   const where = AREAS.find((a) => a === area) ?? "other";
@@ -99,6 +103,9 @@ const VERBS = [
   "push",
   "fetch",
   "exec",
+  "resent",
+  "revoked",
+  "archived",
 ] as const;
 const AREAS = [
   "routine",
@@ -126,6 +133,9 @@ const AREAS = [
   "issue",
   "message",
   "run",
+  "member",
+  "invitation",
+  "credential",
 ] as const;
 
 /** What the row is about in its own words (the call's title, a change's name). */
@@ -133,7 +143,8 @@ export const auditHint = (row: AuditRow) =>
   auditStr(row.details.title) ??
   auditStr(row.details.name) ??
   auditStr(row.details.label) ??
-  auditStr(row.details.subject);
+  auditStr(row.details.subject) ??
+  auditStr(row.details.email);
 
 /** Where it happened: "#geral", "conversa privada", "fórum: …". */
 export function auditWhere(t: TFunction, row: AuditRow) {

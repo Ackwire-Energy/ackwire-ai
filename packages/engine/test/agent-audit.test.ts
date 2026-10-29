@@ -1,16 +1,23 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  archiveAgent,
   auditInput,
+  changeMemberRole,
   auditsCall,
   createToolGateway,
   decideApproval,
   ForbiddenError,
   grantScopes,
+  inviteMany,
   listAudit,
   postPersonMessage,
   recordAudit,
   recordToolCall,
+  removeMember,
+  revokeConnection,
+  rotateCredential,
+  updateAgent,
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
@@ -285,8 +292,9 @@ describe("agents' tool calls in the audit log", () => {
       details: { serverUrl: "https://mcp.acme.com/sse?api_key=abc123supersecret", token: "t0ps3cret" },
     });
 
+    // Newest first (setting up the workspace wrote rows of its own before these).
     const rows = (await listAudit(f.db, f.owner.id, f.org.id)).rows;
-    expect(rows.map((r) => r.action)).toEqual(["connector.created", "tool.call"]);
+    expect(rows.slice(0, 2).map((r) => r.action)).toEqual(["connector.created", "tool.call"]);
     const change = JSON.stringify(rows[0]?.details);
     expect(change).toContain("mcp.acme.com");
     expect(change).not.toContain("abc123supersecret");
@@ -337,5 +345,58 @@ describe("agents' tool calls in the audit log", () => {
     expect((await listAudit(f.db, f.owner.id, f.org.id, { waiting: true })).rows).toEqual([]);
     const after = (await listAudit(f.db, f.owner.id, f.org.id, { kind: "tool" })).rows[0];
     expect(after?.secret).toEqual({ id: request.id, status: "delivered" });
+  });
+});
+
+describe("people's changes in the audit log", () => {
+  test("members, invitations, agents, connectors and AI keys; a key never kept", async () => {
+    f = await setup();
+    const changes = async () =>
+      (await listAudit(f.db, f.owner.id, f.org.id, { kind: "change", actorType: "person" })).rows;
+    // Setting up the workspace: its key and its agent.
+    expect((await changes()).map((r) => r.action)).toEqual(["agent.created", "credential.added"]);
+
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "admin");
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id);
+    await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["caio@acme.com"], role: "member" });
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { instructions: "Be brief.", role: "Support" });
+    await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, f.credential.id, {
+      apiKey: "sk-new-abcdefgh1234",
+    });
+    const [connection] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        label: "Linear",
+        serverUrl: "https://mcp.linear.app/sse",
+        authType: "none",
+      })
+      .returning();
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection?.id ?? "");
+    await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id);
+
+    const rows = await changes();
+    expect(rows.map((r) => r.action).slice(0, 7)).toEqual([
+      "agent.archived",
+      "connector.disconnected",
+      "credential.key_changed",
+      "agent.updated",
+      "invitation.sent",
+      "member.removed",
+      "member.role_changed",
+    ]);
+    const byAction = (action: string) => rows.find((r) => r.action === action);
+    expect(byAction("member.role_changed")).toMatchObject({
+      actor: { id: f.owner.id },
+      target: { type: "person", id: bia.id },
+      details: { name: "bia", from: "member", to: "admin" },
+    });
+    expect(byAction("invitation.sent")?.details).toMatchObject({ email: "caio@acme.com", role: "member" });
+    expect(byAction("agent.updated")?.details).toMatchObject({ changed: ["instructions", "role"], role: "Support" });
+    expect(JSON.stringify(byAction("agent.updated")?.details)).not.toContain("Be brief");
+    expect(byAction("credential.key_changed")?.details).toMatchObject({ keyHint: "1234" });
+    expect(JSON.stringify(rows)).not.toContain("sk-new-abcdefgh");
   });
 });

@@ -7346,6 +7346,11 @@ export const en: Translations = {
         refused: "Refused a request",
         expired: "A request expired with no answer",
       },
+      member: {
+        joined: "Joined the workspace",
+        left: "Left the workspace",
+        role_changed: "Changed a member's role",
+      },
       verb: {
         created: "Created",
         deleted: "Deleted",
@@ -7375,6 +7380,9 @@ export const en: Translations = {
         push: "Pushed code to",
         fetch: "Fetched",
         exec: "Ran a command on",
+        resent: "Resent",
+        revoked: "Revoked",
+        archived: "Archived",
         other: "Changed",
       },
       area: {
@@ -7403,6 +7411,9 @@ export const en: Translations = {
         issue: "a task",
         message: "a message",
         run: "a reply",
+        member: "a member",
+        invitation: "an invitation",
+        credential: "an AI key",
         other: "the workspace",
       },
     },

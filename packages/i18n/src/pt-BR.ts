@@ -7390,6 +7390,11 @@ export const ptBR = {
         refused: "Recusou um pedido",
         expired: "Um pedido expirou sem resposta",
       },
+      member: {
+        joined: "Entrou no workspace",
+        left: "Saiu do workspace",
+        role_changed: "Mudou o papel de um membro",
+      },
       verb: {
         created: "Criou",
         deleted: "Apagou",
@@ -7419,6 +7424,9 @@ export const ptBR = {
         push: "Enviou código para",
         fetch: "Baixou",
         exec: "Rodou um comando em",
+        resent: "Reenviou",
+        revoked: "Revogou",
+        archived: "Arquivou",
         other: "Mexeu em",
       },
       area: {
@@ -7447,6 +7455,9 @@ export const ptBR = {
         issue: "uma tarefa",
         message: "uma mensagem",
         run: "uma resposta",
+        member: "um membro",
+        invitation: "um convite",
+        credential: "uma chave de IA",
         other: "o workspace",
       },
     },
