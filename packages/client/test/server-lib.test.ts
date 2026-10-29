@@ -38,7 +38,7 @@ describe("server addresses", () => {
     expect(normalizeServer("agentes.tail1234.ts.net")).toBe("https://agentes.tail1234.ts.net");
     expect(normalizeServer("  https://Chat.Example.com/login?x=1 ")).toBe("https://chat.example.com");
     expect(normalizeServer("box.tail1234.ts.net:8443")).toBe("https://box.tail1234.ts.net:8443");
-    expect(normalizeServer("https://agentes.chat/")).toBe("https://agentes.chat");
+    expect(normalizeServer("https://app.agentes.chat/")).toBe("https://app.agentes.chat");
   });
 
   test("https only; http just for a development build on the local network", () => {
@@ -78,16 +78,16 @@ describe("server addresses", () => {
     expect(serverHost("https://box.tail1234.ts.net")).toBe("box.tail1234.ts.net");
     expect(serverHost("https://chat.example.com:8443")).toBe("chat.example.com:8443");
     expect(isTailnet("https://box.tail1234.ts.net")).toBe(true);
-    expect(isTailnet("https://agentes.chat")).toBe(false);
+    expect(isTailnet("https://app.agentes.chat")).toBe(false);
   });
 });
 
 describe("help links", () => {
   test("a page on agentes.chat in the reader's language, with only the section after it", () => {
-    expect(helpUrl("memory", "en")).toBe("https://agentes.chat/help/memory?lang=en");
-    expect(helpUrl("computers", "pt-BR", "folders")).toBe("https://agentes.chat/help/computers?lang=pt-BR#folders");
-    expect(helpUrl("wiki", "en-GB")).toBe("https://agentes.chat/help/wiki?lang=en");
-    expect(helpUrl("wiki", "fr")).toBe("https://agentes.chat/help/wiki?lang=pt-BR");
+    expect(helpUrl("memory", "en")).toBe("https://app.agentes.chat/help/memory?lang=en");
+    expect(helpUrl("computers", "pt-BR", "folders")).toBe("https://app.agentes.chat/help/computers?lang=pt-BR#folders");
+    expect(helpUrl("wiki", "en-GB")).toBe("https://app.agentes.chat/help/wiki?lang=en");
+    expect(helpUrl("wiki", "fr")).toBe("https://app.agentes.chat/help/wiki?lang=pt-BR");
   });
 });
 
@@ -99,9 +99,9 @@ describe("connect links", () => {
     const link = connectLink("https://box.tail1234.ts.net", { token });
     expect(link).toBe(`agenteschat://connect?server=https%3A%2F%2Fbox.tail1234.ts.net&token=${token}`);
     expect(parseConnectLink(link)).toEqual({ server: "https://box.tail1234.ts.net", token });
-    expect(parseConnectLink(connectLink("https://agentes.chat"))).toEqual({ server: "https://agentes.chat" });
-    expect(parseConnectLink("agenteschat:///connect?server=https://agentes.chat")).toEqual({
-      server: "https://agentes.chat",
+    expect(parseConnectLink(connectLink("https://app.agentes.chat"))).toEqual({ server: "https://app.agentes.chat" });
+    expect(parseConnectLink("agenteschat:///connect?server=https://app.agentes.chat")).toEqual({
+      server: "https://app.agentes.chat",
     });
   });
 
@@ -125,12 +125,12 @@ describe("connect links", () => {
     expect(parseConnectLink(`${base}&claim=${encodeURIComponent("<script>alert(1)</script>xxxxxxxxxx")}`)).toBeNull();
     expect(parseConnectLink(`${base}&token=${"a".repeat(201)}`)).toBeNull();
     expect(parseConnectLink(`${base}&x=${"a".repeat(2048)}`)).toBeNull();
-    expect(parseConnectLink(`${base}&token=`)).toEqual({ server: "https://agentes.chat" });
+    expect(parseConnectLink(`${base}&token=`)).toEqual({ server: "https://app.agentes.chat" });
   });
 
   test("anything else is not a connect link", () => {
     for (const other of [
-      "https://agentes.chat",
+      "https://app.agentes.chat",
       "agenteschat://chat/123",
       "agenteschat://connect",
       "agenteschat://connect?server=",

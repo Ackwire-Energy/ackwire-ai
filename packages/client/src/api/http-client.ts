@@ -327,14 +327,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
       removeJev: () => request<JevKey>("/api/app/jev", { method: "DELETE" }),
     },
-    waitlist: {
-      join: async (input, humanCheck) => {
-        await request<{ ok: true }>("/api/waitlist", { json: input, headers: humanCheckHeaders(humanCheck) });
-      },
-      confirm: async (input) => {
-        await request<{ ok: true }>("/api/waitlist/confirm", { json: input });
-      },
-    },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
       signInOptions: (input, humanCheck) =>

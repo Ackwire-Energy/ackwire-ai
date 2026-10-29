@@ -59,7 +59,7 @@ describe("links read as ours, never the browser's blue", () => {
       expect(a?.getAttribute("target")).toBe("_blank");
       expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
       const url = new URL(a?.getAttribute("href") ?? "");
-      expect(url.origin + url.pathname).toBe("https://agentes.chat/help/computers");
+      expect(url.origin + url.pathname).toBe("https://app.agentes.chat/help/computers");
       expect([...url.searchParams]).toEqual([["lang", lang]]);
       expect(url.hash).toBe("#folders");
       cleanup();
