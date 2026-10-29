@@ -105,6 +105,38 @@ test("a handoff needs a signed-in browser with a fresh sign-in", async () => {
   expect(rows).toHaveLength(0);
 });
 
+test("a revoked browser session cannot hand off through its signed cookie cache", async () => {
+  t = await createTestServer();
+  const site = browser(t);
+  const window = browser(t);
+  await signUp(site, "eva@acme.com");
+  const { verifier, challenge } = pair();
+  const { requestId } = await open(window, challenge);
+  const priorCookies = site.cookie();
+
+  expect((await site("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  const stale = browser(t);
+  const res = await stale("/api/auth/desktop/handoff", {
+    json: { requestId },
+    headers: { cookie: priorCookies },
+  });
+  expect(res.status).toBe(401);
+  expect(await (await window("/api/auth/desktop/redeem", { json: { verifier } })).json()).toEqual({ signedIn: false });
+});
+
+test("a pending handoff cannot be redeemed after its browser session is revoked", async () => {
+  t = await createTestServer();
+  const site = browser(t);
+  const window = browser(t);
+  await signUp(site, "fabi@acme.com");
+  const { verifier, challenge } = pair();
+  const { requestId } = await open(window, challenge);
+
+  expect(await (await site("/api/auth/desktop/handoff", { json: { requestId } })).json()).toEqual({ ok: true });
+  expect((await site("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  expect(await (await window("/api/auth/desktop/redeem", { json: { verifier } })).json()).toEqual({ signedIn: false });
+});
+
 test("the browser only ever sees the code the request was opened with", async () => {
   t = await createTestServer();
   const window = browser(t);

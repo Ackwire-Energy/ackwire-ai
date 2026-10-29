@@ -20,9 +20,9 @@ import { z } from "zod";
  *    and asks the person to confirm it matches the code on their computer. Only
  *    then does it call `/desktop/handoff` with the request id.
  * 4. `handoff` accepts only a request that a window opened, still pending and not
- *    expired, and only from a fresh browser session. It consumes the request and
- *    records the hand-over for the challenge. `redeem` then returns a session to
- *    the window that holds the matching verifier.
+ *    expired, and only from a fresh, still-live browser session. It consumes the
+ *    request and records that source session for the challenge. `redeem` checks
+ *    it is still live before returning a session to the window with the verifier.
  *
  * Nothing is handed over on its own: a link that jumps straight to the page still
  * stops at the confirmation, and the verifier never leaves the window, so the
@@ -106,12 +106,18 @@ export function desktopSignIn() {
           if (Date.now() - new Date(session.createdAt).getTime() > FRESH_SIGN_IN_MS) {
             throw new APIError("FORBIDDEN", { message: "Sign in again to continue in the app" });
           }
+          // sessionMiddleware may use the signed five-minute cookie cache. A session
+          // revoked in the database must not mint a new device session through it.
+          const source = await ctx.context.internalAdapter.findSession(session.token);
+          if (!source || source.session.userId !== session.userId || source.session.expiresAt <= new Date()) {
+            throw new APIError("UNAUTHORIZED", { message: "Sign in again to continue in the app" });
+          }
           const found = await ctx.context.internalAdapter.consumeVerificationValue(REQUEST_PREFIX + ctx.body.requestId);
           const request = found && found.expiresAt >= new Date() ? parseRequest(found.value) : null;
           if (!request) return ctx.json({ ok: false });
           await ctx.context.internalAdapter.createVerificationValue({
             identifier: HANDOFF_PREFIX + request.challenge,
-            value: session.userId,
+            value: session.token,
             expiresAt: new Date(Date.now() + HANDOFF_TTL_MS),
           });
           return ctx.json({ ok: true });
@@ -125,8 +131,10 @@ export function desktopSignIn() {
             HANDOFF_PREFIX + desktopChallenge(ctx.body.verifier),
           );
           if (!found || found.expiresAt < new Date()) return ctx.json({ signedIn: false });
-          const user = await ctx.context.internalAdapter.findUserById(found.value);
-          if (!user) return ctx.json({ signedIn: false });
+          // The source browser may have signed out or been revoked after handoff.
+          const source = await ctx.context.internalAdapter.findSession(found.value);
+          if (!source || source.session.expiresAt <= new Date()) return ctx.json({ signedIn: false });
+          const { user } = source;
           const session = await ctx.context.internalAdapter.createSession(user.id);
           await setSessionCookie(ctx, { session, user });
           return ctx.json({ signedIn: true });
