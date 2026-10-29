@@ -50,7 +50,8 @@ function AppStack() {
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
-  const pushSheet = useFormSheetOptions([0.74, 1]);
+  const pushSheet = useFormSheetOptions("fitToContents");
+  const wikiSheet = useFormSheetOptions([0.55, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -63,10 +64,17 @@ function AppStack() {
       <Stack.Screen name="usage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
@@ -111,8 +119,8 @@ function AppStack() {
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
+      <Stack.Screen name="wiki-new" options={wikiSheet} />
       <Stack.Screen name="new" options={newSheet} />
-      <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
       <Stack.Screen name="code" options={formSheet} />

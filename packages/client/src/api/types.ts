@@ -3467,6 +3467,14 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
+/** A computer the caller may give an agent, with what it offers. */
+export interface BrainMachine {
+  machineId: string;
+  name: string;
+  online: boolean;
+  options: BrainOption[];
+}
+
 /** `GET …/agents/{id}/brain` (its owner or an admin). */
 export interface AgentBrain {
   agentId: string;
@@ -3479,7 +3487,7 @@ export interface AgentBrain {
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
-  machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
+  machines: BrainMachine[];
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;

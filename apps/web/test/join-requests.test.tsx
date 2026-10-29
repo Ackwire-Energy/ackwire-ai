@@ -587,6 +587,18 @@ describe("Members › Invite people", () => {
   });
 });
 
+describe("Members › Invite people, self-hosted", () => {
+  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
+    const state = seedState({ joinRequests: [], edition: "selfhost" });
+    await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
+    await settle(6);
+    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+    expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
+    expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
+    expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
+  });
+});
+
 describe("Members › Invitation link", () => {
   test("Turn off's word ends where Copy ends above it: the text button's padding hangs past the edge", async () => {
     const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();

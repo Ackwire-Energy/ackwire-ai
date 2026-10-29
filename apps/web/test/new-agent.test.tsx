@@ -340,6 +340,59 @@ describe("Criar agente: what gets created", () => {
     expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
   });
 
+  test("plan: with no key, Claude Code on a computer can think; the agent moves there and thinks with it", async () => {
+    const plan = (kind: "claude_code" | "codex", available: boolean) => ({
+      kind,
+      available,
+      ...(available ? {} : { reason: "not_installed" as const }),
+      experimental: kind === "codex",
+      models: [],
+      defaultModel: null,
+    });
+    const state = seedState();
+    state.credentials = [];
+    state.platformKey = false;
+    state.brainMachines = [
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    // No key: the API can't think, and Codex isn't on any computer.
+    await proceed();
+    expect(screen().getAllByText("Escolha um modelo que o workspace pode usar.").length).toBeGreaterThan(0);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Codex.*Indisponível/ })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
+    await click(claude);
+    expect(claude.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    await proceed();
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Code");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, agentId, "machine_mini"]);
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code" },
+    ]);
+  });
+
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
     const state = await open();
     await startAs("QA");
