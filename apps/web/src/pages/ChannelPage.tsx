@@ -3061,13 +3061,15 @@ export const TimelineMessage = memo(function TimelineMessage({
                 accent={colorOf(agent)}
               />
             </MessageText>
-          ) : (opening.said || opening.opener !== null) && (
-            <MessageText>
-              <MessageBody
-                body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
-                resolveMention={dir.mentionName}
-              />
-            </MessageText>
+          ) : (
+            (opening.said || opening.opener !== null) && (
+              <MessageText>
+                <MessageBody
+                  body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
+                  resolveMention={dir.mentionName}
+                />
+              </MessageText>
+            )
           )}
           {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
           <LiveTools
