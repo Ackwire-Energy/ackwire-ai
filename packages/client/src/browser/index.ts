@@ -181,6 +181,8 @@ export function applyBrowserHandoff(
   qc.setQueryData<DesktopStatus>(keys.agentDesktop(orgId, handoff.agentId), (old) =>
     old ? desktopWithHandoff(old, handoff) : old,
   );
+  // A request asked of someone lets them drive while it is open: who may control follows it.
+  void qc.invalidateQueries({ queryKey: keys.agentBrowserControl(orgId, handoff.agentId, handoffScreen(handoff)) });
 }
 
 /**
@@ -233,6 +235,26 @@ export const useAgentBrowserHandoff = (
     enabled,
     retry: false,
     staleTime,
+  });
+};
+
+/**
+ * Whether this person may drive the agent's screen (take over, open a page, type): admins, its owner, and the
+ * person an open request was asked of (ADR 0040). Watchers who may not see no Assumir.
+ */
+export const useAgentScreenControl = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  screen: ScreenKind = "browser",
+) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentBrowserControl(orgId, agentId, screen),
+    queryFn: () => api.browser.agentControl(orgId, agentId, screen),
+    enabled,
+    retry: false,
+    staleTime: 60_000,
   });
 };
 

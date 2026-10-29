@@ -22,6 +22,7 @@ import {
   rememberHeldPlace,
   textEvent,
   useAgentBrowserHandoff,
+  useAgentScreenControl,
   useBrowserHandoffMutations,
   useDesktopStatus,
   useMachines,
@@ -387,6 +388,9 @@ export function BrowserCard({
     setStoppedAt(null);
   }, [live.frame]);
   const openQ = useAgentBrowserHandoff(org.id, agentId, open);
+  // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
+  const control = useAgentScreenControl(org.id, agentId, !given);
+  const mayDrive = canTakeOver && (given !== null || control.data !== false);
   const actions = useBrowserHandoffMutations(org.id);
   const machines = useMachines(org.id);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -766,7 +770,7 @@ export function BrowserCard({
     // The dialog's page: Assumir alone (the dialog holds full screen), also to open a closed browser and sign in.
     !otherInControl &&
     !blocker &&
-    canTakeOver && (
+    mayDrive && (
       <Button size="sm" icon="person" className="cmp-take" loading={actions.takeover.isPending} onClick={takeover}>
         <span className="cmp-act-label">{t("desktop.takeover")}</span>
       </Button>
@@ -785,14 +789,18 @@ export function BrowserCard({
     !otherInControl &&
     !blocker &&
     (closed ? (
-      <Button size="sm" icon="globe" loading={actions.takeover.isPending} onClick={takeover}>
-        {t("browser.inCard.openBrowser")}
-      </Button>
+      mayDrive && (
+        <Button size="sm" icon="globe" loading={actions.takeover.isPending} onClick={takeover}>
+          {t("browser.inCard.openBrowser")}
+        </Button>
+      )
     ) : (
       <>
-        <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
-          {t("browser.inCard.takeover")}
-        </Button>
+        {mayDrive && (
+          <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
+            {t("browser.inCard.takeover")}
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"

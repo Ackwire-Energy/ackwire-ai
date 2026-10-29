@@ -19,6 +19,13 @@ test("a repository's own config passes only with keys that never name a program"
     ["local", "user.email"],
     ["local", "push.autosetupremote"],
     ["local", "lfs.repositoryformatversion"],
+    // Left by everyday tools: `gh repo set-default`, colors, signing on, merge and diff styles.
+    ["local", "remote.origin.gh-resolved"],
+    ["local", "color.diff.meta"],
+    ["local", "commit.gpgsign"],
+    ["local", "merge.conflictstyle"],
+    ["local", "diff.algorithm"],
+    ["local", "pull.rebase"],
     ["command", "core.fsmonitor"],
   );
   expect(unsafeRepoConfig(clean)).toBeNull();
@@ -28,6 +35,10 @@ test("a repository's own config passes only with keys that never name a program"
     "filter.evil.clean",
     "filter.evil.process",
     "diff.x.textconv",
+    "diff.external",
+    "merge.x.driver",
+    "gpg.program",
+    "gpg.ssh.program",
     "core.sshcommand",
     "core.pager",
     "core.editor",

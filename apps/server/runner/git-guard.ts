@@ -49,6 +49,13 @@ const SAFE_REPO_KEYS: RegExp[] = [
   // Git LFS's own (never `lfs.customtransfer.*` or `lfs.extension.*`, which name programs).
   /^lfs\.(repositoryformatversion|url|pushurl|locksverify|fetchinclude|fetchexclude)$/,
   /^lfs\..+\.(access|locksverify)$/,
+  // Preferences that name no program: the GitHub CLI's default remote, colors, signing (with the program from
+  // the person's own global config; a repository's `gpg.program` stays refused), merge and diff styles.
+  /^remote\..+\.gh-resolved$/,
+  /^(color|advice)\.[a-z0-9.-]+$/,
+  /^(commit|tag|push)\.gpgsign$/,
+  /^(rebase\.(autosquash|autostash|updaterefs)|merge\.(ff|conflictstyle)|diff\.(algorithm|renames|colormoved|mnemonicprefix))$/,
+  /^(status\.(showuntrackedfiles|submodulesummary)|log\.(date|decorate)|fetch\.(writecommitgraph|parallel)|push\.followtags|maintenance\.(auto|strategy))$/,
 ];
 
 const isSafeRepoKey = (key: string) => SAFE_REPO_KEYS.some((re) => re.test(key));
