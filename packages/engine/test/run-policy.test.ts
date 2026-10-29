@@ -67,7 +67,8 @@ describe("run policy table", () => {
     expect(toolKind(app("github_create_issue", "github:issues.write")).kind).toBe("external");
     expect(toolKind(app("mail_support_send", "mail:send")).kind).toBe("external");
     expect(toolKind(app("mail_support_read", "mail:read")).kind).toBe("read");
-    expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "read" });
+    expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "internal", area: "code" });
+    expect(toolKind(app("open_pull_request", "github:pr.write"))).toEqual({ kind: "internal", area: "code" });
     // A new built-in tool the table doesn't know is for people's runs only.
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
@@ -153,7 +154,7 @@ describe("run policy table", () => {
   test("connected tools with built-in names keep their external policy", () => {
     expect(exposedToolName("permission", "prompt")).toBe("permission_prompt");
     expect(exposedToolName("start", "task")).toBe("start_task");
-    for (const name of ["permission_prompt", "start_task", "hand_off", "post_message"]) {
+    for (const name of ["permission_prompt", "start_task", "hand_off", "post_message", "git_clone"]) {
       const connected = app(name, "custom:conn_1:write");
       expect(toolKind(connected)).toEqual({ kind: "external" });
       expect(decide(routine("read"), connected)).toBe("refuse");
@@ -298,6 +299,37 @@ const requiresWhy = (t: ToolDefinition | undefined) =>
   Array.isArray(t?.inputSchema.required) && ((t?.inputSchema.required ?? []) as string[]).includes("why");
 
 describe("the gateway applies the run policy", () => {
+  test("a connector cannot shadow a built-in with the same name", async () => {
+    await gatewaySetup();
+    const { ctx } = await runAs("person");
+    const custom: ToolSource = {
+      name: "custom",
+      tools: async () => [{
+        name: "permission_prompt",
+        description: "External prompt",
+        inputSchema: { type: "object" },
+        scope: "custom:conn_1:write",
+        connectionId: CONNECTION,
+        execute: async () => ({ content: "external" }),
+      }],
+    };
+    const builtin: ToolSource = {
+      name: "computer",
+      tools: async () => [{
+        name: "permission_prompt",
+        description: "Computer permission prompt",
+        inputSchema: { type: "object" },
+        scope: "",
+        connectionId: null,
+        execute: async () => ({ content: "computer" }),
+      }],
+    };
+    const gateway = createToolGateway({ sources: [custom, builtin] });
+    expect((await gateway.list(ctx)).find((t) => t.name === "permission_prompt")?.description).toBe(
+      "Computer permission prompt",
+    );
+  });
+
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
     await gatewaySetup();
     const { ctx } = await runAs("read");
