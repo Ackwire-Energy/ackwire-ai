@@ -1305,7 +1305,7 @@ describe("the dialog's size (computer.css)", () => {
     }
   });
 
-  test("on a phone the wait and the page fill the sheet; the screen and its covers are one box in its middle, all else under it", async () => {
+  test("on a phone the wait and the page fill the sheet; the screen and its covers are one box, in its middle with all else under it", async () => {
     const text = await css();
     const sheet = text.split("@media (max-width: 720px) {")[1]?.split("\n}\n")[0] ?? "";
     const inSheet = (selector: string) => sheet.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
@@ -1342,16 +1342,20 @@ describe("the dialog's size (computer.css)", () => {
     expect(inSheet(".cmp-body > .cmp-stage,\n  .cmp-body > .dsk > .dsk-stage")).toContain(
       "grid-template-columns: minmax(0, 1fr)",
     );
-    // That box in the sheet's middle, the body measuring its room: what comes and goes goes under it, so nothing
-    // moves it. The request being helped with right under it, then the line or the note, a banner after the steps.
-    // The room over the box gives first: where what goes under it would run past the foot, the box rises that much.
+    // That box and what goes under it, one block in the sheet's middle, the body measuring its room: the request being
+    // helped with right under it, then the line or the note, a banner after the steps. The same room over the block
+    // and under it gives: where they would run past the foot, the block rises that much. A cover keeps the screen's
+    // line under it, so the screen opens in its place.
     expect(inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body")).toContain("container-type: size");
     const over = inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before");
     for (const d of ['content: ""', "flex: 1 1 0", "max-height: calc((100cqh - 100cqw * 900 / 1280) / 2)"]) {
       expect(over).toContain(d);
     }
-    // The body's gap after it, taken back: it adds no gap of its own.
+    const under = inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::after");
+    for (const d of ['content: ""', "order: 1", "flex: 1 1 0"]) expect(under).toContain(d);
+    // The body's gap next to each, taken back: neither adds a gap of its own.
     expect(over).toContain("margin-bottom: -8px");
+    expect(under).toContain("margin-top: -8px");
     expect(rule(text, ".cmp-body")).toContain("gap: 8px");
     expect(sheet).not.toContain("margin-top: max(0px");
     expect(inSheet(".cmp-dialog:not(.is-screen-only) .dsk > .dsk-stage")).toContain("order: -1");

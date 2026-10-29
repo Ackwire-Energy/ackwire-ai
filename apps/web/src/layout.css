@@ -3519,15 +3519,21 @@ p {
   margin-top: -36px;
   padding: 0 24px 4px;
 }
+/*
+ * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
+ * air up and down as it does sideways, so the row is its ink. 24px is the sheet's own inset, where its icon and words
+ * start, and keeps the × under the sky's densest top rows, whose lightest pixels in dark come close to its own ink. On
+ * the sky it takes the full ink: the muted one fades into a dark sky.
+ */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 24px;
+  right: 24px;
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
-/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
 .catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  margin-block: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
   color: var(--ink);
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
