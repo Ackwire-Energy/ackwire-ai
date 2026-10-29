@@ -134,6 +134,13 @@ export async function createAgent(
     caches.agents.delete(`${orgId}:team`);
     await resyncBudgetCounter(db, orgId, agent.id);
     await recordOperatorEvent(db, { type: "agent.created", orgId, userId: actorId, data: { agentId: agent.id } });
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.created",
+      target: { type: "agent", id: agent.id },
+      details: { name: agent.name, handle: agent.handle, model: agent.model },
+    });
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
@@ -197,16 +204,38 @@ export async function updateAgent(
       },
     });
   }
+  // Which fields changed, not the instructions' text (they can be long and say anything); the rest as set.
+  const changed = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+  if (changed.length) {
+    const { instructions: _, ...shown } = input;
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.updated",
+      target: { type: "agent", id: agentId },
+      details: { name: agent.name, changed, ...shown },
+    });
+  }
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
   return agent;
 }
 
 export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
   await requirePermission(db, actorId, orgId, "manage_agents");
-  await db
+  const [gone] = await db
     .update(agents)
     .set({ archivedAt: new Date() })
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .returning({ name: agents.name, handle: agents.handle });
+  if (gone) {
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.archived",
+      target: { type: "agent", id: agentId },
+      details: { name: gone.name, handle: gone.handle },
+    });
+  }
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
 }
