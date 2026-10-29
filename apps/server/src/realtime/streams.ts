@@ -32,8 +32,12 @@ export const STREAM_PATHS = {
 /** A person's desktop or terminal socket. */
 export interface ViewerSocketData {
   kind: "stream.viewer";
-  input: StreamInput;
+  input: StreamInput & { sessionToken: string };
   stream: Stream | null;
+  sessionValidatedAt: number;
+  sessionCheckInFlight: Promise<boolean> | null;
+  sessionCheckStartedAt: number;
+  sessionTimer: ReturnType<typeof setInterval> | null;
 }
 
 /** A runner's data socket. */
@@ -57,6 +61,8 @@ const socketOf = (ws: Socket): StreamSocket => ({
 });
 
 const upgraded = (ok: boolean) => (ok ? undefined : new Response("WebSocket upgrade failed", { status: 400 }));
+const SESSION_RECHECK_MS = 15_000;
+const SESSION_FRAME_RECHECK_MS = 2_000;
 
 /** What a viewer's address asks for; null when it is malformed. */
 function viewerRequest(path: string, q: URLSearchParams): StreamRequest | null {
@@ -72,6 +78,49 @@ function viewerRequest(path: string, q: URLSearchParams): StreamRequest | null {
 export function createStreamSockets(deps: { db: Database; auth: Auth; config: Config; broker: StreamBroker }) {
   const origins = allowedOrigins(deps.config);
   const { broker } = deps;
+
+  const closeViewer = (ws: Socket, code: number, reason: string) => {
+    if (ws.data.kind !== "stream.viewer" || ws.readyState !== 1) return;
+    if (ws.data.stream) broker.close(ws.data.stream, code, reason);
+    if (ws.readyState === 1) ws.close(code, reason);
+  };
+
+  async function liveViewerSession(ws: Socket, force = false): Promise<boolean> {
+    const data = ws.data;
+    if (data.kind !== "stream.viewer" || ws.readyState !== 1) return false;
+    if (!force && Date.now() - data.sessionValidatedAt < SESSION_FRAME_RECHECK_MS) return true;
+    if (data.sessionCheckInFlight) {
+      if (force && Date.now() - data.sessionCheckStartedAt >= SESSION_RECHECK_MS) {
+        closeViewer(ws, STREAM_CLOSE.internal, "session unavailable");
+        return false;
+      }
+      return data.sessionCheckInFlight;
+    }
+    data.sessionCheckStartedAt = Date.now();
+    const check = (async () => {
+      try {
+        const { internalAdapter } = await deps.auth.$context;
+        const found = await internalAdapter.findSession(data.input.sessionToken);
+        if (!found || found.session.userId !== data.input.userId || found.session.expiresAt <= new Date()) {
+          closeViewer(ws, STREAM_CLOSE.forbidden, "session revoked");
+          return false;
+        }
+        data.sessionValidatedAt = Date.now();
+        return true;
+      } catch {
+        closeViewer(ws, STREAM_CLOSE.internal, "session unavailable");
+        return false;
+      }
+    })();
+    data.sessionCheckInFlight = check;
+    try {
+      return await check;
+    } finally {
+      data.sessionCheckInFlight = null;
+      data.sessionCheckStartedAt = 0;
+    }
+  }
+
   return {
     paths: new Set<string>(Object.values(STREAM_PATHS)),
 
@@ -94,23 +143,34 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
         kind: "stream.viewer",
         input: { userId: user.id, orgId, agentId, request, sessionToken: user.sessionToken },
         stream: null,
+        sessionValidatedAt: 0,
+        sessionCheckInFlight: null,
+        sessionCheckStartedAt: 0,
+        sessionTimer: null,
       };
       return upgraded(server.upgrade(req, { data }));
     },
 
-    open(ws: Socket) {
+    async open(ws: Socket) {
       if (ws.data.kind === "stream.data") ws.data.link = broker.accept(socketOf(ws));
-      else ws.data.stream = broker.open(socketOf(ws), ws.data.input);
+      else {
+        if (!(await liveViewerSession(ws, true))) return;
+        if (ws.readyState !== 1) return;
+        ws.data.stream = broker.open(socketOf(ws), ws.data.input);
+        ws.data.sessionTimer = setInterval(() => void liveViewerSession(ws, true), SESSION_RECHECK_MS);
+      }
     },
 
     async message(ws: Socket, raw: string | Buffer) {
       if (ws.data.kind === "stream.viewer") {
-        if (ws.data.stream) broker.fromViewer(ws.data.stream, raw);
+        if (ws.data.stream && (await liveViewerSession(ws))) broker.fromViewer(ws.data.stream, raw);
       } else if (ws.data.link) await broker.fromRunner(ws.data.link, raw);
     },
 
     close(ws: Socket, code: number) {
       if (ws.data.kind === "stream.viewer") {
+        if (ws.data.sessionTimer) clearInterval(ws.data.sessionTimer);
+        ws.data.sessionTimer = null;
         if (ws.data.stream) broker.close(ws.data.stream, STREAM_CLOSE.normal, "the viewer left");
       } else if (ws.data.link) broker.runnerClosed(ws.data.link, code);
     },
