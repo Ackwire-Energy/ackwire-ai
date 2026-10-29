@@ -312,9 +312,9 @@ describe("uploads", () => {
     expect(await uploadRow(up.id)).toMatchObject({ status: "pending" });
     const { artifact } = await receiveMachineUpload(uploadDeps(), { ...input, machineId });
     expect(artifact.content).toMatchObject({ kind: "file", name: "hello.txt", text: "hello" });
-    // And a machine can't complete an upload the server reads.
-    const serverSide = await newUpload();
-    await expect(receiveMachineUpload(uploadDeps(), { ...input, uploadId: serverSide.id, machineId })).rejects.toThrow(
+    // And a machine can't complete an upload made for no machine.
+    const noMachine = await newUpload();
+    await expect(receiveMachineUpload(uploadDeps(), { ...input, uploadId: noMachine.id, machineId })).rejects.toThrow(
       ForbiddenError,
     );
   });

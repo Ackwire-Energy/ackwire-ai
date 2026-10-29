@@ -6398,7 +6398,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the workspace's own computer, the other computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;

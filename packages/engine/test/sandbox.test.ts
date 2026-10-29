@@ -9,6 +9,7 @@ import {
   grantKey,
   grantScopes,
   importSkillZip,
+  NO_COMPUTER_MESSAGE,
   NotFoundError,
   postPersonMessage,
   setAgentAccess,
@@ -98,6 +99,8 @@ describe("access", () => {
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).not.toContain("run_code");
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).toContain("run_code");
+    // Granted, but no computer was chosen for it: computer_status says so.
+    expect(await call(ctx, "computer_status", {})).toMatchObject({ isError: true, content: NO_COMPUTER_MESSAGE });
   });
 });
 
@@ -120,6 +123,11 @@ describe("limits", () => {
     expect(long.content.length).toBeLessThan(21_000);
     expect(long.content).toContain("characters cut");
 
+    // A member can't change the Run code settings (`configure`).
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    await expect(updateSandboxSettings(f.db, member.id, f.org.id, { requireApproval: true })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
     await updateSandboxSettings(f.db, f.owner.id, f.org.id, { requireApproval: true });
     const outcome = await f.tools?.invoke(await runCtx(), {
       toolUseId: crypto.randomUUID(),

@@ -499,7 +499,7 @@ export function RealtimeProvider({
             },
           );
       }
-      // An agent switched computers: no more polling needed.
+      // An agent switched computers, or its computer was removed: the cached view takes the new target.
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);

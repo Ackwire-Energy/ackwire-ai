@@ -9,7 +9,7 @@
 
 ADR 0021 gave each agent a computer we created at Daytona and then started, stopped, archived and billed by the hour, behind `SandboxProvider`. ADR 0025 added connected computers, machines that run our runner, and today every computer the product offers is one: agentes.chat Cloud gives each workspace a computer of its own, always on (ADR 0056 §10); a self-hosted server is its agents' computer by default (ADR 0060 §3); people connect their own (ADR 0025, ADR 0066 §5); the desktop app's server here uses the computer it runs on (ADR 0066 §7). Nothing depends on a third-party computer per agent anymore. Keeping that path cost a second lifecycle, its own usage, limits and network policy, an image and its snapshot script, and words on every computer screen. It also hid a bug: the server registered the git proxy only when Daytona was configured, so connected computers, which clone and push through it, had no git anywhere else.
 
-The desktop app's move from the menu bar app (ADR 0066 §8) existed only to retire the homes that app had paired with agentes.chat Cloud; that app is gone.
+The desktop app's move from the menu bar app (ADR 0066 §8) carried people over: it retired the homes paired with agentes.chat Cloud, kept the homes of their own servers running and put those servers in the list, and opened the server chosen in the menu bar app. That app is gone.
 
 Before launch nothing needs a compatibility path or a data migration, so all of it goes in one change.
 
