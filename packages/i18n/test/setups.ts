@@ -19,14 +19,13 @@ export const PHRASES: Record<Condition, Record<Locale, readonly RegExp[]>> = {
       /\barmazenamento do agentes\b/i,
     ],
   },
-  /** Self-host: a server someone runs, computers people connect, Daytona's sandboxes. */
+  /** Self-host: a server someone runs, computers people connect. */
   selfhost: {
     en: [
       /\bthis server\b/i,
       /\byour (own )?server\b/i,
       /\bconnected computers?\b/i,
       /\bconnect (a|another) computer\b/i,
-      /\bDaytona\b/,
       /SELF_HOSTING/,
     ],
     "pt-BR": [
@@ -34,7 +33,6 @@ export const PHRASES: Record<Condition, Record<Locale, readonly RegExp[]>> = {
       /\bseu (próprio )?servidor\b/i,
       /\bcomputadores? conectados?\b/i,
       /\bconectar (um|outro) computador\b/i,
-      /\bDaytona\b/,
       /SELF_HOSTING/,
     ],
   },
@@ -69,8 +67,7 @@ export const PHRASES: Record<Condition, Record<Locale, readonly RegExp[]>> = {
 
 /**
  * Keys (exact, or a prefix ending in ".") each condition gates. A key with a segment ending in `Cloud`
- * (`outage.titleCloud`, `aiAccounts.connect.needsCloud.online`) is the Cloud's without a line here. A lowercase
- * `cloud` is Daytona's sandbox, a self-host thing (`computers.cloud.note`, `errors.machine.targetCloudUnavailable`).
+ * (`outage.titleCloud`, `aiAccounts.connect.needsCloud.online`) is the Cloud's without a line here.
  * Help lines are keyed `help.<edition>.<slug>.<path>`, phone keys `mobile.…`, desktop keys `desktop.…`.
  */
 export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
@@ -88,7 +85,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "mobile.outage.cloudSub",
     "mobile.outage.sheet.cloudTag",
     "mobile.outage.sheet.managedDesc",
-    "desktop.migrate.",
     // Shown only on the Cloud, to owners, while email goes out.
     "connectAi.wait.email",
   ],
@@ -98,31 +94,18 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "auth.flow.ownerWaitsLead",
     "auth.flow.noPasswordLead",
     "access.unavailable",
-    "agentPage.computer.adminsPick",
-    "agentPage.computer.ownerPicks",
     "agentPage.computer.unavailable",
     "agentPage.work.browserDialog.noComputer",
     "agentPage.work.computer.connect",
-    "agentPage.work.computer.useDaytona",
-    "agentPage.work.saved.daytona",
     "aiAccounts.connect.addComputer",
     "aiAccounts.connect.noComputer",
     "brain.reasons.no_computer",
-    "browser.agent.cloud",
     "browser.inCard.noComputer",
     "browser.live.noComputer",
-    "computer.emptyText",
-    "computer.target.connectHint",
-    "computer.target.daytona",
-    "computer.target.daytonaText",
-    "computers.cloud.",
-    "computers.daytona.",
     "computers.hostMissing",
     "computers.lead",
     "connectAi.key.platform",
     "connectAi.wait.connecting",
-    "errors.machine.noLifecycle",
-    "errors.machine.targetCloudUnavailable",
     "errors.mission.unavailable",
     "machines.download.step2",
     "machines.download.title",
@@ -132,21 +115,14 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "missions.new.connectComputer",
     "missions.new.needsMachine",
     "missions.new.noEligibleText",
-    "missions.new.reason.cloud_computer",
     "missions.new.reason.no_computer",
     "missions.pinned.noComputers",
-    "onboarding.computer.cloud",
-    "onboarding.computer.cloudDesc",
-    "onboarding.computer.cloudReady",
     "onboarding.computer.hostConnecting",
     "onboarding.computer.hostReady",
     "onboarding.computer.otherComputer",
     "onboarding.platformKeyDesc",
     "openOnPhone.stepTailscale",
-    "outage.dialog.cloud",
-    "outage.dialog.cloudText",
     "outage.dialog.none",
-    "sandbox.",
     "settings.platformAvailable",
     "settings.telemetry.",
     "settings.tileState.platformKey",
@@ -158,11 +134,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "support.ask",
     "help.selfhost.",
     "mobile.newMission.noAgents",
-    "mobile.newMission.reason.cloud_computer",
     "mobile.newMission.reason.no_computer",
-    "mobile.outage.error.target_cloud_unavailable",
-    "mobile.outage.sheet.cloud",
-    "mobile.outage.sheet.cloudDesc",
     // The Jev card and its setup screen render only for the installation's owner on self-host
     // (GET /api/app/jev is 404 elsewhere).
     "jev.",

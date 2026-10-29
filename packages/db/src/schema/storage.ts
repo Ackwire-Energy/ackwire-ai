@@ -229,9 +229,9 @@ export const artifactUploads = pgTable(
     /** The run's channel and thread: completion acts as the agent there. */
     channelId: uuid().notNull(),
     threadId: uuid(),
-    /** `daytona:<sandbox row id>` or `machine:<machine id>`. */
+    /** `machine:<machine id>`. */
     computer: text().notNull(),
-    /** Connected machines: only this machine may complete it. */
+    /** Only this machine may complete it. */
     machineId: uuid(),
     /** Workspace-relative path on the computer. */
     path: text().notNull(),

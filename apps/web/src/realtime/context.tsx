@@ -499,7 +499,7 @@ export function RealtimeProvider({
             },
           );
       }
-      // The agent's PC changed (started, stopped, deleted, switched computers): no more polling needed.
+      // An agent switched computers: no more polling needed.
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);

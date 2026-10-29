@@ -803,7 +803,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/usage/report",
       tags: ["Usage"],
       security,
-      summary: "Spend by kind (agent, router, embedding, summary, sandbox) and per agent with budgets (admins)",
+      summary: "Spend by kind (agent, router, embedding, summary) and per agent with budgets (admins)",
       request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },
       responses: {
         200: json(
@@ -816,7 +816,7 @@ export function managementRoutes(deps: AppDeps) {
               .openapi({ description: "Calls the server pays for (Jev), not in the total." }),
             byKind: z.array(
               z.object({
-                kind: z.enum(["agent", "router", "embedding", "summary", "sandbox"]),
+                kind: z.enum(["agent", "router", "embedding", "summary"]),
                 calls: z.number(),
                 partialCalls: z.number(),
                 inputTokens: z.number(),

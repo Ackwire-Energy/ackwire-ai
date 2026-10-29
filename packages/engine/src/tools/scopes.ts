@@ -68,8 +68,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
   "sandbox:run": {
     label: "Run code",
-    description:
-      "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time.",
+    description: "Run code and skill scripts on the agent's computer (files kept between conversations).",
   },
   "browser:use": {
     label: "Use a browser",

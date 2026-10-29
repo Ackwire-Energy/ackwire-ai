@@ -60,8 +60,8 @@ import {
   stepClock,
   stepStates,
 } from "../control/local-server";
-import { appServer, serverKind, serverName } from "../control/server";
-import { readPref, useOnShown, useTailnet, writePref } from "../hooks";
+import { serverKind, serverName } from "../control/server";
+import { useOnShown, useTailnet } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDetails, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
@@ -167,16 +167,6 @@ export function FirstRun() {
       .then((s) => setCanRunHere(s.bundled))
       .catch(() => {});
   }, [host]);
-
-  // The server the menu bar app was told to sign in to ("Server: … · Change"): it opens, as chosen then.
-  useEffect(() => {
-    const old = appServer(readPref<string | null>("server", null) ?? "");
-    if (!old) return;
-    writePref("server", null);
-    void host.servers().then(({ current }) => {
-      if (!current) void finish(old);
-    });
-  }, [host, finish]);
 
   // A link waiting when the window opens, and any that arrives while it's open.
   useEffect(() => {

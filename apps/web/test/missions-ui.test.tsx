@@ -175,7 +175,7 @@ describe("Missões", () => {
       pick(ADA_ID, "Ada"),
       pick(ATLAS_ID, "Atlas", {
         eligible: false,
-        reason: "cloud_computer",
+        reason: "no_computer",
         machine: null,
         ready: false,
         executors: [],
@@ -187,7 +187,7 @@ describe("Missões", () => {
     const { dialog } = await openAgents();
     const atlas = screen().getByRole("option", { name: /^Atlas/ });
     expect(atlas.getAttribute("aria-disabled")).toBe("true");
-    expect(atlas.textContent).toContain("missões lá chegam depois");
+    expect(atlas.textContent).toContain("Sem computador conectado");
     // The open agent list hides the rest of the dialog from the accessibility tree (a modal popover).
     const blocked = within(dialog).getByRole("list", {
       name: "Agentes que ainda não podem rodar uma missão",

@@ -827,6 +827,13 @@
       "when": 1793134118058,
       "tag": "0117_push_device_session",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1793144118058,
+      "tag": "0118_drop_cloud_sandboxes",
+      "breakpoints": true
     }
   ]
 }

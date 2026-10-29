@@ -9,23 +9,18 @@ import { deriveSecret } from "../crypto";
 export interface GitTokenClaims {
   orgId: string;
   agentId: string;
-  /** `sandboxes.id` of the computer it was issued to (a connected machine: `machines.id`). */
+  /** The machine it was issued to (`machines.id`; the field keeps its name inside the token). */
   sandboxId: string;
-  /**
-   * `sandboxes.git_token_gen` when issued: bumping it revokes every token of
-   * that computer. A connected machine: a number from its machine token's
-   * hash (`machineGitGen`), so re-pairing or deleting it revokes them.
-   */
+  /** The machine's generation (`machineGitGen` of its token hash): re-pairing or deleting it revokes every token. */
   gen: number;
-  /** `machine`: issued to a connected machine (ADR 0024 addendum); absent: a cloud computer. */
+  /** `machine`: issued to a connected machine (ADR 0024 addendum); the proxy refuses any other token. */
   kind?: "machine";
   /** Unix seconds. */
   exp: number;
 }
 
-/** Tokens live 6 hours and are re-issued on each start and every 3 hours of use. */
+/** Tokens live 6 hours; `git.sync` hands the computer a fresh one each time. */
 export const GIT_TOKEN_TTL_SECONDS = 6 * 3600;
-export const GIT_TOKEN_REFRESH_MS = 3 * 3600_000;
 
 const PREFIX = "agtgit1";
 
@@ -83,46 +78,3 @@ export const gitProxyBase = (publicUrl: string, orgId: string, connectionId: str
 /** An agent's commit email, on our host: `theo@agents.agentes.chat` for `https://agentes.chat` (or any URL under it). */
 export const agentCommitEmail = (publicUrl: string, handle: string) =>
   `${handle}@agents.${new URL(publicUrl).hostname}`;
-
-const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-
-/**
- * Configures git in the computer (as its user, in `$HOME`):
- * - our proxy token in `~/.config/agentes/git-token` (mode 600) and a tiny
- *   credential helper that returns it, only for our host;
- * - `url.<proxy>.insteadOf https://github.com/` (and `git@github.com:`), so
- *   `git clone https://github.com/owner/repo` goes through the proxy;
- * - the commit author: "Theo (agentes) <theo@agents.{our host}>".
- * Nothing goes in the environment, and no GitHub token is ever here.
- */
-export function gitSetupScript(input: { base: string; token: string; agentName: string; agentHandle: string }) {
-  const helper = [
-    "#!/bin/sh",
-    "# agentes.chat: the git proxy credential for this computer (not a GitHub token).",
-    '[ "$1" = get ] || exit 0',
-    "echo username=agentes",
-    'printf "password=%s\\n" "$(cat "$HOME/.config/agentes/git-token")"',
-  ].join("\n");
-  const origin = new URL(input.base).origin;
-  return [
-    "set -e",
-    'mkdir -p "$HOME/.config/agentes"',
-    'chmod 700 "$HOME/.config/agentes"',
-    `printf %s ${shq(input.token)} > "$HOME/.config/agentes/git-token"`,
-    'chmod 600 "$HOME/.config/agentes/git-token"',
-    `printf '%s\\n' ${shq(helper)} > "$HOME/.config/agentes/git-credential"`,
-    'chmod 700 "$HOME/.config/agentes/git-credential"',
-    // Replace earlier settings of ours (another connection, an old host).
-    "git config --global --remove-section credential.https://github.com 2>/dev/null || true",
-    `for k in $(git config --global --name-only --get-regexp '^url\\..*/api/git/.*\\.insteadof$' 2>/dev/null); do git config --global --unset-all "$k" || true; done`,
-    `git config --global ${shq(`credential.${origin}.helper`)} "$HOME/.config/agentes/git-credential"`,
-    `git config --global ${shq(`credential.${origin}.useHttpPath`)} false`,
-    `git config --global --add ${shq(`url.${input.base}.insteadOf`)} https://github.com/`,
-    `git config --global --add ${shq(`url.${input.base}.insteadOf`)} git@github.com:`,
-    `git config --global user.name ${shq(`${input.agentName} (agentes)`)}`,
-    `git config --global user.email ${shq(agentCommitEmail(input.base, input.agentHandle))}`,
-    "git config --global init.defaultBranch main",
-    "git config --global push.autoSetupRemote true",
-    "echo ok",
-  ].join("\n");
-}

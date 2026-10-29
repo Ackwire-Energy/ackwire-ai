@@ -8,7 +8,6 @@ import type { Presence } from "./presence";
 import type { PubSub } from "./pubsub";
 import type { PushSender } from "./push";
 import type { RateLimiter } from "./rate-limiter";
-import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
 import type { WebPushSender } from "./web-push";
 
@@ -59,8 +58,6 @@ export interface Adapters {
    * their own bucket are resolved on top of it by the engine.
    */
   platformBlobs: BlobStore;
-  /** Where agents run code (ADR 0021): Daytona in the Cloud; null/absent = the sandbox tools are off. */
-  sandbox?: SandboxProvider | null;
   /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
   push?: PushSender | null;
   /** Web Push to browsers (`push.send` outbox job, ADR 0071); null/absent = browsers get no push. */

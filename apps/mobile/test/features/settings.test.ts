@@ -290,7 +290,7 @@ describe("Computadores", () => {
       expect(member.canPick).toBe(false);
     });
 
-    test("no computer: offered only for an agent that has none, never the cloud's sandboxes", () => {
+    test("no computer: offered only for an agent that has none", () => {
       const pick = agentComputerPick({
         agent: { id: "dev", ownerUserId: null },
         meId: "u1",

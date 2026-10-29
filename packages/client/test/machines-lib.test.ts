@@ -145,7 +145,6 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(computerKind("linux")).toBe("linux");
     expect(computerKind("other")).toBe("linux");
     expect(computerKind(null)).toBe("linux");
-    expect(computerKind("darwin", true)).toBe("cloud");
     expect(computerState({ online: true, paused: null })).toBe("online");
     expect(computerState({ online: false, paused: null })).toBe("offline");
     expect(computerState({ online: true, paused: { until: null } })).toBe("paused");
@@ -171,7 +170,7 @@ describe("connected computers helpers (ADR 0036)", () => {
     applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", access: true } as { type: string });
     expect(stale()).toEqual([true, true]);
     fresh();
-    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "cloud" } } as {
+    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "none" } } as {
       type: string;
     });
     expect(stale()).toEqual([true, true]);

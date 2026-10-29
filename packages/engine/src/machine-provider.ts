@@ -3,9 +3,7 @@ import {
   type ExecRequest,
   type ExecResult,
   MAX_INLINE_FILE_BYTES,
-  type SandboxInfo,
   type SandboxProvider,
-  SandboxProviderError,
   SECRETS_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
@@ -62,11 +60,10 @@ function explain(error: unknown, name: string, path?: string): Error {
 }
 
 /**
- * Connected machines as a `SandboxProvider` (ADR 0025): no lifecycle (a
- * machine is on while its runner is connected; we never create, start or
- * stop it) and a channel over the hub. Files travel base64 up to 5 MB;
- * uploads go through `push`, straight to our upload URL. Every request is
- * for `agent`, which the runner keeps in its own folder of the workspace.
+ * Connected machines as a `SandboxProvider` (ADR 0025): the channel over the hub. A machine is on while its
+ * runner is connected; people pair it, and we never create, start or stop it. Files travel base64 up to 5 MB;
+ * uploads go through `push`, straight to our upload URL. Every request is for `agent`, which the runner keeps
+ * in its own folder of the workspace.
  */
 export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
   const nameOf = async (id: string) => (await hub.status(id))?.name ?? "computer";
@@ -104,31 +101,8 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
         ...(r.canceled ? { canceled: r.canceled } : {}),
       };
     });
-  const info = (id: string, online: boolean): SandboxInfo => ({
-    id,
-    state: online ? "started" : "stopped",
-    resources: { cpu: 0, memoryGiB: 0, diskGiB: 0 },
-    network: "provider-default",
-  });
   return {
     id: MACHINE_PROVIDER_ID,
-    async create() {
-      throw new SandboxProviderError("connected computers are paired by people, not created");
-    },
-    async get(id) {
-      const s = await hub.status(id);
-      return s ? info(id, s.online) : null;
-    },
-    async ensureStarted(id) {
-      const s = await hub.status(id);
-      if (!s?.online) throw new MachineOfflineError(s?.name ?? "computer");
-      return info(id, true);
-    },
-    async stop() {},
-    async destroy() {},
-    async setNetwork() {
-      return "provider-default";
-    },
     exec: (id, request) => execOn(id, request),
     execStream: (id, request, onOutput) => execOn(id, request, onOutput),
     async writeFile(id, path, data) {

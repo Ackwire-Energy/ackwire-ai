@@ -465,7 +465,7 @@ export async function deleteMachine(
 /**
  * Removes a machine: its token stops working, its socket is closed
  * (`refused: revoked`, on whichever replica holds it), and agents that used
- * it go back to the cloud computer (remembered in `previous_agent_ids`, so
+ * it are left with no computer (remembered in `previous_agent_ids`, so
  * reconnecting the same computer gives them back). Soft delete, audited.
  * `also` runs in the same transaction.
  */
@@ -520,27 +520,26 @@ export async function removeMachine(
     await publishOrgEvent(deps.pubsub, {
       type: "org.broadcast",
       orgId,
-      event: { type: "agent.computer", agentId, target: { kind: "cloud" } },
+      event: { type: "agent.computer", agentId, target: { kind: "none" } },
     });
   }
 }
 
 /** Which computer an agent uses (`GET …/computer` `target`). */
-export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: string; name: string; online: boolean };
+export type ComputerTarget = { kind: "none" } | { kind: "machine"; machineId: string; name: string; online: boolean };
 
 export async function computerTarget(db: Database, orgId: string, agentId: string): Promise<ComputerTarget> {
   const agent = await getAgent(db, orgId, agentId);
-  if (!agent?.machineId) return { kind: "cloud" };
+  if (!agent?.machineId) return { kind: "none" };
   const machine = await getMachine(db, orgId, agent.machineId);
-  if (!machine) return { kind: "cloud" };
+  if (!machine) return { kind: "none" };
   return { kind: "machine", machineId: machine.id, name: machine.name, online: machineOnline(machine) };
 }
 
 /**
- * Points an agent at a connected machine (or back to the cloud computer with
- * null). An admin (`manage_agents`) may; so may the agent's owner when they
- * paired that machine or it is the workspace's own (going back to the cloud
- * only needs the owner).
+ * Points an agent at a connected machine, or at none with null. An admin (`manage_agents`) may; so may the
+ * agent's owner when they paired that machine or it is the workspace's own (leaving it with none only needs
+ * the owner).
  */
 export async function setAgentComputerTarget(
   deps: Pick<MachineDeps, "db" | "pubsub">,
@@ -587,7 +586,7 @@ export async function setAgentComputerTarget(
   });
   const target: ComputerTarget = machine
     ? { kind: "machine", machineId: machine.id, name: machine.name, online: machineOnline(machine) }
-    : { kind: "cloud" };
+    : { kind: "none" };
   await publishOrgEvent(deps.pubsub, {
     type: "org.broadcast",
     orgId,

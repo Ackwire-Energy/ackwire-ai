@@ -80,7 +80,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { CLOUD, useNoComputer } from "@/components/AgentComputer";
+import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
@@ -126,7 +126,7 @@ function useWork() {
   const machines = useMachines(org.id, owner);
   const granted = (scopes.data ?? []).some((s) => s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE);
   const target = computer.data?.target;
-  const machineId = target?.kind === "machine" ? target.machineId : CLOUD;
+  const machineId = target?.kind === "machine" ? target.machineId : NO_COMPUTER;
   const browserWord: BrowserWord = !granted
     ? "off"
     : !browser.data?.available
@@ -258,13 +258,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
           {!member && (
             <Cell
               icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
-              label={
-                choice === "none"
-                  ? t("computer.target.label")
-                  : choice === "cloud"
-                    ? t("agentPage.work.cell.daytona")
-                    : t("agentPage.work.cell.computer")
-              }
+              label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
               value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
               openLabel={t("agentPage.work.open.computer")}
@@ -1201,10 +1195,10 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const setTarget = useSetComputerTarget(org.id);
   const noComputer = useNoComputer();
   const listed = noComputer.pending ? pickable.filter((m) => m.kind !== "managed") : pickable;
-  const cloud = noComputer.choice(work.machineId === CLOUD);
-  // The workspace's own computer on its way stands in the cloud's place: what it will be (every brain, the
-  // browser) and when, never what the cloud computer lacks.
-  const workspace = cloud === "workspace" ? noComputer.setup : null;
+  const none = noComputer.choice(work.machineId === NO_COMPUTER);
+  // The workspace's own computer on its way stands in for no computer: what it will be (every brain, the
+  // browser) and when.
+  const workspace = none === "workspace" ? noComputer.setup : null;
   const [choice, setChoice] = useState(work.machineId);
   // In the desktop app, this computer not yet in the organization (where agents may work on it): connect it
   // from here and pick it (ADR 0036).
@@ -1232,13 +1226,12 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   };
   const also = (id: string) => {
     if (id === work.machineId) return [];
-    if (id === CLOUD && workspace) return [t("computerSetup.agentWaiting", g)];
+    if (id === NO_COMPUTER && workspace) return [t("computerSetup.agentWaiting", g)];
     const m = pickable.find((x) => x.id === id);
     return [
       ...(brain !== "model" && !has(id, brain)
         ? [t("agentPage.work.computer.alsoBrain", { brain: t(`brain.card.${brain}`) })]
         : []),
-      ...(work.granted && id === CLOUD ? [t("agentPage.work.computer.alsoBrowser")] : []),
       ...(m && !m.online ? [t("agentPage.work.computer.alsoOffline", g)] : []),
     ];
   };
@@ -1248,17 +1241,15 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const use = async () => {
     setBusy(true);
     try {
-      await setTarget.mutateAsync({ agentId: agent.id, machineId: choice === CLOUD ? null : choice });
+      await setTarget.mutateAsync({ agentId: agent.id, machineId: choice === NO_COMPUTER ? null : choice });
       // What the new computer can't do goes back to the organization's model (said before, in the dialog).
-      if (brain !== "model" && (choice === CLOUD ? !workspace : !has(choice, brain)))
+      if (brain !== "model" && (choice === NO_COMPUTER ? !workspace : !has(choice, brain)))
         await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       refresh();
       toast.show(
         chosen || workspace
           ? t("agentPage.work.saved.computer", { ...g, computer: chosen ? chosen.name : noComputer.label("workspace") })
-          : cloud === "cloud"
-            ? t("agentPage.work.saved.daytona", g)
-            : t("agentPage.work.saved.none", g),
+          : t("agentPage.work.saved.none", g),
       );
       onClose();
     } catch {
@@ -1294,30 +1285,26 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
           value={choice}
           onValueChange={setChoice}
           options={[
-            ...(cloud
+            ...(none
               ? [
                   {
-                    value: CLOUD,
+                    value: NO_COMPUTER,
                     // Portraits are as wide as their drawings: one column keeps the titles in line.
                     leading: (
                       <span className="machine-row__pic">
-                        {cloud === "none" ? (
+                        {none === "none" ? (
                           <Icon name="dash" size={20} />
                         ) : (
                           <ComputerPortrait
-                            kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                            kind={WORKSPACE_COMPUTER_KIND}
                             state={workspace ? setupPortrait(workspace, false) : "online"}
                           />
                         )}
                       </span>
                     ),
-                    title: noComputer.label(cloud),
-                    description: workspace
-                      ? t(workspace.textKey)
-                      : cloud === "none"
-                        ? t("computer.target.noneText")
-                        : t("computer.target.daytonaText"),
-                    children: note(CLOUD),
+                    title: noComputer.label(none),
+                    description: workspace ? t(workspace.textKey) : t("computer.target.noneText"),
+                    children: note(NO_COMPUTER),
                   },
                 ]
               : []),
@@ -1357,9 +1344,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
             ? t("agentPage.work.computer.useMachine", { computer: chosen.name })
             : workspace
               ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
-              : cloud === "cloud"
-                ? t("agentPage.work.computer.useDaytona")
-                : t("agentPage.work.use")
+              : t("agentPage.work.use")
         }
         onClose={onClose}
         onUse={() => void use()}
@@ -1397,10 +1382,10 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const [typed, setTyped] = useState("");
   const [bad, setBad] = useState(false);
   const [busy, setBusy] = useState(false);
-  // On the cloud the browser needs a connected computer: the first with the browser ready, else any.
+  // With no computer the browser needs a connected one: the first with the browser ready, else any.
   const ready = (m: Machine) => Boolean(m.access?.tools.browser && m.browser?.available);
   const moveTo =
-    mode !== "off" && work.machineId === CLOUD
+    mode !== "off" && work.machineId === NO_COMPUTER
       ? (pickable.find((m) => ready(m) && m.online) ?? pickable.find(ready) ?? pickable[0] ?? null)
       : null;
   const add = () => {
@@ -1414,7 +1399,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const on = mode !== "off";
   const sitesNow = mode === "only" ? sites : [];
   const unchanged = on === work.granted && (!on || JSON.stringify(sitesNow) === JSON.stringify(domains));
-  const noComputer = on && work.machineId === CLOUD && !moveTo;
+  const noComputer = on && work.machineId === NO_COMPUTER && !moveTo;
   // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
   const blocked = noComputer && edition !== "cloud";
   const use = async () => {

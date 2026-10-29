@@ -1906,9 +1906,9 @@ export function useSkillAction(orgId: string) {
   });
 }
 
-// ── PC do agente (sandbox) ───────────────────────────────────────────────────
+// ── Agent computer and Run code settings ─────────────────────────────────────
 
-/** `retry: false`: 404 = no sandbox on this server (the UI hides it). */
+/** The organization's Run code settings (`retry: false`). */
 export const useSandboxSettings = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
@@ -1968,42 +1968,18 @@ export const useAccountLogin = (orgId: string, machineId: string, loginId: strin
   });
 };
 
-export const useComputer = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
+export const useComputer = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.computer(orgId, agentId),
     queryFn: () => api.sandbox.computer(orgId, agentId),
     enabled,
     retry: false,
-    refetchInterval: pollMs,
-    // Polling doesn't show the top progress bar.
     meta: { quiet: true },
   });
 };
 
-export function useComputerAction(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ agentId, action }: { agentId: string; action: "start" | "stop" | "remove" }): Promise<unknown> =>
-      action === "start"
-        ? api.sandbox.start(orgId, agentId)
-        : action === "stop"
-          ? api.sandbox.stop(orgId, agentId)
-          : api.sandbox.remove(orgId, agentId),
-    onSuccess: (result, { agentId, action }) => {
-      if (action === "remove") {
-        qc.setQueryData<AgentComputer>(keys.computer(orgId, agentId), (old) =>
-          old ? { ...old, status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null } : old,
-        );
-      } else if (result && typeof result === "object" && "status" in result) {
-        qc.setQueryData(keys.computer(orgId, agentId), result as AgentComputer);
-      }
-    },
-  });
-}
-
-/** Cloud or a connected machine for the agent; the computer view follows the answer. */
+/** A connected machine for the agent, or none; the computer view follows the answer. */
 export function useSetComputerTarget(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2156,7 +2132,7 @@ export function useMachineAction(orgId: string) {
           : list?.map((m) => (m.id === input.machineId ? { ...m, name: input.name } : m)),
       );
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
-      // Agents on a removed machine go back to the cloud; a renamed one shows its new name.
+      // Agents on a removed machine are left with no computer; a renamed one shows its new name.
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
     },
   });

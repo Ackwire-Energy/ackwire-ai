@@ -9,7 +9,6 @@ import {
   useConfirmDevice,
   useJevKey,
   useMachines,
-  useSandboxSettings,
   useSaveJevKey,
 } from "@agenteschat/client";
 import {
@@ -160,7 +159,7 @@ const COMPUTER_POLL_MS = 5000;
 const FIRST_TIME_POLL_MS = 2000;
 
 /** `host`: the server's own computer. */
-type Computer = "cloud" | "machine" | "host" | null;
+type Computer = "machine" | "host" | null;
 /** An agent created here (a preset or an imported one), for the later steps. */
 interface CrewMember {
   key: string;
@@ -541,9 +540,6 @@ export function OnboardingPage() {
     },
   });
 
-  const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
-  // Daytona's sandboxes are a choice only on a server that has them.
-  const daytona = sandbox.data?.available === true;
   // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
@@ -590,7 +586,7 @@ export function OnboardingPage() {
   // something is connected, the chosen agent's view and the accounts are asked again every few seconds (no socket
   // is open here), so a plan's panel turns on by itself once the computer is ready.
   const orgSummary = me.data?.organizations.find((o) => o.id === created?.orgId);
-  const noComputer = edition === "selfhost" && (computer === null || computer === "cloud");
+  const noComputer = edition === "selfhost" && computer === null;
   const aiOf = (id: string): AgentAi => planned[id]?.choice ?? (keySaved ? "key" : null);
   const hasAi = (id: string) => aiOf(id) !== null;
   // The crew shares one computer here.
@@ -641,10 +637,6 @@ export function OnboardingPage() {
   const saveComputer = useMutation({
     mutationFn: async (skipped: boolean) => {
       if (!created) return;
-      if (!skipped && computer === "cloud" && sandbox.data?.available && !sandbox.data.enabled) {
-        const saved = await api.sandbox.saveSettings(created.orgId, { enabled: true });
-        qc.setQueryData(keys.sandboxSettings(created.orgId), saved);
-      }
       // The agents come next and go to the connected computer when they are created; ones made already (back here
       // from the AI step) follow the new choice now, off the computer they were on when there's none.
       if (edition !== "selfhost") return;
@@ -670,7 +662,7 @@ export function OnboardingPage() {
   });
 
   // Done. The computer as it is now (it may have gone to sleep since it was picked), and whether it gives the agents
-  // a browser: a ready one does; one still being prepared and a Daytona sandbox don't.
+  // a browser: a ready one does; one still being prepared doesn't.
   const machinesNow = useMachines(created?.orgId ?? "", step.id === "done" && machine !== null);
   const machineNow = machinesNow.data?.find((m) => m.id === machine?.id) ?? machine;
   const browser = workspaceComputer
@@ -685,21 +677,19 @@ export function OnboardingPage() {
           .filter(Boolean)
           .join(" · "),
       }
-    : computer === "cloud"
-      ? { kind: "cloud", state: "online", label: t("onboarding.computer.cloud") }
-      : (computer === "machine" || computer === "host") && machineNow
+    : (computer === "machine" || computer === "host") && machineNow
+      ? {
+          kind: computerKind(machineNow.os),
+          state: computerState(machineNow),
+          label: computer === "host" ? t("machines.host.label") : machineNow.name,
+        }
+      : computer === "machine"
         ? {
-            kind: computerKind(machineNow.os),
-            state: computerState(machineNow),
-            label: computer === "host" ? t("machines.host.label") : machineNow.name,
+            kind: "mac",
+            state: "paused",
+            label: `${t("onboarding.stepNames.computer")} · ${t("onboarding.done.computerPending")}`,
           }
-        : computer === "machine"
-          ? {
-              kind: "mac",
-              state: "paused",
-              label: `${t("onboarding.stepNames.computer")} · ${t("onboarding.done.computerPending")}`,
-            }
-          : null;
+        : null;
 
   // The first message: written as Done opens, so it never changes while it's read, and kept through edits and Back;
   // written again only when the ready-made agents, who offer it, change (an import retried on Done keeps it).
@@ -875,13 +865,11 @@ export function OnboardingPage() {
       : t("onboarding.railValue.skipped"),
     computer: workspaceComputer
       ? t(workspaceComputer.chipKey)
-      : computer === "cloud"
-        ? t("onboarding.computer.cloud")
-        : computer === "host"
-          ? t("machines.host.label")
-          : computer === "machine" && machine
-            ? machine.name
-            : t("onboarding.railValue.skipped"),
+      : computer === "host"
+        ? t("machines.host.label")
+        : computer === "machine" && machine
+          ? machine.name
+          : t("onboarding.railValue.skipped"),
     agents: crew.length
       ? joinNames(
           crew.map((c) => c.name),
@@ -1178,7 +1166,6 @@ export function OnboardingPage() {
               <ComputerStep
                 orgId={created.orgId}
                 computer={computer}
-                daytona={daytona}
                 machine={machine}
                 onChoose={(c) => {
                   // Leaving the server's computer for "this computer": the pairing starts from nothing.
@@ -1563,14 +1550,12 @@ function ChoiceCard({
 }
 
 /**
- * Where the agents work: the workspace's cloud computer, or this computer / a
- * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
- * In agentes for Mac (ADR 0036) the second choice is "Este Mac", and choosing it connects it.
+ * Where the agents work: this computer or a server (the Mac app or the terminal; the computer shows a code to confirm,
+ * live until it connects). In agentes for Mac (ADR 0036) the choice is "Este Mac", and choosing it connects it.
  */
 function ComputerStep({
   orgId,
   computer,
-  daytona,
   machine,
   onChoose,
   onPaired,
@@ -1578,8 +1563,6 @@ function ComputerStep({
 }: {
   orgId: string;
   computer: Computer;
-  /** This server has Daytona's sandboxes. */
-  daytona: boolean;
   machine: Machine | null;
   onChoose: (c: Computer) => void;
   onPaired: (m: Machine) => void;
@@ -1661,23 +1644,7 @@ function ComputerStep({
           pressed={computer === "machine"}
           onClick={chooseMachine}
         />
-        {daytona && (
-          <ChoiceCard
-            art={<ComputerPortrait kind="cloud" state="online" />}
-            title={t("onboarding.computer.cloud")}
-            desc={t("onboarding.computer.cloudDesc")}
-            pressed={computer === "cloud"}
-            onClick={() => onChoose("cloud")}
-          />
-        )}
       </div>
-
-      {computer === "cloud" && (
-        <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" size={14} />
-          <span>{t("onboarding.computer.cloudReady")}</span>
-        </p>
-      )}
 
       {computer === "host" && (
         <p className="onb__status ac-iconline" role="status">

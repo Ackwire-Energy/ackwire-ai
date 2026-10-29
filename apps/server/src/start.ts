@@ -4,7 +4,6 @@ import {
   type Adapters,
   createComposioClient,
   createComposioMailConnector,
-  createDaytonaSandboxProvider,
   createDiskBlobStore,
   createExpoPushSender,
   createImapConnectionTester,
@@ -137,14 +136,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
     platformBlobs: platformBlobStore(config, database.db),
-    sandbox: config.DAYTONA_API_KEY
-      ? createDaytonaSandboxProvider({
-          apiKey: config.DAYTONA_API_KEY,
-          apiUrl: config.DAYTONA_API_URL,
-          target: config.DAYTONA_TARGET,
-          snapshot: config.SANDBOX_SNAPSHOT,
-        })
-      : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
@@ -170,7 +161,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
-  log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version };
@@ -279,7 +269,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         talker: engine.talker,
         router: engine.router,
         jevKey: engine.jevKey,
-        gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        gitProxy: engine.gitProxy,
         appleRevoke: appleTokenRevoker(config),
       },
     },

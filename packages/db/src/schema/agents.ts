@@ -94,7 +94,10 @@ export const agents = pgTable(
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
-    /** Its computer (ADR 0025): null = the cloud computer (Daytona); set = that connected machine. */
+    /**
+     * Its computer (ADR 0025): the connected machine it works on; null = none yet (the workspace's own computer
+     * takes the agents with none once it connects).
+     */
     machineId: uuid(),
     /**
      * The autonomy its new missions start with (`always | low_risk_auto |
