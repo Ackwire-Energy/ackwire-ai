@@ -485,12 +485,15 @@ export async function removeMachine(
       .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
       .returning({ id: agents.id });
     const ids = rows.map((r) => r.id);
-    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`).
+    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`). A connected
+    // computer's token hash stays too: a removed row never authenticates (`authenticateMachine`), and
+    // the token is how that computer proves it is this machine when it asks to come back
+    // (`startDeviceCode`, ADR 0036 §5). The workspace's own computers lose it.
     await tx
       .update(machines)
       .set({
         deletedAt: now,
-        tokenHash: null,
+        ...(machine.kind === "connected" ? {} : { tokenHash: null }),
         online: false,
         connectedReplica: null,
         previousAgentIds: ids,

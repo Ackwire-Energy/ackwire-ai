@@ -28,6 +28,7 @@ import type { DesktopSessions } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
+import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import type { McpTaskInfo } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
@@ -317,11 +318,19 @@ async function doWrite(
   if (data.byteLength > MAX_INLINE_FILE_BYTES) {
     throw new RunnerError("too_large", `Files sent inline are limited to ${MAX_INLINE_FILE_BYTES} bytes`);
   }
-  const first = await resolvePath(ctx, requireString(req.path, "path"));
+  const requested = requireString(req.path, "path");
+  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
+  // without the "commands" switch): never written by a file op (`git-guard.ts`).
+  const gitInternal = () =>
+    new RunnerError("bad_request", `${requested} is inside a .git folder; files there can't be written this way`);
+  if (isGitInternalPath(requested)) throw gitInternal();
+  const first = await resolvePath(ctx, requested);
   if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
+  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
   if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
   // Check again now that the parents exist (nothing raced us outside).
   const target = await resolvePath(ctx, req.path);
+  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
   if (target.exists && (await stat(target.abs)).isDirectory()) {
     throw new RunnerError("bad_request", `${req.path} is a folder`);
   }
@@ -457,7 +466,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
         signal: scope.signal,
       });
     case "git.sync":
-      // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
+      // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed,
+      // so it never runs with a program the repository's config names (`git-guard.ts`).
       if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
       if (!ctx.gitDir) throw new RunnerError("bad_request", "This runner keeps no git credentials");
       return gitSync(

@@ -7,6 +7,7 @@ import {
   type LiveRun,
   rememberHeldPlace,
   useAgentBrowserHandoff,
+  useAgentScreenControl,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -110,6 +111,9 @@ export function BrowserCard({
   // A take over has no message of its own: the agent's open request, while this card is open.
   const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given);
   const handoff = given ?? (ofAgent.data && isOpenHandoff(ofAgent.data) ? ofAgent.data : null);
+  // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
+  const control = useAgentScreenControl(orgId, agentId, !given);
+  const mayDrive = given !== null || control.data !== false;
   // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
   // The person in control keeps watching even closed: their watching is what keeps their control.
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
@@ -335,12 +339,14 @@ export function BrowserCard({
             <View style={styles.acts}>
               {!controller && canTake ? (
                 <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    label={surface ? t("desktop.takeover") : t("mobile.browser.live.takeOver")}
-                    onPress={takeover}
-                  />
+                  {mayDrive ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      label={surface ? t("desktop.takeover") : t("mobile.browser.live.takeOver")}
+                      onPress={takeover}
+                    />
+                  ) : null}
                   {ready && !surface ? (
                     <Pressable
                       onPress={stop}

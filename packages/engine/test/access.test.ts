@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import {
   accessMatrix,
   type ConnectorDeps,
@@ -152,6 +152,43 @@ describe("agent access", () => {
     expect(cells["builtin|update_issue"]).toBe("off");
     expect(cells["builtin|ask_user"]).toBe("inherited");
     await expect(accessMatrix(f.db, bia.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("the agent's owner (not an admin) only narrows its access: giving more is an admin's call", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const deny = [{ connectionId: null, name: "list_artifacts" }];
+    const scopes = (...names: string[]) => names.map((scope) => ({ connectionId: null, scope }));
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, {
+      ...none,
+      scopes: scopes("drive:read", "issues:read"),
+      tools: { allow: [], deny },
+    });
+    await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+    const wider = [
+      { ...none, all: true, scopes: scopes("drive:read", "issues:read"), tools: { allow: [], deny } },
+      { ...none, scopes: scopes("drive:read", "issues:read", "sandbox:run"), tools: { allow: [], deny } },
+      {
+        ...none,
+        scopes: scopes("drive:read", "issues:read"),
+        tools: { allow: [{ connectionId: null, name: "create_issue" }], deny },
+      },
+      // Lifting a denial gives the tool back.
+      { ...none, scopes: scopes("drive:read", "issues:read") },
+    ];
+    for (const input of wider) {
+      await expect(setAgentAccess(f.db, bia.id, f.org.id, f.agent.id, input)).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    // Dropping a grant and denying another tool narrows it.
+    await setAgentAccess(f.db, bia.id, f.org.id, f.agent.id, {
+      ...none,
+      scopes: scopes("drive:read"),
+      tools: { allow: [], deny: [...deny, { connectionId: null, name: "read_artifact" }] },
+    });
+    const matrix = await accessMatrix(f.db, f.owner.id, f.org.id);
+    const cells = matrix.cells[f.agent.id] ?? {};
+    expect(cells["builtin|list_issues"]).toBe("off");
+    expect(cells["builtin|read_artifact"]).toBe("denied");
   });
 });
 

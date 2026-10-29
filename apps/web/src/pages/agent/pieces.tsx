@@ -10,7 +10,7 @@ import { useAgentEdit } from "./context";
 
 /**
  * Who edits here, for those who can't edit everything: members read; the
- * owner (responsável) changes the look, access, audience and computer.
+ * owner (responsável) changes the look, audience and computer.
  * `field`: only when that part is read-only for the viewer.
  */
 export function ReadOnlyNote({ field }: { field?: Field }) {
@@ -19,12 +19,16 @@ export function ReadOnlyNote({ field }: { field?: Field }) {
   if (viewer === "admin") return null;
   if (field && can(field)) return null;
   if (viewer === "owner") {
-    if (field && field !== "instructions") return null;
+    if (field && field !== "instructions" && field !== "levels") return null;
     return (
       <p className="agp-readonly ac-iconline">
         <Icon name="person" size={16} />
         <span>
-          {field === "instructions" ? t("agentPage.readOnly.ownerInstructions") : t("agentPage.readOnly.owner", g)}
+          {field === "instructions"
+            ? t("agentPage.readOnly.ownerInstructions")
+            : field === "levels"
+              ? t("agentPage.readOnly.ownerAccess")
+              : t("agentPage.readOnly.owner", g)}
         </span>
       </p>
     );

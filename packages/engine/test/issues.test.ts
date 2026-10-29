@@ -360,6 +360,41 @@ describe("issues", () => {
     expect(row?.assignee).toEqual({ type: "agent", id: f.agent.id });
   });
 
+  test("update_issue links only an https pull request; any other address is refused", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const tools = await createIssueToolSource(deps).tools(ctx);
+    const update = tools.find((t) => t.name === "update_issue");
+    if (!update) throw new Error("no update_issue");
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Corrigir o login" });
+    for (const url of ["javascript:alert(1)//pull/3", "data:text/html,x/pull/3", "http://example.com/pull/3"]) {
+      const refused = await update.execute({ issue: issue.id, pull_request_url: url, pull_request_number: 3 }, ctx);
+      expect(refused.isError).toBe(true);
+      expect(refused.content).toContain("https://");
+    }
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).pullRequests).toEqual([]);
+    const pr = "https://github.com/acme/app/pull/3";
+    const linked = await update.execute({ issue: issue.id, pull_request_url: pr }, ctx);
+    expect(linked.isError).toBeUndefined();
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).pullRequests).toMatchObject([
+      { number: 3, url: pr },
+    ]);
+    await expect(
+      updateIssue(deps, person(f.owner.id), f.org.id, issue.id, {
+        addPullRequest: { number: 4, url: "javascript:alert(1)" },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {
     f = await setup({
       issueTools: true,

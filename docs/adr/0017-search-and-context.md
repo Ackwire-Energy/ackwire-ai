@@ -26,4 +26,4 @@ Embeddings go through the Model Gateway (`gateway.embed`, usage kind `embedding`
 
 ## Guardrails
 
-Memory never carries permissions, scopes or secrets: credential-like text and text that tries to bypass approvals or grant permissions are refused at write time (people, agents and reflection alike). Permissions come only from `agent_scopes` and approvals. Low-trust items are never promoted. Everything is listable and editable by people (`/context-items`, `/proposals`).
+Memory never carries permissions, scopes or secrets: credential-like text and text that tries to bypass approvals or grant permissions are refused at write time (people, agents and reflection alike). Permissions come only from `agent_scopes` and approvals. Low-trust items are never promoted. Everything is listable and editable by people (`/context-items`, `/proposals`). A person sees only items whose every channel they can read (an agent's memories page and the old versions it quotes too), and a proposal only when they can see every item behind it; admins see every proposal. An agent's owner who isn't an admin edits, archives or deletes only the items they can see; the others answer "not found".

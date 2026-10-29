@@ -9,6 +9,7 @@ import {
   openHandoffOf,
   openPageInControl,
   requireBrowserAccess,
+  requireBrowserControl,
   startTakeover,
   stopAgentBrowser,
 } from "@agenteschat/engine";
@@ -85,6 +86,28 @@ export function browserRoutes(deps: AppDeps) {
         await requireBrowserAccess(db, c.get("user").id, orgId, agentId, undefined, screen);
         const open = await openHandoffOf(db, orgId, agentId, screen);
         return c.json({ handoff: open ? handoffView(open) : null }, 200);
+      },
+    );
+
+    app.openapi(
+      createRoute({
+        method: "get",
+        path: `/organizations/{orgId}/agents/{agentId}/${screen}/control`,
+        tags,
+        security,
+        summary: `Whether this person may drive the agent's ${screen} (take over, open, type); watching needs less`,
+        request: { params: AgentParams },
+        responses: { 200: json(z.object({ canControl: z.boolean() })), ...errors },
+      }),
+      async (c) => {
+        const { orgId, agentId } = c.req.valid("param");
+        const userId = c.get("user").id;
+        await requireBrowserAccess(db, userId, orgId, agentId, undefined, screen);
+        const canControl = await requireBrowserControl(db, userId, orgId, agentId, undefined, screen).then(
+          () => true,
+          () => false,
+        );
+        return c.json({ canControl }, 200);
       },
     );
 

@@ -9,6 +9,7 @@ import {
   SECRET_NAME,
 } from "@agenteschat/adapters/secret-box";
 import { errnoCode, RunnerError } from "./errors";
+import { touchesGitInternals } from "./git-guard";
 import { agentFolderName, resolveInWorkspace } from "./paths";
 
 /**
@@ -124,6 +125,10 @@ export async function handleSecret(
       if (target.kind === "file") {
         const resolved = await resolveInWorkspace(workspaceReal, target.path);
         if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
+        // Like the `write` op: a repository's git dir is the runner's own git's settings (`git-guard.ts`).
+        if (touchesGitInternals(target.path, resolved.abs)) {
+          throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
+        }
         await mkdir(path.dirname(resolved.abs), { recursive: true });
         await writeFile(resolved.abs, value, { mode: 0o600 });
         await chmod(resolved.abs, 0o600).catch(() => undefined);
