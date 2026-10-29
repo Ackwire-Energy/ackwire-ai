@@ -601,7 +601,7 @@ jobs:
             home=$(mktemp -d)
             if [ "$name" = cloud ]; then
               mkdir -p "$home/.config/chat.agentes.desktop"
-              echo '{"current":"https://agentes.chat","servers":["https://agentes.chat"]}' \
+              echo '{"current":"https://app.agentes.chat","servers":["https://app.agentes.chat"]}' \
                 > "$home/.config/chat.agentes.desktop/servers.json"
             fi
             # Its own folders, whatever the runner sets for XDG.

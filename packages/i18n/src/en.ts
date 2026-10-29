@@ -1,4 +1,3 @@
-import { landingEn } from "./landing";
 import type { Translations } from "./pt-BR";
 
 /** English. Typed against the pt-BR source, so a missing key fails the build. */
@@ -1022,7 +1021,7 @@ export const en: Translations = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
-    receipt: "Nobody will answer: no AI connected",
+    receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
   connectAi: {
@@ -7930,7 +7929,6 @@ export const en: Translations = {
         'The forum "{{title}}" is over. The synthesis is in the file below, with {{count}} suggested issue(s) to approve.',
     },
   },
-  landing: landingEn,
   builtinTools: {
     ask_user: {
       label: "Ask the person",

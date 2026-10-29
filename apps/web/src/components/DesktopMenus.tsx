@@ -101,30 +101,41 @@ export function ContextMenuHost() {
   }, [t, router, toast]);
 
   if (!open) return null;
-  const run = (fn: () => void) => () => {
-    close();
-    fn();
-  };
   return (
     <MenuAt key={open.key} at={open} onClose={close} label={t("contextMenu.label")}>
-      {open.entries.map((e, i) => {
-        const key = e.kind === "item" ? e.id : `${e.kind}-${i}`;
-        if (e.kind === "separator") return <MenuSeparator key={key} />;
-        if (e.kind === "header") return <MenuHeading key={key}>{e.label}</MenuHeading>;
-        if (e.kind === "reactions") {
-          const pick = e.pick;
-          return (
-            <MenuReactions key={key} label={e.label} emojis={e.emojis} onPick={(emoji) => run(() => pick(emoji))()} />
-          );
-        }
-        return (
-          <MenuItem key={key} icon={e.icon} danger={e.danger} disabled={e.disabled} onSelect={run(e.run)}>
-            {e.label}
-          </MenuItem>
-        );
-      })}
+      <MenuEntries entries={open.entries} onRun={close} />
     </MenuAt>
   );
+}
+
+/** Entries as our menu's items: the desktop app's right click, and a message's menu on touch. */
+export function MenuEntries({ entries, onRun }: { entries: MenuEntry[]; onRun?: () => void }) {
+  const run = (fn: () => void) => () => {
+    onRun?.();
+    fn();
+  };
+  return entries.map((e, i) => {
+    const key = e.kind === "item" ? e.id : `${e.kind}-${i}`;
+    if (e.kind === "separator") return <MenuSeparator key={key} />;
+    if (e.kind === "header") return <MenuHeading key={key}>{e.label}</MenuHeading>;
+    if (e.kind === "reactions") {
+      const { pick, more } = e;
+      return (
+        <MenuReactions
+          key={key}
+          label={e.label}
+          emojis={e.emojis}
+          onPick={(emoji) => run(() => pick(emoji))()}
+          more={more && { label: more.label, onSelect: run(more.run) }}
+        />
+      );
+    }
+    return (
+      <MenuItem key={key} icon={e.icon} danger={e.danger} disabled={e.disabled} onSelect={run(e.run)}>
+        {e.label}
+      </MenuItem>
+    );
+  });
 }
 
 /** A link's name as people see it (its label or text), short; empty when it has none. */

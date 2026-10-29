@@ -27,7 +27,7 @@ describe("words true in every setup", () => {
       expect(misplaced(TREES[locale], locale)).toEqual([]);
     });
 
-    test(`${locale}: nobody says the cloud, the landing included`, () => {
+    test(`${locale}: nobody says the cloud, the help pages included`, () => {
       expect(TREES[locale].filter(([, text]) => bannedIn(text, SELFHOST_BANNED).length > 0)).toEqual([]);
     });
   }

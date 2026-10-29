@@ -1,7 +1,7 @@
 import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 
 /**
- * The "new version" check (ADR 0036 §9): `GET https://agentes.chat/api/desktop/latest?target=…&arch=…`
+ * The "new version" check (ADR 0036 §9): `GET https://app.agentes.chat/api/desktop/latest?target=…&arch=…`
  * at start and every 6 hours. A newer version shows the notes and "Update and reopen" (the Tauri
  * updater, `update_install`); the download link and the manual steps are the fallback.
  */
