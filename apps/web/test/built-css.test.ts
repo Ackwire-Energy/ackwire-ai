@@ -28,25 +28,39 @@ const normal = (selector: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** The rules of every `@media (pointer: coarse)` block, in order, as one sheet. */
-const touchRules = (css: string) =>
+/** The rules of every `@media (<feature>: <value>)` block, in order, as one sheet. */
+const mediaRules = (css: string, feature: string, value: string) =>
   [
     ...css
       .replace(/\/\*[\s\S]*?\*\//g, "")
-      .matchAll(/@media\s*\(pointer:\s*coarse\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g),
+      .matchAll(new RegExp(`@media\\s*\\(${feature}:\\s*${value}\\)\\s*\\{((?:[^{}]*\\{[^{}]*\\})*[^{}]*)\\}`, "g")),
   ]
     .map((m) => m[1] ?? "")
     .join("\n");
+const touchRules = (css: string) => mediaRules(css, "pointer", "coarse");
+
+/** A selector list's selectors: its commas outside parentheses (`:not(a, b)` is one). */
+function selectorsOf(list: string) {
+  const s = normal(list);
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")") depth--;
+    else if (s[i] === "," && depth === 0) {
+      out.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  return [...out, s.slice(start)];
+}
 
 /** The declarations of every rule whose selector list holds `selector`, in order, as [property, value]. */
 function declarations(css: string, selector: string) {
   const wanted = normal(selector);
   return [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter((m) =>
-      normal(m[1] ?? "")
-        .split(",")
-        .includes(wanted),
-    )
+    .filter((m) => selectorsOf(m[1] ?? "").includes(wanted))
     .flatMap((m) =>
       (m[2] ?? "")
         .split(";")
@@ -116,10 +130,42 @@ test("the built stylesheet keeps the bar's 32px plates on touch, their 40px targ
     );
   expect(at(".ac-btn--sm.ac-btn--icon")).toBeGreaterThanOrEqual(0);
   expect(at(".ac-msg__actions .ac-btn--sm")).toBeGreaterThan(at(".ac-btn--sm.ac-btn--icon"));
-  for (const selector of [".ac-receipt__dot", ".ac-hintline + .ac-receipt__dot"]) {
+  // A receipt's words wrap on their own column, and a dot and its action as one piece.
+  for (const selector of [
+    ".ac-receipt",
+    ".ac-receipt__words",
+    ".ac-receipt__words > :first-child",
+    ".ac-receipt__words > .ac-hintline:first-child",
+    ".ac-receipt__then",
+  ]) {
     expect(declarations(kit, selector).length).toBeGreaterThan(0);
     expect(declarations(css, selector)).toEqual(expect.arrayContaining(declarations(kit, selector)));
   }
+  expect(declarations(css, ".ac-receipt").filter(([p]) => p === "flex-wrap")).toEqual([]);
+});
+
+test("the built stylesheet keeps touch's bar for the keyboard only, and the lit row of an open menu", async () => {
+  const css = await builtCss();
+  const kit = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
+  const hidden =
+    '.ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write))) .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"]))';
+  const [built, source] = [mediaRules(css, "hover", "none"), mediaRules(kit, "hover", "none")];
+  expect(declarations(source, hidden)).toEqual([
+    ["opacity", "0"],
+    ["pointer-events", "none"],
+  ]);
+  expect(declarations(built, hidden)).toEqual(declarations(source, hidden));
+  const lit = '.ac-msg[data-menu-open="true"]';
+  expect(declarations(kit, lit).length).toBeGreaterThan(0);
+  expect(declarations(css, lit)).toEqual(expect.arrayContaining(declarations(kit, lit)));
+  // The menu's reactions are 40px targets on touch, as its items are, and the last one's two icons sit side by side.
+  expect(declarations(touchRules(kit), ".ac-menu__reaction").length).toBeGreaterThan(0);
+  expect(declarations(touchRules(css), ".ac-menu__reaction")).toEqual(
+    expect.arrayContaining(declarations(touchRules(kit), ".ac-menu__reaction")),
+  );
+  const more = ".ac-menu__reaction--more";
+  expect(declarations(kit, more).length).toBeGreaterThan(0);
+  expect(declarations(css, more)).toEqual(expect.arrayContaining(declarations(kit, more)));
 });
 
 test("no rule sets translate, rotate or scale beside transform: the build's minifier drops or merges them", async () => {

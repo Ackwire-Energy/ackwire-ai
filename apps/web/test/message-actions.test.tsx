@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -141,13 +141,15 @@ describe("message action bars", () => {
     // Words with an action: the message's last line, on a first and a grouped message alike, never in the header.
     for (const id of ["w1", "w2"]) {
       const foot = row(id).querySelector(".ac-msg__body > .ac-msg__foot:last-child") as HTMLElement;
-      // The dot is a part of its own, as far from the words as from the action (the kit's `.ac-receipt__dot`).
-      expect([...(foot.querySelector(".ac-receipt")?.children ?? [])].map((part) => part.textContent)).toEqual([
+      // The words, then the dot and its action as one piece that wraps whole, on the words' own column.
+      const words = foot.querySelector(".ac-receipt > .ac-receipt__words");
+      expect([...(words?.children ?? [])].map((part) => part.textContent)).toEqual([
         "Ninguém vai responder: falta uma IA",
-        "·",
-        "Conectar",
+        "·Conectar",
       ]);
-      expect(foot.querySelector(".ac-receipt > .ac-receipt__dot[aria-hidden='true']")?.textContent).toBe("·");
+      expect(
+        words?.querySelector(":scope > .ac-receipt__then > .ac-receipt__dot[aria-hidden='true']")?.textContent,
+      ).toBe("·");
       expect(within(foot).getByRole("button", { name: "Conectar" })).toBeTruthy();
       expect(row(id).querySelector(".ac-msg__head .ac-receipt, .ac-msg__aside .ac-receipt")).toBeNull();
     }
@@ -184,6 +186,87 @@ describe("message action bars", () => {
     const rows = rules.filter((r) => /\.channel__messages[^,]*\.ac-msg\s*$/.test(r.selector));
     expect(rows.filter((r) => /(^|;)\s*padding(-left|-right|-inline)?\s*:/.test(r.body)).map((r) => r.at)).toEqual([]);
     expect(rows.some((r) => /--msg-inline:\s*12px/.test(r.body))).toBe(true);
+  });
+
+  test("on touch a tap on a message opens its bar's actions in a menu off its text, an agent's with its feedback", async () => {
+    const media = spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("hover: none"),
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    const points = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+    try {
+      const state = seedState();
+      // A file with no words.
+      state.messages.push({
+        id: "m-file",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      });
+      await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+      await settle(8);
+      const tap = (id: string) =>
+        click(document.querySelector(`article[data-message-id="${id}"] .ac-msg__text`) as HTMLElement);
+      await tap("m-1");
+      const menu = screen().getByRole("menu", { name: "Ações da mensagem de João" });
+      // The quick reactions, then every emoji, as the bar's Reagir has.
+      const reactions = within(menu).getByRole("group", { name: "Reagir" });
+      expect(
+        within(reactions)
+          .getAllByRole("menuitem")
+          .map((c) => c.getAttribute("aria-label") ?? c.textContent),
+      ).toEqual(["👍", "🎉", "👀", "✅", "❤️", "Adicionar reação"]);
+      const items = (m: HTMLElement) =>
+        within(m)
+          .getAllByRole("menuitem")
+          .filter((i) => !i.classList.contains("ac-menu__reaction"))
+          .map((i) => i.textContent);
+      // What the bar and its "…" have, as the desktop app's right click lists it.
+      expect(items(menu)).toEqual(["Responder", "Copiar texto", "Copiar link", "Salvar na wiki"]);
+      expect(document.querySelector('article[data-message-id="m-1"]')?.getAttribute("data-menu-open")).toBe("true");
+      await click(within(reactions).getByRole("menuitem", { name: "Adicionar reação" }));
+      await settle(1);
+      expect(screen().queryByRole("menu")).toBeNull();
+      const picker = screen().getByRole("dialog", { name: "Emojis" });
+      await click(within(picker).getByRole("button", { name: "rocket" }));
+      await settle(3);
+      expect(state.calls.find((c) => c.method === "chat.react")?.args).toEqual([ORG_ID, "m-1", "🚀"]);
+      expect(screen().queryByRole("dialog", { name: "Emojis" })).toBeNull();
+      await tap("m-file");
+      // No words: nothing to copy or to save, as on the phone app.
+      expect(items(screen().getByRole("menu", { name: "Ações da mensagem de João" }))).toEqual([
+        "Responder",
+        "Copiar link",
+      ]);
+      await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
+      expect(screen().queryByRole("menu")).toBeNull();
+      await tap("m-2");
+      const agent = screen().getByRole("menu", { name: "Ações da mensagem de Ada" });
+      expect(items(agent)).toEqual([
+        "Responder",
+        "Não ajudou",
+        "Corrigir resposta",
+        "Copiar texto",
+        "Copiar link",
+        "Salvar na wiki",
+      ]);
+      await click(within(agent).getByRole("menuitem", { name: "Corrigir resposta" }));
+      await settle(2);
+      expect(screen().getByRole("dialog", { name: "Corrigir a resposta da Ada" })).toBeTruthy();
+    } finally {
+      media.mockRestore();
+      if (points) Object.defineProperty(navigator, "maxTouchPoints", points);
+      else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+    }
   });
 
   test("a thread opened with Responder: the channel keeps what came before, one line opens the rest", async () => {
