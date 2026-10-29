@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "../src/index";
-import { isRoutineCall, routineReplyOf, timezoneLabel, utcOffset } from "../src/lib/routines";
+import {
+  isRoutineCall,
+  platformZoneName,
+  routineReplyOf,
+  timezoneLabel,
+  timezoneName,
+  utcOffset,
+  zoneDisplayName,
+} from "../src/lib/routines";
 import { buildTimeline } from "../src/lib/timeline";
 
 const walter = { type: "person" as const, id: "walter" };
@@ -49,5 +57,35 @@ describe("time zones", () => {
     // A zone without a friendly name keeps its IANA id (as in the selector, which shows the city).
     expect(timezoneLabel("Asia/Kathmandu", at)).toBe("Asia/Kathmandu (UTC+5:45)");
     expect(timezoneLabel("UTC", at)).toBe("UTC");
+  });
+
+  test("a zone said in words: ours, else the platform's in the person's language, not its IANA id", () => {
+    expect(timezoneName("America/Sao_Paulo", "pt-BR")).toBe("horário de Brasília");
+    expect(timezoneName("America/Sao_Paulo", "en")).toBe("Brasília time");
+    expect(timezoneName("Etc/UTC", "pt-BR")).toBe("UTC");
+    expect(timezoneName("Asia/Kathmandu", "pt-BR")).toBe("Horário do Nepal");
+    expect(timezoneName("Asia/Kathmandu", "en")).toBe("Nepal Time");
+    // Only a zone the platform doesn't know keeps what it was given.
+    expect(timezoneName("Not/A_Zone", "en")).toBe("Not/A_Zone");
+  });
+
+  test("an English reader never gets the Portuguese name", () => {
+    expect(timezoneName("Asia/Singapore", "pt-BR")).toBe("Singapura");
+    expect(timezoneName("Asia/Singapore", "en")).toBe("Singapore");
+    expect(zoneDisplayName("Asia/Singapore", "en")).toBe("Singapore");
+    expect(zoneDisplayName("Europe/Lisbon", "pt-BR")).toBe("Lisboa");
+  });
+
+  test("the platform's name is never a city's bare offset, which an engine without zone names gives", () => {
+    expect(platformZoneName("Asia/Kathmandu", "en")).toBe("Nepal Time");
+    const real = Intl.DateTimeFormat.prototype.formatToParts;
+    Intl.DateTimeFormat.prototype.formatToParts = () => [{ type: "timeZoneName", value: "GMT-03:00" }];
+    try {
+      expect(platformZoneName("America/Sao_Paulo", "pt-BR")).toBeUndefined();
+      // A zone that is only an offset keeps it: its id's sign reads the other way round.
+      expect(platformZoneName("Etc/GMT+3", "pt-BR")).toBe("GMT-03:00");
+    } finally {
+      Intl.DateTimeFormat.prototype.formatToParts = real;
+    }
   });
 });

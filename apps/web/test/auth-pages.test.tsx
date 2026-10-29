@@ -1940,8 +1940,12 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__note")).toBeNull();
   });
 
-  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+  test("workspace: the time zone in words, its reason behind its ⓘ, with no line under the field", async () => {
     await start();
+    // Its name as people say it (the IANA id goes to the API only).
+    const zone = [...document.querySelectorAll(".onb__help")].find((p) => p.textContent?.startsWith("Fuso horário"));
+    expect(zone?.textContent).toMatch(/^Fuso horário: .+ · trocar$/);
+    expect(zone?.textContent).not.toMatch(/\w\/\w/);
     await click(button("trocar"), 2);
     const about = button("Sobre Fuso horário");
     const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");

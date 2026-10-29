@@ -193,6 +193,35 @@ test("Windows and Linux: each platform's own files, from the newest release that
   expect(await update("target=darwin&arch=aarch64&current=0.2.0")).toBe(204);
 });
 
+test("apps that check agentes.chat, the Cloud's old address, get links there; others get PUBLIC_URL's", async () => {
+  const signed = release("0.6.0", {
+    assets: [
+      asset("agentes_0.6.0_universal.dmg"),
+      asset("agentes_0.6.0_universal.dmg.sha256"),
+      asset("agentes_0.6.0_universal.app.tar.gz"),
+      asset("agentes_0.6.0_universal.app.tar.gz.sig"),
+    ],
+  });
+  t = await createTestServer({
+    env: { DESKTOP_RELEASES_TOKEN: "ghp_test", PUBLIC_URL: "https://app.agentes.chat" },
+    desktopFetch: fakeGithub([signed]).fetch,
+  });
+  const links = async (site: string) => {
+    const latest = await server().app.request(`${site}/api/desktop/latest?target=darwin&arch=arm64`);
+    const update = await server().app.request(`${site}/api/desktop/update?target=darwin&arch=aarch64&current=0.5.5`);
+    return [((await latest.json()) as { url: string }).url, ((await update.json()) as { url: string }).url];
+  };
+  // Apps up to 0.5.5 take only links on agentes.chat, whose /api still reaches the app.
+  expect(await links("https://agentes.chat")).toEqual([
+    "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg",
+    "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.app.tar.gz",
+  ]);
+  expect(await links("https://app.agentes.chat")).toEqual([
+    "https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg",
+    "https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.app.tar.gz",
+  ]);
+});
+
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {
   const github = fakeGithub([release("0.2.0"), { tag_name: "v1.0.0", assets: [asset("secret.txt")] }]);
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });

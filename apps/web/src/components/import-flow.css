@@ -64,6 +64,7 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 20px;
+  text-wrap: pretty;
 }
 /* A help page's link, on a line of its own under what it explains. */
 .imp-help {

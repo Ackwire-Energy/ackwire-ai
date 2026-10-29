@@ -5,7 +5,7 @@ import { parseAccess, type RunnerAccess, type RunnerPause } from "@agenteschat/a
 
 /** What `pair` writes and `start` reads (`~/.agentes-runner/config.json`, mode 600). */
 export interface RunnerConfig {
-  /** Our server, e.g. `https://agentes.chat` (no trailing slash). */
+  /** Our server, e.g. `https://app.agentes.chat` (no trailing slash). */
   server: string;
   machineId: string;
   name: string;

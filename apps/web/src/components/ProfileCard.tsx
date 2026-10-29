@@ -5,6 +5,7 @@ import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
+import { timezoneName } from "@agenteschat/client/lib/routines";
 import { Avatar, Button, hoverPointer, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -156,7 +157,9 @@ function PersonCard({ userId }: { userId: string }) {
           <>
             <dt>{t("profile.localTime")}</dt>
             <dd className="tabular">
-              {timezone ? t("profile.timeIn", { time: localTime, zone: timezone }) : localTime}
+              {timezone
+                ? t("profile.timeIn", { time: localTime, zone: timezoneName(timezone, i18n.language) })
+                : localTime}
             </dd>
           </>
         )}

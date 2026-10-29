@@ -1,9 +1,7 @@
 /* The usage views (PlanUsage.tsx, pages/agent/UsageTab.tsx). Flat: hairlines, no wells. */
 
+/* A face line (`.ac-faceline`): the tile beside the name and the line under it, the name's capitals at its top. */
 .plan-acct {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   min-width: 0;
 }
 .plan-acct__text {
@@ -12,18 +10,20 @@
   min-width: 0;
   line-height: 1.3;
 }
+/* The plan's chip follows the name's last word, in the middle of its 22px line, so a name that wraps keeps no word
+   alone on its last line. */
 .plan-acct__name {
-  display: flex;
-  align-items: center;
-  gap: 7px;
   font-size: 15px;
   font-weight: 600;
   line-height: 22px;
+  text-wrap: balance;
 }
 .plan-acct__chip {
   display: inline-flex;
   align-items: center;
   height: 19px;
+  margin: 1.5px 0 0 7px;
+  vertical-align: top;
   padding: 0 6px;
   border-radius: 6px 6px 6px 2px;
   background: var(--plate);

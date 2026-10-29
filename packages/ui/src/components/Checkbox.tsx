@@ -106,6 +106,7 @@ export function RadioCard({
   description,
   disabled,
   aside,
+  detail,
 }: {
   value: string;
   id: string;
@@ -115,6 +116,8 @@ export function RadioCard({
   disabled?: boolean;
   /** Trailing content on the title's line, e.g. an "Em breve" chip. */
   aside?: ReactNode;
+  /** A line of its own under the description, in its words' style, e.g. what the option in use holds. */
+  detail?: ReactNode;
 }) {
   return (
     <label
@@ -130,6 +133,7 @@ export function RadioCard({
           {aside && <span className="ac-option__aside">{aside}</span>}
         </span>
         {description && <span className="ac-option__desc">{description}</span>}
+        {detail && <span className="ac-option__desc">{detail}</span>}
       </span>
     </label>
   );

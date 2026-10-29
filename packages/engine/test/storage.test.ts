@@ -1,15 +1,26 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDiskBlobStore, createS3BlobStore, StorageError } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
 import {
+  type BlobStore,
+  createDiskBlobStore,
+  createPostgresBlobStore,
+  createS3BlobStore,
+  StorageError,
+} from "@agenteschat/adapters";
+import { eq, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  type ArtifactDeps,
+  addFileVersion,
   artifactDownload,
   assertPublicHttpsUrl,
   createArtifact,
+  createBlobStoreResolver,
+  createFileArtifact,
   createOrganization,
   deleteAccount,
+  deleteArtifact,
   drainOutbox,
   enqueue,
   ForbiddenError,
@@ -19,9 +30,13 @@ import {
   isBlockedAddress,
   ORG_FILES_PURGE_JOB,
   purgeOrgFiles,
+  restoreArtifact,
   type S3Input,
+  saveSkill,
   saveStorage,
   startMigration,
+  storedBytes,
+  storedBytesQueries,
   testStorage,
   ValidationError,
 } from "../src";
@@ -336,4 +351,136 @@ describe("org storage", () => {
     const metadata = assertPublicHttpsUrl("https://x.example.com", async () => ["169.254.169.254"]);
     await expect(metadata).rejects.toBeInstanceOf(ValidationError);
   });
+});
+
+describe("what a workspace's files take", () => {
+  const bytes = (n: number) => new Uint8Array(n).fill(97);
+  /** The Drive and skills with `platform` as this server's storage. */
+  const on = (platform: BlobStore): ArtifactDeps => ({
+    db: f.db,
+    blobs: createBlobStoreResolver({ ...f.storage, platform }),
+    pubsub: f.pubsub,
+  });
+  const upload = (deps: ArtifactDeps, orgId: string, name: string, size: number) =>
+    createFileArtifact(deps, person(f.owner.id), orgId, { title: name, name, bytes: bytes(size) });
+  const skill = (deps: ArtifactDeps, orgId: string, files: [string, number][]) =>
+    saveSkill({ db: f.db, blobs: deps.blobs }, f.owner.id, orgId, {
+      name: "relatorio-semanal",
+      description: "Monta o relatório da semana.",
+      body: "Siga o modelo.",
+      metadata: {},
+      source: "manual",
+      files: files.map(([path, size]) => ({ path, data: bytes(size) })),
+    });
+  /** The bytes of the files under `dir`, their content types left out. */
+  const folderBytes = async (dir: string) => {
+    let total = 0;
+    for (const name of await readdir(dir, { recursive: true })) {
+      const file = await stat(join(dir, name));
+      if (file.isFile() && !name.endsWith(".type")) total += file.size;
+    }
+    return total;
+  };
+
+  test("on this server's disk: every version kept and the skills' files, the trash and other workspaces apart", async () => {
+    f = await setup();
+    const dir = await mkdtemp(join(tmpdir(), "agentes-usage-"));
+    try {
+      const deps = on(createDiskBlobStore(dir));
+      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 0, ownBucketBytes: 0 });
+      const report = await upload(deps, f.org.id, "relatorio.pdf", 3000);
+      await addFileVersion(deps, person(f.owner.id), f.org.id, report.id, {
+        name: "relatorio.pdf",
+        bytes: bytes(5000),
+      });
+      const old = await upload(deps, f.org.id, "antigo.zip", 7000);
+      // A skill's picture is only listed: nothing of it is stored.
+      await skill(deps, f.org.id, [
+        ["modelo.md", 400],
+        ["exemplo.png", 900],
+      ]);
+      const { organization: other } = await createOrganization(f.db, f.owner.id, { name: "Outra" });
+      await upload(deps, other.id, "deles.pdf", 11_000);
+      await deleteArtifact(deps, f.owner.id, f.org.id, old.id);
+
+      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 8400, ownBucketBytes: 0 });
+      expect(await storedBytes(f.db, other.id)).toEqual({ platformBytes: 11_000, ownBucketBytes: 0 });
+      // The folder holds as much, and the file in the trash until it goes for good.
+      expect(await folderBytes(join(dir, "orgs", f.org.id))).toBe(8400 + 7000);
+      await restoreArtifact(deps, f.owner.id, f.org.id, old.id);
+      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 15_400, ownBucketBytes: 0 });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("in this server's database: what its rows hold for the workspace, the trash apart", async () => {
+    f = await setup();
+    const deps = on(createPostgresBlobStore(f.db));
+    await upload(deps, f.org.id, "planilha.xlsx", 1200);
+    await skill(deps, f.org.id, [["modelo.md", 300]]);
+    const draft = await upload(deps, f.org.id, "rascunho.txt", 500);
+    await deleteArtifact(deps, f.owner.id, f.org.id, draft.id);
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 1500, ownBucketBytes: 0 });
+    const [rows] = await f.db
+      .select({ size: sql<string>`sum(${schema.blobs.size})` })
+      .from(schema.blobs)
+      .where(eq(schema.blobs.orgId, f.org.id));
+    expect(Number(rows?.size)).toBe(1500 + 500);
+  });
+
+  test("in the workspace's own bucket: what went there, apart from what this server keeps", async () => {
+    f = await setup();
+    const deps = f.artifactDeps;
+    await upload(deps, f.org.id, "antes.pdf", 2000);
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+    await upload(deps, f.org.id, "depois.pdf", 6000);
+    await skill(deps, f.org.id, [["modelo.md", 250]]);
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 2000, ownBucketBytes: 6250 });
+    const objects = [...(f.s3.buckets.get("acme-files")?.values() ?? [])];
+    expect(objects.reduce((n, o) => n + o.body.byteLength, 0)).toBe(6250);
+    // Copying the files kept before moves them to the bucket's side.
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 0, ownBucketBytes: 8250 });
+    // Back on this server, the bucket still holds its files.
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
+    await upload(deps, f.org.id, "de-volta.pdf", 100);
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 100, ownBucketBytes: 8250 });
+  });
+
+  test("a small workspace next to a big one: summed through its own rows, never the whole table", async () => {
+    f = await setup();
+    const { organization: big } = await createOrganization(f.db, f.owner.id, { name: "Grande" });
+    // Files of 5 versions each, a tenth of them in the trash: 20,000 in the big one, 20 in the small one.
+    for (const [orgId, files] of [
+      [big.id, 20_000],
+      [f.org.id, 20],
+    ] as const) {
+      await f.db.execute(sql`insert into artifacts (id, org_id, kind, title, created_by_type, created_by_id,
+          updated_by_type, updated_by_id, deleted_at)
+        select gen_random_uuid(), ${orgId}, 'file', 'arquivo ' || i, 'person', ${f.owner.id}, 'person', ${f.owner.id},
+          case when i % 10 = 0 then now() end
+        from generate_series(1, ${files}) i`);
+      await f.db.execute(sql`insert into artifact_versions (id, org_id, artifact_id, version, blob_key, content_type,
+          size, sha256, author_type, author_id)
+        select gen_random_uuid(), a.org_id, a.id, v, 'k/' || a.id || '/' || v, 'application/pdf', 1000, '',
+          'person', ${f.owner.id}
+        from artifacts a, generate_series(1, 5) v where a.org_id = ${orgId}`);
+    }
+    // The planner's statistics, as autovacuum keeps them on a server.
+    await f.db.execute(sql`analyze artifacts`);
+    await f.db.execute(sql`analyze artifact_versions`);
+    expect(await storedBytes(f.db, big.id)).toEqual({ platformBytes: 18_000 * 5 * 1000, ownBucketBytes: 0 });
+    expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 18 * 5 * 1000, ownBucketBytes: 0 });
+    // The plan, not a time: here a scan of both tables takes milliseconds too, and on a server of many workspaces
+    // it grows with all of them.
+    const [drive] = storedBytesQueries(f.db, f.org.id);
+    const plan = rowsOf<{ "QUERY PLAN": string }>(await f.db.execute(sql`explain ${drive.getSQL()}`))
+      .map((row) => row["QUERY PLAN"])
+      .join("\n");
+    expect(plan).toContain("Index");
+    expect(plan).not.toMatch(/Seq Scan on artifact/);
+  }, 120_000);
 });

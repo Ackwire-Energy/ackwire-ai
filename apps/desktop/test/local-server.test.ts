@@ -75,11 +75,12 @@ describe("setting it up", () => {
         "desktop.here.slow",
         "desktop.here.copyDetails",
         "desktop.here.serveFix",
+        "desktop.here.fail.retry",
       ]) {
         expect({ key, ok: has(key) }).toEqual({ key, ok: true });
       }
       const reason = i18n.t(REASON_TEXT.https);
-      expect(i18n.t("desktop.here.fail.reach", { reason })).toContain(reason);
+      expect(i18n.t("desktop.server.reachFailed", { reason })).toContain(reason);
       // Screen readers hear each step's state: the marks on screen are drawn.
       for (const state of ["active", "done", "failed", "warn"])
         expect({ state, ok: has(`desktop.here.stepState.${state}`) }).toEqual({ state, ok: true });
