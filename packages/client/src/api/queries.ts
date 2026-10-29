@@ -1,4 +1,5 @@
 import {
+  type InfiniteData,
   queryOptions,
   useInfiniteQuery,
   useMutation,
@@ -41,6 +42,9 @@ import type {
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  AuditPage,
+  AuditQuery,
+  AuditRow,
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
@@ -1063,6 +1067,34 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
+
+/** Configurações › Auditoria: pages of 50, newest first (admins). */
+export function useAudit(orgId: string, query: AuditQuery, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    enabled,
+    queryKey: keys.audit(orgId, query),
+    queryFn: ({ pageParam }) => api.orgs.audit(orgId, { ...query, ...(pageParam ? { before: pageParam } : {}) }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.next ?? undefined,
+    placeholderData: (prev) => prev,
+    staleTime: 15_000,
+  });
+}
+
+/**
+ * One row of the audit log already on screen (the phone's detail screen, pushed over the list): read from the
+ * pages loaded for any filter; null when none holds it.
+ */
+export function useAuditRow(orgId: string, id: string): AuditRow | null {
+  const qc = useQueryClient();
+  const pages = qc.getQueriesData<InfiniteData<AuditPage>>({ queryKey: ["org", orgId, "audit"] });
+  for (const [, data] of pages) {
+    const row = data?.pages.flatMap((p) => p.rows).find((r) => r.id === id);
+    if (row) return row;
+  }
+  return null;
+}
 
 /** Configurações › Uso: every plan account by computer and the API per agent (ADR 0063). */
 export const usePlanUsage = (orgId: string) => {

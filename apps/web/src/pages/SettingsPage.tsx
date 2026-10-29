@@ -54,6 +54,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
+import { AuditSection } from "@/components/Audit";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { ComputersSection } from "@/components/Computers";
@@ -161,6 +162,7 @@ export function SettingsPage({
         )}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
+        {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
