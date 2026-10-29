@@ -32,6 +32,7 @@ import type { IconName } from "@/ui";
 export type SettingsSection =
   | "general"
   | "members"
+  | "audit"
   | "access"
   | "connectors"
   | "skills"
@@ -59,6 +60,8 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   // Everyone on the web (a read-only list for members); the phone's Membros is the managers' (the requests to join
   // and the invitation link), so it opens for them, as Você already does.
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (r) => can(r, "manage_members") },
+  // What agents did and people changed: admins only (it shows everyone's work).
+  { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (r) => can(r, "configure") },
   { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (r) => can(r, "configure") },
   { id: "connectors", group: "agents", icon: "bolt", href: "/connectors", allowed: () => true },
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (r) => can(r, "configure") },

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
+import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -132,6 +133,16 @@ async function storeConnection(
     if (previous) {
       await tx.update(agentScopes).set({ connectionId: row.id }).where(eq(agentScopes.connectionId, previous.id));
     }
+    // A custom server writes its own rows (`connector.custom_connected`, custom.ts).
+    if (!input.connector.startsWith("custom:")) {
+      await recordAudit(tx, {
+        orgId: input.orgId,
+        actor: { type: "person", id: input.actorId },
+        action: previous ? "connector.reconnected" : "connector.connected",
+        target: { type: "connector", id: row.id },
+        details: { connector: input.connector, label: row.label, auth: input.authType },
+      });
+    }
     caches.connections.delete(`${input.orgId}:active`);
     caches.scopes.deletePrefix(`${input.orgId}:`);
     return row;
@@ -222,6 +233,13 @@ export async function revokeConnection(db: Database, actorId: string, orgId: str
       .returning();
     if (!row) throw new NotFoundError("Connection not found");
     await tx.delete(agentScopes).where(eq(agentScopes.connectionId, connectionId));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "connector.disconnected",
+      target: { type: "connector", id: connectionId },
+      details: { connector: row.connector, label: row.label },
+    });
   });
   caches.connections.delete(`${orgId}:active`);
   caches.scopes.deletePrefix(`${orgId}:`);

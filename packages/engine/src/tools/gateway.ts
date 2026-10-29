@@ -1,5 +1,6 @@
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { type RunAuthority, runAuthorityById } from "../authority";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
@@ -20,11 +21,12 @@ import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
-import { approvalOrigin, type PolicyDecision, takeWhy, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
+import { approvalOrigin, type PolicyDecision, takeWhy, toolKind, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
 const { approvals, agents } = schema;
+type AuditOutcome = schema.AuditOutcome;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
 export const ALWAYS_SENSITIVE = /(^|[^a-z])(merge|deploy|rollback|revert_deploy|promote)([^a-z]|$)/i;
@@ -89,6 +91,18 @@ function promptAnswer(content: string): { behavior?: string; status?: string; re
   } catch {
     return {};
   }
+}
+
+/**
+ * A computer command's ending for the audit: allowed, refused, or waiting for a person. Asking again
+ * about one still waiting is no new action (nothing to record).
+ */
+function promptOutcome(prompt: { poll: string | null }, output: ToolOutput): AuditOutcome | undefined {
+  const answer = promptAnswer(output.content);
+  if (answer.behavior === "allow") return "done";
+  if (answer.behavior === "deny") return "refused";
+  if (answer.status === "pending") return prompt.poll ? undefined : "pending";
+  return output.isError ? "failed" : undefined;
 }
 
 /** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
@@ -258,7 +272,35 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         input: call.input,
         ...(detail ? { detail } : {}),
       });
-      const finish = async (output: ToolOutput) => {
+      const tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
+      // delivers, never to its room.
+      const actionChannel =
+        authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
+      const audit = (
+        outcome: AuditOutcome,
+        extra: { reason?: string | null; approvalId?: string; secretRequestId?: string } = {},
+      ) => {
+        if (!tool) return Promise.resolve();
+        const kind = toolKind(tool).kind;
+        if (!auditsCall(kind, tool, outcome)) return Promise.resolve();
+        return recordToolCall(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId || null,
+          channelId: actionChannel || null,
+          authority,
+          tool: tool.name,
+          kind,
+          connector: tool.connectorLabel ?? null,
+          title: callTitle(tool, call.input),
+          input: call.input,
+          outcome,
+          ...extra,
+        });
+      };
+      /** `outcome`: what the audit says; none for a call that never really was one (a malformed input). */
+      const finish = async (output: ToolOutput, outcome?: AuditOutcome) => {
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
@@ -266,16 +308,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           content: shown(output.content),
           ...(output.data ? { data: output.data } : {}),
         });
+        if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
         return { type: "result" as const, output };
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
-      const tool = all.get(call.name) ?? directoryTool;
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
       const builtIn = isBuiltIn(tool);
       const decision = policyFor(authority, tool);
       if (decision.action === "refuse") {
-        return finish({ content: decision.reason, isError: true, data: { code: "tool.not_allowed" } });
+        return finish({ content: decision.reason, isError: true, data: { code: "tool.not_allowed" } }, "refused");
       }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
@@ -285,7 +327,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             access === "denied"
               ? "this tool is turned off for this agent"
               : `this agent lacks the scope ${tool.scope}. If the request needs it, ask for it with request_permission`;
-          return finish({ content: `Not allowed: ${reason}`, isError: true });
+          return finish({ content: `Not allowed: ${reason}`, isError: true }, "refused");
         }
       }
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
@@ -319,19 +361,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // A run nobody is behind never sends a credential anywhere (ADR 0053 §3): a key it read on its computer
       // (a sandbox that can't keep it from being read) can't leave through any tool, on any brain.
       if (authority && authority.kind !== "person" && carriesCredential(call.input)) {
-        return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } });
+        return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } }, "refused");
       }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);
-      if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} });
+      if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} }, "refused");
       if (whyMissing) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
       // Team actions (ADR 0064): before acting outside, has the team already done this to the same target?
-      // A routine's action belongs where it delivers, never to its room.
-      const actionChannel =
-        authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
       const prompt = tool.name === PERMISSION_TOOL && builtIn ? promptQuestion(call.input) : null;
       const targets = outside ? callTargets(call.input) : (prompt?.action?.targets ?? []);
       let teamReason: string | null = null;
@@ -344,7 +383,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         if (!seen.proceed) {
           // A computer command is answered the way its prompt expects: a refusal with the notice.
           const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
-          return finish({ content, isError: !prompt, data: { code: "team.action_seen" } });
+          return finish({ content, isError: !prompt, data: { code: "team.action_seen" } }, "refused");
         }
         teamReason = seen.reason;
       }
@@ -410,6 +449,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           )[0];
         if (!row) throw new Error("approval insert returned nothing");
         await record(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
+        await audit("pending", { reason: why || null, approvalId: row.id });
         return { type: "approval", approval: row };
       }
       const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
@@ -439,9 +479,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
       if (!tool.connectionId && output.waitForSecret?.requestId) {
+        // The reader follows the request (delivered, declined, expired) from here.
+        await audit("pending", { secretRequestId: output.waitForSecret.requestId });
         return { type: "secret", requestId: output.waitForSecret.requestId };
       }
-      return finish(output);
+      return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done");
     },
 
     /**
@@ -510,6 +552,28 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         content: shown(output.content),
         ...(output.data ? { data: output.data } : {}),
       });
+      // The audit: the approved action ran (or couldn't any more). Who approved it is the approval's row.
+      if (tool) {
+        const kind = toolKind(tool).kind;
+        const outcome: AuditOutcome = refused ? "refused" : output.isError ? "failed" : "done";
+        if (auditsCall(kind, tool, outcome)) {
+          await recordToolCall(ctx.db, {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId || null,
+            channelId: approval.channelId,
+            authority: await authorityOf(ctx).catch(() => null),
+            tool: tool.name,
+            kind,
+            connector: tool.connectorLabel ?? null,
+            title: approval.title,
+            input: approval.params,
+            outcome,
+            reason: outcome === "done" ? null : shown(output.content),
+            approvalId: approval.id,
+          });
+        }
+      }
       return output;
     },
   };
