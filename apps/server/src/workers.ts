@@ -28,6 +28,7 @@ import {
   reapRoutineRuns,
   reconcileComposioAccounts,
   recoverStaleRuns,
+  releaseJobs,
   sweepEndedInboxes,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
@@ -281,6 +282,14 @@ export function startWorkers(deps: WorkerDeps) {
       offWake();
       offCancel();
       for (const timer of timers) clearInterval(timer);
+    },
+    /**
+     * After `stop`: waits up to `ms` for the jobs running here to finish, then hands the rest back to the queue,
+     * due at once for the next instance. Returns how many went back.
+     */
+    async drain(ms: number) {
+      await Promise.race([outboxPump.idle(), Bun.sleep(ms)]);
+      return releaseJobs(db, workerId);
     },
   };
 }

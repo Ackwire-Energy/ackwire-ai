@@ -13,6 +13,7 @@ import {
   MissingCredentialError,
   PermanentJobError,
   processOutbox,
+  releaseJobs,
   renewLease,
   retryDelayMs,
 } from "../src";
@@ -116,6 +117,73 @@ test("failures retry with backoff, then fail after max attempts", async () => {
   expect(await failJob(db, second as NonNullable<typeof second>, new Error("e2"), { retryable: true })).toBe("failed");
   [row] = await rows();
   expect([row?.status, row?.lastError]).toEqual(["failed", "e2"]);
+});
+
+test("a handback (its worker is shutting down) is due again at once and spends no attempt", async () => {
+  await enqueue(db, job("run"));
+  const outcomes: string[] = [];
+  await processOutbox(
+    db,
+    {
+      run: async () => {
+        throw Object.assign(new Error("stopped by a shutdown"), { handback: true });
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  expect(outcomes).toEqual(["retry"]);
+  expect((await rows())[0]).toMatchObject({
+    status: "pending",
+    attempts: 0,
+    lockedBy: null,
+    lastError: "stopped by a shutdown",
+  });
+  expect(await claimJobs(db, { workerId: "next" })).toHaveLength(1);
+});
+
+test("a stopping worker hands its running jobs back: due at once for the next one, the attempt not spent", async () => {
+  await enqueue(db, job("a"));
+  await enqueue(db, job("b"));
+  expect(await claimJobs(db, { workerId: "stopping" })).toHaveLength(2);
+  await enqueue(db, job("c"));
+  expect(await claimJobs(db, { workerId: "other" })).toHaveLength(1);
+
+  expect(await releaseJobs(db, "stopping")).toBe(2);
+  const next = await claimJobs(db, { workerId: "next" });
+  expect(next.map((j) => [j.kind, j.attempts]).sort()).toEqual([
+    ["a", 1],
+    ["b", 1],
+  ]);
+  // Another worker's job stays with it.
+  expect((await rows()).find((r) => r.kind === "c")).toMatchObject({ status: "processing", lockedBy: "other" });
+});
+
+test("a job whose failure can't be recorded (the database went away) doesn't reject the pump", async () => {
+  await enqueue(db, job("flaky"));
+  const update = db.update;
+  const outcomes: string[] = [];
+  const pump = createOutboxPump(
+    db,
+    {
+      flaky: async () => {
+        // The database goes away mid-job: recording the failure fails too.
+        db.update = (() => {
+          throw new Error("connection refused");
+        }) as unknown as typeof db.update;
+        throw new Error("connection refused");
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  try {
+    expect(await pump.pump()).toBe(1);
+    await pump.idle();
+  } finally {
+    db.update = update;
+  }
+  expect(outcomes).toEqual(["retry"]);
+  // Still leased to the worker: it comes back when the lease ends.
+  expect((await rows())[0]).toMatchObject({ status: "processing", lockedBy: "w" });
 });
 
 test("a lease that expires after the final attempt marks the job failed", async () => {

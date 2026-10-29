@@ -41,8 +41,11 @@ export async function enqueue(db: Executor, input: EnqueueInput): Promise<void> 
     .onConflictDoNothing();
 }
 
-/** A claimed job is invisible to other workers for this long; `runJob` renews it every third of it while the handler runs. */
-export const DEFAULT_LEASE_MS = 10 * 60_000;
+/**
+ * A claimed job is invisible to other workers for this long; `runJob` renews it every third of it while the handler
+ * runs. Also how late the jobs of a worker that died come back.
+ */
+export const DEFAULT_LEASE_MS = 2 * 60_000;
 
 /** A handler still running after this (hung on a socket) stops renewing: its lease expires and another worker retries. */
 export const MAX_RENEWED_MS = 6 * 3600_000;
@@ -70,19 +73,28 @@ export interface ClaimOptions {
 /** A claimed job, and whether it is background work (it counts against the pump's background slots). */
 export type ClaimedJob = OutboxJob & { background: boolean };
 
+/** The run an `agent_run.execute` job executes (null for a malformed payload). */
+const runOfJob = sql`case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end`;
+
 /**
  * Background work (ADR 0053 §10): a routine firing (`routine.run`), or the execution of a routine's
  * background run (`agent_run.execute` of a run with `agent_runs.background`). A person's message never
  * waits behind it: it holds at most half of a worker's slots.
  */
 const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} = 'agent_run.execute' and exists (
-  select 1 from ${schema.agentRuns} r
-  where r.id = case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end
-    and r.background)))`;
+  select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.background)))`;
 
 /**
- * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired. Other
- * work first, then background jobs up to `maxBackground` in the slots left.
+ * The job of a run still `running` whose lease ran out: its worker died in the middle of it. The stale-run sweep
+ * takes it (`recoverStaleRuns`: a tool cut in half fails the run instead of running twice), never a plain retry.
+ */
+const orphanedRunJobSql = sql`(${outbox.kind} = 'agent_run.execute' and exists (
+  select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.status = 'running'))`;
+
+/**
+ * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired (except a dead
+ * worker's agent run, `orphanedRunJobSql`). Other work first, then background jobs up to `maxBackground` in the
+ * slots left.
  */
 export async function claimJobs(db: Database, options: ClaimOptions): Promise<ClaimedJob[]> {
   const now = options.now ?? new Date();
@@ -130,7 +142,8 @@ function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL,
     .where(
       sql`${outbox.id} in (select ${outbox.id} from ${outbox}
         where ((${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${now.toISOString()}::timestamptz)
-           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz))
+           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz
+             and not ${orphanedRunJobSql}))
           and ${filter}
         order by ${outbox.nextAttemptAt}
         limit ${limit}
@@ -164,7 +177,22 @@ export async function completeJob(db: Database, job: OutboxJob, now = new Date()
   return rows.length > 0;
 }
 
-/** Records a failure: schedules a retry with backoff, or marks the job `failed`. */
+/** Back in the queue, due `now`, with the attempt it was claimed for given back: its worker stopped, not the job. */
+const handedBack = (now: Date) => ({
+  status: "pending" as const,
+  attempts: sql`greatest(${outbox.attempts} - 1, 0)`,
+  lockedUntil: null,
+  lockedBy: null,
+  nextAttemptAt: now,
+});
+
+/** A handler that stopped because its worker is shutting down throws an error with `handback: true`. */
+const isHandback = (error: unknown) => (error as { handback?: unknown } | null)?.handback === true;
+
+/**
+ * Records a failure: schedules a retry with backoff, or marks the job `failed`. A handback (`isHandback`) is no
+ * failure: the job is due again at once, the attempt not spent.
+ */
 export async function failJob(
   db: Database,
   job: OutboxJob,
@@ -173,6 +201,13 @@ export async function failJob(
 ): Promise<"retry" | "failed"> {
   const now = options.now ?? new Date();
   const message = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
+  if (isHandback(error)) {
+    await db
+      .update(outbox)
+      .set({ ...handedBack(now), lastError: message })
+      .where(and(eq(outbox.id, job.id), eq(outbox.lockedBy, job.lockedBy ?? "")));
+    return "retry";
+  }
   const final = !options.retryable || job.attempts >= job.maxAttempts;
   await db
     .update(outbox)
@@ -190,6 +225,19 @@ export async function failJob(
   return final ? "failed" : "retry";
 }
 
+/**
+ * A stopping worker's jobs still running: back in the queue at once for the next instance instead of waiting out
+ * their lease. Returns how many.
+ */
+export async function releaseJobs(db: Database, workerId: string, now = new Date()): Promise<number> {
+  const rows = await db
+    .update(outbox)
+    .set(handedBack(now))
+    .where(and(eq(outbox.status, "processing"), eq(outbox.lockedBy, workerId)))
+    .returning({ id: outbox.id });
+  return rows.length;
+}
+
 /** Throw from a handler to fail the job without retrying. */
 export class PermanentJobError extends Error {
   constructor(message: string) {
@@ -201,6 +249,8 @@ export class PermanentJobError extends Error {
 export interface JobContext {
   /** True on the job's last allowed attempt: handlers should give up cleanly instead of rethrowing. */
   finalAttempt: boolean;
+  /** Whether this worker still holds the job: a stale-run recovery may have taken it back since it was claimed. */
+  owned?(): Promise<boolean>;
 }
 
 export type JobHandler = (job: OutboxJob, ctx: JobContext) => Promise<void>;
@@ -229,12 +279,22 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
       () => undefined,
     );
   }, leaseMs / 3);
+  const owned = async () => {
+    const [row] = await db
+      .select({ id: outbox.id })
+      .from(outbox)
+      .where(and(eq(outbox.id, job.id), eq(outbox.status, "processing"), eq(outbox.lockedBy, job.lockedBy ?? "")));
+    return Boolean(row);
+  };
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
-    await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });
+    await handler(job, { finalAttempt: job.attempts >= job.maxAttempts, owned });
     await completeJob(db, job, options.now);
   } catch (error) {
-    const outcome = await failJob(db, job, error, { retryable: isRetryable(error), now: options.now });
+    // The database may be what failed: the failure can't be recorded then, and the lease brings the job back.
+    const outcome = await failJob(db, job, error, { retryable: isRetryable(error), now: options.now }).catch(
+      () => "retry" as const,
+    );
     options.onError?.(job, error, outcome);
   } finally {
     clearInterval(renew);

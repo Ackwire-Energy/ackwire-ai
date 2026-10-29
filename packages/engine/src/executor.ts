@@ -353,6 +353,13 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
+/** The result of a call in a step cut by a server restart that never started. */
+const NOT_RUN_BY_RESTART =
+  "Interrupted by a server restart before it ran: nothing was done. Call it again if it's still needed.";
+/** Put before what a call stopped partway by a server restart returned. */
+const CUT_BY_RESTART =
+  "Interrupted by a server restart while it ran: it may have done part of its work. Check before running it again. What it returned:";
+
 const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
   if (approval.status === "refused") {
@@ -384,8 +391,11 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
 export async function executeRun(
   deps: EngineDeps,
   runId: string,
-  /** `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale. */
-  options: { finalAttempt: boolean; wait?: string },
+  /**
+   * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
+   * `owned`: whether this worker still holds the job (`JobContext.owned`).
+   */
+  options: { finalAttempt: boolean; wait?: string; owned?: () => Promise<boolean> },
 ) {
   const prof = createProfiler();
   // A person can cancel it: the signal aborts the model stream, tools and running code.
@@ -410,7 +420,7 @@ export async function executeRun(
 async function executeRunInner(
   deps: EngineDeps,
   runId: string,
-  options: { finalAttempt: boolean; wait?: string },
+  options: { finalAttempt: boolean; wait?: string; owned?: () => Promise<boolean> },
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
 ) {
@@ -439,6 +449,15 @@ async function executeRunInner(
     if (!loaded) throw new PermanentJobError(`agent run ${runId} not found`);
     run = loaded;
     if (isTerminal(run.status) || run.status === "queued") return;
+    if (run.status === "running") {
+      // Picked up again (handed back at a shutdown, or recovered) with its old beat: a fresh one first, so a
+      // recovery sweep can't take it from this worker. A sweep that took it first took its job back too.
+      await db
+        .update(agentRuns)
+        .set({ heartbeatAt: new Date() })
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
+      if (options.owned && !(await options.owned())) return;
+    }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const [stillPending, stillOpen, stillSecret] = await Promise.all([
         db
@@ -953,6 +972,8 @@ async function executeRunInner(
     if (isShutdown(signal.reason)) throw new RunInterruptedError();
     return true;
   };
+  /** The server is shutting down: the step in progress ends cleanly, then the run is handed back. */
+  const shuttingDown = () => signal.aborted && isShutdown(signal.reason);
   const isCanceled = async () => {
     if (aborted()) return true;
     const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -1831,8 +1852,9 @@ async function executeRunInner(
         return suspendedByBridge(run.status, turnText, deltas.text() ? deltas.textBefore : undefined);
       }
 
-      // Canceled while the model answered: its tool calls never run.
-      if (aborted()) {
+      // Canceled while the model answered: its tool calls never run. A shutdown ends the step below instead: its
+      // calls don't start and are saved as not run, a final answer is posted.
+      if (!shuttingDown() && aborted()) {
         await saveTranscript(db, transcript);
         return stopCanceled("");
       }
@@ -1854,9 +1876,11 @@ async function executeRunInner(
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
         for (const use of toolUses) {
-          // Canceled during a tool: the rest never run.
+          // Canceled during a tool, or the server is shutting down: the rest never run.
           if (signal.aborted) break;
           const outcome = await invokeWithChip(toolScope, use);
+          // The shutdown aborted it while it ran: its error may hide work it already did.
+          const cutShort = shuttingDown();
           await absorbToolOutcome(use, outcome);
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
@@ -1879,14 +1903,25 @@ async function executeRunInner(
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });
             waits.push(wait.id);
           } else {
+            const { content, isError } = outcome.output;
             calls.push({
               toolUseId: use.id,
               name: use.name,
-              result: { content: outcome.output.content, isError: outcome.output.isError === true },
+              result: {
+                content: cutShort && isError ? `${CUT_BY_RESTART}\n${content}` : content,
+                isError: isError === true,
+              },
             });
           }
         }
-        if (aborted()) {
+        // The server is shutting down: the calls that never started say so, and the step ends as any other (its
+        // results saved, its approvals and questions asked); the next instance takes the run from there.
+        if (shuttingDown()) {
+          for (const use of toolUses) {
+            if (!calls.some((c) => c.toolUseId === use.id))
+              calls.push({ toolUseId: use.id, name: use.name, result: { content: NOT_RUN_BY_RESTART, isError: true } });
+          }
+        } else if (aborted()) {
           // The calls made are kept for the record; the run ends here.
           transcript.messages.push({
             role: "user",

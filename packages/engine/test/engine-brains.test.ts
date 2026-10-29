@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  addRunStep,
   type Brain,
   type BrainEvent,
   type BrainTurn,
@@ -31,6 +32,7 @@ import {
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
+  recoverStaleRuns,
   resolveBrain,
   resumeRunsWaitingForMachine,
   runWhere,
@@ -751,6 +753,48 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
   expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
   main = await timeline(f);
   expect(main.at(-1)?.body).toBe("Voltei.");
+});
+
+test("a computer turn whose server died mid-turn is sent again as cut off, with what ran, never as the request again", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Tem Go 1.23." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev tem Go aí?");
+  // Its server died in the middle of the turn, after `check_env` ran through the bridge; the dead worker still
+  // holds the job.
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const long = new Date(Date.now() - 10 * 60_000);
+  await f.db
+    .update(schema.agentRuns)
+    .set({
+      status: "running",
+      brain: "claude_code",
+      startedAt: long,
+      heartbeatAt: long,
+      transcript: { system: [], messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0 },
+    })
+    .where(eq(schema.agentRuns.id, run.id));
+  await addRunStep(f.db, run, "tool_call", { toolUseId: "c-1", name: "check_env", input: {} });
+  await addRunStep(f.db, run, "tool_result", { toolUseId: "c-1", name: "check_env", isError: false, content: "go" });
+  await f.db
+    .update(schema.outbox)
+    .set({ status: "processing", lockedUntil: new Date(Date.now() + 600_000), lockedBy: "dead" })
+    .where(eq(schema.outbox.kind, "agent_run.execute"));
+
+  expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([run.id]);
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(1);
+  expect(seen[0]?.trigger).toContain("cut off");
+  expect(seen[0]?.trigger).toContain("do not repeat: check_env");
+  expect(seen[0]?.trigger).toContain("tem Go aí?");
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  expect((await timeline(f)).at(-1)?.body).toBe("Tem Go 1.23.");
 });
 
 test("a message to a run parked for its computer: looked at again now; resumes with it, or parks again quietly", async () => {
