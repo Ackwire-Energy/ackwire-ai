@@ -34,7 +34,7 @@ export interface AppExtras {
   /** Org storage settings and the blob resolver (Drive, artifacts). */
   storage?: StorageDeps;
   artifacts?: ArtifactDeps;
-  /** Code sandbox (ADR 0021); null/absent = off on this server. */
+  /** Agents' computers (ADR 0025): the machine hub, Run code settings and git; null/absent = none on this server. */
   sandbox?: SandboxDeps | null;
   /** The git proxy for agents' computers (ADR 0024); absent = off. */
   gitProxy?: GitProxyDeps;

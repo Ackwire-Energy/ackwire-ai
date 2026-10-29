@@ -12,7 +12,6 @@ import {
   outageOf,
   targetBlock,
   targetsFor,
-  targetValue,
   waitingText,
 } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -174,15 +173,6 @@ const brainList = (t: TFunction, brains: string[]) => joinNames(brains.map(brain
 function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[]) {
   const needed = brainList(t, brains);
   const block = targetBlock(target, brains);
-  if (target.kind === "cloud") {
-    return {
-      value: "cloud",
-      title: t("outage.dialog.cloud"),
-      description: block ? t(`outage.dialog.block.${block}`, { brains: needed }) : t("outage.dialog.cloudText"),
-      leading: <Icon name="computerCloud" />,
-      disabled: block !== null,
-    } satisfies OptionListItem<string>;
-  }
   const description =
     block === null
       ? t("outage.dialog.has", { brains: brainList(t, target.brains) })
@@ -224,7 +214,7 @@ export function SwitchComputerDialog({
   // A target must run every brain of the agents chosen (all of them while none is chosen).
   const brains = brainsOf(chosenAgents.length > 0 ? chosenAgents : o.agents);
   // Which rows show doesn't change with the checks: only whether each can take who is checked.
-  const targets = targetsFor(data, o.machineId, brainsOf(o.agents));
+  const targets = targetsFor(data, o.machineId);
   const options = targets.map((x) => targetOption(t, x, brains));
   const firstOpen = options.find((x) => !x.disabled)?.value ?? "";
   const [target, setTarget] = useState(firstOpen);
@@ -237,14 +227,14 @@ export function SwitchComputerDialog({
   );
   const nameOf = (agentId: string) => o.agents.find((a) => a.agentId === agentId)?.name ?? agentId;
   const submit = () => {
-    const chosen = targets.find((x) => targetValue(x) === value);
+    const chosen = targets.find((x) => x.machineId === value);
     if (!chosen || picked.length === 0) return;
-    const targetName = chosen.kind === "cloud" ? t("outage.dialog.cloud") : chosen.name;
+    const targetName = chosen.name;
     move.mutate(
       {
         machineId: o.machineId,
         agentIds: picked,
-        target: chosen.kind === "cloud" ? { kind: "cloud" } : { kind: "machine", machineId: chosen.machineId },
+        target: { kind: "machine", machineId: chosen.machineId },
       },
       {
         onSuccess: (r) => {

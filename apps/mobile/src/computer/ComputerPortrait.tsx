@@ -88,7 +88,7 @@ function ComputerPortraitView({ kind, state, size = 48, live = true, label }: Co
 /**
  * A computer's portrait, drawn by the shared engine
  * (`@agenteschat/ui/computer/portrait`) on a Skia canvas, the way agents are: a Mac laptop, a Windows
- * monitor, a Linux tower or the cloud computer, its screen lit, dimmed (paused) or dark (offline). It
+ * monitor or a Linux tower, its screen lit, dimmed (paused) or dark (offline). It
  * sits directly on the surface, no tile. Living portraits share the app's clock; with reduced motion,
  * `live={false}` or an off-screen screen they hold a still frame. Below 48 points use `ComputerIcon`.
  */
@@ -98,7 +98,6 @@ const ICONS = {
   mac: "computerMac",
   windows: "computerWindows",
   linux: "computerLinux",
-  cloud: "computerCloud",
 } as const;
 
 /** A computer's line icon next to text (chips, small rows): pixels don't read that small. */

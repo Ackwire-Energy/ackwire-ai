@@ -123,21 +123,15 @@ export function sheetDesc(t: TFunction, o: OutageLike, agentIds: ReadonlySet<str
   });
 }
 
-/** The icon of a target or a computer: by its platform, the cloud one for the cloud. */
-export function computerIcon(platform: string | null | undefined, cloud = false) {
-  const kind = computerKind(platform, cloud);
-  return kind === "mac"
-    ? "computerMac"
-    : kind === "windows"
-      ? "computerWindows"
-      : kind === "cloud"
-        ? "computerCloud"
-        : "computerLinux";
+/** The icon of a target or a computer, by its platform. */
+export function computerIcon(platform: string | null | undefined) {
+  const kind = computerKind(platform);
+  return kind === "mac" ? "computerMac" : kind === "windows" ? "computerWindows" : "computerLinux";
 }
 
 /** A target row: its title, the tag next to it ("Ligado", "Sempre ligado") and the line under it. */
 export function targetText(t: TFunction, x: TargetOption) {
-  const title = x.kind === "cloud" ? t("mobile.outage.sheet.cloud") : (x.name ?? "");
+  const title = x.name;
   if (!x.enabled) {
     const brain = x.missing ? BRAIN_NAME[x.missing] : x.brains[0] ? BRAIN_NAME[x.brains[0]] : BRAIN_NAME.claude_code;
     const reason = x.reason ?? "other";
@@ -150,7 +144,6 @@ export function targetText(t: TFunction, x: TargetOption) {
       }),
     };
   }
-  if (x.kind === "cloud") return { title, tag: null, desc: t("mobile.outage.sheet.cloudDesc") };
   // The workspace's own computer: always on, a user of its own for each agent.
   if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
   const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));

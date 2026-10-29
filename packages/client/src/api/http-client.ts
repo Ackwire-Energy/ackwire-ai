@@ -577,11 +577,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       saveSettings: (orgId, input) =>
         request<SandboxSettings>(`${org(orgId)}/sandbox-settings`, { method: "PUT", json: input }),
       computer: (orgId, agentId) => request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer`),
-      start: (orgId, agentId) =>
-        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/start`, { json: {} }),
-      stop: (orgId, agentId) =>
-        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/stop`, { json: {} }),
-      remove: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/computer`, { method: "DELETE" }),
       setTarget: (orgId, agentId, machineId) =>
         request<ComputerTarget>(`${org(orgId)}/agents/${enc(agentId)}/computer/target`, {
           method: "PUT",

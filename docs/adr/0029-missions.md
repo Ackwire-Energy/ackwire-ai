@@ -1,6 +1,6 @@
 # 0029. Missions: long work driven by the executor on the agent's computer
 
-- Status: Proposed
+- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the `cloud_computer` reason and missions on the agent's cloud computer
 - Date: 2026-10-16
 - Extends: ADR 0025 (connected computers and the runner), ADR 0015 (tools, approvals, resumable runs), ADR 0008 (agent runs)
 

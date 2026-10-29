@@ -1,6 +1,6 @@
 # 0032. One agent engine, swappable brains (model, Claude Code, Codex)
 
-- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen)
+- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen). Superseded in part by ADR 0077 (2026-10-28): §2's git on cloud computers (connected computers use the git proxy through the runner).
 - Date: 2026-10-17
 - Extends: ADR 0008 (agent runs), ADR 0015 (Tool Gateway and approvals), ADR 0025 (connected computers and the runner), ADR 0029 (missions), ADR 0030 (runner isolation)
 

@@ -129,12 +129,11 @@ export function desktopTargetOf(userAgent: string) {
 }
 
 /** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
-export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
+export type ComputerKind = "mac" | "windows" | "linux";
 export type ComputerState = "online" | "paused" | "offline";
 
 /** A machine's `os` → its portrait: Macs, Windows PCs, and everything else drawn as a Linux server. */
-export function computerKind(os: string | null | undefined, cloud = false): ComputerKind {
-  if (cloud) return "cloud";
+export function computerKind(os: string | null | undefined): ComputerKind {
   const v = (os ?? "").toLowerCase();
   if (v === "darwin" || v === "macos" || v === "mac") return "mac";
   if (v === "windows" || v === "win32") return "windows";

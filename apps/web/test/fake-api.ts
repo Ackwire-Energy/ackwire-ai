@@ -126,7 +126,7 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
 
 export interface FakeState {
   me: Me | null;
-  /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
+  /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
   signInOptions?: SignInOptions;

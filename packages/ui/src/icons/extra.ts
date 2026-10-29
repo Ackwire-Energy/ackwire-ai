@@ -269,7 +269,7 @@ export const extraIcons = {
     ["rect", { x: "3", y: "4", width: "14", height: "9.5", rx: "2" }],
     ["path", { d: "M7.5 16.5h5M10 13.5v3" }],
   ],
-  /** The cloud computer. */
+  /** A cloud (agentes.chat Cloud, status). */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
   /** "Abrir no celular". */
   phone: [
@@ -299,11 +299,6 @@ export const extraIcons = {
     ["rect", { x: "2.5", y: "3.75", width: "15", height: "12.5", rx: "2.08" }],
     ["path", { d: "M2.5 7.17h15" }],
     ["path", { d: "m6 10 2.17 1.75-2.17 1.75M10 13.58h3.83" }],
-  ],
-  /** Computers: the cloud computer, a cloud with a screen set in it. */
-  computerCloud: [
-    ["path", { d: "M5.83 15.42h8.75a3.33 3.33 0 0 0 .5-6.62A4.58 4.58 0 0 0 6.25 8 3.75 3.75 0 0 0 5.83 15.42Z" }],
-    ["rect", { x: "7.92", y: "9.67", width: "5", height: "3.33", rx: ".67" }],
   ],
   /** "Reagir" and the composer's emoji button (our face, never an emoji glyph). */
   smile: [
