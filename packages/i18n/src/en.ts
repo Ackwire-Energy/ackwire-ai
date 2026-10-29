@@ -1007,11 +1007,11 @@ export const en: Translations = {
   },
   noAi: {
     banner: {
-      org: "Your agents don't have an AI yet.",
+      org: "Your agents don't have an AI\u00a0yet.",
       orgHint: "You can also ask in the chat, like “use my Claude plan”.",
       orgAction: "Connect an AI",
     },
-    agent: "{{name}} won't reply because {{she}} has no AI connected.",
+    agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",

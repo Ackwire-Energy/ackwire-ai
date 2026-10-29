@@ -121,7 +121,7 @@ describe("no AI connected: above the composer", () => {
     const shown = banner();
     // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
     // line is a whole sentence). Jev is what understands that ask.
-    expect(shownText(shown as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(shownText(shown as HTMLElement)).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", shown as HTMLElement).text).toBe(
       "Você também pode pedir no chat, como “usar meu plano do Claude”.",
     );
@@ -147,7 +147,7 @@ describe("no AI connected: above the composer", () => {
   test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {
     for (const routing of [undefined, { by: "rules", mine: "rules", model: null, noSmallModel: null } as const]) {
       await open(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), ...(routing ? { routing } : {}) } }));
-      expect(shownText(banner() as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+      expect(shownText(banner() as HTMLElement)).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
       expect(within(banner() as HTMLElement).queryByRole("button", { name: "Sobre Conectar uma IA" })).toBeNull();
       cleanup();
     }
@@ -196,7 +196,7 @@ describe("no AI connected: above the composer", () => {
   test("a DM with an agent that has none says so for that agent; an organization with AI shows nothing in channels", async () => {
     const state = seedState({ aiStatus: aiStatus(true, ADA_ID) });
     await open(state, `dm/agent/${ADA_ID}`);
-    expect(banner()?.textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
+    expect(banner()?.textContent).toContain("Ada não vai responder porque não tem uma IA\u00a0conectada.");
     cleanup();
     await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }));
     expect(banner()).toBeNull();
@@ -242,7 +242,7 @@ describe("the agent's no-AI card", () => {
     const state = withCard({ intent: "api_key", provider: "openai" });
     await open(state);
     const row = cardRow();
-    expect(row.textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
+    expect(row.textContent).toContain("Ada não vai responder porque não tem uma IA\u00a0conectada.");
     // The card is that line and Connect, even for whoever asked.
     expect(row.querySelector(".waitcard p")).toBeNull();
     expect(row.textContent).not.toContain("Depois de conectar");
@@ -446,7 +446,7 @@ describe("receipts and the live block", () => {
     // The server confirms the subscription: the channel is read again.
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
-    expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
+    expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA\u00a0conectada.");
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
       "Ninguém vai responder: falta uma IA·Conectar",

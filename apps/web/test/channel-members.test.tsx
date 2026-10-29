@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -64,6 +64,31 @@ describe("channel header: who's here", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver detalhes do canal" })));
     await settle(3);
     expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
+  });
+
+  test("on a phone, where the stack is gone, Detalhes do canal folds to its icon and keeps its name", async () => {
+    const media = spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(max-width: 420px)",
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    try {
+      await open();
+      const details = screen().getByRole("button", { name: "Detalhes do canal" });
+      expect({ icon: details.classList.contains("ac-btn--icon"), words: details.textContent }).toEqual({
+        icon: true,
+        words: "",
+      });
+      await act(async () => fireEvent.click(details));
+      await settle(3);
+      expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
+    } finally {
+      media.mockRestore();
+    }
   });
 
   test("hover opens it after a short delay", async () => {

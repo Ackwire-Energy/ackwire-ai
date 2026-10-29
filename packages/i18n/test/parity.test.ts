@@ -35,6 +35,14 @@ describe("menu paths", () => {
   });
 });
 
+describe("closing words", () => {
+  test("the chat's no-AI lines end on two words held together, never on one alone", () => {
+    for (const tree of [ptBR, en])
+      for (const s of [tree.noAi.agent, tree.noAi.banner.org])
+        expect({ s, together: / \S+$/.test(s) }).toEqual({ s, together: true });
+  });
+});
+
 describe("examples in one-line fields", () => {
   test("fit a 360px phone's field: one email address, a short database address", () => {
     for (const tree of [ptBR, en]) {
