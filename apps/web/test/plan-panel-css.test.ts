@@ -31,10 +31,9 @@ test("what ships keeps dark's chosen press visible, the ready line apart from th
   const light = '[data-theme="light"]';
   const dark = '[data-theme="dark"]';
 
-  // Dark sinks a chosen option into a face that isn't black, between the page and a card, under light's shadow made
+  // Dark presses a chosen option into a face lighter than a card, where a black shadow shows, under light's shadow made
   // deeper: the same layers, each at least three times as dark. Light stays as it was.
-  expect(level(last(dark, "--chosen-bg"))).toBeGreaterThan(level(last(dark, "--bg")));
-  expect(level(last(dark, "--chosen-bg"))).toBeLessThan(level(last(dark, "--raised")));
+  expect(level(last(dark, "--chosen-bg"))).toBeGreaterThan(level(last(dark, "--raised")));
   const darkPress = layers(last(dark, "--chosen-press"));
   const lightPress = layers(last(light, "--chosen-press"));
   expect(darkPress.map((l) => l.shape)).toEqual(lightPress.map((l) => l.shape));
