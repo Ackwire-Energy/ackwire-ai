@@ -143,18 +143,45 @@ const esc = (s: string) =>
 const LINK_MUTED = `color:${L.muted};text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px`;
 
 const inlines = (t: Text): Inline[] => (Array.isArray(t) ? t : [t]);
-const html = (t: Text, bold = `font-weight:600;color:${L.ink}`) =>
-  inlines(t)
-    .map((i) =>
-      typeof i === "string"
-        ? esc(i)
-        : "b" in i
-          ? `<b class="ink" style="${bold}">${esc(i.b)}</b>`
-          : "mail" in i
-            ? `<a class="ln-m" href="mailto:${esc(i.mail)}" style="${LINK_MUTED}">${esc(i.mail)}</a>`
-            : `<span style="display:inline-block">${esc(i.nobr)}</span>`,
-    )
-    .join("");
+const nobr = (inner: string) => `<span style="display:inline-block">${inner}</span>`;
+
+/**
+ * A text's parts, split before its last two words: those move down together, so a wrapped text never ends on a word
+ * alone (held whole, as `{ nobr }` does: a no-break space would still split "e-mail" at its hyphen). Bold words stay
+ * bold on both sides. A text of one or two words, or one that ends in a `{ nobr }` of its own, isn't split.
+ */
+function closing(parts: Inline[]): [head: Inline[], tail: Inline[]] {
+  const last = parts.at(-1);
+  if (typeof last === "object" && "nobr" in last) return [parts, []];
+  let spaces = 0;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i] ?? "";
+    // An address or a `{ nobr }` inside the text is one word.
+    const text = typeof p === "string" ? p : "b" in p ? p.b : "";
+    for (let at = text.lastIndexOf(" "); at >= 0; at = at > 0 ? text.lastIndexOf(" ", at - 1) : -1) {
+      if (++spaces < 2) continue;
+      const piece = (s: string): Inline[] => (!s ? [] : typeof p === "string" ? [s] : [{ b: s }]);
+      return [
+        [...parts.slice(0, i), ...piece(text.slice(0, at + 1))],
+        [...piece(text.slice(at + 1)), ...parts.slice(i + 1)],
+      ];
+    }
+  }
+  return [parts, []];
+}
+
+const html = (t: Text, bold = `font-weight:600;color:${L.ink}`) => {
+  const part = (i: Inline) =>
+    typeof i === "string"
+      ? esc(i)
+      : "b" in i
+        ? `<b class="ink" style="${bold}">${esc(i.b)}</b>`
+        : "mail" in i
+          ? `<a class="ln-m" href="mailto:${esc(i.mail)}" style="${LINK_MUTED}">${esc(i.mail)}</a>`
+          : nobr(esc(i.nobr));
+  const [head, tail] = closing(inlines(t));
+  return head.map(part).join("") + (tail.length ? nobr(tail.map(part).join("")) : "");
+};
 const plain = (t: Text) =>
   inlines(t)
     .map((i) => (typeof i === "string" ? i : "b" in i ? i.b : "mail" in i ? i.mail : i.nobr))
@@ -211,7 +238,7 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
       .map(
         ([title, text], i) => `<tr>
 <td width="36" valign="top" style="width:36px;padding:0 0 ${under(i, b.steps, 14)}px"><table ${T("")}><tr><td class="num" width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;border:1px solid ${L.border};border-radius:7px;background:${L.card};${P};font-size:13px;line-height:22px;font-weight:600;color:${L.muted}">${i + 1}</td></tr></table></td>
-<td valign="top" class="tx" style="padding:0 0 ${under(i, b.steps, 14)}px;${P};font-size:16px;line-height:24px;color:${L.text}"><b class="ink" style="font-weight:600;color:${L.ink}">${esc(title)}</b> ${esc(text)}</td>
+<td valign="top" class="tx" style="padding:0 0 ${under(i, b.steps, 14)}px;${P};font-size:16px;line-height:24px;color:${L.text}"><b class="ink" style="font-weight:600;color:${L.ink}">${esc(title)}</b> ${html(text)}</td>
 </tr>`,
       )
       .join("")}</table>`;
@@ -263,7 +290,7 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
       : "";
     return `<table${last ? ' class="end-btn"' : ""} ${T(`margin:8px 0 ${gap(20, "button")}px`)}><tr><td>${btn}${also}</td></tr></table>`;
   }
-  return `<p class="mu" style="margin:0 0 ${gap(12)}px;${P};font-size:13px;line-height:19px;color:${L.muted}">${esc(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
+  return `<p class="mu" style="margin:0 0 ${gap(12)}px;${P};font-size:13px;line-height:19px;color:${L.muted}">${html(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
 }
 
 /** The plain-text part of a block: the same words, a button as `Label: url`. */
@@ -346,7 +373,7 @@ ${logo("logo-ink.png", "logo-ink", "block", L.ink)}
 </a>
 </td></tr>
 <tr><td class="card" style="background:${L.card};border:1px solid ${L.border};border-radius:16px;padding:32px">
-<h1 class="h1 ink" style="margin:0 0 16px;${P};font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${esc(doc.headline)}</h1>
+<h1 class="h1 ink" style="margin:0 0 16px;${P};font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${html(doc.headline)}</h1>
 ${body}
 </td></tr>
 <tr><td style="padding:24px 0 0"><img class="sky" src="${esc(src("sky-band.png"))}" width="${SKY.width}" height="${SKY.height}" alt="" style="display:block;border:0;outline:none;width:${SKY.width}px;max-width:100%;height:auto"></td></tr>
