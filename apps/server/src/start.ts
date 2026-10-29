@@ -47,7 +47,6 @@ import {
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
-  enablePersonalPlans,
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
@@ -195,8 +194,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
-  // Where workspaces get their computer from this server, an agent on a plan answers only its owner.
-  enablePersonalPlans(config.MACHINE_PROVISIONING === "external");
   // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
   setRestrictionNotices(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).

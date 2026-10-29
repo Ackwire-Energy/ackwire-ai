@@ -634,7 +634,7 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
   });
 
-  test("on the Cloud a plan only answers its owner: a fixed line with its ⓘ, no switch to share it", async () => {
+  test("on the Cloud too, the plan's owner lets it reply to everyone: the switch, its line and ⓘ", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, true);
@@ -644,10 +644,14 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
     await open(state, api);
     const d = await brainDialog();
-    expect(within(d).queryByRole("switch", { name: /^Só responde/ })).toBeNull();
-    expect(hintOf("Só responde a você", d).text).toBe(
-      "Um plano é pessoal, então só responde a quem o conectou. Os outros podem usar o próprio plano ou a chave de API do workspace.",
-    );
+    const replies = within(d).getByRole("switch", { name: "Responde a todos" });
+    expect(replies.getAttribute("aria-checked")).toBe("false");
+    expect(hintOf("Zona cinzenta nos termos do Claude", d).text).toContain("Os termos do Claude dizem");
+    expect(shownText(d)).not.toContain("Um plano é pessoal");
+    await click(replies);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: null, fallback: true, onlyOwner: false });
   });
 });
 

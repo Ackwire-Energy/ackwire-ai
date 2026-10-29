@@ -915,9 +915,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect([...panel().querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
     const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
-    // Ada asks which AI they use, so the plan is for her, as the foot says; Theo is the other choice.
+    // Ada asks which AI they use, so the plan is for her; Theo is the other choice. The foot is whom she replies to.
     expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
-    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("a Ada só responde a você");
+    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Responde a todos");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -1146,12 +1146,14 @@ describe("the onboarding where the workspace gets its own computer", () => {
       a.ownerUserId = "u-walter";
       a.audience = { mode: "owner", userIds: [] };
     }
+    // The list asked again, as after a move.
+    await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.agents(orgId) }));
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
     const note = () => screen().queryByText("Seus agentes só respondem a você.")?.closest(".setup-line");
     expect(note()).toBeTruthy();
     expect(hintOf("Seus agentes só respondem a você.").text).toBe(
-      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+      "Num plano, você pode deixar cada um responder a todos na página dele.",
     );
     // It comes before the invitations it's about.
     const emails = screen().getByLabelText("E-mails");

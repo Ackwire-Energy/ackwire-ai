@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrain, MachineAccount, PlanUsage } from "@agenteschat/client";
-import { sharePlanBody } from "@agenteschat/client/lib/plans";
+import { planTerms } from "@agenteschat/client/lib/plans";
 import { accountKindOf, agentAccounts, takenFrom, thinkingUsage } from "../../src/features/ai/logic";
 import { translator } from "./fixtures";
 
@@ -69,12 +69,49 @@ describe("the agent's AI", () => {
     expect(takenFrom(account("a", { usedBy: ["Dev"] }), "Dev")).toEqual([]);
   });
 
-  test("before it replies to everyone on a plan: the words of the plan, a seat or a coding plan's maker", async () => {
+  test("under Responde a todos: a gray area in the plan's terms, and their words for a plan, a seat or a maker", async () => {
     const t = await translator("en");
-    expect(sharePlanBody(t, "claude_code", "max")).toContain("Claude's terms say your plan is for your own use");
-    expect(sharePlanBody(t, "claude_code", "Team")).toContain("each seat is for one person");
-    expect(sharePlanBody(t, "codex", null)).toContain("ChatGPT plans are meant for personal use");
-    expect(sharePlanBody(t, "claude_code", "max", "Z.ai")).toContain("Z.ai says the plan is for its subscriber only");
+    expect(planTerms(t, "claude_code", "max")).toEqual({
+      line: "A gray area in Claude's terms",
+      text: "Claude's terms say your plan is for your own use. Using it to reply to other people might go against them.",
+    });
+    expect(planTerms(t, "claude_code", "Team").text).toBe(
+      "Claude's terms say each seat is for one person. Using yours to reply to other people might go against them.",
+    );
+    expect(planTerms(t, "codex", null)).toMatchObject({
+      line: "A gray area in ChatGPT's terms",
+      text: expect.stringContaining("ChatGPT's terms say your plan is for your own use."),
+    });
+    expect(planTerms(t, "claude_code", "max", "Z.ai")).toEqual({
+      line: "A gray area in the plan's terms",
+      text: "Z.ai says the plan is for its subscriber only. Using yours to reply to other people might go against its terms.",
+    });
+    const pt = await translator("pt-BR");
+    expect(planTerms(pt, "claude_code", null).line).toBe("Zona cinzenta nos termos do Claude");
+  });
+
+  test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [screen, connect, parts] = await Promise.all([
+      read("AgentAiScreen.tsx"),
+      read("ConnectAiSteps.tsx"),
+      read("parts.tsx"),
+    ]);
+    for (const source of [screen, connect]) {
+      expect(source).toMatch(/import \{[^}]*\bPlanReplies\b[^}]*\} from "\.\/parts"/);
+      expect(source).toContain("<PlanReplies");
+      expect(source).not.toMatch(/acceptPlanTerms|share\.title|share\.accept|connectAi\.onlyYou|own\.note/);
+    }
+    // One switch, its line under it with the ⓘ, the plan's words behind it.
+    expect(parts).toContain('label={t("aiAccounts.share.switch")}');
+    expect(parts).toContain("planTerms(t, brain, plan, maker)");
+    expect(parts).toMatch(/<InfoHint name=\{t\("common\.about", \{ label: terms\.line \}\)\} text=\{terms\.text\}/);
+    // Someone who isn't the plan's owner: whom it replies to and who decides, no switch.
+    expect(screen).toMatch(/view\.canUsePlans \? \(\s*<PlanReplies[\s\S]*?\) : \(\s*<PlanRepliesOf/);
+    // On a plan's page: under its steps or the account cards, and on the page that says it's done.
+    expect(connect).toContain("{steps || ownable ? repliesRow(current) : null}");
+    expect(connect).toContain("repliesRow(done.account)");
   });
 
   test("Claude's sign-in asks for no address: Claude's page picks the account, an account already there is offered", async () => {
@@ -109,7 +146,5 @@ describe("the agent's AI", () => {
     // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
-    // "Só responde a você" said once: under the sign-in only when the cards (whose note says it) aren't there.
-    expect(connect).toMatch(/note=\{\s*!coding && !ownable \?/);
   });
 });

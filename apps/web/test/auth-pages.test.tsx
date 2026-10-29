@@ -1436,13 +1436,19 @@ describe("Onboarding", () => {
     const own = within(panel).getByRole("button", { name: "A conta que os seus agentes dividem" });
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    // Who they reply to: off, each only the person. Switched on here, the save says everyone (ADR 0059 §5).
+    const replies = within(panel).getByRole("switch", { name: "Respondem a todos" });
+    expect(replies.getAttribute("aria-checked")).toBe("false");
+    await click(replies);
+    expect(replies.getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
     await settle(4);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
-      { brain: "claude_code", fallback: true },
-      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
     ]);
 
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();

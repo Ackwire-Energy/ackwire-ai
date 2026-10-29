@@ -83,7 +83,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { CLOUD, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
-import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
+import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -638,11 +638,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
-  // "Só responde a você" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they say otherwise.
+  // "Responde a todos" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
-  const [asking, setAsking] = useState(false);
   const offId = useId();
-  const shareId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -747,7 +745,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           fallback,
           ...(effortChanged ? { effort: effortToSave } : {}),
           ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
-          ...(shareChanged ? { onlyOwner, ...(onlyOwner ? {} : { acceptPlanTerms: true }) } : {}),
+          ...(shareChanged ? { onlyOwner } : {}),
         });
       }
       refresh();
@@ -755,8 +753,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
-      // On the API it answers its stored audience: `view.onlyOwner` is the gate's, which a personal plan narrows.
-      if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
+      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
           label: agent.audience?.userIds?.length
@@ -945,9 +942,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
     </BrainField>
   );
-  const shareLabel = view.canUsePlans
-    ? t("aiAccounts.share.switch")
-    : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" });
   const also = typeof adding === "object" ? adding : undefined;
   const planRows = (
     <>
@@ -985,49 +979,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
       {accountField}
       {agent.ownerUserId &&
-        (edition === "cloud" ? (
-          // Where the server provisions the computers a plan is personal: nobody lets more people in (ADR 0059 §5).
-          <div className="agp-brainshare">
-            <span className="agp-brainoff ac-hintline">
-              <b>{shareLabel}</b>
-              <InfoHint name={t("common.about", { label: shareLabel })}>{t("aiAccounts.share.fixedHint")}</InfoHint>
-            </span>
-          </div>
+        accountKind &&
+        (view.canUsePlans ? (
+          <PlanReplies
+            on={!onlyOwner}
+            onChange={(on) => setShare({ kind, onlyOwner: !on })}
+            brain={accountKind}
+            plan={current?.plan}
+            maker={plan?.maker}
+          />
         ) : (
-          <div className="agp-brainshare">
-            <SwitchLabel
-              htmlFor={shareId}
-              label={shareLabel}
-              hint={
-                view.canUsePlans
-                  ? t("aiAccounts.share.hint", g)
-                  : t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })
-              }
-            />
-            <Switch
-              id={shareId}
-              aria-describedby={`${shareId}-hint`}
-              checked={onlyOwner}
-              // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
-              disabled={!view.canUsePlans && onlyOwner}
-              onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
-            />
-          </div>
+          <PlanRepliesOf on={!onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
         ))}
-      {asking && accountKind && (
-        <SharePlanDialog
-          agentName={agent.name}
-          brain={accountKind}
-          plan={current?.plan ?? null}
-          {...(plan ? { maker: plan.maker } : {})}
-          everyone
-          onAccept={() => {
-            setShare({ kind: accountKind, onlyOwner: false });
-            setAsking(false);
-          }}
-          onKeep={() => setAsking(false)}
-        />
-      )}
       {apiKey && (
         <div className="ac-optcard__foot">
           <SwitchLabel

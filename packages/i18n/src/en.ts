@@ -1065,9 +1065,7 @@ export const en: Translations = {
     own: {
       shared: "The account your agents share",
       one: "An account just for {{name}}",
-      note: "They only reply to you while they think with your plan.",
     },
-    onlyYou: "{{name}} will only reply to you.",
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
       text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin\u00a0does\u00a0it.",
@@ -1082,11 +1080,6 @@ export const en: Translations = {
     for: "For",
     all: "All agents",
     agentAria: "Agents that use this plan",
-    foot: {
-      one: "On your plan, {{name}} only replies to you.",
-      all: "On your plan, your agents only reply to you.",
-      signIn: "The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
-    },
     each: "One sign-in per agent, with the same account.",
     eachHint: "Each agent keeps its own sign-in. They all share your plan's limits.",
     signInFor: "Sign in for {{name}}",
@@ -1881,10 +1874,6 @@ export const en: Translations = {
           },
           stepOneHint:
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
-          stepOneTip: {
-            claude_code: "Wrong account? Sign out on Claude's page and try again.",
-            codex: "Wrong account? Sign out on ChatGPT's page and try again.",
-          },
           open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT" },
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
@@ -2596,7 +2585,7 @@ export const en: Translations = {
   },
   members: {
     agentsOnlyYou: "Your agents only reply to you.",
-    agentsOnlyYouHint: "A plan is personal. Agents that use the API key reply to everyone.",
+    agentsOnlyYouHint: "On a plan, you can let each one reply to everyone on its page.",
     filters: "Filter people",
     roleFilter: "Role",
     rolesCount_one: "{{count}} role",
@@ -4503,29 +4492,18 @@ export const en: Translations = {
   },
   aiAccounts: {
     share: {
-      switch: "Only replies to you",
+      switch: "Replies to everyone",
+      switchAll: "Reply to everyone",
       switchOther: "Only replies to {{name}}",
-      hint: "Others see that {{name}} only replies to you. Without it, {{name}} replies to other people too, on your plan.",
       onOther: "{{She}} uses {{owner}}'s plan: only {{owner}} can let other people talk to {{pronoun}}.",
-      title: "Now {{name}} replies to everyone",
-      titlePeople: "Now {{name}} replies to other people",
-      body: {
-        claude_code:
-          "Claude's terms say your plan is for your own use. Using it to reply to other people might go against them. If you continue, the risk is yours.",
-        codex:
-          "OpenAI says ChatGPT plans are meant for personal use. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
-        seat: {
-          claude_code:
-            "Claude's terms say each seat is for one person. Using yours to reply to other people might go against them. If you continue, the risk is yours.",
-          codex:
-            "OpenAI's terms say each seat is for one person. Using yours to reply to other people might go against them. If you continue, the risk is yours.",
-        },
+      terms: {
+        line: "A gray area in {{provider}}'s terms",
+        linePlan: "A gray area in the plan's terms",
+        own: "{{provider}}'s terms say your plan is for your own use. Using it to reply to other people might go against them.",
+        seat: "{{provider}}'s terms say each seat is for one person. Using yours to reply to other people might go against them.",
         other:
-          "{{maker}} says the plan is for its subscriber only. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+          "{{maker}} says the plan is for its subscriber only. Using yours to reply to other people might go against its terms.",
       },
-      accept: "Reply to everyone",
-      acceptPeople: "Continue",
-      keep: "Keep {{pronoun}} just for me",
       savedEveryone: "Now {{name}} replies to everyone.",
       savedOwner: "{{name}} now only replies to you.",
       backOnApi: "{{name}} is back on the API and still only replies to you.",
@@ -4533,14 +4511,10 @@ export const en: Translations = {
       letPeople: "Let them talk to {{pronoun}} again",
       ownerOnly: "{{name}} thinks with {{owner}}'s plan: only {{owner}} can let more people talk to {{pronoun}}.",
       hereNotYours: "Only for agents of whoever connected {{computer}}",
-      fixedHint:
-        "A plan is personal, so it only answers its owner. Others can use their own plan or the workspace's API key.",
     },
     errors: {
       planOwnerOnly:
         "Only the person responsible for {{agentName}} can let more people in: their plan is the one that answers.",
-      planTermsRequired: "Confirm the personal-plan warning before letting more people in.",
-      planPersonal: "A plan is personal. On this workspace only its owner talks to agents that use it.",
     },
     add: {
       paste: "Paste",

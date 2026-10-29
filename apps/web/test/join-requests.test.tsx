@@ -576,7 +576,7 @@ describe("Members › Invite people", () => {
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
     expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+      "Num plano, você pode deixar cada um responder a todos na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");

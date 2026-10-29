@@ -1,6 +1,7 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
 import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import {
   computerEdition,
   computerName,
@@ -26,14 +27,13 @@ import {
   planMark,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId } from "@agenteschat/client/lib/plans";
+import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { keyLooksValid, keyStepHint, PROVIDERS, type ProviderId, providerOf } from "@agenteschat/client/lib/providers";
 import {
   type AgentAppearance,
   AvatarStack,
   Button,
   Card,
-  CardFooter,
   Icon,
   InfoHint,
   Input,
@@ -52,8 +52,10 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { KeyMismatch } from "@/components/ProviderKey";
 import { managedOf, SetupProgress, useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AddAccount, OpenPage, Step, StepTitle } from "./AddAccountFlow";
+import { PlanReplies } from "./PlanReplies";
 
 /*
  * One picker wherever an AI is connected (the setup's AI step, Connect an AI, Settings › AI accounts): the six
@@ -204,6 +206,8 @@ export interface PlanPanelProps {
    * `SetupProgress`'s `said`.
    */
   said?: boolean;
+  /** "Responde a todos" kept by the caller, which saves the computer's own sign-in for every agent itself (the setup). */
+  replies?: { on: boolean; onChange: (on: boolean) => void };
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -297,6 +301,7 @@ function PlanSteps({
   hostConnecting,
   justReady,
   said = false,
+  replies,
   onKey,
   onComputer,
   onDone,
@@ -330,6 +335,19 @@ function PlanSteps({
   const [missed, setMissed] = useState<string[]>([]);
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
+  const dir = useDirectory(org.id);
+  // "Responde a todos" (ADR 0059 §5) for whom the panel is: an agent already on this brain shows its own and changes
+  // it at once, one moved onto it starts on its owner alone unless this is on (the move says so).
+  const onBrain = (id: string) => ownSaved || id in assigned || dir.agentById.get(id)?.brain?.kind === kind;
+  const repliesNow = (id: string) => {
+    const row = dir.agentById.get(id);
+    return row !== undefined && answersOthers(audienceOf(row), row.ownerUserId);
+  };
+  const [ownReplies, setOwnReplies] = useState(() => forWhom.every((a) => onBrain(a.id) && repliesNow(a.id)));
+  const replyAll = replies?.on ?? ownReplies;
+  const setReplies = replies?.onChange ?? setOwnReplies;
+  const [replying, setReplying] = useState(false);
+  const toEveryone = replyAll ? { onlyOwner: false } : {};
   // It turns ready while the person watches, or they came because it did: said in place, and again on a way back.
   const waited = gates.waited || justReady === true;
   const { markWaited } = gates;
@@ -357,7 +375,7 @@ function PlanSteps({
     setFailed(null);
     setSaving((n) => n + 1);
     try {
-      await api.agents.setBrain(org.id, agentId, { brain: a.kind, account: a.id });
+      await api.agents.setBrain(org.id, agentId, { brain: a.kind, account: a.id, ...toEveryone });
       setAssigned((x) => ({ ...x, [agentId]: a }));
       refresh([agentId]);
     } catch {
@@ -368,7 +386,7 @@ function PlanSteps({
   };
   const saveOwn = async () => {
     try {
-      for (const a of todo) await api.agents.setBrain(org.id, a.id, { brain: kind, account: null });
+      for (const a of todo) await api.agents.setBrain(org.id, a.id, { brain: kind, account: null, ...toEveryone });
       setOwnSaved(true);
       refresh(todo.map((a) => a.id));
       onDone(
@@ -391,23 +409,41 @@ function PlanSteps({
     );
   }, [allDone, todo, account, onDone]);
 
+  const replyToEveryone = async (on: boolean) => {
+    setReplies(on);
+    const now = forWhom.filter((a) => onBrain(a.id)).map((a) => a.id);
+    if (now.length === 0) return;
+    setReplying(true);
+    try {
+      for (const id of now) await api.agents.setBrain(org.id, id, { onlyOwner: !on });
+      refresh(now);
+    } catch {
+      setReplies(!on);
+      toast.show(t("agentPage.work.failed"), "error");
+    } finally {
+      setReplying(false);
+    }
+  };
+
   const ready = gate.state === "ready";
   const brand = planLabel(t, choice);
-  const footText =
-    everyone || everyAgent ? t("connectAi.foot.all") : t("connectAi.foot.one", agentGrammar(t, agent.name));
-  // Who the agents answer, once for the plan; where the account (or the key) stays, behind its ⓘ.
+  const current = view?.accounts.find(
+    (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
+  );
+  // Who the agents reply to, once for the plan, as its foot: its icon says it, its switch changes it.
   const foot = (
-    <CardFooter icon="audienceOwner">
-      {footText}
-      {computer && (
-        <>
-          {" "}
-          <InfoHint name={t("common.about", { label: footText })}>
-            {coding ? t("aiAccounts.add.keySafe", { computer }) : t("connectAi.foot.signIn", { computer, brand })}
-          </InfoHint>
-        </>
-      )}
-    </CardFooter>
+    <div className="ac-card__foot ac-iconline ai-panel__replies">
+      <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
+      <PlanReplies
+        all={everyone || everyAgent}
+        on={replyAll}
+        onChange={(on) => void replyToEveryone(on)}
+        brain={kind}
+        plan={account?.plan ?? current?.plan ?? (own?.chosen || ownSaved ? gates.row?.own?.[kind]?.plan : null)}
+        maker={planOf(choice)?.maker}
+        disabled={replying}
+      />
+    </div>
   );
 
   if (gates.failed) return <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>;
@@ -590,9 +626,6 @@ function PlanSteps({
   // The shared sign-in's plan, where the computer says it ("Claude Max").
   const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
   const otherChosen = own ? !own.chosen : other;
-  const current = view?.accounts.find(
-    (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
-  );
   const signedOut = !everyone && current?.status === "signed_out" ? current : undefined;
   // One sign-in per agent, in turn: the agent signing in now, and the account the first one signed in as.
   const turn = everyone && !coding ? todo.find((a) => !assigned[a.id]) : undefined;
@@ -675,7 +708,6 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          privacy={false}
           {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
           {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
           onSent={() => {

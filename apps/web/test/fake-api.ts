@@ -1113,8 +1113,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             ...rest,
             ...(seesCost() ? { monthlyBudgetUsd } : {}),
             budgetUsedPercent: percentOf(a),
-            // As stored, which `audience` (the gate) may narrow: on the Cloud a plan answers only its owner.
-            audienceMode: a.audienceMode ?? mode,
+            audienceMode: mode,
             canTalk,
           };
         }),
@@ -1140,8 +1139,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
-        const { acceptPlanTerms: _, ...fields } = input;
-        Object.assign(agent, fields);
+        Object.assign(agent, input);
         return { ...agent };
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
@@ -1276,12 +1274,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const b = brainOf(agentId);
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
-        // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's, with the terms.
+        // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
         const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
-        if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner)) {
-          if (!b.canUsePlans) throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
-          if (!input.acceptPlanTerms) throw new ApiError(400, "audience.plan_terms_required", "Confirm the warning");
-        }
+        if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
+          throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
         const option = b.options.find((o) => o.kind === brain);
         const next: AgentBrain = {

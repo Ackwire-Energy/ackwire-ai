@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type {
+  Agent,
   AgentBrain,
   AgentBrainLine,
   AiComputer,
@@ -85,6 +86,7 @@ async function connect({
   crew = false,
   path = `/org/${ORG_ID}/settings/keys`,
   role,
+  ada: adaRow,
 }: {
   computers?: AiComputer[];
   setup?: Partial<ComputerSetup>;
@@ -98,6 +100,8 @@ async function connect({
   path?: string;
   /** Walter's role in the workspace, when he isn't its owner. */
   role?: "admin" | "member";
+  /** Over Ada's row (what she thinks with, whom she replies to). */
+  ada?: Partial<Agent>;
 } = {}) {
   const state = seedState();
   const workspace = state.me?.organizations[0];
@@ -109,6 +113,7 @@ async function connect({
     state.aiStatus = { any: false, agents: mine.map((agentId) => ({ agentId, state: "no_ai", reason: "no_key" })) };
   }
   for (const a of state.agents) if (mine.includes(a.id)) a.ownerUserId = "u-walter";
+  if (ada && adaRow) Object.assign(ada, adaRow);
   const api = createFakeApi(state);
   const machines = fakeMachinesOf.get(api);
   if (setup) machines?.setSetup(setup);
@@ -217,21 +222,23 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     // The sign-in step is its title, its ⓘ and its button: the title names the account, the button the sign-in,
-    // and the ⓘ says what to do on the wrong account. Its one step takes no number.
+    // and the ⓘ says what to do on the wrong account and where the account stays. Its one step takes no number.
     expect(hintOf("A conta com o seu plano", panel)).toMatchObject({
-      text: "Conta errada? Saia na página do Claude e tente de novo.",
+      text: "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
       hidden: true,
     });
     expect(panel.querySelector(".agp-addacct__step")?.classList.contains("ac-iconline")).toBe(false);
     expect(panel.querySelector(".agp-addacct__step > i")).toBeNull();
     expect(shownText(panel)).not.toMatch(/Abre a página|nunca vê a senha|senha vai só/);
-    // Who the agent answers, once, in the panel's foot (no lock note above it), and where the account stays in its ⓘ.
+    // Who the agent replies to, once, as the panel's foot: "Responde a todos", off, with Claude's terms a gray area in a
+    // line and their words behind its ⓘ (no lock note above it).
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
     expect(panel.lastElementChild).toBe(foot);
     expect(foot.firstElementChild?.getAttribute("data-icon") ?? foot.querySelector("svg")).toBeTruthy();
-    expect(shownText(foot)).toBe("Com o seu plano, a Ada só responde a você. ");
-    expect(hintOf("Com o seu plano, a Ada só responde a você.", foot).text).toBe(
-      "A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0Claude.",
+    expect(shownText(foot)).toBe("Responde a todosZona cinzenta nos termos do Claude");
+    expect(within(foot).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
+    expect(hintOf("Zona cinzenta nos termos do Claude", foot).text).toBe(
+      "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
     );
     expect(panel.classList.contains("ai-panel--plan")).toBe(true);
     expect(panel.querySelectorAll(".ac-setnote")).toHaveLength(0);
@@ -287,14 +294,17 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(hintOf("Crie a chave do seu plano", panel).text).toBe(
       "Num plano de equipe, use a chave da página Team\u00a0Plan.",
     );
-    // Where the key goes is the foot's ⓘ, said once for the panel: the paste step has none.
-    expect(within(panel).queryByRole("button", { name: "Sobre Cole a chave aqui" })).toBeNull();
+    const safe = hintOf("Cole a chave aqui", panel);
+    expect(safe.text).toBe("A chave vai criptografada para o MacBook e\u00a0fica\u00a0só\u00a0lá.");
+    // The foot's terms are the plan's maker's.
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
-    expect(hintOf("Com o seu plano, a Ada só responde a você.", foot).text).toBe(
-      "A chave vai criptografada para o MacBook e\u00a0fica\u00a0só\u00a0lá.",
+    expect(hintOf("Zona cinzenta nos termos do plano", foot).text).toBe(
+      "Z.ai diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
     );
-    expect(shownText(panel)).not.toMatch(/Fica em|Num plano de equipe|criptografada/);
-    expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("aria-describedby")).toBe(false);
+    expect(shownText(panel)).not.toMatch(/Fica em|Num plano de equipe|criptografada|só de quem assina/);
+    expect(within(panel).getByLabelText("Chave do GLM Coding").getAttribute("aria-describedby")).toBe(
+      safe.button.getAttribute("aria-describedby"),
+    );
     // Z.ai publishes no prefix for its keys: no example in the field, never a bare "…". Its buttons are the field's
     // height (the ruler's default step).
     expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("placeholder")).toBe(false);
@@ -348,7 +358,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     );
     expect(within(panel).queryByRole("button", { name: "Sobre Permita o login com código no ChatGPT" })).toBeNull();
     expect(hintOf("A conta com o seu plano", panel).text).toBe(
-      "Conta errada? Saia na página do ChatGPT e tente de novo.",
+      "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. Você digita a senha na\u00a0página\u00a0do\u00a0ChatGPT.",
     );
     const { opened, popup } = await withPopup(() =>
       click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })),
@@ -504,14 +514,14 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Small columns, so the two cards sit side by side on the panel's text column in the setup too.
     expect(own.parentElement?.className).toBe("grid-options grid-options--sm");
     // Who it replies to is the foot's, once, either way.
-    expect(shownText(dialog).split("Com o seu plano, a Ada só responde a você.")).toHaveLength(2);
+    expect(within(dialog).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
     // One just for Ada: its title alone; then the sign-in, which asks for no address: Claude's own page does.
     const one = within(dialog).getByRole("button", { name: "Uma conta só para a Ada" });
     expect(one.textContent).toBe("Uma conta só para a Ada");
     await click(one);
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    expect(shownText(dialog).split("Com o seu plano, a Ada só responde a você.")).toHaveLength(2);
+    expect(within(dialog).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
     expect(panel.querySelector("input")).toBeNull();
     expect(within(panel).queryByRole("textbox")).toBeNull();
     expect(shownText(panel)).not.toMatch(/Qual conta|Email da conta|opcional/);
@@ -532,7 +542,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const panel = () => within(dialog).getByRole("region", { name: /^Seu plano do/ });
     expect(within(dialog).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(panel()).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    expect(shownText(panel()).split("Com o seu plano, a Ada só responde a você.")).toHaveLength(2);
+    expect(within(panel()).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
     // ChatGPT's own sign-in isn't reported: its cards stay.
     await click(tile("ChatGPT"));
     expect(within(panel()).getByRole("button", { name: "A conta que os seus agentes dividem" })).toBeTruthy();
@@ -882,6 +892,54 @@ describe("Conectar uma IA: one picker, plans first", () => {
   });
 });
 
+describe("Responde a todos, in the plan's panel", () => {
+  const replies = (inside: HTMLElement, name = "Responde a todos") => within(inside).getByRole("switch", { name });
+
+  test("off by default; on before the sign-in, the move carries it; after, it changes at once", async () => {
+    const { state, machines, dialog, tile } = await connect();
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(replies(panel).getAttribute("aria-checked")).toBe("false");
+    expect(hintOf("Zona cinzenta nos termos do ChatGPT", panel).text).toContain("Os termos do ChatGPT dizem");
+    // Nothing thinks with the plan yet: nothing to save.
+    await click(replies(panel));
+    expect(replies(panel).getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
+    machines?.endLogin("login_1", {
+      state: "done",
+      account: account({ id: "acct_plus", kind: "codex", label: "ChatGPT Plus", provider: null, keyHint: null }),
+    });
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(8);
+    expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
+      [ORG_ID, ADA_ID, { brain: "codex", account: "acct_plus", onlyOwner: false }],
+    ]);
+    expect(dialog.textContent).toContain("Ada agora pensa com ChatGPT Plus.");
+    // Ada thinks with it now: off saves at once, with nothing asked.
+    await click(replies(panel));
+    expect(calls(state, "agents.setBrain").at(-1)?.args).toEqual([ORG_ID, ADA_ID, { onlyOwner: true }]);
+    expect(replies(panel).getAttribute("aria-checked")).toBe("false");
+    expect(screen().getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  test("an agent already on the plan's brain shows its own, and the account their agents share keeps it", async () => {
+    const { state, dialog } = await connect({
+      brain: { ownSignIn: true },
+      computers: [{ ...MAC, own: { claude_code: { plan: "max" } } }],
+      ada: { brain: { kind: "claude_code", model: "Sonnet" }, audience: { mode: "everyone", userIds: [] } },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(replies(panel).getAttribute("aria-checked")).toBe("true");
+    await click(within(panel).getByRole("button", { name: /^A conta que os seus agentes dividem/ }));
+    await settle(4);
+    expect(calls(state, "agents.setBrain")[0]?.args).toEqual([
+      ORG_ID,
+      ADA_ID,
+      { brain: "claude_code", account: null, onlyOwner: false },
+    ]);
+  });
+});
+
 describe("All agents: one plan for the team, a login per agent", () => {
   test("the head: the name's capitals at the mark's top, For with All agents first where the plan allows it", async () => {
     const { dialog, tile } = await connect({ crew: true });
@@ -908,8 +966,8 @@ describe("All agents: one plan for the team, a login per agent", () => {
     expect(options.map((o) => o.textContent)).toEqual(["Todos os agentesAda, Atlas e Lia", "Ada", "Atlas", "Lia"]);
     expect(options[0]?.querySelectorAll(".ac-avatar-stack > .ac-avatar")).toHaveLength(3);
     expect(options[1]?.querySelectorAll(".ac-avatar")).toHaveLength(1);
-    // Who it's for, and who it answers, once.
-    expect(shownText(panel)).toContain("Com o seu plano, os seus agentes só respondem a você.");
+    // Who it's for, and who they reply to, once (the list's still open, so the rest is hidden from the tree).
+    expect(within(panel).getAllByRole("switch", { name: "Respondem a todos", hidden: true })).toHaveLength(1);
   });
 
   test("an agent on the API key stays out of All agents: a plan would make it answer only its owner", async () => {

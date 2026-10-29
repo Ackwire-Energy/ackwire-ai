@@ -341,8 +341,6 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
-  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
-  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -3502,7 +3500,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3591,10 +3589,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  /** "Responde a todos" turned off: false lets everyone talk to it (on the API, whoever did before a plan). */
   onlyOwner?: boolean;
-  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
-  acceptPlanTerms?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
   /** The account thinks for another agent: take it from that one. */
