@@ -15,7 +15,6 @@ import {
   withConnectedMachine,
   withSandbox,
 } from "./sandbox";
-import { SECRET_HELPER_DIR, SECRET_HELPER_PATH, SECRET_HELPER_SOURCE } from "./secret-helper";
 import type { ToolContext } from "./tools/types";
 
 const { secretRequests, agentRuns } = schema;
@@ -41,7 +40,7 @@ export interface SecretRequestView {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site: string | null;
-  /** null = the agent's cloud computer. */
+  /** The connected machine that holds it (ADR 0025). */
   machineId: string | null;
   /** Only useful while pending: the browser seals the value to it. */
   publicKey: string | null;
@@ -138,82 +137,16 @@ const resumeJob = (row: SecretRequestRow) => ({
   maxAttempts: 4,
 });
 
-const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-
-/**
- * One secret action on the computer: a connected machine does it itself
- * (runner protocol 3); a cloud computer runs the helper we install there
- * (written each time: cheap, and a recreated computer gets it back).
- */
+/** One secret action on the computer: the runner keeps the key and the value (runner protocol 3, ADR 0027). */
 export async function secretOnComputer(
   computer: ComputerHandle,
   request: SecretRequest,
 ): Promise<{ publicKey?: string; size?: number }> {
-  if (computer.provider.secret) return computer.provider.secret(computer.id, request);
-  const arg =
-    request.action === "keypair" || request.action === "discard"
-      ? request.requestId
-      : request.action === "remove"
-        ? request.name
-        : Buffer.from(
-            JSON.stringify({
-              requestId: request.requestId,
-              name: request.name,
-              target: request.target,
-              aad: request.aad,
-              box: request.box,
-            }),
-          ).toString("base64");
-  const helper = Buffer.from(SECRET_HELPER_SOURCE).toString("base64");
-  const command = [
-    `d="${SECRET_HELPER_DIR}"`,
-    `mkdir -p "$d" && chmod 700 "$d"`,
-    `echo ${helper} | base64 -d > "${SECRET_HELPER_PATH}"`,
-    `node "${SECRET_HELPER_PATH}" ${request.action} ${quote(arg)}`,
-  ].join(" && ");
-  const r = await computer.provider.exec(computer.id, { command, timeoutSeconds: 60 });
-  const last = r.stdout.trim().split("\n").at(-1) ?? "";
-  let reply: { error?: string; publicKey?: string; size?: number } | null = null;
-  try {
-    reply = JSON.parse(last);
-  } catch {
-    reply = null;
-  }
-  if (!reply) throw new Error(`The computer's secrets helper failed: ${(r.stderr || r.stdout).trim().slice(0, 500)}`);
-  if (reply.error) throw new Error(reply.error);
-  return reply;
-}
-
-/**
- * The command a cloud computer runs when the agent has secrets there: our
- * helper starts it with the env secrets and redacts their values from the
- * output. Without the helper (a recreated computer) the command runs as is.
- */
-export function withSecretsCommand(command: string) {
-  const encoded = Buffer.from(command).toString("base64");
-  return `if [ -f "${SECRET_HELPER_PATH}" ]; then node "${SECRET_HELPER_PATH}" run ${encoded}; else ${command}\nfi`;
-}
-
-/** Whether the agent has delivered secrets on its cloud computer (then commands go through the helper). */
-export async function hasCloudSecrets(db: Database, orgId: string, agentId: string) {
-  const [row] = await db
-    .select({ id: secretRequests.id })
-    .from(secretRequests)
-    .where(
-      and(
-        eq(secretRequests.orgId, orgId),
-        eq(secretRequests.agentId, agentId),
-        eq(secretRequests.status, "delivered"),
-        isNull(secretRequests.removedAt),
-        isNull(secretRequests.machineId),
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
+  return computer.provider.secret(computer.id, request);
 }
 
 /** Files on the agent's computers that hold secrets: the file tools refuse them. */
-export async function secretFilePaths(db: Database, orgId: string, agentId: string, machineId: string | null) {
+export async function secretFilePaths(db: Database, orgId: string, agentId: string, machineId: string) {
   const rows = await db
     .select({ path: secretRequests.targetPath })
     .from(secretRequests)
@@ -224,7 +157,7 @@ export async function secretFilePaths(db: Database, orgId: string, agentId: stri
         eq(secretRequests.status, "delivered"),
         eq(secretRequests.targetKind, "file"),
         isNull(secretRequests.removedAt),
-        machineId ? eq(secretRequests.machineId, machineId) : isNull(secretRequests.machineId),
+        eq(secretRequests.machineId, machineId),
       ),
     );
   return rows.flatMap((r) => (r.path ? [r.path] : []));
@@ -266,8 +199,8 @@ async function onRequestComputer<T>(
       fn,
     );
   }
-  return withSandbox(deps, ctx, 60, async (computer) => {
-    if ((computer.machineId ?? null) !== row.machineId) {
+  return withSandbox(deps, ctx, async (computer) => {
+    if (computer.machineId !== row.machineId) {
       throw new ConflictError("The agent changed computers since it asked. Ask it again.", "secret.computer_changed");
     }
     return fn(computer);

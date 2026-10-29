@@ -10,7 +10,6 @@
  *   mac      an aluminum laptop with the screen notch; the screen shows our sky with a pixel agent
  *   windows  a light monitor on a stand; a window and a taskbar over the sky
  *   linux    a server tower: drive bays, vents, a green light (most Linux machines are servers)
- *   cloud    the cloud computer we start for the agents: a pixel cloud with a screen set in it, floating
  * The screen goes dark when the computer is offline and dims when it's paused.
  * Drawn on a 48×48 grid (one canvas pixel per cell), scaled by whole numbers so
  * every pixel stays crisp.
@@ -18,18 +17,18 @@
 
 /** The grid's side, in cells. */
 export const COMPUTER_GRID = 48;
-export const COMPUTER_KINDS = ["mac", "windows", "linux", "cloud"];
+export const COMPUTER_KINDS = ["mac", "windows", "linux"];
 export const COMPUTER_STATES = ["online", "paused", "offline"];
 /**
  * The columns each drawing covers, shadow included, in every state and frame: [first, count]. A portrait's box
  * is this wide, so its pixels meet the row's edge like any other lead (the tower is half the grid's width).
  */
-export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25], cloud: [7, 38] };
+export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25] };
 /**
  * The rows each drawing covers, in every state and frame: [first, count]. The box keeps the whole grid's height, so
  * a row that starts text at a picture's top (`.ac-faceline`) starts it at the drawing's first row instead.
  */
-export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42], cloud: [8, 36] };
+export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42] };
 
 const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
@@ -196,41 +195,6 @@ const DRAW = {
     p.box(22, 38, 3, 2, ALU[3]);
     p.set(23, 38, ALU[5]);
     p.set(27, 39, light(state));
-  },
-  /* The cloud: a union of circles over a flat bottom, shaded light at the top, outlined, floating. */
-  cloud(p, state, dark, t) {
-    const bob = state === "online" ? Math.round(Math.sin(t * 1.4)) : 0;
-    shadow(p, 24, 42, state === "online" && bob < 0 ? 11 : 13, dark);
-    const blobs = [
-      [13, 28, 6.5],
-      [21, 21, 8],
-      [30, 18, 9],
-      [38, 26, 6.5],
-      [25, 25, 8],
-    ];
-    const inside = (x, y) =>
-      (y <= 35 && y >= 9 && x >= 7 && x <= 42 && (y >= 27 ? y <= 34 && x >= 9 && x <= 40 : false)) ||
-      blobs.some(([cx, cy, r]) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r);
-    for (let y = 6; y < 38; y++)
-      for (let x = 4; x < 46; x++) {
-        if (!inside(x, y)) continue;
-        const edge = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
-        if (edge) {
-          p.set(x, y + bob, y > 30 ? ALU[5] : ALU[4]);
-          continue;
-        }
-        const v = (y - 9) / 26;
-        const k = Math.min(1, 0.02 + 0.55 * v * v) * (ALU.length - 2);
-        const lo = Math.floor(k);
-        p.set(x, y + bob, ALU[Math.min(ALU.length - 2, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))]);
-      }
-    // A screen set in the cloud: graphite bezel, our sky, the agent.
-    p.box(17, 19 + bob, 15, 10, GRAPHITE[2]);
-    p.clear([17, 19 + bob], [31, 19 + bob], [17, 28 + bob], [31, 28 + bob]);
-    screen(p, 18, 20 + bob, 13, 8, state, t);
-    if (state !== "offline") agent(p, 22, 22 + bob, state, t);
-    // The status light, low on the right.
-    p.set(36, 31 + bob, light(state));
   },
 };
 

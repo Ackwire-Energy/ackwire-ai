@@ -160,8 +160,6 @@ const SELFHOST_EXTRA = [
   "computers.hostMissing",
   ...["title", "text", "emptyTitle"].map((k) => `computers.other.${k}`),
   "computers.how",
-  "computers.daytona.cardTitle",
-  "computers.cloud.note",
   "computers.agents.title",
   "machines.host.label",
   "machines.host.desc",
@@ -171,12 +169,7 @@ const SELFHOST_EXTRA = [
   "machines.pausedHint",
   "outage.switch",
   "outage.title",
-  "outage.dialog.cloud",
-  "outage.dialog.cloudText",
   "computer.target.none",
-  "computer.target.daytona",
-  "computer.target.daytonaText",
-  "computer.emptyText",
   "computer.machineOffline",
   "desktop.use.title",
   "agentPage.work.offline",
@@ -184,12 +177,8 @@ const SELFHOST_EXTRA = [
   "agentPage.work.computer.offline",
   "agentPage.work.computer.alsoOffline",
   "agentPage.work.computer.connect",
-  "agentPage.work.cell.daytona",
-  "agentPage.work.saved.daytona",
   "agentPage.work.saved.none",
-  "agentPage.work.computer.useDaytona",
-  "agentPage.computer.ownerPicks",
-  ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
+  ...["mine", "mineDesc"].map((k) => `onboarding.computer.${k}`),
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
@@ -356,6 +345,5 @@ describe("computer copy", () => {
       expect(bannedIn(s, [...CLOUD_BANNED.en, ...CLOUD_BANNED["pt-BR"]])).toEqual([]);
     }
     expect(bannedIn("Cloud computer", SELFHOST_BANNED)).toEqual(["cloud computer"]);
-    expect(bannedIn("Sandbox da Daytona", SELFHOST_BANNED)).toEqual([]);
   });
 });

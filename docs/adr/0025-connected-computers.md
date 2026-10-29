@@ -1,6 +1,6 @@
 # 0025. Connected computers, provider-agnostic computers, and binary files in the Drive
 
-- Status: Accepted
+- Status: Accepted. Superseded in part by ADR 0077 (2026-10-28): §1's lifecycle half of `SandboxProvider`, §2's server-side upload fallback and, in §6, a null `agents.machine_id` as the cloud computer (now no computer), the `cloud` target, the organization's network mode and the tools only with Daytona
 - Date: 2026-10-15
 
 ## Context

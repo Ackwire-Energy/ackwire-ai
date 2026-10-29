@@ -211,8 +211,8 @@ export const artifactVersions = pgTable(
 
 /**
  * A one-time upload of a file from an agent's computer to the Drive
- * (`upload_file`, ADR 0025): pending until the bytes arrive (pushed by the
- * machine, or read by the server), then `done` with the artifact and
+ * (`upload_file`, ADR 0025): pending until the machine pushes the bytes
+ * (`PUT /api/machines/uploads/{id}`), then `done` with the artifact and
  * version it became. Expires after 10 minutes.
  */
 export const artifactUploads = pgTable(
@@ -229,9 +229,9 @@ export const artifactUploads = pgTable(
     /** The run's channel and thread: completion acts as the agent there. */
     channelId: uuid().notNull(),
     threadId: uuid(),
-    /** `daytona:<sandbox row id>` or `machine:<machine id>`. */
+    /** `machine:<machine id>`. */
     computer: text().notNull(),
-    /** Connected machines: only this machine may complete it. */
+    /** Only this machine may complete it. */
     machineId: uuid(),
     /** Workspace-relative path on the computer. */
     path: text().notNull(),

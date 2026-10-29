@@ -233,7 +233,7 @@ function TargetRow({
         !x.enabled && styles.off,
       ]}
     >
-      <Tile icon={computerIcon(x.platform, x.kind === "cloud")} size={36} />
+      <Tile icon={computerIcon(x.platform)} size={36} />
       <View style={styles.grow}>
         <View style={styles.titleLine}>
           <Text variant="body" tone="ink" numberOfLines={1} style={styles.shrink}>
@@ -244,7 +244,7 @@ function TargetRow({
         {text.desc ? (
           <View style={styles.descLine}>
             {/* Only "Tem o Claude Code e o Codex" names the brains: each gets its maker's mark. */}
-            {x.enabled && x.kind === "machine" ? x.brains.map((b) => <ProviderLogo key={b} id={b} size="xs" />) : null}
+            {x.enabled ? x.brains.map((b) => <ProviderLogo key={b} id={b} size="xs" />) : null}
             <Text variant="small" tone="faint" numberOfLines={2} style={styles.shrink}>
               {text.desc}
             </Text>

@@ -1,6 +1,6 @@
 # 0026. Every agent has a budget; only admins see money
 
-- Status: Accepted
+- Status: Accepted. Superseded in part by ADR 0077 (2026-10-28): the sandbox's budget check before a command (no computer time is metered)
 - Date: 2026-10-16
 - Refines 0012 (budget reservation).
 

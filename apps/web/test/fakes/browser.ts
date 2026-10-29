@@ -1,7 +1,7 @@
 /**
  * Test fake — the agent browser (ADR 0040) and screen (ADR 0058), same shapes as the server's
  * `…/agents/{id}/browser`, `…/agents/{id}/desktop` and `…/browser/handoffs/*` routes. Agents start
- * without a browser or a desktop (their computer is the cloud one); tests put handoffs in
+ * without a browser or a desktop (they have no computer); tests put handoffs in
  * `fake.handoffs`, settings in `fake.settings` and desktops in `fake.desktops`.
  */
 import type { AgentBrowserSettings, ApiClient, BrowserHandoff, DesktopStatus } from "@agenteschat/client";

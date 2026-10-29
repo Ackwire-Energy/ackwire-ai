@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { channelTopic, createFakeSandboxProvider } from "@agenteschat/adapters";
+import { channelTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -9,16 +9,17 @@ import {
   createAgent,
   drainOutbox,
   ForbiddenError,
-  grantScopes,
   listMessages,
   postPersonMessage,
   stopChecksSettled,
   type ToolSource,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { connectedComputer } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
+  await f?.machineHub?.stop();
   const current = f;
   f = undefined as unknown as Fixture;
   await current?.close();
@@ -79,11 +80,8 @@ describe("canceling a run", () => {
   });
 
   test("during a tool call: running code is killed, no further model call, the narration is kept", async () => {
-    const sandbox = createFakeSandboxProvider({
-      exec: () => ({ delayMs: 5000, result: { exitCode: 0, stdout: "fim", stderr: "", timedOut: false } }),
-    });
     f = await setup({
-      sandbox,
+      machines: true,
       reply: (_req: ModelRequest, call: number) =>
         call === 1
           ? {
@@ -92,17 +90,20 @@ describe("canceling a run", () => {
             }
           : { chunks: ["não deveria"] },
     });
-    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
-    await ask("@dev compila");
-    onFirst("agent.tool", (e) => {
-      if (e.tool === "run_code") void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId));
+    // Stopped while the command runs on the computer (it never ends by itself): the runner is told to kill it.
+    const { runner } = await connectedComputer(f, {
+      exec: () => {
+        void runOf().then((r) => cancelRun(deps(), f.owner.id, f.org.id, r?.id ?? ""));
+        return "hang";
+      },
     });
+    await ask("@dev compila");
     const started = Date.now();
     await drainOutbox(f.db, f.handlers);
     expect(Date.now() - started).toBeLessThan(4000);
 
     expect((await runOf())?.status).toBe("canceled");
-    expect(sandbox.calls.some((c) => c.op === "kill")).toBe(true);
+    expect(runner.sent.some((s) => s.type === "cancel")).toBe(true);
     expect(f.provider.calls).toHaveLength(1);
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.body).toBe("Vou compilar.\n\n_Stopped by ana._");

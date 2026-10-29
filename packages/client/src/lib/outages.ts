@@ -65,30 +65,15 @@ export function waitingAgents(data: MachineOutages | undefined): Map<string, str
 export const brainsOf = (agents: Pick<OutageAgent, "brain">[]) => [...new Set(agents.map((a) => a.brain))];
 
 /** Why a target can't take these agents now, or null when it can. */
-export function targetBlock(
-  target: OutageTarget,
-  brains: ComputerBrain[],
-): "offline" | "unavailable" | "noBrain" | "reason" | null {
-  if (target.kind === "cloud") {
-    if (!target.available) return "unavailable";
-    return brains.every((b) => (target.brains ?? []).includes(b)) ? null : "noBrain";
-  }
+export function targetBlock(target: OutageTarget, brains: ComputerBrain[]): "offline" | "noBrain" | "reason" | null {
   if (!target.online || target.reasonOff === "offline") return "offline";
   if (target.reasonOff) return "reason";
   return brains.every((b) => target.brains.includes(b)) ? null : "noBrain";
 }
 
-/** The option value of a target in the picker. */
-export const targetValue = (target: OutageTarget) => (target.kind === "cloud" ? "cloud" : target.machineId);
-
-/**
- * The targets offered for an outage: never the offline computer itself, and the cloud computer only where this
- * server has it and it runs one of the agents' `brains` (today it runs none: a row nobody could pick).
- */
-export const targetsFor = (data: MachineOutages | undefined, machineId: string, brains: ComputerBrain[]) =>
-  (data?.targets ?? []).filter((x) =>
-    x.kind === "cloud" ? x.available && brains.some((b) => (x.brains ?? []).includes(b)) : x.machineId !== machineId,
-  );
+/** The targets offered for an outage: every computer but the offline one itself. */
+export const targetsFor = (data: MachineOutages | undefined, machineId: string) =>
+  (data?.targets ?? []).filter((x) => x.machineId !== machineId);
 
 /** "2 rotinas e 1 conversa esperando"; null when nothing waits. */
 export function waitingText(t: TFunction, waiting: OutageAgent["waiting"]): string | null {

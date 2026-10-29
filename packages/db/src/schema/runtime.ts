@@ -191,7 +191,7 @@ export const agentRunSteps = pgTable(
   (t) => [unique().on(t.runId, t.seq)],
 );
 
-export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary", "sandbox"]);
+export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary"]);
 
 /**
  * One row per model call, written by the Model Gateway only. Same numbers in
@@ -626,7 +626,7 @@ export const secretRequests = pgTable(
     purpose: text().notNull(),
     targetKind: text().notNull().$type<"env" | "file">(),
     targetPath: text(),
-    /** The connected machine holding the key; null = the agent's cloud computer. */
+    /** The connected machine holding the key (ADR 0025). */
     machineId: uuid(),
     /**
      * For a password the agent's browser types (ADR 0040): the only site

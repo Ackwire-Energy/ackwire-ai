@@ -45,7 +45,7 @@ export interface Saved {
   skills?: string[];
   /** Channels it is in that the viewer can pick (no DMs), sorted. */
   channels?: string[];
-  /** `"cloud"` or a machine id. */
+  /** `NO_COMPUTER` or a machine id. */
   machine?: string;
   /** Who thinks (owner and admins only; absent until loaded). */
   brain?: BrainChoice;

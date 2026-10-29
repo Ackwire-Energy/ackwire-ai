@@ -3,16 +3,15 @@ import { getAgentCached } from "../agents";
 import { connectorScope } from "../connectors/catalog";
 import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
 import { publishChannelEvent } from "../events";
+import { computerPreparing } from "../machine-provisioning";
 import { missionOfRun } from "../mission-context";
 import { replyThreadOf } from "../runs";
-import { SANDBOX_SCOPE, type SandboxDeps, truncateOutput, withSandbox } from "../sandbox";
-import { grantedScopeKeys, grantKey } from "../tools/scopes";
+import { NO_COMPUTER_MESSAGE, PREPARING_COMPUTER_MESSAGE, type SandboxDeps } from "../sandbox";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
 import { cloneOnMachine } from "./machine";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
@@ -74,13 +73,9 @@ function progressPublisher(pubsub: PubSub | undefined, c: ToolContext) {
 
 /**
  * Git in the agent's computer (ADR 0024), through our proxy:
- * - `git_clone` (`github:git.read`): on a cloud computer, `git clone
- *   https://github.com/owner/repo` in the workspace (the computer's git is
- *   set up for the proxy; it needs the computer, `sandbox:run`); on a
- *   connected machine, the runner's `git.sync` (protocol 11) clones it into
- *   the agent's folder (`repos/owner/name`) with our proxy credential, no
- *   other scope and no approval (ADR 0024 addendum). Pushes from there go
- *   through the proxy too;
+ * - `git_clone` (`github:git.read`): on the agent's connected computer, the runner's `git.sync` (protocol 11)
+ *   clones it into the agent's folder (`repos/owner/name`) with our proxy credential, with no other scope and no
+ *   approval (ADR 0024 addendum). Pushes from there go through the proxy too;
  * - `open_pull_request` (`github:pr.write`): opens a PR from a pushed branch
  *   with the org's GitHub credential (server side). Merging stays approval-gated.
  * Offered only when GitHub is connected in the organization.
@@ -97,7 +92,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
         {
           name: "git_clone",
           description:
-            "Clone a GitHub repository into your computer (on a connected computer: into your folder, repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there, only to branches agentes/<your handle>/…, then open_pull_request.",
+            "Clone a GitHub repository into your folder on your computer (repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there, only to branches agentes/<your handle>/…, then open_pull_request.",
           scope: connectorScope("github", "git.read"),
           connectionId: connection.id,
           connectorLabel: connection.label,
@@ -108,8 +103,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               dir: {
                 type: "string",
                 maxLength: 200,
-                description:
-                  "Folder in your workspace (default: the repo name; on a connected computer repos/<owner>/<name>)",
+                description: "Folder in your workspace (default: repos/<owner>/<name>)",
               },
             },
             required: ["repo"],
@@ -153,34 +147,16 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                   data: { repo: r.repo, dir: r.dir, machineId: agent.machineId, status: r.status },
                 };
               }
-              if (mission?.machineId) {
+              if (mission) {
                 return {
-                  content:
-                    "In a mission, work in the mission's own folder on its computer (its repository is set up there).",
+                  content: mission.machineId
+                    ? "In a mission, work in the mission's own folder on its computer (its repository is set up there)."
+                    : "This mission has no computer yet: its owner chooses one first.",
                   isError: true,
                 };
               }
-              const keys = await grantedScopeKeys(c.db, c.orgId, c.agentId);
-              if (!keys.has(grantKey(null, SANDBOX_SCOPE))) {
-                return {
-                  content: "Cloning needs your computer (scope sandbox:run), which you don't have.",
-                  isError: true,
-                };
-              }
-              const dir = given || repo.repo;
-              const result = await withSandbox(deps.sandbox, c, 300, (computer) =>
-                computer.provider.exec(computer.id, {
-                  command: `git clone --quiet https://github.com/${repo.owner}/${repo.repo} ${quote(dir)} 2>&1 && cd ${quote(dir)} && git log --oneline -1 && git branch --show-current`,
-                  timeoutSeconds: 290,
-                  ...(c.signal ? { signal: c.signal } : {}),
-                }),
-              );
-              const output = truncateOutput(`${result.stdout}${result.stderr}`.trim(), 4000);
-              if (result.exitCode !== 0) return { content: `git clone failed:\n${output}`, isError: true };
-              return {
-                content: `Cloned ${repo.owner}/${repo.repo} into /workspace/${dir}.\n${output}\nCreate a branch agentes/<your handle>/<topic> to push.`,
-                data: { repo: `${repo.owner}/${repo.repo}`, dir },
-              };
+              const preparing = await computerPreparing(c.db, c.orgId);
+              return { content: preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
             } catch (error) {
               return failed(error);
             }

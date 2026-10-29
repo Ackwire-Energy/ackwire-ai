@@ -3233,12 +3233,7 @@ export async function missionsOnMachine(db: Executor, machineId: string) {
 // ── Who can run a mission for the caller ─────────────────────────────────────
 
 /** Why an agent can't run a mission for the caller ("Nova missão" shows it, translated). */
-export type MissionIneligibleReason =
-  | "no_computer"
-  | "cloud_computer"
-  | "exec_off"
-  | "runner_outdated"
-  | "not_in_audience";
+export type MissionIneligibleReason = "no_computer" | "exec_off" | "runner_outdated" | "not_in_audience";
 
 export interface EligibleAgent {
   agentId: string;
@@ -3246,11 +3241,11 @@ export interface EligibleAgent {
   name: string;
   /** It can run a mission for the caller now (or when its computer comes back online). */
   eligible: boolean;
-  /** Set when not eligible. `cloud_computer`: missions on cloud computers come later. */
+  /** Set when not eligible. */
   reason: MissionIneligibleReason | null;
   /** The caller can choose its computer (an admin or the agent's owner): the web links to its settings. */
   canManage: boolean;
-  /** Its connected computer; null on the cloud computer or with none. */
+  /** Its connected computer; null with none. */
   machine: { id: string; name: string; online: boolean } | null;
   /** Eligible and online: a mission can start now. Offline agents are listed (their computer comes back). */
   ready: boolean;
@@ -3267,15 +3262,9 @@ export interface EligibleAgent {
  * "Nova missão": every agent of the organization, each saying whether it can
  * run a mission for the caller: a connected computer that allows commands
  * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience.
- * The others carry the reason (`cloud`: the server has cloud computers, so an
- * agent without a connected one is on the cloud computer). Eligible first. One query.
+ * The others carry the reason. Eligible first. One query.
  */
-export async function eligibleMissionAgents(
-  deps: Pick<MissionDeps, "db">,
-  userId: string,
-  orgId: string,
-  opts: { cloud?: boolean } = {},
-) {
+export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userId: string, orgId: string) {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
   const admin = can(membership.role, "manage_agents");
   const rows = rowsOf<{
@@ -3320,9 +3309,7 @@ export async function eligibleMissionAgents(
     const reason: MissionIneligibleReason | null = !r.can_talk
       ? "not_in_audience"
       : !machine
-        ? opts.cloud
-          ? "cloud_computer"
-          : "no_computer"
+        ? "no_computer"
         : !r.exec_allowed
           ? "exec_off"
           : protocol < MISSION_WORKTREE_PROTOCOL

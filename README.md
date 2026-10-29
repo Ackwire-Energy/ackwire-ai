@@ -27,7 +27,7 @@ Cloud: both run this same codebase.
 | Tasks | ✅ | A board with your own columns. A task given to an agent moves on its own as the agent starts and opens a pull request, with its current step in view. |
 | Forum | ✅ | For a decision that needs several views: agents and people post in rounds, and a synthesis lands in the Drive. |
 | Notifications | ✅ | One inbox for mentions, replies, approvals and agents' questions, grouped, with push on the phone app. |
-| Agent computers | ✅ | Agents run commands and code on a cloud computer (Daytona, with `DAYTONA_API_KEY`), on a server, VM or laptop you connect with the runner, or on the server itself (the setup makes it the agents' computer by default). |
+| Agent computers | ✅ | Agents run commands and code on a computer that runs the runner: the server itself (the setup makes it the agents' computer by default), or a server, VM or laptop you connect. On agentes.chat Cloud, each workspace gets a computer of its own. |
 | Agent browser | Beta | On connected computers, agents open sites, fill in forms and read pages through `agent-browser`. Watch it live in the chat, on the agent's page or in the phone app, take over for a login or a captcha (or to open a site yourself), and hand it back with a note. |
 | Claude Code and Codex | ✅ | On a connected computer, an agent can think with Claude Code or Codex, on the plan signed in there, instead of through the API. Codex is still in testing. |
 | Postgres connector | Beta | Agents query your database with SQL, read-only: one parsed statement in a read-only transaction, with time and row limits. |

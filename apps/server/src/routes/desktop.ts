@@ -21,7 +21,7 @@ const FILE_NAME = /^[\w.-]{1,200}$/;
 
 export interface DesktopRelease {
   version: string;
-  /** The download's path here (`/api/desktop/download/…`); the routes put the origin in front. */
+  /** The download's path here (`/api/desktop/download/…`); the routes put `PUBLIC_URL` in front. */
   url: string;
   sha256: string;
   notes: string;
@@ -269,17 +269,6 @@ export function createNativeReleases(options: ReleaseSource) {
 export type DesktopReleases = ReturnType<typeof createDesktopReleases>;
 export type NativeReleases = ReturnType<typeof createNativeReleases>;
 
-/**
- * The Cloud's address before app.agentes.chat. Desktop apps up to 0.5.5 check it for updates and take only
- * download links there, and its `/api` still reaches this server.
- */
-const OLD_CLOUD = new URL("https://agentes.chat");
-
-/** The origin of an answer's download links: agentes.chat for a request that came in there, else `PUBLIC_URL`. */
-function downloadOrigin(requestUrl: string, publicUrl: string): string {
-  return new URL(requestUrl).hostname === OLD_CLOUD.hostname ? OLD_CLOUD.origin : publicUrl.replace(/\/+$/, "");
-}
-
 /** Light limits: the app checks every 6 hours; downloads are people clicking. */
 const LATEST_LIMIT = { limit: 60, windowMs: 60_000 };
 const DOWNLOAD_LIMIT = { limit: 20, windowMs: 60_000 };
@@ -302,6 +291,8 @@ const Latest = z
  */
 export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases: DesktopReleases) {
   const { rateLimiter } = deps.adapters;
+  // Download links are on `PUBLIC_URL`, whatever address a request came in on.
+  const base = deps.config.PUBLIC_URL.replace(/\/+$/, "");
 
   // The desktop app's web view (origin `tauri://localhost`) reads it with fetch: public data, no credentials.
   api.use("/desktop/latest", async (c, next) => {
@@ -344,7 +335,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       const release = platform ? await releases.latest(platform).catch(() => null) : null;
       if (!release) return apiError(c, 404, "desktop.no_release", "No desktop build for this computer yet");
       const { updater: _, ...latest } = release;
-      return c.json({ ...latest, url: `${downloadOrigin(c.req.url, deps.config.PUBLIC_URL)}${latest.url}` }, 200);
+      return c.json({ ...latest, url: `${base}${latest.url}` }, 200);
     },
   );
 
@@ -365,7 +356,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
         version: release.version,
         notes: release.notes,
         pub_date: release.publishedAt,
-        url: `${downloadOrigin(c.req.url, deps.config.PUBLIC_URL)}${release.updater.url}`,
+        url: `${base}${release.updater.url}`,
         signature: release.updater.signature,
       },
       200,

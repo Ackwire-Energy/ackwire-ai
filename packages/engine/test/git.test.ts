@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
-import { createFakeSandboxProvider } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentCommitEmail,
@@ -11,27 +10,26 @@ import {
   createGitToolSource,
   drainOutbox,
   type GitProxyDeps,
-  gitSetupScript,
-  grantScopes,
   handleGitProxy,
   inflateZlib,
   issueGitToken,
+  machineGitGen,
   parseReceivePackRequest,
   pkt,
   postPersonMessage,
   readPack,
   refRule,
-  revokeComputerGitCredentials,
+  setAgentComputerTarget,
   setAgentHold,
   setAgentRepositories,
   setAgentScopes,
   setOrgStanding,
   type ToolContext,
   verifyGitToken,
-  withSandbox,
   ZERO_OID,
 } from "../src";
 import { type Fixture, SECRET, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -203,29 +201,19 @@ async function world(scopes: string[] = ["github:git.read", "github:git.write"])
     scopes.map((scope) => ({ connectionId: connection.id, scope })),
     connectorGrantValidator,
   );
-  const [computer] = await f.db
-    .insert(schema.sandboxes)
-    .values({
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      key: `agent:${f.agent.id}`,
-      provider: "fake",
-      providerId: "sbx_1",
-      status: "running",
-      cpu: 1,
-      memoryGib: 1,
-      diskGib: 3,
-    })
-    .returning();
-  if (!computer) throw new Error("no computer");
+  // The agent on a connected computer, with the credential issued to it (ADR 0024 addendum).
+  const m = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Mac" });
+  await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, m.machineId);
+  const [row] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, m.machineId));
   const github = fakeGitHub();
   const deps: GitProxyDeps = { db: f.db, secret: SECRET, connectors, upstream: github };
   const token = issueGitToken(SECRET, {
     orgId: f.org.id,
     agentId: f.agent.id,
-    sandboxId: computer.id,
-    gen: 0,
+    sandboxId: m.machineId,
+    gen: machineGitGen(row?.tokenHash ?? ""),
     exp: Math.floor(Date.now() / 1000) + 3600,
+    kind: "machine",
   });
   const auth = `Basic ${Buffer.from(`agentes:${token}`).toString("base64")}`;
   const call = (
@@ -244,7 +232,7 @@ async function world(scopes: string[] = ["github:git.read", "github:git.write"])
       }),
       { orgId: f.org.id, connectionId: connection.id, path },
     );
-  return { connection, computer, github, deps, call, token };
+  return { connection, machine: m, github, deps, call, token };
 }
 
 const audits = async (action: string) =>
@@ -360,22 +348,16 @@ describe("git proxy", () => {
     );
     expect(other.status).toBe(401);
 
-    await revokeComputerGitCredentials(f.db, f.org.id, f.agent.id);
+    // The agent off its computer: revoked; back on it, it works again.
+    const deps = { db: f.db, pubsub: f.pubsub };
+    await setAgentComputerTarget(deps, f.owner.id, f.org.id, f.agent.id, null);
     expect((await w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(401);
+    await setAgentComputerTarget(deps, f.owner.id, f.org.id, f.agent.id, w.machine.machineId);
+    expect((await w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(200);
 
     // Without any git scope: refused.
     await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, []);
-    const w2token = issueGitToken(SECRET, {
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      sandboxId: w.computer.id,
-      gen: 1,
-      exp: Math.floor(Date.now() / 1000) + 60,
-    });
-    const noScope = await w.call("acme/app.git/info/refs", {
-      query: "?service=git-upload-pack",
-      auth: `Basic ${Buffer.from(`agentes:${w2token}`).toString("base64")}`,
-    });
+    const noScope = await w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" });
     expect(noScope.status).toBe(403);
   });
 
@@ -404,89 +386,22 @@ describe("git proxy", () => {
 });
 
 describe("the computer", () => {
-  test("on start it gets our credential, the helper and insteadOf; never a GitHub token; our host is allowed", async () => {
-    const sandbox = createFakeSandboxProvider();
-    f = await setup({ sandbox, reply: () => ({ chunks: ["ok"] }) });
-    const connectors: ConnectorDeps = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: PUBLIC_URL };
-    const connection = await createApiKeyConnection(connectors, f.owner.id, f.org.id, {
-      connector: "github",
-      apiKey: GH_TOKEN,
-    });
-    await grantScopes(f.db, f.org.id, f.agent.id, [
-      { connectionId: connection.id, scope: "github:git.write" },
-      { connectionId: null, scope: "sandbox:run" },
-    ]);
-    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-      body: "@dev oi",
-    });
-    await drainOutbox(f.db, f.handlers);
-    const [run] = await f.db.select().from(schema.agentRuns);
-    const ctx: ToolContext = {
-      db: f.db,
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      runId: run?.id ?? "",
-      channelId: f.general.id,
-      threadRootId: run?.threadRootId ?? msg.id,
-      triggerMessageId: msg.id,
-    };
-    const deps = { ...(f.sandboxDeps ?? ({} as never)), git: { publicUrl: PUBLIC_URL, secret: SECRET } };
-    await withSandbox(deps, ctx, 10, async () => undefined);
-
-    const created = sandbox.calls.find((c) => c.op === "create");
-    expect(created?.spec).toMatchObject({ network: "allowlist", allowDomains: ["agentes.test"] });
-    const setupCall = sandbox.calls.find((c) => c.op === "exec" && c.request?.command.includes("insteadOf"));
-    const script = setupCall?.request?.command ?? "";
-    expect(script).toContain(`url.${PUBLIC_URL}/api/git/${f.org.id}/${connection.id}/.insteadOf`);
-    expect(script).toContain("https://github.com/");
-    expect(script).toContain("Dev (agentes)");
-    expect(script).toContain("dev@agents.agentes.test");
-    const token = /printf %s '([^']+)' > "\$HOME\/\.config\/agentes\/git-token"/.exec(script)?.[1] ?? "";
-    expect(verifyGitToken(SECRET, token)).toMatchObject({ orgId: f.org.id, agentId: f.agent.id });
-    // The GitHub token is nowhere in the computer: not in commands, files or the spec.
-    expect(JSON.stringify(sandbox.calls)).not.toContain(GH_TOKEN);
-    expect(script).not.toContain("GITHUB_TOKEN");
-    // The row still says the org's mode, and the token's time is recorded.
-    const [row] = await f.db.select().from(schema.sandboxes);
-    expect(row).toMatchObject({ network: "blocked" });
-    expect(row?.gitTokenIssuedAt).not.toBeNull();
-
-    // Used again while running and fresh: no new setup.
-    const before = sandbox.calls.filter((c) => c.op === "exec").length;
-    await withSandbox(deps, ctx, 10, async () => undefined);
-    expect(sandbox.calls.filter((c) => c.op === "exec").length).toBe(before);
-  });
-
-  test("the setup script is plain sh and keeps the token out of the environment", () => {
-    const script = gitSetupScript({
-      base: `${PUBLIC_URL}/api/git/o/c/`,
-      token: "agtgit1.x.y",
-      agentName: "Theo",
-      agentHandle: "theo",
-    });
-    expect(script).not.toMatch(/\bexport\b|\benv\b/);
-    expect(script).toContain('chmod 600 "$HOME/.config/agentes/git-token"');
-    expect(script).toContain("credential.https://agentes.test.helper");
-  });
-
   test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on agentes.chat", () => {
     expect(agentCommitEmail("https://agentes.chat", "theo")).toBe("theo@agents.agentes.chat");
     expect(agentCommitEmail("https://agentes.chat/api/git/o/c/", "theo")).toBe("theo@agents.agentes.chat");
     expect(agentCommitEmail("http://localhost:3000", "theo")).toBe("theo@agents.localhost");
   });
 
-  test("git_clone runs real git in the computer; open_pull_request goes through the org's GitHub", async () => {
-    const sandbox = createFakeSandboxProvider();
-    f = await setup({ sandbox });
+  test("git_clone with no computer says so; open_pull_request goes through the org's GitHub", async () => {
+    f = await setup();
     const connectors: ConnectorDeps = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: PUBLIC_URL };
     const connection = await createApiKeyConnection(connectors, f.owner.id, f.org.id, {
       connector: "github",
       apiKey: GH_TOKEN,
     });
-    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
     const github = fakeGitHub();
     const source = createGitToolSource({
-      sandbox: { ...(f.sandboxDeps ?? ({} as never)), git: { publicUrl: PUBLIC_URL, secret: SECRET } },
+      sandbox: {} as never,
       connectors,
       github: { apiUrl: github.apiUrl, fetch: github.fetch },
     });
@@ -511,16 +426,13 @@ describe("the computer", () => {
     ]);
     const clone = tools.find((t) => t.name === "git_clone");
     const result = await clone?.execute({ repo: "https://github.com/acme/app.git" }, ctx);
-    expect(result?.isError).toBeFalsy();
-    expect(
-      sandbox.calls.some((c) => c.request?.command.startsWith("git clone --quiet https://github.com/acme/app 'app'")),
-    ).toBe(true);
+    expect(result).toMatchObject({ isError: true });
+    expect(result?.content).toContain("You have no computer");
     const pr = await tools
       .find((t) => t.name === "open_pull_request")
       ?.execute({ repo: "acme/app", branch: "agentes/dev/fix", title: "Fix login" }, ctx);
     expect(pr?.content).toContain("https://github.com/acme/app/pull/7");
     const post = github.calls.find((c) => c.method === "POST");
     expect(post?.auth).toBe(`Bearer ${GH_TOKEN}`);
-    expect(JSON.stringify(sandbox.calls)).not.toContain(GH_TOKEN);
   });
 });

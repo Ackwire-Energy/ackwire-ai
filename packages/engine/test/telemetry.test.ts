@@ -188,7 +188,6 @@ async function seed() {
     usage("moonshot", `${SECRET.agent} custom!`, 10, 1),
     usage("anthropic", "claude-sonnet-5-5", 99_999, 99_999, ago(2 * 24 * HOUR)),
   ]);
-  await db.insert(schema.usageRecords).values({ ...usage("", "", 0, 0), kind: "sandbox", agentId: agent.id });
 
   const audit = (action: string, seconds: number, createdAt = ago(HOUR)) => ({
     orgId: org.id,

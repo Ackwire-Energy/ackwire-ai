@@ -328,10 +328,6 @@ export const desktopEn: DesktopTranslations = {
     allow: "Allow",
     notNow: "Not now",
   },
-  migrate: {
-    cloudTitle: "This {{device}} no longer works for agentes.chat Cloud",
-    cloudBody: "There, agents work on their workspace's own computer, always on. Their folders here stay in {{path}}.",
-  },
   tools: {
     claudeName: "Claude Code",
     claudeDesc: "Writes and changes code in the allowed folders, with your Claude account.",

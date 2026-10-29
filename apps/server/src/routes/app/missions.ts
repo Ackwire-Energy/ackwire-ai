@@ -313,13 +313,9 @@ const EligibleAgent = z
     handle: z.string(),
     name: z.string(),
     eligible: z.boolean().openapi({ description: "It can run a mission for you." }),
-    reason: z
-      .enum(["no_computer", "cloud_computer", "exec_off", "runner_outdated", "not_in_audience"])
-      .nullable()
-      .openapi({
-        description:
-          "Why not, when not eligible: no computer, the cloud computer (missions there come later), commands off, an old runner, or it doesn't answer you.",
-      }),
+    reason: z.enum(["no_computer", "exec_off", "runner_outdated", "not_in_audience"]).nullable().openapi({
+      description: "Why not: no computer, commands off, an old runner, or it doesn't answer you.",
+    }),
     canManage: z.boolean().openapi({ description: "You can choose its computer (an admin or its owner)." }),
     machine: z.object({ id: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
     ready: z.boolean(),
@@ -415,14 +411,7 @@ export function missionRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      return c.json(
-        {
-          agents: await eligibleMissionAgents(missions(), c.get("user").id, orgId, {
-            cloud: Boolean(deps.extras?.sandbox?.provider),
-          }),
-        },
-        200,
-      );
+      return c.json({ agents: await eligibleMissionAgents(missions(), c.get("user").id, orgId) }, 200);
     },
   );
 

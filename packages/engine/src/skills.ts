@@ -130,7 +130,7 @@ export function validateSkill(s: { name: string; description: string; body: stri
   if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
 }
 
-/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (ADR 0021). */
+/** Scripts we keep (never shown to the model) so `run_skill_script` can run them on the agent's computer (ADR 0021). */
 export const SKILL_SCRIPTS: Record<string, string> = {
   py: "text/x-python",
   sh: "text/x-shellscript",
@@ -142,7 +142,7 @@ export const SKILL_SCRIPTS: Record<string, string> = {
 
 export type SkillFileStatus = "stored" | "script" | "ignored";
 
-/** `stored`: text the model may read; `script`: kept for the sandbox, never shown; `ignored`: listed only. */
+/** `stored`: text the model may read; `script`: kept for the agent's computer, never shown; `ignored`: listed only. */
 export function classifyFile(path: string): { mime: string; status: SkillFileStatus } {
   const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
   const mime = SHOWABLE[ext];
@@ -632,7 +632,7 @@ export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, 
     .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, version), eq(skillFiles.path, path)));
   if (!f) throw new NotFoundError(`No file ${path} in this skill`);
   if (f.status === "script") {
-    throw new NotFoundError(`${path} is a script: it is never shown, only run in the sandbox with run_skill_script`);
+    throw new NotFoundError(`${path} is a script: it is never shown, only run on your computer with run_skill_script`);
   }
   if (f.status !== "stored" || !f.blobKey) {
     throw new NotFoundError(`${path} is not available: binaries are listed only, never stored`);
@@ -659,7 +659,10 @@ export async function getSkillFile(
   return { path, version: version ?? s.version, mime, content: text };
 }
 
-/** Every kept file of the skill's version (text and scripts), with bytes: what `run_skill_script` copies into the sandbox. */
+/**
+ * Every kept file of the skill's version (text and scripts), with bytes: what `run_skill_script` copies onto
+ * the computer.
+ */
 export async function skillFolderFiles(deps: SkillDeps, s: SkillRow) {
   const rows = await deps.db
     .select()

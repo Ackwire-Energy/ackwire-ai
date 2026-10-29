@@ -1,6 +1,6 @@
 # 0024. Git in the agents' computers through our proxy (the token never enters the machine)
 
-- Status: Accepted
+- Status: Accepted. Superseded in part by ADR 0077 (2026-10-28): the cloud computer's credential (`sandboxes.id`, `git_token_gen`, issued on every start), its setup inside that computer and **Network**; connected computers (the addendum) are every agent's computer, and the proxy is mounted on every server
 - Date: 2026-10-15
 
 ## Decision
