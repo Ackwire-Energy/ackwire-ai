@@ -28,9 +28,22 @@ test("the setup rail's horizon ships in the rail's column, under its steps, neve
   expect(shipped.some((d) => /^(position:absolute|inset:|top:|z-index:)/.test(d))).toBe(false);
 });
 
-test("a service's × ships in the full ink on its sky", async () => {
+test("a service's × ships in the full ink on its sky, its ink as far from the top as from the side", async () => {
   const selector = ".catalog-svc .ac-dialog__acts > .ac-btn--glyph";
-  expect(await ships("layout.css", "src/styles.css", selector)).toContain("color:var(--ink)");
+  const glyph = await ships("layout.css", "src/styles.css", selector);
+  expect(glyph).toContain("color:var(--ink)");
+  // It reaches up and down as far as the kit's row makes it reach sideways, so its row is its ink, placed evenly.
+  const kit = squeeze(
+    declarations(
+      topLevel(await Bun.file(join(SRC, "../../../packages/ui/src/styles/components.css")).text()),
+      ".ac-acts > .ac-btn--glyph",
+    ),
+  );
+  const sideways = kit.find((d) => d.startsWith("margin-inline:"))?.slice("margin-inline:".length);
+  expect(sideways).toBeTruthy();
+  expect(glyph).toContain(`margin-block:${sideways}`);
+  const row = await ships("layout.css", "src/styles.css", ".catalog-svc .ac-dialog__acts");
+  expect(row).toEqual(expect.arrayContaining(["top:24px", "right:24px"]));
 });
 
 test("a closed browser's sky takes the line's room in the computer window, steps or not, at every width", async () => {
