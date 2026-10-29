@@ -544,7 +544,9 @@ describe("answering", () => {
     expect(answer?.template).toMatchObject({ outcome: "denied", reason: "Only <b>studio</b> people", locale: "en" });
     const rendered = renderEmail(answer?.template as EmailTemplate);
     expect(rendered.subject).toBe("Your request to join wasn't approved");
-    expect(rendered.html).toContain("“Only &lt;b&gt;studio&lt;/b&gt; people”");
+    expect(rendered.html).toContain(
+      '“Only <span style="display:inline-block">&lt;b&gt;studio&lt;/b&gt; people”</span>',
+    );
     expect(rendered.html).not.toContain("<b>studio</b>");
     expect((await notices()).every((n) => n.doneAt !== null)).toBe(true);
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "join_request.denied"));
@@ -724,7 +726,9 @@ describe("words", () => {
     expect(answer("en", "denied").text).toContain("Their note: “Full <b>team</b>”");
     expect(answer("en", "denied").html).toContain("“Full &lt;b&gt;team&lt;/b&gt;”");
     expect(answer("en", "denied").html).not.toContain("https://a.test/x");
-    expect(answer("en", "denied").html).toContain("this address asked to join Acme on agentes.chat");
+    expect(answer("en", "denied").html).toContain(
+      'this address asked to join Acme <span style="display:inline-block">on agentes.chat.</span>',
+    );
     expect(answer("pt-BR", "joined").html).toContain("este endereço pediu para entrar na Acme");
   });
 

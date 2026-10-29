@@ -6904,6 +6904,8 @@ a.machine-row__name:hover {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
+  /* Criar agente's column doesn't wrap pretty, as the onboarding's does. */
+  text-wrap: pretty;
 }
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
@@ -10097,8 +10099,18 @@ html[data-menu-overlay] .shell {
 /* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
   padding: 12px var(--text-edge);
-  /* Short lines: wrapped, they break into two of a length. */
+}
+/* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
+   The e-mail line then runs the bar's column, so the well isn't empty on its right. */
+.ai-panel__wait:has(> .setup-progress),
+.ai-panel__wait > [role="status"] {
   text-wrap: balance;
+}
+/* Without pretty (Safari before 26) the e-mail line would end on a word alone. */
+@supports not (text-wrap: pretty) {
+  .ai-panel__wait {
+    text-wrap: balance;
+  }
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
    hang in before them. */

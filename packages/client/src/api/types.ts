@@ -1572,7 +1572,10 @@ export interface StorageUsage {
   platformBytes: number;
   /** In the workspace's own buckets, the trash left out too. */
   ownBucketBytes: number;
-  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  /**
+   * The disk holding this server's files folder: its size and what is free. Null without a folder, and on the Cloud,
+   * where that disk is every workspace's.
+   */
   disk: { sizeBytes: number; freeBytes: number } | null;
 }
 
