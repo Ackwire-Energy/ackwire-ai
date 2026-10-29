@@ -10,6 +10,8 @@ export function createFakeAuth(
     signUp?: AuthResult;
     reset?: AuthResult;
     redeem?: boolean;
+    open?: { requestId: string; code: string } | null;
+    requestCode?: string | null;
     oneTime?: AuthResult;
     claim?: AuthResult;
     verification?: AuthResult;
@@ -47,8 +49,16 @@ export function createFakeAuth(
     signOut: async () => {
       calls.push({ method: "signOut", args: [] });
     },
-    desktopHandoff: async (challenge) => {
-      calls.push({ method: "desktopHandoff", args: [challenge] });
+    desktopOpen: async (challenge) => {
+      calls.push({ method: "desktopOpen", args: [challenge] });
+      return options.open === undefined ? { requestId: "r".repeat(43), code: "KQ7M-3XPF" } : options.open;
+    },
+    desktopRequestCode: async (requestId) => {
+      calls.push({ method: "desktopRequestCode", args: [requestId] });
+      return options.requestCode === undefined ? "KQ7M-3XPF" : options.requestCode;
+    },
+    desktopHandoff: async (requestId) => {
+      calls.push({ method: "desktopHandoff", args: [requestId] });
       return { ok: true };
     },
     desktopRedeem: async (verifier) => {

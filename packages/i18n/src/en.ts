@@ -130,10 +130,15 @@ export const en: Translations = {
     desktop: {
       browser: "Continue in your browser",
       browserLead: "We'll come back here once you sign in with {{provider}}.",
+      codeHint: "Your browser will show this code. Confirm it matches before you continue.",
       reopen: "Open the browser again",
       otherWay: "Sign in another way",
       otherServer: "Use another server",
       opening: "Opening {{provider}}…",
+      confirm: "Is this your app?",
+      confirmLead: "This code should match the one shown by the agentes.chat app on your computer.",
+      confirmYes: "Yes, sign the app in",
+      confirmNo: "This wasn't me",
       done: "All set.",
       doneLead: "You're signed in to the agentes app. You can close this tab.",
       expired: "This request expired.",
@@ -1995,8 +2000,9 @@ export const en: Translations = {
     readOnly: {
       member: "You see how {{name}} works. Only admins edit.",
       memberOwner: "You see how {{name}} works. Who edits: admins and {{owner}} (owner).",
-      owner: "You own {{name}}: you change the look, access, who can talk and the computer. The rest, only admins.",
+      owner: "You own {{name}}: you change the look, who can talk and the computer. The rest, only admins.",
       ownerInstructions: "Only admins edit the instructions. As the owner, you approve proposed changes.",
+      ownerAccess: "Only admins give or take away access and repositories.",
     },
     status: {
       idle: "Available",

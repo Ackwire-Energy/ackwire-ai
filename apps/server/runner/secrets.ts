@@ -9,6 +9,7 @@ import {
   SECRET_NAME,
 } from "@agenteschat/adapters/secret-box";
 import { errnoCode, RunnerError } from "./errors";
+import { touchesGitInternals } from "./git-guard";
 import { agentFolderName, resolveInWorkspace } from "./paths";
 
 /**
@@ -124,15 +125,42 @@ export async function handleSecret(
       if (target.kind === "file") {
         const resolved = await resolveInWorkspace(workspaceReal, target.path);
         if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
+        // Like the `write` op: a repository's git dir is the runner's own git's settings (`git-guard.ts`).
+        if (touchesGitInternals(target.path, resolved.abs)) {
+          throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
+        }
         await mkdir(path.dirname(resolved.abs), { recursive: true });
         await writeFile(resolved.abs, value, { mode: 0o600 });
         await chmod(resolved.abs, 0o600).catch(() => undefined);
         target.path = resolved.rel;
       }
       await ensureDir(dir);
-      const secrets = (await readStore(dir)).filter((s) => s.name !== req.name);
-      secrets.push({ name: req.name, target, value, deliveredAt: new Date().toISOString() });
-      await writeStore(dir, secrets);
+      const before = await readStore(dir);
+      const next = before.filter((s) => s.name !== req.name);
+      next.push({ name: req.name, target, value, deliveredAt: new Date().toISOString() });
+      // A replacement can move a secret to another file or to the environment.
+      // Keep every old file in the store (and therefore in file guards and
+      // redaction) until its plaintext has actually been removed.
+      const livePaths = new Set(next.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])));
+      const oldFiles = before.filter(
+        (s) => s.name === req.name && s.target.kind === "file" && !livePaths.has(s.target.path),
+      );
+      await writeStore(dir, [...oldFiles, ...next]);
+      if (oldFiles.length > 0) {
+        let allRemoved = true;
+        for (const old of oldFiles) {
+          if (old.target.kind !== "file") continue;
+          try {
+            const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
+            if (resolved.exists) await rm(resolved.abs, { force: true });
+          } catch {
+            // Retain the old entry so reads/uploads stay blocked and a later
+            // remove or replacement can try the cleanup again.
+            allRemoved = false;
+          }
+        }
+        if (allRemoved) await writeStore(dir, next);
+      }
       await rm(file, { force: true });
       return { size: Buffer.byteLength(value) };
     }
@@ -141,12 +169,16 @@ export async function handleSecret(
       return {};
     case "remove": {
       const secrets = await readStore(dir);
-      const gone = secrets.find((s) => s.name === req.name);
-      if (gone?.target.kind === "file") {
-        const resolved = await resolveInWorkspace(workspaceReal, gone.target.path).catch(() => null);
-        if (resolved?.exists) await rm(resolved.abs, { force: true });
+      const gone = secrets.filter((s) => s.name === req.name);
+      const otherPaths = new Set(
+        secrets.flatMap((s) => (s.name !== req.name && s.target.kind === "file" ? [s.target.path] : [])),
+      );
+      for (const old of gone) {
+        if (old.target.kind !== "file" || otherPaths.has(old.target.path)) continue;
+        const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
+        if (resolved.exists) await rm(resolved.abs, { force: true });
       }
-      if (gone)
+      if (gone.length > 0)
         await writeStore(
           dir,
           secrets.filter((s) => s.name !== req.name),
@@ -178,5 +210,5 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
 export async function secretValue(root: string | undefined, agent: AgentScope, name: string): Promise<string | null> {
   if (!root) return null;
   const secrets = await readStore(dirOf(root, agent)).catch(() => [] as Stored[]);
-  return secrets.find((s) => s.name === name)?.value ?? null;
+  return secrets.filter((s) => s.name === name).at(-1)?.value ?? null;
 }

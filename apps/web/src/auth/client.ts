@@ -29,8 +29,12 @@ export interface AuthClient {
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;
-  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (ADR 0036). */
-  desktopHandoff(challenge: string): Promise<AuthResult>;
+  /** In the Mac app's window: opens a hand-over request for the window's challenge, returning its id and the code to show (ADR 0036). */
+  desktopOpen(challenge: string): Promise<{ requestId: string; code: string } | null>;
+  /** In the browser: the code of a pending request, to show for the person to match against the app's window. */
+  desktopRequestCode(requestId: string): Promise<string | null>;
+  /** In the browser, after a fresh sign-in and the person's confirmation: hands it to the window that opened `requestId`. */
+  desktopHandoff(requestId: string): Promise<AuthResult>;
   /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
   desktopRedeem(verifier: string): Promise<boolean>;
   /** In the app's window: a one-time sign-in from another device's link, traded once for a session of its own. */

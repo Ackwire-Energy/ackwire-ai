@@ -12,6 +12,7 @@ import {
   validGitHubAppSignature,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import { readWebhookText } from "./webhook-body";
 import {
   type AppDeps,
   body,
@@ -223,8 +224,8 @@ export function registerGitHubAppWebhook(api: OpenAPIHono, deps: AppDeps) {
   api.post("/github-app/webhook", async (c) => {
     const secret = deps.config.GITHUB_APP_WEBHOOK_SECRET;
     if (!secret) return c.json({ error: "not configured" }, 404);
-    const raw = await c.req.text();
-    if (raw.length > 5_000_000) return c.json({ error: "too large" }, 413);
+    const raw = await readWebhookText(c.req.raw, 5_000_000);
+    if (raw === null) return c.json({ error: "too large" }, 413);
     if (!validGitHubAppSignature(secret, raw, c.req.header("x-hub-signature-256") ?? null)) {
       return c.json({ error: "invalid signature" }, 401);
     }

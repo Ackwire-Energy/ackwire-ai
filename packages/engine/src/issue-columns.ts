@@ -3,7 +3,7 @@ import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import type { IssueStatus } from "./issues";
-import { can, getMembership } from "./organizations";
+import { can, requireActiveMembership } from "./organizations";
 
 const { issueColumns, issues, issueActivity } = schema;
 
@@ -57,8 +57,7 @@ export interface ColumnDeps {
 }
 
 async function requirePoster(db: Database, userId: string, orgId: string) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
 }
 
@@ -75,7 +74,7 @@ const cleanName = (name: string) => {
 };
 
 export async function listIssueColumns(db: Database, userId: string, orgId: string): Promise<IssueColumnView[]> {
-  if (!(await getMembership(db, userId, orgId))) throw new ForbiddenError("You are not a member of this organization");
+  await requireActiveMembership(db, userId, orgId);
   return (await boardColumns(db, orgId)).map(view);
 }
 

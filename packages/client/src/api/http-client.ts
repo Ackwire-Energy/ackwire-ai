@@ -281,6 +281,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       agentHandoff: async (orgId, agentId, screen = "browser") =>
         (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/handoff`))
           .handoff,
+      agentControl: async (orgId, agentId, screen = "browser") =>
+        (await request<{ canControl: boolean }>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/control`)).canControl,
       handoff: (orgId, handoffId) => request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}`),
       takeControl: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/control`, { json: {} }),

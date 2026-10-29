@@ -16,7 +16,7 @@ import {
   sha256Hex,
 } from "./machines";
 import { notifyMachineConnected } from "./notification-producers";
-import { can, getMembership } from "./organizations";
+import { can, getMembership, requireActiveMembership } from "./organizations";
 
 const { agents, machineDeviceCodes, machines, organizations } = schema;
 
@@ -34,7 +34,13 @@ const { agents, machineDeviceCodes, machines, organizations } = schema;
  * someone points one at it.
  *
  * Reconnecting: a computer the server refused (removed, token revoked) asks
- * again with `previousMachineId`. When the person confirming picks that
+ * again with `previousMachineId` and the token it had for that machine
+ * (`previousToken`), which proves it is that computer: machine ids are seen by
+ * every member, so an id alone would let any computer take over another's row
+ * (its permissions and agents). A removed computer's token hash stays on its
+ * row for this (`removeMachine`; a removed row never authenticates). Without a
+ * matching token, or for the workspace's own computers (`host`, `managed`), the
+ * code is an ordinary new computer. When the person confirming picks that
  * machine's organization and may manage it (admin, or who paired it), the
  * same row comes back: same name and permissions, a fresh token, and the
  * agents that used it before its removal get it back. Anything else (other
@@ -95,6 +101,8 @@ export interface DeviceStartInput {
   exec?: boolean;
   /** The machine this computer was before (it was refused); see "Reconnecting" above. */
   previousMachineId?: string;
+  /** The token this computer had for `previousMachineId`: without it, no reconnect. */
+  previousToken?: string;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -132,6 +140,7 @@ export async function startDeviceCode(
       ),
     );
   if (Number(pending?.n ?? 0) >= DEVICE_MAX_PENDING_PER_IP) throw new DeviceCodeLimitError();
+  const previousMachineId = await provenPreviousMachine(deps.db, input);
   const deviceCode = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + DEVICE_CODE_TTL_MS);
   for (let attempt = 0; ; attempt++) {
@@ -148,9 +157,7 @@ export async function startDeviceCode(
         ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
         ...(input.workspace !== undefined ? { workspace: input.workspace.slice(0, 500) } : {}),
         ...(input.exec !== undefined ? { execAllowed: input.exec } : {}),
-        ...(input.previousMachineId && UUID_RE.test(input.previousMachineId)
-          ? { previousMachineId: input.previousMachineId.toLowerCase() }
-          : {}),
+        ...(previousMachineId ? { previousMachineId } : {}),
         requesterIp: ip,
         approxLocation: requester.approxLocation?.slice(0, 120) || null,
         expiresAt,
@@ -169,6 +176,25 @@ export async function startDeviceCode(
       if (!isUniqueViolation(error) || attempt >= 4) throw error;
     }
   }
+}
+
+/**
+ * The machine a code may ask to come back as: only one whose token the
+ * computer still holds (the hash stays on a removed row, see "Reconnecting"),
+ * and only a computer someone connected (`connected`), never the server's own
+ * (`host`) or the workspace's provisioned one (`managed`). Null otherwise.
+ */
+async function provenPreviousMachine(db: Database, input: DeviceStartInput): Promise<string | null> {
+  const id = input.previousMachineId;
+  const token = input.previousToken;
+  if (!id || !UUID_RE.test(id) || !token) return null;
+  const [machine] = await db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(
+      and(eq(machines.id, id.toLowerCase()), eq(machines.kind, "connected"), eq(machines.tokenHash, sha256Hex(token))),
+    );
+  return machine?.id ?? null;
 }
 
 export type DeviceTokenError = "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
@@ -319,10 +345,11 @@ async function reconnectTarget(
     .select()
     .from(machines)
     .where(and(eq(machines.id, machineId), ...(orgId ? [eq(machines.orgId, orgId)] : [])));
-  // The workspace's own computer comes back only through its provisioner's code, never as someone's computer.
-  if (!machine || machine.kind === "managed") return null;
+  // Only a computer someone connected: the workspace's own (`managed`, its provisioner's code) and the
+  // server's own (`host`, its sync) never come back as someone's computer.
+  if (machine?.kind !== "connected") return null;
   const member = await getMembership(db, actorId, machine.orgId);
-  if (!member || !can(member.role, "post")) return null;
+  if (!member || member.standing?.state === "suspended" || !can(member.role, "post")) return null;
   if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;
   return { machine, orgName: member.orgName };
 }
@@ -370,8 +397,7 @@ export async function confirmDeviceCode(
   userCode: string,
   input: { name?: string | null },
 ): Promise<MachineView> {
-  const membership = await getMembership(deps.db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(deps.db, actorId, orgId);
   if (!can(membership.role, "post")) {
     throw new ForbiddenError(
       "Only members who can post in the organization can connect a computer",

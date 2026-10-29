@@ -81,6 +81,7 @@ export function createFakeBrowser(
       log("browser.agentHandoff", orgId, agentId);
       return openOn(agentId, screen);
     },
+    agentControl: async () => true,
     handoff: async (_orgId, handoffId) => find(handoffId),
     takeControl: async (orgId, handoffId) => {
       log("browser.takeControl", orgId, handoffId);

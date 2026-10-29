@@ -92,7 +92,7 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
       }
       const data: ViewerSocketData = {
         kind: "stream.viewer",
-        input: { userId: user.id, orgId, agentId, request },
+        input: { userId: user.id, orgId, agentId, request, sessionToken: user.sessionToken },
         stream: null,
       };
       return upgraded(server.upgrade(req, { data }));

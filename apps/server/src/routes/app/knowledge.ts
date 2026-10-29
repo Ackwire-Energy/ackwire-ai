@@ -12,7 +12,7 @@ import {
   ForbiddenError,
   getAgent,
   listContextItems,
-  listReactions,
+  listMessageReactions,
   memoryJudging,
   removeReaction,
   requirePermission,
@@ -380,8 +380,7 @@ export function knowledgeRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "read");
-      return c.json({ reactions: await listReactions(db, orgId, messageId) }, 200);
+      return c.json({ reactions: await listMessageReactions(db, c.get("user").id, orgId, messageId) }, 200);
     },
   );
 

@@ -5,7 +5,7 @@ import { recordAudit } from "./audit";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { can, getMembership } from "./organizations";
+import { can, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 
@@ -380,8 +380,7 @@ async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pic
 
 async function requireMember(db: Database, actor: ArtifactActor, orgId: string) {
   if (actor.type !== "person") return null;
-  const membership = await getMembership(db, actor.userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actor.userId, orgId);
   return membership;
 }
 
@@ -1015,8 +1014,7 @@ export const ARTIFACT_TRASH_DAYS = 30;
  * agent made, the person who asked it and the agent's owner; admins always.
  */
 async function canDeleteArtifact(db: Database, userId: string, orgId: string, a: ArtifactRow) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   if (can(membership.role, "configure")) return true;
   if (a.createdByType === "person") return a.createdById === userId;
   const [agent] = await db
@@ -1095,8 +1093,7 @@ export async function listDeletedArtifacts(
   userId: string,
   orgId: string,
 ): Promise<TrashedArtifactView[]> {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const since = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000);
   const rows = await db
     .select()

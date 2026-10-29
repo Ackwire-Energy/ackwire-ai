@@ -12,7 +12,7 @@ import type { IssueWorkMeta } from "./issue-work";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
 import { notifyIssueChanged, notifyIssueComment } from "./notification-producers";
-import { can, getMembership } from "./organizations";
+import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { toolDetail } from "./tool-detail";
@@ -209,8 +209,7 @@ async function canSee(
 
 async function requireOrgMember(db: Database, actor: IssueActor, orgId: string) {
   if (actor.type !== "person") return null;
-  const membership = await getMembership(db, actor.userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actor.userId, orgId);
   return membership;
 }
 
@@ -674,6 +673,14 @@ export async function listIssues(
   return views(db, visible);
 }
 
+const isHttpsUrl = (value: string) => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 /** Changes fields; each change is an event in the activity ("changed the status to In review"). */
 export async function updateIssue(
   deps: IssueDeps,
@@ -736,6 +743,9 @@ export async function updateIssue(
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
   if (patch.addPullRequest) {
+    // People open this link from the issue page: only an https address, never javascript:, data: or the like.
+    if (!isHttpsUrl(patch.addPullRequest.url))
+      throw new ValidationError("The pull request URL must be an https:// address");
     const prs = (current.pullRequests as unknown as IssueView["pullRequests"]).filter(
       (p) => p.url !== patch.addPullRequest?.url,
     );
