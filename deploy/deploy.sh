@@ -7,12 +7,15 @@
 #
 # The app restarts in place: requests fail for a few seconds while the new container boots, and up to
 # about 25 s more while agent runs finish (they get 20 s, then resume in the new container). A version
-# that never gets healthy keeps the app down for about a minute more, until the rollback.
+# that never gets healthy keeps the app down for up to 150 s more, until the rollback.
 #
 # Setup: .env sets AGENTES_IMAGE=agentes:current, the tag this script moves (with the backup profile,
 # AGENTES_BACKUP_IMAGE=agentes-backup:current too), and RUN_MIGRATIONS_ON_BOOT=false: this script
 # migrates on every deploy, a restored dump included, and after a rollback the previous version runs
-# on a database the newer one may have migrated, which a boot that migrates refuses. For the workflow,
+# on a database the newer one may have migrated, which a boot that migrates refuses. With
+# MACHINE_PROVISIONING=external (agentes.chat Cloud), uploaded files must not live on this server's
+# disk alone, so the script refuses to deploy without S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and
+# S3_SECRET_ACCESS_KEY. For the workflow,
 # the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
@@ -56,6 +59,16 @@ main() {
     echo "deploy: .env needs AGENTES_IMAGE=agentes:current and RUN_MIGRATIONS_ON_BOOT=false (top of deploy/deploy.sh)" >&2
     false
   fi
+  if grep -Eq "^MACHINE_PROVISIONING=[\"']?external([\"'[:space:]#]|$)" .env; then
+    local key missing=""
+    for key in S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
+      grep -Eq "^${key}=[\"']?[^\"'[:space:]#]" .env || missing+=" $key"
+    done
+    if [[ -n $missing ]]; then
+      echo "deploy: .env sets MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks${missing} (top of deploy/deploy.sh)" >&2
+      false
+    fi
+  fi
   echo "deploy: ${target:0:7}"
   if [[ -n ${DEPLOY_IMAGE:-} ]]; then
     docker pull --quiet "$DEPLOY_IMAGE"
@@ -73,14 +86,15 @@ main() {
   current=$(docker image inspect --format '{{.Id}}' agentes:current 2>/dev/null || true)
   next=$(docker image inspect --format '{{.Id}}' agentes:next)
   docker tag agentes:next agentes:current
-  if ! docker compose up --detach --wait --wait-timeout 60; then
+  # Past the image's health check start period (120 s, Dockerfile): a slow boot isn't a broken version.
+  if ! docker compose up --detach --wait --wait-timeout 150; then
     docker compose logs --no-color --tail 50 agentes >&2 || true
     echo "deploy: ${target:0:7} is not healthy, going back to ${previous:0:7}" >&2
     git checkout --quiet --detach "$previous"
     if [[ -n $current ]]; then
       docker tag "$current" agentes:current
     fi
-    docker compose up --detach --wait --wait-timeout 60 || echo "deploy: the rollback is not healthy either" >&2
+    docker compose up --detach --wait --wait-timeout 150 || echo "deploy: the rollback is not healthy either" >&2
     return 1
   fi
   trap - ERR

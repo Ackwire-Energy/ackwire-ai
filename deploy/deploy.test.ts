@@ -1,0 +1,199 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const root = resolve(import.meta.dir, "..");
+const dir = mkdtempSync(join(tmpdir(), "agentes-deploy-"));
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+/** An executable stand-in on a PATH of its own. */
+function stub(bin: string, name: string, script: string) {
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, name), script);
+  chmodSync(join(bin, name), 0o755);
+}
+
+// deploy.sh itself, run against git repositories of its own and a stand-in for docker that records every call.
+describe("deploy/deploy.sh", () => {
+  const origin = join(dir, "origin.git");
+  const bin = join(dir, "bin");
+  const identity = {
+    GIT_AUTHOR_NAME: "test",
+    GIT_AUTHOR_EMAIL: "test@example.com",
+    GIT_COMMITTER_NAME: "test",
+    GIT_COMMITTER_EMAIL: "test@example.com",
+  };
+  const commits = { first: "", second: "" };
+  let runs = 0;
+
+  function git(cwd: string, ...args: string[]): string {
+    const run = Bun.spawnSync(["git", ...args], { cwd, env: { ...process.env, ...identity } });
+    if (run.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${run.stderr.toString()}`);
+    return run.stdout.toString().trim();
+  }
+
+  function commit(work: string, notes: string): string {
+    writeFileSync(join(work, "notes"), notes);
+    git(work, "add", "-A");
+    git(work, "commit", "--quiet", "-m", notes);
+    return git(work, "rev-parse", "HEAD");
+  }
+
+  beforeAll(() => {
+    git(dir, "init", "--quiet", "--bare", "--initial-branch=main", origin);
+    const work = join(dir, "work");
+    git(dir, "clone", "--quiet", origin, work);
+    mkdirSync(join(work, "deploy"));
+    copyFileSync(join(root, "deploy/deploy.sh"), join(work, "deploy/deploy.sh"));
+    writeFileSync(join(work, ".gitignore"), ".env\n");
+    commits.first = commit(work, "first");
+    commits.second = commit(work, "second");
+    git(work, "push", "--quiet", "origin", "HEAD:main");
+
+    // `compose config` answers as for an .env with AGENTES_IMAGE=agentes:current and no backup profile.
+    stub(
+      bin,
+      "docker",
+      `#!/usr/bin/env bash
+set -euo pipefail
+state=$STUB_STATE
+printf '%s\\n' "\${AGENTES_IMAGE:+AGENTES_IMAGE=$AGENTES_IMAGE }docker $*" >>"$state/calls"
+id_of() { awk -v tag="$1" '$1 == tag { id = $2 } END { if (id == "") exit 1; print id }' "$state/tags"; }
+tag() { { grep -v "^$1 " "$state/tags" || true; echo "$1 $2"; } >"$state/tags.new" && mv "$state/tags.new" "$state/tags"; }
+case "$*" in
+"compose config --images") printf 'pgvector/pgvector:0.8.7-pg18\\nagentes:current\\n' ;;
+"compose config --services") printf 'postgres\\nagentes\\n' ;;
+"image inspect --format "*) id_of "$5" ;;
+"build "*) tag agentes:next sha256:new ;;
+"tag "*) tag "$3" "$(id_of "$2" || echo "$2")" ;;
+esac
+`,
+    );
+  });
+
+  /** A server's checkout at `at` with this .env, where `agentes:current` is the image `sha256:old`. */
+  function server(at: string, env: string) {
+    runs += 1;
+    const path = join(dir, `server-${runs}`);
+    const state = join(dir, `state-${runs}`);
+    git(dir, "clone", "--quiet", origin, path);
+    git(path, "checkout", "--quiet", "--detach", at);
+    writeFileSync(join(path, ".env"), env);
+    mkdirSync(state);
+    writeFileSync(join(state, "tags"), "agentes:current sha256:old\n");
+    writeFileSync(join(state, "calls"), "");
+    return {
+      head: () => git(path, "rev-parse", "HEAD"),
+      deploy(args: string[]) {
+        const run = Bun.spawnSync(["bash", join(path, "deploy/deploy.sh"), ...args], {
+          cwd: dir,
+          env: { PATH: `${bin}:${process.env.PATH}`, HOME: dir, STUB_STATE: state, ...identity },
+        });
+        const calls = readFileSync(join(state, "calls"), "utf8").split("\n").filter(Boolean);
+        return { code: run.exitCode, out: `${run.stdout}${run.stderr}`, calls };
+      },
+    };
+  }
+
+  const cloud = [
+    "AGENTES_IMAGE=agentes:current",
+    "RUN_MIGRATIONS_ON_BOOT=false",
+    "MACHINE_PROVISIONING=external",
+    "S3_ENDPOINT=https://account.r2.cloudflarestorage.com",
+    'S3_BUCKET="agentes-files"',
+    "S3_ACCESS_KEY_ID=key",
+    "S3_SECRET_ACCESS_KEY=secret",
+  ];
+
+  test("a Cloud server with its files' bucket: built, migrated before the switch, up with a wait past the image's start period", () => {
+    const at = server(commits.first, `${cloud.join("\n")}\n`);
+    const { code, out, calls } = at.deploy([commits.second]);
+    expect({ code, out }).toMatchObject({ code: 0 });
+    expect(at.head()).toBe(commits.second);
+    const steps = [
+      "docker build --tag agentes:next .",
+      "AGENTES_IMAGE=agentes:next docker compose run --rm agentes migrate",
+      "docker tag agentes:next agentes:current",
+      "docker compose up --detach --wait --wait-timeout ",
+    ].map((step) => calls.findIndex((call) => call.startsWith(step)));
+    expect(steps.filter((index) => index < 0)).toEqual([]);
+    expect(steps).toEqual([...steps].sort((a, b) => a - b));
+    // A version that boots slowly but well is not rolled back: the wait outlasts the health check's start period.
+    const wait = Number(/--wait-timeout (\d+)/.exec(calls[steps[3] ?? -1] ?? "")?.[1]);
+    const startPeriod = Number(/--start-period=(\d+)s/.exec(readFileSync(join(root, "Dockerfile"), "utf8"))?.[1]);
+    expect(startPeriod).toBeGreaterThan(0);
+    expect(wait).toBeGreaterThan(startPeriod);
+  });
+
+  test("a Cloud server without its files' bucket stops before anything is built: files would live on its disk alone", () => {
+    for (const lacking of ["S3_BUCKET", "S3_SECRET_ACCESS_KEY"]) {
+      const env = cloud.map((line) => (line.replace(/"/g, "").startsWith(`${lacking}=`) ? `${lacking}=` : line));
+      const at = server(commits.first, `${env.join("\n")}\n`);
+      const { code, out, calls } = at.deploy([commits.second]);
+      expect(code).toBe(1);
+      expect(out).toContain(`MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks ${lacking}`);
+      expect(at.head()).toBe(commits.first);
+      expect(calls.filter((call) => call.startsWith("docker build") || call.includes(" migrate"))).toEqual([]);
+    }
+    // A self-hosted server keeps its files where it likes (FILES_DIR or Postgres).
+    const selfHosted = server(commits.first, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
+    expect(selfHosted.deploy([commits.second]).code).toBe(0);
+  });
+});
+
+// The backup service's schedule, with stand-ins for the clock, the bucket and the wait: the stand-in for `sleep`
+// writes down how long the service would wait for its next dump, then stops it.
+describe("deploy/backup/backup.sh", () => {
+  const bin = join(dir, "backup-bin");
+  // Thursday 2026-10-29, 10:20 UTC.
+  const now = Date.UTC(2026, 9, 29, 10, 20) / 1000;
+
+  beforeAll(() => {
+    copyFileSync(join(root, "deploy/backup/backup.sh"), join(dir, "backup.sh"));
+    chmodSync(join(dir, "backup.sh"), 0o755);
+    // A dump from a moment ago is in the bucket, so the service goes straight to its schedule.
+    stub(
+      bin,
+      "rclone",
+      `#!/bin/sh\necho "$*" >>"$STUB_STATE/rclone"\ncase "$*" in *lsf*) echo agentes-20261029-100000.dump ;; esac\n`,
+    );
+    stub(bin, "date", `#!/bin/sh\ncase "$*" in *+%s*) echo "${now}" ;; *) exec /bin/date "$@" ;; esac\n`);
+    stub(bin, "sleep", `#!/bin/sh\necho "$1" >"$STUB_STATE/sleep"\nkill -TERM "$PPID"\n`);
+  });
+
+  function schedule(hours?: string) {
+    const state = mkdtempSync(join(dir, "backup-"));
+    const run = Bun.spawnSync(["sh", join(dir, "backup.sh")], {
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        STUB_STATE: state,
+        S3_BACKUP_BUCKET: "backups",
+        ...(hours === undefined ? {} : { BACKUP_INTERVAL_HOURS: hours }),
+      },
+      timeout: 10_000,
+    });
+    return {
+      err: run.stderr.toString(),
+      maxAge: /--max-age (\S+)/.exec(readFileSync(join(state, "rclone"), "utf8"))?.[1],
+      sleep: Number(readFileSync(join(state, "sleep"), "utf8")),
+    };
+  }
+
+  test("a dump a day at 03:00 UTC by default; BACKUP_INTERVAL_HOURS dumps every that many hours from then", () => {
+    // Until tomorrow 03:00; a dump younger than 26 hours at start counts.
+    expect(schedule()).toMatchObject({ maxAge: "26h", sleep: 16 * 3600 + 40 * 60 });
+    // Until 11:00.
+    expect(schedule("1")).toMatchObject({ maxAge: "3h", sleep: 40 * 60 });
+    // 03:00, 09:00, 15:00, 21:00: until 15:00.
+    expect(schedule("6")).toMatchObject({ maxAge: "8h", sleep: 4 * 3600 + 40 * 60 });
+  });
+
+  test("an interval that isn't a whole number of hours says so and keeps a dump a day", () => {
+    for (const hours of ["abc", "0", "1.5"]) {
+      const run = schedule(hours);
+      expect(run.err).toContain(`BACKUP_INTERVAL_HOURS=${hours} is not a whole number of hours`);
+      expect(run).toMatchObject({ maxAge: "26h", sleep: 16 * 3600 + 40 * 60 });
+    }
+  });
+});
