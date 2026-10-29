@@ -164,7 +164,7 @@ describe("Configurações → Importar e exportar", () => {
     // Whoever shares the file needs to know what never goes in it: one line. The full list is on the help page.
     expect(card.querySelector(".imp-note")?.textContent).toBe("Nunca leva chaves, senhas, logins nem conversas.");
     const whatsIn = within(card).getByRole("link", { name: "O que vai no arquivo" });
-    expect(whatsIn.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#export");
+    expect(whatsIn.getAttribute("href")).toBe("https://app.agentes.chat/help/import?lang=pt-BR#export");
     expect(whatsIn.className).toBe("ac-link ac-link--muted");
     expect([whatsIn.getAttribute("target"), whatsIn.getAttribute("rel")]).toEqual(["_blank", "noopener noreferrer"]);
     await click(within(card).getByRole("button", { name: "Baixar o arquivo" }));
@@ -482,7 +482,7 @@ describe("Configurações → Importar e exportar", () => {
     // Where each app puts its file is on the help page, one link under the request.
     expect(other.querySelector("dl")).toBeNull();
     const where = within(other).getByRole("link", { name: "Onde cada app entrega" });
-    expect(where.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#other-apps");
+    expect(where.getAttribute("href")).toBe("https://app.agentes.chat/help/import?lang=pt-BR#other-apps");
     expect(where.className).toBe("ac-link ac-link--muted");
 
     await click(within(other).getByRole("button", { name: "Copiar o pedido" }), 2);

@@ -1,4 +1,3 @@
-import { landingEn } from "./landing";
 import type { Translations } from "./pt-BR";
 
 /** English. Typed against the pt-BR source, so a missing key fails the build. */
@@ -7930,7 +7929,6 @@ export const en: Translations = {
         'The forum "{{title}}" is over. The synthesis is in the file below, with {{count}} suggested issue(s) to approve.',
     },
   },
-  landing: landingEn,
   builtinTools: {
     ask_user: {
       label: "Ask the person",
