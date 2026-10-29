@@ -1886,7 +1886,7 @@ describe("Onboarding", () => {
       ["Hermes Agent", "/brands/hermes.svg"],
       ["OpenClaw", "/brands/openclaw.svg"],
       ["Paperclip", "/brands/paperclip.svg"],
-      ["Exportação do agentes.chat", "/favicon.svg"],
+      ["agentes.chat", "/favicon.svg"],
       ["Outro app", "svg"],
     ]);
     await skip();
