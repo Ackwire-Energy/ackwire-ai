@@ -426,6 +426,16 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
+    // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
+    // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
+    let opened = false;
+    const offOpen = conn.onStatus((status) => {
+      if (status !== "open" || opened) return;
+      opened = true;
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+    });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
     const offUser = conn.onUserEvent((event) => {
       if ((event.type === "approval.created" || event.type === "approval.decided") && "approval" in event) {
@@ -518,6 +528,7 @@ export function RealtimeProvider({
     setConnection(conn);
     return () => {
       offReconnect();
+      offOpen();
       offUser();
       conn.stop();
       setConnection(null);

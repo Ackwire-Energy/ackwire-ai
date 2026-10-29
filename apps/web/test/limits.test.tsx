@@ -105,6 +105,18 @@ describe("a workspace's limits (ADR 0077)", () => {
     expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
   });
 
+  test("back from the billing service: the plan lands in core before this page's socket opens, and its first open asks again", async () => {
+    const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
+    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    // Read, then the plan changes before the socket opens: its `org.limits` went out to no one.
+    state.limits = limits({ members: { used: 1, limit: 10 } });
+    await act(async () => sockets.last().open());
+    await settle(6);
+    expect(invite().textContent).not.toContain("cabe 1 pessoa");
+    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+  });
+
   test("Armazenamento: the meter, near the limit with the plan's options; on its own bucket, no limit from us", async () => {
     await go("settings/storage", { storage: { usedBytes: 10 * GB, limitBytes: 50 * GB, ownStorage: false } });
     const quiet = screen().getByRole("region", { name: "Armazenamento" });
