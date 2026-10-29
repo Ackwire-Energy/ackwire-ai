@@ -1,5 +1,7 @@
-import { type Message, useConsultations } from "@agenteschat/client";
-import { consultationOfNotice } from "@agenteschat/client/lib/notices";
+import { keys, type Message, useConsultations } from "@agenteschat/client";
+import { shownConsultations } from "@agenteschat/client/lib/consult-group";
+import { consultationOfNotice, noticeOf } from "@agenteschat/client/lib/notices";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -21,7 +23,9 @@ export function EventLine({ message }: { message: Message }) {
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
-  const shown = useConsultations(useOrgId(), message.channelId);
+  const orgId = useOrgId();
+  const qc = useQueryClient();
+  const list = useConsultations(orgId, message.channelId);
   // An answer from another agent that carries the consultation (who asked whom, the question and the
   // answer apart): the same card as a reply that waited for it, not the text written for the agent.
   const consulted = consultationOfNotice(message.meta);
@@ -29,8 +33,17 @@ export function EventLine({ message }: { message: Message }) {
     author: dir.nameOf(message.author) || t("channel.unknownAgent"),
     agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
   });
-  // The reply that asked already shows it with its answer (`ConsultGroup`): not drawn twice.
-  if (consulted && shown.data?.some((q) => q.id === consulted.consultation.consultationId)) return null;
+  // The reply that asked, loaded here, already shows it with its answer (`ConsultGroup`): not drawn twice.
+  if (consulted && list.data?.length) {
+    const askedIn = noticeOf(message.meta)?.refs.runId;
+    const thread = message.threadId ? keys.thread(orgId, message.channelId, message.threadId) : null;
+    const loaded = [
+      ...(qc.getQueryData<Message[]>(keys.messages(orgId, message.channelId)) ?? []),
+      ...((thread && qc.getQueryData<Message[]>(thread)) || []),
+    ];
+    const inView = new Set(askedIn && loaded.some((x) => x.agentRunId === askedIn) ? [askedIn] : []);
+    if (shownConsultations(list.data, inView).has(consulted.consultation.consultationId)) return null;
+  }
   if (consulted)
     return (
       <View style={styles.line}>

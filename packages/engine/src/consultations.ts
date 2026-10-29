@@ -671,52 +671,56 @@ export interface RunConsultation {
   expiresAt: Date;
 }
 
-/** The questions of the latest asking runs here: older replies keep the `consult_reply` cards they had. */
-const LIST_LIMIT = 200;
+/**
+ * How many of the latest questions the conversation's list carries: each holds up to 10 kB of question and
+ * answer, and the list reloads on every consult event. Older replies keep the `consult_reply` cards they had.
+ */
+const LIST_LIMIT = 50;
 
 /**
  * The questions agents asked from this conversation, latest first, at most `LIST_LIMIT`: the app draws them inside
  * the reply of the run that asked, each with its state, and folds the `consult_reply` notices of the ones it shows.
  */
 export async function consultationsIn(db: Executor, orgId: string, channelId: string): Promise<RunConsultation[]> {
-  const target = schema.agentRuns;
   const rows = await db
     .select({
       id: agentConsultations.id,
       runId: agentConsultations.askerRunId,
       agentId: agentConsultations.askerAgentId,
       consultedAgentId: agentConsultations.targetAgentId,
+      targetRunId: agentConsultations.targetRunId,
       status: agentConsultations.status,
       question: agentConsultations.question,
       answer: agentConsultations.answer,
       createdAt: agentConsultations.createdAt,
       answeredAt: agentConsultations.answeredAt,
       expiresAt: agentConsultations.expiresAt,
-      targetStatus: sql<
-        string | null
-      >`(select ${target.status} from ${target} where ${target.id} = ${agentConsultations.targetRunId} and ${target.orgId} = ${agentConsultations.orgId})`,
     })
     .from(agentConsultations)
     .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
     .where(and(eq(agentConsultations.orgId, orgId), eq(agentRuns.orgId, orgId), eq(agentRuns.channelId, channelId)))
     .orderBy(desc(agentConsultations.createdAt))
     .limit(LIST_LIMIT);
+  // Where the consulted runs of the open questions are: held on a person, or not.
+  const held = rows.flatMap((r) => (r.status === "open" && r.targetRunId ? [r.targetRunId] : []));
+  const targets = held.length
+    ? await db
+        .select({ id: agentRuns.id, status: agentRuns.status })
+        .from(agentRuns)
+        .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
+    : [];
+  const statusOf = new Map(targets.map((t) => [t.id, t.status as string]));
   return rows.map((r) => {
     const status = r.status as RunConsultation["status"];
     const open = status === "open";
+    const target = open && r.targetRunId ? statusOf.get(r.targetRunId) : undefined;
     return {
       id: r.id,
       runId: r.runId,
       agentId: r.agentId,
       consultedAgentId: r.consultedAgentId,
       status,
-      waiting: !open
-        ? null
-        : r.targetStatus === "waiting_approval"
-          ? "approval"
-          : r.targetStatus === "waiting_input"
-            ? "input"
-            : null,
+      waiting: target === "waiting_approval" ? "approval" : target === "waiting_input" ? "input" : null,
       question: r.question.slice(0, NOTICE_QUESTION_MAX),
       // An expired question has no answer; a failed one keeps its reason (the asking agent read it too).
       answer: open || status === "expired" ? null : (r.answer?.slice(0, NOTICE_ANSWER_MAX) ?? null),

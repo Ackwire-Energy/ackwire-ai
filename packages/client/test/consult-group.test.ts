@@ -7,6 +7,7 @@ import {
   firstOfRun,
   foldsNotice,
   groupsByRun,
+  shownConsultations,
 } from "../src/lib/consult-group";
 
 const T0 = Date.parse("2026-10-29T10:00:00Z");
@@ -91,6 +92,14 @@ describe("foldsNotice", () => {
     const note = { notice: { kind: "agent_note", text: "hi", refs: { consultationId: "q1" } } };
     expect(foldsNotice(note, new Set(["q1"]))).toBe(false);
     expect(foldsNotice(undefined, new Set(["q1"]))).toBe(false);
+  });
+});
+
+describe("shownConsultations", () => {
+  test("only the questions of runs with a reply in view", () => {
+    const list = [q({ id: "a", runId: "r1" }), q({ id: "b", runId: "r2" })];
+    expect([...shownConsultations(list, new Set(["r1"]))]).toEqual(["a"]);
+    expect(shownConsultations(list, new Set()).size).toBe(0);
   });
 });
 

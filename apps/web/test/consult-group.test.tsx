@@ -128,6 +128,15 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(document.querySelectorAll(".ac-consult").length).toBe(1);
   });
 
+  test("the reply that asked isn't loaded here: the notice keeps its card", async () => {
+    const state = withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true);
+    // The asking reply is further up, not paged in: only the notice is here.
+    state.messages = state.messages.filter((m) => m.id !== "msg-asked");
+    await open(state);
+    expect(document.querySelectorAll(".ac-consult").length).toBe(1);
+    expect(document.querySelector(".ac-consult-group")).toBeNull();
+  });
+
   test("an event reloads the list: an answer that came shows in place", async () => {
     const { socket, state } = await open(withAsk([consultation({})]));
     expect(group()?.textContent).toContain("Atlas está trabalhando");
@@ -150,6 +159,11 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
       }),
     );
     await settle(5);
-    expect(group()?.textContent).toContain("Atlas respondeu");
+    // Every answer is in: the block folds by itself, without the count; it opens to the answer.
+    const block = group() as HTMLElement;
+    expect(block.textContent).not.toContain("de 1");
+    fireEvent.click(within(block).getByRole("button", { name: /Perguntou a 1 colega/ }));
+    await settle(1);
+    expect(block.textContent).toContain("Atlas respondeu");
   });
 });

@@ -5,11 +5,12 @@ import {
   consultLineState,
   consultSeconds,
   groupsByRun,
+  shownConsultations,
 } from "@agenteschat/client/lib/consult-group";
 import { previewOf } from "@agenteschat/client/lib/consultations";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatLineTime } from "@agenteschat/client/lib/work";
-import { type AgentColor, ToolBlock, type ToolBlockItem, type ToolBlockState } from "@agenteschat/ui";
+import { type AgentColor, Icon, ToolBlock, type ToolBlockItem, type ToolBlockState } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { createContext, useContext, useMemo } from "react";
@@ -33,8 +34,11 @@ export const ConsultGroupsProvider = ConsultGroupsContext.Provider;
 
 const RELOAD_ON = new Set(["agent.consulting", "agent.consulted", "agent.consultation"]);
 
-/** The conversation's questions to other agents, by the run that asked; reloaded when one changes. */
-export function useConsultGroups(channelId: string): ConsultGroups {
+/**
+ * The conversation's questions to other agents, by the run that asked; reloaded when one changes. `runsInView`:
+ * the runs with a reply (or a live block) loaded here, whose questions fold their notices away.
+ */
+export function useConsultGroups(channelId: string, runsInView: ReadonlySet<string>): ConsultGroups {
   const { org } = useOrg();
   const qc = useQueryClient();
   const list = useConsultations(org.id, channelId);
@@ -44,11 +48,9 @@ export function useConsultGroups(channelId: string): ConsultGroups {
   return useMemo(() => {
     const all = list.data ?? [];
     if (all.length === 0) return EMPTY;
-    return { byRun: groupsByRun(all), shown: new Set(all.map((c) => c.id)) };
-  }, [list.data]);
+    return { byRun: groupsByRun(all), shown: shownConsultations(all, runsInView) };
+  }, [list.data, runsInView]);
 }
-
-export const useShownConsultations = () => useContext(ConsultGroupsContext).shown;
 
 const BLOCK_STATE: Record<ConsultLineState, ToolBlockState> = {
   working: "run",
@@ -111,20 +113,30 @@ export function ConsultGroup({ runId, askerId, color }: { runId: string; askerId
         label: lineLabel(t, state, c, to),
         hint: answer ? previewOf(answer) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
+        // The consultation card's words and type (prose, never the tools' mono): the question, the answer, who saw it.
         detail: (
-          <div className="ac-tools__io">
-            <b>{t("chat.consultation.asked", { name: from.name })}</b>
-            <span>
+          <div className="ac-consult__body ac-consult__body--inline">
+            <small>{t("chat.consultation.asked", { name: from.name })}</small>
+            <div className="ac-consult__text ac-consult__text--q">
               <MessageBody body={c.question} resolveMention={dir.mentionName} />
-            </span>
+            </div>
             {answer !== null && (
               <>
-                <b>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</b>
-                <span>
+                <small>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</small>
+                <div className="ac-consult__text">
                   <MessageBody body={answer} resolveMention={dir.mentionName} />
-                </span>
+                </div>
               </>
             )}
+            <p className="ac-consult__foot ac-iconline">
+              <Icon name="eyeOff" size={14} />
+              {t("chat.consultation.private", {
+                from: from.name,
+                articleFrom: from.article,
+                to: to.name,
+                articleTo: to.article,
+              })}
+            </p>
           </div>
         ),
       },
@@ -132,6 +144,8 @@ export function ConsultGroup({ runId, askerId, color }: { runId: string; askerId
   });
   return (
     <ToolBlock
+      // Open while answers are out; it folds by itself once the last one is in (a click opens it again).
+      key={summary.open ? "out" : "in"}
       className="ac-consult-group"
       logos={group.map((c) => (
         <AgentAvatar

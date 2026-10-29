@@ -112,6 +112,14 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
                 <MessageText body={answer} />
               </>
             ) : null}
+            <Text variant="caption" tone="faint" style={styles.gap}>
+              {t("chat.consultation.private", {
+                from: from.name,
+                articleFrom: from.article,
+                to: to.name,
+                articleTo: to.article,
+              })}
+            </Text>
           </View>
         ),
       },
@@ -119,6 +127,8 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
   });
   return (
     <ToolBlock
+      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again).
+      key={summary.open ? "out" : "in"}
       logos={group.map((c) => ({
         key: c.id,
         node: <AgentFace agentId={c.consultedAgentId} size={18} live={false} />,

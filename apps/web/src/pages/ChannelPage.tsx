@@ -2023,8 +2023,16 @@ const Timeline = memo(function Timeline({
   // A block slides in once, when it first shows (not the ones already working when the page opened).
   const blockEnters = useRef(new Map<string, boolean>());
   const threadsView = useChannelThreadsView();
-  // Questions the agents asked other agents from here: drawn inside the replies that asked them.
-  const consultGroups = useConsultGroups(channelId);
+  // Questions the agents asked other agents from here: drawn inside the replies that asked them (loaded or live).
+  const runsInView = useMemo(
+    () =>
+      new Set([
+        ...items.flatMap((i) => (i.kind === "message" && i.message.agentRunId ? [i.message.agentRunId] : [])),
+        ...slots.map((slot) => slot.runId),
+      ]),
+    [items, slots],
+  );
+  const consultGroups = useConsultGroups(channelId, runsInView);
   // Threads a mission link card already points to (the agent's reply): their start marker stays out.
   const linked = useMemo(
     () =>
@@ -3255,9 +3263,14 @@ export const TimelineMessage = memo(function TimelineMessage({
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
-          )}
+          {lastOfRun &&
+            m.author.type === "agent" &&
+            m.author.id &&
+            m.agentRunId &&
+            !m.local &&
+            consulted.length === 0 && (
+              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+            )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
             <SavedTools
               runId={m.agentRunId}

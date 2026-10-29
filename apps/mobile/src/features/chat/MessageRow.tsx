@@ -321,7 +321,9 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {isAgent && m.agentRunId && !m.local ? <ConsultGroup message={m} color={color} /> : null}
+        {isAgent && m.agentRunId && !m.local && consulted.length === 0 ? (
+          <ConsultGroup message={m} color={color} />
+        ) : null}
         {kept ? (
           <TurnTools
             items={kept.items}

@@ -58,6 +58,17 @@ export function consultGroupSummary(group: readonly RunConsultation[], now: numb
   return { total: group.length, closed, answered, open: closed < group.length, waiting };
 }
 
+/**
+ * The questions a reply in view shows: those of runs with a message (or a live block) loaded here. A notice
+ * whose asking reply isn't loaded (further up, not paged in yet) keeps its card, so no answer goes unseen.
+ */
+export function shownConsultations(
+  list: readonly RunConsultation[],
+  runsInView: ReadonlySet<string>,
+): ReadonlySet<string> {
+  return new Set(list.flatMap((c) => (runsInView.has(c.runId) ? [c.id] : [])));
+}
+
 /** A `consult_reply` notice whose question a reply here already shows with its answer: not drawn again. */
 export function foldsNotice(meta: Record<string, unknown> | undefined, shown: ReadonlySet<string>): boolean {
   const notice = noticeOf(meta);

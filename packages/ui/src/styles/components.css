@@ -7401,6 +7401,10 @@ label.ac-setrow__title {
     padding-left: 12px;
   }
 }
+/* Inside a tool block's line (the questions a reply asked): the line's own padding holds it */
+.ac-consult__body.ac-consult__body--inline {
+  padding: 0;
+}
 
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
 .ac-msg__note {
