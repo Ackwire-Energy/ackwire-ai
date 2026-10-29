@@ -1321,6 +1321,15 @@ describe("the dialog's size (computer.css)", () => {
     expect(covered).toContain("width: 100%");
     expect(covered).toContain("aspect-ratio: 1280 / 900");
     expect(covered).toContain("place-self: auto");
+    // The cover shares the box's cell, so words taller than the box (a fix to run there) grow it instead of spilling.
+    expect(
+      inSheet(
+        ".cmp-body > .cmp-stage > :is(.cmp-stage__box, .brw-dim),\n  .cmp-body > .dsk > .dsk-stage > :is(.dsk-screen, .brw-dim)",
+      ),
+    ).toContain("grid-area: 1 / 1");
+    const cell = inSheet(".cmp-body > .cmp-stage > .brw-dim,\n  .cmp-body > .dsk > .dsk-stage > .brw-dim");
+    expect(cell).toContain("position: relative");
+    expect(cell).toContain("place-self: stretch");
     // That box in the sheet's middle, the body measuring its room: what comes and goes goes under it, so nothing
     // moves it. The request being helped with right under it, then the line or the note, a banner after the steps.
     expect(inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body")).toContain("container-type: size");

@@ -91,6 +91,17 @@ test("on a phone the screen and its covers ship as one box in the sheet's middle
     const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone);
     expect(shipped).toEqual(expect.arrayContaining(["width:100%", "aspect-ratio:1280/900", "place-self:auto"]));
   }
+  // A cover shares the box's cell: words taller than the box grow it instead of spilling over the head.
+  for (const selector of [
+    ".cmp-body > .cmp-stage > :is(.cmp-stage__box, .brw-dim)",
+    ".cmp-body > .dsk > .dsk-stage > :is(.dsk-screen, .brw-dim)",
+  ]) {
+    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, phone)).toContain("grid-area:1/1");
+  }
+  for (const selector of [".cmp-body > .cmp-stage > .brw-dim", ".cmp-body > .dsk > .dsk-stage > .brw-dim"]) {
+    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone);
+    expect(shipped).toEqual(expect.arrayContaining(["position:relative", "place-self:stretch"]));
+  }
   // The box's top as far under the body's top as its foot is over the body's foot: 243 px on a 390 px phone.
   for (const selector of [
     ".cmp-dialog:not(.is-screen-only) .cmp-body > .cmp-stage",
