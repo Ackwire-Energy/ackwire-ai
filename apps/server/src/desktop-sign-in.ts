@@ -50,7 +50,7 @@ export function newConfirmationCode(): string {
   let code = "";
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (i === CODE_LENGTH / 2) code += "-";
-    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+    code += CODE_ALPHABET[(bytes[i] ?? 0) % CODE_ALPHABET.length];
   }
   return code;
 }
