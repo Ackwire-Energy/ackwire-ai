@@ -1707,9 +1707,11 @@
 }
 
 /* After the run: the frame closed into its top, a light band of the agent's color that opens to the steps. */
-.brw-ac.brw-mf-end {
-  max-width: 640px;
-  border-radius: 18px 18px 18px 6px;
+/* The same size as the tools block under it ("Ver o que ele fez": .ac-tools), so the two bars line up. */
+.brw-ac.brw-trail.brw-mf-end,
+.brw-ac.brw-trail.brw-mf-end.is-open {
+  max-width: 560px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: color-mix(in srgb, var(--mf-a) 14%, var(--raised));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--mf-a) 25%, transparent);
 }
@@ -1718,11 +1720,11 @@
   box-sizing: border-box;
   cursor: pointer;
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px 6px 10px;
+  gap: 9px;
+  padding: 0 10px 0 12px;
   font-size: 13px;
   color: var(--ink2);
 }
@@ -1760,11 +1762,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px 8px 36px;
+  padding: 0 12px 8px 39px;
 }
 .brw-ac.brw-mf-end .brw-mf-end__log {
   margin: 0 5px 5px;
   border-top: 0;
-  border-radius: 13px 13px 13px 2px;
+  border-radius: calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) 2px;
   background: var(--raised);
 }
