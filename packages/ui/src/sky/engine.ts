@@ -3,7 +3,7 @@
  * tones, with pixel-art agents drifting up and blinking, a light that follows
  * the pointer, and calm zones behind text (the field settles on one tone there
  * and the sprites pass behind). Faces and pills on a sky are clear zones: no
- * pixel agent is drawn near them. Ported from the landing (pages/landing/sky.ts)
+ * pixel agent is drawn near them. Ported from the landing page's sky (now in lp-agentes.chat)
  * and made palette-agnostic: any agent color, faded from any surface token.
  *
  * One animation loop runs for every sky on the page, about 30 frames a

@@ -28,7 +28,6 @@ describe("loadConfig", () => {
     expect(config.AGENT_DEFAULT_MODEL).toBe("claude-sonnet-5-5");
     expect(config.ROUTER_MODEL).toBe("claude-haiku-5-5");
     expect(config.AGENT_MAX_HOPS).toBe(3);
-    expect(config.LANDING_PAGE).toBe(false);
     expect(config.S3_PATH_STYLE).toBe(false);
     expect(config.MILLIONSEND_API_URL).toBe("https://api.millionsend.com");
     // Unset: the email senders use ola@ on the host of PUBLIC_URL.
@@ -50,20 +49,13 @@ describe("loadConfig", () => {
     );
   });
 
-  test("agentes.chat's own site keeps its landing page and legal links without extra settings", () => {
-    const site = loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat" });
-    expect(site.LANDING_PAGE).toBe(true);
-    expect(site.TERMS_URL).toBe("https://agentes.chat/terms");
-    expect(site.PRIVACY_URL).toBe("https://agentes.chat/privacy");
-    expect(loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat", LANDING_PAGE: "false" }).LANDING_PAGE).toBe(
-      false,
-    );
+  test("agentes.chat's own servers have their legal links without extra settings", () => {
+    const app = loadConfig({ ...valid, PUBLIC_URL: "https://app.agentes.chat" });
+    expect(app.TERMS_URL).toBe("https://app.agentes.chat/terms");
+    expect(app.PRIVACY_URL).toBe("https://app.agentes.chat/privacy");
+    expect(loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat" }).TERMS_URL).toBe("https://agentes.chat/terms");
     const selfHosted = loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" });
-    expect([selfHosted.LANDING_PAGE, selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([
-      false,
-      undefined,
-      undefined,
-    ]);
+    expect([selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([undefined, undefined]);
   });
 
   test("treats empty strings as unset", () => {
