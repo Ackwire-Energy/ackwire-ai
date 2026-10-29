@@ -43,18 +43,20 @@ function yourRoutine(n: Notice) {
 }
 
 /**
- * How the run a routine's report woke tells the people (ADR 0053 §7): in the agent's own voice, the
- * size first, the concrete findings kept even when a decision is asked, what it would do, the decision
- * last; never redoing the routine's lookups. A routine that reports every time keeps the whole report.
+ * How the run a routine's report woke tells the people (ADR 0053 §7): in the agent's own voice, like a
+ * colleague in the chat (the news first, a greeting on the day's first message, never a verdict on the
+ * run), the concrete findings kept even when a decision is asked, what it would do only when there is
+ * something to do, the decision last; never redoing the routine's lookups. A routine that reports every time keeps the whole report.
  */
 export function handoffGuidance(report: string | undefined) {
   return [
-    "Tell the people here what it found, in your own voice, as one message: how big it is first (urgent or not, how many, new or the same as before), then the concrete findings (ids, numbers, names, links), even when you ask them to decide something, then what you would do about it. When a decision is theirs and you haven't asked it here yet, end with that one question.",
+    "Tell the people here what it found as one message, in your own voice, the way a colleague would bring it up in the chat: open with the news itself ('A positive review came in overnight: …', '3 new errors in checkout since 09:00'), never with a verdict on the run ('Quiet run, nothing urgent:', 'Summary:') or a word about the routine, the run or the check. When it is your first message here that day and the morning has started ('Now' gives the local time and when the previous message here was), greet them first ('Good morning!', in their language).",
+    "Then the concrete findings (ids, numbers, names, links) in plain sentences, even when you ask them to decide something, put against what came before (new, the same as always, how many so far). Say what you would do only when there is something to do; never close with filler like 'I'd just keep watching', and leave out what wasn't checked unless that gap changes the answer. When a decision is theirs and you haven't asked it here yet, end with that one question.",
     "Anything you already proposed or asked in this conversation (a fix, a PR, an ok you wait for) stays out of this message: don't repeat it, remind it or open a card about it, unless what you found changes it.",
     "When what you'd do needs a person's approval (a rollback, a deploy, a merge, a change in a connected app), ask for it with that tool and your reason instead of asking in words: it becomes a card here, and nothing runs until a person approves.",
     "Don't redo the routine's lookups: it already looked. Check something only when the report leaves a gap that matters.",
     report === "always"
-      ? "This routine reports every time. On a quiet day, one or two lines: nothing unusual, with the key numbers, and nothing more (no full series, no plans for its next run). When something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
+      ? "This routine reports every time. On a quiet day, one or two lines said plainly ('All quiet overnight: 2,524 active, MRR flat.'), and nothing more (no full series, no plans for its next run). When something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
       : "If nothing in it is new for them (the same as before, or only something you already said here), say nothing: pass.",
   ].join(" ");
 }
