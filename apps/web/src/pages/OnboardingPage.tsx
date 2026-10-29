@@ -107,6 +107,7 @@ import {
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
+import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
@@ -555,6 +556,9 @@ export function OnboardingPage() {
     return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  // The rail says where that computer is, except at phone width (a bar of step numbers there).
+  const phone = useMediaQuery(COMPACT_QUERY);
+  const railSaysComputer = workspaceComputer !== null && !phone;
   const aiOpen = step.id === "agents" && agentsPhase === "ai";
   const jevOpen = step.id === "agents" && agentsPhase === "jev";
   // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
@@ -1274,6 +1278,7 @@ export function OnboardingPage() {
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
                           hostConnecting={computer === "host"}
+                          said={railSaysComputer}
                           onKey={() => pickAi("key")}
                           onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                           onDone={(ids, account) => {

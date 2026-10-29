@@ -1056,11 +1056,13 @@ export const en: Translations = {
     wait: {
       signIn: "You sign in here as soon as the computer is ready.",
       key: "You send the key as soon as the computer is ready.",
-      email: "We'll email you when it's ready. You can close this page.",
-      ready: "{{computer}} is ready.",
+      email: "We'll email you when the computer is ready. You can close this page.",
+      ready: "The computer is ready.",
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
+    /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
+    theComputer: "the computer",
     own: {
       shared: "The account your agents share",
       one: "An account just for {{name}}",
@@ -1889,7 +1891,7 @@ export const en: Translations = {
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
           send: "Send to {{computer}}",
-          sent: "Code sent. {{computer}} is finishing the sign-in.",
+          sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
           deviceCodeText: "Type this code on the page that opens.",
@@ -1903,7 +1905,7 @@ export const en: Translations = {
             codex:
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
           },
-          startFailed: "{{computer}} didn't answer. Try again in a moment.",
+          startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
           done: "The {{account}} account is on {{computer}}. Click Use to save.",
         },

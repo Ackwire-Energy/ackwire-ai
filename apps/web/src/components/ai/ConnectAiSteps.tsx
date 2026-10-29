@@ -1,7 +1,13 @@
 import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
 import { planWordOf } from "@agenteschat/client/lib/ai-accounts";
-import { computerEdition, computerName, etaLine, setupView } from "@agenteschat/client/lib/computer";
+import {
+  computerEdition,
+  computerName,
+  etaLine,
+  setupView,
+  statusRestatesChip,
+} from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -193,6 +199,11 @@ export interface PlanPanelProps {
   hostConnecting?: boolean;
   /** The person came because the computer just got ready (its email, its notification): said first, once it is. */
   justReady?: boolean;
+  /**
+   * The setup's rail beside the panel says where the computer is: a line that would only say it again stays out, as
+   * `SetupProgress`'s `said`.
+   */
+  said?: boolean;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -285,6 +296,7 @@ function PlanSteps({
   own,
   hostConnecting,
   justReady,
+  said = false,
   onKey,
   onComputer,
   onDone,
@@ -478,9 +490,10 @@ function PlanSteps({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
-    // The computer's wait in one well: how far it is and the time left, or why it waits, then when the step under it
-    // turns on, said once (the owner's email line says it for them). A hold decides when anything runs there: it
-    // speaks alone. The well's lines start on the panel's text edge, so none leads with an icon.
+    // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
+    // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
+    // hold decides when anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none
+    // leads with an icon.
     wait = (hold || preparing) && (
       <div className="ai-panel__wait">
         {hold ? (
@@ -492,7 +505,8 @@ function PlanSteps({
             {preparing?.step ? (
               <SetupProgress view={preparing} />
             ) : (
-              preparing && (
+              preparing &&
+              !(said && statusRestatesChip(preparing)) && (
                 <p className="setup-line" role="status">
                   {t(preparing.textKey)}
                 </p>
@@ -588,11 +602,19 @@ function PlanSteps({
   return (
     <>
       {wait}
-      {ready && waited && (
-        <SettingNote icon="check" live>
-          {t("connectAi.wait.ready", { computer })}
-        </SettingNote>
-      )}
+      {ready &&
+        waited &&
+        (said ? (
+          // The rail says it to the eye, and a screen reader still hears the sign-in come on.
+          <p className="ac-visually-hidden" role="status">
+            {t("connectAi.wait.ready")}
+          </p>
+        ) : (
+          // A group of its own over a hairline, so it never reads as part of the account choice under it.
+          <SettingNote icon="check" live className="ai-panel__ready">
+            {t("connectAi.wait.ready")}
+          </SettingNote>
+        ))}
       {everyone && steps && (
         <ul className="ai-panel__who" aria-label={t("connectAi.agentAria")}>
           {forWhom.map((a) => {
@@ -646,7 +668,8 @@ function PlanSteps({
           key={turn?.id}
           machineId={view?.computer?.machineId ?? ""}
           kind={kind}
-          computer={computer}
+          // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
+          computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(coding ? { provider: choice } : {})}
           again={signedOut?.id}
           email={turn && sameAs ? sameAs : signedOut?.email}

@@ -43,6 +43,7 @@ export function SettingNote({
   icon,
   quiet,
   live,
+  className,
   children,
 }: {
   icon: IconName;
@@ -50,11 +51,12 @@ export function SettingNote({
   quiet?: boolean;
   /** It changes with the choice above (announced politely, fades in). */
   live?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   return (
     <p
-      className={cx("ac-setnote ac-iconline", quiet && "ac-setnote--quiet", live && "ac-setnote--live")}
+      className={cx("ac-setnote ac-iconline", quiet && "ac-setnote--quiet", live && "ac-setnote--live", className)}
       aria-live={live ? "polite" : undefined}
     >
       <Icon name={icon} size={14} />

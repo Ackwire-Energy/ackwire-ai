@@ -99,15 +99,45 @@ describe("buttons and kbd", () => {
     expect(off).not.toContain("var(--sunken)");
   });
 
-  test("a chosen option looks the same in both themes and never moves, so a row of options keeps its words on one line", async () => {
+  test("a chosen option is pressed the same in both themes and never moves, so a row of options keeps its words on one line", async () => {
     const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
-    // One recipe, in the block both themes share: held down into the page, and neither theme redefines it.
-    const defining = [...tokens.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)]
-      .filter(([, , rule]) => (rule ?? "").includes("--chosen-"))
-      .map(([, selector]) => (selector ?? "").trim().replace(/\s+/g, " "));
-    expect(defining).toEqual([":root, [data-theme]"]);
-    expect(tokens).toContain("--chosen-bg: var(--sunken);");
-    expect(tokens).toContain("--chosen-lift: none;");
+    const blocks = [...tokens.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map(
+      ([, selector, rule]) => ({
+        selector: (selector ?? "").trim().replace(/\s+/g, " "),
+        vars: new Map(
+          [...(rule ?? "").matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [
+            name ?? "",
+            (value ?? "").trim(),
+          ]),
+        ),
+      }),
+    );
+    type Vars = Map<string, string>;
+    const chosen = (vars: Vars) => [...vars.keys()].filter((name) => name.startsWith("chosen-"));
+    // One recipe, in the block both themes share, and each theme gives it its face and its shadow.
+    const defining = blocks.filter((b) => chosen(b.vars).length > 0);
+    expect(defining.map((b) => [b.selector, chosen(b.vars)])).toEqual([
+      [':root, [data-theme="light"]', ["chosen-bg", "chosen-press"]],
+      ['[data-theme="dark"]', ["chosen-bg", "chosen-press"]],
+      [":root, [data-theme]", ["chosen-shadow", "chosen-lift"]],
+    ]);
+    const [light, dark, shared] = defining.map((b) => b.vars) as [Vars, Vars, Vars];
+    expect(light.get("chosen-bg")).toBe("var(--sunken)");
+    expect(light.get("chosen-press")).toBe(
+      "inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12)",
+    );
+    // Dark's face sits between the page and a card, never on its near-black --sunken, where a black shadow can't
+    // show. Its shadow is light's, deeper.
+    const level = (hex = "") => Number.parseInt(hex.slice(1, 3), 16);
+    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("bg")));
+    expect(level(dark.get("chosen-bg"))).toBeLessThan(level(dark.get("raised")));
+    const shape = (press = "") => press.replace(/rgba\([^)]*\)/g, "");
+    expect(shape(dark.get("chosen-press"))).toBe(shape(light.get("chosen-press")));
+    const alphas = (press = "") => [...press.matchAll(/rgba\(0, 0, 0, ([\d.]+)\)/g)].map(([, a]) => Number(a));
+    const lightAlphas = alphas(light.get("chosen-press"));
+    expect(alphas(dark.get("chosen-press")).map((a, i) => a >= 3 * (lightAlphas[i] ?? 1))).toEqual([true, true]);
+    expect(shared.get("chosen-shadow")).toBe("var(--chosen-press), inset 0 0 0 1px var(--line)");
+    expect(shared.get("chosen-lift")).toBe("none");
   });
 });
 

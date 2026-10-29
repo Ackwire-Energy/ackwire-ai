@@ -4,15 +4,18 @@ import { build } from "vite";
 const WEB = join(import.meta.dir, "..");
 
 /**
- * A stylesheet as the production build writes it, the app's own unless `input` names another (a page's or a
- * component's, from apps/web): Vite's own CSS pipeline (its minifier and targets).
+ * Stylesheets as the production build writes them: Vite's own CSS pipeline (its minifier and targets). The app's
+ * own unless `inputs` names others (paths under apps/web, a page's or a component's), built together.
  */
-export async function builtCss(input = "src/styles.css") {
+export async function builtCss(...inputs: string[]) {
   const out = await build({
     configFile: false,
     logLevel: "silent",
     root: WEB,
-    build: { write: false, rollupOptions: { input: join(WEB, input) } },
+    build: {
+      write: false,
+      rollupOptions: { input: (inputs.length ? inputs : ["src/styles.css"]).map((i) => join(WEB, i)) },
+    },
   });
   return (Array.isArray(out) ? out : [out])
     .flatMap((o) => ("output" in o ? o.output : []))
@@ -84,18 +87,24 @@ const normal = (selector: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** Every rule, in order (an at-rule block's too), as its selectors, normalised, and its [property, value] pairs. */
+export function rules(css: string) {
+  return [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+    selectors: splitList(normal(m[1] ?? "")),
+    declarations: (m[2] ?? "")
+      .split(";")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => [d.slice(0, d.indexOf(":")).trim(), d.slice(d.indexOf(":") + 1).trim()] as const),
+  }));
+}
+
 /** The declarations of every rule whose selector list holds `selector`, in order, as [property, value]. */
 export function declarations(css: string, selector: string) {
   const wanted = normal(selector);
-  return [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter((m) => splitList(normal(m[1] ?? "")).includes(wanted))
-    .flatMap((m) =>
-      (m[2] ?? "")
-        .split(";")
-        .map((d) => d.trim())
-        .filter(Boolean)
-        .map((d) => [d.slice(0, d.indexOf(":")).trim(), d.slice(d.indexOf(":") + 1).trim()] as const),
-    );
+  return rules(css)
+    .filter((r) => r.selectors.includes(wanted))
+    .flatMap((r) => r.declarations);
 }
 
 /** A selector list's selectors, split on its top-level commas only (`:is(a, b)` stays one). */
