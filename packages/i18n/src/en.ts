@@ -301,7 +301,7 @@ export const en: Translations = {
       lead: "They come with their instructions, skills, routines and memory.",
       sourcesLabel: "Where the agents come from",
       otherName: "Another app",
-      agenteschatName: "agentes.chat export",
+      agenteschatName: "agentes.chat",
       where: {
         openbotrun:
           "Drop openbot-import.json (from Migrator by OpenBot) or openbot-transfer.json (from the instance transfer), or the .zip it came in.",

@@ -202,7 +202,7 @@ describe("Configurações → Importar e exportar", () => {
         ["Hermes Agent", "/brands/hermes.svg"],
         ["OpenClaw", "/brands/openclaw.svg"],
         ["Paperclip", "/brands/paperclip.svg"],
-        ["Exportação do agentes.chat", "/favicon.svg"],
+        ["agentes.chat", "/favicon.svg"],
         // It names many apps: no one maker's logo fits.
         ["Outro app", null],
       ]);
@@ -218,7 +218,7 @@ describe("Configurações → Importar e exportar", () => {
         ["Hermes Agent", "/brands/hermes-dark.svg"],
         ["OpenClaw", "/brands/openclaw.svg"],
         ["Paperclip", "/brands/paperclip-dark.svg"],
-        ["Exportação do agentes.chat", "/favicon.svg"],
+        ["agentes.chat", "/favicon.svg"],
         ["Outro app", null],
       ]);
     } finally {
@@ -306,7 +306,7 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().queryByRole("button", { name: /^OpenBot$/ })).toBeNull();
     await click(button(/^OpenBot\.run$/), 1);
     expect(text()).toContain("Solte o openbot-import.json");
-    await click(button(/^Exportação do agentes\.chat/), 1);
+    await click(button(/^agentes\.chat$/), 1);
     expect(text()).toContain("Configurações → Importar e exportar → Baixar o arquivo");
 
     await pick("Pasta para importar", folder("paperclip-company"));
