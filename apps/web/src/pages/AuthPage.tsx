@@ -144,9 +144,12 @@ export function AuthPage({
         : joining
           ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
           : null;
-  const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
-    null,
-  );
+  const [browser, setBrowser] = useState<{
+    provider: SignInProvider;
+    verifier: string;
+    requestId: string;
+    code: string;
+  } | null>(null);
   // This server runs inside the app here: the app signs its owner in.
   const [local, setLocal] = useState(false);
   const [ownerPending, setOwnerPending] = useState(false);
@@ -284,16 +287,18 @@ export function AuthPage({
     else if (step === "forgot") void sendReset();
   };
 
-  /** The Mac app: the provider in the browser; this window keeps the verifier and waits. */
+  /** The Mac app: the provider in the browser; this window keeps the verifier, shows the code and waits. */
   const signInInBrowser = async (provider: SignInProvider) => {
     const verifier = newVerifier();
     const challenge = await challengeOf(verifier);
-    setBrowser({ provider, verifier, challenge });
+    const opened = await auth.desktopOpen(challenge).catch(() => null);
+    if (!opened) return;
+    setBrowser({ provider, verifier, requestId: opened.requestId, code: opened.code });
     go("browser");
-    window.location.assign(browserSignInUrl(provider, challenge));
+    window.location.assign(browserSignInUrl(provider, opened.requestId));
   };
   const reopenBrowser = () => {
-    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.challenge));
+    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.requestId));
   };
 
   // Asks every 2 s and whenever the window comes back to the front; a full load after, so everything starts signed in.
@@ -302,6 +307,7 @@ export function AuthPage({
     let stopped = false;
     const check = async () => {
       if (stopped || !(await auth.desktopRedeem(browser.verifier).catch(() => false)) || stopped) return;
+      // The code is matched in the browser, so once the session arrives the window just loads signed in.
       stopped = true;
       window.location.assign(`${SIGNED_IN_PATH}?${new URLSearchParams({ to: redirect ?? "/" })}`);
     };
@@ -563,6 +569,12 @@ export function AuthPage({
 
             {step === "browser" && (
               <>
+                {browser && (
+                  <div className="auth__code">
+                    <span className="auth__codeValue">{browser.code}</span>
+                    <p className="auth__fine">{t("auth.desktop.codeHint")}</p>
+                  </div>
+                )}
                 <Button type="button" size="lg" block onClick={reopenBrowser}>
                   {t("auth.desktop.reopen")}
                 </Button>

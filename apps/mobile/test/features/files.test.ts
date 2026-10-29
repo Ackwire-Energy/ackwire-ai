@@ -130,6 +130,14 @@ describe("shared copies", () => {
       uri: "https://bucket.s3/x?sig=1",
       needsSession: false,
     });
+    expect(resolveDownloadUrl("https://app.agentes.chat", "https://app.agentes.chat.attacker.test/file")).toEqual({
+      uri: "https://app.agentes.chat.attacker.test/file",
+      needsSession: false,
+    });
+    expect(resolveDownloadUrl("https://app.agentes.chat", "https://app.agentes.chat/file")).toEqual({
+      uri: "https://app.agentes.chat/file",
+      needsSession: true,
+    });
     expect(
       resolveDownloadUrl("https://app.agentes.chat/", "/api/app/organizations/o/artifacts/a/file?version=2"),
     ).toEqual({

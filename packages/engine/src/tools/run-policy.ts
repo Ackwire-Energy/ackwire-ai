@@ -146,9 +146,18 @@ const INTERNAL_BY_SCOPE: Readonly<Record<string, InternalArea>> = {
 
 const isReadScope = (scope: string) => /[:.]read$/.test(scope);
 
-/** What a tool does (see `ToolKind`): by name first, then its scope and whether it is a connector's. */
+/** What a tool does (see `ToolKind`): provenance first, then built-in name and scope. */
 export function toolKind(tool: PolicyTool): ToolKind {
   if (directoryRole(tool as ToolDefinition)) return { kind: "directory" };
+  // These Git tools carry a connection ID for credentials, but they are our own
+  // workspace-changing actions. Their exact scopes distinguish them from MCP tools.
+  if (tool.name === "git_clone" && tool.scope === "github:git.read") return { kind: "internal", area: "code" };
+  if (tool.name === "open_pull_request" && tool.scope === "github:pr.write") return { kind: "internal", area: "code" };
+  // A connected app's tool (a catalog connector, custom server, mailbox, or database) is a read
+  // only when its scope says so. Connector names can collide with built-ins (a custom MCP
+  // server named "permission" exposing "prompt"). Classify by provenance
+  // before consulting the built-in name table.
+  if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
@@ -158,9 +167,6 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (READS.has(tool.name)) return { kind: "read" };
   const named = INTERNAL_BY_NAME[tool.name];
   if (named) return { kind: "internal", area: named };
-  // A connected app's tool (a catalog connector, a custom server, a mailbox, a database): a read when
-  // its scope says so (`github:pr.read`, `custom:<id>:read`, `mail:read`, `database:read`), else a write.
-  if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (isReadScope(tool.scope)) return { kind: "read" };
   const area = INTERNAL_BY_SCOPE[tool.scope];
   if (area) return { kind: "internal", area };

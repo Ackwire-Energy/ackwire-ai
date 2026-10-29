@@ -72,7 +72,7 @@ import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
-import { recentTurn, stoppedOf } from "./turn";
+import { recentTurn, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
@@ -138,6 +138,9 @@ export const MessageRow = memo(function MessageRow({
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (isAgent && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
+  // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
+  const opened =
+    kept && m.agentRunId ? turnOpener({ runId: m.agentRunId, status: "running", text: "" }, kept.items) : null;
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -320,9 +323,10 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
+        {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {kept ? (
           <TurnTools
-            items={kept.items}
+            items={opened?.lines ?? kept.items}
             agentName={agent?.name ?? name}
             color={color}
             quoteOf={(id) => kept.quotes[id]}

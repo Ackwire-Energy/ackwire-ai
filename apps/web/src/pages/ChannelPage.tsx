@@ -2772,6 +2772,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
+  // Nothing said and no steps yet: its words stream where the opener stands, so the line it opens with
+  // stays put when a tool call turns it into narration (and the answer, with no tools, starts there too).
+  const wordsOnTop = !opening.said && opening.work.length === 0;
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
@@ -2935,6 +2938,9 @@ export const TimelineMessage = memo(function TimelineMessage({
     keptAll && onCards.length > 0
       ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
       : keptAll;
+  // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
+  const keptSaid = keptWork?.find((w) => w.kind === "say");
+  const keptSteps = keptSaid && keptWork ? keptWork.filter((w) => w !== keptSaid) : keptWork;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
   const details = [
@@ -3046,7 +3052,16 @@ export const TimelineMessage = memo(function TimelineMessage({
       {live ? (
         <>
           {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
-          {(opening.said || opening.opener !== null) && (
+          {wordsOnTop && !liveFailed && revealed ? (
+            <MessageText>
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
+            </MessageText>
+          ) : (opening.said || opening.opener !== null) && (
             <MessageText>
               <MessageBody
                 body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
@@ -3084,7 +3099,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
           <RunBrowserCard run={live} name={name} />
-          {!liveFailed && revealed && (
+          {!liveFailed && revealed && !wordsOnTop && (
             <MessageText>
               <MessageBody
                 body={revealed}
@@ -3105,9 +3120,14 @@ export const TimelineMessage = memo(function TimelineMessage({
         </>
       ) : (
         <>
-          {keptWork?.length && seenLive ? (
+          {keptSaid?.kind === "say" && (
+            <MessageText>
+              <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
+            </MessageText>
+          )}
+          {keptSteps?.length && seenLive ? (
             <LiveTools
-              work={keptWork}
+              work={keptSteps}
               agentName={name}
               color={colorOf(agent)}
               steerNote={steerNote}
