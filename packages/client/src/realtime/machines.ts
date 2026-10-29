@@ -143,7 +143,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       break;
     case "machine.deleted":
       qc.setQueryData<Machine[]>(list, (old) => old?.filter((m) => m.id !== machineId));
-      // Its agents went back to the cloud (`agent.computer` events follow; refetch anyway).
+      // Its agents are left with no computer (`agent.computer` events follow; refetch anyway).
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
       // The server's own computer, stopped here, offers to come back.
       void qc.invalidateQueries({ queryKey: keys.hostComputer(orgId) });
@@ -157,19 +157,13 @@ const isAgentBrainKey = (key: readonly unknown[], orgId: string) =>
   key[0] === "org" && key[1] === orgId && key[2] === "agent" && key[4] === "brain";
 
 /**
- * `agent.computer`: a full view (`computer`), or only `target` when someone
- * switched computers. A target-only event keeps the cached status and
- * refetches the rest (cost, disk) in the background.
+ * `agent.computer`: someone switched the agent's computer, or its computer was removed. The cached view takes the
+ * new target, and what depends on the computer is asked again.
  */
 export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type: string }) {
-  const e = event as { agentId?: unknown; computer?: AgentComputer; target?: ComputerTarget };
+  const e = event as { agentId?: unknown; target?: ComputerTarget };
   if (event.type !== "agent.computer" || typeof e.agentId !== "string") return;
   const key = keys.computer(orgId, e.agentId);
-  if (e.computer && typeof e.computer.status === "string") {
-    const computer = e.computer;
-    qc.setQueryData<AgentComputer>(key, (old) => ({ ...computer, target: computer.target ?? e.target ?? old?.target }));
-    return;
-  }
   if (e.target && typeof e.target.kind === "string") {
     const target = e.target;
     qc.setQueryData<AgentComputer>(key, (old) => (old ? { ...old, target } : old));
@@ -200,7 +194,7 @@ const SETUP_FIELDS = [
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0077) asks for the limits again, so a
+ * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0078) asks for the limits again, so a
  * full workspace's invitations open by themselves. Returns whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {

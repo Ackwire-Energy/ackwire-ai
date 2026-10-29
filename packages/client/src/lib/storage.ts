@@ -4,7 +4,8 @@ import { formatBytes } from "./files";
 
 /**
  * The line under the storage option in use (Settings › Storage, web and phone): what the workspace keeps there and,
- * where that is a folder on this server, what its disk has left. Null from a server that doesn't say.
+ * where that is a folder on a server of its own, what its disk has left (the server never sends the Cloud's). Null
+ * from a server that doesn't say.
  */
 export function storageUsageLine(t: TFunction, locale: string, config: StorageConfig): string | null {
   const { usage } = config;

@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { useStreams } from "@/realtime/context";
 
 /** Opening on hover waits a little (a pointer just passing by doesn't open it). */
@@ -14,6 +15,25 @@ export const MEMBERS_OPEN_MS = 150;
 const MEMBERS_CLOSE_MS = 200;
 /** Avatars in the stack before "+N". */
 const STACKED = 3;
+/** Up to here the details' words and the faces don't both fit beside the channel's name: the words fold. */
+const PHONE_HEADER = "(max-width: 480px)";
+
+/** "Detalhes do canal" in the channel header; folded to its icon on a phone. */
+export function ChannelDetailsButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  const folded = useMatchMedia(PHONE_HEADER);
+  return (
+    <Button
+      size="sm"
+      iconOnly={folded}
+      icon={folded ? "info" : undefined}
+      aria-label={folded ? t("channel.details") : undefined}
+      onClick={onClick}
+    >
+      {t("channel.details")}
+    </Button>
+  );
+}
 
 /**
  * The stacked avatars in the channel header: a button ("Membros do canal (5)")

@@ -10,7 +10,6 @@ import {
   useConfirmDevice,
   useJevKey,
   useMachines,
-  useSandboxSettings,
   useSaveJevKey,
 } from "@agenteschat/client";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
@@ -170,7 +169,7 @@ const COMPUTER_POLL_MS = 5000;
 const FIRST_TIME_POLL_MS = 2000;
 
 /** `host`: the server's own computer. */
-type Computer = "cloud" | "machine" | "host" | null;
+type Computer = "machine" | "host" | null;
 /** An agent created here (a preset or an imported one), for the later steps. */
 interface CrewMember {
   key: string;
@@ -202,7 +201,7 @@ export interface ResumedOnboarding {
 }
 
 /**
- * Back from the billing service (ADR 0077): the workspace, its context and its team. The agents the import made, and
+ * Back from the billing service (ADR 0078): the workspace, its context and its team. The agents the import made, and
  * their models, are the ones this tab kept (`createTeam`); the ready-made agents are known by the handles the
  * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
  */
@@ -633,9 +632,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     },
   });
 
-  const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
-  // Daytona's sandboxes are a choice only on a server that has them.
-  const daytona = sandbox.data?.available === true;
   // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
@@ -672,7 +668,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const emails = sendsEmail(authConfig);
   const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
   const hold = holdText(t, standing);
-  // A new workspace waiting for its first plan (ADR 0077): its computer and its invitations come with the plan.
+  // A new workspace waiting for its first plan (ADR 0078): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
   // Back at the AI step, the plan says active once its hold is gone. Back from paying, the billing service lifts it
   // seconds later: until then the same line says the payment arrived.
@@ -704,7 +700,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   // something is connected, the chosen agent's view and the accounts are asked again every few seconds (no socket
   // is open here), so a plan's panel turns on by itself once the computer is ready.
   const orgSummary = me.data?.organizations.find((o) => o.id === created?.orgId);
-  const noComputer = edition === "selfhost" && (computer === null || computer === "cloud");
+  const noComputer = edition === "selfhost" && computer === null;
   const aiOf = (id: string): AgentAi => planned[id]?.choice ?? (keySaved ? "key" : null);
   const hasAi = (id: string) => aiOf(id) !== null;
   // The crew shares one computer here.
@@ -752,10 +748,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const saveComputer = useMutation({
     mutationFn: async (skipped: boolean) => {
       if (!created) return;
-      if (!skipped && computer === "cloud" && sandbox.data?.available && !sandbox.data.enabled) {
-        const saved = await api.sandbox.saveSettings(created.orgId, { enabled: true });
-        qc.setQueryData(keys.sandboxSettings(created.orgId), saved);
-      }
       // The agents, made a step before, follow the choice: onto the connected computer, or off the one they were on
       // when there's none.
       if (edition !== "selfhost") return;
@@ -785,7 +777,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   });
 
   // Done. The computer as it is now (it may have gone to sleep since it was picked), and whether it gives the agents
-  // a browser: a ready one does; one still being prepared and a Daytona sandbox don't.
+  // a browser: a ready one does; one still being prepared doesn't.
   const machinesNow = useMachines(created?.orgId ?? "", step.id === "done" && machine !== null);
   const machineNow = machinesNow.data?.find((m) => m.id === machine?.id) ?? machine;
   const browser = workspaceComputer
@@ -800,21 +792,19 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
           .filter(Boolean)
           .join(" · "),
       }
-    : computer === "cloud"
-      ? { kind: "cloud", state: "online", label: t("onboarding.computer.cloud") }
-      : (computer === "machine" || computer === "host") && machineNow
+    : (computer === "machine" || computer === "host") && machineNow
+      ? {
+          kind: computerKind(machineNow.os),
+          state: computerState(machineNow),
+          label: computer === "host" ? t("machines.host.label") : machineNow.name,
+        }
+      : computer === "machine"
         ? {
-            kind: computerKind(machineNow.os),
-            state: computerState(machineNow),
-            label: computer === "host" ? t("machines.host.label") : machineNow.name,
+            kind: "mac",
+            state: "paused",
+            label: `${t("onboarding.stepNames.computer")} · ${t("onboarding.done.computerPending")}`,
           }
-        : computer === "machine"
-          ? {
-              kind: "mac",
-              state: "paused",
-              label: `${t("onboarding.stepNames.computer")} · ${t("onboarding.done.computerPending")}`,
-            }
-          : null;
+        : null;
 
   // The first message: written as Done opens, so it never changes while it's read, and kept through edits and Back;
   // written again only when the ready-made agents, who offer it, change (an import retried on Done keeps it).
@@ -990,13 +980,11 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       : t("onboarding.railValue.skipped"),
     computer: workspaceComputer
       ? t(workspaceComputer.chipKey)
-      : computer === "cloud"
-        ? t("onboarding.computer.cloud")
-        : computer === "host"
-          ? t("machines.host.label")
-          : computer === "machine" && machine
-            ? machine.name
-            : t("onboarding.railValue.skipped"),
+      : computer === "host"
+        ? t("machines.host.label")
+        : computer === "machine" && machine
+          ? machine.name
+          : t("onboarding.railValue.skipped"),
     agents: crew.length
       ? joinNames(
           crew.map((c) => c.name),
@@ -1351,7 +1339,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
               <ComputerStep
                 orgId={created.orgId}
                 computer={computer}
-                daytona={daytona}
                 machine={machine}
                 onChoose={(c) => {
                   // Leaving the server's computer for "this computer": the pairing starts from nothing.
@@ -1751,14 +1738,12 @@ function ChoiceCard({
 }
 
 /**
- * Where the agents work: the workspace's cloud computer, or this computer / a
- * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
- * In agentes for Mac (ADR 0036) the second choice is "Este Mac", and choosing it connects it.
+ * Where the agents work: this computer or a server (the Mac app or the terminal; the computer shows a code to confirm,
+ * live until it connects). In agentes for Mac (ADR 0036) the choice is "Este Mac", and choosing it connects it.
  */
 function ComputerStep({
   orgId,
   computer,
-  daytona,
   machine,
   onChoose,
   onPaired,
@@ -1766,8 +1751,6 @@ function ComputerStep({
 }: {
   orgId: string;
   computer: Computer;
-  /** This server has Daytona's sandboxes. */
-  daytona: boolean;
   machine: Machine | null;
   onChoose: (c: Computer) => void;
   onPaired: (m: Machine) => void;
@@ -1849,23 +1832,7 @@ function ComputerStep({
           pressed={computer === "machine"}
           onClick={chooseMachine}
         />
-        {daytona && (
-          <ChoiceCard
-            art={<ComputerPortrait kind="cloud" state="online" />}
-            title={t("onboarding.computer.cloud")}
-            desc={t("onboarding.computer.cloudDesc")}
-            pressed={computer === "cloud"}
-            onClick={() => onChoose("cloud")}
-          />
-        )}
       </div>
-
-      {computer === "cloud" && (
-        <p className="onb__status ac-iconline" role="status">
-          <Icon name="check" size={14} />
-          <span>{t("onboarding.computer.cloudReady")}</span>
-        </p>
-      )}
 
       {computer === "host" && (
         <p className="onb__status ac-iconline" role="status">
@@ -1936,7 +1903,7 @@ function ComputerStep({
 }
 
 /**
- * The computer step of a new workspace waiting for its first plan (ADR 0077): its computer waiting with the team
+ * The computer step of a new workspace waiting for its first plan (ADR 0078): its computer waiting with the team
  * around it, only what is done so far, then the banner holding the step's one action, the plan that brings the
  * computer (`billing`: the server has a billing service).
  */

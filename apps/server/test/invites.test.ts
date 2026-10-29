@@ -381,7 +381,9 @@ test("only admins see and answer requests; asks must come from our own pages", a
   expect(((await again.json()) as { error: { code: string } }).error.code).toBe("join.answered");
   await t.drain();
   const toAna = mailTo("ana@example.com").find((m) => m.subject === "Seu pedido para entrar não foi aprovado");
-  expect(toAna?.html).toContain("We only take people from &lt;the studio&gt;");
+  expect(toAna?.html).toContain(
+    'We only take people from <span style="display:inline-block">&lt;the studio&gt;”</span>',
+  );
 });
 
 test("an account that never confirmed its address reads no one else's answer, nor asks without its mailbox", async () => {

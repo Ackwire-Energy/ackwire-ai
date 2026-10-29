@@ -41,6 +41,9 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
     expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
+    // A real spend too small for 4 decimals (a few thousand tokens of a cheap model) never reads as zero.
+    expect(formatUsd(t, "pt-BR", 0.00003)).toBe("<US$ 0,0001");
+    expect(formatUsd(t, "pt-BR", 0.00005)).toBe("US$ 0,0001");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
@@ -161,7 +164,7 @@ describe("grammar", () => {
     const ada = agentGrammar(te, "Ada");
     const theo = agentGrammar(te, "Theo");
     // Her page says "her" in both lines it has for her.
-    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI connected.");
+    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI\u00a0connected.");
     expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
     expect(te("agentPage.work.cell.label", ada)).toBe("How she works");
     expect(te("agentPage.overview.proposes", ada)).toBe("Ada proposes changing her instructions");
@@ -214,7 +217,7 @@ describe("grammar", () => {
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
     for (const name of masculine)
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
-    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI connected.");
+    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
     expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
   });
 

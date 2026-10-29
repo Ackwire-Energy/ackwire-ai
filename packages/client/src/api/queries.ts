@@ -1,4 +1,5 @@
 import {
+  type InfiniteData,
   queryOptions,
   useInfiniteQuery,
   useMutation,
@@ -41,6 +42,9 @@ import type {
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  AuditPage,
+  AuditQuery,
+  AuditRow,
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
@@ -1064,6 +1068,34 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
 
+/** Configurações › Auditoria: pages of 50, newest first (admins). */
+export function useAudit(orgId: string, query: AuditQuery, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    enabled,
+    queryKey: keys.audit(orgId, query),
+    queryFn: ({ pageParam }) => api.orgs.audit(orgId, { ...query, ...(pageParam ? { before: pageParam } : {}) }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.next ?? undefined,
+    placeholderData: (prev) => prev,
+    staleTime: 15_000,
+  });
+}
+
+/**
+ * One row of the audit log already on screen (the phone's detail screen, pushed over the list): read from the
+ * pages loaded for any filter; null when none holds it.
+ */
+export function useAuditRow(orgId: string, id: string): AuditRow | null {
+  const qc = useQueryClient();
+  const pages = qc.getQueriesData<InfiniteData<AuditPage>>({ queryKey: ["org", orgId, "audit"] });
+  for (const [, data] of pages) {
+    const row = data?.pages.flatMap((p) => p.rows).find((r) => r.id === id);
+    if (row) return row;
+  }
+  return null;
+}
+
 /** Configurações › Uso: every plan account by computer and the API per agent (ADR 0063). */
 export const usePlanUsage = (orgId: string) => {
   const api = useApi();
@@ -1460,7 +1492,7 @@ export function useDecideProposal(orgId: string) {
   });
 }
 
-/** People, files and today's uploads against the workspace's limits (ADR 0077): any member. */
+/** People, files and today's uploads against the workspace's limits (ADR 0078): any member. */
 export const useWorkspaceLimits = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.limits(orgId), queryFn: () => api.orgs.limits(orgId), enabled });
@@ -1925,9 +1957,9 @@ export function useSkillAction(orgId: string) {
   });
 }
 
-// ── PC do agente (sandbox) ───────────────────────────────────────────────────
+// ── Agent computer and Run code settings ─────────────────────────────────────
 
-/** `retry: false`: 404 = no sandbox on this server (the UI hides it). */
+/** The organization's Run code settings (`retry: false`). */
 export const useSandboxSettings = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
@@ -1997,42 +2029,18 @@ export const useAccountLogin = (orgId: string, machineId: string, loginId: strin
   });
 };
 
-export const useComputer = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
+export const useComputer = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.computer(orgId, agentId),
     queryFn: () => api.sandbox.computer(orgId, agentId),
     enabled,
     retry: false,
-    refetchInterval: pollMs,
-    // Polling doesn't show the top progress bar.
     meta: { quiet: true },
   });
 };
 
-export function useComputerAction(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ agentId, action }: { agentId: string; action: "start" | "stop" | "remove" }): Promise<unknown> =>
-      action === "start"
-        ? api.sandbox.start(orgId, agentId)
-        : action === "stop"
-          ? api.sandbox.stop(orgId, agentId)
-          : api.sandbox.remove(orgId, agentId),
-    onSuccess: (result, { agentId, action }) => {
-      if (action === "remove") {
-        qc.setQueryData<AgentComputer>(keys.computer(orgId, agentId), (old) =>
-          old ? { ...old, status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null } : old,
-        );
-      } else if (result && typeof result === "object" && "status" in result) {
-        qc.setQueryData(keys.computer(orgId, agentId), result as AgentComputer);
-      }
-    },
-  });
-}
-
-/** Cloud or a connected machine for the agent; the computer view follows the answer. */
+/** A connected machine for the agent, or none; the computer view follows the answer. */
 export function useSetComputerTarget(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2185,7 +2193,7 @@ export function useMachineAction(orgId: string) {
           : list?.map((m) => (m.id === input.machineId ? { ...m, name: input.name } : m)),
       );
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
-      // Agents on a removed machine go back to the cloud; a renamed one shows its new name.
+      // Agents on a removed machine are left with no computer; a renamed one shows its new name.
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
     },
   });

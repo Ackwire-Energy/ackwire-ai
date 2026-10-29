@@ -162,8 +162,6 @@ const SELFHOST_EXTRA = [
   "computers.hostMissing",
   ...["title", "text", "emptyTitle"].map((k) => `computers.other.${k}`),
   "computers.how",
-  "computers.daytona.cardTitle",
-  "computers.cloud.note",
   "computers.agents.title",
   "machines.host.label",
   "machines.host.desc",
@@ -173,12 +171,7 @@ const SELFHOST_EXTRA = [
   "machines.pausedHint",
   "outage.switch",
   "outage.title",
-  "outage.dialog.cloud",
-  "outage.dialog.cloudText",
   "computer.target.none",
-  "computer.target.daytona",
-  "computer.target.daytonaText",
-  "computer.emptyText",
   "computer.machineOffline",
   "desktop.use.title",
   "agentPage.work.offline",
@@ -186,12 +179,8 @@ const SELFHOST_EXTRA = [
   "agentPage.work.computer.offline",
   "agentPage.work.computer.alsoOffline",
   "agentPage.work.computer.connect",
-  "agentPage.work.cell.daytona",
-  "agentPage.work.saved.daytona",
   "agentPage.work.saved.none",
-  "agentPage.work.computer.useDaytona",
-  "agentPage.computer.ownerPicks",
-  ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
+  ...["mine", "mineDesc"].map((k) => `onboarding.computer.${k}`),
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
@@ -320,6 +309,27 @@ describe("computer copy", () => {
     }
   });
 
+  test("'responde a' only says whom an agent replies to, never whose agent it is", () => {
+    // The pages that say whom an agent replies to ("Responde a todos", "Quem pode falar") also name its owner: there
+    // "responde a Lucas", or "Responde a" over the owner's name, would read as whom it replies to.
+    for (const [strings, replies] of [
+      [ptBR, /\bresponde a\b/i],
+      [en, /\b(answers|replies) to\b/i],
+    ] as const) {
+      const values = [...valuesOf(strings)];
+      const headers = values.filter(([, v]) => v.startsWith("{{role}} ·") && v.includes("{{owner}}"));
+      expect(headers.map(([k]) => k)).toEqual(["dm.subtitle", "agent.subtitle"]);
+      // The headers, every owner label and line, and on Criar agente the owner step's lead and the labels its review
+      // and its preview would put over the owner.
+      const page = ["newAgent.steps.where.lead", "newAgent.answers", "newAgent.preview.answers"];
+      const naming = values.filter(
+        ([k]) => headers.some(([h]) => h === k) || /(^|\.)owner\w*$/.test(k) || page.includes(k),
+      );
+      expect(naming.length).toBeGreaterThan(20);
+      expect(naming.filter(([, v]) => replies.test(v))).toEqual([]);
+    }
+  });
+
   test("the storage line says what the files take, and where only for this server's disk, the one place it shows", () => {
     // Every setup shows how much (the Cloud, a server's folder or database, a bucket), and each option's own words say
     // where: only a folder on this server adds what its disk has free.
@@ -358,6 +368,5 @@ describe("computer copy", () => {
       expect(bannedIn(s, [...CLOUD_BANNED.en, ...CLOUD_BANNED["pt-BR"]])).toEqual([]);
     }
     expect(bannedIn("Cloud computer", SELFHOST_BANNED)).toEqual(["cloud computer"]);
-    expect(bannedIn("Sandbox da Daytona", SELFHOST_BANNED)).toEqual([]);
   });
 });

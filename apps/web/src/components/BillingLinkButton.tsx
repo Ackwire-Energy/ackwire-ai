@@ -6,7 +6,7 @@ import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
 /**
- * Mints the workspace's billing link and leaves for it (ADR 0077), saying `billing.failed` when it can't. The link
+ * Mints the workspace's billing link and leaves for it (ADR 0078), saying `billing.failed` when it can't. The link
  * goes nowhere but the address bar: it opens once and lasts minutes.
  */
 export function useOpenBilling(orgId: string, from: BillingFrom) {

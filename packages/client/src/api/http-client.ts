@@ -32,6 +32,7 @@ import type {
   ArtifactDetail,
   ArtifactVersion,
   AskToJoinResult,
+  AuditPage,
   AuthConfig,
   BatchInviteResult,
   BrainMachine,
@@ -383,6 +384,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
       planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
+      audit: (orgId, query = {}) =>
+        request<AuditPage>(`${org(orgId)}/audit`, {
+          query: {
+            actorType: query.actorType,
+            actorId: query.actorId,
+            outcome: query.outcome?.length ? query.outcome.join(",") : undefined,
+            waiting: query.waiting ? "true" : undefined,
+            kind: query.kind,
+            before: query.before,
+            limit: query.limit,
+          },
+        }),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
@@ -581,11 +594,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       saveSettings: (orgId, input) =>
         request<SandboxSettings>(`${org(orgId)}/sandbox-settings`, { method: "PUT", json: input }),
       computer: (orgId, agentId) => request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer`),
-      start: (orgId, agentId) =>
-        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/start`, { json: {} }),
-      stop: (orgId, agentId) =>
-        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/stop`, { json: {} }),
-      remove: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/computer`, { method: "DELETE" }),
       setTarget: (orgId, agentId, machineId) =>
         request<ComputerTarget>(`${org(orgId)}/agents/${enc(agentId)}/computer/target`, {
           method: "PUT",

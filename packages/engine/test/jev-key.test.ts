@@ -125,7 +125,9 @@ describe("the key, saved and read", () => {
     const key = jevKey(typesafe(401).fetch);
     await expect(key.save("ts_made_up_key", f.owner.id)).rejects.toMatchObject({ code: "jev_key_invalid" });
     expect(await f.db.select().from(schema.instanceSecrets)).toEqual([]);
-    expect(await f.db.select().from(schema.auditLog)).toEqual([]);
+    const audit = await f.db.select().from(schema.auditLog);
+    expect(audit.filter((a) => a.action.startsWith("jev."))).toEqual([]);
+    expect(JSON.stringify(audit)).not.toContain("ts_made_up_key");
   });
 
   test("a key that isn't printable ASCII is refused before TypeSafe sees it, and one in the env is never called", async () => {

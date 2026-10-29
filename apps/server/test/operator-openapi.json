@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, billing holds and limits, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056, ADR 0077)."
+    "description": "Workspace and account lookups, workspace standing, billing holds and limits, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056, ADR 0078)."
   },
   "servers": [
     {

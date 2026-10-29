@@ -80,6 +80,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
       "org:general",
       "org:members",
+      "org:audit",
       "agents:access",
       "agents:connectors",
       "agents:skills",
@@ -291,7 +292,7 @@ describe("Computadores", () => {
       expect(member.canPick).toBe(false);
     });
 
-    test("no computer: offered only for an agent that has none, never the cloud's sandboxes", () => {
+    test("no computer: offered only for an agent that has none", () => {
       const pick = agentComputerPick({
         agent: { id: "dev", ownerUserId: null },
         meId: "u1",
@@ -397,6 +398,10 @@ describe("Armazenamento", () => {
     expect(line(en, "en", { usage: { ...held(0), disk: { sizeBytes: 4096 * GB, freeBytes: 1536 * GB } } })).toBe(
       "No files · 1.5 TB free on disk",
     );
+    // The Cloud keeps files on its own disk too, which every workspace there shares: its server sends no disk.
+    const cloud = { platform: { kind: "disk" as const, folder: null } };
+    expect(line(pt, "pt-BR", { ...cloud, usage: held(3.2 * GB) })).toBe("3,2 GB de arquivos");
+    expect(line(en, "en", { ...cloud, usage: held(0) })).toBe("No files");
     // A first short document: bytes, plural in both languages.
     expect(line(en, "en", { usage: held(7) })).toBe("7 bytes of files");
     expect(line(pt, "pt-BR", { usage: held(820) })).toBe("820 bytes de arquivos");

@@ -108,6 +108,11 @@ export const featureKeysEn: FeatureTranslations = {
   },
   chats: {
     title: "Chats",
+    serverError: {
+      offline: "No internet on your phone.",
+      text: "It may be down or outside your network. Your chats show up on their own when it's back.",
+      kept: "Showing what was already in the app.",
+    },
     section: {
       agents: "Agents",
       channels: "Channels",
@@ -498,7 +503,6 @@ export const featureKeysEn: FeatureTranslations = {
     noAgents: "No agent can run missions yet. Connect a computer on the website.",
     reason: {
       no_computer: "Needs a connected computer",
-      cloud_computer: "Missions on a cloud computer are coming soon",
       exec_off: "The computer doesn't allow running commands",
       runner_outdated: "The computer needs an update",
       not_in_audience: "Doesn't work with you",
@@ -1168,9 +1172,7 @@ export const featureKeysEn: FeatureTranslations = {
       submit_other: "Switch {{count}} agents",
       later: "Not now",
       on: "On",
-      cloud: "Cloud computer",
       cloudTag: "Always on",
-      cloudDesc: "An isolated computer in the cloud",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
       and: " and ",
@@ -1180,7 +1182,6 @@ export const featureKeysEn: FeatureTranslations = {
         offline: "Disconnected",
         paused: "Paused",
         missing_brain: "Doesn't have {{brain}}",
-        unavailable: "Not available right now",
         exec_off: "Doesn't allow running commands",
         runner_old: "Needs an update",
         outdated: "Needs an update",
@@ -1205,7 +1206,6 @@ export const featureKeysEn: FeatureTranslations = {
       target_not_found: "That computer isn't connected anymore. Choose another one.",
       target_same: "Choose a computer other than {{computer}}.",
       target_paused: "That computer is paused. Choose another one.",
-      target_cloud_unavailable: "The cloud computer isn't available right now.",
       not_found: "{{computer}} isn't in the computers list anymore.",
     },
     card: {

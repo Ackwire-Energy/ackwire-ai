@@ -250,7 +250,7 @@ describe("Configurações → Computadores", () => {
     };
   };
 
-  test("one section (Sandbox joined it): one lead line, other computers and how to connect one", async () => {
+  test("one section: one lead line, other computers and how to connect one", async () => {
     await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     const links = within(nav)
@@ -274,12 +274,6 @@ describe("Configurações → Computadores", () => {
     expect(body.textContent).not.toMatch(/runner|MCP/i);
   });
 
-  test("the old Sandbox address opens Computadores", async () => {
-    const { router } = await renderApp(`/org/${ORG_ID}/settings/sandbox`, { api: createFakeApi(seedState()) });
-    await settle(8);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers`);
-  });
-
   test("which computer each agent uses: picked here and saved at once; the counts follow", async () => {
     const state = seedState();
     const api = createFakeApi(state);
@@ -288,8 +282,7 @@ describe("Configurações → Computadores", () => {
     await settle(8);
     const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
     const trigger = within(card).getByRole("combobox", { name: "Computador de Ada" });
-    // This server has Daytona's sandboxes: they're the "no computer" choice, by name.
-    expect(trigger.textContent).toContain("Sandbox da Daytona");
+    expect(trigger.textContent).toContain("Nenhum computador");
     trigger.focus();
     await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
     await act(async () => fireEvent.click(screen().getByRole("option", { name: /^Escritório/ })));
@@ -321,9 +314,7 @@ describe("Configurações → Computadores", () => {
     await settle(8);
     const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
     expect(within(card).queryByRole("combobox")).toBeNull();
-    expect(card.textContent).toContain("Sandbox da Daytona");
-    // Daytona's settings stay with the admins.
-    expect(screen().queryByRole("region", { name: "Sandboxes da Daytona" })).toBeNull();
+    expect(card.textContent).toContain("Nenhum computador");
   });
 
   test("download: the Mac app from the latest build (version, size, SHA-256), first-run steps, other ways", async () => {
@@ -901,12 +892,9 @@ describe("agent page: which computer", () => {
     expect(screen().queryByRole("combobox", { name: "Computador" })).toBeNull();
   });
 
-  test("start/stop on a machine: machine.no_lifecycle is said in the person's language", () => {
+  test("an error's code is said in the person's language; an unknown one keeps the server's words", () => {
     const i18n = createI18n("pt-BR");
     const t = i18n.t.bind(i18n);
-    expect(errorText(t, new ApiError(400, "machine.no_lifecycle", "no lifecycle"))).toBe(
-      "Este agente usa um computador conectado: quem conectou liga e desliga no próprio computador.",
-    );
     expect(errorText(t, new ApiError(413, "artifact.file_too_large", "too large"))).toBe(
       "O arquivo passa de 50 MB, o limite por arquivo.",
     );
@@ -937,10 +925,6 @@ describe("realtime: machines and agent computers", () => {
     ...over,
   });
   const pc: AgentComputer = {
-    status: "stopped",
-    diskUsedGib: 1,
-    createdAt: null,
-    lastUsedAt: null,
     target: { kind: "machine", machineId: "m1", name: "Escritório", online: true },
   };
 
@@ -996,27 +980,16 @@ describe("realtime: machines and agent computers", () => {
     expect(qc.getQueryData<Machine[]>(keys.machines(ORG_ID))?.[0]?.paused).toEqual({ paused: false });
   });
 
-  test("agent.computer with only a target keeps the status", () => {
+  test("agent.computer sets the target", () => {
     const qc = new QueryClient();
-    qc.setQueryData(keys.computer(ORG_ID, ADA_ID), { ...pc, target: { kind: "cloud" } });
+    qc.setQueryData(keys.computer(ORG_ID, ADA_ID), { target: { kind: "none" } });
     applyComputerEvent(qc, ORG_ID, {
       type: "agent.computer",
       agentId: ADA_ID,
       target: { kind: "machine", machineId: "m1", name: "Escritório", online: true },
     } as never);
     const view = qc.getQueryData<AgentComputer>(keys.computer(ORG_ID, ADA_ID));
-    expect(view?.status).toBe("stopped");
     expect(view?.target).toEqual({ kind: "machine", machineId: "m1", name: "Escritório", online: true });
-    // A full view replaces it, keeping the target it doesn't carry.
-    applyComputerEvent(qc, ORG_ID, {
-      type: "agent.computer",
-      agentId: ADA_ID,
-      computer: { status: "running", diskUsedGib: 2, createdAt: null, lastUsedAt: null },
-    } as never);
-    expect(qc.getQueryData<AgentComputer>(keys.computer(ORG_ID, ADA_ID))).toMatchObject({
-      status: "running",
-      target: { kind: "machine" },
-    });
   });
 });
 

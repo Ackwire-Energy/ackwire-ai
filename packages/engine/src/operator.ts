@@ -81,7 +81,7 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
 }
 
 /**
- * One workspace: its owners and admins, how much is in it, and its limits (ADR 0077) with what it uses of them.
+ * One workspace: its owners and admins, how much is in it, and its limits (ADR 0078) with what it uses of them.
  * Null when there is none with that id.
  */
 export async function operatorOrg(db: Database, orgId: string) {

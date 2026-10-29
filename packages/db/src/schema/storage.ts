@@ -118,8 +118,10 @@ export const storageMigrations = pgTable(
 );
 
 /**
- * Who changed what (storage settings, artifacts…). Append-only; read by
- * admins.
+ * Who changed what (storage settings, artifacts…) and every tool call an
+ * agent made that matters (`tool.call`, from the Tool Gateway). Append-only;
+ * read by admins (`listAudit`). No foreign key to agents, runs or people: the
+ * record outlives them.
  */
 export const auditLog = pgTable(
   "audit_log",
@@ -133,15 +135,30 @@ export const auditLog = pgTable(
     /** `person`, `agent` or `system`. */
     actorType: text().notNull(),
     actorId: text(),
-    /** e.g. `storage.activated`, `artifact.version_created`. */
+    /** e.g. `storage.activated`, `artifact.version_created`, `tool.call`. */
     action: text().notNull(),
     targetType: text().notNull(),
     targetId: text(),
     details: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /** An agent's: the run it happened in. */
+    runId: uuid(),
+    /** An agent's: the conversation it belongs to (a routine's: where it delivers). */
+    channelId: uuid(),
+    /** An agent's: the person behind the run (ADR 0053); null for a routine or nobody. */
+    onBehalfOfUserId: text(),
+    /** A tool call's: `done`, `failed`, `refused` or `pending` (waiting for a person). Null for the rest. */
+    outcome: text().$type<AuditOutcome>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.orgId, t.createdAt)],
+  // The reader pages newest first by id (UUIDv7, so in time order): one index for the whole log, one per actor.
+  (t) => [
+    index().on(t.orgId, t.createdAt),
+    index().on(t.orgId, t.id),
+    index().on(t.orgId, t.actorType, t.actorId, t.id),
+  ],
 );
+
+export type AuditOutcome = "done" | "failed" | "refused" | "pending";
 
 export const artifactKindEnum = pgEnum("artifact_kind", ["document", "table", "diff", "html", "diagram", "file"]);
 
@@ -211,8 +228,8 @@ export const artifactVersions = pgTable(
 
 /**
  * A one-time upload of a file from an agent's computer to the Drive
- * (`upload_file`, ADR 0025): pending until the bytes arrive (pushed by the
- * machine, or read by the server), then `done` with the artifact and
+ * (`upload_file`, ADR 0025): pending until the machine pushes the bytes
+ * (`PUT /api/machines/uploads/{id}`), then `done` with the artifact and
  * version it became. Expires after 10 minutes.
  */
 export const artifactUploads = pgTable(
@@ -229,9 +246,9 @@ export const artifactUploads = pgTable(
     /** The run's channel and thread: completion acts as the agent there. */
     channelId: uuid().notNull(),
     threadId: uuid(),
-    /** `daytona:<sandbox row id>` or `machine:<machine id>`. */
+    /** `machine:<machine id>`. */
     computer: text().notNull(),
-    /** Connected machines: only this machine may complete it. */
+    /** Only this machine may complete it. */
     machineId: uuid(),
     /** Workspace-relative path on the computer. */
     path: text().notNull(),

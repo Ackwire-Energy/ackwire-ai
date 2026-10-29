@@ -15,7 +15,6 @@ const KNOWN = {
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
   "artifact.not_found": "errors.artifact.notFound",
-  "machine.no_lifecycle": "errors.machine.noLifecycle",
   "machine.forbidden": "errors.machine.forbidden",
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
@@ -25,7 +24,6 @@ const KNOWN = {
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
   "machine.target_paused": "errors.machine.targetPaused",
-  "machine.target_cloud_unavailable": "errors.machine.targetCloudUnavailable",
   "thread.context_not_visible": "errors.thread.contextNotVisible",
   "thread.archived": "errors.thread.archived",
   "thread.has_replies": "errors.thread.hasReplies",
@@ -145,7 +143,7 @@ export function restrictionLine(
     cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
   switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
     case "org.paused": {
-      // A billing hold (ADR 0077) is said in words of its own, never as the reason.
+      // A billing hold (ADR 0078) is said in words of its own, never as the reason.
       const billing = billingHoldOf({ state: "hold", reason });
       if (billing) return t(`standing.billing.${billing}`);
       if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);

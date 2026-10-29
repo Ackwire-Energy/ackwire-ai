@@ -61,7 +61,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, billing holds and limits, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056, ADR 0077).",
+        "Workspace and account lookups, workspace standing, billing holds and limits, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056, ADR 0078).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

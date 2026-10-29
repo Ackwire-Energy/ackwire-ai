@@ -150,6 +150,17 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
   );
 }
 
+/** "US$ 0,32 de US$ 50,00 (padrão do workspace)": the closing "(…)" wraps as one piece, not split across lines. */
+function noteWhole(text: string) {
+  const m = /^(.*\S)\s+(\(.+\))$/.exec(text);
+  if (!m) return text;
+  return (
+    <>
+      {m[1]} <span className="plan-api__note">{m[2]}</span>
+    </>
+  );
+}
+
 function ApiCard({ data }: { data: OrgPlanUsage }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -161,6 +172,8 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
       <div className="plan-api">
         {data.api.map((a) => {
           const name = dir.agentById.get(a.agentId)?.name ?? a.name;
+          // The server's percent has one decimal, so a tiny spend comes as 0: the money, when sent, is exact.
+          const percent = a.costUsd !== undefined && a.budgetUsd ? (a.costUsd / a.budgetUsd) * 100 : a.budgetPercent;
           return (
             <Link
               key={a.agentId}
@@ -175,20 +188,18 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
                 <small>{t("usageViews.tokens", { tokens: formatTokensShort(t, i18n.language, a.tokens) })}</small>
               </span>
               <span className="plan-api__meter">
-                <Meter
-                  value={Math.min(100, a.budgetPercent)}
-                  max={100}
-                  label={t("settings.usageAgentMeter", { name })}
-                />
+                <Meter value={Math.min(100, percent)} max={100} label={t("settings.usageAgentMeter", { name })} />
               </span>
               <span className="plan-api__value">
-                {t("usageViews.budgetShare", { percent: formatPercent(i18n.language, a.budgetPercent) })}
+                {t("usageViews.budgetShare", { percent: formatPercent(i18n.language, percent) })}
                 {a.costUsd !== undefined && a.budgetUsd !== undefined && (
                   <small>
-                    {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                      spent: formatUsd(t, i18n.language, a.costUsd),
-                      budget: formatUsd(t, i18n.language, a.budgetUsd),
-                    })}
+                    {noteWhole(
+                      t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
+                        spent: formatUsd(t, i18n.language, a.costUsd),
+                        budget: formatUsd(t, i18n.language, a.budgetUsd),
+                      }),
+                    )}
                   </small>
                 )}
               </span>

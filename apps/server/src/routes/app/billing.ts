@@ -6,7 +6,7 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 const tags = ["Billing"];
 
 /**
- * The workspace's way to the billing service, and its limits (ADR 0077): this server knows no plan, price or
+ * The workspace's way to the billing service, and its limits (ADR 0078): this server knows no plan, price or
  * currency, only a link that opens the service signed in as the person asking and the numbers the service set.
  */
 export function billingRoutes(deps: AppDeps) {

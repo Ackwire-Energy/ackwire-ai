@@ -8,6 +8,7 @@ import type { IconName } from "@agenteschat/ui";
 export type SettingsSection =
   | "general"
   | "members"
+  | "audit"
   | "access"
   | "connectors"
   | "skills"
@@ -29,17 +30,19 @@ export const SETTINGS_SECTIONS: {
 }[] = [
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
+  // What agents did and people changed: admins only (it shows everyone's work).
+  { id: "audit", icon: "shield", group: "org", allowed: (r) => can(r, "configure") },
   { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
-  // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
+  // Every member sees the computers and can pair one (ADR 0025).
   { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
   // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
-  // Only where a billing service runs (ADR 0077), for who may open it.
+  // Only where a billing service runs (ADR 0078), for who may open it.
   {
     id: "billing",
     icon: "coin",
@@ -52,9 +55,6 @@ export const SETTINGS_SECTIONS: {
 export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
-
-/** Old section ids and where they live now ("sandbox" joined Computadores). */
-export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to

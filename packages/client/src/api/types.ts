@@ -54,13 +54,13 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
-  /** The billing service (ADR 0077): owners and admins open a workspace's plan there; null or absent: no billing. */
+  /** The billing service (ADR 0078): owners and admins open a workspace's plan there; null or absent: no billing. */
   billingUrl?: string | null;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
 }
 
-/** A workspace's use against its limits (ADR 0077, `GET …/limits`), for any member; a null limit: none. */
+/** A workspace's use against its limits (ADR 0078, `GET …/limits`), for any member; a null limit: none. */
 export interface WorkspaceLimits {
   members: { used: number; limit: number | null };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
@@ -68,7 +68,7 @@ export interface WorkspaceLimits {
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
 }
 
-/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0077). */
+/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0078). */
 export type BillingFrom =
   | "settings"
   | "hold"
@@ -1186,7 +1186,7 @@ export interface UsageReport {
   defaultAgentBudgetUsd: number;
   totalUsd: number;
   byKind: {
-    kind: "agent" | "router" | "embedding" | "summary" | "sandbox";
+    kind: "agent" | "router" | "embedding" | "summary";
     calls: number;
     partialCalls: number;
     inputTokens: number;
@@ -1538,7 +1538,7 @@ export interface SecretRequest {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site?: string | null;
-  /** null = the agent's cloud computer. */
+  /** The connected machine that holds it. */
   machineId: string | null;
   /** The computer's key for this request; null once it is closed. */
   publicKey: string | null;
@@ -1595,7 +1595,10 @@ export interface StorageUsage {
   platformBytes: number;
   /** In the workspace's own buckets, the trash left out too. */
   ownBucketBytes: number;
-  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  /**
+   * The disk holding this server's files folder: its size and what is free. Null without a folder, and on the Cloud,
+   * where that disk is every workspace's.
+   */
   disk: { sizeBytes: number; freeBytes: number } | null;
 }
 
@@ -2245,51 +2248,27 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
 }
 
-// ── PC do agente (sandbox): apps/server/src/routes/app/sandboxes.ts; `…/agents/{id}/computer` expected ──
-
-export type SandboxNetwork = "blocked" | "allowlist" | "open";
+// ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──
 
 export interface SandboxSettings {
-  /** A sandbox provider is configured on this server. */
-  available: boolean;
   enabled: boolean;
-  /** Domains the PCs may reach (`*.` wildcards), used when `network` is `allowlist`. */
-  allowDomains: string[];
-  /** No internet, only the listed domains, or open internet. Absent (older servers): follows the list. */
-  network?: SandboxNetwork;
-  /** After a save: running PCs got it now (`live`) or get it when they next start (`next_start`). */
-  networkApply?: "live" | "next_start";
   execTimeoutSeconds: number;
   maxTimeoutSeconds: number;
-  /** Minutes of PC time per day for the whole workspace. */
-  dailyMinutes: number;
   /** Ask a person before running code. */
   requireApproval: boolean;
 }
 
-export type SandboxSettingsInput = Partial<
-  Pick<
-    SandboxSettings,
-    "enabled" | "allowDomains" | "network" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
-  >
->;
+export type SandboxSettingsInput = Partial<Pick<SandboxSettings, "enabled" | "execTimeoutSeconds" | "requireApproval">>;
 
-/** `GET …/agents/{id}/computer`: the agent's own PC. */
+/** `GET …/agents/{id}/computer`: which computer the agent uses (ADR 0025). */
 export interface AgentComputer {
-  status: "running" | "stopped" | "archived" | "none";
-  diskUsedGib: number;
-  createdAt: string | null;
-  lastUsedAt: string | null;
-  /** `provider-default` when the provider can't apply our domain list (plan limitation). */
-  network?: "blocked" | "allowlist" | "open" | "provider-default";
-  /** Which computer the agent uses (ADR 0025). Absent on older servers: the cloud one. */
-  target?: ComputerTarget;
+  target: ComputerTarget;
 }
 
 // ── Connected computers (ADR 0025; apps/server/src/routes/machines.ts) ──────
 
-/** The agent's cloud computer, or a machine someone connected with the runner. */
-export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: string; name: string; online: boolean };
+/** No computer, or a machine someone connected with the runner. */
+export type ComputerTarget = { kind: "none" } | { kind: "machine"; machineId: string; name: string; online: boolean };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -2480,22 +2459,19 @@ export interface MachineOutage {
   waitingRuns: number;
 }
 
-/** Where waiting agents may move: another connected machine, or the cloud computer. */
-export type OutageTarget =
-  | {
-      kind: "machine";
-      machineId: string;
-      name: string;
-      platform: string;
-      /** The workspace's own computer (ADR 0056 §10). */
-      managed?: boolean;
-      online: boolean;
-      brains: ComputerBrain[];
-      /** Why it can't take them now, or null. */
-      reasonOff: "offline" | "paused" | null;
-    }
-  /** The cloud computer: runs only the brains listed (none of the computer brains today). */
-  | { kind: "cloud"; available: boolean; brains: ComputerBrain[] };
+/** Where waiting agents may move: another connected machine. */
+export type OutageTarget = {
+  kind: "machine";
+  machineId: string;
+  name: string;
+  platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
+  online: boolean;
+  brains: ComputerBrain[];
+  /** Why it can't take them now, or null. */
+  reasonOff: "offline" | "paused" | null;
+};
 
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
@@ -2506,7 +2482,7 @@ export interface MachineOutages {
 /** `POST …/machines/{machineId}/move-agents`. */
 export interface MoveAgentsInput {
   agentIds: string[];
-  target: { kind: "machine"; machineId: string } | { kind: "cloud" };
+  target: { kind: "machine"; machineId: string };
 }
 
 export interface MoveAgentsResult {
@@ -3426,13 +3402,8 @@ export interface MissionJoinRequest {
   createdAt: string;
 }
 
-/** Why an agent can't run a mission for you (`cloud_computer`: missions on cloud computers come later). */
-export type MissionIneligibleReason =
-  | "no_computer"
-  | "cloud_computer"
-  | "exec_off"
-  | "runner_outdated"
-  | "not_in_audience";
+/** Why an agent can't run a mission for you. */
+export type MissionIneligibleReason = "no_computer" | "exec_off" | "runner_outdated" | "not_in_audience";
 
 /** An agent for "Nova missão": whether it can run a mission for you, and why not. */
 export interface MissionEligibleAgent {
@@ -4041,7 +4012,7 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
-  /** `org_standing`: the billing hold put on (ADR 0077), in place of `text`. */
+  /** `org_standing`: the billing hold put on (ADR 0078), in place of `text`. */
   billingHold?: string;
   /** Missions and routines. */
   steps?: { done: number; total: number; failedAt?: number };
@@ -4083,6 +4054,51 @@ export interface AppNotification {
   snoozedUntil: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Audit (Configurações › Auditoria) ────────────────────────────────────────
+
+export type AuditOutcome = "done" | "failed" | "refused" | "pending";
+
+/**
+ * One row of the org's audit log (`GET …/audit`, admins): an agent's tool call
+ * (`action: "tool.call"`, with an `outcome`) or a change (`approval.approved`,
+ * `routine.created`…; `outcome` null).
+ */
+export interface AuditRow {
+  id: string;
+  at: string;
+  actor: { type: "person" | "agent" | "system"; id: string | null; name: string | null };
+  action: string;
+  target: { type: string; id: string | null };
+  /**
+   * A tool call's: `kind`, `connector`, `title` (the call in words), `behind` (`person`, `routine`,
+   * `unattended`), `routine` ({ id, name }), `input` (secrets masked), `reason`, `approvalId`, `secretRequestId`.
+   */
+  details: Record<string, unknown>;
+  runId: string | null;
+  channelId: string | null;
+  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
+  onBehalfOf: { id: string; name: string | null } | null;
+  outcome: AuditOutcome | null;
+  /** The approval the call waited for or ran after, as it stands now. */
+  approval: { id: string; status: string; decidedBy: { id: string; name: string | null } | null } | null;
+  /** The secret the call waited for (`request_secret`), as it stands now. */
+  secret: { id: string; status: "pending" | "delivered" | "declined" | "expired" | "canceled" } | null;
+}
+
+export interface AuditPage {
+  rows: AuditRow[];
+  next: string | null;
+}
+
+export interface AuditQuery {
+  actorType?: "person" | "agent" | "system";
+  actorId?: string;
+  outcome?: AuditOutcome[];
+  /** Only calls whose approval or secret nobody has answered yet. */
+  waiting?: boolean;
+  kind?: "tool" | "change";
 }
 
 export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions";

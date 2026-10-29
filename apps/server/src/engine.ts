@@ -1,10 +1,4 @@
-import {
-  type Adapters,
-  type BrainTurnRequest,
-  type S3Fetch,
-  type SandboxProvider,
-  STREAM_CLOSE,
-} from "@agenteschat/adapters";
+import { type Adapters, type BrainTurnRequest, type S3Fetch, STREAM_CLOSE } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -114,8 +108,6 @@ export interface EngineOptions {
   resolveHost?: ResolveHost;
   /** Per-run stage breakdown (debug log). */
   onRunProfile?: RunExecutorDeps["onRunProfile"];
-  /** Tests: a fake sandbox provider (default: the adapters' one, if any). */
-  sandbox?: SandboxProvider | null;
   /** Tests: a fake GitHub (git smart HTTP and REST) for the git proxy and tools. */
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   /** Tests: this process's replica id for the machine hub (default: random). */
@@ -178,7 +170,7 @@ export function buildEngine(o: EngineOptions) {
   // Claude or an OpenAI key, the catalog's routing pick on the others.
   const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
-  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0077).
+  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0078).
   if (!context.judge) {
     const llmJudge = createLlmJudge({
       gateway,
@@ -226,9 +218,7 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
-  // Code sandbox (ADR 0021): cloud computers only when a provider is configured (Daytona in the Cloud);
-  // connected machines (ADR 0025) always, through the hub that holds their sockets.
-  const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
+  // Agents' computers (ADR 0025): connected machines, through the hub that holds their sockets.
   const machineHub = createMachineHub({
     db,
     pubsub: adapters.pubsub,
@@ -237,15 +227,7 @@ export function buildEngine(o: EngineOptions) {
   });
   const sandbox: SandboxDeps = {
     db,
-    provider: sandboxProvider,
     machines: { hub: machineHub },
-    pricing: {
-      vcpuHourUsd: config.SANDBOX_PRICE_VCPU_HOUR_USD,
-      memoryGibHourUsd: config.SANDBOX_PRICE_MEMORY_GIB_HOUR_USD,
-      diskGibHourUsd: config.SANDBOX_PRICE_DISK_GIB_HOUR_USD,
-    },
-    autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
-    archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
     // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
@@ -329,7 +311,7 @@ export function buildEngine(o: EngineOptions) {
         judge: context.judge,
         vision,
       }),
-      // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
+      // Git through our proxy (ADR 0024): connected machines clone and push through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({
         sandbox,

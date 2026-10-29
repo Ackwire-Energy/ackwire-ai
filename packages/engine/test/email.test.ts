@@ -48,6 +48,9 @@ const TYPED = [
 ];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
+/** The headline as it reads: its last words keep together in a span of their own. */
+const headline = (html: string) =>
+  (html.match(/<h1[^>]*>(.*?)<\/h1>/)?.[1] ?? "?").replace(/<[^>]+>/g, "").replaceAll("&#39;", "'");
 const buttons = (t: EmailTemplate) =>
   [...renderEmail(t, art).html.matchAll(/<a class="btn" href="([^"]*)"[^>]*>.*?<span[^>]*>([^<]*)<\/span>/g)].map(
     (m) => ({ url: (m[1] ?? "").replaceAll("&amp;", "&"), label: m[2] ?? "" }),
@@ -73,9 +76,7 @@ describe("every email, in both languages", () => {
             `<body[^>]*>\\n<div style="[^"]*">${e.preheader.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "&#39;")}`,
           ),
         );
-        expect(e.text.startsWith(e.html.match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1]?.replaceAll("&#39;", "'") ?? "?")).toBe(
-          true,
-        );
+        expect(e.text.startsWith(headline(e.html))).toBe(true);
         for (const b of buttons(t)) expect(e.text).toContain(`${b.label}: ${b.url}`);
         expect(`${e.subject}${e.html}${e.text}`).not.toMatch(/undefined|null|\{\w+\}/);
         expect(e.html.length).toBeLessThan(60_000);
@@ -87,7 +88,7 @@ describe("every email, in both languages", () => {
         );
         // Our words only in the subject, preheader, headline and buttons; typed words inert in the body.
         const p = renderEmail(poisoned(t), art);
-        for (const s of [p.subject, p.preheader, p.html.match(/<h1[^>]*>([^<]*)</)?.[1] ?? ""]) {
+        for (const s of [p.subject, p.preheader, headline(p.html)]) {
           expect(s).not.toContain("Zq9");
         }
         for (const b of buttons(poisoned(t))) expect(b.label).not.toContain("Zq9");
@@ -312,6 +313,35 @@ describe("the look", () => {
     );
     expect(renderEmail({ ...code, locale: "pt-BR" }, art).text).toContain(
       "\n\nVale por 10 minutos. Se não foi você, ignore este e-mail.\n\n",
+    );
+  });
+
+  test("every text keeps its last two words together, in every email: none ends on a word alone", () => {
+    const nobr = '<span style="display:inline-block">';
+    const html = (id: string) => renderEmail(EMAIL_SAMPLES[id] as EmailTemplate, art).html;
+    expect(html("verify_email.pt-BR")).toContain(`pode ignorar ${nobr}este e-mail.</span></p>`);
+    expect(html("join_request.pt-BR")).toContain(`e pediu ${nobr}para entrar.</span></p>`);
+    expect(html("join_code.en")).toContain(`Souza Bakery ${nobr}on agentes.chat.</span></p>`);
+    // A name in bold moves down with its period, still bold.
+    expect(html("join_code.en")).toContain(
+      `to ask to join ${nobr}<b class="ink" style="font-weight:600;color:#151514">Souza Bakery</b>.</span></p>`,
+    );
+    expect(html("computer_ready-ai.pt-BR")).toContain(`dos seus agentes ${nobr}está pronto</span></h1>`);
+    // Headlines and paragraphs of every kind, the fallback's words before its address (which breaks anywhere); the
+    // plain text is as written.
+    for (const id of Object.keys(EMAIL_SAMPLES)) {
+      const texts = [...html(id).matchAll(/<(h1|p) class="(?:h1 ink|tx|mu|fa)"[^>]*>(.*?)<\/\1>/g)]
+        .map(([, , inner = ""]) => inner.split("<br>")[0] ?? "")
+        .filter((inner) => inner.replace(/<[^>]+>/g, "").split(" ").length > 2);
+      expect(texts.length).toBeGreaterThan(2);
+      const loose = texts.filter((inner) => {
+        const tail = new RegExp(`${nobr}((?:(?!</?span)[^])*)</span>$`).exec(inner)?.[1];
+        return !tail || tail.replace(/<[^>]+>/g, "").split(" ").length < 2;
+      });
+      expect({ id, loose }).toEqual({ id, loose: [] });
+    }
+    expect(renderEmail(EMAIL_SAMPLES["verify_email.pt-BR"] as EmailTemplate, art).text).toContain(
+      "Se não foi você que se cadastrou, pode ignorar este e-mail.\n",
     );
   });
 

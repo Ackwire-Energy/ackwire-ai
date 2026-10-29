@@ -1,6 +1,6 @@
 # 0027. Secrets delivered to an agent's computer, end to end
 
-- Status: Accepted (built 2026-10-16)
+- Status: Accepted (built 2026-10-16). Superseded in part by ADR 0077 (2026-10-28): the cloud computer's helper (`packages/engine/src/secret-helper.ts`) and its command wrapper; secrets reach connected computers through the runner (protocol 3)
 - Date: 2026-10-16
 
 ## Context

@@ -55,6 +55,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
+import { AuditSection } from "@/components/Audit";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -165,6 +166,7 @@ export function SettingsPage({
         )}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
+        {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
@@ -186,7 +188,7 @@ export function SettingsPage({
 }
 
 /**
- * Plano e cobrança (ADR 0077): people and files against the plan's limits; the plan, card and invoices live on the
+ * Plano e cobrança (ADR 0078): people and files against the plan's limits; the plan, card and invoices live on the
  * billing service, opened signed in.
  */
 function BillingSection() {

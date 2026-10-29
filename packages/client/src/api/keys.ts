@@ -57,6 +57,7 @@ export const keys = {
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
   inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
+  audit: (orgId: string, query: object) => ["org", orgId, "audit", query] as const,
   /** The usage views; an agent's sits under it, so one invalidation refreshes both. */
   planUsage: (orgId: string) => ["org", orgId, "plan-usage"] as const,
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,

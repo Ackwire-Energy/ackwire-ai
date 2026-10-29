@@ -55,9 +55,13 @@ export function useConversations() {
       }),
     [channels.data, dms.data, threads.data, work],
   );
+  const lists = [channels, dms];
   return {
     rows,
     loading: channels.isLoading || dms.isLoading,
+    // The server didn't answer: nothing to show (`failed`), or the kept rows weren't loaded again (`stale`).
+    failed: lists.some((q) => q.isError && !q.data),
+    stale: lists.some((q) => q.isError && q.data),
     refetch: () => Promise.all([channels.refetch(), dms.refetch(), threads.refetch()]),
   };
 }

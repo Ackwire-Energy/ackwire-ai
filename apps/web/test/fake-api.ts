@@ -9,6 +9,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  AuditRow,
   AuthConfig,
   BrainMachine,
   Channel,
@@ -127,7 +128,7 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
 
 export interface FakeState {
   me: Me | null;
-  /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
+  /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
   signInOptions?: SignInOptions;
@@ -170,6 +171,8 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** Configurações › Auditoria: newest first. */
+  audit?: AuditRow[];
   /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
   actionCheck?: boolean;
   /** What agents did outside (search kind `action`), as the search returns it. */
@@ -186,7 +189,7 @@ export interface FakeState {
   holdPosts?: Promise<void>;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
-  /** `orgs.limits` (ADR 0077); unset = no limits, the members counted from `members`. */
+  /** `orgs.limits` (ADR 0078); unset = no limits, the members counted from `members`. */
   limits?: WorkspaceLimits;
   /** `agents.aiStatus`; unset = every agent ready. */
   aiStatus?: AiStatus;
@@ -1020,6 +1023,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           },
         ],
       }),
+      audit: async (_orgId, query = {}) => {
+        const rows = (state.audit ?? []).filter(
+          (r) =>
+            (!query.actorType || r.actor.type === query.actorType) &&
+            (!query.actorId || r.actor.id === query.actorId) &&
+            (!query.outcome?.length || (r.outcome !== null && query.outcome.includes(r.outcome))) &&
+            (!query.waiting ||
+              (r.outcome === "pending" && (r.approval?.status === "pending" || r.secret?.status === "pending"))) &&
+            (!query.kind || (query.kind === "tool") === (r.action === "tool.call")),
+        );
+        const from = query.before ? rows.findIndex((r) => r.id === query.before) + 1 : 0;
+        const limit = query.limit ?? 50;
+        const page = rows.slice(from, from + limit);
+        return { rows: page, next: from + limit < rows.length ? (page.at(-1)?.id ?? null) : null };
+      },
       usageReport: async () => ({
         since: minutesAgo(60 * 24 * 14),
         defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50,

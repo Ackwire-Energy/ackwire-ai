@@ -51,7 +51,7 @@ const SkillDetail = Skill.extend({
       mime: z.string(),
       status: z.enum(["stored", "script", "ignored"]).openapi({
         description:
-          "`stored`: text agents can read; `script`: runs only in the sandbox, never shown; `ignored`: binary.",
+          "`stored`: text agents can read; `script`: runs only on the agent's computer, never shown; `ignored`: binary.",
       }),
     }),
   ),

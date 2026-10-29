@@ -50,7 +50,7 @@ import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-je
 import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
-import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
+import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
@@ -92,7 +92,7 @@ export interface JobDeps extends RunExecutorDeps {
   storage?: StorageDeps;
   /** Drive (job `forum.advance` saves the forum synthesis). */
   artifacts?: ArtifactDeps;
-  /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
+  /** Agents' computers: the hub and public URL missions use. */
   sandbox?: SandboxDeps | null;
   /** The engine missions start, resume and cancel runs with (default: today's run queue). */
   missionEngine?: MissionEngine | null;
@@ -448,26 +448,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await advanceForumTopic(
         { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
         String(job.payload.topicId),
-      );
-    },
-    "sandbox.start": async (job) => {
-      const provider = deps.sandbox?.provider;
-      if (!deps.sandbox || !provider) throw new PermanentJobError("no computer provider configured");
-      await runComputerStart(
-        { ...deps.sandbox, provider, pubsub: deps.pubsub },
-        orgOf(job),
-        String(job.payload.agentId),
-        String(job.payload.actorId),
-      );
-    },
-    "sandbox.stop": async (job) => {
-      const provider = deps.sandbox?.provider;
-      if (!deps.sandbox || !provider) throw new PermanentJobError("no computer provider configured");
-      await runComputerStop(
-        { ...deps.sandbox, provider, pubsub: deps.pubsub },
-        orgOf(job),
-        String(job.payload.agentId),
-        String(job.payload.actorId),
       );
     },
     "storage.migrate": async (job) => {

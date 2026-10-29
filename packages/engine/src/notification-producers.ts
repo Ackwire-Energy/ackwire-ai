@@ -734,7 +734,7 @@ export async function notifyComputerReady(
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
  * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
- * ADR 0077), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
+ * ADR 0078), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
  * read a restriction as the restriction itself reads. One row per change.
  */
 export async function notifyOrgStanding(

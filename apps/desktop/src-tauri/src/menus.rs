@@ -42,8 +42,6 @@ pub struct Zoom(Mutex<Option<usize>>);
 pub struct MenuParts {
     labels: Mutex<HashMap<String, String>>,
     orgs: Mutex<Vec<(String, String)>>,
-    /// Shown once the labels arrive: where the folders of retired Cloud homes stay (`runners::migrate`).
-    retired: Mutex<Option<String>>,
 }
 
 /// The labels the popover sent last (empty before it did).
@@ -56,20 +54,6 @@ pub fn org_name(app: &AppHandle, id: &str) -> Option<String> {
     let parts = app.state::<MenuParts>();
     let orgs = parts.orgs.lock().unwrap_or_else(|e| e.into_inner());
     orgs.iter().find(|(o, _)| o == id).map(|(_, name)| name.clone())
-}
-
-/// The move from the menu bar app retired Cloud homes: one notification, once the app's language is known.
-pub fn retired_cloud_homes(app: &AppHandle, folders: String) {
-    *app.state::<MenuParts>().retired.lock().unwrap_or_else(|e| e.into_inner()) = Some(folders);
-}
-
-fn show_retired_notice(app: &AppHandle, labels: &HashMap<String, String>) {
-    use tauri_plugin_notification::NotificationExt;
-    let (Some(title), Some(body)) = (labels.get("migrateTitle"), labels.get("migrateBody")) else { return };
-    let Some(folders) = app.state::<MenuParts>().retired.lock().unwrap_or_else(|e| e.into_inner()).take() else {
-        return;
-    };
-    let _ = app.notification().builder().title(title).body(body.replace("{path}", &folders)).show();
 }
 
 /// The server list changed (chosen, removed): the menus that list them.
@@ -338,8 +322,7 @@ pub fn app_menu_set(app: AppHandle, window: tauri::Window, labels: HashMap<Strin
     if labels.len() > 100 || labels.iter().any(|(k, v)| k.len() > 40 || v.chars().count() > MAX_LABEL) {
         return Err("bad labels".into());
     }
-    *app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()) = labels.clone();
-    show_retired_notice(&app, &labels);
+    *app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()) = labels;
     crate::tray::refresh(&app);
     rebuild(&app)
 }

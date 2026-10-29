@@ -275,6 +275,7 @@ export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCod
       to: [email],
       template: { kind: "join_code", locale, orgName: found.orgName, code, url: base(publicUrl) },
       maxAttempts: 3,
+      runAt: now,
     });
     return { email, resendIn: JOIN_CODE_RESEND_SECONDS };
   });

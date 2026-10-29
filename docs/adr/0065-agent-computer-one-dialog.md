@@ -1,6 +1,6 @@
 # 0065. The agent's computer in one dialog; screens stay on
 
-- Status: Accepted (2026-10-25)
+- Status: Accepted (2026-10-25). Superseded in part by ADR 0077 (2026-10-28): §2's `computer_start` and `computer_stop`, which no computer offers anymore; `computer_status` stays
 - Date: 2026-10-25
 - Amends: ADR 0058 §1 (a desktop starts the first time it is needed and stays on; only a lack of room parks one), §6 (no terminal view; its backend goes in a later change) and §13 (one dialog in the apps); ADR 0056 §10 (the ready time, when the wait began, the ready email, no pairing with external provisioning, no approval step); ADR 0060 §3 (no server's own computer with external provisioning)
 - Builds on: ADR 0025 (connected computers), ADR 0040 (the agent browser), ADR 0057 (system mode), ADR 0059 (AI accounts), ADR 0062 (desktop computer use)

@@ -567,11 +567,7 @@ describe("external provisioning", () => {
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing" });
     const early = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });
     expect(early.machineId).toBeNull();
-    expect(await agentComputerInfo({ db: f.db, provider: null }, f.org.id, early.id)).toEqual({
-      kind: "cloud",
-      available: false,
-      preparing: true,
-    });
+    expect(await agentComputerInfo({ db: f.db }, f.org.id, early.id)).toEqual({ kind: "none", preparing: true });
 
     const { machineId, token } = await enrolled();
     const runner = await hello(token);

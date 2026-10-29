@@ -90,7 +90,7 @@ const WORKSPACE_COMPUTER: Partial<Machine> & { name: string } = {
   mode: "system",
 };
 
-/** Acme where the workspace's computer is ready (Ada on it) and the server has no cloud computer. */
+/** Acme where the workspace's computer is ready (Ada on it). */
 async function readyWorkspace(path: string, patch: Partial<Machine> = {}) {
   const state = seedState();
   const api = createFakeApi(state);
@@ -98,8 +98,6 @@ async function readyWorkspace(path: string, patch: Partial<Machine> = {}) {
   const m = machines.pair({ ...WORKSPACE_COMPUTER, ...patch });
   machines.setSetup({ state: "ready", machineId: m.id, specs: SPECS });
   await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
-  const settings = api.sandbox.settings;
-  api.sandbox.settings = async (orgId) => ({ ...(await settings(orgId)), available: false });
   const r = await renderApp(path.replace("$machineId", m.id), { api });
   await settle(10);
   return { ...r, state, api, m };
@@ -311,10 +309,10 @@ describe("no AI yet while the workspace's computer is on its way", () => {
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;
     const ask = "Você também pode pedir no chat, como “usar meu plano do Claude”.";
-    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
     await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
-    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma\u00a0IA.Conectar uma IA");
     expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
   });
 });
@@ -351,7 +349,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
   });
 
-  test("its card instead of the cloud's: steps, size, one user per agent; ready, online with its agents", async () => {
+  test("its card: steps, size, one user per agent; ready, online with its agents", async () => {
     const { push, machines } = await open(`/org/${ORG_ID}/settings/computers`, {
       state: "preparing",
       step: "starting",
@@ -370,9 +368,6 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(hintOf("Computador da Acme", card()).text).toBe(users);
     expect(shownText(card())).not.toContain("Um usuário para cada agente");
     expect(card().textContent).not.toMatch(TECHNICAL);
-    // Not the cloud computer's cards: there is none here.
-    expect(screen().queryByText("Na nuvem")).toBeNull();
-    expect(screen().queryByRole("region", { name: "Computador na nuvem" })).toBeNull();
 
     // The chip is the one place the card says where it is, so its live region: a screen reader hears each change.
     expect(card().querySelector(".computers-card__head [role='status'] .ac-chip")?.textContent).toBe("Sendo preparado");
@@ -612,7 +607,7 @@ describe("an agent's computer while the workspace's is on its way", () => {
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
   });
 
-  test("Configurações › its computer: the progress, and no cloud PC to create", async () => {
+  test("Configurações › its computer: the progress", async () => {
     await open(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { state: "preparing", step: "installing" });
     const pc = document.querySelector(".agp-pc") as HTMLElement;
     expect(pc.textContent).toContain("Computador da Acme");
@@ -622,7 +617,6 @@ describe("an agent's computer while the workspace's is on its way", () => {
     expect(pc.textContent?.split("Computador da Acme")).toHaveLength(2);
     expect(pc.querySelector(".agp-ro")).toBeNull();
     expect(pc.textContent).not.toMatch(TECHNICAL);
-    expect(within(pc).queryByRole("button", { name: /Criar PC/ })).toBeNull();
   });
 });
 
@@ -751,8 +745,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).not.toContain("opcional");
     expect(step.textContent).toContain("Pode seguir enquanto isso.");
     expect(step.textContent).not.toMatch(TECHNICAL);
-    // No cloud PC or computer of mine to pick, and nothing to skip.
-    expect(screen().queryByRole("button", { name: /Computador na nuvem/ })).toBeNull();
+    // Nothing to skip.
     expect(screen().queryByRole("button", { name: "Pular esta etapa" })).toBeNull();
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await click(button("Continuar"));

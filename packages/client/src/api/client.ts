@@ -34,6 +34,8 @@ import type {
   ArtifactFilters,
   ArtifactVersion,
   AskToJoinResult,
+  AuditPage,
+  AuditQuery,
   AuthConfig,
   BatchInviteResult,
   BillingFrom,
@@ -270,11 +272,11 @@ export interface ApiClient {
     removeLogo(orgId: string): Promise<void>;
     /**
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
-     * 0071). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
+     * 0078). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
      * on a server without billing.
      */
     billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
-    /** People, files and today's uploads against the workspace's limits (any member; ADR 0077). */
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0078). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
@@ -298,6 +300,8 @@ export interface ApiClient {
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
+    /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
+    audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
@@ -476,20 +480,16 @@ export interface ApiClient {
   sandbox: {
     settings(orgId: string): Promise<SandboxSettings>;
     saveSettings(orgId: string, input: SandboxSettingsInput): Promise<SandboxSettings>;
-    /** The agent's PC (404 = this server has no sandbox). */
+    /** Which computer the agent uses. */
     computer(orgId: string, agentId: string): Promise<AgentComputer>;
-    start(orgId: string, agentId: string): Promise<AgentComputer>;
-    stop(orgId: string, agentId: string): Promise<AgentComputer>;
-    /** Deletes the PC and all its files. */
-    remove(orgId: string, agentId: string): Promise<void>;
-    /** Which computer the agent uses: a connected machine, or `null` for the cloud one. */
+    /** Which computer the agent uses: a connected machine, or `null` for none. */
     setTarget(orgId: string, agentId: string, machineId: string | null): Promise<ComputerTarget>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {
     list(orgId: string): Promise<Machine[]>;
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
-    /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
+    /** Revokes its token and disconnects the runner at once; agents on it are left with no computer. */
     remove(orgId: string, machineId: string): Promise<void>;
     /** The server's own computer in this organization; null when the server has none or doesn't serve it. */
     host(orgId: string): Promise<HostComputer | null>;

@@ -115,7 +115,7 @@ export function accountRoutes(deps: AppDeps) {
             }),
             billingUrl: z.string().nullable().openapi({
               description:
-                "The billing service (BILLING_URL, ADR 0077): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
+                "The billing service (BILLING_URL, ADR 0078): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
             }),
             turnstileSiteKey: z.string().nullable().openapi({
               description:
@@ -586,7 +586,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan. With BILLING_HOLD_NEW_WORKSPACES it starts on that hold (ADR 0077).",
+        "403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan. With BILLING_HOLD_NEW_WORKSPACES it starts on that hold (ADR 0078).",
       request: {
         body: body(
           z.object({
