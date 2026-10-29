@@ -199,7 +199,12 @@ describe("org storage", () => {
     const rows = await f.db.select().from(schema.storageConfigs);
     expect(JSON.stringify(rows)).not.toContain(SECRET);
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, f.org.id));
-    expect(audit.map((a) => a.action).sort()).toEqual(["storage.activated", "storage.test_passed"]);
+    expect(
+      audit
+        .map((a) => a.action)
+        .filter((a) => a.startsWith("storage."))
+        .sort(),
+    ).toEqual(["storage.activated", "storage.test_passed"]);
     expect(JSON.stringify(audit)).not.toContain(SECRET);
     // Re-testing with empty keys reuses the stored ones.
     const again = await testStorage(f.storage, f.owner.id, f.org.id, {

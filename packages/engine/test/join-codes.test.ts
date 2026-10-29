@@ -436,7 +436,9 @@ describe("the code's email", () => {
     const handlers = createJobHandlers({ ...fx().jobDeps, email: down });
     await drainOutbox(fx().db, handlers, { now: at(DAY), maxBatches: 1 });
     expect(await codeEmails()).toHaveLength(1);
+    // Each drain runs at its own time, so each runs one try: the second, then the last.
     await drainOutbox(fx().db, handlers, { now: at(2 * DAY) });
+    await drainOutbox(fx().db, handlers, { now: at(3 * DAY) });
     expect(tries).toBe(3);
     expect(await codeEmails()).toEqual([]);
   });

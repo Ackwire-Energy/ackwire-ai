@@ -164,8 +164,6 @@
   color: var(--ink2);
 }
 .audit-panel__reason > .ac-icon {
-  flex: none;
-  margin-top: 2px;
   color: var(--muted);
 }
 .audit-panel__reason--refused > .ac-icon {
