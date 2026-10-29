@@ -43,10 +43,11 @@ const COMPUTER = {
   exec: true,
 };
 let ipSeq = 0;
-const start = (previousMachineId?: string) =>
+/** A code asking to come back as `previousMachineId`, proved with `previousToken` (the token that computer had). */
+const start = (previousMachineId?: string, previousToken?: string) =>
   startDeviceCode(
     { db: f.db, publicUrl: "https://agentes.chat" },
-    { ...COMPUTER, ...(previousMachineId ? { previousMachineId } : {}) },
+    { ...COMPUTER, ...(previousMachineId ? { previousMachineId } : {}), ...(previousToken ? { previousToken } : {}) },
     { ip: `203.0.113.${++ipSeq}` },
   );
 const machineRow = async (id: string) => {
@@ -80,7 +81,7 @@ describe("reconnecting a computer", () => {
     expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "none" });
     expect((await machineRow(paired.machineId)).previousAgentIds).toEqual([f.agent.id]);
 
-    const s = await start(paired.machineId);
+    const s = await start(paired.machineId, paired.token);
     const view = await getDeviceCode(deps(), s.userCode, f.owner.id);
     expect(view.reconnect).toEqual({
       machineId: paired.machineId,
@@ -118,13 +119,13 @@ describe("reconnecting a computer", () => {
     await deleteMachine(deps(), f.owner.id, f.org.id, paired.machineId);
     // @dev got another computer before the Mac came back.
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, other.machineId);
-    const s = await start(paired.machineId);
+    const s = await start(paired.machineId, paired.token);
     await confirmDeviceCode(deps(), f.owner.id, f.org.id, s.userCode, {});
     expect(await computerTarget(f.db, f.org.id, f.agent.id)).toMatchObject({ machineId: other.machineId });
 
     // Now a live machine reconnects (e.g. its token was replaced): the old token stops at confirm.
     const live = await pairMachine(deps(), f.owner.id, f.org.id, { hostname: "pc" });
-    const again = await start(live.machineId);
+    const again = await start(live.machineId, live.token);
     await confirmDeviceCode(deps(), f.owner.id, f.org.id, again.userCode, {});
     expect(await authenticateMachine(f.db, live.token)).toBeNull();
     const token = await pollDeviceToken(deps(), again.deviceCode);
@@ -135,7 +136,7 @@ describe("reconnecting a computer", () => {
     f = await setup();
     const paired = await pairedWithAgent();
     await deleteMachine(deps(), f.owner.id, f.org.id, paired.machineId);
-    const s = await start(paired.machineId);
+    const s = await start(paired.machineId, paired.token);
     await confirmDeviceCode(deps(), f.owner.id, f.org.id, s.userCode, {});
     const late = () => new Date(Date.now() + 11 * 60_000);
     expect(await pollDeviceToken({ ...deps(), now: late }, s.deviceCode)).toEqual({
@@ -153,28 +154,28 @@ describe("reconnecting a computer", () => {
 
     // A member who didn't pair it and isn't an admin.
     const carl = await addMember(f.db, f.org.id, "member", "carl");
-    const byCarl = await start(paired.machineId);
+    const byCarl = await start(paired.machineId, paired.token);
     expect((await getDeviceCode(deps(), byCarl.userCode, carl.id)).reconnect).toBeUndefined();
     const carlMachine = await confirmDeviceCode(deps(), carl.id, f.org.id, byCarl.userCode, {});
     expect(carlMachine.id).not.toBe(paired.machineId);
 
     // Confirmed for another organization of the owner.
     const { organization: other } = await createOrganization(f.db, f.owner.id, { name: "Other" });
-    const elsewhere = await start(paired.machineId);
+    const elsewhere = await start(paired.machineId, paired.token);
     const otherMachine = await confirmDeviceCode(deps(), f.owner.id, other.id, elsewhere.userCode, {});
     expect(otherMachine.id).not.toBe(paired.machineId);
     expect(otherMachine.name).toBe("MacBook");
 
     // Someone outside the organization sees no reconnect.
     const zed = await addUser(f.db, "zed");
-    const unknown = await start(crypto.randomUUID());
+    const unknown = await start(crypto.randomUUID(), paired.token);
     expect((await getDeviceCode(deps(), unknown.userCode, zed.id)).reconnect).toBeUndefined();
     expect((await getDeviceCode(deps(), unknown.userCode, f.owner.id)).reconnect).toBeUndefined();
     const fresh = await confirmDeviceCode(deps(), f.owner.id, f.org.id, unknown.userCode, {});
     expect(fresh.id).not.toBe(paired.machineId);
 
     // A malformed id is ignored.
-    const junk = await start("not-a-uuid");
+    const junk = await start("not-a-uuid", paired.token);
     expect((await confirmDeviceCode(deps(), f.owner.id, f.org.id, junk.userCode, {})).id).not.toBe(paired.machineId);
 
     // The removed Mac is still removed, @dev still with no computer.
@@ -182,12 +183,44 @@ describe("reconnecting a computer", () => {
     expect(await computerTarget(f.db, f.org.id, f.agent.id)).toEqual({ kind: "none" });
   });
 
+  test("only the computer that held the machine's token: an id alone, or another machine's token, is a new computer", async () => {
+    f = await setup();
+    const live = await pairedWithAgent();
+    const other = await pairMachine(deps(), f.owner.id, f.org.id, { hostname: "other" });
+
+    // Every member sees machine ids: naming a live one without its token takes nothing over.
+    for (const s of [await start(live.machineId), await start(live.machineId, other.token)]) {
+      expect((await getDeviceCode(deps(), s.userCode, f.owner.id)).reconnect).toBeUndefined();
+      expect((await confirmDeviceCode(deps(), f.owner.id, f.org.id, s.userCode, {})).id).not.toBe(live.machineId);
+    }
+    expect((await authenticateMachine(f.db, live.token))?.id).toBe(live.machineId);
+    expect(await computerTarget(f.db, f.org.id, f.agent.id)).toMatchObject({ machineId: live.machineId });
+
+    // Removed: the same holds (its token hash stays for the proof, but never authenticates).
+    await deleteMachine(deps(), f.owner.id, f.org.id, live.machineId);
+    expect(await authenticateMachine(f.db, live.token)).toBeNull();
+    const unproved = await start(live.machineId);
+    expect((await getDeviceCode(deps(), unproved.userCode, f.owner.id)).reconnect).toBeUndefined();
+    expect((await confirmDeviceCode(deps(), f.owner.id, f.org.id, unproved.userCode, {})).id).not.toBe(live.machineId);
+    expect((await machineRow(live.machineId)).deletedAt).not.toBeNull();
+  });
+
+  test("the server's own computer never comes back as someone's computer", async () => {
+    f = await setup();
+    const paired = await pairMachine(deps(), f.owner.id, f.org.id, { hostname: "srv" });
+    await f.db.update(schema.machines).set({ kind: "host" }).where(eq(schema.machines.id, paired.machineId));
+    const s = await start(paired.machineId, paired.token);
+    expect((await getDeviceCode(deps(), s.userCode, f.owner.id)).reconnect).toBeUndefined();
+    expect((await confirmDeviceCode(deps(), f.owner.id, f.org.id, s.userCode, {})).id).not.toBe(paired.machineId);
+    expect((await authenticateMachine(f.db, paired.token))?.id).toBe(paired.machineId);
+  });
+
   test("the person who paired it may reconnect it without being an admin", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     const paired = await pairMachine(deps(), bia.id, f.org.id, { hostname: "bia-mac", name: "Mac da Bia" });
     await deleteMachine(deps(), f.owner.id, f.org.id, paired.machineId);
-    const s = await start(paired.machineId);
+    const s = await start(paired.machineId, paired.token);
     expect((await getDeviceCode(deps(), s.userCode, bia.id)).reconnect?.name).toBe("Mac da Bia");
     expect((await confirmDeviceCode(deps(), bia.id, f.org.id, s.userCode, {})).id).toBe(paired.machineId);
   });

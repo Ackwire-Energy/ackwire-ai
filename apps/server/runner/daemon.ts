@@ -186,22 +186,28 @@ export function configFromGrant(
 
 /**
  * The machine this home was on `server`, to reconnect it instead of making a
- * new one (the id stays in the config after a refusal and after "leave").
- * Undefined for another server or a home never paired.
+ * new one (the id stays in the config after a refusal and after "leave"),
+ * with the token it had there: the server reconnects a machine only for a
+ * computer that proves it held that machine's token (ADR 0036 §5).
+ * Undefined for another server, a home never paired, or no token kept.
  */
-export function previousMachineFor(prev: StoredConfig | null, server: string): string | undefined {
-  return prev?.machineId && prev.server === server ? prev.machineId : undefined;
+export function previousMachineFor(
+  prev: StoredConfig | null,
+  server: string,
+): { machineId: string; token: string } | undefined {
+  const token = prev?.token ?? prev?.previousToken;
+  return prev?.machineId && prev.server === server && token ? { machineId: prev.machineId, token } : undefined;
 }
 
 /** What `POST /api/machines/device` is told about this computer. */
-export function deviceInfo(name?: string, previousMachineId?: string) {
+export function deviceInfo(name?: string, previous?: { machineId: string; token: string }) {
   return {
     ...(name ? { name } : {}),
     os: machineOs(),
     arch: os.arch(),
     hostname: os.hostname(),
     version: RUNNER_VERSION,
-    ...(previousMachineId ? { previousMachineId } : {}),
+    ...(previous ? { previousMachineId: previous.machineId, previousToken: previous.token } : {}),
   };
 }
 
@@ -1389,14 +1395,15 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   /**
-   * Forgets the pairing: the token goes; settings that aren't the
-   * organization's stay. `machineId` stays too, so pairing again with the
+   * Forgets the pairing: the token goes (nothing connects with it); settings
+   * that aren't the organization's stay. `machineId` stays too, with the token
+   * as `previousToken` (its only use is the proof), so pairing again with the
    * same server can bring that machine back (`previousMachineFor`).
    */
   unpair(): { unpaired: true } {
     const s = this.stored;
     if (!s?.token) return { unpaired: true };
-    const { token: _token, orgId: _orgId, orgName, name: _name, paused: _paused, access, ...rest } = s;
+    const { token, orgId: _orgId, orgName, name: _name, paused: _paused, access, ...rest } = s;
     this.agents = [];
     try {
       writeAgents(this.opts.home, []);
@@ -1406,7 +1413,11 @@ export class RunnerDaemon implements RequestObserver {
       removeCachedLogo(this.opts.home);
     } catch {}
     this.refused = null;
-    this.write({ ...rest, ...(access ? { access: { folders: [], tools: access.tools } } : {}) });
+    this.write({
+      ...rest,
+      previousToken: token,
+      ...(access ? { access: { folders: [], tools: access.tools } } : {}),
+    });
     this.record({ kind: "pair", summary: `disconnected${orgName ? ` from ${orgName}` : ""}`, result: "ok" });
     return { unpaired: true };
   }

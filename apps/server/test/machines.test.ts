@@ -149,6 +149,30 @@ test("\"it wasn't me\", outsiders can't confirm, and new codes are rate limited 
   expect((await runnerPost("/api/machines/device", RUNNER, "198.51.100.2")).status).toBe(200);
 });
 
+test("guessing codes: lookup, confirm and deny share one budget per person, and unknown codes cost more", async () => {
+  const { owner, api } = await start();
+  const real = (await (await runnerPost("/api/machines/device", { name: "x", ...RUNNER })).json()) as {
+    userCode: string;
+  };
+  // Six misses (confirm or deny alike) spend a person's budget for 10 minutes.
+  const statuses: number[] = [];
+  for (const code of ["AAAAAA", "AAAAAB", "AAAAAC"]) {
+    statuses.push((await api(`/machines/device/${code}/confirm`, { json: {} })).status);
+    statuses.push((await owner(`/api/app/machines/device/${code}/deny`, { method: "POST", json: {} })).status);
+  }
+  expect(statuses).toEqual([404, 404, 404, 404, 404, 404]);
+  // Then even a real code is refused, on every one of the three.
+  expect((await api(`/machines/device/${real.userCode}/confirm`, { json: {} })).status).toBe(429);
+  expect((await owner(`/api/app/machines/device/${real.userCode}/deny`, { method: "POST", json: {} })).status).toBe(
+    429,
+  );
+  expect((await owner(`/api/app/machines/device/${real.userCode}`)).status).toBe(429);
+  // Someone else (same address, under its larger budget) still sees it.
+  const other = browser(t);
+  await signUp(other, "bia@example.com");
+  expect((await other(`/api/app/machines/device/${real.userCode}`)).status).toBe(200);
+});
+
 test("install.sh is served without a session, never cached", async () => {
   t = await createTestServer();
   const res = await runnerCall("/api/machines/install.sh");
@@ -237,11 +261,28 @@ test("rename, delete, target and the computer view; deleting revokes the token",
 
 test("reconnecting over HTTP: the removed computer comes back with its agent; a junk id is a new computer", async () => {
   const { owner, api, pair, agentId } = await start();
-  const { machineId } = await pair("Laptop");
+  const { machineId, token: oldToken } = await pair("Laptop");
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId } });
   expect((await api(`/machines/${machineId}`, { method: "DELETE" })).status).toBe(204);
 
-  const started = await runnerPost("/api/machines/device", { name: "x", ...RUNNER, previousMachineId: machineId });
+  // The id alone (every member sees it) proves nothing: an ordinary new computer.
+  const unproved = await runnerPost(
+    "/api/machines/device",
+    { name: "z", ...RUNNER, previousMachineId: machineId },
+    "203.0.113.9",
+  );
+  const unprovedCode = (await unproved.json()) as { userCode: string };
+  const unprovedView = (await (await owner(`/api/app/machines/device/${unprovedCode.userCode}`)).json()) as {
+    reconnect?: unknown;
+  };
+  expect(unprovedView.reconnect).toBeUndefined();
+
+  const started = await runnerPost("/api/machines/device", {
+    name: "x",
+    ...RUNNER,
+    previousMachineId: machineId,
+    previousToken: oldToken,
+  });
   const code = (await started.json()) as { deviceCode: string; userCode: string };
   const view = await owner(`/api/app/machines/device/${code.userCode}`);
   expect(await view.json()).toMatchObject({ reconnect: { machineId, name: "Laptop", orgName: "Acme" } });

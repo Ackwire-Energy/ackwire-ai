@@ -835,7 +835,7 @@ export async function agentBrainSummaries(
       : Promise.resolve([]),
   ]);
   const names = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m.name]));
-  const manages = membership !== null && can(membership.role, "manage_agents");
+  const manages = membership !== null && membership.standing?.state !== "suspended" && can(membership.role, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const computer = a.machineId && (manages || a.ownerUserId === viewerId) ? names.get(a.machineId) : undefined;

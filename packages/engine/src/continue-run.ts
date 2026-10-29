@@ -7,7 +7,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { continuedTranscript, type Transcript } from "./executor";
 import { getMessage } from "./messages";
-import { can, getMembership } from "./organizations";
+import { can, requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
 
@@ -30,8 +30,7 @@ export async function continueRun(
   runId: string,
 ): Promise<{ runId: string }> {
   const { db } = deps;
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [row] = await db
     .select({
       run: agentRuns,

@@ -1,10 +1,42 @@
 import type { Me, OrgSummary } from "../api/types";
 
-/** Only same-site relative redirects (no open redirect to other hosts). */
+const SAME_ORIGIN = "https://x.invalid";
+/** Control characters (browsers drop tabs and newlines, so `/\t/evil.com` becomes `//evil.com`) or a backslash. */
+const unsafeChars = (text: string) =>
+  [...text].some((ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 0x20 || code === 0x7f || ch === "\\";
+  });
+
+/**
+ * Only same-site relative redirects (no open redirect to other hosts): parsed against a placeholder origin that
+ * must stay the origin, refused when the path (also decoded) has control characters or a backslash or starts with
+ * `//`. Returns the normalized path, query and fragment.
+ */
 export function safeRedirect(value: unknown): string | undefined {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\")
-    ? value
-    : undefined;
+  if (typeof value !== "string" || !value.startsWith("/") || unsafeChars(value)) return undefined;
+  let url: URL;
+  let decoded: string;
+  try {
+    url = new URL(value, SAME_ORIGIN);
+    decoded = decodeURIComponent(url.pathname);
+  } catch {
+    return undefined;
+  }
+  if (url.origin !== SAME_ORIGIN || url.pathname.startsWith("//") || decoded.startsWith("//") || unsafeChars(decoded))
+    return undefined;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** `value` when it is an http(s) address, the only links the apps open from data agents or people wrote. */
+export function webUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:" ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The sign-in page that comes back to `redirect`, with the address the page before already knew filled in. */

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   isAutoModel,
@@ -454,7 +454,25 @@ async function executeRunInner(
         db
           .select({ id: secretRequests.id })
           .from(secretRequests)
-          .where(and(eq(secretRequests.runId, run.id), eq(secretRequests.status, "pending"))),
+          .leftJoin(
+            schema.outbox,
+            eq(
+              schema.outbox.dedupeKey,
+              sql<string>`concat('agent_run.execute:', ${secretRequests.runId}, ':secret:', ${secretRequests.id})`,
+            ),
+          )
+          .where(
+            and(
+              eq(secretRequests.runId, run.id),
+              or(
+                eq(secretRequests.status, "pending"),
+                // Delivery is committed before activation. Another wake-up
+                // must not tell the agent it has a secret until activation
+                // inserted the corresponding resume job.
+                and(eq(secretRequests.status, "delivered"), isNull(secretRequests.removedAt), isNull(schema.outbox.id)),
+              ),
+            ),
+          ),
       ]);
       // Resumes when the last decision or answer comes in.
       if (stillPending.length > 0 || stillOpen.length > 0 || stillSecret.length > 0) return;

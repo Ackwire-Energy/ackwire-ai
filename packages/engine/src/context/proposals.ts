@@ -8,7 +8,15 @@ import { publishUserEvent } from "../events";
 import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
-import { type ContextItem, checkContent, checkPermissionText, consolidateItem } from "./items";
+import { userVisibleChannels } from "../search";
+import {
+  type ContextItem,
+  checkContent,
+  checkPermissionText,
+  consolidateItem,
+  getContextItems,
+  itemVisibleIn,
+} from "./items";
 
 const { contextProposals, contextItems, agents, organizations, organizationMembers } = schema;
 
@@ -140,12 +148,30 @@ async function deciders(db: Database, p: Proposal) {
   return [...ids];
 }
 
+/**
+ * A proposal carries its items' text (the bullet in `proposedText`, the
+ * evidence), so outside admins it is only for who may see every item behind
+ * it, the same rule as `listContextItems`. An item that is gone counts as hidden.
+ */
+async function proposalsVisible<T extends Proposal>(db: Database, actorId: string, orgId: string, rows: T[]) {
+  const ids = [...new Set(rows.flatMap((r) => r.itemIds))];
+  if (ids.length === 0) return rows;
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  const items = new Map((await getContextItems(db, orgId, ids)).map((i) => [i.id, i]));
+  return rows.filter((r) =>
+    r.itemIds.every((id) => {
+      const item = items.get(id);
+      return item !== undefined && itemVisibleIn(item, visible);
+    }),
+  );
+}
+
 async function mayDecide(db: Database, actorId: string, p: Proposal) {
   const membership = await requirePermission(db, actorId, p.orgId, "read");
   if (can(membership.role, "configure")) return true;
   if (p.target === "agent_instructions" && p.agentId) {
     const agent = await getAgent(db, p.orgId, p.agentId);
-    return agent?.ownerUserId === actorId;
+    return agent?.ownerUserId === actorId && (await proposalsVisible(db, actorId, p.orgId, [p])).length > 0;
   }
   return false;
 }
@@ -156,8 +182,8 @@ export async function listProposals(
   orgId: string,
   options: { status?: Proposal["status"]; agentId?: string } = {},
 ) {
-  await requirePermission(db, actorId, orgId, "read");
-  const rows = await db
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const all = await db
     .select()
     .from(contextProposals)
     .where(
@@ -169,6 +195,7 @@ export async function listProposals(
     )
     .orderBy(desc(contextProposals.createdAt))
     .limit(200);
+  const rows = can(membership.role, "configure") ? all : await proposalsVisible(db, actorId, orgId, all);
   const out: (Proposal & { canDecide: boolean })[] = [];
   for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
   return out;

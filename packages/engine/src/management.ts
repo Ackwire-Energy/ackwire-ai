@@ -6,7 +6,7 @@ import { CHANNEL_NAME_PATTERN } from "./channels";
 import { invalidateDefaults } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
 import {
   agentBudgetsThisMonth,
   budgetPercent,
@@ -263,8 +263,7 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
 }
 
 export async function listAgentChannels(db: Database, actorId: string, orgId: string, agentId: string) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [rows, ownChannels] = await Promise.all([
     db
       .select({
@@ -348,8 +347,7 @@ export async function updateChannel(
   channelId: string,
   input: { name?: string; topic?: string; visibility?: "public" | "private" },
 ) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
     .select()
     .from(channels)

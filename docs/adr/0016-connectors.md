@@ -7,7 +7,7 @@
 
 **Layer 1, the organization connects once.** `connector_connections` holds an org's connection to an MCP server: connector id (from our catalog), server URL (https), auth type and the credential (OAuth tokens or an API key, as JSON), envelope-encrypted like provider credentials and bound to `(org_id, id)`. One active connection per connector per org; reconnecting replaces it and moves the agents' grants over. Disconnecting deletes the grants. Secrets are never returned by any API.
 
-**Layer 2, each agent gets a subset.** Grants live in `agent_scopes` with the connection id. A grant is accepted only if the connection is active in the org and the scope exists in that connector's catalog (`connectorGrantValidator`).
+**Layer 2, each agent gets a subset.** Grants live in `agent_scopes` with the connection id. A grant is accepted only if the connection is active in the org and the scope exists in that connector's catalog (`connectorGrantValidator`). Giving an agent a grant is an admin's call (`manage_agents`), on every path: `PUT …/agents/{id}/scopes`, `PUT …/agents/{id}/access` and a `request_permission` approval. The agent's owner, when not an admin, may only narrow its access (drop grants it has, add tool denials), so whoever an admin made responsible for an agent can't hand it the org's connectors.
 
 **Catalog** (`CONNECTOR_CATALOG`, code we own): for each connector (seeded: GitHub, Sentry, Linear, a Drive-like server) the scopes with labels, and a map from each MCP tool name to one of our scopes, with `sensitive` and an approval-title template. A tool the server lists but the catalog doesn't is never exposed. Merge, deploy and rollback stay sensitive regardless (0015).
 

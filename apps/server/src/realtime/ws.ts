@@ -9,7 +9,7 @@ import {
   userTopic,
 } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import type { Database } from "@agenteschat/db";
+import { and, eq, inArray, isNotNull, isNull, or, schema, type Database } from "@agenteschat/db";
 import {
   type BrowserLive,
   ForbiddenError,
@@ -50,9 +50,9 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  *   `approval.*`) wrapped as `{"type":"event","channelId":…,"event":{…}}`.
  *   Events for this person only (approvals waiting for them, DMs) arrive as
  *   `{"type":"event","scope":"user","event":{…}}`.
- * - Membership changes take effect at once: leaving (or being removed from) a
- *   channel drops that subscription; leaving the organization closes the
- *   socket with code 4403.
+ * - Membership changes normally take effect through pub/sub at once. A
+ *   periodic database check also drops subscriptions or closes the socket if
+ *   that notification was lost.
  * - A revoked session closes its socket on the next frame or periodic check.
  */
 export interface RealtimeDeps {
@@ -114,6 +114,7 @@ export const MAX_SUBSCRIPTIONS = 200;
 export const SESSION_RECHECK_MS = 15_000;
 /** Incoming frames recheck at most once this often, to avoid a database query per mouse event. */
 const SESSION_FRAME_RECHECK_MS = 2_000;
+const MEMBERSHIP_CHECK_TIMEOUT_MS = 5_000;
 
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
@@ -136,7 +137,8 @@ export async function personUpgrade(
   const session = await deps.auth.api.getSession({ headers: req.headers, query: { disableCookieCache: true } });
   if (!session) return new Response("Sign in to continue", { status: 401 });
   const user = session.user as SessionUser;
-  if (!(await getMembership(deps.db, user.id, orgId))) {
+  const membership = await getMembership(deps.db, user.id, orgId);
+  if (!membership || membership.standing?.state === "suspended") {
     return new Response("Not a member of this organization", { status: 403 });
   }
   return { ...user, sessionToken: session.session.token };
@@ -180,6 +182,38 @@ export async function authorizeSubscription(
     if (error instanceof NotFoundError) return "not_found";
     throw error;
   }
+}
+
+/** Reconcile an existing socket against durable membership when a revocation event was lost. */
+export async function currentSubscriptions(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelIds: string[],
+): Promise<Set<string> | null> {
+  const member = await getMembership(db, userId, orgId);
+  if (!member || member.standing?.state === "suspended") return null;
+  if (channelIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: schema.channels.id })
+    .from(schema.channels)
+    .leftJoin(
+      schema.channelMembers,
+      and(
+        eq(schema.channelMembers.orgId, orgId),
+        eq(schema.channelMembers.channelId, schema.channels.id),
+        eq(schema.channelMembers.userId, userId),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.channels.orgId, orgId),
+        inArray(schema.channels.id, channelIds),
+        isNull(schema.channels.archivedAt),
+        or(eq(schema.channels.kind, "forum"), isNotNull(schema.channelMembers.id)),
+      ),
+    );
+  return new Set(rows.map((row) => row.id));
 }
 
 export function createRealtime(deps: RealtimeDeps) {
@@ -347,7 +381,6 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
         if (!(await liveSession(ws, true))) return;
-        ws.data.sessionTimer = setInterval(() => void liveSession(ws, true), SESSION_RECHECK_MS);
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
           const pending = ws.data.pending.get(channelId);
@@ -358,12 +391,53 @@ export function createRealtime(deps: RealtimeDeps) {
           ws.data.subscriptions.delete(channelId);
           if (ws.readyState === 1) send(ws, { type: "unsubscribed", channelId, reason });
         };
+        let rechecking = false;
+        ws.data.sessionTimer = setInterval(() => {
+          if (rechecking || ws.readyState !== 1) return;
+          rechecking = true;
+          void (async () => {
+            try {
+              if (!(await liveSession(ws, true))) return;
+              let timeout: ReturnType<typeof setTimeout> | undefined;
+              const deadline = new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => reject(new Error("membership check timed out")), MEMBERSHIP_CHECK_TIMEOUT_MS);
+                timeout.unref?.();
+              });
+              let allowed: Set<string> | null;
+              try {
+                allowed = await Promise.race([
+                  currentSubscriptions(deps.db, user.id, orgId, [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()]),
+                  deadline,
+                ]);
+              } finally {
+                if (timeout) clearTimeout(timeout);
+              }
+              if (ws.readyState !== 1) return;
+              if (!allowed) {
+                ws.close(4403, "membership revoked");
+                return;
+              }
+              for (const channelId of ws.data.subscriptions.keys())
+                if (!allowed.has(channelId)) drop(channelId, "revoked");
+              for (const [channelId, pending] of ws.data.pending)
+                if (!allowed.has(channelId)) pending.revoked = true;
+            } catch {
+              // A failed durable check must not leave a private subscription open.
+              if (ws.readyState === 1) ws.close(1011, "membership unavailable");
+            } finally {
+              rechecking = false;
+            }
+          })();
+        }, SESSION_RECHECK_MS);
         ws.data.system.push(
           deps.pubsub.subscribe(orgTopic(orgId), (raw) => {
             const event = raw as unknown as OrgEvent;
             if (event.type === "channel.archived") return drop(event.channelId, "archived");
             if (event.type === "org.broadcast") {
               if (ws.readyState === 1) send(ws, { type: "event", scope: "org", event: event.event });
+              if (event.event.type === "org.standing" && event.event.state === "suspended" && ws.readyState === 1) {
+                ws.close(4403, "organization suspended");
+              }
               return;
             }
             if (event.type !== "membership.revoked" || event.userId !== user.id) return;

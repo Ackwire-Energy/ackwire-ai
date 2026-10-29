@@ -6,7 +6,7 @@ import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events
 import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
-import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
 import { OrgPausedError, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
@@ -252,8 +252,7 @@ export async function addChannelMember(
   options: { pubsub?: PubSub } = {},
 ) {
   // Admins manage members of any channel, also private ones they're not in.
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
     .select()
     .from(channels)
@@ -313,8 +312,7 @@ export async function setChannelAgentAutoReply(
   autoReply: boolean,
   options: { pubsub?: PubSub } = {},
 ) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [row] = await db
     .select({ createdBy: channels.createdByUserId, ownerUserId: agents.ownerUserId })
     .from(channelMembers)
@@ -367,8 +365,7 @@ export async function removeChannelMember(
   member: { userId: string } | { agentId: string },
   options: { pubsub?: PubSub } = {},
 ) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
     .select()
     .from(channels)
@@ -407,8 +404,7 @@ export async function removeChannelMember(
 
 /** The channel, when `actorId` may archive it or bring it back: its creator or an admin. */
 async function archivableChannel(db: Database, actorId: string, orgId: string, channelId: string) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
     .select()
     .from(channels)

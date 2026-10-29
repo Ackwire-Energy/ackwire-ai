@@ -10,6 +10,7 @@ import {
   deleteMachine,
   deliverSecret,
   drainOutbox,
+  executeRun,
   expireSecretRequests,
   ForbiddenError,
   getAgentComputer,
@@ -33,7 +34,7 @@ import {
   type ToolContext,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { fakeRunner, type FakeRunnerOptions, pairMachine, RUNNER } from "./machine-fixtures";
 import { until } from "./stream-fixtures";
 
 let f: Fixture;
@@ -801,6 +802,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   /** An agent that asks for NPM_TOKEN when told "publica", then says what it got. */
   async function asking(
     target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
+    runnerOptions: FakeRunnerOptions = {},
   ) {
     f = await setup({
       machines: true,
@@ -820,7 +822,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     });
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     const paired = await pair();
-    const runner = fakeRunner(f.machineHub as MachineHub);
+    const runner = fakeRunner(f.machineHub as MachineHub, runnerOptions);
     await runner.hello(paired.token);
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -925,6 +927,170 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
   });
 
+  test("a decline during staging prevents activation and leaves no live secret", async () => {
+    let stagedWhilePending = false;
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretStaged: async (requestId) => {
+        const [current] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, requestId));
+        stagedWhilePending = current?.status === "pending";
+        await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, requestId);
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered",
+    );
+    expect(stagedWhilePending).toBe(true);
+    expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
+    expect(runner.staged.has(row.id)).toBe(false);
+    const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    expect(closed?.status).toBe("declined");
+  });
+
+  test("a delivered request cannot wake its run before activation", async () => {
+    const { row } = await asking();
+    await f.db
+      .update(schema.secretRequests)
+      .set({ status: "delivered", deliveredAt: new Date() })
+      .where(eq(schema.secretRequests.id, row.id));
+    await executeRun(f.jobDeps, row.runId, { finalAttempt: true });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, row.runId));
+    expect(run?.status).toBe("waiting_input");
+  });
+
+  test("a pause after staging still allows committed activation but blocks new keys", async () => {
+    let pauseRunner!: ReturnType<typeof fakeRunner>;
+    const { runner, row, paired } = await asking({ target: "env" }, {
+      onSecretStaged: async () => {
+        await pauseRunner.frame({ type: "runner.state", paused: { paused: true, until: null } });
+      },
+    });
+    pauseRunner = runner;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivered = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(delivered.status).toBe("delivered");
+    expect(runner.secrets.has(row.name)).toBe(true);
+    const hub = f.machineHub as MachineHub;
+    await expect(hub.call(paired.machineId, {
+      agent: { id: f.agent.id, handle: "dev" }, op: "secret", action: "keypair",
+      requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    })).rejects.toThrow(/paused/i);
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    expect(runner.secrets.has(row.name)).toBe(false);
+  });
+
+  test("delivery generation stays monotonic after a previous replica clock ran ahead", async () => {
+    const { row } = await asking();
+    const ahead = new Date(Date.now() + 60_000);
+    await f.db.insert(schema.secretRequests).values({
+      ...row, id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", toolUseId: "prior-clock-delivery", messageId: null,
+      status: "delivered", deliveredAt: ahead, removedAt: new Date(),
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const result = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(result.deliveredAt && new Date(result.deliveredAt).getTime()).toBeGreaterThan(ahead.getTime());
+  });
+
+  test("a delayed older activation cannot overwrite a newer secret of the same name", async () => {
+    let releaseOlder!: () => void;
+    let reachedOlder!: () => void;
+    const holdOlder = new Promise<void>((resolve) => { releaseOlder = resolve; });
+    const olderReached = new Promise<void>((resolve) => { reachedOlder = resolve; });
+    let olderId = "";
+    const { runner, row: older, paired } = await asking({ target: "env" }, {
+      onSecretActivate: async (id) => {
+        if (id === olderId) {
+          reachedOlder();
+          await holdOlder;
+        }
+      },
+    });
+    olderId = older.id;
+    const newerId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+    const hub = f.machineHub as MachineHub;
+    const key = await hub.call(paired.machineId, {
+      agent: { id: f.agent.id, handle: "dev" }, op: "secret", action: "keypair", requestId: newerId,
+    }) as { publicKey: string };
+    await f.db.insert(schema.secretRequests).values({
+      ...older, id: newerId, toolUseId: "second-secret", messageId: null,
+      publicKey: key.publicKey, status: "pending", deliveredAt: null, deliveredSize: null, removedAt: null,
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const aad = (id: string) => secretAad({ requestId: id, orgId: f.org.id, name: "NPM_TOKEN", target: { kind: "env" } });
+    const olderValue = "older-secret-value";
+    const newerValue = "newer-secret-value";
+    const olderDelivery = deliverSecret(
+      sandbox, f.owner.id, f.org.id, older.id, await sealSecret(older.publicKey, olderValue, aad(older.id)),
+    );
+    await olderReached;
+    const newerView = await deliverSecret(
+      sandbox, f.owner.id, f.org.id, newerId, await sealSecret(key.publicKey, newerValue, aad(newerId)),
+    );
+    expect(newerView.removed).toBe(false);
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(newerValue);
+    releaseOlder();
+    const olderView = await olderDelivery;
+    expect(olderView.removed).toBe(true);
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(newerValue);
+    const [newerRow] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, newerId));
+    expect(newerRow?.removedAt).toBeNull();
+  });
+
+  test("removing a delivered request before activation cancels its runner value and resumes absent", async () => {
+    let release!: () => void;
+    let reached!: () => void;
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const atActivation = new Promise<void>((resolve) => { reached = resolve; });
+    let targetId = "";
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretActivate: async (id) => {
+        if (id === targetId) { reached(); await hold; }
+      },
+    });
+    targetId = row.id;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivery = deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    await atActivation;
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    release();
+    const result = await delivery;
+    expect(result.removed).toBe(true);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    const [resume] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey,
+      `agent_run.execute:${row.runId}:secret:${row.id}`));
+    expect(resume).toBeDefined();
+  });
+
+  test("removal after runner activation wins before a delayed DB finalization", async () => {
+    let release!: () => void;
+    let reached!: () => void;
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const activated = new Promise<void>((resolve) => { reached = resolve; });
+    let targetId = "";
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretActivated: async (id) => {
+        if (id === targetId) { reached(); await hold; }
+      },
+    });
+    targetId = row.id;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivery = deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    await activated;
+    expect(runner.secrets.has(row.name)).toBe(true);
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    release();
+    expect((await delivery).removed).toBe(true);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    const [resume] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey,
+      `agent_run.execute:${row.runId}:secret:${row.id}`));
+    expect(resume).toBeDefined();
+  });
+
   test("declined or expired: the run goes on without it, and the machine drops the key", async () => {
     const { runner, row } = await asking();
     await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, row.id);
@@ -953,6 +1119,24 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(secretSite("https://a.example:8443/x")).toBe("https://a.example:8443");
     expect(secretSite("file:///etc/passwd")).toBeNull();
     expect(secretSite("not a site")).toBeNull();
+  });
+
+  test("owner removes a mixed browser and command secret from its original machine after code is disabled", async () => {
+    const { runner, row } = await asking({ target: "env", site: "dashboard.stripe.com/login" });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    const [delivered] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    if (!delivered) throw new Error("missing delivered request");
+    await f.db.insert(schema.secretRequests).values({
+      ...delivered, id: "dddddddd-dddd-dddd-dddd-dddddddddddd", toolUseId: "mixed-command-secret",
+      messageId: null, site: null, deliveredAt: new Date((delivered.deliveredAt?.getTime() ?? 0) + 1),
+    });
+    await f.db.insert(schema.orgSandboxSettings).values({ orgId: f.org.id, enabled: false })
+      .onConflictDoUpdate({ target: schema.orgSandboxSettings.orgId, set: { enabled: false } });
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
   });
 
   test("a runner older than protocol 3 is told to update", async () => {

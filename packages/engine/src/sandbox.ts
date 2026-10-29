@@ -139,6 +139,7 @@ export async function withSandbox<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
   fn: (computer: ComputerHandle) => Promise<T>,
+  options: { allowPaused?: boolean } = {},
 ): Promise<T> {
   const [agent, mission] = await Promise.all([getAgentCached(deps.db, ctx.orgId, ctx.agentId), missionOfRun(ctx)]);
   // In a mission's thread the work runs on the mission's computer (ADR 0029), never on another one.
@@ -151,10 +152,11 @@ export async function withSandbox<T>(
       ctx,
       { machineId: mission.machineId, handle: agent?.handle ?? "agent", name: agent?.name },
       fn,
+      options,
     );
   }
   if (agent?.machineId) {
-    return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle, name: agent.name }, fn);
+    return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle, name: agent.name }, fn, options);
   }
   const preparing = await computerPreparing(deps.db, ctx.orgId);
   throw new SandboxUnavailableError(preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE);
@@ -169,13 +171,14 @@ async function withMachine<T>(
   ctx: ToolContext,
   { machineId, handle, name }: { machineId: string; handle: string; name?: string },
   fn: (computer: ComputerHandle) => Promise<T>,
+  options: { allowPaused?: boolean } = {},
 ): Promise<T> {
   const settings = await getSandboxSettings(deps.db, ctx.orgId);
   if (!settings.enabled)
     throw new SandboxUnavailableError("The agents' computers are turned off for this organization.");
   const machines = deps.machines;
   if (!machines) throw new SandboxUnavailableError("Connected computers are not available on this server.");
-  return withConnectedMachine(machines.hub, ctx, { machineId, handle, ...(name ? { name } : {}) }, fn);
+  return withConnectedMachine(machines.hub, ctx, { machineId, handle, ...(name ? { name } : {}) }, fn, options);
 }
 
 /**
@@ -188,6 +191,7 @@ export async function withConnectedMachine<T>(
   ctx: Pick<ToolContext, "orgId" | "agentId">,
   { machineId, handle, name }: { machineId: string; handle: string; name?: string },
   fn: (computer: ComputerHandle) => Promise<T>,
+  options: { allowPaused?: boolean } = {},
 ): Promise<T> {
   const status = await hub.status(machineId);
   if (!status || status.orgId !== ctx.orgId) {
@@ -195,7 +199,7 @@ export async function withConnectedMachine<T>(
   }
   if (!status.online) throw new MachineOfflineError(status.name, status.kind);
   // Paused by its owner (ADR 0036 §6): nothing new starts there; the agent relays why and until when.
-  if (status.paused) throw new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
+  if (status.paused && !options.allowPaused) throw new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
   // An old runner would ignore `agent` and put every agent in the same folder.
   if (status.protocol < AGENT_FOLDERS_PROTOCOL) {
     throw new SandboxUnavailableError(

@@ -251,7 +251,7 @@ export function isNewWork(request: MachineRequest) {
     case "desktop.text":
       return false;
     case "secret":
-      return request.action !== "discard" && request.action !== "remove";
+      return request.action !== "discard" && request.action !== "remove" && request.action !== "activate";
     // Watching a desktop isn't (the runner starts one that isn't running, and it stays on); taking control of it
     // or a terminal is work on it.
     case "stream.open":

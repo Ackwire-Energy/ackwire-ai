@@ -10,6 +10,7 @@ import {
 } from "@agenteschat/client";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { webUrl } from "@agenteschat/client/lib/guards";
 import {
   Alert,
   Button,
@@ -698,7 +699,7 @@ function Links({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
         {!bare && <span className="ac-field__label">{t("issues.links")}</span>}
         {i.pullRequests.length + i.artifacts.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
-          <a key={pr.number} href={pr.url} target="_blank" rel="noopener noreferrer" className="issue-link">
+          <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
             <Icon name="pullRequest" size={16} />
             {pr.openedBy
               ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) })

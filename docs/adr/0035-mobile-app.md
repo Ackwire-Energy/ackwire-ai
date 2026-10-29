@@ -25,6 +25,7 @@ We want a phone app with the same identity and behavior as the web. Today all cl
 
 **3. App sessions without browser CSRF.**
 - The server adds Better Auth's Expo plugin (`@better-auth/expo`) and trusts the app scheme `agenteschat://`. The app signs in with `expoClient` (session in SecureStore, social sign-in through the system browser and a deep link back).
+- The plugin's `/api/auth/expo-authorization-proxy`, where that browser starts, would redirect to any https address and sign that address's `state` into the visitor's state cookie (an open redirect, and a way to plant someone else's sign-in). It only goes on to a configured provider's authorization endpoint (Google, GitHub, Apple) with our client id and our own callback as `redirect_uri`; anything else is a 400 (`expoProxyAllowed` in `apps/server/src/auth.ts`).
 - The app calls `/api/app/*` and `/api/ws` with the session cookie read from SecureStore (`authClient.getCookie()`) in a `Cookie` header, plus `X-Agentes-Client: mobile`, and no `Origin`.
 - The CSRF rule in `routes/app/context.ts` becomes: with an `Origin`, it must be one of ours (unchanged). Without an `Origin`, the request must carry `X-Agentes-Client: mobile`. A browser cannot send that custom header cross-site without a CORS preflight, and we never allow one. Plain HTML forms always send an `Origin`. The WebSocket upgrade follows the same rule.
 - React Native's WebSocket sends an `Origin` derived from the URL. It passes because the app's API URL is the server's `PUBLIC_URL`; a foreign `Origin` is refused even with the app header.

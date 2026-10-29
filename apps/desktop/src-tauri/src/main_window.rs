@@ -71,8 +71,20 @@ enum Route {
     Stay,
     /// Stays, and the window comes to the front (signed in from the browser).
     Front,
-    /// Opens in the person's browser (or the app for its scheme) instead.
+    /// Opens in the person's browser (or their mail app) instead.
     Outside,
+    /// Goes nowhere: a scheme the system would hand to some other app (file:, smb:, an app's own links), which a
+    /// page or a link someone wrote must never be able to launch.
+    Drop,
+}
+
+/// Schemes the system may open for the window: the web, mail, and this app's own links (`deep_link.rs`
+/// checks those again when they come back).
+fn outside_or_drop(url: &Url) -> Route {
+    match url.scheme() {
+        "http" | "https" | "mailto" | crate::deep_link::SCHEME => Route::Outside,
+        _ => Route::Drop,
+    }
 }
 
 fn route(url: &Url, site: &Url) -> Route {
@@ -87,18 +99,17 @@ fn route(url: &Url, site: &Url) -> Route {
         "http" | "https" => Route::Outside,
         // The site's own previews (sandboxed HTML, PDFs) load from these.
         "blob" | "data" | "about" => Route::Stay,
-        // mailto:, tel: and other apps.
-        _ => Route::Outside,
+        _ => outside_or_drop(url),
     }
 }
 
-/// The route for `url` against the server open now; with none, everything goes outside.
+/// The route for `url` against the server open now; with none, nothing stays in the window.
 fn route_now(app: &AppHandle, url: &Url) -> Route {
-    site(app).map(|s| route(url, &s)).unwrap_or(Route::Outside)
+    site(app).map(|s| route(url, &s)).unwrap_or_else(|| outside_or_drop(url))
 }
 
 fn open_outside(app: &AppHandle, url: &Url) {
-    if url.as_str().len() > 8192 {
+    if url.as_str().len() > 8192 || outside_or_drop(url) == Route::Drop {
         return;
     }
     let _ = app.opener().open_url(url.as_str(), None::<&str>);
@@ -216,8 +227,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
         // browser, the device's name in its words), that `this_mac` takes `servers` and `files` (older apps
         // refuse them, so the sign-in's other server and Storage's "Show the folder" show only where this says
-        // so), and that a connector's sign-in comes back here (`deep_link.rs`, older apps don't take it);
-        // nothing else.
+        // so), and that a connector's sign-in and the window's own browser sign-in come back here (`deep_link.rs`,
+        // older apps don't take them); nothing else.
         .initialization_script(format!(
             "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true }});"
         ))
@@ -235,6 +246,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
                 open_outside(&on_nav, url);
                 false
             }
+            Route::Drop => false,
         })
         // `target="_blank"`, ⌘-click and window.open: a page of the server moves the window there; anything
         // else opens in the browser. Never a second app window.
@@ -1070,6 +1082,10 @@ mod tests {
         assert_eq!(r("https://agentes.tail1234.ts.net.evil.com/", own), Route::Outside);
         assert_eq!(r("http://127.0.0.1:4311/", "http://127.0.0.1:4310"), Route::Outside);
         assert_eq!(r("mailto:a@b.c", own), Route::Outside);
+        assert_eq!(r("agenteschat://desktop/sign-in?code=x", own), Route::Outside);
+        for other in ["file:///etc/passwd", "smb://host/share", "tel:+5511", "vscode://file/x", "javascript:alert(1)"] {
+            assert_eq!(r(other, own), Route::Drop, "{other}");
+        }
         let cloud = "https://app.agentes.chat";
         assert_eq!(r("https://app.agentes.chat/help/memory?lang=en#learns", cloud), Route::Outside);
         assert_eq!(r("https://app.agentes.chat/org/x", cloud), Route::Stay);

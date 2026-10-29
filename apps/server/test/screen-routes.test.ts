@@ -22,6 +22,8 @@ test("each screen has its own handoff routes, and they act on that screen alone"
     .delete(schema.agentScopes)
     .where(and(eq(schema.agentScopes.agentId, org.agentId), eq(schema.agentScopes.scope, "desktop:use")));
 
+  // The owner may drive it (watchers behind a run may only watch: ADR 0040).
+  expect(await (await api(`/agents/${org.agentId}/browser/control`)).json()).toEqual({ canControl: true });
   const taken = await (await api(`/agents/${org.agentId}/browser/takeover`, { json: {} })).json();
   expect(taken).toMatchObject({ screen: "browser", status: "active" });
   // The browser's take over isn't the desktop's, and the agent may not use a desktop.
