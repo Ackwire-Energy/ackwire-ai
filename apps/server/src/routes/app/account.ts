@@ -98,9 +98,6 @@ export function accountRoutes(deps: AppDeps) {
               description: "No account yet, and only the owner link (`OWNER_CLAIM_SHA256`) creates the first one.",
             }),
             passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
-            landing: z
-              .boolean()
-              .openapi({ description: "Signed out, `/` shows the marketing page (LANDING_PAGE); else sign-in." }),
             termsUrl: z
               .string()
               .nullable()

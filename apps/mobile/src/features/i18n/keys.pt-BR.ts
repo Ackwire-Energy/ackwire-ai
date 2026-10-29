@@ -980,7 +980,7 @@ export const featureKeysPtBR = {
     folderGone: "Esta pasta não tem mais páginas.",
     reads_one: "{{count}} vez",
     reads_other: "{{count}} vezes",
-    taskConflict: "A página mudou. Atualizei; marque de novo.",
+    taskConflict: "A página mudou e já está atualizada. Marque de novo.",
     view: "Ver",
     notSaved: "Prévia · ainda não salva",
     placeholder: "Escreva aqui. [[ liga outra página.",

@@ -99,7 +99,7 @@ test("status: only the asking server's organizations, and whether agents may wor
     agentsHere: true,
     local: false,
   });
-  expect(await answerThisMac(deps, { kind: "status", origin: "https://agentes.chat", agentsHere: false })).toEqual({
+  expect(await answerThisMac(deps, { kind: "status", origin: "https://app.agentes.chat", agentsHere: false })).toEqual({
     orgs: [],
     agentsHere: false,
     local: false,
@@ -123,7 +123,7 @@ test("connect: refused where agents can't work here (the Cloud, a server on this
   const { store, sent, deps } = setup({});
   store.start();
   await settle();
-  for (const origin of ["https://agentes.chat", "http://127.0.0.1:4310"]) {
+  for (const origin of ["https://app.agentes.chat", "http://127.0.0.1:4310"]) {
     await expect(answerThisMac(deps, { kind: "connect", orgId: "o1", origin, agentsHere: false })).rejects.toThrow(
       "not_here",
     );

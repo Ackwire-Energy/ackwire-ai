@@ -333,7 +333,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     expect(receipt.querySelector(".ac-hintline + .ac-receipt__then > .ac-receipt__dot")?.textContent).toBe("·");
     const pop = await popoverOf("alguém sabe?");
     expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
-      "https://agentes.chat/help/who-answers?lang=pt-BR",
+      "https://app.agentes.chat/help/who-answers?lang=pt-BR",
     );
     // Nobody picked: no line naming who did.
     expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
