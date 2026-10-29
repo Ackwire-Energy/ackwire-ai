@@ -205,7 +205,14 @@ export class McpBridge {
   private send: ((frame: RunnerFrame) => void) | null = null;
   private readonly pending = new Map<
     string,
-    { resolve: (r: IpcReply) => void; timer: ReturnType<typeof setTimeout>; frame: RunnerFrame; tool: string }
+    {
+      resolve: (r: IpcReply) => void;
+      timer: ReturnType<typeof setTimeout>;
+      frame: RunnerFrame;
+      tool: string;
+      /** Sent again under the same `callId` after a reconnect (`detach`). */
+      resend: boolean;
+    }
   >();
   /** Calls made while the connection is down (a restart, a reconnect): relayed once it is back. */
   private readonly waiting = new Map<string, { frame: RunnerFrame; tool: string }>();
@@ -251,15 +258,17 @@ export class McpBridge {
   }
 
   /**
-   * The connection went away. Calls not answered yet: the ones safe to send
-   * twice (the permission prompt, which the server keys by its request, and
-   * reads) wait for the connection and go again; the others fail as
-   * transient (the server may already have done them).
+   * The connection went away. Calls not answered yet wait for the connection
+   * and go again under the same `callId` (the server runs a call once per id
+   * and answers a repeat with the first answer), when that is safe: a mission
+   * task's calls (its executor runs on through a drop), the permission prompt
+   * (keyed by its request) and reads. A brain turn's other calls fail as
+   * transient: the turn itself was cut, and it is sent again whole.
    */
   detach() {
     this.send = null;
     for (const [callId, p] of this.pending) {
-      if (RESEND_SAFE.has(p.tool)) {
+      if (p.resend) {
         this.waiting.set(callId, { frame: p.frame, tool: p.tool });
         continue;
       }
@@ -328,12 +337,12 @@ export class McpBridge {
       // An older server gave no token: the fixed mission tools.
       if (!info.serverToken) return { ok: true, text: "", tools: [...MISSION_MCP_TOOLS] };
       const callId = randomBytes(12).toString("hex");
-      return this.relayAndWait(callId, LIST, {
-        type: "mcp.list",
+      return this.relayAndWait(
         callId,
-        taskId: info.runId ?? taskId,
-        token: info.serverToken,
-      });
+        LIST,
+        { type: "mcp.list", callId, taskId: info.runId ?? taskId, token: info.serverToken },
+        true,
+      );
     }
     const tool = typeof req.tool === "string" ? req.tool.slice(0, 64) : "";
     // A bridge (server token): any tool the server lists; the server decides. Else the fixed mission tools.
@@ -370,10 +379,10 @@ export class McpBridge {
       args,
       ...(info.serverToken ? { token: info.serverToken } : {}),
     };
-    return this.relayAndWait(callId, tool, frame);
+    return this.relayAndWait(callId, tool, frame, !info.runId || RESEND_SAFE.has(tool));
   }
 
-  private relayAndWait(callId: string, tool: string, frame: RunnerFrame) {
+  private relayAndWait(callId: string, tool: string, frame: RunnerFrame, resend: boolean) {
     return new Promise<IpcReply>((resolve) => {
       const timer = setTimeout(() => {
         const waited = this.waiting.has(callId);
@@ -390,7 +399,7 @@ export class McpBridge {
         );
       }, this.opts.callTimeoutMs ?? MCP_CALL_TIMEOUT_MS);
       timer.unref?.();
-      this.pending.set(callId, { resolve, timer, frame, tool });
+      this.pending.set(callId, { resolve, timer, frame, tool, resend });
       this.relay(callId, frame);
     });
   }

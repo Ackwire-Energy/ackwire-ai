@@ -309,6 +309,8 @@ export class BrainFailure extends Error {
     readonly retryable: boolean,
     /** A plan limit's reset time, when the brain said it. */
     readonly resetsAt?: string,
+    /** The computer dropped because our own server stopped: not one of its drops (`MAX_COMPUTER_DROPS`). */
+    readonly serverStop = false,
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -1496,20 +1498,32 @@ async function executeRunInner(
    * The computer dropped in the middle of the turn (its runner restarted, the network went): the run
    * waits for that computer, saying nothing for a short while, and the turn is sent again when it is
    * back (`resumeRunsWaitingForMachine`, or right away when it already is). Still away after the grace:
-   * the next attempt finds it unavailable and says so ("I'll answer when it's back").
+   * the next attempt finds it unavailable and says so ("I'll answer when it's back"). A drop caused by
+   * our own server stopping (`serverStop`) isn't one of the computer's: it never counts toward the limit.
    */
-  const waitForDroppedComputer = async (from: BrainKind, machineId: string, prompt: string, executed: string[]) => {
+  const waitForDroppedComputer = async (
+    from: BrainKind,
+    machineId: string,
+    prompt: string,
+    executed: string[],
+    serverStop: boolean,
+  ) => {
     await deferred;
     const t = transcript as Transcript;
     const prev = t.interruptedTurn;
     t.interruptedTurn = {
       prompt: prev?.prompt ?? prompt,
       executed: [...new Set([...(prev?.executed ?? []), ...executed])],
-      drops: (prev?.drops ?? 0) + 1,
+      drops: (prev?.drops ?? 0) + (serverStop ? 0 : 1),
     };
     const waitId = Bun.randomUUIDv7();
     t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
-    await addRunStep(db, run, "error", { reason: "brain_dropped", code: "machine_offline", executed });
+    await addRunStep(db, run, "error", {
+      reason: "brain_dropped",
+      code: "machine_offline",
+      executed,
+      ...(serverStop ? { serverStop: true } : {}),
+    });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: machineId,
@@ -1645,7 +1659,7 @@ async function executeRunInner(
       // Where this computer turn's steps start (the bridge records a step per tool it runs).
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
-      const executedNow: { id: string; name: string }[] = [];
+      const executedNow: { id: string; name: string; input: unknown }[] = [];
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -1759,16 +1773,18 @@ async function executeRunInner(
             machineId &&
             error instanceof BrainFailure &&
             error.code === "machine_offline" &&
-            (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS
+            (error.serverStop || (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS)
           ) {
-            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, executed);
+            const labels = executed.map((c) => c.label);
+            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, labels, error.serverStop);
           }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure
                 ? { code: error.code, message: error.message }
                 : { code: "brain_failed", message: error instanceof Error ? error.message : String(error) };
-            return interruptedAfterTools(turnPlan.kind, failure, executed, deltas.text());
+            const names = [...new Set(executed.map((c) => c.name))];
+            return interruptedAfterTools(turnPlan.kind, failure, names, deltas.text());
           }
         }
         // A computer brain that can't answer now (offline, not logged in, plan limit, a retryable failure):
@@ -2237,7 +2253,7 @@ async function thinkOnce(
     onUsage?(usage: { input: number; output: number; model?: string; cacheRead?: number; cacheWrite?: number }): void;
     onLimit?(resetsAt?: string): void;
     /** A call the brain already ran (through the bridge, or its own tools). */
-    onExecuted?(call: { id: string; name: string }): void;
+    onExecuted?(call: { id: string; name: string; input: unknown }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
   } = {},
@@ -2252,7 +2268,7 @@ async function thinkOnce(
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {
         executedCount++;
-        hooks.onExecuted?.({ id: event.id, name: event.name });
+        hooks.onExecuted?.({ id: event.id, name: event.name, input: event.input });
       } else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
     } else if (event.type === "usage") {
       usage = event;
@@ -2267,8 +2283,9 @@ async function thinkOnce(
         false,
         event.resetsAt,
       );
-    } else if (event.type === "error") throw new BrainFailure(event.code, event.message, event.retryable === true);
-    else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
+    } else if (event.type === "error") {
+      throw new BrainFailure(event.code, event.message, event.retryable === true, undefined, event.serverStop === true);
+    } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;
   }
@@ -2318,32 +2335,59 @@ async function lastStepSeq(db: Executor, runId: string): Promise<number> {
 
 /**
  * The tools a computer-brain turn already ran: the bridge's successful calls
- * after `fromSeq` (the gateway records a `tool_result` step for each) and the
- * calls the brain reported as executed. Names, once per call.
+ * after `fromSeq` (the gateway records a `tool_call` and a `tool_result` step
+ * for each) and the calls the brain reported as executed. Once per call: its
+ * name, and `label` with what it ran on (`executedLabel`).
  */
 async function executedSince(
   db: Executor,
   runId: string,
   fromSeq: number,
-  reported: { id: string; name: string }[],
-): Promise<string[]> {
+  reported: { id: string; name: string; input?: unknown }[],
+): Promise<{ name: string; label: string }[]> {
   const steps = await db
-    .select({ data: schema.agentRunSteps.data })
+    .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
     .where(
       and(
         eq(schema.agentRunSteps.runId, runId),
-        eq(schema.agentRunSteps.kind, "tool_result"),
+        inArray(schema.agentRunSteps.kind, ["tool_call", "tool_result"]),
         sql`${schema.agentRunSteps.seq} > ${fromSeq}`,
       ),
-    );
-  const calls = new Map<string, string>();
-  for (const { data } of steps) {
+    )
+    .orderBy(schema.agentRunSteps.seq);
+  const inputs = new Map<string, unknown>();
+  const calls = new Map<string, { name: string; label: string }>();
+  for (const { kind, data } of steps) {
+    const id = typeof data.toolUseId === "string" ? data.toolUseId : null;
+    if (kind === "tool_call") {
+      if (id) inputs.set(id, data.input);
+      continue;
+    }
     if (data.isError === true || typeof data.name !== "string") continue;
-    calls.set(typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`, data.name);
+    const input = id ? inputs.get(id) : undefined;
+    calls.set(id ?? `step:${calls.size}`, { name: data.name, label: executedLabel(data.name, input) });
   }
-  for (const c of reported) calls.set(c.id, c.name);
-  return [...new Set(calls.values())];
+  for (const c of reported) calls.set(c.id, { name: c.name, label: executedLabel(c.name, c.input) });
+  return [...new Map([...calls.values()].map((c) => [c.label, c])).values()];
+}
+
+/**
+ * A call a cut-off turn already ran, as its resumed turn reads it: the command's first line or the
+ * path it touched ("Bash (git push origin main)", "Edit (src/app.ts)"), so it can tell which ran.
+ */
+function executedLabel(name: string, input: unknown): string {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const changes = Array.isArray(i.changes) ? i.changes.map((c) => text((c as { path?: unknown })?.path)) : [];
+  const what =
+    (text(i.command) || text(i.code)).trim().split("\n")[0] ||
+    text(i.file_path) ||
+    text(i.notebook_path) ||
+    text(i.path) ||
+    changes.filter(Boolean).join(", ");
+  const head = maskCredentials(what.trim().replace(/\s+/g, " "));
+  return head ? `${name} (${head.length > 120 ? `${head.slice(0, 119)}…` : head})` : name;
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */

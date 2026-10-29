@@ -56,6 +56,17 @@ export const wrapExternal = (source: string, text: string) => untrustedBlock(sou
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
 
+/**
+ * An approved action already claimed (it runs at most once): what it returned, or, with nothing recorded
+ * (it still runs elsewhere, or a restart or a dropped connection cut it), that it may not have finished.
+ */
+const ranBefore = (approval: { result: unknown }): ToolOutput =>
+  (approval.result as ToolOutput | null) ?? {
+    content:
+      "This approved action was already started and its result isn't recorded: it may still be running, or it was cut off before finishing. Check its state before doing it again.",
+    isError: true,
+  };
+
 /** The answer to a call of a run nobody is behind that carries a credential (`carriesCredential`). */
 export const CREDENTIAL_REFUSAL =
   "Refused: this call carries what looks like a key, token or private key. Work no person asked for never sends credentials anywhere: leave the value out (you may say one was found, and where).";
@@ -493,9 +504,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
      */
     async executeApproved(ctx: ToolContext, approval: Approval): Promise<ToolOutput> {
       if (approval.status !== "approved") return { content: "This action was not approved", isError: true };
-      if (approval.executedAt) {
-        return (approval.result as ToolOutput | null) ?? { content: "Already executed", isError: false };
-      }
+      if (approval.executedAt) return ranBefore(approval);
       const expected = actionHash({
         tool: approval.tool,
         scope: approval.scope,
@@ -524,7 +533,13 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .set({ executedAt: now() })
           .where(sql`${approvals.id} = ${approval.id} and ${approvals.executedAt} is null`)
           .returning({ id: approvals.id });
-        if (claimed.length === 0) return { content: "Already executed", isError: false };
+        if (claimed.length === 0) {
+          const [row] = await ctx.db
+            .select({ result: approvals.result })
+            .from(approvals)
+            .where(sql`${approvals.id} = ${approval.id}`);
+          return ranBefore(row ?? approval);
+        }
         output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
         // Team actions (ADR 0064): what a person approved and went out is the team's too.
         if (isOutsideTool(tool) && !output.isError) {

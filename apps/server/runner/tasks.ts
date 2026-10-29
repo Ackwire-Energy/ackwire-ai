@@ -66,9 +66,10 @@ export { excludeLocally };
  *   running. The wrapper starts the command with stdout/stderr going to
  *   `<runner home>/tasks/<taskId>/stdout.log` and `stderr.log`, touches
  *   `alive` every 15 s, enforces `maxSeconds`, stops on `cancel` (a file, so
- *   it works on Windows too, or SIGTERM), and writes `exit.json` (atomically)
- *   when the command ends. A pid alone can't tell "still running" after a
- *   reboot (pids are reused); a fresh `alive` can.
+ *   it works on Windows too; a SIGTERM from outside, as at a shutdown, ends it
+ *   as interrupted), and writes `exit.json` (atomically) when the command
+ *   ends. A pid alone can't tell "still running" after a reboot (pids are
+ *   reused); a fresh `alive` can.
  * - The journal `<runner home>/tasks/journal.json` (written whole, then
  *   renamed) lists every task with its state; `hello` carries it.
  * - A watcher tails the logs: Claude Code's `stream-json` lines become a
@@ -164,7 +165,8 @@ interface Journal {
 interface ExitFile {
   exitCode: number | null;
   signal: string | null;
-  reason: "canceled" | "timeout" | null;
+  /** `interrupted`: stopped by a signal from outside (a shutdown), not by us. */
+  reason: "canceled" | "timeout" | "interrupted" | null;
   endedAt: string;
   error?: string;
 }
@@ -295,14 +297,17 @@ const stop = (why) => {
   kill("SIGTERM");
   setTimeout(() => kill("SIGKILL"), 5000).unref();
 };
-process.on("SIGTERM", () => stop("canceled"));
+// The runner cancels through the "cancel" file, never a signal: a SIGTERM comes from outside (the system
+// shutting down stops the agent's scope), and the task resumes or is reported like after a crash.
+process.on("SIGTERM", () => stop("interrupted"));
 process.on("SIGINT", () => stop("canceled"));
 process.on("SIGHUP", () => {});
 if (spec.maxSeconds > 0) setTimeout(() => stop("timeout"), spec.maxSeconds * 1000).unref();
 const poll = setInterval(() => { if (existsSync(file("cancel"))) stop("canceled"); }, 1000);
 child.on("error", (e) => { clearInterval(beat); clearInterval(poll); finish({ exitCode: 127, signal: null, error: String(e && e.message || e) }); });
-// A command stopped by us ends by our signal even when its shell reports none (or exits with 143).
-child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); finish(reason && (signal || code === null || code === 143) ? { exitCode: null, signal: signal ?? "SIGTERM" } : { exitCode: code, signal: signal ?? null }); });
+// A command stopped by us ends by our signal even when its shell reports none (or exits with 143). One
+// killed by a SIGTERM we didn't send (its scope stopped first at a shutdown) was interrupted too.
+child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); if (!reason && signal === "SIGTERM") reason = "interrupted"; finish(reason && (signal || code === null || code === 143) ? { exitCode: null, signal: signal ?? "SIGTERM" } : { exitCode: code, signal: signal ?? null }); });
 `;
 
 /** The wrapper every task runs under (written next to the journal; plain JS for Node and Bun). */
@@ -1431,8 +1436,10 @@ export class TaskManager {
   ) {
     const endedAt = exit?.endedAt ?? new Date(this.now()).toISOString();
     const seconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(t.startedAt)) / 1000));
-    const canceled = exit ? exit.reason === "canceled" : t.canceling === true;
-    const interrupted = !exit && !t.canceling;
+    // Gone without an exit, or stopped from outside: interrupted, unless we were canceling it.
+    const cut = exit?.reason === "interrupted";
+    const canceled = exit && !cut ? exit.reason === "canceled" : t.canceling === true;
+    const interrupted = !canceled && (!exit || cut);
     // Codex writes its final message to `last.txt` (`-o`): the result when the stream had none.
     const codexLast =
       t.executor === "codex" && !w.result

@@ -293,7 +293,7 @@ export class Supervisor {
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", STOPPING);
+    if (this.closed) throw new RunnerError("dropped", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -444,7 +444,7 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", STOPPING));
+      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
       this.endSession(w, STOPPING);
       this.endShows(w, STOPPING);
@@ -574,7 +574,10 @@ export class Supervisor {
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
-    this.endSession(w, "The agent's worker stopped on this computer. Try again.");
+    this.endSession(
+      w,
+      "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
+    );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
@@ -583,9 +586,12 @@ export class Supervisor {
     if (w.waiters.size > 0 || [...this.owners.values()].some((o) => o.agentId === w.user.id)) this.launch(w);
   }
 
-  /** Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. */
+  /**
+   * Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. `dropped`: the
+   * server waits for the computer and resumes an agent's turn instead of failing it.
+   */
   private endSession(w: Worker, message: string) {
-    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("internal", message) });
+    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("dropped", message) });
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
   }
 

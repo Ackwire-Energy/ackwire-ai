@@ -129,11 +129,39 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   expect(sent).toMatchObject({ type: "mcp.call", taskId: TASK, tool: "report", args: { summary: "hi" } });
   b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "Reported in the thread." });
   expect(await pending).toEqual({ ok: true, text: "Reported in the thread." });
-  // A dropped connection fails the calls in flight.
+  // A mission task runs on through a dropped connection: its call in flight goes again under the same
+  // callId once the connection is back (the server runs it once and answers the copy).
   const second = b.handle(req);
   await waitFor(() => frames.length === 2);
   b.detach();
-  expect(await second).toMatchObject({ ok: false });
+  const resent: RunnerFrame[] = [];
+  b.attach((f) => resent.push(f));
+  await waitFor(() => resent.length === 1);
+  expect(resent[0]).toEqual(frames[1]);
+  b.result({ type: "mcp.result", callId: (frames[1] as { callId: string }).callId, ok: true, text: "Reported." });
+  expect(await second).toEqual({ ok: true, text: "Reported." });
+});
+
+test("at a drop, a brain turn's calls fail as transient (the turn itself is sent again); its prompt goes again", async () => {
+  const { b, frames } = bridge({
+    token: "secret-token-1",
+    missionId: "",
+    running: true,
+    runId: "0193aaaa-0000-7000-8000-0000000000aa",
+    serverToken: SERVER_TOKEN,
+  });
+  b.attach((f) => frames.push(f));
+  const post = b.handle({ taskId: TASK, token: "secret-token-1", tool: "post_message", args: { text: "oi" } });
+  const prompt = b.handle({ taskId: TASK, token: "secret-token-1", tool: "permission_prompt", args: {} });
+  await waitFor(() => frames.length === 2);
+  b.detach();
+  expect(await post).toMatchObject({ ok: false, transient: true });
+  const resent: RunnerFrame[] = [];
+  b.attach((f) => resent.push(f));
+  await waitFor(() => resent.length === 1);
+  expect(resent[0]).toMatchObject({ tool: "permission_prompt" });
+  b.result({ type: "mcp.result", callId: (resent[0] as { callId: string }).callId, ok: true, text: "{}" });
+  expect(await prompt).toEqual({ ok: true, text: "{}" });
 });
 
 test("while the connection is down (a runner restart, a reconnect) a call waits and is relayed after it comes back", async () => {

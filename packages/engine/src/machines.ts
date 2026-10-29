@@ -48,11 +48,38 @@ export interface MachineDeps {
 export const REMOVED_COMPUTER_MESSAGE =
   "Your connected computer was removed. Ask an admin or your owner to choose another one.";
 
-/** The machine can't be reached now (runner not connected). */
+/**
+ * The machine can't be reached now (runner not connected): nothing was sent. The workspace's own computer
+ * (`managed`) has no runner for anyone to start: it comes back by itself.
+ */
 export class MachineOfflineError extends Error {
-  constructor(readonly machineName: string) {
-    super(`The computer ${machineName} is offline. Ask its owner to start the runner.`);
+  constructor(
+    readonly machineName: string,
+    kind?: string | null,
+  ) {
+    super(
+      kind === "managed"
+        ? `The computer ${machineName} isn't answering right now; it usually comes back within minutes.`
+        : `The computer ${machineName} is offline. Ask its owner to start the runner.`,
+    );
     this.name = "MachineOfflineError";
+  }
+}
+
+/**
+ * The request was sent and the link to the machine (or the agent's process there) went away before its
+ * answer: it may have stopped partway or finished, with effects. `serverStop`: our own server stopped (a
+ * restart), not the computer or its network.
+ */
+export class MachineDroppedError extends MachineOfflineError {
+  readonly serverStop: boolean;
+  constructor(machineName: string, options: { serverStop?: boolean; message?: string } = {}) {
+    super(machineName);
+    this.name = "MachineDroppedError";
+    this.serverStop = options.serverStop === true;
+    this.message =
+      options.message ??
+      `The connection to the computer ${machineName} dropped while this ran: it may have stopped partway or finished, and may have had effects. Check before running it again.`;
   }
 }
 

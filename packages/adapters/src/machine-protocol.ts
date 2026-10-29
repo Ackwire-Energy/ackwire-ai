@@ -1528,6 +1528,11 @@ export type MachineErrorCode =
   | "terminal_unavailable"
   /** Protocol 18: the agent's (or the computer's) streams of that kind are at their cap. */
   | "too_many_streams"
+  /**
+   * The agent's process on the computer went away while the request ran (its worker stopped, the runner is
+   * stopping): it may have stopped partway. Older servers read it like `internal`.
+   */
+  | "dropped"
   | "bad_request"
   | "internal";
 

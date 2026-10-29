@@ -285,6 +285,38 @@ test.skipIf(!posix)(
 );
 
 test.skipIf(!posix)(
+  "a SIGTERM from outside (the system shutting down) ends a task interrupted, not canceled: it resumes like after a crash",
+  async () => {
+    const { tasks, send, done, home } = setup();
+    await tasks.init();
+    tasks.attach(send);
+    const childPid = async (taskId: string) => {
+      const file = path.join(home, "tasks", taskId, "child.pid");
+      await waitFor(() => existsSync(file) && readFileSync(file, "utf8").trim() !== "");
+      return Number(readFileSync(file, "utf8"));
+    };
+    // The wrapper gets it (systemd stops the agent's scope).
+    const { pid } = await tasks.start(AGENT, { taskId: id(11), executor: "shell", command: "sleep 30" });
+    groups.push(await childPid(id(11)));
+    process.kill(pid, "SIGTERM");
+    await waitFor(() => Boolean(done(id(11))), 8000);
+    expect(done(id(11))).toMatchObject({ interrupted: true, exitCode: null });
+    expect(done(id(11))?.canceled).toBeUndefined();
+
+    // Only the command gets it, before the wrapper does.
+    await tasks.start(AGENT, { taskId: id(12), executor: "shell", command: "sleep 30" });
+    process.kill(-(await childPid(id(12))), "SIGTERM");
+    await waitFor(() => Boolean(done(id(12))), 8000);
+    expect(done(id(12))).toMatchObject({ interrupted: true, exitCode: null, signal: "SIGTERM" });
+    expect(tasks.list()).toMatchObject([
+      { taskId: id(11), status: "interrupted" },
+      { taskId: id(12), status: "interrupted" },
+    ]);
+  },
+  15_000,
+);
+
+test.skipIf(!posix)(
   "Claude Code: the prompt goes through stdin, its session is resumed when it exists, secrets are redacted",
   async () => {
     const bin = tempDir("bin-");

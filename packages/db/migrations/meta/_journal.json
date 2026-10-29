@@ -841,6 +841,13 @@
       "when": 1793154118058,
       "tag": "0119_agent_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1793296939159,
+      "tag": "0120_machine_mcp_calls",
+      "breakpoints": true
     }
   ]
 }

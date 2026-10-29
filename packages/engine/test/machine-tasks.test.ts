@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   createMachineHub,
@@ -41,8 +41,11 @@ const deps = () => ({ db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.ch
 type Request = Extract<ServerFrame, { type: "request" }>;
 type TaskStartRequest = Extract<Request, { op: "task.start" }>;
 
-/** A runner over an in-memory socket that answers task ops (and nothing else) on a later tick. */
-function taskRunner(hub: MachineHub, options: { noSlot?: boolean } = {}) {
+/**
+ * A runner over an in-memory socket that answers task ops (and nothing else) on a later tick. `dropOnStart`:
+ * it takes a `task.start` and its socket drops before the answer.
+ */
+function taskRunner(hub: MachineHub, options: { noSlot?: boolean; dropOnStart?: boolean } = {}) {
   const sent: ServerFrame[] = [];
   const started: TaskStartRequest[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -63,6 +66,7 @@ function taskRunner(hub: MachineHub, options: { noSlot?: boolean } = {}) {
             });
           }
           started.push(frame);
+          if (options.dropOnStart) return void hub.close(conn);
           return ok({
             taskId: frame.taskId,
             pid: 100 + started.length,
@@ -362,7 +366,11 @@ describe("background tasks (ADR 0029)", () => {
     const notices = thread.filter((m) => m.meta.bodyCode === "machine_offline");
     expect(notices).toHaveLength(1);
     expect(notices[0]?.body).toContain("The computer MacBook went offline");
-    expect(notices[0]?.body).toContain("2 tasks here are paused");
+    // Claude Code with a session: they run on through a network drop, and resume after a restart.
+    expect(notices[0]?.body).toContain(
+      "2 tasks here keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
+    );
+    expect(notices[0]?.meta.bodyParams).toMatchObject({ count: "2", context: "resumes" });
 
     // Back: "API" still runs there; "Screens" is gone (the Mac rebooted) and resumes its session.
     const back = taskRunner(hub);
@@ -438,6 +446,138 @@ describe("background tasks (ADR 0029)", () => {
       .from(schema.agentRuns)
       .where(and(eq(schema.agentRuns.agentId, f.agent.id), eq(schema.agentRuns.status, "done")));
     expect(woken).toHaveLength(1);
+  });
+
+  test("a shell task's offline notice says it won't resume after a restart; the grace's end tells open apps", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-g", taskOfflineGraceMs: 0 });
+    hubs.push(hub);
+    const runner = taskRunner(hub);
+    await runner.hello(paired.token);
+    const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "build it",
+    });
+    await startMachineTask(
+      { db: f.db, pubsub: f.pubsub, call: hub.call },
+      {
+        orgId: f.org.id,
+        agent: { id: f.agent.id, handle: "dev" },
+        machineId: paired.machineId,
+        protocol: 4,
+        machineName: "MacBook",
+        channelId: f.general.id,
+        threadRootId: root.id,
+        runId: null,
+        requestedByUserId: f.owner.id,
+        title: "Build",
+        executor: "shell",
+        command: "make",
+      },
+    );
+    await runner.disconnect();
+    const statuses: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => statuses.push((e as { event?: unknown }).event));
+    await drainOutbox(f.db, f.handlers);
+    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
+    const notice = thread.find((m) => m.meta.bodyCode === "machine_offline");
+    expect(notice?.body).toContain(
+      '"Build" keeps running there if only the connection dropped. If the computer restarted, it stopped and won\'t resume by itself.',
+    );
+    expect(notice?.meta.bodyParams).not.toHaveProperty("context");
+    // Still away past the grace: open apps look again (it is an outage now).
+    expect(statuses).toContainEqual({ type: "machine.status", machineId: paired.machineId, online: false });
+  });
+
+  test("a start cut by a drop stays live: the next hello's journal says it runs, or it starts with its task", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = f.machineHub as MachineHub;
+    const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "two parts",
+    });
+    const start = (title: string) =>
+      startMachineTask(
+        { db: f.db, pubsub: f.pubsub, call: hub.call },
+        {
+          orgId: f.org.id,
+          agent: { id: f.agent.id, handle: "dev" },
+          machineId: paired.machineId,
+          protocol: 4,
+          machineName: "MacBook",
+          channelId: f.general.id,
+          threadRootId: root.id,
+          runId: null,
+          requestedByUserId: f.owner.id,
+          title,
+          executor: "claude",
+          prompt: `do ${title}`,
+          sessionId: root.id,
+        },
+      );
+    const running = (taskId: string) => ({
+      taskId,
+      agentId: f.agent.id,
+      status: "running",
+      startedAt: new Date().toISOString(),
+    });
+    const cut = taskRunner(hub, { dropOnStart: true });
+    await cut.hello(paired.token);
+    const api = await start("API");
+    expect(cut.started).toHaveLength(1);
+    // Not failed (it may run there), and never back in our queue (that would start a second copy).
+    expect(api).toMatchObject({ status: "interrupted", endedAt: null, startRequest: null });
+
+    // Back, and its journal has it: it runs (since when the journal says), nothing started twice.
+    const back = taskRunner(hub);
+    await back.hello(paired.token, { tasks: [running(api.id)] });
+    const runs = await taskRow(api.id);
+    expect(runs).toMatchObject({ status: "running", endedAt: null });
+    expect(runs?.startedAt).toBeInstanceOf(Date);
+    expect(back.started).toEqual([]);
+
+    // A start the computer never got: back without it, it starts with what it was asked.
+    const cut2 = taskRunner(hub, { dropOnStart: true });
+    await cut2.hello(paired.token, { tasks: [running(api.id)] });
+    const screens = await start("Screens");
+    expect(screens.status).toBe("interrupted");
+    const again = taskRunner(hub);
+    await again.hello(paired.token, { tasks: [running(api.id)] });
+    expect(again.started).toHaveLength(1);
+    expect(again.started[0]?.prompt).toContain(RESUME_PROMPT);
+    expect(again.started[0]?.prompt).toContain("What you were asked:\ndo Screens");
+    expect(await taskRow(api.id)).toMatchObject({ status: "running" });
+  });
+
+  test("start_task cut by a drop tells the agent it may have started and not to start it again", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const runner = taskRunner(f.machineHub as MachineHub, { dropOnStart: true });
+    await runner.hello(paired.token);
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      channelId: f.general.id,
+      threadRootId: run?.threadRootId ?? msg.id,
+      triggerMessageId: msg.id,
+    };
+    const outcome = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "start_task",
+      input: { title: "Deploy", command: "make deploy" },
+    });
+    if (outcome?.type !== "result") throw new Error("expected a result");
+    expect(outcome.output.isError).toBeFalsy();
+    expect(outcome.output.content).toContain("dropped while starting task");
+    expect(outcome.output.content).toContain("Don't start it again");
+    expect((await tasks())[0]).toMatchObject({ status: "interrupted", endedAt: null });
   });
 
   test("a task notice reads as news for the model, with the instruction only when it is the current message", () => {
