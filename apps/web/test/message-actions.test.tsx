@@ -23,6 +23,46 @@ const openMenu = async (trigger: HTMLElement) => {
   await act(() => new Promise((r) => setTimeout(r, 0)));
   return screen().getByRole("menu");
 };
+/** A phone: no hover, touch points. Returns what puts the browser back. */
+const onTouch = () => {
+  const media = spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches: query.includes("hover: none"),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+  const points = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+  Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+  return () => {
+    media.mockRestore();
+    if (points) Object.defineProperty(navigator, "maxTouchPoints", points);
+    else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+  };
+};
+/** No agent has an AI: a message nobody can answer says so under it, with Conectar. */
+const withoutAi = () =>
+  seedState({
+    aiStatus: {
+      any: false,
+      agents: [ADA_ID, ATLAS_ID].map((agentId) => ({ agentId, state: "no_ai" as const, reason: "no_key" })),
+    },
+  });
+const noAi = { seenBy: [], pickedBy: [], handled: [], noAi: true };
+/** A person's message in #eng, `minutes` before now. */
+const said = (id: string, body: string, minutes: number, receipts?: Message["receipts"], who = "u-walter") =>
+  ({
+    id,
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "person", id: who },
+    body,
+    mentionedAgentIds: [],
+    agentRunId: null,
+    createdAt: new Date(NOW.getTime() - minutes * 60_000).toISOString(),
+    receipts,
+  }) as Message;
 
 describe("message action bars", () => {
   test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder", async () => {
@@ -104,25 +144,7 @@ describe("message action bars", () => {
   });
 
   test("the bar never covers a receipt: a check ends the first line and the bar stands left of it, words go under the text", async () => {
-    const state = seedState({
-      aiStatus: {
-        any: false,
-        agents: [ADA_ID, ATLAS_ID].map((agentId) => ({ agentId, state: "no_ai" as const, reason: "no_key" })),
-      },
-    });
-    const said = (id: string, body: string, minutes: number, receipts: Message["receipts"], who = "u-walter") =>
-      ({
-        id,
-        channelId: ENG_ID,
-        threadId: null,
-        author: { type: "person", id: who },
-        body,
-        mentionedAgentIds: [],
-        agentRunId: null,
-        createdAt: new Date(NOW.getTime() - minutes * 60_000).toISOString(),
-        receipts,
-      }) as Message;
-    const noAi = { seenBy: [], pickedBy: [], handled: [], noAi: true };
+    const state = withoutAi();
     const answered = {
       seenBy: [ADA_ID],
       pickedBy: [ADA_ID],
@@ -214,16 +236,7 @@ describe("message action bars", () => {
   });
 
   test("on touch a tap on a message opens its bar's actions in a menu off its text, an agent's with its feedback", async () => {
-    const media = spyOn(window, "matchMedia").mockImplementation(
-      (query: string) =>
-        ({
-          matches: query.includes("hover: none"),
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList,
-    );
-    const points = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
-    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+    const restore = onTouch();
     try {
       const state = seedState();
       // A file with no words.
@@ -288,9 +301,55 @@ describe("message action bars", () => {
       await settle(2);
       expect(screen().getByRole("dialog", { name: "Corrigir a resposta da Ada" })).toBeTruthy();
     } finally {
-      media.mockRestore();
-      if (points) Object.defineProperty(navigator, "maxTouchPoints", points);
-      else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+      restore();
+    }
+  });
+
+  test("on touch the first tap on a message opens its actions while another row holds focus (Conectar's dialog closed, a link tapped)", async () => {
+    const restore = onTouch();
+    try {
+      const state = withoutAi();
+      state.messages = [
+        said("w1", "Mando os arquivos para a gráfica na sexta.", 20, noAi),
+        said("w2", "O briefing está em https://agentes.chat/help/who-answers, confere?", 19),
+        said("w3", "Os rótulos ficam com o verde antigo?", 18),
+      ];
+      await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+      await settle(8);
+      const row = (id: string) => document.querySelector(`article[data-message-id="${id}"]`) as HTMLElement;
+      // As a phone sends a tap: the finger goes down (focus leaves the row that held it), lifts, then the click.
+      const tap = (id: string) =>
+        act(async () => {
+          const text = row(id).querySelector(".ac-msg__text") as HTMLElement;
+          fireEvent.pointerDown(text);
+          fireEvent.mouseDown(text);
+          (document.activeElement as HTMLElement | null)?.blur();
+          fireEvent.pointerUp(text);
+          fireEvent.mouseUp(text);
+          fireEvent.click(text);
+        });
+      const actionsOpen = (id: string) => {
+        expect(screen().getByRole("menu", { name: "Ações da mensagem de Walter" })).toBeTruthy();
+        expect([...document.querySelectorAll('[data-menu-open="true"]')]).toEqual([row(id)]);
+      };
+      // Conectar's dialog, closed: focus is back on Conectar, in its row.
+      const conectar = within(row("w1")).getByRole("button", { name: "Conectar" });
+      conectar.focus();
+      await click(conectar);
+      await settle(2);
+      await click(within(screen().getByRole("dialog")).getByRole("button", { name: "Fechar" }));
+      await settle(2);
+      expect(document.activeElement).toBe(conectar);
+      await tap("w2");
+      actionsOpen("w2");
+      await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
+      // A link tapped (it opens in a new tab), and back to the page: the link keeps the focus, in its row.
+      within(row("w2")).getByRole("link").focus();
+      expect(row("w2").contains(document.activeElement)).toBe(true);
+      await tap("w3");
+      actionsOpen("w3");
+    } finally {
+      restore();
     }
   });
 

@@ -361,8 +361,9 @@ function highlightMessage(scroller: HTMLElement | null, messageId: string) {
   if (!el) return false;
   el.scrollIntoView?.({ block: "center" });
   // Rows off screen are laid out at an estimated height until drawn (`content-visibility`): once the
-  // ones around it are drawn, center it again.
-  requestAnimationFrame(() => el.scrollIntoView?.({ block: "center" }));
+  // ones around it are drawn, center it again. They are drawn by the next frame's rendering, which runs
+  // after its animation callbacks, so the second centering waits for a task after that frame.
+  requestAnimationFrame(() => setTimeout(() => el.scrollIntoView?.({ block: "center" }), 0));
   // A soft plate that fades (CSS; static with reduced motion).
   el.classList.add("ac-msg--focus");
   setTimeout(() => el.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);

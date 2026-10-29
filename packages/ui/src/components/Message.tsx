@@ -104,8 +104,7 @@ export function Message({
   useEffect(() => {
     if (!menuOpen) return;
     // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
-    // page, the list scrolls, or a row above changes height (one that held focus is drawn again a frame after the tap,
-    // `content-visibility`).
+    // page, the list scrolls, or a row above changes height (a reply still being written).
     let frame = requestAnimationFrame(function follow() {
       const next = row.current && menuPlace(row.current, tap.current);
       setMenuAt((at) =>
