@@ -1,4 +1,3 @@
-import { landingPtBR } from "./landing";
 import type { Widen } from "./widen";
 
 /**
@@ -7980,7 +7979,6 @@ export const ptBR = {
         'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
     },
   },
-  landing: landingPtBR,
   builtinTools: {
     ask_user: {
       label: "Perguntar à pessoa",

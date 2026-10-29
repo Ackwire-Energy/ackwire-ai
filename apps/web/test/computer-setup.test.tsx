@@ -449,7 +449,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(document.body.textContent).not.toContain("plano de IA");
     const about = screen().getByRole("link", { name: "Sobre este computador" });
     const url = new URL(about.getAttribute("href") ?? "");
-    expect(url.origin + url.pathname).toBe("https://agentes.chat/help/workspace-computer");
+    expect(url.origin + url.pathname).toBe("https://app.agentes.chat/help/workspace-computer");
     expect(url.searchParams.get("lang")).toBe("pt-BR");
     expect(about.className).toBe("ac-link ac-link--muted");
     expect(about.getAttribute("rel")).toBe("noopener noreferrer");

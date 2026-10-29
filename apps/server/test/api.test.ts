@@ -21,10 +21,9 @@ describe("sign-up policy (self-host)", () => {
     expect(JSON.stringify(await res.json())).toContain("Sign-up is closed");
   });
 
-  test("auth-config: no landing page, legal links or support address unless configured; password reset when email goes out", async () => {
+  test("auth-config: no legal links or support address unless configured; password reset when email goes out", async () => {
     // The test server's fake email sender delivers; people connect their own computers.
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
-      landing: false,
       termsUrl: null,
       privacyUrl: null,
       supportEmail: null,
@@ -34,7 +33,6 @@ describe("sign-up policy (self-host)", () => {
     await t.close();
     t = await createTestServer({
       env: {
-        LANDING_PAGE: "true",
         TERMS_URL: "https://example.com/terms",
         PRIVACY_URL: "https://example.com/privacy",
         SUPPORT_EMAIL: "help@example.com",
@@ -43,7 +41,6 @@ describe("sign-up policy (self-host)", () => {
       },
     });
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
-      landing: true,
       termsUrl: "https://example.com/terms",
       privacyUrl: "https://example.com/privacy",
       supportEmail: "help@example.com",

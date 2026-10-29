@@ -36,7 +36,7 @@ export type HeadersSource = () => Record<string, string> | Promise<Record<string
 
 /** Where requests go and how. Defaults: same origin, the global `fetch`, the browser's cookie. */
 export interface TransportOptions {
-  /** e.g. "https://agentes.chat" (no trailing slash needed); "" or absent = same origin. */
+  /** e.g. "https://app.agentes.chat" (no trailing slash needed); "" or absent = same origin. */
   baseUrl?: string;
   fetch?: FetchLike;
   headers?: HeadersSource;
