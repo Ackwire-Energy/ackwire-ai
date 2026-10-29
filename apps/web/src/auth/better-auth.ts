@@ -59,17 +59,26 @@ export function createBetterAuthClient(origin = window.location.origin, language
     signOut: async () => {
       await client.signOut();
     },
-    desktopHandoff: async (challenge) => {
-      const res = await client.$fetch<{ code: string }>("/desktop/handoff", { method: "POST", body: { challenge } });
-      return typeof res.data?.code === "string" ? res.data.code : null;
+    desktopOpen: async (challenge) => {
+      const res = await client.$fetch<{ requestId: string; code: string }>("/desktop/open", {
+        method: "POST",
+        body: { challenge },
+      });
+      return res.data ?? null;
     },
+    desktopRequestCode: async (requestId) => {
+      const res = await client.$fetch<{ code: string | null }>("/desktop/request", {
+        method: "POST",
+        body: { requestId },
+      });
+      return res.data?.code ?? null;
+    },
+    desktopHandoff: async (requestId) =>
+      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { requestId } })).error),
     signInOneTime: async (token) =>
       toResult((await client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })).error),
-    desktopRedeem: async (code, verifier) => {
-      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", {
-        method: "POST",
-        body: { code, verifier },
-      });
+    desktopRedeem: async (verifier) => {
+      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
       return res.data?.signedIn === true;
     },
     ownerClaim: async (input) => toResult((await client.$fetch("/owner-claim", { method: "POST", body: input })).error),

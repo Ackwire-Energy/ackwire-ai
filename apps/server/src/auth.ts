@@ -1,5 +1,5 @@
 import { randomBytes, sign as signWithKey } from "node:crypto";
-import type { HumanAction, HumanCheck, PubSub, RateLimiter } from "@agenteschat/adapters";
+import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import {
@@ -51,8 +51,6 @@ export function createAuth(deps: {
   rateLimiter: RateLimiter;
   /** The bot check of the email forms (ADR 0075); absent: none. */
   humanCheck?: HumanCheck | null;
-  /** Where an ended session is announced so its sockets close (`sessionTopic`); absent: their periodic check only. */
-  pubsub?: PubSub;
 }) {
   const { db, config, log, rateLimiter } = deps;
   const emailEnabled = deps.emailDelivers === true;
@@ -198,8 +196,11 @@ export function createAuth(deps: {
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 15 * 60, max: 10 },
         "/request-password-reset": { window: 15 * 60, max: 3 },
-        // The app's window redeems once per code the browser hands it (no polling, ADR 0036).
-        "/desktop/redeem": { window: 60, max: 10 },
+        // The app opens one hand-over request per sign-in; keep it cheap for an unauthenticated caller.
+        "/desktop/open": { window: 60, max: 10 },
+        "/desktop/request": { window: 60, max: 30 },
+        // The app's window asks every 2 s while the browser signs in.
+        "/desktop/redeem": { window: 60, max: 40 },
         "/desktop/handoff": { window: 60, max: 10 },
         "/owner-claim": { window: 60, max: 10 },
         "/owner-key": { window: 60, max: 10 },
@@ -283,14 +284,6 @@ export function createAuth(deps: {
             );
           },
         },
-        // Signing out, "sign out everywhere", a password reset and a deleted user all end here, one row at a
-        // time: the sockets opened with that session close now, on every replica (`realtime/session-watch.ts`).
-        delete: {
-          after: async (session) => {
-            await deps.pubsub
-              ?.publish(sessionTopic(session.userId), { type: SESSION_ENDED, sessionId: session.id })
-              .catch((error) => log.warn("session end not announced", { error: String(error) }));
-          },
         },
       },
     },
@@ -306,22 +299,6 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
   const session = await auth.api.getSession({ headers });
   return session ? (session.user as SessionUser) : null;
 }
-
-/**
- * The person and their session behind a socket's upgrade. Read from the database, never the signed cookie
- * cache: a session ended minutes ago must not open a socket that outlives it.
- */
-export async function socketSession(
-  auth: Auth,
-  headers: Headers,
-): Promise<{ user: SessionUser; sessionId: string } | null> {
-  const found = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
-  return found ? { user: found.user as SessionUser, sessionId: found.session.id } : null;
-}
-
-/** Server-side: one person's sessions that ended (`SESSION_ENDED`, with its id). Never forwarded to clients. */
-export const sessionTopic = (userId: string) => `session:${userId}`;
-export const SESSION_ENDED = "session.ended";
 
 /**
  * The Expo plugin's `/expo-authorization-proxy` (the phone app's social sign-in, ADR 0035) redirects to any

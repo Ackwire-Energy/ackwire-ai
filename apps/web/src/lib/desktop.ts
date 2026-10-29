@@ -94,24 +94,8 @@ export function oauthReturnPath(path: string) {
 
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";
-/**
- * Loading this brings the window to the front (main_window.rs), then goes on to `to`. With `code`, the app opened it
- * from the browser's link (`agenteschat://desktop/sign-in`, deep_link.rs): the window redeems first.
- */
+/** Loading this brings the window to the front (main_window.rs), then goes on to `to`. */
 export const SIGNED_IN_PATH = "/desktop/signed-in";
-
-/**
- * The app takes the browser's sign-in back through its own link (`signInReturn` in `window.__agentesDesktop`);
- * older apps don't, and their window offers no browser sign-in.
- */
-export const desktopSignInReturns = () =>
-  inDesktopApp() && (window as { __agentesDesktop?: { signInReturn?: unknown } }).__agentesDesktop?.signInReturn === true;
-
-/**
- * In the browser, after the handoff: the one-time code goes to the app on this computer through its own link,
- * never to the page that made the sign-in link (ADR 0036).
- */
-export const appSignInLink = (code: string) => `agenteschat://desktop/sign-in?${new URLSearchParams({ code })}`;
 
 const base64url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
@@ -129,56 +113,8 @@ export async function challengeOf(verifier: string) {
   return base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 }
 
-export const browserSignInUrl = (provider: SignInProvider, challenge: string) =>
-  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, challenge })}`;
-
-/**
- * The window keeps its verifier (and where to go after) while the browser signs in: the app's link loads a new page
- * in this same window, which takes it once to redeem the code.
- */
-const VERIFIER_KEY = "agentes.desktopVerifier";
-export const windowVerifier = {
-  set(verifier: string, to: string) {
-    try {
-      sessionStorage.setItem(VERIFIER_KEY, JSON.stringify({ verifier, to }));
-    } catch {
-      // Without storage the code can't be redeemed; the person signs in another way.
-    }
-  },
-  take(): { verifier: string; to: string } | null {
-    try {
-      const raw = sessionStorage.getItem(VERIFIER_KEY);
-      sessionStorage.removeItem(VERIFIER_KEY);
-      const parsed = raw ? (JSON.parse(raw) as { verifier?: unknown; to?: unknown }) : null;
-      return typeof parsed?.verifier === "string" && typeof parsed.to === "string"
-        ? { verifier: parsed.verifier, to: parsed.to }
-        : null;
-    } catch {
-      return null;
-    }
-  },
-};
-
-/** The browser keeps the challenge it started with: a link that skips the provider finds none. */
-const CHALLENGE_KEY = "agentes.desktopChallenge";
-export const browserChallenge = {
-  set(challenge: string) {
-    try {
-      sessionStorage.setItem(CHALLENGE_KEY, challenge);
-    } catch {
-      // Without storage the handoff is refused; the person signs in again.
-    }
-  },
-  take(): string | null {
-    try {
-      const value = sessionStorage.getItem(CHALLENGE_KEY);
-      sessionStorage.removeItem(CHALLENGE_KEY);
-      return value;
-    } catch {
-      return null;
-    }
-  },
-};
+export const browserSignInUrl = (provider: SignInProvider, requestId: string) =>
+  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request: requestId })}`;
 
 /**
  * What the site may ask of this computer (ADR 0036, `this_mac` in main_window.rs): which of this server's

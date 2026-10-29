@@ -5,7 +5,6 @@ import {
   type Presence,
   type PubSub,
   type RateLimiter,
-  STREAM_CLOSE,
   type Unsubscribe,
   userTopic,
 } from "@agenteschat/adapters";
@@ -21,7 +20,7 @@ import {
   requireChannelAccess,
   touchLastSeen,
 } from "@agenteschat/engine";
-import { type Auth, type SessionUser, socketSession } from "../auth";
+import { type Auth, type SessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
@@ -31,7 +30,6 @@ import {
   parseBrowserClientFrame,
 } from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
-import { createSessionWatch } from "./session-watch";
 import type { StreamSocketData, StreamSockets } from "./streams";
 
 /**
@@ -55,9 +53,7 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  * - Membership changes take effect at once: leaving (or being removed from) a
  *   channel drops that subscription; leaving the organization closes the
  *   socket with code 4403.
- * - The socket lives only as long as its session: signing out, "sign out
- *   everywhere" or a password reset closes it with code 4401
- *   (`session-watch.ts`).
+ * - A revoked session closes its socket on the next frame or periodic check.
  */
 export interface RealtimeDeps {
   db: Database;
@@ -80,11 +76,13 @@ export interface BrowserSocketData {
   kind: "browser";
   connectionId: string;
   user: SessionUser;
-  /** The session it was opened with: the socket closes when that session ends. */
-  sessionId: string;
+  sessionToken: string;
+  sessionValidatedAt: number;
+  sessionCheckInFlight: Promise<boolean> | null;
+  sessionTimer: ReturnType<typeof setInterval> | null;
   orgId: string;
   subscriptions: Map<string, Unsubscribe>;
-  /** Org, user and session topic listeners. */
+  /** Org and user topic listeners. */
   system: Unsubscribe[];
   /** Channels being authorized right now; a revocation during the check marks them. */
   pending: Map<string, { revoked: boolean }>;
@@ -110,34 +108,38 @@ export type ClientFrame =
 /** How long a typing indicator lasts without a new `typing` frame. */
 export const TYPING_TTL_MS = 5000;
 
-/** Close code of a person's socket whose session ended (signed out, revoked, expired). */
-export const SESSION_ENDED_CLOSE = 4401;
-
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_SUBSCRIPTIONS = 200;
+/** Bound the lifetime of an idle socket after its session is revoked. */
+export const SESSION_RECHECK_MS = 15_000;
+/** Incoming frames recheck at most once this often, to avoid a database query per mouse event. */
+const SESSION_FRAME_RECHECK_MS = 2_000;
 
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
  * terminal streams): our Origin, or the phone app without one (cross-site
- * WebSocket hijacking); a session from the cookie, read from the database;
- * membership of `orgId`. The person and their session, or the refusal.
+ * WebSocket hijacking); a session from the cookie; membership of `orgId`.
+ * The person, or the refusal.
  */
 export async function personUpgrade(
   deps: Pick<RealtimeDeps, "auth" | "db">,
   origins: Set<string>,
   req: Request,
   orgId: string,
-): Promise<{ user: SessionUser; sessionId: string } | Response> {
+): Promise<(SessionUser & { sessionToken: string }) | Response> {
   if (!requestOriginAllowed(origins, req.headers)) {
     return new Response("Cross-origin WebSocket refused", { status: 403 });
   }
   if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
-  const signedIn = await socketSession(deps.auth, req.headers);
-  if (!signedIn) return new Response("Sign in to continue", { status: 401 });
-  if (!(await getMembership(deps.db, signedIn.user.id, orgId))) {
+  // An upgrade is a new long-lived capability: resolve the session against the
+  // database instead of accepting a signed cookie that outlived its DB row.
+  const session = await deps.auth.api.getSession({ headers: req.headers, query: { disableCookieCache: true } });
+  if (!session) return new Response("Sign in to continue", { status: 401 });
+  const user = session.user as SessionUser;
+  if (!(await getMembership(deps.db, user.id, orgId))) {
     return new Response("Not a member of this organization", { status: 403 });
   }
-  return signedIn;
+  return { ...user, sessionToken: session.session.token };
 }
 
 export function parseClientFrame(raw: string | Buffer): ClientFrame | null {
@@ -182,10 +184,37 @@ export async function authorizeSubscription(
 
 export function createRealtime(deps: RealtimeDeps) {
   const origins = allowedOrigins(deps.config);
-  const sessions = createSessionWatch({ db: deps.db, pubsub: deps.pubsub, log: deps.log });
   const send = (ws: BrowserSocket, frame: unknown): void => {
     ws.send(JSON.stringify(frame));
   };
+
+  async function liveSession(ws: BrowserSocket, force = false): Promise<boolean> {
+    if (ws.readyState !== 1) return false;
+    if (!force && Date.now() - ws.data.sessionValidatedAt < SESSION_FRAME_RECHECK_MS) return true;
+    if (ws.data.sessionCheckInFlight) return ws.data.sessionCheckInFlight;
+    const check = (async () => {
+      try {
+        const { internalAdapter } = await deps.auth.$context;
+        const found = await internalAdapter.findSession(ws.data.sessionToken);
+        if (!found || found.session.userId !== ws.data.user.id || found.session.expiresAt <= new Date()) {
+          if (ws.readyState === 1) ws.close(4401, "session revoked");
+          return false;
+        }
+        ws.data.sessionValidatedAt = Date.now();
+        return true;
+      } catch {
+        // If the session store cannot be checked, stop forwarding private events.
+        if (ws.readyState === 1) ws.close(1011, "session unavailable");
+        return false;
+      }
+    })();
+    ws.data.sessionCheckInFlight = check;
+    try {
+      return await check;
+    } finally {
+      ws.data.sessionCheckInFlight = null;
+    }
+  }
 
   /** Placeholders of browser views still starting (`browser.watch` in flight). */
   const startingBrowsers = new WeakSet<() => void>();
@@ -289,13 +318,17 @@ export function createRealtime(deps: RealtimeDeps) {
 
     async upgrade(req: Request, server: Bun.Server<SocketData>): Promise<Response | undefined> {
       const orgId = new URL(req.url).searchParams.get("orgId") ?? "";
-      const signedIn = await personUpgrade(deps, origins, req, orgId);
-      if (signedIn instanceof Response) return signedIn;
+      const user = await personUpgrade(deps, origins, req, orgId);
+      if (user instanceof Response) return user;
+      const { sessionToken, ...person } = user;
       const data: BrowserSocketData = {
         kind: "browser",
         connectionId: crypto.randomUUID(),
-        user: signedIn.user,
-        sessionId: signedIn.sessionId,
+        user: person,
+        sessionToken,
+        sessionValidatedAt: 0,
+        sessionCheckInFlight: null,
+        sessionTimer: null,
         orgId,
         subscriptions: new Map(),
         system: [],
@@ -311,16 +344,10 @@ export function createRealtime(deps: RealtimeDeps) {
       idleTimeout: 120,
       async open(socket: Bun.ServerWebSocket<SocketData>) {
         if (isMachine(socket)) return deps.machines?.open(socket);
-        if (isStream(socket)) {
-          const data = socket.data;
-          if (data.kind === "stream.viewer") {
-            data.unwatch = sessions.watch(data.input.userId, data.sessionId, () => {
-              if (socket.readyState === 1) socket.close(STREAM_CLOSE.forbidden, "signed_out");
-            });
-          }
-          return deps.streams?.open(socket);
-        }
+        if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
+        if (!(await liveSession(ws, true))) return;
+        ws.data.sessionTimer = setInterval(() => void liveSession(ws, true), SESSION_RECHECK_MS);
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
           const pending = ws.data.pending.get(channelId);
@@ -352,11 +379,6 @@ export function createRealtime(deps: RealtimeDeps) {
           deps.pubsub.subscribe(userTopic(orgId, user.id), (event) => {
             if (ws.readyState === 1) send(ws, { type: "event", scope: "user", event });
           }),
-          sessions.watch(user.id, ws.data.sessionId, () => {
-            if (ws.readyState !== 1) return;
-            send(ws, { type: "error", code: "session_ended" });
-            ws.close(SESSION_ENDED_CLOSE, "session ended");
-          }),
         );
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         await touchLastSeen(deps.db, orgId, user.id).catch(() => {});
@@ -366,6 +388,7 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
+        if (!(await liveSession(ws))) return;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
         if (browserFrame) {
           return browserMessage(ws, browserFrame).catch(() => {
@@ -428,11 +451,10 @@ export function createRealtime(deps: RealtimeDeps) {
       },
       async close(socket: Bun.ServerWebSocket<SocketData>, code: number) {
         if (isMachine(socket)) return deps.machines?.close(socket);
-        if (isStream(socket)) {
-          if (socket.data.kind === "stream.viewer") socket.data.unwatch?.();
-          return deps.streams?.close(socket, code);
-        }
+        if (isStream(socket)) return deps.streams?.close(socket, code);
         const ws = socket as BrowserSocket;
+        if (ws.data.sessionTimer) clearInterval(ws.data.sessionTimer);
+        ws.data.sessionTimer = null;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();
         for (const stop of ws.data.browsers.values()) stop();

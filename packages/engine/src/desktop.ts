@@ -142,11 +142,11 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
  * its holder's control alive (`touchControl`).
  */
 export async function recheckStream(db: Database, stream: Stream) {
-  if (stream.sessionId) {
+  if (stream.sessionToken) {
     const [alive] = await db
       .select({ id: sessions.id })
       .from(sessions)
-      .where(and(eq(sessions.id, stream.sessionId), gt(sessions.expiresAt, new Date())));
+      .where(and(eq(sessions.token, stream.sessionToken), gt(sessions.expiresAt, new Date())));
     if (!alive) return refused(STREAM_CLOSE.forbidden, "signed_out");
   }
   const access = await streamAccess(db, stream);

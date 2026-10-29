@@ -251,7 +251,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     emailDelivers: adapters.email.delivers,
     rateLimiter: adapters.rateLimiter,
     humanCheck: adapters.humanCheck,
-    pubsub: adapters.pubsub,
   });
   const app = createApp({
     edition,

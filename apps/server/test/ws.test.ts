@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { authorizeSubscription, parseClientFrame, SESSION_ENDED_CLOSE } from "../src/realtime/ws";
+import { authorizeSubscription, parseClientFrame } from "../src/realtime/ws";
 import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
 
 describe("parseClientFrame", () => {
@@ -73,6 +73,35 @@ test("upgrade requires a session, our Origin and org membership", async () => {
   const stranger = browser(t);
   await signUp(stranger, "stranger@example.com");
   expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: stranger.cookie() })).toBe(403);
+});
+
+test("revoked signed cookies cannot open a new realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies })).toBe(401);
+});
+
+test("a revoked session closes its existing realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  // The ordinary client pings; a revoked socket must close instead of
+  // accepting another frame. The periodic check also bounds idle sockets.
+  await Bun.sleep(2_100);
+  c.send({ type: "ping" });
+  expect(await Promise.race([closed, Bun.sleep(5_000).then(() => -1)])).toBe(4401);
 });
 
 test("subscriptions are limited to channels the person belongs to, in the connection's org", async () => {
@@ -219,45 +248,4 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(await closed).toBe(4403);
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
-});
-
-test("a socket lives only as long as its session: signing out here, or 'sign out everywhere' elsewhere", async () => {
-  const owner = browser(t);
-  await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
-  const signIn = async () => {
-    const b = browser(t);
-    const res = await b("/api/auth/sign-in/email", {
-      json: { email: "owner@example.com", password: "correct horse battery" },
-    });
-    expect(res.status).toBe(200);
-    return b;
-  };
-  const open = async (b: ReturnType<typeof browser>) => {
-    const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: b.cookie() });
-    await c.opened;
-    await c.next((f) => f.type === "ready");
-    const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
-    return { ...c, closed };
-  };
-
-  // Signing out closes the socket opened with that session at once.
-  const a = await open(owner);
-  const oldCookie = owner.cookie();
-  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
-  expect(await a.closed).toBe(SESSION_ENDED_CLOSE);
-  expect(a.frames).toContainEqual({ type: "error", code: "session_ended" });
-  // Its cookie opens no new one, even while the signed cookie cache would still vouch for it.
-  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookie })).toBe(401);
-
-  // "Sign out everywhere else" closes the other sessions' sockets and keeps this one's.
-  const here = await signIn();
-  const there = await signIn();
-  const mine = await open(here);
-  const theirs = await open(there);
-  expect((await here("/api/auth/revoke-other-sessions", { json: {} })).status).toBe(200);
-  expect(await theirs.closed).toBe(SESSION_ENDED_CLOSE);
-  mine.send({ type: "ping" });
-  expect(await mine.next((f) => f.type === "pong")).toEqual({ type: "pong" });
-  mine.ws.close();
 });

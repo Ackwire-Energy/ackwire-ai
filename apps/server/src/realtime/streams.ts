@@ -34,10 +34,6 @@ export interface ViewerSocketData {
   kind: "stream.viewer";
   input: StreamInput;
   stream: Stream | null;
-  /** The session it was opened with: the stream closes (4403, `signed_out`) when that session ends. */
-  sessionId: string;
-  /** Stops watching that session (`ws.ts`, once the socket closes). */
-  unwatch?: () => void;
 }
 
 /** A runner's data socket. */
@@ -87,8 +83,8 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
       }
       const q = url.searchParams;
       const orgId = q.get("orgId") ?? "";
-      const signedIn = await personUpgrade(deps, origins, req, orgId);
-      if (signedIn instanceof Response) return signedIn;
+      const user = await personUpgrade(deps, origins, req, orgId);
+      if (user instanceof Response) return user;
       const agentId = q.get("agentId") ?? "";
       const request = viewerRequest(url.pathname, q);
       if (!UUID.test(agentId) || !request) {
@@ -96,9 +92,8 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
       }
       const data: ViewerSocketData = {
         kind: "stream.viewer",
-        input: { userId: signedIn.user.id, orgId, agentId, request, sessionId: signedIn.sessionId },
+        input: { userId: user.id, orgId, agentId, request, sessionToken: user.sessionToken },
         stream: null,
-        sessionId: signedIn.sessionId,
       };
       return upgraded(server.upgrade(req, { data }));
     },

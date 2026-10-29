@@ -5,69 +5,69 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
-import { appSignInLink, BROWSER_SIGN_IN_PATH, browserChallenge } from "@/lib/desktop";
+import { BROWSER_SIGN_IN_PATH } from "@/lib/desktop";
 
 /**
  * In the browser, for the Mac app's window (ADR 0036): goes to the provider, and
- * when it comes back (`done`), hands the fresh sign-in over for `challenge` and
- * gives the one-time code it gets to the app on this computer, through the app's
- * own link (`agenteschat://desktop/sign-in`). Only that app's window, holding the
- * challenge's verifier, can redeem it: whoever wrote this page's link gets nothing.
- * The challenge must be the one this tab started with, so a link straight to
- * `done` hands nothing over.
+ * when it comes back (`done`), shows the request's code and asks the person to
+ * confirm it matches the code on their computer. The hand-over happens only after
+ * that explicit confirmation, so a link that jumps straight here signs no one in.
  */
 export function DesktopSignInPage({
   provider,
-  challenge,
+  request,
   done,
 }: {
   provider?: SignInProvider;
-  challenge?: string;
+  request?: string;
   done: boolean;
 }) {
   const { t } = useTranslation();
   const auth = useAuth();
-  const [state, setState] = useState<"opening" | "app" | "expired">("opening");
+  const [state, setState] = useState<"opening" | "confirm" | "done" | "expired">("opening");
   const [code, setCode] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    if (!provider || !challenge) {
+    if (!provider || !request) {
       setState("expired");
       return;
     }
     if (!done) {
-      browserChallenge.set(challenge);
-      const back = `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, challenge, done: "1" })}`;
+      const back = `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request, done: "1" })}`;
       void auth.signInSocial(provider, back).then((r) => {
         if (!r.ok) setState("expired");
       });
       return;
     }
-    if (browserChallenge.take() !== challenge) {
-      setState("expired");
-      return;
-    }
-    void auth.desktopHandoff(challenge).then((handed) => {
-      if (!handed) {
-        setState("expired");
-        return;
+    void auth.desktopRequestCode(request).then((c) => {
+      if (!c) setState("expired");
+      else {
+        setCode(c);
+        setState("confirm");
       }
-      setCode(handed);
-      setState("app");
-      window.location.assign(appSignInLink(handed));
     });
-  }, [auth, provider, challenge, done]);
+  }, [auth, provider, request, done]);
+
+  const confirm = async () => {
+    if (!request || working) return;
+    setWorking(true);
+    const r = await auth.desktopHandoff(request).catch(() => ({ ok: false }));
+    setState(r.ok ? "done" : "expired");
+  };
 
   const name = provider ? t(`auth.provider.${provider}`) : "";
   const [title, lead] =
-    state === "app"
-      ? [t("auth.desktop.toApp"), t("auth.desktop.toAppLead")]
-      : state === "expired"
-        ? [t("auth.desktop.expired"), t("auth.desktop.expiredLead", { provider: name })]
-        : [t("auth.desktop.opening", { provider: name }), ""];
+    state === "done"
+      ? [t("auth.desktop.done"), t("auth.desktop.doneLead")]
+      : state === "confirm"
+        ? [t("auth.desktop.confirm"), t("auth.desktop.confirmLead")]
+        : state === "expired"
+          ? [t("auth.desktop.expired"), t("auth.desktop.expiredLead", { provider: name })]
+          : [t("auth.desktop.opening", { provider: name }), ""];
 
   return (
     <AuthShell>
@@ -76,18 +76,26 @@ export function DesktopSignInPage({
           <AgentAvatar
             name="agentes.chat"
             size="lg"
-            state={state === "opening" ? "writing" : undefined}
-            expression={state === "app" ? "happy" : undefined}
+            state={state === "opening" || working ? "writing" : undefined}
+            expression={state === "done" ? "happy" : undefined}
           />
           <div className="auth__bubble" key={state} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
             {lead && <p className="auth__lead">{lead}</p>}
           </div>
         </header>
-        {state === "app" && code && (
-          <Button type="button" size="lg" block onClick={() => window.location.assign(appSignInLink(code))}>
-            {t("auth.desktop.openApp")}
-          </Button>
+        {state === "confirm" && code && (
+          <div className="auth__step">
+            <div className="auth__code">
+              <span className="auth__codeValue">{code}</span>
+            </div>
+            <Button type="button" size="lg" block onClick={() => void confirm()} disabled={working}>
+              {t("auth.desktop.confirmYes")}
+            </Button>
+            <button type="button" className="auth__quiet" onClick={() => setState("expired")} disabled={working}>
+              {t("auth.desktop.confirmNo")}
+            </button>
+          </div>
         )}
       </div>
     </AuthShell>

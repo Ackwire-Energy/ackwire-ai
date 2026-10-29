@@ -221,20 +221,6 @@ test("bytes go both ways through the computer's data socket; the audit keeps who
   runner.ws.close();
 });
 
-test("signing out ends the person's desktop and terminal streams at once", async () => {
-  const { owner, machine, desktop, terminal } = await seeded();
-  const runner = await connectRunner(machine.token);
-  const watcher = openViewer(desktop, owner);
-  const shell = openViewer(terminal, owner);
-  await until(() => runner.data.length === 2 && runner.data.every((d) => d.ready), "both data sockets");
-  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
-  await until(() => watcher.closed !== null && shell.closed !== null, "the viewers' close");
-  expect(watcher.closed).toEqual({ code: STREAM_CLOSE.forbidden, reason: "signed_out" });
-  expect(shell.closed).toEqual({ code: STREAM_CLOSE.forbidden, reason: "signed_out" });
-  await until(() => runner.data.every((d) => d.closed !== null), "the data sockets' close");
-  runner.ws.close();
-});
-
 test("a terminal: the resize reaches the computer and the shell's exit the person; only who paired it opens one", async () => {
   const { owner, machine, terminal, invite } = await seeded();
   const runner = await connectRunner(machine.token);

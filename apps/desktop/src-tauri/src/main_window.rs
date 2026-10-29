@@ -230,7 +230,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // so), and that a connector's sign-in and the window's own browser sign-in come back here (`deep_link.rs`,
         // older apps don't take them); nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true, signInReturn: true }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,

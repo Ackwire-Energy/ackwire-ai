@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { noPlatformCredentials } from "@agenteschat/adapters";
-import { schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   acceptInvitation,
   agentDetail,
@@ -13,9 +13,11 @@ import {
   drainOutbox,
   ForbiddenError,
   inviteMany,
+  listAgentChannels,
   listInvitationsWithStatus,
   listRuns,
   orgOverview,
+  openDm,
   postPersonMessage,
   resendInvitation,
   rotateCredential,
@@ -198,6 +200,41 @@ describe("agents, runs and usage", () => {
     await expect(
       setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: crypto.randomUUID() }]),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("agent channel listings hide private and DM metadata from unrelated members", async () => {
+    f = await setup();
+    const outsider = await addMember(f.db, f.org.id, "member", "outsider");
+    const [secret] = await f.db
+      .insert(schema.channels)
+      .values({ orgId: f.org.id, name: "secret-project", visibility: "private", createdByUserId: f.owner.id })
+      .returning();
+    if (!secret) throw new Error("no private channel");
+    await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: secret.id }]);
+    expect(await listAgentChannels(f.db, outsider.id, f.org.id, f.agent.id)).toEqual([]);
+    expect((await agentDetail(f.db, outsider.id, f.org.id, f.agent.id)).channels).toEqual([]);
+    expect(await listAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([
+      { id: secret.id, name: secret.name, autoReply: true },
+    ]);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    expect(await listAgentChannels(f.db, outsider.id, f.org.id, f.agent.id)).toEqual([]);
+    expect((await listAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id)).map((c) => c.id)).toContain(dm.id);
+  });
+
+  test("bulk agent channel settings cannot change a DM's fixed participants", async () => {
+    f = await setup();
+    const other = await addMember(f.db, f.org.id, "member", "dm-peer");
+    const peopleDm = await openDm(f.db, f.owner.id, f.org.id, { userId: other.id });
+    await expect(
+      setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: peopleDm.id }]),
+    ).rejects.toBeInstanceOf(ValidationError);
+    const agentDm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, []);
+    const [participant] = await f.db
+      .select({ id: schema.channelMembers.id })
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, agentDm.id), eq(schema.channelMembers.agentId, f.agent.id)));
+    expect(participant).toBeDefined();
   });
 
   test("channel updates: creator or admin, unique names, #general keeps its name", async () => {

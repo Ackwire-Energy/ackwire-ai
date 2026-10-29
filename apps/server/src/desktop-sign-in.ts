@@ -6,77 +6,135 @@ import { z } from "zod";
 
 /**
  * Social sign-in for the Mac app's window (ADR 0036). Google and Apple refuse
- * embedded web views, so the window opens the sign-in in the person's
- * browser and waits. The window keeps a random verifier and sends only its
- * SHA-256 (the challenge) along. Once signed in, the browser registers that
- * challenge for its user (`/desktop/handoff`) and gets back a one-time code,
- * which it hands to the app on this computer through the app's own link
- * (`agenteschat://desktop/sign-in?code=`, deep_link.rs). The window then
- * redeems the code together with its verifier (`/desktop/redeem`) and gets a
- * session of its own (the browser's stays where it is).
+ * embedded web views, so the window opens the sign-in in the person's browser
+ * and waits. The hand-over is a device-style exchange so that a sign-in is only
+ * ever moved to a window the person is actually using, never to one chosen by
+ * whoever crafted the link:
  *
- * Both halves are needed: whoever wrote the sign-in link knows the verifier
- * but never sees the code (it goes from the person's browser to the app on
- * their own computer), and that app holds no verifier for someone else's
- * challenge. So a link crafted by someone else can't hand a session over.
+ * 1. The window asks the server to `open` a request, sending only the challenge
+ *    (the SHA-256 of a verifier it keeps). It gets back a random `requestId` and
+ *    a short human `code`, and shows the code.
+ * 2. The window opens the browser at `/desktop/sign-in?request=<requestId>` and
+ *    polls `/desktop/redeem` with the verifier.
+ * 3. After the provider sign-in, the browser reads the request's `code`, shows it,
+ *    and asks the person to confirm it matches the code on their computer. Only
+ *    then does it call `/desktop/handoff` with the request id.
+ * 4. `handoff` accepts only a request that a window opened, still pending and not
+ *    expired, and only from a fresh, still-live browser session. It consumes the
+ *    request and records that source session for the challenge. `redeem` checks
+ *    it is still live before returning a session to the window with the verifier.
  *
- * A handoff needs a fresh sign-in (a session made in the last few minutes),
- * so a link that skips the provider can't hand over an old browser session.
+ * Nothing is handed over on its own: a link that jumps straight to the page still
+ * stops at the confirmation, and the verifier never leaves the window, so the
+ * request id and code alone cannot sign anyone in.
  */
 export const HANDOFF_PREFIX = "desktop-handoff:";
-/** How long the app has to redeem the code: it gets it right away, through its own link. */
-const HANDOFF_TTL_MS = 5 * 60_000;
+export const REQUEST_PREFIX = "desktop-request:";
+/** How long the window has to pick the session up once handed over. */
+const HANDOFF_TTL_MS = 10 * 60_000;
+/** How long a request stays open for the browser to confirm. */
+const REQUEST_TTL_MS = 10 * 60_000;
 /** How recent the browser's sign-in must be to hand it over. */
 const FRESH_SIGN_IN_MS = 10 * 60_000;
-/** 32 random bytes and their SHA-256, both base64url (43 characters). */
+/** 32 random bytes and their SHA-256, both base64url (43 characters): challenge, verifier and request id. */
 const KEY = /^[A-Za-z0-9_-]{43}$/;
+/** Unambiguous code alphabet (no I/O/0/1) for the match the person reads off both screens. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 8;
 
 export const desktopChallenge = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
 
-function parseHandoff(value: string): { userId: string; challenge: string } | null {
-  try {
-    const parsed = JSON.parse(value) as { userId?: unknown; challenge?: unknown };
-    return typeof parsed.userId === "string" && typeof parsed.challenge === "string"
-      ? { userId: parsed.userId, challenge: parsed.challenge }
-      : null;
-  } catch {
-    return null;
+/** A short code the person compares between the app window and the browser (`KQ7M-3XPF`). */
+export function newConfirmationCode(): string {
+  const bytes = randomBytes(CODE_LENGTH);
+  let code = "";
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    if (i === CODE_LENGTH / 2) code += "-";
+    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
   }
+  return code;
+}
+
+type RequestRecord = { challenge: string; code: string };
+
+function parseRequest(value: string | undefined): RequestRecord | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as RequestRecord;
+    if (typeof parsed?.challenge === "string" && typeof parsed?.code === "string") return parsed;
+  } catch {
+    // A malformed record is treated as no request.
+  }
+  return null;
 }
 
 export function desktopSignIn() {
   return {
     id: "desktop-sign-in",
     endpoints: {
+      // The window opens a request bound to its challenge and gets the id and the code to show.
+      desktopOpen: createAuthEndpoint(
+        "/desktop/open",
+        { method: "POST", body: z.object({ challenge: z.string().regex(KEY) }) },
+        async (ctx) => {
+          const requestId = randomBytes(32).toString("base64url");
+          const code = newConfirmationCode();
+          await ctx.context.internalAdapter.createVerificationValue({
+            identifier: REQUEST_PREFIX + requestId,
+            value: JSON.stringify({ challenge: ctx.body.challenge, code } satisfies RequestRecord),
+            expiresAt: new Date(Date.now() + REQUEST_TTL_MS),
+          });
+          return ctx.json({ requestId, code });
+        },
+      ),
+      // The browser reads the request's code to show it; it is for the person to match, not a secret.
+      desktopRequestCode: createAuthEndpoint(
+        "/desktop/request",
+        { method: "POST", body: z.object({ requestId: z.string().regex(KEY) }) },
+        async (ctx) => {
+          const found = await ctx.context.internalAdapter.findVerificationValue(REQUEST_PREFIX + ctx.body.requestId);
+          const request = found && found.expiresAt >= new Date() ? parseRequest(found.value) : null;
+          return ctx.json({ code: request?.code ?? null });
+        },
+      ),
+      // After the person confirms the code, the fresh browser session hands itself over for the window's challenge.
       desktopHandoff: createAuthEndpoint(
         "/desktop/handoff",
-        { method: "POST", body: z.object({ challenge: z.string().regex(KEY) }), use: [sessionMiddleware] },
+        { method: "POST", body: z.object({ requestId: z.string().regex(KEY) }), use: [sessionMiddleware] },
         async (ctx) => {
           const { session } = ctx.context.session;
           if (Date.now() - new Date(session.createdAt).getTime() > FRESH_SIGN_IN_MS) {
             throw new APIError("FORBIDDEN", { message: "Sign in again to continue in the app" });
           }
-          // The code is the lookup key; the challenge stays on the row, to be matched by the verifier.
-          const code = randomBytes(32).toString("base64url");
+          // sessionMiddleware may use the signed five-minute cookie cache. A session
+          // revoked in the database must not mint a new device session through it.
+          const source = await ctx.context.internalAdapter.findSession(session.token);
+          if (!source || source.session.userId !== session.userId || source.session.expiresAt <= new Date()) {
+            throw new APIError("UNAUTHORIZED", { message: "Sign in again to continue in the app" });
+          }
+          const found = await ctx.context.internalAdapter.consumeVerificationValue(REQUEST_PREFIX + ctx.body.requestId);
+          const request = found && found.expiresAt >= new Date() ? parseRequest(found.value) : null;
+          if (!request) return ctx.json({ ok: false });
           await ctx.context.internalAdapter.createVerificationValue({
-            identifier: HANDOFF_PREFIX + code,
-            value: JSON.stringify({ userId: session.userId, challenge: ctx.body.challenge }),
+            identifier: HANDOFF_PREFIX + request.challenge,
+            value: session.token,
             expiresAt: new Date(Date.now() + HANDOFF_TTL_MS),
           });
-          return ctx.json({ code });
+          return ctx.json({ ok: true });
         },
       ),
       desktopRedeem: createAuthEndpoint(
         "/desktop/redeem",
-        { method: "POST", body: z.object({ code: z.string().regex(KEY), verifier: z.string().regex(KEY) }) },
+        { method: "POST", body: z.object({ verifier: z.string().regex(KEY) }) },
         async (ctx) => {
-          // Single use either way: a wrong verifier spends the code too.
-          const found = await ctx.context.internalAdapter.consumeVerificationValue(HANDOFF_PREFIX + ctx.body.code);
+          const found = await ctx.context.internalAdapter.consumeVerificationValue(
+            HANDOFF_PREFIX + desktopChallenge(ctx.body.verifier),
+          );
           if (!found || found.expiresAt < new Date()) return ctx.json({ signedIn: false });
-          const handoff = parseHandoff(found.value);
-          if (!handoff || handoff.challenge !== desktopChallenge(ctx.body.verifier)) return ctx.json({ signedIn: false });
-          const user = await ctx.context.internalAdapter.findUserById(handoff.userId);
-          if (!user) return ctx.json({ signedIn: false });
+          // The source browser may have signed out or been revoked after handoff.
+          const source = await ctx.context.internalAdapter.findSession(found.value);
+          if (!source || source.session.expiresAt <= new Date()) return ctx.json({ signedIn: false });
+          const { user } = source;
           const session = await ctx.context.internalAdapter.createSession(user.id);
           await setSessionCookie(ctx, { session, user });
           return ctx.json({ signedIn: true });

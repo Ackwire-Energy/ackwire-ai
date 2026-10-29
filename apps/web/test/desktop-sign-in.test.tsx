@@ -11,8 +11,7 @@ import { renderApp, screen, settle } from "./render";
 
 /**
  * agentes for Mac (ADR 0036): in the app's window, Google/GitHub/Apple sign in
- * through the browser; the browser page hands the fresh sign-in back as a one-time
- * code through the app's own link, and the window redeems it with its verifier.
+ * through the browser; the browser page hands the fresh sign-in back.
  */
 
 const app = () => window as { __agentesDesktop?: unknown };
@@ -26,31 +25,25 @@ const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], c
 const KEY = /^[A-Za-z0-9_-]{43}$/;
 const heading = () => screen().getByRole("heading").textContent;
 
-/** `window.location.assign` and `replace` recorded instead of followed. */
+/** `window.location.assign` recorded instead of followed. */
 function recordAssign() {
   const urls: string[] = [];
-  const replaced: string[] = [];
   const spy = spyOn(window.location, "assign").mockImplementation((url: string | URL) => {
     urls.push(String(url));
   });
-  const replace = spyOn(window.location, "replace").mockImplementation((url: string | URL) => {
-    replaced.push(String(url));
-  });
-  return {
-    urls,
-    replaced,
-    restore: () => {
-      spy.mockRestore();
-      replace.mockRestore();
-    },
-  };
+  return { urls, restore: () => spy.mockRestore() };
 }
 
 describe("in the Mac app's window", () => {
-  test("GitHub opens in the browser; the window keeps the verifier and never polls", async () => {
-    app().__agentesDesktop = { version: "0.6.0", signInReturn: true };
+  test("GitHub opens in the browser and the window waits, then enters", async () => {
+    app().__agentesDesktop = { version: "0.6.0" };
     const assign = recordAssign();
-    const { auth, calls } = createFakeAuth({ redeem: true });
+    let redeemed = false;
+    const { auth, calls } = createFakeAuth();
+    auth.desktopRedeem = async (verifier) => {
+      calls.push({ method: "desktopRedeem", args: [verifier] });
+      return redeemed;
+    };
     const state = seedState({ me: null });
     const api = createFakeApi(state);
     api.account.signInOptions = async () => ACCOUNT;
@@ -60,70 +53,32 @@ describe("in the Mac app's window", () => {
       await settle(6);
       expect(calls.some((c) => c.method === "signInSocial")).toBe(false);
       expect(heading()).toBe("Continue no navegador");
-      expect(document.querySelector(".auth__lead")?.textContent).toBe(
-        "A gente volta para cá quando você entrar com GitHub.",
-      );
-      const opened = new URL(assign.urls[0] ?? "", "https://app.agentes.chat");
-      expect(opened.pathname).toBe("/desktop/sign-in");
-      expect(opened.searchParams.get("provider")).toBe("github");
-      expect(opened.searchParams.get("challenge")).toMatch(KEY);
+      // The window opens a request for the challenge and shows the code it got back.
+      const opened = calls.find((c) => c.method === "desktopOpen");
+      expect(opened?.args[0]).toMatch(KEY);
+      expect(document.querySelector(".auth__codeValue")?.textContent).toBe("KQ7M-3XPF");
+      const url = new URL(assign.urls[0] ?? "", "https://app.agentes.chat");
+      expect(url.pathname).toBe("/desktop/sign-in");
+      expect(url.searchParams.get("provider")).toBe("github");
+      // The request id travels through the browser, never the challenge or the verifier.
+      expect(url.searchParams.get("request")).toBe("r".repeat(43));
+      expect(url.searchParams.get("challenge")).toBeNull();
 
-      // The verifier stays in this window; only its hash went to the browser.
-      const kept = JSON.parse(sessionStorage.getItem("agentes.desktopVerifier") ?? "{}") as { verifier?: string };
-      expect(kept.verifier).toMatch(KEY);
-      expect(opened.searchParams.get("challenge")).not.toBe(kept.verifier);
-
-      // Coming back to the front redeems nothing by itself: only the app's link, with the browser's code, does.
+      // Not yet: stays. Back in front after the browser finished: enters.
       await act(async () => window.dispatchEvent(new Event("focus")));
       await settle(3);
-      expect(calls.some((c) => c.method === "desktopRedeem")).toBe(false);
       expect(assign.urls).toHaveLength(1);
+      redeemed = true;
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      await settle(3);
+      expect(assign.urls[1]).toBe("/desktop/signed-in?to=%2F");
+      const verifiers = calls.filter((c) => c.method === "desktopRedeem").map((c) => c.args[0]);
+      expect(verifiers[0]).toMatch(KEY);
+      // The verifier never left the window: only the request id went to the browser.
+      expect(url.searchParams.get("request")).not.toBe(verifiers[0]);
     } finally {
       assign.restore();
     }
-  });
-
-  test("an app that can't take the sign-in back offers no browser sign-in", async () => {
-    app().__agentesDesktop = { version: "0.5.0" };
-    const { auth } = createFakeAuth();
-    const api = createFakeApi(seedState({ me: null }));
-    api.account.signInOptions = async () => ACCOUNT;
-    await renderApp("/login", { api, auth });
-    await settle(3);
-    expect(screen().queryByRole("button", { name: /Continuar com GitHub/ })).toBeNull();
-  });
-
-  test("the app's link brings the code: redeemed with the kept verifier, then in", async () => {
-    app().__agentesDesktop = { version: "0.6.0", signInReturn: true };
-    const verifier = "v".repeat(43);
-    sessionStorage.setItem("agentes.desktopVerifier", JSON.stringify({ verifier, to: "/org/o1" }));
-    const assign = recordAssign();
-    const { auth, calls } = createFakeAuth({ redeem: true });
-    try {
-      await renderApp(`/desktop/signed-in?code=${"k".repeat(43)}`, {
-        api: createFakeApi(seedState({ me: null })),
-        auth,
-      });
-      await settle(4);
-      expect(calls).toEqual([{ method: "desktopRedeem", args: ["k".repeat(43), verifier] }]);
-      expect(assign.replaced).toEqual(["/desktop/signed-in?to=%2Forg%2Fo1"]);
-      // Taken once.
-      expect(sessionStorage.getItem("agentes.desktopVerifier")).toBeNull();
-    } finally {
-      assign.restore();
-    }
-  });
-
-  test("a code this window didn't ask for signs nobody in", async () => {
-    app().__agentesDesktop = { version: "0.6.0", signInReturn: true };
-    const { auth, calls } = createFakeAuth({ redeem: true });
-    await renderApp(`/desktop/signed-in?code=${"k".repeat(43)}`, {
-      api: createFakeApi(seedState({ me: null })),
-      auth,
-    });
-    await settle(4);
-    expect(calls).toEqual([]);
-    expect(heading()).toBe("Esse pedido expirou.");
   });
 
   test("outside the app, GitHub signs in right here as before", async () => {
@@ -137,65 +92,47 @@ describe("in the Mac app's window", () => {
 });
 
 describe("in the browser, for the app", () => {
-  const challenge = "c".repeat(43);
+  const request = "r".repeat(43);
 
-  test("goes to the provider, and back from it gives the code to the app on this computer", async () => {
+  test("goes to the provider, and back from it asks to confirm the code before handing over", async () => {
     const first = createFakeAuth();
-    await renderApp(`/desktop/sign-in?provider=github&challenge=${challenge}`, {
+    await renderApp(`/desktop/sign-in?provider=github&request=${request}`, {
       api: createFakeApi(seedState({ me: null })),
       auth: first.auth,
     });
     await settle(3);
     expect(first.calls[0]).toEqual({
       method: "signInSocial",
-      args: ["github", `/desktop/sign-in?provider=github&challenge=${challenge}&done=1`],
+      args: ["github", `/desktop/sign-in?provider=github&request=${request}&done=1`],
     });
     cleanup();
 
-    const assign = recordAssign();
-    const back = createFakeAuth({ handoffCode: "k".repeat(43) });
-    try {
-      await renderApp(`/desktop/sign-in?provider=github&challenge=${challenge}&done=1`, {
-        api: createFakeApi(seedState()),
-        auth: back.auth,
-      });
-      await settle(3);
-      expect(back.calls).toEqual([{ method: "desktopHandoff", args: [challenge] }]);
-      // Only through the app's own link: nothing the page that made the link could read.
-      expect(assign.urls).toEqual([`agenteschat://desktop/sign-in?code=${"k".repeat(43)}`]);
-      expect(heading()).toBe("Continue no app agentes.chat");
-      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir o app" })));
-      expect(assign.urls).toHaveLength(2);
-    } finally {
-      assign.restore();
-    }
+    const back = createFakeAuth();
+    await renderApp(`/desktop/sign-in?provider=github&request=${request}&done=1`, {
+      api: createFakeApi(seedState()),
+      auth: back.auth,
+    });
+    await settle(3);
+    // The code is read and shown, but nothing is handed over yet.
+    expect(back.calls).toEqual([{ method: "desktopRequestCode", args: [request] }]);
+    expect(document.querySelector(".auth__codeValue")?.textContent).toBe("KQ7M-3XPF");
+    expect(back.calls.some((c) => c.method === "desktopHandoff")).toBe(false);
+    // Only the person's confirmation hands it over.
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: /Sim, entrar no app/ })));
+    await settle(3);
+    expect(back.calls.some((c) => c.method === "desktopHandoff" && c.args[0] === request)).toBe(true);
+    expect(heading()).toBe("Tudo certo.");
   });
 
-  test("a refused handoff opens nothing", async () => {
-    const assign = recordAssign();
-    sessionStorage.setItem("agentes.desktopChallenge", challenge);
-    const { auth } = createFakeAuth({ handoffCode: null });
-    try {
-      await renderApp(`/desktop/sign-in?provider=github&challenge=${challenge}&done=1`, {
-        api: createFakeApi(seedState()),
-        auth,
-      });
-      await settle(3);
-      expect(assign.urls).toEqual([]);
-      expect(heading()).toBe("Esse pedido expirou.");
-    } finally {
-      assign.restore();
-    }
-  });
-
-  test("a link straight to the end hands nothing over", async () => {
-    const { auth, calls } = createFakeAuth();
-    await renderApp(`/desktop/sign-in?provider=google&challenge=${challenge}&done=1`, {
+  test("a link straight to the end hands nothing over without a real request", async () => {
+    const { auth, calls } = createFakeAuth({ requestCode: null });
+    await renderApp(`/desktop/sign-in?provider=google&request=${request}&done=1`, {
       api: createFakeApi(seedState()),
       auth,
     });
     await settle(3);
-    expect(calls).toEqual([]);
+    // It only looked the request up; with no pending request it expires and hands nothing over.
+    expect(calls).toEqual([{ method: "desktopRequestCode", args: [request] }]);
     expect(heading()).toBe("Esse pedido expirou.");
   });
 });

@@ -25,11 +25,10 @@ import {
   browserSignInUrl,
   challengeOf,
   desktopPicksServer,
-  desktopSignInReturns,
   inDesktopApp,
   newVerifier,
+  SIGNED_IN_PATH,
   thisMac,
-  windowVerifier,
 } from "@/lib/desktop";
 import { useHumanCheck } from "@/lib/human-check";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
@@ -40,8 +39,7 @@ import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
  * In the Mac app, Google/GitHub/Apple open in the browser and the window
- * waits for the sign-in to come back through the app's own link ("browser",
- * ADR 0036; `/desktop/signed-in?code=` redeems it). On the server the
+ * waits for the sign-in to come back ("browser", ADR 0036). On the server the
  * app runs on this computer, its owner has no password: "Continue on this Mac"
  * asks the app, which signs them in (ADR 0060 §6).
  */
@@ -65,6 +63,10 @@ const STEP_ACTIONS: Partial<Record<Step, HumanAction>> = {
   newPassword: "sign-up",
   forgot: "password-reset",
 };
+
+/** How often the Mac app's window asks whether the browser finished, and for how long. */
+const REDEEM_EVERY_MS = 2000;
+const REDEEM_FOR_MS = 10 * 60_000;
 
 /** Help under a new password, live: what's missing, or "Senha ok." */
 export function passwordHelp(t: TFunction, password: string) {
@@ -128,8 +130,6 @@ export function AuthPage({
   const termsUrl = config.data?.termsUrl;
   const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
-  // Apps that can't take the browser's sign-in back offer no Google/GitHub/Apple in their window.
-  const socialHere = !desktop || desktopSignInReturns();
   // Where this sign-in leads, in place of the general line, read from the address alone: only what the page before
   // already showed (an invitation's workspace, by its token; the ready email's Connect your AI or Create an agent).
   const goal = signInFor(redirect);
@@ -144,7 +144,12 @@ export function AuthPage({
         : joining
           ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
           : null;
-  const [browser, setBrowser] = useState<{ provider: SignInProvider; challenge: string } | null>(null);
+  const [browser, setBrowser] = useState<{
+    provider: SignInProvider;
+    verifier: string;
+    requestId: string;
+    code: string;
+  } | null>(null);
   // This server runs inside the app here: the app signs its owner in.
   const [local, setLocal] = useState(false);
   const [ownerPending, setOwnerPending] = useState(false);
@@ -282,21 +287,41 @@ export function AuthPage({
     else if (step === "forgot") void sendReset();
   };
 
-  /**
-   * The Mac app: the provider in the browser; this window keeps the verifier (in this window's storage) and waits
-   * for the app's link to bring the browser's one-time code here (`/desktop/signed-in?code=`).
-   */
+  /** The Mac app: the provider in the browser; this window keeps the verifier, shows the code and waits. */
   const signInInBrowser = async (provider: SignInProvider) => {
     const verifier = newVerifier();
     const challenge = await challengeOf(verifier);
-    windowVerifier.set(verifier, redirect ?? "/");
-    setBrowser({ provider, challenge });
+    const opened = await auth.desktopOpen(challenge).catch(() => null);
+    if (!opened) return;
+    setBrowser({ provider, verifier, requestId: opened.requestId, code: opened.code });
     go("browser");
-    window.location.assign(browserSignInUrl(provider, challenge));
+    window.location.assign(browserSignInUrl(provider, opened.requestId));
   };
   const reopenBrowser = () => {
-    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.challenge));
+    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.requestId));
   };
+
+  // Asks every 2 s and whenever the window comes back to the front; a full load after, so everything starts signed in.
+  useEffect(() => {
+    if (step !== "browser" || !browser) return;
+    let stopped = false;
+    const check = async () => {
+      if (stopped || !(await auth.desktopRedeem(browser.verifier).catch(() => false)) || stopped) return;
+      // The code is matched in the browser, so once the session arrives the window just loads signed in.
+      stopped = true;
+      window.location.assign(`${SIGNED_IN_PATH}?${new URLSearchParams({ to: redirect ?? "/" })}`);
+    };
+    const timer = setInterval(() => void check(), REDEEM_EVERY_MS);
+    const giveUp = setTimeout(() => clearInterval(timer), REDEEM_FOR_MS);
+    const onFocus = () => void check();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      clearTimeout(giveUp);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [step, browser, auth, redirect]);
 
   const capsKey = (e: KeyboardEvent<HTMLInputElement>) => setCaps(e.getModifierState?.("CapsLock") ?? false);
   const toggleShow = () => {
@@ -510,7 +535,7 @@ export function AuthPage({
               </Button>
             )}
 
-            {step === "email" && socialHere && allProviders.length > 0 && (
+            {step === "email" && allProviders.length > 0 && (
               <>
                 <div className="auth__or">{t("common.or")}</div>
                 <SocialButtons
@@ -529,13 +554,11 @@ export function AuthPage({
 
             {step === "social" && (
               <>
-                {socialHere && (
-                  <SocialButtons
-                    callbackURL={redirect ?? "/"}
-                    providers={linkedProviders}
-                    onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
-                  />
-                )}
+                <SocialButtons
+                  callbackURL={redirect ?? "/"}
+                  providers={linkedProviders}
+                  onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+                />
                 {canReset && (
                   <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
                     {t("auth.flow.createPassword")}
@@ -546,6 +569,12 @@ export function AuthPage({
 
             {step === "browser" && (
               <>
+                {browser && (
+                  <div className="auth__code">
+                    <span className="auth__codeValue">{browser.code}</span>
+                    <p className="auth__fine">{t("auth.desktop.codeHint")}</p>
+                  </div>
+                )}
                 <Button type="button" size="lg" block onClick={reopenBrowser}>
                   {t("auth.desktop.reopen")}
                 </Button>
