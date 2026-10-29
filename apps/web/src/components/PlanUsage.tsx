@@ -188,11 +188,7 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
                 <small>{t("usageViews.tokens", { tokens: formatTokensShort(t, i18n.language, a.tokens) })}</small>
               </span>
               <span className="plan-api__meter">
-                <Meter
-                  value={Math.min(100, percent)}
-                  max={100}
-                  label={t("settings.usageAgentMeter", { name })}
-                />
+                <Meter value={Math.min(100, percent)} max={100} label={t("settings.usageAgentMeter", { name })} />
               </span>
               <span className="plan-api__value">
                 {t("usageViews.budgetShare", { percent: formatPercent(i18n.language, percent) })}
