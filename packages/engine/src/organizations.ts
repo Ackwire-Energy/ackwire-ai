@@ -142,14 +142,25 @@ export async function getMembership(
   return row ?? null;
 }
 
+/** Refuses a suspended workspace without changing membership/status lookups. */
+export function assertActiveMembership(membership: Membership): void {
+  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+}
+
+/** Requires an active organization member before acting on its resources. */
+export async function requireActiveMembership(db: Database, userId: string, orgId: string): Promise<Membership> {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  assertActiveMembership(membership);
+  return membership;
+}
+
 /**
  * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a
  * suspended workspace. Returns the membership.
  */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+  const membership = await requireActiveMembership(db, userId, orgId);
   if (!can(membership.role, permission)) throw new ForbiddenError();
   return membership;
 }

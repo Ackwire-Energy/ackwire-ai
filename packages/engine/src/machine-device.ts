@@ -16,7 +16,7 @@ import {
   sha256Hex,
 } from "./machines";
 import { notifyMachineConnected } from "./notification-producers";
-import { can, getMembership } from "./organizations";
+import { can, getMembership, requireActiveMembership } from "./organizations";
 
 const { agents, machineDeviceCodes, machines, organizations } = schema;
 
@@ -349,7 +349,7 @@ async function reconnectTarget(
   // server's own (`host`, its sync) never come back as someone's computer.
   if (machine?.kind !== "connected") return null;
   const member = await getMembership(db, actorId, machine.orgId);
-  if (!member || !can(member.role, "post")) return null;
+  if (!member || member.standing?.state === "suspended" || !can(member.role, "post")) return null;
   if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;
   return { machine, orgName: member.orgName };
 }
@@ -397,8 +397,7 @@ export async function confirmDeviceCode(
   userCode: string,
   input: { name?: string | null },
 ): Promise<MachineView> {
-  const membership = await getMembership(deps.db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(deps.db, actorId, orgId);
   if (!can(membership.role, "post")) {
     throw new ForbiddenError(
       "Only members who can post in the organization can connect a computer",
