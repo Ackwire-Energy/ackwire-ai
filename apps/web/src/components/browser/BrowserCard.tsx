@@ -246,6 +246,9 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
   return !liveHere && open.data && isHeldTakeover(open.data, runId) ? open.data : null;
 }
 
+/** The site as people say it: "www.google.com" → "google.com" (its letter is G, not W). */
+const siteName = (host: string) => host.replace(/^(www|web|m)\./, "");
+
 const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
 /**
@@ -728,7 +731,7 @@ export function BrowserCard({
     asTitle === "ask"
       ? (ask ?? "")
       : asTitle === "host"
-        ? host
+        ? siteName(host)
         : asTitle === "opening"
           ? t("browser.inCard.opening")
           : t("browser.inCard.group", g);
@@ -908,7 +911,7 @@ export function BrowserCard({
           <span className="brw-mf__site">
             {asTitle === "host" ? (
               <span className="brw-stile" aria-hidden="true">
-                {host.charAt(0)}
+                {siteName(host).charAt(0)}
               </span>
             ) : (
               <Icon name="globe" size={14} />
