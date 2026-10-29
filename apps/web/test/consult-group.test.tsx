@@ -75,6 +75,23 @@ function withAsk(list: RunConsultation[], notice = false) {
   return state;
 }
 
+/** The conversation went on after the reply that asked: `count` people's messages, so it sits farther up. */
+function talkAfter(state: ReturnType<typeof seedState>, count: number) {
+  for (let i = 0; i < count; i++)
+    state.messages.push({
+      id: `msg-talk-${i}`,
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-joao" },
+      body: `Enquanto isso, item ${i + 1}.`,
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: ago(30 - i * 5),
+    });
+  state.messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return state;
+}
+
 const open = async (state: ReturnType<typeof seedState>) => {
   const api = createFakeApi(state);
   const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
@@ -89,6 +106,14 @@ const asked = () =>
     .getAllByRole("article")
     .find((a) => a.textContent?.includes("Pedi a parte de juros")) as HTMLElement;
 const group = () => asked().querySelector(".ac-consult-group") as HTMLElement | null;
+const typingBar = () => document.querySelector(".ac-typing") as HTMLElement;
+const bar = () => typingBar().querySelector(".ac-typing__text")?.textContent ?? "";
+const push = (socket: { push: (f: unknown) => void }, event: Record<string, unknown>) =>
+  act(async () =>
+    socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, threadId: null, ...event } }),
+  );
+/** Ada's question going out, live: "Ada está perguntando ao Atlas…" on the working line. */
+const asking = { type: "agent.consulting", runId: RUN, agentId: ADA_ID, consultedAgentId: ATLAS_ID };
 
 describe("the questions inside the reply that asked (ConsultGroup)", () => {
   test("still out: 'Perguntou a 1 colega' open, the agent working, the count", async () => {
@@ -117,8 +142,28 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     await settle(1);
     expect(block.textContent).toContain(QUESTION);
     expect(block.textContent).toContain("subiu 6 pb");
-    // The answer is shown once: the `consult_reply` card isn't drawn again under it.
+    // The answer is shown once: the `consult_reply` card isn't drawn again under it, nor a line (it's close).
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
+    expect(document.body.textContent).not.toContain("respondeu à pergunta");
+  });
+
+  test("the answer far below its question: one line where it arrived, 'Ver' goes to the reply, open at the answer", async () => {
+    const state = withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true);
+    await open(talkAfter(state, 3));
+    expect(document.querySelectorAll(".ac-consult").length).toBe(0);
+    const line = screen().getByText(/Atlas respondeu à pergunta da Ada/).closest(".cn-line") as HTMLElement;
+    expect(line).not.toBeNull();
+    // Every answer is in: the block is closed.
+    const head = () => within(group() as HTMLElement).getByRole("button", { name: /Perguntou a 1 colega/ });
+    expect(head().getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
+    // To the reply that asked, highlighted as a quote's jump does.
+    expect(document.querySelector('[data-message-id="msg-asked"]')?.classList.contains("ac-msg--focus")).toBe(true);
+    await settle(2);
+    // Its block open at that answer: the question and the whole answer.
+    expect(head().getAttribute("aria-expanded")).toBe("true");
+    expect(group()?.textContent).toContain(QUESTION);
+    expect(group()?.textContent).toContain("subiu 6 pb");
   });
 
   test("without questions the reply has no block, and the notice stays", async () => {
@@ -165,5 +210,28 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     fireEvent.click(within(block).getByRole("button", { name: /Perguntou a 1 colega/ }));
     await settle(1);
     expect(block.textContent).toContain("Atlas respondeu");
+  });
+});
+
+describe("the working line while the block shows the questions", () => {
+  test("the reply that asked is close: its block says it, the line doesn't; the asker's own work stays", async () => {
+    const { socket } = await open(withAsk([consultation({})]));
+    await push(socket, asking);
+    await settle(2);
+    expect(group()?.textContent).toContain("Atlas está trabalhando");
+    expect(bar()).toBe("");
+    expect(typingBar().getAttribute("data-active")).toBe("false");
+    // Ada at work again (another turn): her own line, not the question.
+    await push(socket, { type: "agent.thinking", runId: "r-next", agentId: ADA_ID });
+    await settle(2);
+    expect(bar()).toBe("Ada está trabalhando…");
+  });
+
+  test("the reply that asked is farther up: the line still says it (the only sign at the bottom)", async () => {
+    const { socket } = await open(talkAfter(withAsk([consultation({})]), 3));
+    await push(socket, asking);
+    await settle(2);
+    expect(bar()).toBe("Ada está perguntando ao Atlas…");
+    expect(typingBar().querySelector(".ac-typing__clock")).not.toBeNull();
   });
 });

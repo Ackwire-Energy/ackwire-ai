@@ -7737,6 +7737,9 @@ export const en: Translations = {
       working: "{{name}} is working",
       waitingApproval: "{{name}} is waiting for an approval",
       waitingInput: "{{name}} is waiting for an answer",
+      /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
+      answeredFar: "{{to}} answered {{from}}'s question",
+      see: "See",
     },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {

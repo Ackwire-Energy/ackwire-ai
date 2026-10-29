@@ -3,6 +3,7 @@ import { parseSecretBox, SECRET_NAME, type SecretTarget, secretAad } from "@agen
 import { and, type Database, type Executor, eq, isNull, lt, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -437,13 +438,15 @@ export async function removeAgentSecret(
 
 /**
  * Who a secret may be asked of: the person behind the run (`authority.ts`), where they read the card.
- * Nobody for a routine's or an unattended run, nor in an agents' DM (no person reads the card there).
+ * Nobody for a routine's or an unattended run. In an agents' DM no person reads the card: only a run
+ * answering another agent's question for a person asks them, and its card goes where they asked (ADR 0034).
  */
 export async function requesterOfRun(ctx: ToolContext): Promise<string | null> {
   const [here] = await ctx.db
     .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
     .from(schema.channels)
     .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
-  if (!here || isAgentOnlyDm(here)) return null;
+  if (!here) return null;
+  if (isAgentOnlyDm(here)) return consultedFor(ctx);
   return personBehindCall(ctx);
 }

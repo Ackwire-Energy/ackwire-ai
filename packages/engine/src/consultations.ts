@@ -513,7 +513,7 @@ export async function onConsultedRunFinished(
   error?: string,
 ) {
   if (status === "waiting_approval" || status === "waiting_input") {
-    await announceWaiting(deps, run).catch(() => {});
+    await announceConsultationChange(deps, run).catch(() => {});
     return [];
   }
   // Several questions may have reached the same run (it read the later ones at its next step).
@@ -732,10 +732,16 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
 }
 
 /**
- * The consulted agent's run stopped on a person (an approval, a question, a secret): the conversations that
- * asked it hear so (`agent.consultation`) and draw that question as waiting.
+ * The consulted agent's run stopped on a person (an approval, a question, a secret) or went back to work
+ * (`executor.ts`, on resume): the conversations that asked it hear so (`agent.consultation`) and draw that
+ * question as waiting, or working again. Callers keep it to runs in an agents' DM (only those answer
+ * questions): `target_run_id` has no index, and only open questions are read (they close within
+ * `CONSULTATION_TTL_MS`).
  */
-async function announceWaiting(deps: { db: Database; pubsub?: PubSub }, run: { id: string; orgId: string }) {
+export async function announceConsultationChange(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string },
+) {
   if (!deps.pubsub) return;
   const rows = await deps.db
     .select({
@@ -843,4 +849,17 @@ export async function consultationOrigin(
 export async function consultationCardThread(db: Executor, orgId: string, runId: string, fallback: string) {
   const origin = await consultationOrigin(db, orgId, runId);
   return origin ? origin.threadId : fallback;
+}
+
+/**
+ * The person a run in an agents' DM may ask something (an `ask_user` question, a secret): the person behind
+ * it (`personBehindCall`, ADR 0034 addendum of 2026-10-18 §3) when it answers another agent's question, since
+ * its cards go where that person asked (`consultationOrigin`, `postPauseCards`). Null for a run answering no
+ * question (a note) or one nobody is behind: no person would see the card.
+ */
+export async function consultedFor(
+  ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Executor },
+): Promise<string | null> {
+  if (!ctx.runId || !(await consultationOrigin(ctx.db, ctx.orgId, ctx.runId))) return null;
+  return personBehindCall(ctx);
 }

@@ -7787,6 +7787,9 @@ export const ptBR = {
       working: "{{name}} está trabalhando",
       waitingApproval: "{{The}} {{name}} espera uma aprovação",
       waitingInput: "{{The}} {{name}} espera uma resposta",
+      /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
+      answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
+      see: "Ver",
     },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {

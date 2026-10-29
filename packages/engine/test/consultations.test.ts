@@ -1,25 +1,35 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { sealSecret, secretAad } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
+  answerQuestion,
   CONSULTATION_TTL_MS,
   consultationsIn,
   createAgent,
+  decideApproval,
+  deliverSecret,
   drainOutbox,
   expireConsultations,
   grantScopes,
   type JobHandlers,
   listDms,
   listMessages,
+  type MachineHub,
   postPersonMessage,
   recoverStaleRuns,
+  setAgentComputerTarget,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  await f?.machineHub?.stop();
+  await f?.close();
+});
 
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
 /** The consulted agent's run: its prompt says it is in a conversation between agents. */
@@ -169,6 +179,211 @@ describe("ask_agent", () => {
     expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
     expect(github.executed).toHaveLength(0);
     expect((await consultations())[0]?.status).toBe("open");
+  });
+
+  test("approved where the person asked: the consulted agent goes on, and that conversation hears so", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      toolSources: [github.source],
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Merged.")
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
+      ),
+    });
+    const infra = await addInfra();
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const events = f.listen(f.general.id);
+    await post("@dev deploy the fix");
+    await drainOutbox(f.db, f.handlers);
+    const [approval] = await f.db.select().from(schema.approvals);
+    const [row] = await consultations();
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.waiting).toBe("approval");
+    await Bun.sleep(5);
+    const mark = events.length;
+
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+      decision: "approve",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(github.executed).toHaveLength(1);
+    expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "Merged." });
+    await Bun.sleep(5);
+    // Back at work, the question shows as no longer held (`agent.consultation`), before its answer closes it.
+    const later = events.slice(mark);
+    const resumed = later.findIndex((e) => e.type === "agent.consultation" && e.consultationId === row?.id);
+    expect(resumed).toBeGreaterThanOrEqual(0);
+    expect(later[resumed]).toMatchObject({ channelId: f.general.id, runId: row?.askerRunId });
+    expect(resumed).toBeLessThan(later.findIndex((e) => e.type === "agent.consulted"));
+  });
+
+  test("a consulted agent's question shows where the person asked; answering it there resumes it", async () => {
+    f = await setup({
+      askAgent: true,
+      askUser: true,
+      reply: consultReply((req) => {
+        const picked = /The person answered: (\w+)/.exec(lastText(req));
+        if (picked) return answer(`Staging deploys from ${picked[1]}.`);
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "ask_user",
+              input: {
+                why: "Staging can deploy from two branches, and which one changes the steps I give back.",
+                question: "Which branch goes to staging?",
+                choices: ["main", "release"],
+              },
+            },
+          ],
+        };
+      }),
+    });
+    const infra = await addInfra();
+    const events = f.listen(f.general.id);
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+
+    // The question waits where the person asked (the asker replied in the main timeline), not in the agents' DM.
+    const [q] = await f.db.select().from(schema.agentQuestions);
+    expect(q).toMatchObject({ agentId: infra.id, channelId: f.general.id, threadId: null, status: "open" });
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const card = timeline.find((m) => m.meta.questionId === q?.id);
+    expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
+    const target = (await runs()).find((r) => r.agentId === infra.id);
+    expect(target?.status).toBe("waiting_input");
+    const [held] = await consultationsIn(f.db, f.org.id, f.general.id);
+    expect(held).toMatchObject({ status: "open", waiting: "input" });
+    await Bun.sleep(5);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "question.asked", question: expect.objectContaining({ id: q?.id }) }),
+    );
+    const mark = events.length;
+
+    // Anyone who reads that conversation answers it there; the consulted run picks it up in its DM.
+    await answerQuestion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, q?.id ?? "", { choice: "release" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs()).find((r) => r.id === target?.id)?.status).toBe("done");
+    expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "Staging deploys from release." });
+    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(after.at(-1)?.body).toBe("Relaying: Staging deploys from release.");
+    await Bun.sleep(5);
+    const later = events.slice(mark);
+    const resumed = later.findIndex((e) => e.type === "agent.consultation");
+    expect(resumed).toBeGreaterThanOrEqual(0);
+    expect(resumed).toBeLessThan(later.findIndex((e) => e.type === "agent.consulted"));
+  });
+
+  test("a note's run asks no person: it answers no consultation", async () => {
+    f = await setup({
+      askAgent: true,
+      askUser: true,
+      reply: (req) => {
+        const last = lastText(req);
+        if (inAgentDm(req)) {
+          if (last.includes("tool_result")) return answer("Noted.");
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: {
+                  why: "The note doesn't say which deploy finished, and the metrics to watch depend on it.",
+                  question: "Which deploy?",
+                },
+              },
+            ],
+          };
+        }
+        if (last.includes("tool_result")) return answer("Told Infra.");
+        return {
+          chunks: [],
+          toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "The deploy to staging finished." } }],
+        };
+      },
+    });
+    await addInfra();
+    await post("@dev tell infra the deploy finished");
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.agentQuestions)).toHaveLength(0);
+    const refused = f.provider.calls
+      .map((c) => c.request)
+      .find((r) => inAgentDm(r) && lastText(r).includes("tool_result"));
+    expect(lastText(refused as ModelRequest)).toContain("No person reads this conversation");
+  });
+
+  test("a consulted agent's secret request goes to the person behind it, where they asked", async () => {
+    const VALUE = "npm_s3cr3t_value_0123456789";
+    f = await setup({
+      askAgent: true,
+      machines: true,
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Signed in to the registry.")
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "request_secret",
+                  input: { name: "NPM_TOKEN", purpose: "sign in to the package registry", target: "env" },
+                },
+              ],
+            },
+      ),
+    });
+    const infra = await addInfra();
+    // @infra's own computer, its runner online (the key is made there and the value goes there).
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const paired = await pairMachine(deps, f.owner.id, f.org.id, { name: "Build box", ...RUNNER, exec: true });
+    await grantScopes(f.db, f.org.id, infra.id, [{ connectionId: null, scope: "sandbox:run" }]);
+    await setAgentComputerTarget(deps, f.owner.id, f.org.id, infra.id, paired.machineId);
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    const events = f.listen(f.general.id);
+    await post("@dev deploy staging");
+    await drainOutbox(f.db, f.handlers);
+
+    const [request] = await f.db.select().from(schema.secretRequests);
+    if (!request) throw new Error("no secret request");
+    expect(request).toMatchObject({
+      agentId: infra.id,
+      channelId: f.general.id,
+      threadId: null,
+      requestedForUserId: f.owner.id,
+      status: "pending",
+    });
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const card = timeline.find((m) => m.meta.secretRequestId === request.id);
+    expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.waiting).toBe("input");
+    await Bun.sleep(5);
+    const mark = events.length;
+
+    const box = await sealSecret(
+      request.publicKey,
+      VALUE,
+      secretAad({ requestId: request.id, orgId: f.org.id, name: request.name, target: { kind: "env" } }),
+    );
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    await deliverSecret(sandbox, f.owner.id, f.org.id, request.id, box);
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(VALUE);
+    await drainOutbox(f.db, f.handlers);
+    expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "Signed in to the registry." });
+    await Bun.sleep(5);
+    expect(events.slice(mark)).toContainEqual(expect.objectContaining({ type: "agent.consultation" }));
   });
 
   test("the conversation's list: each question by the run that asked, waiting on a person while held", async () => {

@@ -1,13 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import type { RunConsultation } from "../src/api/types";
 import {
+  CONSULT_REQUEST_FRESH_MS,
+  consultBlocksNearEnd,
   consultGroupSummary,
   consultLineState,
+  consultNoticeFolds,
   consultSeconds,
+  consultsForLine,
   firstOfRun,
   foldsNotice,
   groupsByRun,
+  requestConsultBlock,
   shownConsultations,
+  takeConsultBlockRequest,
 } from "../src/lib/consult-group";
 
 const T0 = Date.parse("2026-10-29T10:00:00Z");
@@ -119,5 +125,98 @@ describe("firstOfRun", () => {
     ];
     expect(firstOfRun(list, "r1")).toBe("m1");
     expect(firstOfRun(list, "r9")).toBeNull();
+  });
+});
+
+// Rows as the conversation draws them: the reply that asked (run r1), others' messages, the answers' notices.
+const asked = (id = "ask", runId = "r1") => ({ id, agentRunId: runId });
+const said = (id: string) => ({ id, agentRunId: null });
+const answerOf = (id: string, consultationId = "q1") => ({
+  id,
+  agentRunId: null,
+  meta: { notice: { kind: "consult_reply", text: "…", refs: { consultationId, runId: "r1" } } },
+});
+
+describe("consultNoticeFolds", () => {
+  const list = [q({ status: "answered", answer: "Up 6 bp", answeredAt: iso(80) })];
+
+  test("the reply that asked close above: the notice folds away", () => {
+    expect(consultNoticeFolds([asked(), answerOf("n1")], list).get("n1")).toEqual({ fold: "hide" });
+    // Two messages between them: still close (CONSULT_NEAR_ROWS).
+    expect(consultNoticeFolds([asked(), said("a"), said("b"), answerOf("n1")], list).get("n1")).toEqual({
+      fold: "hide",
+    });
+  });
+
+  test("farther up: one line that leads to it", () => {
+    const folds = consultNoticeFolds([asked(), said("a"), said("b"), said("c"), answerOf("n1")], list);
+    expect(folds.get("n1")).toEqual({ fold: "line", consultation: list[0] as RunConsultation, messageId: "ask" });
+  });
+
+  test("the reply isn't loaded, or the question isn't in the list: the notice keeps its card", () => {
+    expect(consultNoticeFolds([said("a"), answerOf("n1")], list).get("n1")).toEqual({ fold: "card" });
+    expect(consultNoticeFolds([asked(), answerOf("n1", "q9")], list).get("n1")).toEqual({ fold: "card" });
+    expect(consultNoticeFolds([asked(), answerOf("n1")], []).get("n1")).toEqual({ fold: "card" });
+  });
+
+  test("a live block is at the end, under everything: its answers fold", () => {
+    const rows = [answerOf("n1"), said("a"), said("b"), said("c"), said("d")];
+    expect(consultNoticeFolds(rows, list, new Set(["r1"])).get("n1")).toEqual({ fold: "hide" });
+  });
+
+  test("answers to several questions in a row don't push their reply away; only notices are listed", () => {
+    const four = ["q1", "q2", "q3", "q4"].map((id) => q({ id, status: "answered", answer: "ok" }));
+    const rows = [asked(), ...four.map((c, i) => answerOf(`n${i}`, c.id))];
+    const folds = consultNoticeFolds(rows, four);
+    expect([...folds.values()].map((f) => f.fold)).toEqual(["hide", "hide", "hide", "hide"]);
+    expect(folds.has("ask")).toBe(false);
+  });
+
+  test("the run's nearest message, before or after the notice (it kept working when the answer came)", () => {
+    const rows = [asked("first"), said("a"), said("b"), said("c"), said("d"), answerOf("n1")];
+    const after = [...rows, said("e"), said("f"), said("g"), asked("later")];
+    expect(consultNoticeFolds(after, list).get("n1")).toMatchObject({ fold: "line", messageId: "later" });
+    expect(consultNoticeFolds([...rows, asked("later")], list).get("n1")).toEqual({ fold: "hide" });
+  });
+});
+
+describe("consultBlocksNearEnd", () => {
+  const list = [q()];
+
+  test("a reply that asked among the last rows, or a live block", () => {
+    expect([...consultBlocksNearEnd([said("a"), asked()], list)]).toEqual(["r1"]);
+    expect([...consultBlocksNearEnd([asked(), said("a"), said("b")], list)]).toEqual(["r1"]);
+    expect(consultBlocksNearEnd([asked(), said("a"), said("b"), said("c")], list).size).toBe(0);
+    expect([...consultBlocksNearEnd([said("a")], list, new Set(["r1"]))]).toEqual(["r1"]);
+  });
+
+  test("only runs that asked something; an answer it shows takes no row", () => {
+    expect(consultBlocksNearEnd([asked("x", "r2")], list).size).toBe(0);
+    expect(consultBlocksNearEnd([said("a")], list, new Set(["r2"])).size).toBe(0);
+    const answered = [q({ status: "answered", answer: "ok" })];
+    expect([...consultBlocksNearEnd([asked(), said("a"), said("b"), answerOf("n1")], answered)]).toEqual(["r1"]);
+  });
+});
+
+describe("consultsForLine", () => {
+  test("the working line leaves out the runs whose block near the end shows their questions", () => {
+    const live = [
+      { runId: "r1", agentId: "lia" },
+      { runId: "r2", agentId: "dev" },
+    ];
+    expect(consultsForLine(live, new Set(["r1"]))).toEqual([{ runId: "r2", agentId: "dev" }]);
+    expect(consultsForLine(live, new Set())).toBe(live);
+  });
+});
+
+describe("requestConsultBlock ('Ver' on an answer's line)", () => {
+  test("waits for its run's block and is used once; a stale one opens nothing", () => {
+    requestConsultBlock("r1", "q1", T0);
+    expect(takeConsultBlockRequest("r2", T0 + 100)).toBeNull();
+    expect(takeConsultBlockRequest("r1", T0 + 100)).toEqual({ runId: "r1", consultationId: "q1", at: T0 });
+    expect(takeConsultBlockRequest("r1", T0 + 200)).toBeNull();
+    requestConsultBlock("r1", "q1", T0);
+    expect(takeConsultBlockRequest("r1", T0 + CONSULT_REQUEST_FRESH_MS + 1)).toBeNull();
+    expect(takeConsultBlockRequest("r1", T0)).toBeNull();
   });
 });

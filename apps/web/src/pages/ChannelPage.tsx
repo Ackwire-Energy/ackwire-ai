@@ -74,7 +74,7 @@ import {
   nearBottom,
   usageLine,
 } from "@agenteschat/client/lib/chat";
-import { foldsNotice } from "@agenteschat/client/lib/consult-group";
+import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
@@ -187,7 +187,13 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
-import { ConsultGroup, ConsultGroupsProvider, useConsultGroups } from "@/components/ConsultGroup";
+import {
+  ConsultAnswerLine,
+  ConsultGroup,
+  type ConsultGroups,
+  ConsultGroupsProvider,
+  useConsultGroups,
+} from "@/components/ConsultGroup";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -866,6 +872,11 @@ function ChannelView({
     return () => clearTimeout(timer);
   }, [slots]);
   const slotsKey = slots.map((x) => x.key).join(" ");
+  // Questions the agents asked other agents from here, drawn inside the replies that asked them (loaded or live):
+  // how their answers' notices draw, and which ones the working line leaves to a block near the end.
+  const consultRows = useMemo(() => timeline.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [timeline]);
+  const liveRuns = useMemo(() => new Set(slots.map((slot) => slot.runId)), [slots]);
+  const consultGroups = useConsultGroups(channel.id, consultRows, liveRuns);
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
@@ -1750,6 +1761,7 @@ function ChannelView({
                         divider={divider}
                         channelId={channel.id}
                         runVisible={runVisible}
+                        consultGroups={consultGroups}
                         seenId={thread ? null : seenId}
                       />
                       {!thread && (
@@ -1817,6 +1829,7 @@ function ChannelView({
                     outOfView={outOfView}
                     onSee={seeRun}
                     stoppable={stopTarget?.runId}
+                    consultBlocks={consultGroups.nearEnd}
                   />
                   {adjustThreadId ? (
                     <RangeBar adjust={adjust} />
@@ -1992,6 +2005,7 @@ const Timeline = memo(function Timeline({
   divider,
   channelId,
   runVisible,
+  consultGroups,
   seenId = null,
 }: {
   items: ReturnType<typeof buildTimeline>;
@@ -2006,6 +2020,8 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
+  /** The agents' questions to other agents: inside the replies that asked, and how their answers draw. */
+  consultGroups: ConsultGroups;
   /** A DM with a person: my message they read last ("Visto" under it). */
   seenId?: string | null;
 }) {
@@ -2023,16 +2039,6 @@ const Timeline = memo(function Timeline({
   // A block slides in once, when it first shows (not the ones already working when the page opened).
   const blockEnters = useRef(new Map<string, boolean>());
   const threadsView = useChannelThreadsView();
-  // Questions the agents asked other agents from here: drawn inside the replies that asked them (loaded or live).
-  const runsInView = useMemo(
-    () =>
-      new Set([
-        ...items.flatMap((i) => (i.kind === "message" && i.message.agentRunId ? [i.message.agentRunId] : [])),
-        ...slots.map((slot) => slot.runId),
-      ]),
-    [items, slots],
-  );
-  const consultGroups = useConsultGroups(channelId, runsInView);
   // Threads a mission link card already points to (the agent's reply): their start marker stays out.
   const linked = useMemo(
     () =>
@@ -2053,13 +2059,14 @@ const Timeline = memo(function Timeline({
   const threadRow = (key: string, m: MessageType) => {
     // What reached an agent's conversation (a routine's report nobody answered yet, another agent's
     // answer): quiet lines, never a person's or the agent's own voice.
-    if (noticeOf(m.meta))
-      // An answer the reply that asked already shows (`ConsultGroup`): not drawn twice.
-      return foldsNotice(m.meta, consultGroups.shown) ? (
-        <Fragment key={key} />
-      ) : (
-        <NoticeLine key={key} message={m} />
-      );
+    if (noticeOf(m.meta)) {
+      // An answer the reply that asked already shows (`ConsultGroup`): not drawn twice when that reply is close,
+      // one line leading to it when it is farther up.
+      const fold = consultGroups.folds.get(m.id);
+      if (fold?.fold === "hide") return <Fragment key={key} />;
+      if (fold?.fold === "line") return <ConsultAnswerLine key={key} message={m} fold={fold} />;
+      return <NoticeLine key={key} message={m} />;
+    }
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
@@ -2652,6 +2659,7 @@ function ActivityBar({
   outOfView,
   onSee,
   stoppable,
+  consultBlocks,
 }: {
   channelId: string;
   /** Which runs belong here (a thread view shows only its own). */
@@ -2662,6 +2670,8 @@ function ActivityBar({
   onSee: (runId: string) => void;
   /** The run Esc stops (the pill shows its stop). */
   stoppable?: string;
+  /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
+  consultBlocks: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -2673,10 +2683,12 @@ function ActivityBar({
   const asking = useRef(false);
   const now = useSecond(runs.length > 0 || Boolean(typing) || asking.current);
   // An agent asking another one: "Dev está perguntando ao Infra… 0:12" (its run pauses meanwhile).
-  const consults = useLive(
+  const heard = useLive(
     (s) => consultsIn(s.consults, channelId, now).filter((c) => visible?.current(c) ?? true),
     sameList,
   );
+  // A reply near the end shows its questions with where each is and its clock: the asker's own work stays here.
+  const consults = consultsForLine(heard, consultBlocks);
   asking.current = consults.length > 0;
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
   const entries = barEntries(
@@ -3269,7 +3281,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             m.agentRunId &&
             !m.local &&
             consulted.length === 0 && (
-              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} saved />
             )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
             <SavedTools

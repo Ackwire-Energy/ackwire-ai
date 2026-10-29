@@ -1,12 +1,12 @@
-import { keys, type Message, useConsultations } from "@agenteschat/client";
-import { shownConsultations } from "@agenteschat/client/lib/consult-group";
-import { consultationOfNotice, noticeOf } from "@agenteschat/client/lib/notices";
-import { useQueryClient } from "@tanstack/react-query";
+import type { Message } from "@agenteschat/client";
+import type { ConsultNoticeFold } from "@agenteschat/client/lib/consult-group";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
-import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { ConsultationCard } from "./cards";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
@@ -16,16 +16,51 @@ import { MessageText } from "./MessageText";
  * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "Infra
  * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
+ * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, one line
+ * leading to it when it is farther up ("Atlas respondeu à pergunta da Ada · Ver": `onSee` goes there).
  */
-export function EventLine({ message }: { message: Message }) {
+export function EventLine({
+  message,
+  fold,
+  onSee,
+}: {
+  message: Message;
+  fold?: ConsultNoticeFold;
+  onSee?: (fold: Extract<ConsultNoticeFold, { fold: "line" }>) => void;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
-  const orgId = useOrgId();
-  const qc = useQueryClient();
-  const list = useConsultations(orgId, message.channelId);
+  if (fold?.fold === "hide") return null;
+  const far = fold?.fold === "line" ? fold : null;
+  if (far) {
+    const asker = agentGrammar(t, dir.agentById.get(far.consultation.agentId)?.name ?? t("mobile.chat.someone"));
+    const to = dir.agentById.get(far.consultation.consultedAgentId)?.name ?? t("mobile.chat.someone");
+    return (
+      <View style={styles.line}>
+        <View style={styles.head}>
+          <LineIcon name="agent" size={13} color={c.faint} variant="caption" />
+          <Text variant="caption" tone="faint" style={styles.grow}>
+            {t("chat.consultGroup.answeredFar", { to, from: asker.name, of: asker.of })} ·{" "}
+            {when.time(message.createdAt)}
+            {" · "}
+            <Text
+              variant="caption"
+              tone="muted"
+              style={styles.toggle}
+              onPress={() => onSee?.(far)}
+              accessibilityRole="button"
+              suppressHighlighting
+            >
+              {t("chat.consultGroup.see")}
+            </Text>
+          </Text>
+        </View>
+      </View>
+    );
+  }
   // An answer from another agent that carries the consultation (who asked whom, the question and the
   // answer apart): the same card as a reply that waited for it, not the text written for the agent.
   const consulted = consultationOfNotice(message.meta);
@@ -33,17 +68,6 @@ export function EventLine({ message }: { message: Message }) {
     author: dir.nameOf(message.author) || t("channel.unknownAgent"),
     agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
   });
-  // The reply that asked, loaded here, already shows it with its answer (`ConsultGroup`): not drawn twice.
-  if (consulted && list.data?.length) {
-    const askedIn = noticeOf(message.meta)?.refs.runId;
-    const thread = message.threadId ? keys.thread(orgId, message.channelId, message.threadId) : null;
-    const loaded = [
-      ...(qc.getQueryData<Message[]>(keys.messages(orgId, message.channelId)) ?? []),
-      ...((thread && qc.getQueryData<Message[]>(thread)) || []),
-    ];
-    const inView = new Set(askedIn && loaded.some((x) => x.agentRunId === askedIn) ? [askedIn] : []);
-    if (shownConsultations(list.data, inView).has(consulted.consultation.consultationId)) return null;
-  }
   if (consulted)
     return (
       <View style={styles.line}>

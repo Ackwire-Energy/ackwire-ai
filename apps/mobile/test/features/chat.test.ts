@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, Message, RunConsultation } from "@agenteschat/client";
+import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls } from "@agenteschat/client/lib/work";
 import {
@@ -158,6 +159,41 @@ describe("working line", () => {
     const entries = workingEntries([run({ runId: "r1", agentId: "atlas" })], [consult], name);
     expect(entries).toHaveLength(1);
     expect(entries[0]?.consult).toMatchObject({ to: "infra", toName: "Infra", status: "asking" });
+  });
+
+  test("a question its reply shows near the end leaves the line; farther up, the line still says it", () => {
+    const consult: LiveConsult = {
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      channelId: "c1",
+      threadId: "m1",
+      status: "asking",
+      since: 1,
+      at: 1,
+    };
+    const asked: RunConsultation = {
+      id: "q1",
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      status: "open",
+      waiting: null,
+      question: "Como está o deploy?",
+      answer: null,
+      createdAt: at(5),
+      answeredAt: null,
+      expiresAt: at(-10),
+    };
+    // The phone's rows: saved replies only (a turn at work doesn't show its questions yet).
+    const reply = message({ id: "m-ask", author: { type: "agent", id: "atlas" }, agentRunId: "r1" });
+    const near = consultBlocksNearEnd([message({ id: "m0" }), reply], [asked]);
+    // Atlas at work on a new turn: its own entry, not the question.
+    const entries = workingEntries([run({ runId: "r2", agentId: "atlas" })], consultsForLine([consult], near), name);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.consult).toBeUndefined();
+    const far = consultBlocksNearEnd([reply, ...["a", "b", "c"].map((id) => message({ id }))], [asked]);
+    expect(workingEntries([], consultsForLine([consult], far), name)[0]?.consult?.status).toBe("asking");
   });
 
   test("a writing agent stays on the line ('escrevendo'); failed and waiting runs leave it", () => {

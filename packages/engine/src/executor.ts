@@ -53,7 +53,7 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { onConsultedRunFinished } from "./consultations";
+import { announceConsultationChange, onConsultedRunFinished } from "./consultations";
 import {
   buildRunContext,
   type ContextBlock,
@@ -430,6 +430,8 @@ async function executeRunInner(
   // Claim first (the common case is a queued run): one statement.
   let run: AgentRun;
   let fresh = false;
+  /** It waited (on a person, a mission, its computer) and goes back to work with this job. */
+  let backFromWait = false;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -462,6 +464,7 @@ async function executeRunInner(
       const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
+      backFromWait = true;
     }
   }
   // status is `running` here.
@@ -486,6 +489,11 @@ async function executeRunInner(
     agentId: run.agentId,
     runId: run.id,
   });
+  // Every way a held run comes back (an approval decided, a question answered, a secret given, its computer
+  // back) passes here: the conversations that asked a consulted one (ADR 0034) stop showing it held.
+  if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
+    await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
+  }
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */

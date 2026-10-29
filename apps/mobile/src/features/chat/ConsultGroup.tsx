@@ -6,7 +6,9 @@ import {
   consultSeconds,
   firstOfRun,
   groupsByRun,
+  useConsultBlockRequest,
 } from "@agenteschat/client/lib/consult-group";
+import { previewOf } from "@agenteschat/client/lib/consultations";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatLineTime, type ToolState } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
@@ -72,15 +74,20 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
   const list = useConsultations(orgId, m.channelId, Boolean(m.agentRunId));
   const runId = m.agentRunId ?? "";
   const group = useMemo(() => groupsByRun(list.data ?? []).get(runId), [list.data, runId]);
+  const asks = Boolean(group && group.length > 0 && m.author.id);
+  const loaded = asks
+    ? [
+        ...(qc.getQueryData<Message[]>(keys.messages(orgId, m.channelId)) ?? []),
+        ...((m.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, m.channelId, m.threadId))) || []),
+      ]
+    : [];
+  const first = asks ? firstOfRun(loaded, runId) : null;
+  const draws = asks && (!first || first === m.id);
+  // "Ver" on an answer's line farther down: the block opens at that answer (once this row is drawn).
+  const asked = useConsultBlockRequest(draws ? runId : null);
   const live = group?.some((c) => c.status === "open") ?? false;
   const now = useTick(live);
-  if (!group || group.length === 0 || !m.author.id) return null;
-  const loaded = [
-    ...(qc.getQueryData<Message[]>(keys.messages(orgId, m.channelId)) ?? []),
-    ...((m.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, m.channelId, m.threadId))) || []),
-  ];
-  const first = firstOfRun(loaded, runId);
-  if (first && first !== m.id) return null;
+  if (!draws || !group || !m.author.id) return null;
   const summary = consultGroupSummary(group, now);
   const from = agentGrammar(t, dir.agentById.get(m.author.id)?.name ?? t("mobile.chat.someone"));
   const items: BlockItem[] = group.map((c) => {
@@ -95,7 +102,10 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
         logo: <AgentFace agentId={c.consultedAgentId} size={18} mode={state === "working" ? "run" : "idle"} />,
         label: lineLabel(t, state, c, to),
         hint: null,
+        // The start of the answer, as the web shows it next to the phrase: no tap needed to know what came back.
+        preview: answer ? previewOf(answer) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
+        defaultOpen: asked?.consultationId === c.id,
         detail: (
           <View style={styles.detail}>
             <Text variant="caption" tone="faint" style={styles.bold}>
@@ -127,8 +137,9 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
   });
   return (
     <ToolBlock
-      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again).
-      key={summary.open ? "out" : "in"}
+      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again). Asked to
+      // open from an answer's line: open again, at that answer.
+      key={`${summary.open ? "out" : "in"}${asked ? `:${asked.at}` : ""}`}
       logos={group.map((c) => ({
         key: c.id,
         node: <AgentFace agentId={c.consultedAgentId} size={18} live={false} />,
@@ -144,7 +155,7 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       items={items}
       color={color}
       label={t("chat.consultGroup.label", { name: from.name, of: from.of })}
-      defaultOpen={summary.open}
+      defaultOpen={summary.open || asked !== null}
     />
   );
 }

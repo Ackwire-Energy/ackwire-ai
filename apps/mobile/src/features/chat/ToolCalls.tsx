@@ -133,6 +133,8 @@ export interface BlockLine {
   label: string;
   /** The tool's own name or the built-in's label: read aloud, not drawn (no room on a phone). */
   hint: string | null;
+  /** The start of what came back, under the phrase in two lines at most (another agent's answer). */
+  preview?: string | null;
   /** "1,2 s". */
   time?: string;
   /** "×5": several calls of the same kind in a row. */
@@ -269,7 +271,9 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
     running.current = line.state === "run";
   }, [line.state]);
   const opens = Boolean(line.detail);
-  const said = [line.label, line.hint, line.count, line.time].filter(Boolean).join(", ");
+  const said = [line.label, line.hint, line.preview, line.count, line.time].filter(Boolean).join(", ");
+  // With a preview under the phrase: logo, time and mark stay level with the phrase.
+  const top = line.preview ? styles.rowTop : null;
   const row = (
     <>
       <View style={styles.logo}>{line.logo}</View>
@@ -279,6 +283,11 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
             {line.label}
           </Text>
         </Breathing>
+        {line.preview ? (
+          <Text variant="footnote" tone="muted" numberOfLines={2}>
+            {line.preview}
+          </Text>
+        ) : null}
       </View>
       {line.count ? (
         <Text variant="caption" tone="faint" style={styles.num} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
@@ -305,12 +314,12 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
           accessibilityLabel={said}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plateSoft }]}
+          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
         >
           {row}
         </Pressable>
       ) : (
-        <View style={styles.row} accessible accessibilityLabel={said}>
+        <View style={[styles.row, top]} accessible accessibilityLabel={said}>
           {row}
         </View>
       )}
@@ -683,6 +692,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
   },
+  rowTop: { alignItems: "flex-start" },
   logo: { width: 20, alignItems: "center" },
   why: { marginTop: -4, paddingLeft: 37, paddingRight: 8, paddingBottom: 8 },
   detail: { marginHorizontal: 8, marginBottom: 8, gap: 8 },
