@@ -222,6 +222,18 @@ textarea.onb__big.ac-input {
   border-radius: 999px;
   box-shadow: inset 0 0 0 1px var(--line2);
 }
+/* Where the title and the US$ field don't share a line, the field goes under the title, from its words' edge (past
+   the 22px key and its 10px gap), so the title keeps one line. */
+.ac-card__head:has(> .ac-card__action > .onb__money) {
+  flex-wrap: wrap;
+  row-gap: var(--space-3);
+}
+.ac-card__head:has(> .ac-card__action > .onb__money) > .ac-card__lead {
+  flex-basis: auto;
+}
+.ac-card__head:has(> .ac-card__action > .onb__money) > .ac-card__action {
+  margin-left: 32px;
+}
 .onb__money {
   display: inline-flex;
   align-items: center;

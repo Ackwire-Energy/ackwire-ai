@@ -5,7 +5,7 @@ setupDom();
 
 import { keys, type StoragePlatform } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createMockStorage } from "./fakes/storage";
 import { renderApp, screen, settle } from "./render";
 
@@ -20,6 +20,12 @@ const go = async (state = seedState()) => {
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 const section = () => screen().getByRole("region", { name: "Armazenamento" });
+/** Text as read, no-break spaces as spaces. */
+const text = (el: Element | null | undefined) => el?.textContent?.replaceAll("\u00a0", " ");
+/** An option's lines under its title: its words, then what its files take where it is the one in use. */
+const linesOf = (option: Element | null | undefined) =>
+  [...(option?.closest("label")?.querySelectorAll(".ac-option__desc") ?? [])].map(text);
+const GB = 1024 ** 3;
 // Query timers don't run under the test DOM (TanStack sees no window at import): poll by hand.
 type Rendered = Awaited<ReturnType<typeof go>>["r"];
 const poll = async (r: Rendered, times: number) => {
@@ -59,7 +65,7 @@ describe("Configurações → Armazenamento", () => {
     // The page's title names the card, so the choices come first, and the radio alone says which is in use.
     expect(s.querySelector("h2, h3")).toBeNull();
     expect(s.textContent?.indexOf("Este servidor")).toBe(0);
-    expect(server.closest("label")?.textContent).toBe("Este servidorOs arquivos ficam no disco dele.");
+    expect(text(server.closest("label"))).toBe("Este servidorOs arquivos ficam no disco dele.Nenhum arquivo");
     // Our storage is the Cloud's: never said where the server is someone's own.
     expect(s.textContent).not.toMatch(/nosso armazenamento|Armazenamento do agentes/);
     for (const name of ["Google Drive", "OneDrive"]) {
@@ -96,10 +102,104 @@ describe("Configurações → Armazenamento", () => {
     await settle(5);
     const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
-    expect(ours.closest("label")?.textContent).toBe(
-      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.",
+    expect(text(ours.closest("label"))).toBe(
+      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
     );
     expect(section().textContent).not.toContain("Este servidor");
+  });
+
+  test("the option in use says what its files take: on this server's disk with what is free, in its database or bucket, on the Cloud", async () => {
+    const lines = async (state: Partial<FakeState>, options: { cloud?: boolean; en?: boolean } = {}) => {
+      cleanup();
+      const api = createFakeApi(seedState(state));
+      if (options.cloud) fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+      const { services } = await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+      await settle(5);
+      if (options.en) {
+        await act(async () => {
+          await services.i18n.changeLanguage("en");
+        });
+        await settle(3);
+      }
+      return linesOf(document.querySelector('label.ac-option[data-state="checked"]'));
+    };
+    const disk = { platformBytes: 2.4 * GB, ownBucketBytes: 0, disk: { sizeBytes: 256 * GB, freeBytes: 38 * GB } };
+    expect(await lines({ storageUsage: disk })).toEqual([
+      "Os arquivos ficam no disco dele.",
+      "2,4 GB de arquivos · 38 GB livres no disco",
+    ]);
+    expect(await lines({ storageUsage: disk }, { en: true })).toEqual([
+      "Files stay on its disk.",
+      "2.4 GB of files · 38 GB free on disk",
+    ]);
+    // The desktop app's folder: nothing there yet, on a big disk.
+    const folder: StoragePlatform = { kind: "disk", folder: "/Users/walter/.agentes/files" };
+    const empty = { platformBytes: 0, ownBucketBytes: 0, disk: { sizeBytes: 2048 * GB, freeBytes: 1.5 * 1024 * GB } };
+    expect((await lines({ storagePlatform: folder, storageUsage: empty }))[1]).toBe(
+      "Nenhum arquivo · 1,5 TB livres no disco",
+    );
+    // A database or a bucket says what it holds, with no disk of the server's to tell.
+    const held = (platformBytes: number) => ({ platformBytes, ownBucketBytes: 0, disk: null });
+    expect(
+      await lines({ storagePlatform: { kind: "database", folder: null }, storageUsage: held(300 * 1024 ** 2) }),
+    ).toEqual(["Os arquivos ficam no banco de dados dele.", "300 MB de arquivos"]);
+    expect(await lines({ storagePlatform: { kind: "bucket", folder: null }, storageUsage: held(12 * GB) })).toEqual([
+      "Os arquivos ficam no bucket configurado para ele.",
+      "12 GB de arquivos",
+    ]);
+    expect(
+      await lines({ storagePlatform: { kind: "bucket", folder: null }, storageUsage: held(3.2 * GB) }, { cloud: true }),
+    ).toEqual(["Seus arquivos ficam no nosso armazenamento, separados por workspace.", "3,2 GB de arquivos"]);
+    expect(
+      await lines(
+        { storagePlatform: { kind: "bucket", folder: null }, storageUsage: held(3.2 * GB) },
+        { cloud: true, en: true },
+      ),
+    ).toEqual(["Your files stay in our storage, kept apart per workspace.", "3.2 GB of files"]);
+  });
+
+  test("under a storage limit the meter says what the files take, and the option in use doesn't say it again", async () => {
+    const api = createFakeApi(
+      seedState({
+        storagePlatform: { kind: "bucket", folder: null },
+        storageUsage: { platformBytes: 3.2 * GB, ownBucketBytes: 0, disk: null },
+        limits: {
+          members: { used: 2, limit: null },
+          storage: { usedBytes: 3.2 * GB, limitBytes: 50 * GB, ownStorage: false },
+          uploads: { usedBytes24h: 0, limitBytesPerDay: null },
+        },
+      }),
+    );
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+    await settle(5);
+    expect(text(section())).toContain("Vocês usaram 3,2 GB de 50 GB.");
+    expect(linesOf(document.querySelector('label.ac-option[data-state="checked"]'))).toEqual([
+      "Seus arquivos ficam no nosso armazenamento, separados por workspace.",
+    ]);
+  });
+
+  test("on its own bucket, that option says what the bucket holds; picked and not saved, the line stays put", async () => {
+    await go(
+      seedState({
+        storageUsage: {
+          platformBytes: 2 * GB,
+          ownBucketBytes: 1.2 * GB,
+          disk: { sizeBytes: 100 * GB, freeBytes: 40 * GB },
+        },
+      }),
+    );
+    const server = () => within(section()).getByRole("radio", { name: /Este servidor/ });
+    const bucket = () => within(section()).getByRole("radio", { name: /Seu próprio bucket/ });
+    await click(bucket());
+    expect(linesOf(server())).toEqual(["Os arquivos ficam no disco dele.", "2 GB de arquivos · 40 GB livres no disco"]);
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3."]);
+    await fillBucket("acme-arquivos");
+    await testConnection();
+    await click(activate());
+    await settle(4);
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "1,2 GB de arquivos"]);
+    expect(linesOf(server())).toEqual(["Os arquivos ficam no disco dele."]);
   });
 
   test("the General tiles say where files stay: this server, or agentes storage on the Cloud", async () => {
@@ -216,12 +316,18 @@ describe("Configurações → Armazenamento", () => {
   });
 
   test("copy existing files shows progress, stops, resumes and finishes", async () => {
-    const { r } = await go();
+    const { r } = await go(
+      seedState({
+        storageUsage: { platformBytes: 2 * GB, ownBucketBytes: 0, disk: { sizeBytes: 100 * GB, freeBytes: 40 * GB } },
+      }),
+    );
     await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
     await fillBucket("acme-instavel");
     await testConnection();
     await click(activate());
     await settle(4);
+    const bucket = () => within(section()).getByRole("radio", { name: /Seu próprio bucket/ });
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "Nenhum arquivo"]);
     await click(within(section()).getByRole("button", { name: "Copiar arquivos existentes" }));
     await settle(2);
     expect(within(section()).getByRole("meter", { name: "Progresso da cópia" })).toBeTruthy();
@@ -235,6 +341,9 @@ describe("Configurações → Armazenamento", () => {
     await poll(r, 2);
     expect(section().textContent).toContain("Cópia concluída: 120 arquivos no seu bucket.");
     expect(within(section()).getByRole("meter").getAttribute("aria-valuenow")).toBe("120");
+    // The bucket's card says what the copy took there, without reopening the page.
+    await settle(3);
+    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "2 GB de arquivos"]);
   });
 
   test("switch back to this server after confirming, or to agentes storage on the Cloud", async () => {

@@ -47,8 +47,6 @@ export interface AuthConfig {
   ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
-  /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
-  landing?: boolean;
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
@@ -1593,12 +1591,24 @@ export interface StoragePlatform {
   folder: string | null;
 }
 
+/** What the workspace's files take, summed from the sizes recorded as they were written. */
+export interface StorageUsage {
+  /** On this server's storage (`platform`), files in the trash left out. */
+  platformBytes: number;
+  /** In the workspace's own buckets, the trash left out too. */
+  ownBucketBytes: number;
+  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  disk: { sizeBytes: number; freeBytes: number } | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
   platform: StoragePlatform;
+  /** Absent from an older server. */
+  usage?: StorageUsage;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";
@@ -3490,6 +3500,14 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
+/** A computer the caller may give an agent, with what it offers. */
+export interface BrainMachine {
+  machineId: string;
+  name: string;
+  online: boolean;
+  options: BrainOption[];
+}
+
 /** `GET …/agents/{id}/brain` (its owner or an admin). */
 export interface AgentBrain {
   agentId: string;
@@ -3502,7 +3520,7 @@ export interface AgentBrain {
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
-  machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
+  machines: BrainMachine[];
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;

@@ -2,6 +2,7 @@ import type { AiStatus, Edition } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
+import { platformZoneName } from "@agenteschat/client/lib/routines";
 import { isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -252,13 +253,5 @@ export function zoneCity(zone: string): string {
  * id, without accents) where the platform has no name for it, or only an offset ("GMT-03:00").
  */
 export function zoneLabel(zone: string, locale: string): string {
-  try {
-    const name = new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "longGeneric" })
-      .formatToParts(new Date())
-      .find((part) => part.type === "timeZoneName")?.value;
-    if (name && !/^(GMT|UTC)/.test(name)) return name;
-  } catch {
-    // An engine without generic zone names, or an unknown zone.
-  }
-  return zoneCity(zone);
+  return platformZoneName(zone, locale) ?? zoneCity(zone);
 }

@@ -1,4 +1,3 @@
-import { landingPtBR } from "./landing";
 import type { Widen } from "./widen";
 
 /**
@@ -207,7 +206,7 @@ export const ptBR = {
       verified: "Verificado",
       code: "Código do e-mail",
       note: "Algo que eles devam saber? (opcional)",
-      noteHelp: "Quem é você, ou quem mandou o link",
+      noteHelp: "Quem é você e quem te convidou",
       send: "Pedir para entrar",
       as: "Você vai pedir como {{email}}.",
       notYou: "Não é você? Sair",
@@ -1099,11 +1098,13 @@ export const ptBR = {
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
       key: "Você envia a chave assim que o computador ficar pronto.",
-      email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
-      ready: "O {{computer}} está pronto.",
+      email: "Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+      ready: "O computador está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
+    /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
+    theComputer: "computador",
     own: {
       shared: "A conta que os seus agentes dividem",
       one: "Uma conta só {{for}} {{name}}",
@@ -1339,7 +1340,7 @@ export const ptBR = {
     presence: "Presença",
     offline: "Ainda não entrou",
     localTime: "Hora local",
-    timeIn: "{{time}} ({{zone}})",
+    timeIn: "{{time}} · {{zone}}",
     dm: "Mensagem direta",
     viewProfile: "Ver perfil",
     agent: "Agente",
@@ -2584,6 +2585,12 @@ export const ptBR = {
       other: "US$ {{input}} / US$ {{output}} por milhão de tokens",
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
+    plans: "Pelo plano, num computador",
+    plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
+    planOnlyOwner:
+      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+    planNotSaved:
+      "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",
@@ -6104,8 +6111,14 @@ export const ptBR = {
     onedrive: "OneDrive",
     soon: "Em breve",
     current: "Em uso",
+    // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
+    usage: {
+      files: "{{size}}\u00a0de\u00a0arquivos",
+      none: "Nenhum\u00a0arquivo",
+      free: "{{files}}\u00a0· {{size}}\u00a0livres\u00a0no\u00a0disco",
+    },
     endpoint: "Endpoint",
-    endpointHelp: "Por exemplo, https://s3.amazonaws.com ou https://<conta>.r2.cloudflarestorage.com.",
+    endpointHelp: "Por exemplo, https://s3.amazonaws.com.",
     region: "Região",
     bucket: "Bucket",
     prefix: "Prefixo (opcional)",
@@ -7579,7 +7592,7 @@ export const ptBR = {
     },
     import: {
       title: "Importar",
-      exportTitle: "Exportar este workspace",
+      exportTitle: "Exportar",
       download: "Baixar o arquivo",
       neverLine: "Nunca leva chaves, senhas, logins nem conversas.",
       whatsIn: "O que vai no arquivo",
@@ -8006,7 +8019,6 @@ export const ptBR = {
         'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
     },
   },
-  landing: landingPtBR,
   builtinTools: {
     ask_user: {
       label: "Perguntar à pessoa",
@@ -8818,6 +8830,8 @@ export const ptBR = {
       group: "Tela {{of}} {{name}}",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e tudo o que é digitado ou colado nele.",
       step: {
         desktop_open: "Abriu {{detail}}",
         desktop_open_plain: "Abriu um app",

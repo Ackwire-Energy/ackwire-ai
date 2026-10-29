@@ -189,6 +189,7 @@ import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices"
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { useUploadFailed } from "@/components/Limits";
@@ -2959,7 +2960,12 @@ export const TimelineMessage = memo(function TimelineMessage({
     forumSuggestion ||
     issueWork;
   const feedback = m.author.type === "agent" && !card && !m.local && !live;
-  const menu = useMessageMenu(m, channelName ?? "", { feedback });
+  const menu = useMessageMenu(m, channelName ?? "", {
+    feedback,
+    agentName: agent?.name ?? t("channel.unknownAgent"),
+  });
+  // A row with a bar has the same actions in a menu that a tap opens on touch.
+  const barred = feedback || (m.author.type === "person" && !m.local);
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
   const keptWork =
@@ -3067,6 +3073,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       }
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
       foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
+      menu={
+        barred && menu.touch.length > 0
+          ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
+          : undefined
+      }
       stacked={Boolean(card)}
     >
       {live ? (

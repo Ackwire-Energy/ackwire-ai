@@ -83,7 +83,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "storage.agentes",
     "storage.agentesText",
     "storage.place.agentes",
-    "landing.",
     "help.cloud.",
     "mobile.outage.cloudSub",
     "mobile.outage.sheet.cloudTag",
@@ -158,6 +157,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "storage.serverText.",
     "storage.place.server",
     "storage.showFolder",
+    // The free space of the disk under this server's files folder: the Cloud keeps none.
+    "storage.usage.free",
     "support.ask",
     "help.selfhost.",
     "mobile.newMission.noAgents",
@@ -180,7 +181,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.done.invited_other",
     "onboarding.team.emailsHint",
     "computerSetup.email.",
-    "landing.",
     "connectAi.wait.email",
   ],
   apiKey: ["agentPage.work.brain.fallbackTitle"],
@@ -196,8 +196,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
   system: [
     "wiki.import.howTo",
     "machines.download.step1",
-    "landing.demo.",
-    "landing.devices.mac.",
     "help.selfhost.computers.sections.0.blocks.0",
     "desktop.prefs.general.dockDesc",
     "desktop.prefs.general.menuBarTitle",
@@ -211,8 +209,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
 export const ANYWHERE: readonly string[] = [
   "connectFlow.needsKey",
   "database.error.blocked_host",
-  "landing.bento.connectors.own",
-  "landing.faq.items.tools.a",
   // "a server that's always on": what to install instead of this computer.
   "help.selfhost.run-on-your-computer.sections.1.blocks.0",
   "mobile.connectors.needsKey",

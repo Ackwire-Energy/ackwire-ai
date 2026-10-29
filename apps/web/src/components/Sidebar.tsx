@@ -19,7 +19,7 @@ import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
-import { browserTimezone } from "@agenteschat/client/lib/routines";
+import { browserTimezone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
   type AgentColor,
@@ -857,7 +857,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           <MenuOverlayItem
             icon="clock"
             shortcut="2"
-            hint={zone.split("/").at(-1)?.replaceAll("_", " ")}
+            description={zoneDisplayName(zone, i18n.language) ?? timezoneName(zone, i18n.language)}
             onSelect={pick(() => setProfile("timezone"))}
           >
             {t("shell.timezone")}

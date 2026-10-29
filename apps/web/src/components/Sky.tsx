@@ -12,6 +12,7 @@ import {
   HEADER_AREA,
   headerField,
   Icon,
+  isDarkSurface,
   Logo,
   mix,
   PixelSky,
@@ -198,14 +199,18 @@ export function AgentCover({
   );
 }
 
-/** Behind an agent's computer while its screen opens: its sky, calm, filling the stage. `clear`: the words on it. */
+/**
+ * Behind an agent's computer while its screen opens: its sky, calm, filling the stage. `clear`: the words on it.
+ * In light, its day sky. In dark, the window's surface rising into its color, as the app's other skies do there.
+ */
 export function ComputerSky({ color, clear }: { color: AgentColor; clear?: Clear }) {
   return (
     <span className="cmp-sky" aria-hidden="true">
       <PixelSky
         options={{
           pixel: 4,
-          palette: agentTones(color),
+          surface: "--raised",
+          palette: (bg) => (isDarkSurface(bg) ? softTones(color, bg) : agentTones(color)),
           body: spriteTone(color),
           sprites: { area: 1400, max: 12 },
           clear,
@@ -568,7 +573,8 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
     near: 0,
     ceil: 0.3,
     light: 0.06,
-    sprites: 3,
+    // Three on a full horizon, fewer on the short one under the steps of a short window.
+    sprites: { area: 2000, max: 3 },
     base: (u, v, tt) => {
       const s = Math.max(0, (v - 0.08) / 0.92);
       const e = s * s * (3 - 2 * s);

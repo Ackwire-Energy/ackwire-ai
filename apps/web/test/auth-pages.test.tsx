@@ -129,7 +129,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(router.state.location.search).toEqual({});
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect(panel.textContent).toContain("O computador está pronto.");
   });
 
   test("an account without a password: only the provider it signs in with", async () => {
@@ -1992,8 +1992,12 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__note")).toBeNull();
   });
 
-  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+  test("workspace: the time zone in words, its reason behind its ⓘ, with no line under the field", async () => {
     await start();
+    // Its name as people say it (the IANA id goes to the API only).
+    const zone = [...document.querySelectorAll(".onb__help")].find((p) => p.textContent?.startsWith("Fuso horário"));
+    expect(zone?.textContent).toMatch(/^Fuso horário: .+ · trocar$/);
+    expect(zone?.textContent).not.toMatch(/\w\/\w/);
     await click(button("trocar"), 2);
     const about = button("Sobre Fuso horário");
     const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");

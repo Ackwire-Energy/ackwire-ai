@@ -159,12 +159,12 @@ describe("Configurações → Importar e exportar", () => {
     const imports = screen().getByRole("region", { name: "Importar" });
     expect(imports.querySelector(".ac-card__sub")).toBeNull();
 
-    const card = screen().getByRole("region", { name: "Exportar este workspace" });
+    const card = screen().getByRole("region", { name: "Exportar" });
     expect(card.querySelector(".ac-card__sub, ul, .ac-card__foot")).toBeNull();
     // Whoever shares the file needs to know what never goes in it: one line. The full list is on the help page.
     expect(card.querySelector(".imp-note")?.textContent).toBe("Nunca leva chaves, senhas, logins nem conversas.");
     const whatsIn = within(card).getByRole("link", { name: "O que vai no arquivo" });
-    expect(whatsIn.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#export");
+    expect(whatsIn.getAttribute("href")).toBe("https://app.agentes.chat/help/import?lang=pt-BR#export");
     expect(whatsIn.className).toBe("ac-link ac-link--muted");
     expect([whatsIn.getAttribute("target"), whatsIn.getAttribute("rel")]).toEqual(["_blank", "noopener noreferrer"]);
     await click(within(card).getByRole("button", { name: "Baixar o arquivo" }));
@@ -179,7 +179,7 @@ describe("Configurações → Importar e exportar", () => {
     await go(state);
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(within(nav).queryByRole("link", { name: "Importar e exportar" })).toBeNull();
-    expect(screen().queryByRole("region", { name: "Exportar este workspace" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Exportar" })).toBeNull();
   });
 
   test("the most used apps first, each by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
@@ -482,7 +482,7 @@ describe("Configurações → Importar e exportar", () => {
     // Where each app puts its file is on the help page, one link under the request.
     expect(other.querySelector("dl")).toBeNull();
     const where = within(other).getByRole("link", { name: "Onde cada app entrega" });
-    expect(where.getAttribute("href")).toBe("https://agentes.chat/help/import?lang=pt-BR#other-apps");
+    expect(where.getAttribute("href")).toBe("https://app.agentes.chat/help/import?lang=pt-BR#other-apps");
     expect(where.className).toBe("ac-link ac-link--muted");
 
     await click(within(other).getByRole("button", { name: "Copiar o pedido" }), 2);

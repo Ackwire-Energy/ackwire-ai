@@ -1,12 +1,13 @@
 import type { Message } from "@agenteschat/client";
-import { Button, Menu, MenuItem } from "@agenteschat/ui";
+import { Button, EmojiPickerPopover, Menu, MenuItem } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { contextMenuHandler, copyText, type MenuEntry, QUICK_REACTIONS, selectedTextAt } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
-import { ReactButton, reactionOf, useMessageReactions } from "./Reactions";
+import { CorrectionDialog } from "./MessageFeedback";
+import { DOWN, ReactButton, reactionOf, useEmojiLabels, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";
 
 /** A message's address: the channel with `?m=` (the timeline scrolls to it). */
@@ -98,9 +99,15 @@ export function PersonMessageActions({
 /**
  * A message's right click in the desktop app (lib/context-menu.ts): quick reactions, then what its "…" has
  * (Responder, Copiar link, Salvar na wiki) and Copiar texto. With text selected in it, the selection's own menu
- * (Copiar, Responder; Salvar na wiki saves the selection). `dialog` goes with the message.
+ * (Copiar, Responder; Salvar na wiki saves the selection). `touch` is the same menu for a tap on touch, where it stands
+ * in for the bar, so it also has the bar's every emoji, and an agent's reply (`feedback`) the bar's Não ajudou and
+ * Corrigir resposta. `dialog` goes with the message.
  */
-export function useMessageMenu(message: Message, channelName: string, options: { feedback?: boolean } = {}) {
+export function useMessageMenu(
+  message: Message,
+  channelName: string,
+  options: { feedback?: boolean; agentName?: string } = {},
+) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -108,7 +115,10 @@ export function useMessageMenu(message: Message, channelName: string, options: {
   const reactions = useMessageReactions(message.id, message.reactions, { feedback: options.feedback });
   // What Salvar na wiki saves: the selection when it was asked, else the whole message.
   const [saving, setSaving] = useState<string | null>(null);
-  const onContextMenu = contextMenuHandler((e): MenuEntry[] => {
+  const [correcting, setCorrecting] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const labels = useEmojiLabels();
+  const entries = (selected: string, touch = false): MenuEntry[] => {
     if (message.local) return [];
     const copy = (text: string, id: string, label: string): MenuEntry => ({
       kind: "item",
@@ -145,33 +155,71 @@ export function useMessageMenu(message: Message, channelName: string, options: {
       icon: "book",
       run: () => setSaving(text),
     });
-    const selected = selectedTextAt(e.target);
     if (selected) {
       return [copy(selected, "copy", t("contextMenu.copy")), ...reply, { kind: "separator" }, copyLink, wiki(selected)];
     }
+    // A file with no words has no text to copy or save.
+    const words = message.body.trim() !== "";
     return [
       {
         kind: "reactions",
         label: t("contextMenu.react"),
         emojis: QUICK_REACTIONS,
         pick: (emoji) => reactions.toggle(reactionOf(emoji)),
+        ...(touch ? { more: { label: t("reactions.add"), run: () => setPicking(true) } } : {}),
       },
       ...reply,
-      copy(message.body, "copy-text", t("contextMenu.copyText")),
+      ...(touch && options.feedback
+        ? ([
+            {
+              kind: "item",
+              id: "not-helpful",
+              label: t("channel.notHelpful"),
+              icon: "thumbDown",
+              run: () => reactions.toggle(DOWN),
+            },
+            { kind: "item", id: "correct", label: t("channel.correct"), icon: "edit", run: () => setCorrecting(true) },
+          ] satisfies MenuEntry[])
+        : []),
+      ...(words ? [copy(message.body, "copy-text", t("contextMenu.copyText"))] : []),
       copyLink,
-      { kind: "separator" },
-      wiki(message.body),
+      ...(words ? ([{ kind: "separator" }, wiki(message.body)] satisfies MenuEntry[]) : []),
     ];
-  });
-  const dialog =
-    saving === null ? null : (
-      <SaveToWikiDialog
-        open
-        onClose={() => setSaving(null)}
-        text={saving}
-        source={{ kind: "message", channelId: message.channelId, messageId: message.id }}
-        from={t("wiki.fromMessage", { channel: channelName })}
-      />
-    );
-  return { onContextMenu, dialog };
+  };
+  const onContextMenu = contextMenuHandler((e) => entries(selectedTextAt(e.target)));
+  const touch = entries("", true);
+  const dialog = (
+    <>
+      {saving !== null && (
+        <SaveToWikiDialog
+          open
+          onClose={() => setSaving(null)}
+          text={saving}
+          source={{ kind: "message", channelId: message.channelId, messageId: message.id }}
+          from={t("wiki.fromMessage", { channel: channelName })}
+        />
+      )}
+      {correcting && (
+        <CorrectionDialog
+          open
+          onOpenChange={setCorrecting}
+          messageId={message.id}
+          agentName={options.agentName ?? ""}
+        />
+      )}
+      {picking && (
+        <EmojiPickerPopover
+          open
+          onOpenChange={setPicking}
+          labels={labels}
+          onPick={(emoji) => reactions.toggle(reactionOf(emoji))}
+          side="bottom"
+          align="end"
+          // The whole row's box (`.ac-msg` is positioned): the picker opens beside the row, as its menu did.
+          trigger={<span aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />}
+        />
+      )}
+    </>
+  );
+  return { onContextMenu, touch, dialog };
 }

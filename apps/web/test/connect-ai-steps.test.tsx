@@ -9,6 +9,7 @@ import type {
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { LOGIN_PER_AGENT } from "@agenteschat/client/lib/plans";
+import { en } from "@agenteschat/i18n";
 import { icons } from "@agenteschat/ui";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -633,7 +634,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // address, no clock).
     const well = panel.querySelector(".ai-panel__wait") as HTMLElement;
     expect(shownText(well)).toBe(
-      "A Ada está arrumando as ferramentasPasso 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
+      "A Ada está arrumando as ferramentasPasso 3 de 4 · Instalando os programasFaltam uns 6 minAvisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
     );
     expect(panel.textContent).not.toContain("walter@");
     // "Ready" once, in the well: the sign-in's step says nothing more of when.
@@ -803,6 +804,40 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Another tile: the sign-in stops where it runs.
     await click(tile("ChatGPT"));
     expect(calls(state, "machines.cancelAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "managed_1", "login_1"]]);
+  });
+
+  test("on the Cloud the account's sign-in says the computer, never its name: asking it, the button, the code sent", async () => {
+    const workspace: AiComputer = { ...MAC, machineId: "managed_1", name: "Computador da Acme" };
+    const { state, api, dialog } = await connect({
+      computers: [workspace],
+      setup: { state: "ready", machineId: "managed_1" },
+      brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: true } },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    const begin = api.machines.beginAccountLogin;
+    let answer = () => {};
+    api.machines.beginAccountLogin = async (...args) => {
+      await new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      return begin(...args);
+    };
+    await withPopup(async () => {
+      await click(within(panel).getByRole("button", { name: "Entrar com Claude" }));
+      expect(shownText(panel)).toContain("Pedindo ao computador…");
+      await act(async () => answer());
+      await settle(6);
+    });
+    await type(within(panel).getByRole("textbox", { name: "Código do Claude" }), "c0de#st4te");
+    await click(within(panel).getByRole("button", { name: "Enviar ao computador" }));
+    await settle(4);
+    expect(calls(state, "machines.sendAccountCode")).toHaveLength(1);
+    expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");
+    // Its hints too.
+    expect(panel.querySelector(".agp-addacct")?.textContent).not.toContain("Acme");
+    // English puts the unnamed computer ("the computer") mid-sentence, never where a capital would go.
+    const lines = (o: unknown): string[] => (typeof o === "string" ? [o] : Object.values(o as object).flatMap(lines));
+    expect(lines(en.agentPage.work.brain.add).filter((l) => /(^|[.?!]\s+)\{\{computer\}\}/.test(l))).toEqual([]);
   });
 
   test("the agent's view failing to load again mid-sign-in: the steps stay, and nothing is stopped", async () => {

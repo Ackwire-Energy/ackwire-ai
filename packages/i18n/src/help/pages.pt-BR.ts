@@ -167,7 +167,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "export",
         heading: "Exportar um workspace",
         blocks: [
-          "**Configurações\u00a0›\u00a0Importar e exportar\u00a0›\u00a0Exportar este workspace** baixa um arquivo .json, para levar os agentes a outro workspace ou guardar uma cópia. Vai no arquivo:",
+          "**Configurações\u00a0›\u00a0Importar e exportar\u00a0›\u00a0Exportar** baixa um arquivo .json, para levar os agentes a outro workspace ou guardar uma cópia. Vai no arquivo:",
           {
             list: [
               "Agentes, com instruções, modelo e aparência",

@@ -29,6 +29,7 @@
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
     "./sky/workspace": "./src/sky/workspace.ts",
+    "./diff": "./src/diff.ts",
     "./names": "./src/names.ts",
     "./plan-state": "./src/plan-state.ts",
     "./recurrence": "./src/recurrence.ts",

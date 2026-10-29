@@ -9,12 +9,14 @@ import type {
   AppNotification,
   Approval,
   AuthConfig,
+  BrainMachine,
   Channel,
   ChannelMember,
   Connection,
   ConnectorCatalog,
   ConnectorDef,
   Credential,
+  Edition,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -41,6 +43,7 @@ import type {
   ServerTelemetry,
   SignInOptions,
   StoragePlatform,
+  StorageUsage,
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -126,7 +129,7 @@ export interface FakeState {
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
   signInOptions?: SignInOptions;
-  /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
+  /** The server `account.phoneSignIn` names (default: https://app.agentes.chat). */
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
@@ -179,18 +182,18 @@ export interface FakeState {
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
-  /** Make `waitlist.join` fail with this error (429, 400…). */
-  waitlistError?: ApiError;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
   /** `orgs.limits` (ADR 0077); unset = no limits, the members counted from `members`. */
   limits?: WorkspaceLimits;
-  /** Make `waitlist.confirm` fail with this error (invalid_token…). */
-  waitlistConfirmError?: ApiError;
   /** `agents.aiStatus`; unset = every agent ready. */
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** `system.health`'s edition; unset = the Cloud. */
+  edition?: Edition;
+  /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
+  brainMachines?: BrainMachine[];
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
@@ -202,6 +205,8 @@ export interface FakeState {
   jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
+  /** What the workspace's files take (`storage.get`'s `usage`); unset = none yet, no disk told. */
+  storageUsage?: StorageUsage;
   /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
   webPushKey?: string;
   /** `push.stale`: the notification ids the server calls stale (read, done, snoozed, gone); unset = none. */
@@ -766,7 +771,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   return {
     system: {
-      health: async () => ({ status: "ok", version: "test", edition: "cloud" }),
+      health: async () => ({ status: "ok", version: "test", edition: state.edition ?? "cloud" }),
       telemetry: async () => state.telemetry ?? null,
       setTelemetry: async (enabled) => {
         log("system.setTelemetry", enabled);
@@ -799,22 +804,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return state.jev;
       },
     },
-    waitlist: {
-      join: async (input, humanCheck) => {
-        state.calls.push({ method: "waitlist.join", args: humanCheck === undefined ? [input] : [input, humanCheck] });
-        if (state.waitlistError) throw state.waitlistError;
-      },
-      confirm: async (input) => {
-        log("waitlist.confirm", input);
-        if (state.waitlistConfirmError) throw state.waitlistConfirmError;
-      },
-    },
     account: {
       authConfig: async () => ({
         socialProviders: { google: false, github: true },
         signupOpen: true,
         firstRun: false,
-        landing: true,
         ...state.authConfig,
       }),
       signInOptions: async (input, humanCheck) => {
@@ -833,7 +827,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.phoneSignIn");
         return {
           token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
-          server: state.phoneServer ?? "https://agentes.chat",
+          server: state.phoneServer ?? "https://app.agentes.chat",
           expiresIn: 180,
         };
       },
@@ -1276,6 +1270,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
           throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
         return structuredClone(brainOf(agentId));
+      },
+      brainMachines: async (orgId) => {
+        log("agents.brainMachines", orgId);
+        return structuredClone(state.brainMachines ?? []);
       },
       setBrain: async (orgId, agentId, input) => {
         log("agents.setBrain", orgId, agentId, input);
@@ -2023,7 +2021,10 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
       },
     },
-    storage: createMockStorage(() => state.storagePlatform),
+    storage: createMockStorage(
+      () => state.storagePlatform,
+      () => state.storageUsage,
+    ),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,

@@ -1,11 +1,11 @@
-import { and, count, type Database, type Executor, eq, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { and, count, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { ConflictError } from "./errors";
 import { formatBytes } from "./format";
 import type { Judge } from "./judge";
 import { recordOperatorEvent } from "./operator-events";
 import { requirePermission } from "./organizations";
-import { usesOwnBucket } from "./storage";
+import { storedBytes, usesOwnBucket } from "./storage";
 import { monthStartUtc } from "./usage";
 
 /**
@@ -24,7 +24,7 @@ export interface OrgLimits {
   platformUsdPerMonth: number | null;
 }
 
-const { organizations, organizationMembers, artifacts, artifactVersions, skillFiles, usageRecords } = schema;
+const { organizations, organizationMembers, artifactVersions, skillFiles, usageRecords } = schema;
 
 /** `usage_records.cost_nano_usd`'s unit, in which the platform cap is kept. */
 const NANO_PER_USD = 1e9;
@@ -113,35 +113,39 @@ export async function assertMemberRoom(db: Executor, orgId: string) {
 const LAST_DAY = sql`now() - interval '24 hours'`;
 
 /**
- * What a workspace keeps on this server's storage (its own bucket left out): the bytes of its files and skills, the
- * trash left out so deleting a file frees its space at once, and the bytes written in the last 24 hours, the trash
- * included: what was written stays written.
+ * What a workspace keeps on this server's storage (`storedBytes`' platform bytes: the trash left out, so deleting a
+ * file frees its space at once), and the bytes written there in the last 24 hours, the trash included: what was
+ * written stays written.
  */
 export async function storageUsage(
   db: Executor,
   orgId: string,
 ): Promise<{ usedBytes: number; uploadBytes24h: number }> {
-  const [[files], [skills]] = await Promise.all([
+  const [stored, [files], [skills]] = await Promise.all([
+    storedBytes(db, orgId),
     db
-      .select({
-        used: sql<string>`coalesce(sum(${artifactVersions.size}) filter (where ${artifacts.deletedAt} is null), 0)`,
-        day: sql<string>`coalesce(sum(${artifactVersions.size}) filter (where ${artifactVersions.createdAt} > ${LAST_DAY}), 0)`,
-      })
+      .select({ day: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
       .from(artifactVersions)
-      .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
-      .where(and(eq(artifactVersions.orgId, orgId), isNull(artifactVersions.storageConfigId))),
+      .where(
+        and(
+          eq(artifactVersions.orgId, orgId),
+          isNull(artifactVersions.storageConfigId),
+          gt(artifactVersions.createdAt, LAST_DAY),
+        ),
+      ),
     db
-      .select({
-        used: sql<string>`coalesce(sum(${skillFiles.size}), 0)`,
-        day: sql<string>`coalesce(sum(${skillFiles.size}) filter (where ${skillFiles.createdAt} > ${LAST_DAY}), 0)`,
-      })
+      .select({ day: sql<string>`coalesce(sum(${skillFiles.size}), 0)` })
       .from(skillFiles)
-      .where(and(eq(skillFiles.orgId, orgId), isNull(skillFiles.storageConfigId), isNotNull(skillFiles.blobKey))),
+      .where(
+        and(
+          eq(skillFiles.orgId, orgId),
+          isNull(skillFiles.storageConfigId),
+          isNotNull(skillFiles.blobKey),
+          gt(skillFiles.createdAt, LAST_DAY),
+        ),
+      ),
   ]);
-  return {
-    usedBytes: Number(files?.used ?? 0) + Number(skills?.used ?? 0),
-    uploadBytes24h: Number(files?.day ?? 0) + Number(skills?.day ?? 0),
-  };
+  return { usedBytes: stored.platformBytes, uploadBytes24h: Number(files?.day ?? 0) + Number(skills?.day ?? 0) };
 }
 
 /**

@@ -588,7 +588,7 @@ pub fn plan_move(homes: &[(PathBuf, serde_json::Value)]) -> Move {
         if !paired {
             continue;
         }
-        if server == crate::servers::CLOUD {
+        if server == crate::servers::CLOUD || server == crate::servers::OLD_CLOUD {
             out.retire.push(dir.clone());
             if out.retired.is_none() && !text("workspace").is_empty() {
                 out.retired = Some(text("workspace"));
@@ -699,18 +699,20 @@ mod tests {
                 json!({ "server": server, "orgName": org, "token": token, "workspace": format!("/Users/ana/agentes/{org}") }),
             )
         };
+        // The menu bar app paired its Cloud homes at the Cloud's old address.
         let plan = plan_move(&[
             home("/h/1", "https://agentes.chat", "acme", "agm_1"),
             home("/h/2", "https://zeta.tail1234.ts.net", "Zeta", "agm_2"),
             home("/h/3", "https://agentes.tail1234.ts.net", "Beta", "agm_3"),
             home("/h/4", "https://agentes.tail1234.ts.net", "Alfa", "agm_4"),
             home("/h/5", "https://other.example.com", "Unpaired", ""),
+            home("/h/6", "https://app.agentes.chat", "Gama", "agm_6"),
         ]);
         assert_eq!(
             plan,
             Move {
                 servers: vec!["https://agentes.tail1234.ts.net".into(), "https://zeta.tail1234.ts.net".into()],
-                retire: vec![PathBuf::from("/h/1")],
+                retire: vec![PathBuf::from("/h/1"), PathBuf::from("/h/6")],
                 retired: Some("/Users/ana/agentes/acme".into()),
             }
         );

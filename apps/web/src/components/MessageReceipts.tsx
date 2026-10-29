@@ -3,6 +3,7 @@ import { type ReceiptPhase, type ReceiptView, receiptView, useModelLabel } from 
 import { joinNames } from "@agenteschat/client/lib/format";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, InfoHint, Popover, ProviderLogo } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
@@ -28,10 +29,14 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   follow_up: "thread",
 };
 
-function ReceiptDot() {
+/** A dot and the action after it: one piece, which wraps whole. */
+function ReceiptAction({ children }: { children: ReactNode }) {
   return (
-    <span className="ac-receipt__dot" aria-hidden="true">
-      ·
+    <span className="ac-receipt__then">
+      <span className="ac-receipt__dot" aria-hidden="true">
+        ·
+      </span>
+      {children}
     </span>
   );
 }
@@ -52,10 +57,17 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const receipt = useLive((s) => s.receipts[message.id]);
   const view = receiptView(receipt);
   const status = view.status;
+  const callAgent =
+    actions && actions.channelAgents.length > 0 ? (
+      <ReceiptAction>
+        <CallAgentMenu />
+      </ReceiptAction>
+    ) : null;
   const worded =
     view.picking === true ||
     status?.kind === "nobody" ||
     status?.kind === "no_ai" ||
+    status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null);
   if (worded !== (part === "line")) return null;
   if (view.picking) {
@@ -64,9 +76,10 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <span className="ac-receipt__clock">
           <Icon name="waiting" />
         </span>
-        <span>{t("receipts.picking")}</span>
-        <ReceiptDot />
-        <CallAgentMenu />
+        <span className="ac-receipt__words">
+          <span>{t("receipts.picking")}</span>
+          {callAgent}
+        </span>
       </div>
     );
   }
@@ -145,40 +158,40 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         </Popover>
       )}
       {status?.kind === "failed" && actions && (
-        <>
+        <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
-          <ReceiptDot />
-          <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
-            {t("receipts.retry")}
-          </button>
-        </>
+          <ReceiptAction>
+            <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
+              {t("receipts.retry")}
+            </button>
+          </ReceiptAction>
+        </span>
       )}
-      {status?.kind === "nobody" &&
-        (mentionNeeded ? (
-          <>
+      {status?.kind === "nobody" && (
+        <span className="ac-receipt__words">
+          {mentionNeeded ? (
             <span className="ac-hintline">
               <span>{t("receipts.mentionNeeded")}</span>
               <InfoHint name={t("common.about", { label: t("routing.title") })}>
                 {t("receipts.mentionNeededHint")}
               </InfoHint>
             </span>
-            <ReceiptDot />
-            <CallAgentMenu />
-          </>
-        ) : (
-          <>
+          ) : (
             <span>{t("receipts.nobody")}</span>
-            <ReceiptDot />
-            <CallAgentMenu />
-          </>
-        ))}
-      {status?.kind === "platform_cap" && <span>{t("receipts.platformCap")}</span>}
+          )}
+          {callAgent}
+        </span>
+      )}
+      {status?.kind === "platform_cap" && (
+        <span className="ac-receipt__words">
+          <span>{t("receipts.platformCap")}</span>
+        </span>
+      )}
       {status?.kind === "no_ai" && (
-        <>
+        <span className="ac-receipt__words">
           <span>{t("noAi.receipt")}</span>
           {connect && (
-            <>
-              <ReceiptDot />
+            <ReceiptAction>
               <button
                 type="button"
                 className="ac-receipt__action"
@@ -193,9 +206,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
               >
                 {t("noAi.action")}
               </button>
-            </>
+            </ReceiptAction>
           )}
-        </>
+        </span>
       )}
     </div>
   );

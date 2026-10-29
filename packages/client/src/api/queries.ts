@@ -83,6 +83,7 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
+  StorageMigration,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -1483,6 +1484,7 @@ export function useSaveStorage(orgId: string) {
     onSuccess: (config) => {
       qc.setQueryData(keys.storage(orgId), config);
       qc.removeQueries({ queryKey: keys.storageMigration(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
     },
   });
 }
@@ -1490,9 +1492,20 @@ export function useSaveStorage(orgId: string) {
 /** Copy status; polls while the copy runs. */
 export const useStorageMigration = (orgId: string, enabled: boolean) => {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: keys.storageMigration(orgId),
-    queryFn: () => api.storage.migration(orgId),
+    queryFn: async () => {
+      const was = qc.getQueryData<StorageMigration | null>(keys.storageMigration(orgId))?.status;
+      const m = await api.storage.migration(orgId);
+      // A copy that stops has moved files from one storage to the other: what each holds (`usage`, and what the
+      // storage limit counts) is stale.
+      if (was === "running" && m?.status !== "running") {
+        void qc.invalidateQueries({ queryKey: keys.storage(orgId), exact: true });
+        void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+      }
+      return m;
+    },
     enabled,
     refetchInterval: (q) => (q.state.data?.status === "running" ? 1500 : false),
     refetchIntervalInBackground: true,
@@ -1946,6 +1959,16 @@ export const useAgentBrain = (orgId: string, agentId: string, enabled = true, po
     enabled,
     retry: false,
     refetchInterval: pollMs,
+  });
+};
+
+/** "Quem pensa" for an agent still being created ("Criar agente"): the workspace's computers and what each offers. */
+export const useBrainMachines = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.brainMachines(orgId),
+    queryFn: () => api.agents.brainMachines(orgId),
+    retry: false,
   });
 };
 

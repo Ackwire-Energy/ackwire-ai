@@ -4,6 +4,7 @@ import {
   useApproveJoinRequest,
   useChangeRole,
   useDenyJoinRequest,
+  useHealth,
   useInviteLinks,
   useInviteMany,
   useJoinRequests,
@@ -80,6 +81,8 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const dir = useDirectory(org.id);
   const manage = can(org.role, "manage_members");
+  // Self-hosted servers usually send no email: people join by the link only.
+  const byLink = useHealth().data?.edition === "selfhost";
   const invitations = useAllInvitations(org.id, manage);
   const inviteMany = useInviteMany(org.id);
   const resendOne = useResendInvitation(org.id);
@@ -173,42 +176,44 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           </h2>
           <MembersFull />
           <OnlyYouNote orgId={org.id} viewerId={me.user.id} />
-          <div className="row row--end">
-            <Field
-              label={t("members.emails")}
-              id="m-email"
-              style={{ flex: "1 1 280px" }}
-              error={error}
-              hint={{ name: t("common.about", { label: t("members.emails") }), text: t("members.link.emailsJoin") }}
-            >
-              <Input
-                value={draft}
-                onChange={(e) => {
-                  setDraft(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder={t("members.emailsPlaceholder")}
-              />
-            </Field>
-            <Field label={t("members.role")} id="m-role" style={{ flex: "0 1 150px" }}>
-              <Select value={role} onValueChange={setRole} options={roleOptions.filter((o) => o.value !== "owner")} />
-            </Field>
-            <Button
-              variant="primary"
-              onClick={() => void send().catch(() => {})}
-              disabled={inviteMany.isPending || full}
-              loading={inviteMany.isPending}
-            >
-              {t("members.invite")}
-            </Button>
-          </div>
-          <InviteLinkBlock />
+          {!byLink && (
+            <div className="row row--end">
+              <Field
+                label={t("members.emails")}
+                id="m-email"
+                style={{ flex: "1 1 280px" }}
+                error={error}
+                hint={{ name: t("common.about", { label: t("members.emails") }), text: t("members.link.emailsJoin") }}
+              >
+                <Input
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                  placeholder={t("members.emailsPlaceholder")}
+                />
+              </Field>
+              <Field label={t("members.role")} id="m-role" style={{ flex: "0 1 150px" }}>
+                <Select value={role} onValueChange={setRole} options={roleOptions.filter((o) => o.value !== "owner")} />
+              </Field>
+              <Button
+                variant="primary"
+                onClick={() => void send().catch(() => {})}
+                disabled={inviteMany.isPending || full}
+                loading={inviteMany.isPending}
+              >
+                {t("members.invite")}
+              </Button>
+            </div>
+          )}
+          <InviteLinkBlock alone={byLink} />
         </Card>
       )}
 
@@ -224,7 +229,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                 <span className="small muted" style={{ flex: "0 0 72px" }}>
                   {t(`roles.${inv.role}`)}
                 </span>
-                <span className="small muted" style={{ flex: "0 1 180px" }}>
+                <span className="small muted" style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}>
                   {resent[inv.email] ? t("members.resentNow") : invitationStatus(t, i18n.language, inv)}
                 </span>
                 <div className="row" style={{ gap: 4 }}>
@@ -573,7 +578,8 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
  * The workspace's invitation link (ADR 0068), in the "Invite people" card: whoever has it can only ask to join,
  * and an admin approves each person. Links made before links could be shown again are listed to turn off.
  */
-function InviteLinkBlock() {
+/** `alone`: the card's only way in (no email form above), so no hairline over it. */
+function InviteLinkBlock({ alone = false }: { alone?: boolean }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const links = useInviteLinks(org.id);
@@ -591,7 +597,7 @@ function InviteLinkBlock() {
   );
 
   return (
-    <div className="jr-link">
+    <div className={alone ? "jr-link jr-link--alone" : "jr-link"}>
       <span className="ac-field__label" id="invite-link-label">
         {t("members.link.title")}
       </span>

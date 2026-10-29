@@ -5,8 +5,10 @@ import {
   useStorage,
   useStorageMigration,
   useTestStorage,
+  useWorkspaceLimits,
 } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
   Alert,
   Button,
@@ -111,12 +113,17 @@ function PathCode({ path }: { path: string }) {
 /**
  * Settings → Armazenamento (admins only): where files stay unless the workspace brings its own S3-compatible
  * bucket. On the Cloud that is our storage; on a server people run, the server itself, said by where it keeps them.
+ * The option in use also says what the files there take.
  */
 export function StorageSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const admin = can(org.role, "configure");
   const storage = useStorage(org.id, admin);
+  const limits = useWorkspaceLimits(org.id, admin);
+  // Under a storage limit the meter above says what the files here take, against the limit: the option doesn't say it
+  // again (nor before the limits answer, so the line never shows and goes).
+  const metered = limits.data ? limits.data.storage.limitBytes !== null : limits.isPending;
   const edition = useComputerEdition(org.id);
   const reveals = useRevealsFiles();
   const [choice, setChoice] = useState<Choice>("agentes");
@@ -160,6 +167,11 @@ export function StorageSection() {
                 aside={
                   // The radio says which is in use until another is picked: then this says it.
                   config.kind === k && choice !== k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined
+                }
+                detail={
+                  config.kind === k && !(k === "agentes" && metered)
+                    ? storageUsageLine(t, i18n.language, config)
+                    : undefined
                 }
               />
             ))}
@@ -330,7 +342,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
         );
       }}
     >
-      <div className="grid-fields">
+      <div className="grid-fields grid-fields--wide">
         <Field
           label={t("storage.endpoint")}
           id="st-endpoint"

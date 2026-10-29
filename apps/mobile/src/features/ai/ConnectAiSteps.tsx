@@ -293,11 +293,24 @@ function Hero({ mark, title, sub }: { mark: ReactNode; title: string; sub: strin
   );
 }
 
-/** A line in a white card (why the steps wait), with its action. */
-function InfoCard({ icon, children, action }: { icon: IconName; children: ReactNode; action?: ReactNode }) {
+/** A line in a white card (why the steps wait), with its action. `live`: announced when it comes. */
+function InfoCard({
+  icon,
+  children,
+  action,
+  live = false,
+}: {
+  icon: IconName;
+  children: ReactNode;
+  action?: ReactNode;
+  live?: boolean;
+}) {
   const { colors: c, shadows } = useTheme();
   return (
-    <View style={[styles.info, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
+    <View
+      style={[styles.info, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+      accessibilityLiveRegion={live ? "polite" : undefined}
+    >
       <Icon name={icon} size={18} color={c.ink2} />
       <Text variant="subhead" tone="muted">
         {children}
@@ -563,9 +576,10 @@ function PlanSteps({
       {wait}
       {offersKeyNow(gate, hold !== null) ? useKey : null}
       {ready && waited ? (
-        <Note icon="check" live>
-          {t("connectAi.wait.ready", { computer })}
-        </Note>
+        // A card of its own, where the wait's was: never read as the head of the account choice under it.
+        <InfoCard icon="check" live>
+          {t("connectAi.wait.ready")}
+        </InfoCard>
       ) : null}
       {ownable ? (
         <>
@@ -588,7 +602,8 @@ function PlanSteps({
         <AddAccount
           machineId={view?.computer?.machineId ?? ""}
           kind={kind}
-          computer={computer}
+          // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
+          computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(isPlanId(choice) ? { provider: choice } : {})}
           again={signedOut?.id}
           email={signedOut?.email}

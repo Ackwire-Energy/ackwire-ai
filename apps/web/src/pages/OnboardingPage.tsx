@@ -58,7 +58,7 @@ import {
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { AUTO, keyLooksValid, providerLabel } from "@agenteschat/client/lib/providers";
-import { browserTimezone } from "@agenteschat/client/lib/routines";
+import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
@@ -112,6 +112,7 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { MembersFull } from "@/components/Limits";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
+import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingOfferSky, OnboardingProgress, WelcomeSky } from "@/components/Sky";
@@ -641,6 +642,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     return computerPoll || (setupPending(view) || awaiting(view) ? COMPUTER_POLL_MS : false);
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  // The rail says where that computer is, except at phone width (a bar of step numbers there).
+  const phone = useMediaQuery(COMPACT_QUERY);
+  const railSaysComputer = workspaceComputer !== null && !phone;
   const aiOpen = step.id === "ai" && !jev;
   const jevOpen = step.id === "ai" && jev;
   // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
@@ -1202,7 +1206,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                 </Field>
               ) : (
                 <p className="onb__help">
-                  {t("onboarding.workspace.zone", { zone })} ·{" "}
+                  {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
                   <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                     {t("onboarding.workspace.zoneChange")}
                   </button>
@@ -1438,6 +1442,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
                           hostConnecting={computer === "host"}
+                          said={railSaysComputer}
                           onKey={() => pickAi("key")}
                           onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                           onDone={(ids, account) => {

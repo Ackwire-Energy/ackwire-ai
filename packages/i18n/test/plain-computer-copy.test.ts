@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
 import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { leaves } from "./leaves";
+import { conditionsOf } from "./setups";
 
 /**
  * Screens about the agents' computer (onboarding, preparing, its own page) are read by people who aren't
@@ -90,6 +91,7 @@ const CLOUD_EXTRA = [
   "browser.now.handedBack",
   "desktop.control.keys",
   "desktop.control.notice",
+  "desktop.watch.notice",
   "desktop.session.check",
   "desktop.session.screening",
   "desktop.keyboard.field",
@@ -287,6 +289,21 @@ describe("computer copy", () => {
     expect(CLOUD_EXTRA.filter((k) => k.startsWith("connectAi.own.") || k === "usageViews.agent.sharedPart")).toEqual(
       [],
     );
+  });
+
+  test("the storage line says what the files take, and where only for this server's disk, the one place it shows", () => {
+    // Every setup shows how much (the Cloud, a server's folder or database, a bucket), and each option's own words say
+    // where: only a folder on this server adds what its disk has free.
+    const place = /disk|disco|serv|bucket|database|banco|cloud|nuvem|storage|armazenamento/i;
+    for (const strings of [ptBR, en]) {
+      const values = valuesOf(strings);
+      const [files = "", none = "", free = ""] = ["files", "none", "free"].map((k) => values.get(`storage.usage.${k}`));
+      expect([files, none, free].filter((v) => !v || TECHNICAL.test(v))).toEqual([]);
+      expect([files, none].filter((v) => place.test(v))).toEqual([]);
+      expect(free).toMatch(place);
+    }
+    expect([...conditionsOf("storage.usage.free")]).toEqual(["selfhost"]);
+    expect([...conditionsOf("storage.usage.files"), ...conditionsOf("storage.usage.none")]).toEqual([]);
   });
 
   test("catches the words it bans, whatever the case", () => {
