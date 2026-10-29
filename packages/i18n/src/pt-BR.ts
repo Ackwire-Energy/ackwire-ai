@@ -6082,7 +6082,7 @@ export const ptBR = {
     soon: "Em breve",
     current: "Em uso",
     endpoint: "Endpoint",
-    endpointHelp: "Por exemplo, https://s3.amazonaws.com ou https://<conta>.r2.cloudflarestorage.com.",
+    endpointHelp: "Por exemplo, https://s3.amazonaws.com.",
     region: "Região",
     bucket: "Bucket",
     prefix: "Prefixo (opcional)",
@@ -7552,7 +7552,7 @@ export const ptBR = {
     },
     import: {
       title: "Importar",
-      exportTitle: "Exportar este workspace",
+      exportTitle: "Exportar",
       download: "Baixar o arquivo",
       neverLine: "Nunca leva chaves, senhas, logins nem conversas.",
       whatsIn: "O que vai no arquivo",

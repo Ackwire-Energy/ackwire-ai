@@ -6049,7 +6049,7 @@ export const en: Translations = {
     soon: "Coming soon",
     current: "In use",
     endpoint: "Endpoint",
-    endpointHelp: "For example, https://s3.amazonaws.com or https://<account>.r2.cloudflarestorage.com.",
+    endpointHelp: "For example, https://s3.amazonaws.com.",
     region: "Region",
     bucket: "Bucket",
     prefix: "Prefix (optional)",
@@ -7509,7 +7509,7 @@ export const en: Translations = {
     },
     import: {
       title: "Import",
-      exportTitle: "Export this workspace",
+      exportTitle: "Export",
       download: "Download the file",
       neverLine: "Never includes keys, passwords, logins or conversations.",
       whatsIn: "What's in the file",

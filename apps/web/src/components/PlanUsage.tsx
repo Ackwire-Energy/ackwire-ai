@@ -26,10 +26,10 @@ export function AccountHead({ account, extra }: { account: PlanAccountInfo; extr
   const whose =
     account.email ?? (account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null);
   return (
-    <div className="plan-acct">
+    <div className="plan-acct ac-faceline">
       <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
       <span className="plan-acct__text">
-        <span className="plan-acct__name">
+        <span className="plan-acct__name ac-captop">
           {accountName(t, account)}
           {account.plan && <span className="plan-acct__chip">{planName(account.plan)}</span>}
           {account.signedOut && (

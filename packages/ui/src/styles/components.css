@@ -354,6 +354,7 @@ samp {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
 .ac-field__error {
   font-size: 13px;

@@ -3,13 +3,16 @@ import { build } from "vite";
 
 const WEB = join(import.meta.dir, "..");
 
-/** The app's stylesheet as the production build writes it: Vite's own CSS pipeline (its minifier and targets). */
-export async function builtCss() {
+/**
+ * The app's stylesheet (or the one `input` names, a page's own) as the production build writes it: Vite's own CSS
+ * pipeline (its minifier and targets).
+ */
+export async function builtCss(input = "src/styles.css") {
   const out = await build({
     configFile: false,
     logLevel: "silent",
     root: WEB,
-    build: { write: false, rollupOptions: { input: join(WEB, "src/styles.css") } },
+    build: { write: false, rollupOptions: { input: join(WEB, input) } },
   });
   return (Array.isArray(out) ? out : [out])
     .flatMap((o) => ("output" in o ? o.output : []))
