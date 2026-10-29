@@ -156,6 +156,8 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     // The dialog's page is its stage, not a card in a message: one sky, under the dialog's head.
     expect(card().classList.contains("is-surface")).toBe(true);
     expect(card().querySelector(".ac-sky-strip")).toBeNull();
+    // Closed, so with nothing on the line under it the sky takes that room too (computer.css).
+    expect(card().classList.contains("is-closed")).toBe(true);
 
     // Take control opens it, to sign in ahead of time.
     await click(within(dialog() as HTMLElement).getByRole("button", { name: "Assumir o controle" }));
@@ -174,6 +176,7 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     expect(calls(s, "browser.open").at(-1)).toEqual([ORG_ID, ADA_ID, "loja.example.com"]);
     await push(frame("https://loja.example.com/"));
     expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
+    expect(card().classList.contains("is-closed")).toBe(false);
   });
 
   test("a request for me: the entry says so with Ajudar, which takes it and opens the page in my control", async () => {

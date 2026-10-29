@@ -58,6 +58,16 @@ describe("loadConfig", () => {
     expect([selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([undefined, undefined]);
   });
 
+  test("agentes.chat's own servers send from ola@agentes.chat, whichever of its addresses they are at", () => {
+    for (const site of ["https://app.agentes.chat", "https://agentes.chat"]) {
+      expect(loadConfig({ ...valid, PUBLIC_URL: site }).EMAIL_FROM).toBe("agentes.chat <ola@agentes.chat>");
+    }
+    const set = loadConfig({ ...valid, PUBLIC_URL: "https://app.agentes.chat", EMAIL_FROM: "ops@agentes.chat" });
+    expect(set.EMAIL_FROM).toBe("ops@agentes.chat");
+    // Elsewhere it stays unset: the sender is ola@ on the host of PUBLIC_URL.
+    expect(loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" }).EMAIL_FROM).toBeUndefined();
+  });
+
   test("treats empty strings as unset", () => {
     expect(loadConfig({ ...valid, PORT: "" }).PORT).toBe(3000);
   });

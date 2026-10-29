@@ -362,6 +362,7 @@ export {
   cloudAt,
   HEADER_AREA,
   headerField,
+  isDarkSurface,
   type SkyHour,
   skyHourOf,
   starAt,

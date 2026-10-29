@@ -8,7 +8,7 @@ import { legalDocument } from "@agenteschat/i18n/legal";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { Block } from "@/pages/help/HelpPage";
 import { LegalPage } from "@/pages/LegalPage";
-import { createFakeApi, seedState } from "./fake-api";
+import { createFakeApi, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => {
@@ -77,10 +77,14 @@ describe("help pages", () => {
     expect(document.querySelector("pre a")).toBeNull();
   });
 
-  test("an unknown page goes to /", async () => {
+  test("an unknown page goes home: sign-in when signed out, the workspace when signed in", async () => {
     const { router } = await renderApp("/help/nope?lang=en", { api: signedOut() });
     await settle();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/login");
+    cleanup();
+    const signedIn = await renderApp("/help/nope?lang=en", { api: createFakeApi() });
+    await settle();
+    expect(signedIn.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 
   test("the tab reads the page's title while it shows, and what it read before once it's left", async () => {
@@ -89,7 +93,7 @@ describe("help pages", () => {
     expect(document.title).toBe("Memory · agentes.chat");
     await act(async () => fireEvent.click(document.querySelector(".help .legal__bar a") as HTMLElement));
     await settle();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/login");
     expect(document.title).toBe("agentes.chat");
     cleanup();
     // The Terms and the Privacy Policy, the same way.

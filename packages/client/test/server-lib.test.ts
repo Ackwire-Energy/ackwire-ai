@@ -119,7 +119,7 @@ describe("connect links", () => {
   });
 
   test("a token or claim that isn't one, or a link that is too long, is no link", () => {
-    const base = "agenteschat://connect?server=https%3A%2F%2Fagentes.chat";
+    const base = "agenteschat://connect?server=https%3A%2F%2Fapp.agentes.chat";
     expect(parseConnectLink(`${base}&token=short`)).toBeNull();
     expect(parseConnectLink(`${base}&claim=${"x".repeat(19)}`)).toBeNull();
     expect(parseConnectLink(`${base}&claim=${encodeURIComponent("<script>alert(1)</script>xxxxxxxxxx")}`)).toBeNull();

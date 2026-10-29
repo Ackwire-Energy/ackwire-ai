@@ -1417,6 +1417,16 @@ textarea.ac-input {
 .ac-menu__reaction[data-highlighted] {
   background: var(--surface-sunken);
 }
+/* Every emoji: the add-reaction pill's two icons and colors (`.ac-react--add`). */
+.ac-menu__reaction--more {
+  grid-auto-flow: column;
+  place-content: center;
+  gap: 2px;
+  color: var(--faint);
+}
+.ac-menu__reaction--more[data-highlighted] {
+  color: var(--ink);
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;
@@ -2617,21 +2627,33 @@ a.ac-list__row:focus-visible {
 /* Agent receipts under a person's message: muted, small; only the avatars carry color */
 .ac-receipt {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin-top: var(--space-1);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
 }
-/* The dot between the words and the action, 4px from each: the line's whole gap on both sides makes it wrap sooner. */
-.ac-receipt__dot {
-  margin-inline: -2px;
+/* The words after the icon flow as text in a column of their own: a wrapped line starts under the words, never under
+   the icon, and balanced lines leave no action alone on the last one. */
+.ac-receipt__words {
+  min-width: 0;
+  text-wrap: balance;
+}
+/* The dot and its action are one piece that wraps whole, the dot 4px from each. The room before the dot is the
+   words', so a line the dot starts starts on the column. */
+.ac-receipt__words > :first-child {
+  margin-inline-end: 4px;
 }
 /* After an ⓘ, 1.5px closer: the ⓘ's circle stops 1.54px inside its box. */
-.ac-hintline + .ac-receipt__dot {
-  margin-inline-start: -3.5px;
+.ac-receipt__words > .ac-hintline:first-child {
+  margin-inline-end: 2.5px;
+}
+.ac-receipt__then {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
 }
 .ac-receipt__avatars {
   display: inline-flex;
@@ -4428,6 +4450,10 @@ a.ac-list__row:focus-visible {
 }
 .ac-msg:hover {
   background: var(--plate-soft);
+}
+/* The row a menu is open for (a tap on touch), a step brighter than a hover. */
+.ac-msg[data-menu-open="true"] {
+  background: var(--plate);
 }
 /*
  * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
@@ -6369,9 +6395,13 @@ button.ac-tools__row:focus-visible {
 
 /* Touch: hover-only actions and small controls. */
 @media (hover: none) {
-  /* The message bar shows on a tap (the row takes focus, see Message.tsx), like keyboard focus. */
-  .ac-msg:focus {
-    outline: none;
+  /* A tap opens the row's menu beside the row (Message.tsx `menu`), so the bar is the keyboard's here: a hover a tap
+     leaves behind, or a tap on a control in the row, would put it on the text. A field one types in is :focus-visible
+     after a tap too, so it doesn't count (`:read-write`). */
+  .ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write)))
+  .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"])) {
+    opacity: 0;
+    pointer-events: none;
   }
   .ac-msg__actions {
     right: 8px;
@@ -6429,6 +6459,10 @@ button.ac-tools__row:focus-visible {
   }
   .ac-menu__item {
     min-height: 40px;
+  }
+  .ac-menu__reaction {
+    width: 40px;
+    height: 40px;
   }
 }
 

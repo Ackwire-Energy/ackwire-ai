@@ -90,6 +90,7 @@ const CLOUD_EXTRA = [
   "browser.now.handedBack",
   "desktop.control.keys",
   "desktop.control.notice",
+  "desktop.watch.notice",
   "desktop.session.check",
   "desktop.session.screening",
   "desktop.keyboard.field",
