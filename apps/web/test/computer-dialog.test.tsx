@@ -183,8 +183,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
-    // The wait takes the screen's box and its line's room (the empty row steps aside, computer.css), as the Pronto and
-    // the opening cover after it do, so each opens in its place.
+    // The wait takes the screen's box and its line's room (the empty row steps aside, computer.css).
     const row = box().querySelector(".cmp-body > .cmp-prep + .cmp-steps-row");
     expect(row?.childElementCount).toBe(0);
     expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
@@ -223,7 +222,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     const socket = t.sockets.realtime.last();
     await act(async () => socket.open());
-    // The wait and the Pronto that follows it take one box: the screen's, with its line's room.
+    // The wait takes the screen's box with its line's room.
     expect(box().querySelector(".cmp-body > .cmp-prep + .cmp-steps-row")).toBeTruthy();
     // The computer is made, Ada is on it and its screen shows.
     const m = t.machines.pair({ name: "Computador da Acme", kind: "managed", os: "other" });
@@ -240,7 +239,10 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     // The cover says it; the head says nothing over it.
     expect(sub()).toBe("");
     expect(box().textContent?.match(/Pronto/g)).toHaveLength(1);
-    expect(box().querySelector(".cmp-body > .cmp-stage + .cmp-steps-row")).toBeTruthy();
+    // The Pronto leads to the screen: the screen's line stays under it, so the screen opens where it was.
+    expect(box().querySelector(".cmp-body > .cmp-stage + .dsk-line")?.textContent).toBe(
+      "Os programas do computador da Ada veem a tela e tudo o que é digitado ou colado nele.",
+    );
     await act(async () => new Promise((r) => setTimeout(r, 1600)));
     await settle(8);
     // Opening, then the screen: no step of the person's.
@@ -307,6 +309,8 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     await act(async () => t.sockets.realtime.last().open());
     await settle(4);
     expect(sub()).toBe("Sem resposta");
+    // It comes back by itself: the screen's line stays under the cover, so the screen opens where it was.
+    expect(box().querySelector(".cmp-body > .cmp-stage + .dsk-line")).toBeTruthy();
     // The socket drops; meanwhile the computer comes back, and its machine.status never reaches this tab.
     await act(async () => t.sockets.realtime.last().drop());
     t.machines.patch((t.machine as Machine).id, { online: true });
@@ -328,8 +332,10 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
-    // A cover takes the screen's frame and its line's room (the empty row steps aside), as the screen's own do.
+    // A cover that stays until someone acts takes the screen's frame and its line's room (the empty row steps aside),
+    // as the screen's own do.
     expect(box().querySelector(".cmp-stage")).toBeTruthy();
+    expect(box().querySelector(".dsk-line")).toBeNull();
     expect(box().querySelector(".cmp-body > .cmp-steps-row")?.childElementCount).toBe(0);
   });
 });

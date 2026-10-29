@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { atMedia, builtCss, declarations, topLevel } from "./built-css";
+import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
 const SRC = join(import.meta.dir, "../src");
 const COMPUTER = "components/computer/computer.css";
 const DESKTOP = "components/desktop/desktop.css";
+const WINDOW = "@media (min-width: 721px)";
+const PHONE = "@media (max-width: 720px)";
 
 /**
  * Declarations as `property:value`, spaces out, as the minifier may write them: it drops what it may, and writes a
@@ -20,11 +22,12 @@ const built = (input: string) => {
 };
 
 /**
- * What `file` (under src) declares for `selector`, at every width or inside `media`, all of it in the build of `input`
- * too, but for what `except` names, which a test checks by its own measure. Returns what ships.
+ * What `file` (under src) declares for `selector`, at every width or inside `block` (`@media …`, `@supports …`), all of
+ * it in the build of `input` too, but for what `except` names, which a test checks by its own measure. Returns what
+ * ships.
  */
-async function ships(file: string, input: string, selector: string, media?: string, except: string[] = []) {
-  const only = (css: string) => (media ? atMedia(css, media) : topLevel(css));
+async function ships(file: string, input: string, selector: string, block?: string, except: string[] = []) {
+  const only = (css: string) => (block ? atRule(css, block) : topLevel(css));
   const written = squeeze(declarations(only(await Bun.file(join(SRC, file)).text()), selector));
   const shipped = squeeze(declarations(only(await built(input)), selector));
   const kept = written.filter((d) => !except.some((p) => d.startsWith(`${p}:`)));
@@ -33,10 +36,10 @@ async function ships(file: string, input: string, selector: string, media?: stri
   return shipped;
 }
 
-test("the window's foot is as deep as its sides: the line steps aside over a cover and the wait, whose box is its stage", async () => {
+test("the window's foot is as deep as its sides: the line steps aside over the wait and a cover that stays, whose box is its stage", async () => {
   for (const selector of [
     ".cmp-body:has(> .dsk) > .cmp-steps-row:empty",
-    '.cmp-body:has(> :is(.cmp-stage, .cmp-prep, .dsk:not([data-state="live"]))) > .cmp-steps-row',
+    ".cmp-body:has(> :is(.cmp-stage, .cmp-prep, .dsk.is-final)) > .cmp-steps-row",
     ".cmp-body:has(> .cmp-steps-row > .cmp-steps) > .dsk:not(.is-control) > .dsk-line",
   ]) {
     expect(await ships(COMPUTER, `src/${COMPUTER}`, selector)).toContain("display:none");
@@ -56,14 +59,24 @@ test("the window's foot is as deep as its sides: the line steps aside over a cov
     "max-width:min(420px,100%-32px)",
   );
   expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-body .brw-dim__box > *")).toContain("max-width:100%");
-  // The line under a live screen is as tall as the room the window keeps for it, a tablet's 40 px too.
-  const line = await ships(
-    DESKTOP,
-    `src/${DESKTOP}`,
-    ".cmp-dialog:not(.is-screen-only) .dsk-line",
-    "(min-width: 721px)",
-  );
+  // The line under the screen is as tall as the room the window keeps for it, a tablet's 40 px too, with its words on
+  // its middle where no Keyboard button leads them, and so are the steps in its place.
+  const line = await ships(DESKTOP, `src/${DESKTOP}`, ".cmp-dialog:not(.is-screen-only) .dsk-line", WINDOW);
   expect(line).toContain("min-height:var(--cmp-line)");
+  const middle = "margin-top:calc((var(--cmp-line)-22px)/2)";
+  const words = ".cmp-dialog:not(.is-screen-only) .dsk-line > :first-child:not(.ac-btn)";
+  expect(await ships(DESKTOP, `src/${DESKTOP}`, words, WINDOW)).toContain(middle);
+  const steps = ".cmp-body:has(> .dsk) > .cmp-steps-row > .cmp-steps";
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, steps, WINDOW)).toContain(middle);
+});
+
+test("the window ships on a whole pixel where the browser can round: its width even, the same size unrounded elsewhere", async () => {
+  const frame = ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))";
+  const rounded = await ships(COMPUTER, `src/${COMPUTER}`, frame, "@supports (width: round(down, 1px, 1px))");
+  expect(rounded).toEqual(["--cmp-screen:round(down,min(96vw-40px,1280px,var(--cmp-room)*1280/900),2px)"]);
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, frame)).toContain(
+    "--cmp-screen:min(96vw-40px,1280px,var(--cmp-room)*1280/900)",
+  );
 });
 
 test("the head's controls ship on the name's capitals, full screen's bar's in its middle, the raised ones with their room", async () => {
@@ -79,24 +92,23 @@ test("the head's controls ship on the name's capitals, full screen's bar's in it
   );
 });
 
-/** `max(0px, a·cqh − b·cqw)` for a body `w` × `h` px, as written or as the minifier folds it. */
-function centred(value: string, w: number, h: number) {
+/** `(a·cqh − b·cqw) / 2` for a body `w` × `h` px, as written or as the minifier folds it. */
+function half(value: string, w: number, h: number) {
   const v = value.replace(/\s+/g, "");
-  if (v === "max(0px,(100cqh-100cqw*900/1280)/2)") return Math.max(0, (h - (w * 900) / 1280) / 2);
-  const folded = v.match(/^max\(0px,(?:calc\()?([\d.]+)cqh-([\d.]+)cqw\)?\)$/);
-  return folded ? Math.max(0, (Number(folded[1]) * h - Number(folded[2]) * w) / 100) : Number.NaN;
+  if (v === "calc((100cqh-100cqw*900/1280)/2)") return (h - (w * 900) / 1280) / 2;
+  const folded = v.match(/^calc\(([\d.]+)cqh-([\d.]+)cqw\)$/);
+  return folded ? (Number(folded[1]) * h - Number(folded[2]) * w) / 100 : Number.NaN;
 }
 
 test("on a phone the screen and its covers ship as one box in the sheet's middle, risen while the keyboard is up", async () => {
-  const phone = "(max-width: 720px)";
-  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog:not(.is-screen-only) > .cmp-body", phone)).toContain(
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog:not(.is-screen-only) > .cmp-body", PHONE)).toContain(
     "container-type:size",
   );
   for (const selector of [
     ".cmp-body > .cmp-stage > .cmp-stage__box",
     '.cmp-body > .dsk:not([data-state="live"]) .dsk-screen',
   ]) {
-    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone);
+    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, PHONE);
     expect(shipped).toEqual(expect.arrayContaining(["width:100%", "aspect-ratio:1280/900", "place-self:auto"]));
   }
   // A cover shares the box's cell: words taller than the box grow it instead of spilling over the head.
@@ -104,34 +116,46 @@ test("on a phone the screen and its covers ship as one box in the sheet's middle
     ".cmp-body > .cmp-stage > :is(.cmp-stage__box, .brw-dim)",
     ".cmp-body > .dsk > .dsk-stage > :is(.dsk-screen, .brw-dim)",
   ]) {
-    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, phone)).toContain("grid-area:1/1");
+    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, PHONE)).toContain("grid-area:1/1");
   }
   for (const selector of [".cmp-body > .cmp-stage", ".cmp-body > .dsk > .dsk-stage"]) {
-    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, phone, ["flex", "container-type"])).toContain(
+    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, PHONE, ["flex", "container-type"])).toContain(
       "grid-template-columns:minmax(0,1fr)",
     );
   }
   for (const selector of [".cmp-body > .cmp-stage > .brw-dim", ".cmp-body > .dsk > .dsk-stage > .brw-dim"]) {
-    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone);
+    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, PHONE);
     expect(shipped).toEqual(expect.arrayContaining(["position:relative", "place-self:stretch"]));
   }
-  // The box's top as far under the body's top as its foot is over the body's foot: 243 px on a 390 px phone.
-  for (const selector of [
-    ".cmp-dialog:not(.is-screen-only) .cmp-body > .cmp-stage",
-    ".cmp-dialog:not(.is-screen-only) .cmp-body > .dsk > .dsk-stage",
-  ]) {
-    const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone, ["margin-top"]);
-    const margin = shipped.find((d) => d.startsWith("margin-top:"))?.slice("margin-top:".length) ?? "";
-    expect(centred(margin, 358, 738)).toBeCloseTo((738 - (358 * 900) / 1280) / 2, 1);
-    expect(centred(margin, 358, 200)).toBe(0);
-  }
+  // Over the box, room that gives: at most half of what the box leaves (243 px on a 390 × 844 phone's body, none where
+  // the box fills it), less where what goes under the box would run past the foot. It adds no gap of its own.
+  const over = await ships(
+    COMPUTER,
+    `src/${COMPUTER}`,
+    ".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before",
+    PHONE,
+    ["max-height"],
+  );
+  expect(over).toEqual(expect.arrayContaining(['content:""', "flex:110", "margin-bottom:-8px"]));
+  const most = over.find((d) => d.startsWith("max-height:"))?.slice("max-height:".length) ?? "";
+  expect(half(most, 358, 738)).toBeCloseTo((738 - (358 * 900) / 1280) / 2, 1);
+  expect(half(most, 358, 200)).toBeLessThan(0);
+  // The phone's keyboard up: none, the box at the sheet's top; it glides there unless less motion is asked.
   const typing = await ships(
     COMPUTER,
     `src/${COMPUTER}`,
-    ".cmp-dialog:not(.is-screen-only) .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus) > .dsk > .dsk-stage",
-    "(max-width: 720px) and (pointer: coarse)",
+    ".cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before",
+    "@media (max-width: 720px) and (pointer: coarse)",
   );
-  expect(typing).toContain("margin-top:0");
+  expect(typing).toContain("max-height:0");
+  const glide = await ships(
+    COMPUTER,
+    `src/${COMPUTER}`,
+    ".cmp-body::before",
+    "@media (max-width: 720px) and (prefers-reduced-motion: no-preference)",
+    ["transition"],
+  );
+  expect(glide.some((d) => d.startsWith("transition:max-height"))).toBe(true);
 });
 
 test("the keys line's ⓘ ships with its first sentence, the keys clearly further on", async () => {

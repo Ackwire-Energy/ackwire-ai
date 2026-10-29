@@ -72,10 +72,11 @@
  * in place: as large as 96vw allows with 42 px of the page above and below it (a notice along the page's top stays
  * whole), and no larger than the screen itself (1280×900), keeping its shape. Around the screen: the head (70 px), the
  * sky strip (6), the body's padding (20 on every side) and the line under the screen (8 + `--cmp-line`): what programs
- * there can see (the keys after it in control), or the run's steps while the agent works. A cover and the wait have no
- * line: they take its room, as far from the window's foot as from its sides. What comes over or under the screen (a
- * banner, the request being helped with, the hand-back note) takes the screen's room, never the window's: the stage
- * shrinks the screen inside it, keeping its shape.
+ * there can see (the keys after it in control), or the run's steps while the agent works, under the screen and under a
+ * cover it opens from by itself. The wait and a cover that stays until someone acts have no line: they take its room,
+ * as far from the window's foot as from its sides. What comes over or under the screen (a banner, the request being
+ * helped with, the hand-back note) takes the screen's room, never the window's: the stage shrinks the screen inside
+ * it, keeping its shape.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
   --cmp-around: calc(124px + var(--cmp-line));
@@ -83,6 +84,15 @@
   --cmp-screen: min(96vw - 40px, 1280px, var(--cmp-room) * 1280 / 900);
   width: calc(var(--cmp-screen) + 40px);
   height: calc(var(--cmp-screen) * 900 / 1280 + var(--cmp-around));
+}
+/*
+ * An even width, so the window (centred on the page) starts on a whole pixel: a fractional edge moves what its head
+ * shows by up to a pixel, the raised pills' edges among them, differently at each size.
+ */
+@supports (width: round(down, 1px, 1px)) {
+  .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
+    --cmp-screen: round(down, min(96vw - 40px, 1280px, var(--cmp-room) * 1280 / 900), 2px);
+  }
 }
 .ac-dialog.cmp-dialog {
   --cmp-button: var(--control-h-sm);
@@ -111,14 +121,20 @@
   height: var(--cmp-line);
 }
 /*
- * Under the live screen the line always has words: the steps while the agent works, else what programs there can see
- * (`.dsk-line`). Over a cover and the wait it steps aside, steps or not (a run's first step can come before the
- * screen's first picture), and comes back with the screen.
+ * Under the screen, and a cover it opens from by itself, the line always has words: the steps while the agent works,
+ * else what programs there can see (`.dsk-line`). The wait and a cover that stays (`.is-final`) take its room, steps or
+ * not. The dialog's own covers never get steps: a cover the screen opens from brings the screen's line itself.
  */
 .cmp-body:has(> .dsk) > .cmp-steps-row:empty,
-.cmp-body:has(> :is(.cmp-stage, .cmp-prep, .dsk:not([data-state="live"]))) > .cmp-steps-row,
+.cmp-body:has(> :is(.cmp-stage, .cmp-prep, .dsk.is-final)) > .cmp-steps-row,
 .cmp-body:has(> .cmp-steps-row > .cmp-steps) > .dsk:not(.is-control) > .dsk-line {
   display: none;
+}
+/* A tablet's 40 px line: the steps on its middle, as the line's words are (desktop.css). */
+@media (min-width: 721px) {
+  .cmp-body:has(> .dsk) > .cmp-steps-row > .cmp-steps {
+    margin-top: calc((var(--cmp-line) - 22px) / 2);
+  }
 }
 /*
  * The agent's page: in control its tools take the line's place (8 px over the 48 px field). In the window the line
@@ -542,8 +558,9 @@
  * Web on a phone: a full-screen sheet, as the kit's Details is there: clear of the notch and the home bar, what it
  * shows starting under its head. The wait and the agent's page fill it, what they show in their middle, the page at its
  * top. The screen and any cover in its place (the dialog's or the screen's) are one box, the screen's shape as wide as
- * the sheet, in the sheet's middle, so the screen opens where its cover was. What comes and goes with it goes under it,
- * so none of them moves it (the request being helped with first, then the line or the note, the steps, a banner).
+ * the sheet, in the sheet's middle, so the screen opens where its cover was. What comes and goes with it goes under it
+ * (the request being helped with first, then the line or the note, the steps, a banner), so none of them moves it but
+ * where it wouldn't fit under it: there the box rises as much as that needs.
  */
 @media (max-width: 720px) {
   .ac-dialog.cmp-dialog {
@@ -605,13 +622,19 @@
   .cmp-body > .brw-ac.is-surface .brw-ac__stage {
     place-items: start center;
   }
-  /* The sheet's body measures its room: the box's top as far under the body's top as the box's foot is over its foot. */
+  /*
+   * The sheet's body measures its room. Over the box, room that gives: at most half of what the box leaves, so the box
+   * sits in the middle, and less where what goes under it (a banner on a short phone) would then run past the foot, the
+   * box rising just enough, never past the top. Its gap after it is taken back: it adds none.
+   */
   .cmp-dialog:not(.is-screen-only) > .cmp-body {
     container-type: size;
   }
-  .cmp-dialog:not(.is-screen-only) .cmp-body > .cmp-stage,
-  .cmp-dialog:not(.is-screen-only) .cmp-body > .dsk > .dsk-stage {
-    margin-top: max(0px, (100cqh - 100cqw * 900 / 1280) / 2);
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before {
+    content: "";
+    flex: 1 1 0;
+    max-height: calc((100cqh - 100cqw * 900 / 1280) / 2);
+    margin-bottom: -8px;
   }
   /* No frame to keep on the sheet: the steps wrap whole, and with none the line takes no room. */
   .cmp-steps-row {
@@ -631,13 +654,13 @@
 }
 /* The phone's keyboard up (the screen's field or the note has the focus): the screen rises to the sheet's top, over it. */
 @media (max-width: 720px) and (pointer: coarse) {
-  .cmp-dialog:not(.is-screen-only) .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus) > .dsk > .dsk-stage {
-    margin-top: 0;
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before {
+    max-height: 0;
   }
 }
 @media (max-width: 720px) and (prefers-reduced-motion: no-preference) {
-  .cmp-body > .dsk > .dsk-stage {
-    transition: margin-top 0.2s var(--out);
+  .cmp-body::before {
+    transition: max-height 0.2s var(--out);
   }
 }
 /*
