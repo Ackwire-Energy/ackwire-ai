@@ -8,7 +8,9 @@
  * The mock never reaches a bucket. A bucket named with "negado" fails the
  * write step; with "lista" the list step; with "instavel" the copy stops at
  * half once (resume continues). Where the server keeps files itself is
- * `platform` (its disk, no folder, unless a test says otherwise).
+ * `platform` (its disk, no folder, unless a test says otherwise), and what
+ * the workspace's files take is `usage` (none yet, no disk told, unless a
+ * test says otherwise).
  */
 import type {
   ApiClient,
@@ -18,6 +20,7 @@ import type {
   StoragePlatform,
   StorageStep,
   StorageTestResult,
+  StorageUsage,
 } from "@agenteschat/client";
 import { clone } from "./context";
 
@@ -26,14 +29,23 @@ const TOTAL = 120;
 const sig = (s: S3Input) => JSON.stringify([s.endpoint, s.region, s.bucket, s.prefix ?? "", s.pathStyle]);
 const hint = (v: string | undefined, prev?: string) => (v ? v.slice(-4) : (prev ?? ""));
 
-export function createMockStorage(platform: () => StoragePlatform | undefined = () => undefined): ApiClient["storage"] {
+export function createMockStorage(
+  platform: () => StoragePlatform | undefined = () => undefined,
+  usage: () => StorageUsage | undefined = () => undefined,
+): ApiClient["storage"] {
   const configs = new Map<string, StorageConfig>();
   const passed = new Map<string, string>();
   const flakyDone = new Set<string>();
   const get = (orgId: string) => {
     let c = configs.get(orgId);
     if (!c) {
-      c = { kind: "agentes", s3: null, migration: null, platform: platform() ?? { kind: "disk", folder: null } };
+      c = {
+        kind: "agentes",
+        s3: null,
+        migration: null,
+        platform: platform() ?? { kind: "disk", folder: null },
+        usage: usage() ?? { platformBytes: 0, ownBucketBytes: 0, disk: null },
+      };
       configs.set(orgId, c);
     }
     return c;

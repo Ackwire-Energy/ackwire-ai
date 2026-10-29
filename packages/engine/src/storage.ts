@@ -8,7 +8,22 @@ import {
   type S3Settings,
   StorageError,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, eq, gt, gte, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  gte,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { openSecret, randomToken, sealSecret, sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
@@ -16,7 +31,7 @@ import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 
-const { storageConfigs, storageMigrations, artifactVersions } = schema;
+const { storageConfigs, storageMigrations, artifacts, artifactVersions, skillFiles } = schema;
 
 type StorageConfigRow = typeof storageConfigs.$inferSelect;
 type MigrationRow = typeof storageMigrations.$inferSelect;
@@ -404,6 +419,50 @@ export async function getStorage(db: Database, actorId: string, orgId: string): 
       secretHint: active.secretHint,
     },
     migration: migrationView(migration),
+  };
+}
+
+/** What a workspace's files take, in bytes (`storedBytes`). */
+export interface StoredBytes {
+  /**
+   * On this server's storage (its folder, its database or the Cloud's storage), files in the trash and the
+   * workspace's own bucket left out: what a storage limit counts.
+   */
+  platformBytes: number;
+  /** In the workspace's own buckets (the one in use and any it used before), the trash left out too. */
+  ownBucketBytes: number;
+}
+
+/**
+ * What a workspace's files take, summed from the size each one recorded when it was written: no bucket is listed and
+ * no folder walked. It counts every version kept of the Drive's files (uploads, what agents make or bring from their
+ * computers, files attached to messages, issues and wiki pages) and every stored file of its skills, deleted skills'
+ * included, as their files stay. Left out: the Drive's trash, which goes for good after 30 days; the workspace's
+ * logo, connectors' icons and people's photos, small and with no size on record; the old copies a copy between
+ * storages (`runMigration`) leaves where the files were.
+ */
+export async function storedBytes(db: Executor, orgId: string): Promise<StoredBytes> {
+  const [[files], [skills]] = await Promise.all([
+    db
+      .select({
+        platform: sql<string>`coalesce(sum(${artifactVersions.size}) filter (where ${artifactVersions.storageConfigId} is null), 0)`,
+        own: sql<string>`coalesce(sum(${artifactVersions.size}) filter (where ${artifactVersions.storageConfigId} is not null), 0)`,
+      })
+      .from(artifactVersions)
+      .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
+      // The workspace on both sides, so each is read through its index, whatever else the server holds.
+      .where(and(eq(artifactVersions.orgId, orgId), eq(artifacts.orgId, orgId), isNull(artifacts.deletedAt))),
+    db
+      .select({
+        platform: sql<string>`coalesce(sum(${skillFiles.size}) filter (where ${skillFiles.storageConfigId} is null), 0)`,
+        own: sql<string>`coalesce(sum(${skillFiles.size}) filter (where ${skillFiles.storageConfigId} is not null), 0)`,
+      })
+      .from(skillFiles)
+      .where(and(eq(skillFiles.orgId, orgId), isNotNull(skillFiles.blobKey))),
+  ]);
+  return {
+    platformBytes: Number(files?.platform ?? 0) + Number(skills?.platform ?? 0),
+    ownBucketBytes: Number(files?.own ?? 0) + Number(skills?.own ?? 0),
   };
 }
 

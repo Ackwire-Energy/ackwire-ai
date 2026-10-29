@@ -1,3 +1,4 @@
+import { diskSpace } from "@agenteschat/adapters/host-stats";
 import type { Config } from "@agenteschat/config";
 import {
   getMigration,
@@ -5,6 +6,7 @@ import {
   type StorageDeps,
   saveStorage,
   startMigration,
+  storedBytes,
   testStorage,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -34,6 +36,20 @@ const Migration = z
   })
   .openapi("StorageMigration");
 
+const StorageUsage = z
+  .object({
+    platformBytes: z.number().int().openapi({
+      description: "Its files on this server's storage (`platform`), files in the trash left out.",
+    }),
+    ownBucketBytes: z.number().int().openapi({ description: "Its files in its own buckets, the trash left out too." }),
+    disk: z.object({ sizeBytes: z.number().int(), freeBytes: z.number().int() }).nullable().openapi({
+      description: "The disk holding this server's files folder: its size and what is free. Null without a folder.",
+    }),
+  })
+  .openapi("StorageUsage", {
+    description: "What the workspace's files take, summed from the sizes recorded as they were written.",
+  });
+
 const StorageConfig = z
   .object({
     kind: z.enum(["agentes", "s3"]),
@@ -55,6 +71,7 @@ const StorageConfig = z
         description:
           "Where this server keeps the files of organizations without a bucket of their own. `folder`: the disk's folder, only where the server isn't in a container.",
       }),
+    usage: StorageUsage,
   })
   .openapi("StorageConfig");
 
@@ -94,6 +111,12 @@ export function storageRoutes(deps: AppDeps) {
     return s;
   };
   const platform = storagePlatform(deps.adapters.platformBlobs.kind, deps.config);
+  // Not `platform.folder`: in a container its path is hidden, but the disk under it is still this server's.
+  const filesDir = platform.kind === "disk" ? deps.config.FILES_DIR : undefined;
+  const usage = async (orgId: string) => ({
+    ...(await storedBytes(db, orgId)),
+    disk: filesDir ? diskSpace(filesDir) : null,
+  });
 
   app.openapi(
     createRoute({
@@ -101,11 +124,15 @@ export function storageRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/storage",
       tags,
       security,
-      summary: "Current file storage (keys as hints only)",
+      summary: "Current file storage (keys as hints only) and what the workspace's files take",
       request: { params: OrgParams },
       responses: { 200: json(StorageConfig), ...errors },
     }),
-    async (c) => c.json({ ...(await getStorage(db, c.get("user").id, c.req.valid("param").orgId)), platform }, 200),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const view = await getStorage(db, c.get("user").id, orgId);
+      return c.json({ ...view, platform, usage: await usage(orgId) }, 200);
+    },
   );
 
   app.openapi(
@@ -143,8 +170,9 @@ export function storageRoutes(deps: AppDeps) {
       responses: { 200: json(StorageConfig), ...errors },
     }),
     async (c) => {
-      const saved = await saveStorage(storage(), c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
-      return c.json({ ...saved, platform }, 200);
+      const { orgId } = c.req.valid("param");
+      const saved = await saveStorage(storage(), c.get("user").id, orgId, c.req.valid("json"));
+      return c.json({ ...saved, platform, usage: await usage(orgId) }, 200);
     },
   );
 

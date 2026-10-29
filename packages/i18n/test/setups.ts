@@ -155,6 +155,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "storage.serverText.",
     "storage.place.server",
     "storage.showFolder",
+    // The free space of the disk under this server's files folder: the Cloud keeps none.
+    "storage.usage.free",
     "support.ask",
     "help.selfhost.",
     "mobile.newMission.noAgents",

@@ -100,7 +100,7 @@ export function fileIcon(name: string, contentType = ""): FileIconName {
 
 /** "820 B", "1,2 MB" in the active locale (Intl units: no strings to translate). */
 export function formatBytes(locale: string, bytes: number) {
-  const units = ["byte", "kilobyte", "megabyte", "gigabyte"] as const;
+  const units = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
   let value = Math.max(0, bytes);
   let i = 0;
   while (value >= 1024 && i < units.length - 1) {
