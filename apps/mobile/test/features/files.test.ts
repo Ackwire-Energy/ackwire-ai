@@ -126,20 +126,24 @@ describe("shared copies", () => {
   });
 
   test("download links: signed links as they are, ours with the session", () => {
-    expect(resolveDownloadUrl("https://agentes.chat", "https://bucket.s3/x?sig=1")).toEqual({
+    expect(resolveDownloadUrl("https://app.agentes.chat", "https://bucket.s3/x?sig=1")).toEqual({
       uri: "https://bucket.s3/x?sig=1",
       needsSession: false,
     });
-    expect(resolveDownloadUrl("https://agentes.chat/", "/api/app/organizations/o/artifacts/a/file?version=2")).toEqual({
-      uri: "https://agentes.chat/api/app/organizations/o/artifacts/a/file?version=2",
+    expect(
+      resolveDownloadUrl("https://app.agentes.chat/", "/api/app/organizations/o/artifacts/a/file?version=2"),
+    ).toEqual({
+      uri: "https://app.agentes.chat/api/app/organizations/o/artifacts/a/file?version=2",
       needsSession: true,
     });
   });
 
   test("the web Drive at the file", () => {
-    expect(driveWebUrl("https://agentes.chat/", "org1", "a1")).toBe("https://agentes.chat/org/org1/drive?artifact=a1");
-    expect(driveWebUrl("https://agentes.chat", "org1", "a1", 3)).toBe(
-      "https://agentes.chat/org/org1/drive?artifact=a1&v=3",
+    expect(driveWebUrl("https://app.agentes.chat/", "org1", "a1")).toBe(
+      "https://app.agentes.chat/org/org1/drive?artifact=a1",
+    );
+    expect(driveWebUrl("https://app.agentes.chat", "org1", "a1", 3)).toBe(
+      "https://app.agentes.chat/org/org1/drive?artifact=a1&v=3",
     );
   });
 });

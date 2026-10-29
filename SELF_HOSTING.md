@@ -646,7 +646,7 @@ ones a self-hosted instance usually touches:
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
 | `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
-| `LANDING_PAGE` | `false` | The agentes.chat marketing page at `/`, with its waiting list and analytics. Leave it off. |
+| `LANDING_URL` | | The agentes.chat landing page's address, which turns on its waiting list. Leave it unset. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
 | `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
@@ -763,10 +763,11 @@ either way:
 carry nothing about the instance beyond what any download does: the installer
 (`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
 none (`https://agentes.chat/install/docker-compose.yml`), the packages that run it without Docker
-(`https://agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and the
-desktop app's own updates: a check at start and every 6 hours (`https://agentes.chat/api/desktop/latest`,
-naming its system and processor) and, when it installs one, `https://agentes.chat/api/desktop/update`
-(its version and package type too) and `/api/desktop/download/…`. The page that offers the app asks
+(`https://app.agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and
+the desktop app's own updates: a check at start and every 6 hours
+(`https://app.agentes.chat/api/desktop/latest`, naming its system and processor) and, when it installs
+one, `https://app.agentes.chat/api/desktop/update` (its version and package type too) and
+`/api/desktop/download/…`. The page that offers the app asks
 for its newest version from the browser (Connect a computer, above, says what that request carries).
 The instance itself downloads nothing from agentes.chat.
 
@@ -999,7 +1000,7 @@ memory spots repeats said in other words, and agents find buttons from a descrip
 screenshots. The person who set up the server adds the key in **Settings → AI accounts** (the setup
 asks once), or puts it in `.env` as `TYPESAFE_API_KEY`, which wins. It is stored encrypted like
 provider keys and never sent back to a browser. TypeSafe bills your account: US$ 0.042 per million
-tokens read, about US$ 0.0001 per routed message. Without it, see https://agentes.chat/help/jev#without.
+tokens read, about US$ 0.0001 per routed message. Without it, see https://app.agentes.chat/help/jev#without.
 
 **Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder

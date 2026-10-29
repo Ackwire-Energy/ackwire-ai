@@ -39,8 +39,8 @@ describe("connected computers helpers (ADR 0036)", () => {
   });
 
   test("commands: the installer has no code; granting quotes paths that need it", () => {
-    expect(installCommand("https://agentes.chat/")).toBe(
-      "curl -fsSL https://agentes.chat/api/machines/install.sh | sh",
+    expect(installCommand("https://app.agentes.chat/")).toBe(
+      "curl -fsSL https://app.agentes.chat/api/machines/install.sh | sh",
     );
     expect(allowFolderCommand("/Users/you/Projects/loja-v5", "bento")).toBe(
       "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent bento",
@@ -97,10 +97,10 @@ describe("connected computers helpers (ADR 0036)", () => {
   });
 
   test("download link and location", () => {
-    expect(downloadHref("/api/desktop/download/0.2.0/a.dmg", "https://agentes.chat")).toBe(
-      "https://agentes.chat/api/desktop/download/0.2.0/a.dmg",
+    expect(downloadHref("/api/desktop/download/0.2.0/a.dmg", "https://app.agentes.chat")).toBe(
+      "https://app.agentes.chat/api/desktop/download/0.2.0/a.dmg",
     );
-    expect(downloadHref("https://cdn.example/a.dmg", "https://agentes.chat")).toBe("https://cdn.example/a.dmg");
+    expect(downloadHref("https://cdn.example/a.dmg", "https://app.agentes.chat")).toBe("https://cdn.example/a.dmg");
     expect(locationText({ city: "Curitiba", region: null, country: "Brasil" })).toBe("Curitiba, Brasil");
   });
 

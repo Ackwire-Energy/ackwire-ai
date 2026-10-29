@@ -502,7 +502,7 @@ describe("its computer is ready: what comes next", () => {
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect(panel.textContent).toContain("O computador está pronto.");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
       false,
     );

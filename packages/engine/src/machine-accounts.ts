@@ -262,8 +262,6 @@ export async function releaseAgents(db: Executor, orgId: string, accountIds: str
 
 export const forgetAgents = (orgId: string, ids: string[]) => {
   for (const id of ids) caches.agents.delete(`${orgId}:${id}`);
-  // The team's cached rows carry each agent's brain, which the audience gate reads.
-  if (ids.length > 0) caches.agents.delete(`${orgId}:team`);
 };
 
 /** The page that shows a machine's accounts refetches them (no emails in the event). */

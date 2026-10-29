@@ -108,6 +108,11 @@ export const featureKeysEn: FeatureTranslations = {
   },
   chats: {
     title: "Chats",
+    serverError: {
+      offline: "No internet on your phone.",
+      text: "It may be down or outside your network. Your chats show up on their own when it's back.",
+      kept: "Showing what was already in the app.",
+    },
     section: {
       agents: "Agents",
       channels: "Channels",
@@ -974,7 +979,7 @@ export const featureKeysEn: FeatureTranslations = {
     folderGone: "This folder has no pages any more.",
     reads_one: "{{count}} time",
     reads_other: "{{count}} times",
-    taskConflict: "The page changed. It's updated; check it again.",
+    taskConflict: "The page changed and is up to date now. Check it again.",
     view: "View",
     notSaved: "Preview · not saved yet",
     placeholder: "Write here. [[ links another page.",

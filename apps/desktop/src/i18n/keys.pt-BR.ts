@@ -231,7 +231,7 @@ export const desktopPtBR = {
       start: "O agentes.chat não iniciou neste {{device}}.",
       database: "O banco de dados não foi preparado.",
       account: "A sua conta não foi criada.",
-      reach: "O acesso pelos aparelhos não ligou: {{reason}}. Tente de novo em Preferências\u00a0›\u00a0Servidores.",
+      retry: "Tente de novo em Preferências\u00a0›\u00a0Servidores.",
     },
     reason: {
       https: "o HTTPS está desligado na sua rede do Tailscale",

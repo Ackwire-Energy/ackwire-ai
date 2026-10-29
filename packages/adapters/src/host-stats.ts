@@ -5,7 +5,9 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, statfsSync } from "node:fs";
+import { statfs } from "node:fs/promises";
 import os from "node:os";
+import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { type BrowserTraffic, LOAD_SAMPLE_MS, type MachineLoad, type MachineSize } from "./machine-protocol";
 
@@ -44,6 +46,22 @@ export function machineSize(dir: string): MachineSize {
   const limitMemory = Math.min(memory, process.constrainedMemory?.() || memory);
   if (limitCpus < cpus || limitMemory < memory) size.limit = { cpus: limitCpus, memoryGb: halfGb(limitMemory) };
   return size;
+}
+
+/**
+ * The disk holding `dir`, in bytes: its size and what this process may still write there. A folder not made yet is
+ * read through the nearest one that is, where it will be made. Null when nothing on the path can be read. Never
+ * blocks the event loop, so a network share that stalls (a Windows `\\server\share`, NFS) holds up only its caller.
+ */
+export async function diskSpace(dir: string): Promise<{ sizeBytes: number; freeBytes: number } | null> {
+  for (let path = resolve(dir); ; path = dirname(path)) {
+    try {
+      const fs = await statfs(path);
+      return { sizeBytes: fs.blocks * fs.bsize, freeBytes: fs.bavail * fs.bsize };
+    } catch {
+      if (dirname(path) === path) return null;
+    }
+  }
 }
 
 /** Docker, Podman or Kubernetes: the host is shared with whatever else runs there. */

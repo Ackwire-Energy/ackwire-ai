@@ -35,7 +35,7 @@ describe("Abrir no celular", () => {
     expect(state.calls.filter((c) => c.method === "account.phoneSignIn")).toHaveLength(1);
 
     const qr = within(dialog).getByRole("img", { name: "QR code para entrar no app agentes" });
-    const expected = encode(connectLink("https://agentes.chat", { token: "tok-1" }), { ecc: "M", border: 2 });
+    const expected = encode(connectLink("https://app.agentes.chat", { token: "tok-1" }), { ecc: "M", border: 2 });
     expect(qr.getAttribute("viewBox")).toBe(`0 0 ${expected.size} ${expected.size}`);
     const modules = qr.querySelector("path")?.getAttribute("d")?.match(/M/g)?.length;
     expect(modules).toBe(expected.data.flat().filter(Boolean).length);

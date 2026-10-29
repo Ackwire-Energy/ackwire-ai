@@ -41,8 +41,6 @@ export interface AddAccountProps {
   ready?: boolean;
   /** It just got ready and the page is still asking about it: what starts there waits, with the spinner. */
   loading?: boolean;
-  /** Under the steps. */
-  note?: ReactNode;
   onAdded: (account: MachineAccount) => void;
   /**
    * Where an agent is in view: the sign-in came back as an account the person already connected there, signed in and
@@ -67,7 +65,6 @@ function AddAccountFlow({
   local,
   ready = true,
   loading = false,
-  note,
   onAdded,
   onUse,
   onRetry,
@@ -378,7 +375,6 @@ function AddAccountFlow({
         <StepsCard>{steps}</StepsCard>
       )}
       {starting || loading ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
-      {note}
     </View>
   );
 }

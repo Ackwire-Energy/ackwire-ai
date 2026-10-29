@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { groupPlans, ownSignInName, ownSignIns, planWordOf } from "../src/lib/ai-accounts";
+import { groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
@@ -119,6 +119,16 @@ describe("the computers' own sign-ins", () => {
     expect(planWordOf("max")).toBe("Max");
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+
+  test("the plan an agent's sign-in is on: its account's, or with none its computer's own sign-in's", () => {
+    const row = computer({ own: { claude_code: { plan: "team" } } });
+    const seat = login("acct_team", { plan: "max", provider: null });
+    expect(signInPlan({ account: null, accounts: [seat] }, row, "claude_code")).toBe("team");
+    expect(signInPlan({ account: "acct_team", accounts: [seat] }, row, "claude_code")).toBe("max");
+    // Codex's own sign-in said no plan; a computer whose row isn't there yet says none either.
+    expect(signInPlan({ account: null, accounts: [] }, row, "codex")).toBeNull();
+    expect(signInPlan({ account: null, accounts: [] }, undefined, "claude_code")).toBeNull();
   });
 });
 

@@ -164,7 +164,8 @@ describe("no AI connected: above the composer", () => {
     const first = dialog("Conectar uma IA") as HTMLElement;
     expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    // Without the computer's name, in a group of its own over a hairline: never read as part of the account.
+    expect(panel.querySelector(".ai-panel__ready")?.textContent).toBe("O computador está pronto.");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
@@ -208,7 +209,7 @@ describe("no AI connected: above the composer", () => {
     const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(shownText(panel)).toContain("Com o seu plano, a Ada só responde a você.");
+    expect(within(panel).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
     cleanup();
     // Opened from anywhere else, every agent of the viewer's stays a choice.
     await open(both());
@@ -299,8 +300,8 @@ describe("the agent's no-AI card", () => {
     await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    // Choosing a plan asks nothing: she then answers only him until he shares it (ADR 0059 §5).
-    expect(plan.textContent).toContain("Com o seu plano, a Ada só responde a você.");
+    // Choosing a plan asks nothing: she then answers only him until he turns on Responde a todos (ADR 0059 §5).
+    expect(within(plan).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
     // Claude's sign-in starts on its button, in a window of its own.
     const realOpen = window.open;
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };

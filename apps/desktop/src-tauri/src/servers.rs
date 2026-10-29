@@ -13,7 +13,9 @@ use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, Url};
 
 /// agentes.chat Cloud.
-pub const CLOUD: &str = "https://agentes.chat";
+pub const CLOUD: &str = "https://app.agentes.chat";
+/// The Cloud's address before app.agentes.chat: lists saved by earlier builds may still name it.
+pub const OLD_CLOUD: &str = "https://agentes.chat";
 const FILE: &str = "servers.json";
 /// Servers kept in the list; choosing another past this drops the oldest that isn't open.
 const MAX_SERVERS: usize = 20;
@@ -112,13 +114,17 @@ fn path(app: &AppHandle) -> Option<PathBuf> {
 
 /// The list on disk; None before the first start wrote it, or when it can't be read.
 fn read(app: &AppHandle) -> Option<ServerFile> {
-    let text = fs::read_to_string(path(app)?).ok()?;
-    let mut file: ServerFile = serde_json::from_str(&text).ok()?;
+    from_json(&fs::read_to_string(path(app)?).ok()?)
+}
+
+fn from_json(text: &str) -> Option<ServerFile> {
+    let mut file: ServerFile = serde_json::from_str(text).ok()?;
     // Anything that isn't an address the app may open is dropped, whoever wrote it.
     file.servers.retain(|s| origin_of(s).as_deref() == Some(s.as_str()));
     if file.current.as_ref().is_some_and(|c| !file.servers.contains(c)) {
         file.current = None;
     }
+    file.replace(OLD_CLOUD, CLOUD);
     Some(file)
 }
 
@@ -267,7 +273,7 @@ mod tests {
             "https://ana:secret@chat.example.com",
             "ftp://files.example.com",
             "agenteschat://connect?server=x",
-            "https://agentes.chat/ x",
+            "https://app.agentes.chat/ x",
             "",
         ] {
             assert_eq!(origin_of(bad), None, "{bad}");
@@ -321,5 +327,21 @@ mod tests {
         file.current = Some(CLOUD.into());
         file.replace("https://unknown.example.com", tailnet);
         assert_eq!(file.servers, vec![CLOUD.to_string(), here.to_string()], "only a server of the list moves");
+    }
+
+    #[test]
+    fn a_list_saved_before_the_cloud_moved_opens_it_at_its_address() {
+        let tailnet = "https://agentes.tail1234.ts.net";
+        let saved = format!(r#"{{"current":"{OLD_CLOUD}","servers":["{OLD_CLOUD}","{tailnet}","{CLOUD}"]}}"#);
+        assert_eq!(
+            from_json(&saved),
+            Some(ServerFile { current: Some(CLOUD.into()), servers: vec![CLOUD.into(), tailnet.into()] })
+        );
+        let own = format!(r#"{{"current":"{tailnet}","servers":["{tailnet}","{OLD_CLOUD}"]}}"#);
+        assert_eq!(
+            from_json(&own),
+            Some(ServerFile { current: Some(tailnet.into()), servers: vec![tailnet.into(), CLOUD.into()] })
+        );
+        assert_eq!(from_json("not json"), None);
     }
 }

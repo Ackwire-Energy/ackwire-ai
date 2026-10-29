@@ -16,6 +16,7 @@ import { useActiveWork, useConversations, useWorkingNow } from "../shared/querie
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
+import { HomeServerError, HomeServerNotice } from "./HomeServerError";
 import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
 import { homeSections, type ListKind } from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
@@ -40,7 +41,8 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
  * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
- * first request to approve, while the phone wasn't asked yet (`lib/push-offer.ts`).
+ * first request to approve, while the phone wasn't asked yet (`lib/push-offer.ts`). When the server doesn't answer
+ * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -73,11 +75,13 @@ export function ChatsScreen() {
   const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const sections = homeSections(list.rows);
-  const empty = !list.loading && list.rows.length === 0;
+  // A list that failed to load isn't an empty workspace: it says the server didn't answer.
+  const failed = list.failed && list.rows.length === 0;
+  const empty = !list.loading && !failed && list.rows.length === 0;
 
   const { offer, markOffered } = usePush();
   const approvalWaits = waiting.items.some((i) => i.kind === "approval");
-  const offerPush = focused && !list.loading && !empty && (offer.home || (offer.approval && approvalWaits));
+  const offerPush = focused && !list.loading && !empty && !failed && (offer.home || (offer.approval && approvalWaits));
   useEffect(() => {
     if (!offerPush) return;
     const timer = setTimeout(() => {
@@ -94,9 +98,9 @@ export function ChatsScreen() {
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      backdrop={empty ? undefined : <GreetingSky />}
+      backdrop={empty || failed ? undefined : <GreetingSky />}
       below={
-        empty ? undefined : (
+        empty || failed ? undefined : (
           <Greeting working={working} finished={finished.finished} onFinishedPress={(f) => finished.dismiss(f.key)} />
         )
       }
@@ -105,8 +109,11 @@ export function ChatsScreen() {
     >
       <SetupNotice />
       <OutageNotices />
+      {list.stale && !failed ? <HomeServerNotice retry={list.refetch} /> : null}
       {strip}
-      {empty ? (
+      {failed ? (
+        <HomeServerError retry={list.refetch} />
+      ) : empty ? (
         <FirstAgentEmpty />
       ) : list.loading ? (
         <Text tone="faint" style={styles.center}>

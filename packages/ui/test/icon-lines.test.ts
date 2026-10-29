@@ -178,7 +178,12 @@ describe("an icon before text sits on the text's first line", () => {
     // any shape fills it; a key centred with its title only rises.
     expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("line-height: inherit");
     expect(body(".ac-avatar")).toContain("grid-template-rows: 100%");
-    expect(body(".ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key")).toContain("var(--cap-mid)");
+    expect(body(".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key")).toContain("var(--cap-mid)");
+    // A title alone keeps its first line in the middle of the key's 22px, however many lines it wraps to.
+    expect(body(".ac-card__key")).toContain("height: 22px");
+    expect(body(".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key + .ac-card__heading")).toContain(
+      "padding-block: 1px",
+    );
   });
 
   // A declaration holding var() parses even where lh is unknown, so as the second of a pair it would replace the px

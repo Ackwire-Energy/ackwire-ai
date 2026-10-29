@@ -72,8 +72,6 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
-  "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
-  "plan.personal": "aiAccounts.errors.planPersonal",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",

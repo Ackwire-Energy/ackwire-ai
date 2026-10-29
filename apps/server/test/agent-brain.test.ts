@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { testConfig } from "@agenteschat/config";
 import { eq, schema } from "@agenteschat/db";
+import { applyBootSwitches } from "../src/start";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -118,10 +120,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     "sonnet",
     "haiku",
   ]);
-  const noComputer = await api(`/agents/${agentId}/brain`, {
-    method: "PUT",
-    json: { brain: "claude_code", acceptPlanTerms: true },
-  });
+  const noComputer = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code" } });
   expect(noComputer.status).toBe(409);
   expect(((await noComputer.json()) as { error: { code: string } }).error.code).toBe("brain.no_computer");
 
@@ -142,7 +141,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   expect(withMac.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
   expect(withMac.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
 
-  // Choosing a plan asks nothing: it answers only its owner until they let others in, with the terms.
+  // Choosing a plan asks nothing: it answers only its owner until they let others in.
   expect((await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "codex" } })).status).toBe(409);
   const chosen = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
@@ -156,25 +155,40 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     onlyOwner: true,
     ownSignIn: true,
   });
-  const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
-  const unconfirmed = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
-  expect(unconfirmed.status).toBe(400);
-  expect(await code(unconfirmed)).toBe("audience.plan_terms_required");
-  const shared = await api(`/agents/${agentId}/brain`, {
-    method: "PUT",
-    json: { onlyOwner: false, acceptPlanTerms: true },
-  });
+  // "Responde a todos": on with nothing to accept, and Bia may talk to it.
+  const canTalk = async () =>
+    ((await (await asBia("/agents")).json()) as { agents: { id: string; canTalk: boolean }[] }).agents.find(
+      (a) => a.id === agentId,
+    )?.canTalk;
+  expect(await canTalk()).toBe(false);
+  const shared = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
+  expect(shared.status).toBe(200);
   expect(await shared.json()).toMatchObject({ onlyOwner: false });
-  // "Quem pode falar" goes through the same rule: narrowing is free, widening again asks once more.
+  expect(await canTalk()).toBe(true);
+  // "Quem pode falar" goes through the same rule: narrowing and widening ask nothing.
   const audience = (mode: string, extra = {}) =>
     api(`/agents/${agentId}`, { method: "PATCH", json: { audience: { mode, userIds: [] }, ...extra } });
   expect((await audience("owner")).status).toBe(200);
-  const again = await audience("everyone");
-  expect(again.status).toBe(400);
-  expect(await code(again)).toBe("audience.plan_terms_required");
-  expect(
-    (await (await audience("everyone", { acceptPlanTerms: true })).json()) as { audienceMode: string },
-  ).toMatchObject({ audienceMode: "everyone" });
+  expect(((await (await audience("everyone")).json()) as { audienceMode: string }).audienceMode).toBe("everyone");
+  // An older app still sends the terms it used to accept: taken, and changes nothing.
+  const older = await api(`/agents/${agentId}/brain`, {
+    method: "PUT",
+    json: { onlyOwner: true, acceptPlanTerms: true },
+  });
+  expect(await older.json()).toMatchObject({ onlyOwner: true });
+  const olderPatch = await audience("everyone", { acceptPlanTerms: true });
+  expect(olderPatch.status).toBe(200);
+  expect(((await olderPatch.json()) as { audienceMode: string }).audienceMode).toBe("everyone");
+  // Each change of who may talk to it is audited as such, never as an acceptance.
+  const changes = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.audience_changed"));
+  expect(changes.map((a) => (a.details as { to: { mode: string } }).to.mode)).toEqual([
+    "owner",
+    "everyone",
+    "owner",
+    "everyone",
+    "owner",
+    "everyone",
+  ]);
 
   // Model and fallback change without confirming again; bad models are refused.
   const fallbackOff = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { fallback: false } });
@@ -191,8 +205,8 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   const [row] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
   expect(row).toMatchObject({ brain: "claude_code", brainModel: null, brainFallback: false });
   const audit = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.brain"));
-  expect(audit.length).toBe(4);
-  expect(JSON.stringify(audit.map((a) => a.details))).toContain('"acceptedPlanTerms":true');
+  expect(audit.length).toBe(3);
+  expect(JSON.stringify(audit.map((a) => a.details))).not.toMatch(/acceptedPlanTerms|audience/);
 
   // Codex appears once the computer has a recent one; any model name is taken as typed.
   await t.db
@@ -203,7 +217,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     .where(eq(schema.machines.id, mac.machineId));
   const codex = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
-    json: { brain: "codex", model: "gpt-6.1-codex", acceptPlanTerms: true },
+    json: { brain: "codex", model: "gpt-6.1-codex" },
   });
   expect(codex.status).toBe(200);
   expect(await codex.json()).toMatchObject({ brain: "codex", model: "gpt-6.1-codex" });
@@ -211,6 +225,28 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   // Back to the API: no confirmation, the model is cleared.
   const back = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "model" } });
   expect(await back.json()).toMatchObject({ brain: "model", model: null, fallback: false });
+});
+
+test("where the server provisions the computers (the Cloud), an agent on a plan replies to everyone once its owner says so", async () => {
+  const cloud = { MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) };
+  // Booted as the Cloud's server boots: the switches `startServer` sets from this config.
+  applyBootSwitches(testConfig(cloud));
+  try {
+    const { api, asBia, agentId } = await workspace(cloud);
+    // On its owner's plan, as a switch onto one leaves it: only its owner talks to it.
+    await t.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "owner" })
+      .where(eq(schema.agents.id, agentId));
+    const dm = async () => (await asBia("/dms", { json: { agentId } })).status;
+    expect(await dm()).toBe(403);
+    const on = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
+    expect(on.status).toBe(200);
+    expect(await on.json()).toMatchObject({ brain: "claude_code", onlyOwner: false });
+    expect(await dm()).toBe(200);
+  } finally {
+    applyBootSwitches(testConfig());
+  }
 });
 
 test("the agent list says who thinks: the brain, its model's label, the computer only for admins and the owner", async () => {
@@ -222,7 +258,7 @@ test("the agent list says who thinks: the brain, its model's label, the computer
 
   const mac = await pairMac(api);
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
-  await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code", acceptPlanTerms: true } });
+  await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code" } });
   expect((await listed(api))?.brain).toEqual({ kind: "claude_code", model: "Sonnet", computer: "mac" });
   // A member: the brain and its model, not the computer.
   expect((await listed(asBia))?.brain).toEqual({ kind: "claude_code", model: "Sonnet" });
@@ -260,23 +296,23 @@ test("a new agent starts on Automático on every brain; one with a fixed model k
   const brain = (id: string, json: Record<string, unknown>) => api(`/agents/${id}/brain`, { method: "PUT", json });
 
   // Claude Code without a model chosen: Automático, model and effort; it stays through another switch.
-  const claude = await brain(eva.id, { brain: "claude_code", acceptPlanTerms: true });
+  const claude = await brain(eva.id, { brain: "claude_code" });
   expect(await claude.json()).toMatchObject({
     brain: "claude_code",
     model: "auto",
     effectiveModel: "auto",
     effort: "auto",
   });
-  const codex = await brain(eva.id, { brain: "codex", acceptPlanTerms: true });
+  const codex = await brain(eva.id, { brain: "codex" });
   expect(await codex.json()).toMatchObject({ brain: "codex", model: "auto", effort: "auto" });
   // A fixed model belongs to its brain: back on the API and over to Claude Code, it's that brain's default again.
   expect((await brain(eva.id, { model: "gpt-6-sol" })).status).toBe(200);
   await brain(eva.id, { brain: "model" });
-  const again = await brain(eva.id, { brain: "claude_code", acceptPlanTerms: true });
+  const again = await brain(eva.id, { brain: "claude_code" });
   expect(await again.json()).toMatchObject({ model: null, effectiveModel: "sonnet" });
 
   // An agent on a fixed model (chosen, or made before Automático): Claude Code starts on its default, as before.
-  const fixed = await brain(fixedId, { brain: "claude_code", acceptPlanTerms: true });
+  const fixed = await brain(fixedId, { brain: "claude_code" });
   expect(await fixed.json()).toMatchObject({
     brain: "claude_code",
     model: null,

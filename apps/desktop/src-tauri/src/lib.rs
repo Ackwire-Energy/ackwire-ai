@@ -65,12 +65,12 @@ fn is_sign_in_url(url: &str) -> bool {
 
 /// The app's own builds ("Download version …" in Updates), whichever server it opens.
 fn is_app_download(url: &str) -> bool {
-    url.starts_with("https://agentes.chat/api/desktop/download/")
+    url.starts_with("https://app.agentes.chat/api/desktop/download/")
 }
 
 /// The help pages on agentes.chat ("Which one to choose?", "How folders work"), whichever server it opens.
 fn is_help_page(url: &str) -> bool {
-    url.starts_with("https://agentes.chat/help/")
+    url.starts_with("https://app.agentes.chat/help/")
 }
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
@@ -765,12 +765,12 @@ mod tests {
     #[test]
     fn what_opens_in_the_browser() {
         assert!(is_sign_in_url("https://claude.ai/oauth/authorize?client_id=x"));
-        assert!(is_app_download("https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
-        assert!(!is_app_download("https://agentes.chat.evil.com/api/desktop/download/x"));
+        assert!(is_app_download("https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
+        assert!(!is_app_download("https://app.agentes.chat.evil.com/api/desktop/download/x"));
         assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
-        assert!(is_help_page("https://agentes.chat/help/run-on-your-computer?lang=en#who"));
-        assert!(!is_help_page("https://agentes.chat.evil.com/help/x"));
-        assert!(!is_help_page("https://agentes.chat/helpdesk"));
+        assert!(is_help_page("https://app.agentes.chat/help/run-on-your-computer?lang=en#who"));
+        assert!(!is_help_page("https://app.agentes.chat.evil.com/help/x"));
+        assert!(!is_help_page("https://app.agentes.chat/helpdesk"));
     }
 
     #[cfg(unix)]

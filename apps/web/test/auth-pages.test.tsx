@@ -128,7 +128,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(router.state.location.search).toEqual({});
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect(panel.textContent).toContain("O computador está pronto.");
   });
 
   test("an account without a password: only the provider it signs in with", async () => {
@@ -1436,13 +1436,19 @@ describe("Onboarding", () => {
     const own = within(panel).getByRole("button", { name: "A conta que os seus agentes dividem" });
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    // Who they reply to: off, each only the person. Switched on here, the save says everyone (ADR 0059 §5).
+    const replies = within(panel).getByRole("switch", { name: "Respondem a todos" });
+    expect(replies.getAttribute("aria-checked")).toBe("false");
+    await click(replies);
+    expect(replies.getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
     await settle(4);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
-      { brain: "claude_code", fallback: true },
-      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
     ]);
 
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
@@ -1476,6 +1482,30 @@ describe("Onboarding", () => {
     const posts = calls(state, "chat.post");
     expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
     expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
+  });
+
+  test("computer before the agents, the switch left off: each replies only to the person, as the Team step says", async () => {
+    const { state, api, services } = await start({ agents: [] });
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    // Whoever creates an agent owns it, as the server makes them.
+    for (const a of state.agents) a.ownerUserId = "u-walter";
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("switch", { name: "Respondem a todos" }).getAttribute("aria-checked")).toBe("false");
+    await next();
+    await settle(4);
+    expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
+      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true },
+    ]);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(screen().getByText("Seus agentes só respondem a você.")).toBeTruthy();
   });
 
   test("a computer whose Claude Code isn't signed in: no account to share, Claude's sign-in instead, nothing saved on Continue", async () => {
@@ -1910,8 +1940,12 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__note")).toBeNull();
   });
 
-  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+  test("workspace: the time zone in words, its reason behind its ⓘ, with no line under the field", async () => {
     await start();
+    // Its name as people say it (the IANA id goes to the API only).
+    const zone = [...document.querySelectorAll(".onb__help")].find((p) => p.textContent?.startsWith("Fuso horário"));
+    expect(zone?.textContent).toMatch(/^Fuso horário: .+ · trocar$/);
+    expect(zone?.textContent).not.toMatch(/\w\/\w/);
     await click(button("trocar"), 2);
     const about = button("Sobre Fuso horário");
     const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");

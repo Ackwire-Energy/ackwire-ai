@@ -32,7 +32,7 @@ export const TEAM_IN_PROMPT = 15;
 
 type Teammate = Pick<
   typeof agents.$inferSelect,
-  "id" | "name" | "handle" | "role" | "instructions" | "ownerUserId" | "audienceMode" | "audienceUserIds" | "brain"
+  "id" | "name" | "handle" | "role" | "instructions" | "ownerUserId" | "audienceMode" | "audienceUserIds"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -48,7 +48,6 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         ownerUserId: agents.ownerUserId,
         audienceMode: agents.audienceMode,
         audienceUserIds: agents.audienceUserIds,
-        brain: agents.brain,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -185,7 +184,6 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       ownerUserId: agents.ownerUserId,
       audienceMode: agents.audienceMode,
       audienceUserIds: agents.audienceUserIds,
-      brain: agents.brain,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))

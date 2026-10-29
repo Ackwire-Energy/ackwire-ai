@@ -54,7 +54,7 @@ import {
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { AUTO, keyLooksValid, providerLabel } from "@agenteschat/client/lib/providers";
-import { browserTimezone } from "@agenteschat/client/lib/routines";
+import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
@@ -106,6 +106,7 @@ import {
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
+import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
@@ -273,6 +274,8 @@ export function OnboardingPage() {
   const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
+  // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
+  const [replyAll, setReplyAll] = useState(false);
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });
   const [keySaved, setKeySaved] = useState(false);
@@ -526,13 +529,18 @@ export function OnboardingPage() {
         await api.orgs.updateSettings(orgId, { defaultAgentBudgetUsd: Number(budget) });
       }
       if (!ownChosen) return;
-      // The computer's own sign-in thinks for every agent; each answers only the person (ADR 0059 §5).
+      // The computer's own sign-in thinks for every agent; each replies only to the person unless the panel's switch
+      // says everyone (ADR 0059 §5).
       let failed = false;
       for (const c of crewAgents) {
-        await api.agents.setBrain(orgId, c.id, { brain: kindOf(choice), fallback: true }).catch(() => {
-          failed = true;
-        });
+        await api.agents
+          .setBrain(orgId, c.id, { brain: kindOf(choice), fallback: true, ...(replyAll ? { onlyOwner: false } : {}) })
+          .catch(() => {
+            failed = true;
+          });
       }
+      // The Team step reads whom they reply to from the list the plan's panel loaded before the move.
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       if (failed)
         toast.show(
           t("onboarding.brain.failed", { brand: planLabel(t, choice), computer: machine?.name ?? "" }),
@@ -551,6 +559,9 @@ export function OnboardingPage() {
     return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  // The rail says where that computer is, except at phone width (a bar of step numbers there).
+  const phone = useMediaQuery(COMPACT_QUERY);
+  const railSaysComputer = workspaceComputer !== null && !phone;
   const aiOpen = step.id === "agents" && agentsPhase === "ai";
   const jevOpen = step.id === "agents" && agentsPhase === "jev";
   // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
@@ -1068,7 +1079,7 @@ export function OnboardingPage() {
                 </Field>
               ) : (
                 <p className="onb__help">
-                  {t("onboarding.workspace.zone", { zone })} ·{" "}
+                  {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
                   <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                     {t("onboarding.workspace.zoneChange")}
                   </button>
@@ -1260,7 +1271,9 @@ export function OnboardingPage() {
                           target={target}
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
+                          replies={{ on: replyAll, onChange: setReplyAll }}
                           hostConnecting={computer === "host"}
+                          said={railSaysComputer}
                           onKey={() => pickAi("key")}
                           onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                           onDone={(ids, account) => {

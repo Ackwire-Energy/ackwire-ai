@@ -112,6 +112,11 @@ export const featureKeysPtBR = {
   },
   chats: {
     title: "Conversas",
+    serverError: {
+      offline: "Sem internet no celular.",
+      text: "Ele pode estar fora do ar ou fora da sua rede. Suas conversas aparecem sozinhas quando ele voltar.",
+      kept: "Mostrando o que já estava no app.",
+    },
     section: {
       agents: "Agentes",
       channels: "Canais",
@@ -979,7 +984,7 @@ export const featureKeysPtBR = {
     folderGone: "Esta pasta não tem mais páginas.",
     reads_one: "{{count}} vez",
     reads_other: "{{count}} vezes",
-    taskConflict: "A página mudou. Atualizei; marque de novo.",
+    taskConflict: "A página mudou e já está atualizada. Marque de novo.",
     view: "Ver",
     notSaved: "Prévia · ainda não salva",
     placeholder: "Escreva aqui. [[ liga outra página.",

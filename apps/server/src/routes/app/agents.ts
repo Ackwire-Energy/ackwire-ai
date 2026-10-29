@@ -407,8 +407,8 @@ export function agentRoutes(deps: AppDeps) {
         body: body(
           AgentFields.partial().extend({
             acceptPlanTerms: z.boolean().optional().openapi({
-              description:
-                "The agent's owner takes the risk of answering other people on their personal plan: needed the first time an agent that thinks with one lets anyone else talk to it (`audience.plan_terms_required`).",
+              deprecated: true,
+              description: "Ignored. Older apps send it when an agent on a plan replies to everyone.",
             }),
           }),
         ),
@@ -417,7 +417,7 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, appearance, acceptPlanTerms, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, acceptPlanTerms: _, ...input } = c.req.valid("json");
       const actor = c.get("user").id;
       // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
       const other =
@@ -427,7 +427,7 @@ export function agentRoutes(deps: AppDeps) {
       let agent = other
         ? await updateAgent(db, actor, orgId, agentId, { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) })
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, { acceptPlanTerms });
+      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
@@ -526,7 +526,7 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Choose who thinks for the agent (an admin or the agent's owner; audited); only what its computer has can be chosen. A plan (Claude Code or Codex) answers only the agent's owner at first; letting others talk to it is the owner's choice (`onlyOwner: false` with `acceptPlanTerms: true`).",
+        "Choose who thinks for the agent (an admin or the agent's owner; audited); only what its computer has can be chosen. A plan (Claude Code or Codex) answers only the agent's owner at first; letting others talk to it is the owner's choice (`onlyOwner: false`).",
       request: {
         params: AgentParams,
         body: body(
@@ -539,11 +539,11 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Só responde a você\" (ADR 0059): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
+                "\"Responde a todos\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
-              description:
-                "The owner takes the risk of answering other people on their personal plan: needed with `onlyOwner: false` the first time (`audience.plan_terms_required`).",
+              deprecated: true,
+              description: "Ignored. Older apps send it with `onlyOwner: false`.",
             }),
             account: z.uuid().nullable().optional().openapi({
               description:

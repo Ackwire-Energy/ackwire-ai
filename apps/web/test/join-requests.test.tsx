@@ -105,7 +105,7 @@ describe("an invitation link asks to join", () => {
       "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
     );
     const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
-    expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você e quem te convidou");
     expect(note.hasAttribute("aria-describedby")).toBe(false);
     await type(note, "Designer nova da Paula");
     expect(send.hasAttribute("disabled")).toBe(false);
@@ -576,7 +576,7 @@ describe("Members › Invite people", () => {
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
     expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+      "Num plano, você pode deixar cada um responder a todos na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");

@@ -12,15 +12,7 @@ import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agent
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
-import {
-  type AgentAudience,
-  answersOthers,
-  audienceOf,
-  OWNER_ONLY,
-  planSharing,
-  refusePersonalPlan,
-  storedAudience,
-} from "./audience";
+import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -236,7 +228,7 @@ export interface AgentBrainView {
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
-  /** "Só responde a você" (ADR 0059 §5): nobody but its owner talks to it. */
+  /** Nobody but its owner talks to it ("Responde a todos" off, ADR 0059 §5). */
   onlyOwner: boolean;
   /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
   canUsePlans: boolean;
@@ -387,19 +379,12 @@ export interface AgentBrainInput {
   model?: unknown;
   fallback?: unknown;
   /**
-   * "Só responde a você" (ADR 0059 §5): true, only its owner talks to it;
-   * false, on a plan everyone does, and on the API whoever did before a plan
-   * made it its owner's only. Omitted = keep it; a switch onto a plan makes
-   * it its owner's only. Where plans are personal, false on a plan is refused
-   * (`refusePersonalPlan`).
+   * "Responde a todos" turned off (ADR 0059 §5): true, only its owner talks
+   * to it; false, whoever its "who can talk" list lets in (everyone with no
+   * list). Omitted = keep it; a switch onto a plan makes it its owner's only,
+   * and only the plan's owner lets more people in (`planSharing`).
    */
   onlyOwner?: unknown;
-  /**
-   * The plan's owner read that answering other people on a personal plan
-   * might go against the provider's terms, and takes the risk: needed the
-   * first time anyone else may talk to an agent on a plan (`planSharing`).
-   */
-  acceptPlanTerms?: unknown;
   /**
    * The account its computer brain runs with (ADR 0041): an account on the
    * agent's computer of the brain's kind, or null for the computer's own
@@ -422,13 +407,12 @@ function nextAudience(
   changed: boolean,
   onlyOwner: boolean | undefined,
 ): { base: AgentAudience; to: AgentAudience } {
-  const plan = isComputerBrain(brain);
-  const base = changed && plan ? OWNER_ONLY : storedAudience(agent);
+  const base = changed && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
   if (onlyOwner === undefined) return { base, to: base };
   if (onlyOwner) return { base, to: OWNER_ONLY };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
-  // The people a plan kept out come back on the API (their list stays while it is the owner's only).
-  const kept = !plan && agent.audienceUserIds.length > 0;
+  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only.
+  const kept = agent.audienceUserIds.length > 0;
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 
@@ -484,25 +468,21 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
-  if (input.onlyOwner === false) refusePersonalPlan({ name: agent.name, brain });
   const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
-  const accepted = planSharing({ ...agent, brain }, userId, base, to, input.acceptPlanTerms === true);
+  planSharing({ ...agent, brain }, userId, base, to);
   const audience = to.mode === agent.audienceMode ? null : to;
   const next = await nextBrainAccount(deps.db, userId, orgId, agent, brain, changed, machine, input.account, {
     move: input.moveAccount === true,
   });
   const account = next.id;
   const accounts = await brainAccounts(deps.db, userId, orgId, agent, machine);
-  if (
-    !changed &&
-    model === agent.brainModel &&
-    fallback === agent.brainFallback &&
-    account === agent.brainAccountId &&
-    effort === agent.brainEffort &&
-    !audience
-  ) {
-    return view(agent, machine, machines, accounts, userId);
-  }
+  const thinks =
+    changed ||
+    model !== agent.brainModel ||
+    fallback !== agent.brainFallback ||
+    account !== agent.brainAccountId ||
+    effort !== agent.brainEffort;
+  if (!thinks && !audience) return view(agent, machine, machines, accounts, userId);
   const { row, released } = await deps.db.transaction(async (tx) => {
     const released = next.from ? await releaseAgents(tx, orgId, [next.from.accountId]) : [];
     const [row] = await tx
@@ -535,27 +515,36 @@ export async function setAgentBrain(
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);
-  // The team's cached rows carry the brain too, which the audience gate reads.
-  if (audience || changed) caches.agents.delete(`${orgId}:team`);
+  if (audience) caches.agents.delete(`${orgId}:team`);
   forgetAgents(orgId, released);
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: userId },
-    action: "agent.brain",
-    target: { type: "agent", id: agentId },
-    details: {
-      from: {
-        brain: from,
-        model: agent.brainModel,
-        fallback: agent.brainFallback,
-        account: agent.brainAccountId,
-        effort: agent.brainEffort,
+  if (thinks) {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "agent.brain",
+      target: { type: "agent", id: agentId },
+      details: {
+        from: {
+          brain: from,
+          model: agent.brainModel,
+          fallback: agent.brainFallback,
+          account: agent.brainAccountId,
+          effort: agent.brainEffort,
+        },
+        to: { brain, model, fallback, account, effort },
       },
-      to: { brain, model, fallback, account, effort },
-      ...(audience ? { audience: { from: storedAudience(agent), to: audience } } : {}),
-      ...(accepted ? { acceptedPlanTerms: true } : {}),
-    },
-  });
+    });
+  }
+  // Recorded as every change of who may talk to an agent is (`setAgentAudience`).
+  if (audience) {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "agent.audience_changed",
+      target: { type: "agent", id: agentId },
+      details: { from: audienceOf(agent), to: audience },
+    });
+  }
   if (next.from) {
     await recordAudit(deps.db, {
       orgId,

@@ -47,8 +47,6 @@ export interface AuthConfig {
   ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
-  /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
-  landing?: boolean;
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
@@ -341,8 +339,6 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
-  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
-  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -1570,12 +1566,24 @@ export interface StoragePlatform {
   folder: string | null;
 }
 
+/** What the workspace's files take, summed from the sizes recorded as they were written. */
+export interface StorageUsage {
+  /** On this server's storage (`platform`), files in the trash left out. */
+  platformBytes: number;
+  /** In the workspace's own buckets, the trash left out too. */
+  ownBucketBytes: number;
+  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  disk: { sizeBytes: number; freeBytes: number } | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
   platform: StoragePlatform;
+  /** Absent from an older server. */
+  usage?: StorageUsage;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";
@@ -3470,7 +3478,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3559,10 +3567,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
   onlyOwner?: boolean;
-  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
-  acceptPlanTerms?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
   /** The account thinks for another agent: take it from that one. */

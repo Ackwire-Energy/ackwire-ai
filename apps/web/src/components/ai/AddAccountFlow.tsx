@@ -46,8 +46,6 @@ export interface AddAccountProps {
   ready?: boolean;
   /** It just got ready and the page is still asking about it: what starts there shows it's loading. */
   loading?: boolean;
-  /** False in a plan's panel, whose foot says where the account stays: the steps' ⓘ leave that out. */
-  privacy?: boolean;
   /** The sign-in button's words when it signs in for one agent of several ("Sign in for Theo"). */
   signInLabel?: string;
   /**
@@ -174,7 +172,6 @@ function AddAccountFlow({
   local,
   ready = true,
   loading = false,
-  privacy = true,
   signInLabel,
   fanOut,
   onBack,
@@ -373,7 +370,7 @@ function AddAccountFlow({
           spellCheck={false}
           placeholder={placeholder}
           aria-label={label}
-          aria-describedby={plan && privacy ? keyHintId : undefined}
+          aria-describedby={plan ? keyHintId : undefined}
           disabled={sent}
           onChange={(e) => {
             setCode(e.target.value);
@@ -461,10 +458,7 @@ function AddAccountFlow({
     </OpenPage>
   );
 
-  // Inside a plan's panel its foot says where the account stays: the ⓘ keeps what to do on the wrong account.
-  const signInHint = privacy
-    ? t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) })
-    : t(`agentPage.work.brain.add.stepOneTip.${kind}`);
+  const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);
@@ -486,7 +480,7 @@ function AddAccountFlow({
         <Step n={2} side={sent ? waiting : undefined}>
           <StepTitle
             title={t("aiAccounts.add.keyTitle")}
-            hint={privacy ? t("aiAccounts.add.keySafe", { computer }) : undefined}
+            hint={t("aiAccounts.add.keySafe", { computer })}
             htmlFor={codeId}
             hintId={keyHintId}
           />

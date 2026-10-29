@@ -199,7 +199,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
   const brain = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
-    json: { brain: "claude_code", acceptPlanTerms: true, account: login.loginId, effort: "high" },
+    json: { brain: "claude_code", account: login.loginId, effort: "high" },
   });
   expect(brain.status).toBe(200);
   expect(await brain.json()).toMatchObject({

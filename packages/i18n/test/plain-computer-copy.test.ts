@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
 import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { leaves } from "./leaves";
+import { conditionsOf } from "./setups";
 
 /**
  * Screens about the agents' computer (onboarding, preparing, its own page) are read by people who aren't
@@ -74,8 +75,21 @@ const SELFHOST_ONLY = [
   "agentComputer.phone.chooseOnWeb",
 ];
 
+/**
+ * "Responde a todos", its line and its ⓘ (ADR 0059 §5): beside every plan's sign-in and on every agent's page on a
+ * plan, the Cloud's included, so they're checked against both editions' words.
+ */
+const PLAN_REPLIES = [
+  "aiAccounts.share.switch",
+  "aiAccounts.share.switchAll",
+  "aiAccounts.share.switchOther",
+  "aiAccounts.share.onOther",
+  ...["line", "linePlan", "own", "seat", "other"].map((k) => `aiAccounts.share.terms.${k}`),
+];
+
 /** Every key a Cloud workspace shows where a computer is named, past the `computerSetup.` and `agentComputer.` ones. */
 const CLOUD_EXTRA = [
+  ...PLAN_REPLIES,
   "desktop.sub.control",
   "desktop.sub.controlAsked",
   "desktop.sub.hidden",
@@ -90,6 +104,7 @@ const CLOUD_EXTRA = [
   "browser.now.handedBack",
   "desktop.control.keys",
   "desktop.control.notice",
+  "desktop.watch.notice",
   "desktop.session.check",
   "desktop.session.screening",
   "desktop.keyboard.field",
@@ -112,10 +127,8 @@ const CLOUD_EXTRA = [
   "onboarding.keyStep.lead",
   ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
   ...["signIn", "key", "email", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
-  "connectAi.foot.signIn",
   "connectAi.each",
   "connectAi.eachHint",
-  "aiAccounts.share.fixedHint",
   "connectAi.titleFor",
   "agentPage.work.brain.add.startFailed",
   "agentPage.work.brain.add.duplicate.claude_code",
@@ -140,6 +153,7 @@ const CLOUD_EXTRA = [
 
 /** The same screens' self-host keys, past the `agentComputer.` ones. */
 const SELFHOST_EXTRA = [
+  ...PLAN_REPLIES,
   "computers.lead",
   "browser.inCard.offline",
   "browser.inCard.noComputer",
@@ -168,7 +182,7 @@ const SELFHOST_EXTRA = [
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
-  ...["shared", "one", "note"].map((k) => `connectAi.own.${k}`),
+  ...["shared", "one"].map((k) => `connectAi.own.${k}`),
   "usageViews.agent.sharedPart",
   "agentPage.work.brain.add.duplicate.claude_code",
   "agentPage.work.brain.add.duplicate.codex",
@@ -274,6 +288,38 @@ describe("computer copy", () => {
     expect(CLOUD_EXTRA.filter((k) => k.startsWith("connectAi.own.") || k === "usageViews.agent.sharedPart")).toEqual(
       [],
     );
+  });
+
+  test("an agent on a plan replies to everyone once its owner says so: nothing to accept, the terms a gray area", () => {
+    for (const strings of [ptBR, en]) {
+      const values = valuesOf(strings);
+      const words = PLAN_REPLIES.map((k) => values.get(k) ?? "");
+      expect(words.every(Boolean)).toBe(true);
+      // No risk to take on, nothing to accept or confirm, no rule that a plan only answers its owner.
+      expect(words.filter((v) => /risk|risco|accept|aceit|confirm|personal|pessoal/i.test(v))).toEqual([]);
+      // The line under the switch is a few words; its ⓘ says what the terms say.
+      for (const k of ["line", "linePlan"])
+        expect((values.get(`aiAccounts.share.terms.${k}`) ?? "").split(" ").length).toBeLessThanOrEqual(7);
+      // Nothing is left of the confirmation, the fixed note or the refusal they replace.
+      const gone =
+        /^aiAccounts\.share\.(title|body|accept|keep|fixedHint|hint)\b|^connectAi\.(onlyYou|foot)\b|^connectAi\.own\.note$|^aiAccounts\.errors\.plan(Personal|TermsRequired)$/;
+      expect([...values.keys()].filter((k) => gone.test(k))).toEqual([]);
+    }
+  });
+
+  test("the storage line says what the files take, and where only for this server's disk, the one place it shows", () => {
+    // Every setup shows how much (the Cloud, a server's folder or database, a bucket), and each option's own words say
+    // where: only a folder on this server adds what its disk has free.
+    const place = /disk|disco|serv|bucket|database|banco|cloud|nuvem|storage|armazenamento/i;
+    for (const strings of [ptBR, en]) {
+      const values = valuesOf(strings);
+      const [files = "", none = "", free = ""] = ["files", "none", "free"].map((k) => values.get(`storage.usage.${k}`));
+      expect([files, none, free].filter((v) => !v || TECHNICAL.test(v))).toEqual([]);
+      expect([files, none].filter((v) => place.test(v))).toEqual([]);
+      expect(free).toMatch(place);
+    }
+    expect([...conditionsOf("storage.usage.free")]).toEqual(["selfhost"]);
+    expect([...conditionsOf("storage.usage.files"), ...conditionsOf("storage.usage.none")]).toEqual([]);
   });
 
   test("catches the words it bans, whatever the case", () => {

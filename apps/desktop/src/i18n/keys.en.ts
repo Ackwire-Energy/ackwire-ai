@@ -224,7 +224,7 @@ export const desktopEn: DesktopTranslations = {
       start: "agentes.chat didn't start on this {{device}}.",
       database: "The database wasn't prepared.",
       account: "Your account wasn't created.",
-      reach: "Access from your devices didn't turn on: {{reason}}. Try again in Preferences\u00a0›\u00a0Servers.",
+      retry: "Try again in Preferences\u00a0›\u00a0Servers.",
     },
     reason: {
       https: "HTTPS is off on your Tailscale network",

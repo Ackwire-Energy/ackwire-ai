@@ -22,7 +22,7 @@ import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas
 import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
-import { CantShowCover } from "../computer/covers";
+import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
@@ -301,6 +301,8 @@ export function DesktopView({
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
   const settled = SETTLED.includes(shown);
+  // A cover only a person's own step changes (`SETTLED`): the window's foot keeps no line under it.
+  const final = settled && !live;
   useEffect(() => setPoll(settled ? 30_000 : 5_000), [settled]);
   const held = shown === "held";
   useEffect(() => onHeld?.(held), [held, onHeld]);
@@ -474,7 +476,7 @@ export function DesktopView({
   );
 
   return (
-    <div className={["dsk", inControl && "is-control"].filter(Boolean).join(" ")} data-state={shown}>
+    <div className={cx("dsk", inControl && "is-control", final && "is-final")} data-state={shown}>
       <DialogHead
         sub={sub}
         actions={
@@ -590,6 +592,10 @@ export function DesktopView({
             )}
           </div>
         ))}
+      {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
+          sides and the screen opens in place. The ⓘ (what may be checked in control) and the keys come with control;
+          full screen keeps no line. */}
+      {!inControl && !final && !head?.full && <ScreenNotice name={name} />}
     </div>
   );
 }

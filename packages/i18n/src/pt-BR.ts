@@ -1,4 +1,3 @@
-import { landingPtBR } from "./landing";
 import type { Widen } from "./widen";
 
 /**
@@ -207,7 +206,7 @@ export const ptBR = {
       verified: "Verificado",
       code: "Código do e-mail",
       note: "Algo que eles devam saber? (opcional)",
-      noteHelp: "Quem é você, ou quem mandou o link",
+      noteHelp: "Quem é você e quem te convidou",
       send: "Pedir para entrar",
       as: "Você vai pedir como {{email}}.",
       notYou: "Não é você? Sair",
@@ -1069,18 +1068,17 @@ export const ptBR = {
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
       key: "Você envia a chave assim que o computador ficar pronto.",
-      email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
-      ready: "O {{computer}} está pronto.",
+      email: "Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+      ready: "O computador está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
+    /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
+    theComputer: "computador",
     own: {
       shared: "A conta que os seus agentes dividem",
       one: "Uma conta só {{for}} {{name}}",
-      note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
-    /** Under a plan's sign-in: it changes how the agent treats everyone else. */
-    onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
       text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
@@ -1096,12 +1094,6 @@ export const ptBR = {
     for: "Para",
     all: "Todos os agentes",
     agentAria: "Agentes que usam este plano",
-    /** The plan panel's foot: who the agents answer, and where the account stays (its ⓘ). */
-    foot: {
-      one: "Com o seu plano, {{article}} {{name}} só responde a você.",
-      all: "Com o seu plano, os seus agentes só respondem a você.",
-      signIn: "A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
-    },
     each: "Um login por agente, com a mesma conta.",
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
     signInFor: "Fazer login {{for}} {{name}}",
@@ -1309,7 +1301,7 @@ export const ptBR = {
     presence: "Presença",
     offline: "Ainda não entrou",
     localTime: "Hora local",
-    timeIn: "{{time}} ({{zone}})",
+    timeIn: "{{time}} · {{zone}}",
     dm: "Mensagem direta",
     viewProfile: "Ver perfil",
     agent: "Agente",
@@ -1898,11 +1890,6 @@ export const ptBR = {
           /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
             "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
-          /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
-          stepOneTip: {
-            claude_code: "Conta errada? Saia na página do Claude e tente de novo.",
-            codex: "Conta errada? Saia na página do ChatGPT e tente de novo.",
-          },
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
@@ -2615,9 +2602,9 @@ export const ptBR = {
     and: " e ",
   },
   members: {
-    /** Before inviting, while every agent with an AI answers only the person (a plan is personal). */
+    /** Before inviting, while every agent with an AI answers only the person. */
     agentsOnlyYou: "Seus agentes só respondem a você.",
-    agentsOnlyYouHint: "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+    agentsOnlyYouHint: "Num plano, você pode deixar cada um responder a todos na página dele.",
     filters: "Filtrar pessoas",
     roleFilter: "Papel",
     rolesCount_one: "{{count}} papel",
@@ -4524,31 +4511,23 @@ export const ptBR = {
   },
   aiAccounts: {
     share: {
-      switch: "Só responde a você",
+      /** Off by default: the agent replies only to its owner while it thinks with their plan. */
+      switch: "Responde a todos",
+      /** The same switch for every agent a plan's panel connects. */
+      switchAll: "Respondem a todos",
+      /** Off, as someone who isn't the plan's owner sees it. */
       switchOther: "Só responde a {{name}}",
-      /** The switch's ⓘ, on your own plan: the same in both states. */
-      hint: "Os outros veem que {{article}} {{name}} só responde a você. Sem isso, {{article}} {{name}} responde também a outras pessoas, com o seu plano.",
-      /** The switch's ⓘ, on someone else's plan. */
+      /** Who decides, for someone who isn't the plan's owner. */
       onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      title: "Agora {{article}} {{name}} responde a todos",
-      titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
-      body: {
-        claude_code:
-          "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-        codex:
-          "A OpenAI diz que o plano do ChatGPT é para uso pessoal. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
-        seat: {
-          claude_code:
-            "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-          codex:
-            "Os termos da OpenAI dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-        },
+      /** The line under the switch, and its ⓘ: the plan's terms, in its maker's words, a seat's or a personal plan's. */
+      terms: {
+        line: "Zona cinzenta nos termos do {{provider}}",
+        linePlan: "Zona cinzenta nos termos do plano",
+        own: "Os termos do {{provider}} dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
+        seat: "Os termos do {{provider}} dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
         other:
-          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos. Se continuar, o risco é seu.",
+          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
       },
-      accept: "Responder a todos",
-      acceptPeople: "Continuar",
-      keep: "Manter só comigo",
       savedEveryone: "Agora {{article}} {{name}} responde a todos.",
       savedOwner: "{{The}} {{name}} agora só responde a você.",
       backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
@@ -4556,13 +4535,9 @@ export const ptBR = {
       letPeople: "Liberar de novo",
       ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
       hereNotYours: "Só para agentes de quem conectou o {{computer}}",
-      fixedHint:
-        "Um plano é pessoal, então só responde a quem o conectou. Os outros podem usar o próprio plano ou a chave de API do workspace.",
     },
     errors: {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
-      planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
-      planPersonal: "Um plano é pessoal. Neste workspace, só quem o conectou fala com os agentes que o usam.",
     },
     add: {
       paste: "Colar",
@@ -5992,8 +5967,14 @@ export const ptBR = {
     onedrive: "OneDrive",
     soon: "Em breve",
     current: "Em uso",
+    // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
+    usage: {
+      files: "{{size}}\u00a0de\u00a0arquivos",
+      none: "Nenhum\u00a0arquivo",
+      free: "{{files}}\u00a0· {{size}}\u00a0livres\u00a0no\u00a0disco",
+    },
     endpoint: "Endpoint",
-    endpointHelp: "Por exemplo, https://s3.amazonaws.com ou https://<conta>.r2.cloudflarestorage.com.",
+    endpointHelp: "Por exemplo, https://s3.amazonaws.com.",
     region: "Região",
     bucket: "Bucket",
     prefix: "Prefixo (opcional)",
@@ -7447,7 +7428,7 @@ export const ptBR = {
     },
     import: {
       title: "Importar",
-      exportTitle: "Exportar este workspace",
+      exportTitle: "Exportar",
       download: "Baixar o arquivo",
       neverLine: "Nunca leva chaves, senhas, logins nem conversas.",
       whatsIn: "O que vai no arquivo",
@@ -7869,7 +7850,6 @@ export const ptBR = {
         'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
     },
   },
-  landing: landingPtBR,
   builtinTools: {
     ask_user: {
       label: "Perguntar à pessoa",
@@ -8557,6 +8537,8 @@ export const ptBR = {
       group: "Tela {{of}} {{name}}",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e tudo o que é digitado ou colado nele.",
       step: {
         desktop_open: "Abriu {{detail}}",
         desktop_open_plain: "Abriu um app",
