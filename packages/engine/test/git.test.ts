@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
-import { deflateSync } from "node:zlib";
+import { deflateSync, gzipSync } from "node:zlib";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentCommitEmail,
@@ -30,6 +30,7 @@ import {
 } from "../src";
 import { type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
+import { readBody } from "../src/git/proxy";
 
 let f: Fixture;
 afterEach(async () => {
@@ -97,6 +98,15 @@ function pushBody(commands: { old: string; new: string; ref: string }[], pack?: 
 }
 
 describe("pack reading", () => {
+  test("rejects declared objects and commits above the inflated limits", () => {
+    const blob = packOf([blobObject("x".repeat(100))]);
+    expect(() => readPack(blob, 0, { maxInflatedBytes: 99 })).toThrow("uncompressed size limit");
+    const commit = packOf([commitObject([], "x".repeat(100))]);
+    expect(() => readPack(commit, 0, { maxCommitBytes: 99 })).toThrow("commit exceeds size limit");
+    const pair = packOf([blobObject("x".repeat(60)), blobObject("y".repeat(60))]);
+    expect(() => readPack(pair, 0, { maxInflatedBytes: 100 })).toThrow("uncompressed size limit");
+  });
+
   test("inflate matches zlib and reports where each stream ends", () => {
     const inputs = [
       new Uint8Array(),
@@ -153,6 +163,32 @@ describe("pack reading", () => {
     expect(verifyGitToken("another-secret".padEnd(48, "y"), token)).toBeNull();
     expect(verifyGitToken(SECRET, token, new Date(Date.now() + 120_000))).toBeNull();
   });
+});
+
+test("git request body stops reading once it exceeds the limit", async () => {
+  let reads = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      reads++;
+      controller.enqueue(new Uint8Array(4));
+    },
+  });
+  const req = new Request("https://agentes.test/api/git", {
+    method: "POST",
+    body: stream,
+    duplex: "half",
+  } as RequestInit);
+  expect(await readBody(req, 10)).toBeNull();
+  expect(reads).toBeLessThan(10);
+});
+
+test("git request rejects compressed bodies above the expanded limit", async () => {
+  const req = new Request("https://agentes.test/api/git", {
+    method: "POST",
+    headers: { "content-encoding": "gzip" },
+    body: gzipSync(Buffer.alloc(2048)),
+  });
+  expect(await readBody(req, 1024)).toBeNull();
 });
 
 // ── The proxy against a fake GitHub ──────────────────────────────────────────
