@@ -48,6 +48,14 @@ test("the window's foot is as deep as its sides: the line steps aside over a cov
     const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector);
     expect(shipped).toEqual(expect.arrayContaining(["place-self:stretch", "aspect-ratio:auto", "contain:size"]));
   }
+  // A cover's words and a fix to run there keep to its width.
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-body .brw-dim")).toContain(
+    "grid-template-columns:minmax(0,1fr)",
+  );
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-body .brw-dim__box")).toContain(
+    "max-width:min(420px,100%-32px)",
+  );
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-body .brw-dim__box > *")).toContain("max-width:100%");
   // The line under a live screen is as tall as the room the window keeps for it, a tablet's 40 px too.
   const line = await ships(
     DESKTOP,
@@ -97,6 +105,11 @@ test("on a phone the screen and its covers ship as one box in the sheet's middle
     ".cmp-body > .dsk > .dsk-stage > :is(.dsk-screen, .brw-dim)",
   ]) {
     expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, phone)).toContain("grid-area:1/1");
+  }
+  for (const selector of [".cmp-body > .cmp-stage", ".cmp-body > .dsk > .dsk-stage"]) {
+    expect(await ships(COMPUTER, `src/${COMPUTER}`, selector, phone, ["flex", "container-type"])).toContain(
+      "grid-template-columns:minmax(0,1fr)",
+    );
   }
   for (const selector of [".cmp-body > .cmp-stage > .brw-dim", ".cmp-body > .dsk > .dsk-stage > .brw-dim"]) {
     const shipped = await ships(COMPUTER, `src/${COMPUTER}`, selector, phone);

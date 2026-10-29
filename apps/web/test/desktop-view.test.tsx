@@ -1330,6 +1330,10 @@ describe("the dialog's size (computer.css)", () => {
     const cell = inSheet(".cmp-body > .cmp-stage > .brw-dim,\n  .cmp-body > .dsk > .dsk-stage > .brw-dim");
     expect(cell).toContain("position: relative");
     expect(cell).toContain("place-self: stretch");
+    // Its one column is the sheet's width: a long command never widens the box past the sheet.
+    expect(inSheet(".cmp-body > .cmp-stage,\n  .cmp-body > .dsk > .dsk-stage")).toContain(
+      "grid-template-columns: minmax(0, 1fr)",
+    );
     // That box in the sheet's middle, the body measuring its room: what comes and goes goes under it, so nothing
     // moves it. The request being helped with right under it, then the line or the note, a banner after the steps.
     expect(inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body")).toContain("container-type: size");
@@ -1373,6 +1377,10 @@ describe("the dialog's size (computer.css)", () => {
     for (const d of ["place-self: stretch", "width: auto", "aspect-ratio: auto", "contain: size"]) {
       expect(covered).toContain(d);
     }
+    // A cover's words and a fix to run there keep to its width: the command scrolls in its own block.
+    expect(rule(text, ".cmp-body .brw-dim")).toContain("grid-template-columns: minmax(0, 1fr)");
+    expect(rule(text, ".cmp-body .brw-dim__box")).toContain("max-width: min(420px, 100% - 32px)");
+    expect(rule(text, ".cmp-body .brw-dim__box > *")).toContain("max-width: 100%");
     // A tablet's line is as tall as the room the frame keeps for it, watching or in control.
     const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
     const frame = desk.split("@media (min-width: 721px) {")[1]?.split("\n}\n")[0] ?? "";

@@ -385,6 +385,19 @@
   border-radius: 10px;
 }
 /*
+ * A cover's words and a fix to run there keep inside the cover, 16 px from its sides at most, its one column never
+ * wider than the cover: a long command scrolls in its own block.
+ */
+.cmp-body .brw-dim {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cmp-body .brw-dim__box {
+  max-width: min(420px, 100% - 32px);
+}
+.cmp-body .brw-dim__box > * {
+  max-width: 100%;
+}
+/*
  * The agent's page takes the same frame: its stage gets what the site's line and the tools leave, and the page
  * the most of that it can at 16:10, on the stage's own ground. Its tools go under it in place of the steps' line.
  */
@@ -576,6 +589,10 @@
     aspect-ratio: 1280 / 900;
   }
   /* The cover in the box's cell, not over it: words taller than the box (a fix to run there) grow it, never spill. */
+  .cmp-body > .cmp-stage,
+  .cmp-body > .dsk > .dsk-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .cmp-body > .cmp-stage > :is(.cmp-stage__box, .brw-dim),
   .cmp-body > .dsk > .dsk-stage > :is(.dsk-screen, .brw-dim) {
     grid-area: 1 / 1;
