@@ -234,18 +234,19 @@ export const coverBarOptions: NativeStackNavigationOptions = {
 
 /**
  * A native form sheet (Requests, Você): drag to dismiss, detents, the grabber, and on iOS the screen behind
- * scales back. `detents` are fractions of the screen height, ascending. On iOS 26 the system draws its
+ * scales back. `detents` are fractions of the screen height, ascending, or `"fitToContents"`: the sheet is as tall
+ * as what it holds (its content in `SheetScreen fit`), the same on every screen size. On iOS 26 the system draws its
  * corners (floating, concentric with the screen's); a radius of ours would square them off at the bottom. Sheets sit on the grouped gray
  * (white cards on it, like iOS), lifted above the screen in dark (`sheetColors`); `raised` for a sheet that is
  * one white card. The content goes in `SheetSurface` (`SheetScreen` does it): its colors, and Android's grabber.
  */
 export function useFormSheetOptions(
-  detents: number[],
+  detents: number[] | "fitToContents",
   background: "raised" | "bg" = "bg",
 ): NativeStackNavigationOptions {
   const { colors: screen, scheme } = useTheme();
   const colors = useMemo(() => sheetColors(screen, scheme), [screen, scheme]);
-  const key = detents.join(",");
+  const key = typeof detents === "string" ? detents : detents.join(",");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the detents array
   return useMemo<NativeStackNavigationOptions>(
     () => ({

@@ -46,7 +46,7 @@ export function PushAskSheet({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <SheetScreen>
+    <SheetScreen fit>
       <View style={styles.stack} accessible accessibilityLabel={t("mobile.push.ask.examples")}>
         {EXAMPLES.map((x, i) => (
           <Example

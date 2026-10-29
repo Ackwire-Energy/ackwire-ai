@@ -1943,6 +1943,16 @@ export const useAgentBrain = (orgId: string, agentId: string, enabled = true, po
   });
 };
 
+/** "Quem pensa" for an agent still being created ("Criar agente"): the workspace's computers and what each offers. */
+export const useBrainMachines = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.brainMachines(orgId),
+    queryFn: () => api.agents.brainMachines(orgId),
+    retry: false,
+  });
+};
+
 /** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
 export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();

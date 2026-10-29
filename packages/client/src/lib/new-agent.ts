@@ -1,10 +1,11 @@
 import type { AgentAudience } from "../api/types";
+import type { Level } from "./access-levels";
 import { handleFrom, parseAmount } from "./text";
 
 /**
  * "Criar agente" in steps: the pure part
- * (steps, roles, handle and budget rules, what each step needs). The role
- * presets, with their icon and look, live with each platform.
+ * (steps, roles and what each one starts with, handle and budget rules, what each step needs). Each
+ * platform adds its own icons.
  */
 
 export const NEW_AGENT_STEPS = ["role", "identity", "instructions", "tools", "where", "model", "review"] as const;
@@ -35,6 +36,120 @@ export const ROLE_GROUPS = [
   { id: "operations", roles: ["data", "finance", "people", "research", "assistant"] },
 ] as const satisfies readonly { id: string; roles: readonly Exclude<RoleId, "custom">[] }[];
 export type RoleGroupId = (typeof ROLE_GROUPS)[number]["id"];
+
+/* ---------- What a role starts with ---------- */
+
+/** A look as the agent engine draws it (names from `@agenteschat/ui`'s `AgentAppearance`). */
+export interface RoleLook {
+  color: string;
+  eyes: string;
+  accessory: string;
+}
+
+export interface RoleDefaults<L extends RoleLook = RoleLook> {
+  look: L;
+  /** Levels by catalog connector id ("github"); connectors not listed start at "Sem acesso". */
+  levels: Record<string, Level>;
+  /** Channels it joins when the workspace has them (by name; only channels you're in). */
+  channels: string[];
+}
+
+// Keeps each look's literal names, so they type as the engine's colors, eyes and accessories.
+const starts = <const L extends RoleLook>(d: RoleDefaults<L>) => d;
+
+/** Picking a role fills the rest (name and instructions come from i18n: `newAgent.roles.{id}`). */
+export const ROLE_DEFAULTS = {
+  dev: starts({
+    look: { color: "green", eyes: "wide", accessory: "headphones" },
+    levels: { github: "write", sentry: "read", linear: "read" },
+    channels: ["eng", "engenharia", "engineering", "dev", "desenvolvimento"],
+  }),
+  ops: starts({
+    look: { color: "amber", eyes: "round", accessory: "antenna" },
+    levels: { sentry: "write", github: "read", "cloudflare-observability": "read", linear: "read" },
+    channels: ["ops", "incidentes", "incidents", "infra", "alertas", "alerts"],
+  }),
+  qa: starts({
+    look: { color: "violet", eyes: "round", accessory: "headset" },
+    levels: { github: "read", linear: "write", sentry: "read" },
+    channels: ["qa", "bugs", "testes", "eng", "engenharia", "engineering"],
+  }),
+  pm: starts({
+    look: { color: "indigo", eyes: "round", accessory: "cap" },
+    levels: { linear: "write", notion: "write", github: "read", drive: "read" },
+    channels: ["produto", "product", "pm", "roadmap"],
+  }),
+  // Customers: reads where the customer already is; sending to them asks a person first.
+  support: starts({
+    look: { color: "teal", eyes: "happy", accessory: "headset" },
+    levels: { intercom: "write", notion: "read", linear: "read", stripe: "read" },
+    channels: ["suporte", "support", "atendimento", "clientes", "customers", "help"],
+  }),
+  sales: starts({
+    look: { color: "amber", eyes: "wide", accessory: "hat" },
+    levels: { notion: "write", drive: "read", stripe: "read" },
+    channels: ["vendas", "sales", "comercial", "leads", "clientes", "customers"],
+  }),
+  marketing: starts({
+    look: { color: "rose", eyes: "happy", accessory: "party" },
+    levels: { webflow: "write", canva: "write", notion: "read" },
+    channels: ["marketing", "growth", "campanhas", "campaigns", "lancamentos", "launches"],
+  }),
+  content: starts({
+    look: { color: "violet", eyes: "round", accessory: "beanie" },
+    levels: { notion: "write", drive: "write", webflow: "read", canva: "read" },
+    channels: ["conteudo", "content", "blog", "redacao", "writing", "social"],
+  }),
+  // Operations: numbers are read-only by default; money only moves with approval.
+  data: starts({
+    look: { color: "sky", eyes: "dots", accessory: "none" },
+    levels: { "supabase-readonly": "read", stripe: "read", drive: "read" },
+    channels: ["dados", "data", "metricas", "metrics", "analytics", "relatorios", "reports"],
+  }),
+  finance: starts({
+    look: { color: "graphite", eyes: "round", accessory: "hat" },
+    levels: { stripe: "read", paypal: "read", square: "read", drive: "read" },
+    channels: ["financeiro", "finance", "financas", "pagamentos", "payments", "billing"],
+  }),
+  people: starts({
+    look: { color: "green", eyes: "happy", accessory: "flower" },
+    levels: { notion: "write", drive: "read", asana: "read" },
+    channels: ["rh", "people", "pessoas", "hr", "contratacao", "hiring", "time", "team"],
+  }),
+  research: starts({
+    look: { color: "indigo", eyes: "wide", accessory: "scarf" },
+    levels: { notion: "write", drive: "read" },
+    channels: ["pesquisa", "research", "estudos", "insights"],
+  }),
+  assistant: starts({
+    look: { color: "rose", eyes: "round", accessory: "bow" },
+    levels: { asana: "write", notion: "read", drive: "read" },
+    channels: ["geral", "general", "agenda", "secretaria", "admin"],
+  }),
+  custom: starts({ look: { color: "sky", eyes: "round", accessory: "none" }, levels: {}, channels: [] }),
+} satisfies Record<RoleId, RoleDefaults>;
+
+/** The look a draft starts with (before a role is picked). */
+export const BLANK_LOOK = { color: "sky", eyes: "round", accessory: "none" } as const satisfies RoleLook;
+
+/** Each connection's level for a role: the preset's level for its catalog connector, else none. */
+export function presetLevels(role: RoleId, items: { id: string; def: { id: string } | null }[]) {
+  const levels: Record<string, Level> = ROLE_DEFAULTS[role].levels;
+  return Object.fromEntries(items.map((i) => [i.id, (i.def && levels[i.def.id]) || "none"])) as Record<string, Level>;
+}
+
+/** The role's channels among the ones given (by name, accents and case ignored). */
+export function presetChannels<C extends { id: string; name: string }>(role: RoleId, channels: C[]) {
+  const wanted = new Set(ROLE_DEFAULTS[role].channels);
+  return channels.filter((c) => wanted.has(foldName(c.name))).map((c) => c.id);
+}
+
+const foldName = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 /* ---------- @handle ---------- */
 

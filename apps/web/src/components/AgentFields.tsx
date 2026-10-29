@@ -1,4 +1,4 @@
-import type { Credential, Member, Model } from "@agenteschat/client";
+import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
@@ -456,6 +456,76 @@ export function ModelCards({
           />
         )),
       )}
+    </div>
+  );
+}
+
+/** A plan brain (Claude Code, Codex) on a computer, chosen while creating an agent. */
+export interface PlanChoice {
+  kind: "claude_code" | "codex";
+  machineId: string;
+}
+
+const PLAN_KINDS = ["claude_code", "codex"] as const;
+/** Whose models each plan runs, for the mark in the corner (the same as the API cards'). */
+const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai" } as const;
+
+/**
+ * "Pelo plano, num computador": Claude Code and Codex on each computer that has them, as cards like the models';
+ * one that no computer offers says why ("Sem computador", "Indisponível") instead.
+ */
+export function PlanCards({
+  machines,
+  value,
+  onChange,
+}: {
+  machines: BrainMachine[];
+  value: PlanChoice | null;
+  onChange: (choice: PlanChoice) => void;
+}) {
+  const { t } = useTranslation();
+  const head = (kind: PlanChoice["kind"]) => (
+    <span className="newag__model-head">
+      <b>{t(`brain.card.${kind}`)}</b>
+      <span className="newag__model-prov">
+        <ProviderLogo id={PLAN_PROVIDER[kind]} size="xs" />
+        {providerLabel(PLAN_PROVIDER[kind])}
+      </span>
+    </span>
+  );
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+    <div className="newag__models" role="group" aria-label={t("newAgent.plans")}>
+      {PLAN_KINDS.flatMap((kind) => {
+        const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
+        if (on.length === 0)
+          return [
+            <button key={kind} type="button" className="newag__model" aria-disabled="true">
+              {head(kind)}
+              <span className="newag__model-desc">{t(`brain.${kind}Text`)}</span>
+              <span className="newag__cost">
+                <Icon name="computer" size={14} />
+                {machines.length === 0 ? t("brain.foot.noComputer") : t("brain.foot.unavailable")}
+              </span>
+            </button>,
+          ];
+        return on.map((m) => (
+          <button
+            key={`${kind}:${m.machineId}`}
+            type="button"
+            className="newag__model"
+            aria-pressed={value?.kind === kind && value.machineId === m.machineId}
+            onClick={() => onChange({ kind, machineId: m.machineId })}
+          >
+            {head(kind)}
+            <span className="newag__model-desc">{t(`brain.${kind}Text`)}</span>
+            <span className="newag__cost">
+              <Icon name="computer" size={14} />
+              {m.online ? m.name : t("brain.foot.offline", { computer: m.name })}
+            </span>
+          </button>
+        ));
+      })}
     </div>
   );
 }

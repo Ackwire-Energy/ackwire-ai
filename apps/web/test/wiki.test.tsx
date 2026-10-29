@@ -4,10 +4,19 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { WikiGraph } from "@agenteschat/client";
-import { outlineOf, resolveWikiLink, splitSection, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
+import {
+  outlineOf,
+  prefixLines,
+  resolveWikiLink,
+  splitSection,
+  toggleTask,
+  wikiQuery,
+  wikiSlug,
+  wikiTree,
+  wrapSelection,
+} from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { prefixLines, wikiQuery, wrapSelection } from "@/components/WikiEditor";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
@@ -34,6 +43,16 @@ const go = async (path: string, state = seedState(), seed = true) => {
   await settle(8);
   return { ...r, state, api };
 };
+
+describe("toggleTask", () => {
+  test("checks and unchecks one task line, leaves other lines alone", () => {
+    const body = "# Passos\n- [ ] Abrir\n- [x] Revisar\nTexto";
+    expect(toggleTask(body, 1)).toBe("# Passos\n- [x] Abrir\n- [x] Revisar\nTexto");
+    expect(toggleTask(body, 2)).toBe("# Passos\n- [ ] Abrir\n- [ ] Revisar\nTexto");
+    expect(toggleTask(body, 3)).toBe(body);
+    expect(toggleTask(body, 9)).toBe(body);
+  });
+});
 
 describe("wiki rules", () => {
   test("links, slugs, sections, outline, tree", () => {
