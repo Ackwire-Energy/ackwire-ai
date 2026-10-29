@@ -127,7 +127,7 @@ export interface FakeState {
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
   signInOptions?: SignInOptions;
-  /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
+  /** The server `account.phoneSignIn` names (default: https://app.agentes.chat). */
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
@@ -819,7 +819,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.phoneSignIn");
         return {
           token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
-          server: state.phoneServer ?? "https://agentes.chat",
+          server: state.phoneServer ?? "https://app.agentes.chat",
           expiresIn: 180,
         };
       },

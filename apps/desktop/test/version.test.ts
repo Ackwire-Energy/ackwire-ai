@@ -36,24 +36,24 @@ describe("latest release", () => {
     expect(targetParam("macos")).toBe("darwin");
     expect(targetParam("windows")).toBe("windows");
     expect(targetParam("linux")).toBe("linux");
-    expect(latestUrl("macos", "aarch64")).toBe("https://agentes.chat/api/desktop/latest?target=darwin&arch=arm64");
-    expect(latestUrl("windows", "x86_64")).toBe("https://agentes.chat/api/desktop/latest?target=windows&arch=x64");
-    expect(latestUrl("linux", "x86_64")).toBe("https://agentes.chat/api/desktop/latest?target=linux&arch=x64");
+    expect(latestUrl("macos", "aarch64")).toBe("https://app.agentes.chat/api/desktop/latest?target=darwin&arch=arm64");
+    expect(latestUrl("windows", "x86_64")).toBe("https://app.agentes.chat/api/desktop/latest?target=windows&arch=x64");
+    expect(latestUrl("linux", "x86_64")).toBe("https://app.agentes.chat/api/desktop/latest?target=linux&arch=x64");
   });
   test("parses the endpoint and refuses downloads off our site", () => {
     const ok = parseLatest({
       version: "0.2.0",
-      url: "https://agentes.chat/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg",
+      url: "https://app.agentes.chat/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg",
       sha256: "abc",
       notes: "- Pastas\n- Pedidos",
     });
     expect(ok?.version).toBe("0.2.0");
     expect(parseLatest({ version: "0.2.0", url: "https://evil.example/agentes.dmg" })).toBeNull();
-    expect(parseLatest({ version: "x", url: "https://agentes.chat/x" })).toBeNull();
+    expect(parseLatest({ version: "x", url: "https://app.agentes.chat/x" })).toBeNull();
     expect(parseLatest(null)).toBeNull();
   });
   test("available and required", () => {
-    const latest = { version: "0.3.0", url: "https://agentes.chat/d", minVersion: "0.2.0" };
+    const latest = { version: "0.3.0", url: "https://app.agentes.chat/d", minVersion: "0.2.0" };
     expect(updateStateOf("0.1.0", latest)).toMatchObject({ available: true, required: true });
     expect(updateStateOf("0.2.5", latest)).toMatchObject({ available: true, required: false });
     expect(updateStateOf("0.3.0", latest)).toMatchObject({ available: false, required: false });

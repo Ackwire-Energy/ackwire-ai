@@ -54,7 +54,7 @@ on expo.dev (EAS environment variables) for EAS:
 
 | Variable | What | Default |
 | --- | --- | --- |
-| `EXPO_PUBLIC_API_URL` | The default server. **Must be the server's `PUBLIC_URL` host** (see below). | `https://agentes.chat` |
+| `EXPO_PUBLIC_API_URL` | The default server. **Must be the server's `PUBLIC_URL` host** (see below). | `https://app.agentes.chat` |
 | `EAS_PROJECT_ID` | EAS project, for push tokens. | ours (`8514d5b3-…`) |
 | `GOOGLE_SERVICES_JSON` | Path to Firebase's `google-services.json` (the Android workflow writes it from a secret): push on Android (FCM). | none |
 | `ANDROID_VERSION_CODE` | The build's version code (the Android workflow's run). | from the config |
