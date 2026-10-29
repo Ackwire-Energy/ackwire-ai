@@ -475,9 +475,12 @@ describe("Setting it up here", () => {
           await act(async () => resized());
           expect(lead()).toBe(94);
           await until(() => button("Continue"));
-          expect(setup.querySelector(".dk-fr__problem")?.textContent).toContain(
-            "Give that permission once, in the terminal:",
-          );
+          const words = setup.querySelector(".dk-fr__problem")?.textContent ?? "";
+          expect(words).toContain("Give that permission once, in the terminal:");
+          // The step first, then where to try again: under the command, last.
+          expect(words.indexOf("sudo tailscale set --operator=$USER")).toBeGreaterThan(words.indexOf("terminal:"));
+          expect(words.endsWith("Copy Try again in Preferences\u00a0›\u00a0Servers.")).toBe(true);
+          expect(setup.querySelector(".dk-fr__cmd + .dk-fr__retry")).not.toBeNull();
           // Tailscale's words and their command, 60 px more than the window shows: the room above gives those 60.
           rest = 512;
           await act(async () => resized());

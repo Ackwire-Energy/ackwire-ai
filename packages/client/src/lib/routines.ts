@@ -162,9 +162,24 @@ export function browserTimezone(): string | null {
   }
 }
 
-/** "horário de Brasília" (the zone's name, without the offset). */
+/**
+ * "horário de Brasília" (the zone's name, without the offset). A zone we don't name goes by the platform's name in
+ * `locale` ("Horário da Europa Central"): its IANA id only where the platform doesn't know it.
+ */
 export const timezoneName = (timeZone: string, locale?: string) =>
-  timeZone === "UTC" || timeZone === "Etc/UTC" ? "UTC" : (namesFor(locale)[timeZone] ?? NAMES[timeZone] ?? timeZone);
+  timeZone === "UTC" || timeZone === "Etc/UTC"
+    ? "UTC"
+    : (namesFor(locale)[timeZone] ?? NAMES[timeZone] ?? platformZoneName(timeZone, locale) ?? timeZone);
+
+function platformZoneName(timeZone: string, locale?: string): string | undefined {
+  try {
+    return new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: "longGeneric" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value;
+  } catch {
+    return undefined;
+  }
+}
 
 /** A one-off's moment in its own zone: { weekday: "qui", date: "16/10", time: "09:00", zone: "horário de Brasília" }. */
 export function onceParts(locale: string, at: string, timeZone: string) {

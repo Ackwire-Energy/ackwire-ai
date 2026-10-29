@@ -875,6 +875,11 @@ body[data-window="popover"] {
 .dk-honest .dk-fr__cmd {
   margin-top: 6px;
 }
+/* Where to try again, under the command as far as the command is under its words. */
+.dk-fr__cmd + .dk-fr__retry {
+  display: block;
+  margin-top: 6px;
+}
 /* A short command inside a line of text, with its copy button. */
 .dk-fr__cmd--inline {
   display: inline-flex;

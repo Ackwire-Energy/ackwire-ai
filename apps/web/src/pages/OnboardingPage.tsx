@@ -55,7 +55,7 @@ import {
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { AUTO, keyLooksValid, providerLabel } from "@agenteschat/client/lib/providers";
-import { browserTimezone } from "@agenteschat/client/lib/routines";
+import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
@@ -1080,7 +1080,7 @@ export function OnboardingPage() {
                 </Field>
               ) : (
                 <p className="onb__help">
-                  {t("onboarding.workspace.zone", { zone })} ·{" "}
+                  {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
                   <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                     {t("onboarding.workspace.zoneChange")}
                   </button>
