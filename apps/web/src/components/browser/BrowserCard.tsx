@@ -1082,17 +1082,7 @@ export function BrowserCard({
               {framed && !inControl && !otherInControl && (
                 <span className={confirmStop ? "brw-mf__over is-pinned" : "brw-mf__over"}>
                   {watchActs}
-                  {!blocker && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      iconOnly
-                      icon="external"
-                      aria-label={fullLabel}
-                      title={fullLabel}
-                      onClick={() => setFull(true)}
-                    />
-                  )}
+                  {!blocker && <FullScreenButton full={full} onToggle={() => setFull(true)} />}
                 </span>
               )}
             </div>
