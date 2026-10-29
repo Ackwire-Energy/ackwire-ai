@@ -218,7 +218,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
           ) : null}
           {noAi ? (
             <Text variant="small" tone="muted">
-              {t("noAi.agent", { name })}
+              {t("noAi.agent", agentGrammar(t, name))}
             </Text>
           ) : w.reason ? (
             <Text variant="small" tone="muted">

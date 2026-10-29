@@ -50,6 +50,7 @@ import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { openAgentUsage } from "../usage/UsageScreen";
+import { openAgentEdit } from "./AgentEditScreen";
 import {
   canEditMemories,
   type DidLine,
@@ -267,7 +268,7 @@ function Profile({ id }: { id: string }) {
           {noAi ? (
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
-              label={t("noAi.agent", { name: agent?.name ?? "" })}
+              label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
               onPress={() => openConnectAi({ agentId: id })}
             />
           ) : null}
@@ -300,7 +301,7 @@ function Profile({ id }: { id: string }) {
 
         {forYou.data || forYou.isError ? (
           <Section
-            title={t("mobile.intentAgents.did.title")}
+            title={t("mobile.intentAgents.did.title", agentGrammar(t, name))}
             {...(did.length > DID_SHOWN
               ? {
                   action: {
@@ -360,7 +361,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title")}>
+          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(t, name))}>
             {memories.length > 0 ? (
               <>
                 <Card>
@@ -407,7 +408,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title")}>
+          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(t, name))}>
             {uses.lines.length > 0 ? (
               <Card>
                 {uses.lines.map((u) => (
@@ -517,7 +518,12 @@ function Profile({ id }: { id: string }) {
         </Section>
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
-        <PushedHeader plate solid={false} />
+        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
+        <PushedHeader
+          plate
+          solid={false}
+          {...(decides && agent ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } } : {})}
+        />
       </View>
     </View>
   );

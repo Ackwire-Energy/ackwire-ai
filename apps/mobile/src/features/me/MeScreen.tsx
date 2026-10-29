@@ -86,6 +86,7 @@ export function MeScreen() {
       href: "/issues",
     },
     { icon: "clock", label: t("routines.title"), href: "/routines" },
+    { icon: "file", label: t("wiki.title"), href: "/wiki" },
     { icon: "doc", label: t("mobile.me.drive"), href: "/drive" },
     { icon: "bolt", label: t("mobile.me.connectors"), href: "/connectors" },
     { icon: "chart", label: t("mobile.me.usage"), href: "/usage" },

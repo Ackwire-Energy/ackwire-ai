@@ -442,7 +442,7 @@ function AskAgent({ issue }: { issue: Issue }) {
         {avatar({ type: "agent", id: agent.id }, "sm")}
         <span className="issue-ask__text">
           <b>{t("issues.askTitle", { to: g.to, name: agent.name })}</b>
-          <span className="small muted">{t("issues.askText", { The: g.The, name: agent.name })}</span>
+          <span className="small muted">{t("issues.askText", g)}</span>
         </span>
       </div>
       <div className="issue-ask__actions">

@@ -157,6 +157,8 @@ const CONNECTORS: Record<string, string> = {
   notion: "Notion",
   jira: "Jira",
   stripe: "Stripe",
+  // The org's own mailboxes (`mail_<slug>_<verb>`, ADR 0038), labeled "Email" like their tools.
+  mail: "Email",
 };
 
 /** First words that are verbs, not a connector prefix ("send_email" is a tool, not the app "send"). */

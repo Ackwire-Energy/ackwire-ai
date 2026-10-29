@@ -28,6 +28,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { folderName } from "@agenteschat/client/lib/machines";
 import {
   executorName,
@@ -140,6 +141,8 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   const agentName = dir.agentById.get(m?.agentId ?? "")?.name ?? "";
   const current = m?.executor ?? meta.executor;
   const executor = executorName(current, agentName);
+  // "do Claude Code", "da Ada": its words in Portuguese.
+  const xg = agentGrammar(t, executor);
   // Before Start the owner may switch who programs, among those the computer can run.
   const choices = m?.role === "owner" && m.status === "proposed" ? (m.machine?.executors ?? []) : [];
   const items = (plan.data?.current?.items ?? []).filter((i) => i.status !== "dropped");
@@ -196,7 +199,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       <div className="mi-plan__head">
         <span className="mi-cap">
           <ExecutorMark executor={current} agentId={m?.agentId} agentName={agentName} />
-          {investigated ? t("missions.findings.proposed") : t("missions.plan.cap", { executor })}
+          {investigated ? t("missions.findings.proposed") : t("missions.plan.cap", { executor, of: xg.of })}
         </span>
         <h3>{meta.title}</h3>
         {!investigated && !sameAsTitle(meta.title, meta.goal) && <p>{firstSentence(meta.goal)}</p>}
@@ -225,7 +228,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         <div className="mi-plan__drafting" role="status">
           <p>
             <AgentSpinner agentId={m?.agentId} />
-            {t("missions.plan.drafting", { executor, computer })}
+            {t("missions.plan.drafting", { executor, computer, The: xg.The })}
           </p>
           <ul className="mi-plan__list mi-plan__list--ghost" aria-hidden="true">
             {["58%", "44%", "51%"].map((w) => (
@@ -242,7 +245,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       {items.length > 0 && (
         <p className="mi-plan__note">
           {items.length > PLAN_SHOWN ? `${t("missions.plan.more", { count: items.length - PLAN_SHOWN })} · ` : ""}
-          {t("missions.plan.adjusts", { executor })}
+          {t("missions.plan.adjusts", { executor, article: xg.article })}
         </p>
       )}
       <div className="mi-plan__metas">

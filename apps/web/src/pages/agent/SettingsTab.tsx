@@ -452,7 +452,7 @@ export function SettingsTab({
                       onClick={() => openWork("computer")}
                       style={{ alignSelf: "flex-start" }}
                     >
-                      {t("agentPage.work.open.computer")}
+                      {t("agentPage.work.open.computer", g)}
                     </Button>
                   ) : undefined
                 }

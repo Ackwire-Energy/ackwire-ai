@@ -1,6 +1,7 @@
 import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, NO_AI, noAiCardOf, opensByItself } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
@@ -36,7 +37,7 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
       <div className="noai-banner" role="status">
         <span className="noai-banner__text ac-iconline">
           <Icon name="plug" size={16} />
-          <b>{t("noAi.agent", { name })}</b>
+          <b>{t("noAi.agent", agentGrammar(t, name))}</b>
         </span>
         <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
           {t("noAi.action")}
@@ -95,7 +96,7 @@ export function NoAiCard({ message }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", { name });
+        : t("noAi.agent", agentGrammar(t, name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (

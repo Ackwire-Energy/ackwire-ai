@@ -129,6 +129,14 @@ export function planGate({
   return { state: "ready" };
 }
 
+/**
+ * The computer's own sign-in can think for the agent with this plan: whoever connected that computer owns the agent,
+ * and Claude Code is signed in there (`computer.own`, the `/ai-accounts` row). ChatGPT's own sign-in isn't reported,
+ * so it is taken as there.
+ */
+export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, computer: AiComputer | undefined) =>
+  brain?.ownSignIn === true && !isPlanId(choice) && (choice !== "claude" || computer?.own?.claude_code !== undefined);
+
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
 

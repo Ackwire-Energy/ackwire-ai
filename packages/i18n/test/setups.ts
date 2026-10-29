@@ -212,9 +212,11 @@ export function misplaced(leaves: [string, string][], locale: Locale): string[] 
   for (const [key, text] of leaves) {
     const conds = conditionsOf(key);
     const elsewhere = listed(key, ANYWHERE);
+    // A phrase kept whole by no-break spaces is still the phrase.
+    const words = text.replaceAll("\u00a0", " ");
     for (const c of Object.keys(PHRASES) as Condition[]) {
       if (conds.has(c) || (elsewhere && (c === "cloud" || c === "selfhost"))) continue;
-      const hit = PHRASES[c][locale].find((re) => re.test(text));
+      const hit = PHRASES[c][locale].find((re) => re.test(words));
       if (hit) out.push(`${key}: ${c} ${hit}`);
     }
     if (conds.has("cloud") && conds.has("selfhost")) out.push(`${key}: listed for both editions`);

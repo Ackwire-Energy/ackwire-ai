@@ -626,6 +626,22 @@ export const featureKeysPtBR = {
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
   },
+  agentEdit: {
+    missing: "Este agente não existe mais.",
+    saved: "Alterações salvas",
+    rolePlaceholder: "Ex.: Atendimento",
+    adminsOnly: "Só admins mudam o nome, o cargo e as instruções.",
+    discardTitle: "Descartar as alterações?",
+    discardText: "O que você mudou ainda não foi salvo.",
+    discard: "Descartar",
+    keepEditing: "Continuar editando",
+  },
+  newAgent: {
+    leaveTitle: "Sair sem criar?",
+    leaveText: "O agente que você começou não será criado.",
+    keepGoing: "Continuar criando",
+    partly: "O agente foi criado, mas parte do que o papel traz não entrou. Ajuste no perfil dele.",
+  },
   agent: {
     talk: "Conversar",
     task: "Tarefa",
@@ -955,6 +971,31 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar o Drive.",
     more: "Mostrar mais",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Toque em Nova página para escrever a primeira.",
+    missing: "Esta página não existe mais ou mudou de nome.",
+    blank: "Página em branco.",
+    folderGone: "Esta pasta não tem mais páginas.",
+    reads_one: "{{count}} vez",
+    reads_other: "{{count}} vezes",
+    taskConflict: "A página mudou. Atualizei; marque de novo.",
+    view: "Ver",
+    notSaved: "Prévia · ainda não salva",
+    placeholder: "Escreva aqui. [[ liga outra página.",
+    hideKeyboard: "Esconder o teclado",
+    createLink: "Criar “{{title}}”",
+    discardTitle: "Sair sem salvar?",
+    discardText: "O que você escreveu aqui se perde.",
+    discard: "Descartar",
+    keepWriting: "Continuar escrevendo",
+    conflictText: "A versão salva agora é a v{{version}}. Veja a diferença e escolha qual fica.",
+    conflictDiff: "Diferença: salva → sua",
+    createAndWrite: "Criar e escrever",
+    exists: "Já existe uma página com esse título.",
+    openExisting: "Abrir a página",
+  },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Não deu para carregar as rotinas.",
@@ -1019,7 +1060,7 @@ export const featureKeysPtBR = {
     ownerYou: "Responsável: você",
     nowWaiting: "Espera seu ok: {{title}}",
     did: {
-      title: "O que fez por você",
+      title: "O que {{she}} fez por você",
       month_one: "{{count}} este mês",
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
@@ -1052,7 +1093,7 @@ export const featureKeysPtBR = {
       },
     },
     knows: {
-      title: "O que sabe sobre você",
+      title: "O que {{she}} sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
@@ -1078,7 +1119,7 @@ export const featureKeysPtBR = {
     },
     thinks: "Pensa com",
     uses: {
-      title: "O que pode usar",
+      title: "O que {{she}} pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
       area: {
         context: "Memória",
@@ -1425,7 +1466,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem responde",
+    audience: "Para quem {{she}} responde",
     another: "Outra IA",
   },
   crash: {

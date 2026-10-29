@@ -37,6 +37,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BrainKind,
+  BrainMachine,
   BrowserHandoff,
   CalendarEvent,
   CalendarEventInput,
@@ -343,6 +344,8 @@ export interface ApiClient {
     /** "Quem pensa": the API, Claude Code or Codex on its computer (its owner or an admin). */
     brain(orgId: string, agentId: string): Promise<AgentBrain>;
     setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
+    /** "Quem pensa" for an agent still being created: the workspace's computers and what each offers (admins). */
+    brainMachines(orgId: string): Promise<BrainMachine[]>;
     runs(
       orgId: string,
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },

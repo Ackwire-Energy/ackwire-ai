@@ -275,6 +275,11 @@ const FILLER = "&#847;&zwnj;&nbsp;&#8199;&shy;".repeat(60);
  */
 export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: string; inline: InlinePart[] } {
   const { src, inline } = pictures(art);
+  // The app's face from this server's own `/email/`, beside the pictures. A mail app that can't load it shows the stack
+  // after it at once (`swap`). With the pictures attached the email fetches nothing, the face included: an address no
+  // reader can reach would only bring remote-content warnings. Classic Outlook never sees the rule, and Gmail, which
+  // loads no web font, drops this block alone.
+  const fonts = art.base;
   const lang = doc.lang;
   const body = doc.blocks.map((b) => block(b, src)).join("\n");
   const logo = (file: string, cls: string, display: string, color: string) =>
@@ -309,7 +314,7 @@ ${DARK.map((r) => `[data-ogsc] ${r}[data-ogsb] ${r}`).join("\n")}
 <style>
 @media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,${D.actionTop} 0%,${D.action} 100%)!important}}
 </style>
-${art.base ? `<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;size-adjust:107%;src:url('${esc(`${art.base}${FONT}`)}') format('woff2')}</style><!--<![endif]-->` : ""}
+${fonts ? `<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('${esc(`${fonts}${FONT}`)}') format('woff2')}</style><!--<![endif]-->` : ""}
 </head>
 <body class="body bg" style="margin:0;padding:0;width:100%;background:${L.page};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
 <div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all">${esc(doc.preheader)}${FILLER}</div>

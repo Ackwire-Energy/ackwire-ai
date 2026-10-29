@@ -15,6 +15,12 @@ import { askTargets, pickedTarget, requestBody } from "./logic";
 import { SheetHeader } from "./parts";
 import { useOpenDm } from "./useOpenDm";
 
+/** "Criar agente" is a pushed screen of its own: "Novo" closes first, so it opens over the tabs. */
+function openNewAgent() {
+  if (router.canDismiss()) router.dismissAll();
+  setTimeout(() => router.push("/new-agent"), 60);
+}
+
 /**
  * "Novo" (the "+" of the tabs): request first. "O que você precisa?",
  * for whom (the agent you talked to last comes picked; a tap changes it), and one button, "Pedir ao
@@ -57,7 +63,7 @@ export function NewSheet() {
             key: "agent",
             leading: <Tile icon="agent" size={32} />,
             label: t("mobile.agents.new"),
-            onPress: () => router.push("/new-agent"),
+            onPress: () => openNewAgent(),
           },
         ]),
     {
@@ -82,13 +88,7 @@ export function NewSheet() {
           <Text variant="body" tone="muted" style={styles.lone}>
             {t("mobile.new.ask.noAgents")}
           </Text>
-          <Button
-            variant="primary"
-            wide
-            icon="plus"
-            label={t("mobile.agents.new")}
-            onPress={() => router.push("/new-agent")}
-          />
+          <Button variant="primary" wide icon="plus" label={t("mobile.agents.new")} onPress={() => openNewAgent()} />
         </>
       ) : (
         <>

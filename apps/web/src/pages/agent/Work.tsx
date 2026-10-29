@@ -26,9 +26,9 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
+import { groupPlans, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
@@ -220,7 +220,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? null
       : view?.account
         ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
-        : t("agentPage.work.brain.thisComputer", { computer: view?.computer?.name ?? "" });
+        : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
     !view || (kind !== "claude_code" && kind !== "codex")
@@ -253,7 +253,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
   return (
     <div className="agp-work">
-      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label")}>
+      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label", g)}>
         <div className="agp-cells">
           {!member && (
             <Cell
@@ -261,7 +261,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
               label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
               value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
-              openLabel={t("agentPage.work.open.computer")}
+              openLabel={t("agentPage.work.open.computer", g)}
               // The Cloud's agents all work on the workspace's own computer: nothing to pick.
               onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
             />
@@ -753,7 +753,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
+          label: agent.audience?.userIds?.length
+            ? t("aiAccounts.share.letPeople", g)
+            : t("aiAccounts.share.letEveryone", g),
           run: () =>
             void api.agents
               .setBrain(org.id, agent.id, { onlyOwner: false })
@@ -765,7 +767,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             ? t(onlyOwner ? "aiAccounts.share.savedOwner" : "aiAccounts.share.savedEveryone", g)
             : onlyAccount
               ? account === null
-                ? t("agentPage.work.saved.accountHere", { ...g, computer: computerName })
+                ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
+                  t("aiAccounts.done.savedAgent", {
+                    agent: agent.name,
+                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                  })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
                 ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
@@ -829,12 +835,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const accountOptions: SelectOption[] = [
     {
       value: HERE,
-      label: t("agentPage.work.brain.thisComputer", { computer: computerName }),
+      label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
       // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
       disabled: !view.ownSignIn && view.account !== null,
-      description: view.ownSignIn
-        ? t("agentPage.work.brain.thisComputerText", { computer: computerName })
-        : t("aiAccounts.share.hereNotYours", { computer: computerName }),
+      ...(view.ownSignIn ? {} : { description: t("aiAccounts.share.hereNotYours", { computer: computerName }) }),
       leading: accountIcon,
     },
     // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
@@ -991,7 +995,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               hint={
                 view.canUsePlans
                   ? t("aiAccounts.share.hint", g)
-                  : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
+                  : t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })
               }
             />
             <Switch
@@ -1130,13 +1134,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                         ? { provider: also.provider }
                         : {})}
                     email={signedOut ? current?.email : also?.email}
-                    askEmail={!also && (view.ownSignIn || accounts.some((a) => a.mine))}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
                       setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
                       setAccount(a.id);
                       setArrived(a);
+                      setAdding(false);
+                    }}
+                    onUse={(a) => {
+                      setArrived(null);
+                      setAccount(a.id);
                       setAdding(false);
                     }}
                   />
@@ -1274,7 +1282,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("agentPage.work.computer.title", g)}
-      description={t("agentPage.work.computer.sub")}
+      description={t("agentPage.work.computer.sub", g)}
       closeLabel={t("common.close")}
       width={640}
       className="agp-wdlg"

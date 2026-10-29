@@ -621,6 +621,22 @@ export const featureKeysEn: FeatureTranslations = {
     empty: "No agents yet.",
     freeSection: "Free",
   },
+  agentEdit: {
+    missing: "This agent no longer exists.",
+    saved: "Changes saved",
+    rolePlaceholder: "E.g. Support",
+    adminsOnly: "Only admins change the name, role and instructions.",
+    discardTitle: "Discard your changes?",
+    discardText: "What you changed hasn't been saved yet.",
+    discard: "Discard",
+    keepEditing: "Keep editing",
+  },
+  newAgent: {
+    leaveTitle: "Leave without creating?",
+    leaveText: "The agent you started won't be created.",
+    keepGoing: "Keep creating",
+    partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
+  },
   agent: {
     talk: "Chat",
     task: "Task",
@@ -950,6 +966,31 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't load the Drive.",
     more: "Show more",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Tap New page to write the first one.",
+    missing: "This page no longer exists or was renamed.",
+    blank: "Blank page.",
+    folderGone: "This folder has no pages any more.",
+    reads_one: "{{count}} time",
+    reads_other: "{{count}} times",
+    taskConflict: "The page changed. It's updated; check it again.",
+    view: "View",
+    notSaved: "Preview · not saved yet",
+    placeholder: "Write here. [[ links another page.",
+    hideKeyboard: "Hide the keyboard",
+    createLink: "Create “{{title}}”",
+    discardTitle: "Leave without saving?",
+    discardText: "What you wrote here will be lost.",
+    discard: "Discard",
+    keepWriting: "Keep writing",
+    conflictText: "The saved version is now v{{version}}. See the difference and choose which one stays.",
+    conflictDiff: "Difference: saved → yours",
+    createAndWrite: "Create and write",
+    exists: "A page with this title already exists.",
+    openExisting: "Open the page",
+  },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Couldn't load the routines.",
@@ -1014,7 +1055,7 @@ export const featureKeysEn: FeatureTranslations = {
     ownerYou: "Owner: you",
     nowWaiting: "Needs your ok: {{title}}",
     did: {
-      title: "What it did for you",
+      title: "What {{she}} did for you",
       month_one: "{{count}} this month",
       month_other: "{{count}} this month",
       seeAll: "See all",
@@ -1047,7 +1088,7 @@ export const featureKeysEn: FeatureTranslations = {
       },
     },
     knows: {
-      title: "What it knows about you",
+      title: "What {{she}} knows about you",
       footF: "Tap to correct or forget.",
       footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
@@ -1073,7 +1114,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     thinks: "Thinks with",
     uses: {
-      title: "What it can use",
+      title: "What {{she}} can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },
       area: {
         context: "Memory",
@@ -1084,7 +1125,7 @@ export const featureKeysEn: FeatureTranslations = {
         skills: "Skills",
         schedule: "Routines",
         forum: "Forum",
-        sandbox: "Its own computer",
+        sandbox: "Own computer",
         browser: "Browser",
         desktop: "Computer screen",
       },
@@ -1419,7 +1460,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who it replies to",
+    audience: "Who {{she}} replies to",
     another: "Another AI",
   },
   crash: {

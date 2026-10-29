@@ -322,7 +322,39 @@ describe("where the pictures come from", () => {
     expect(inline).toEqual([]);
   });
 
-  test("attached: each message carries only the pictures its HTML names, and no web font", async () => {
+  test("every email loads the app's face from this server alone, in a rule classic Outlook never reads", async () => {
+    const attached = await emailArtFor("http://localhost:3000", WEB_DIR, "auto");
+    // With the pictures attached nothing is fetched, the face included: no reader could reach that address.
+    for (const [from, a] of [
+      ["https://x.test", art],
+      [null, attached],
+    ] as const) {
+      const { html } = renderEmail(EMAIL_SAMPLES["verify_email.en"] as EmailTemplate, a);
+      const faces = [...html.matchAll(/@font-face\{[^}]*\}/g)].map((m) => m[0]);
+      expect(faces).toEqual(
+        from
+          ? [
+              `@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('${from}/email/source-sans-3-latin.woff2') format('woff2')}`,
+            ]
+          : [],
+      );
+      // Every URL a mail app may fetch is this server's: no font host, no other company.
+      const fetched = [...html.matchAll(/(?:src="|url\(')(https?:\/\/[^"')]+)/g)].map(
+        (m) => new URL(m[1] ?? "").origin,
+      );
+      expect(new Set(fetched)).toEqual(new Set(from ? [from] : []));
+      // Its own style block, inside the comment classic Outlook skips. The face is the stack's first font, and
+      // classic Outlook is told its own.
+      if (from) expect(html).toContain(`<!--[if !mso]><!--><style>${faces[0]}</style><!--<![endif]-->`);
+      expect(html).toContain(
+        "font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+      );
+      expect(html).toContain("<!--[if mso]>");
+      expect(html).toMatch(/<!--\[if mso\]>.*font-family:'Segoe UI',Arial,sans-serif!important.*<!\[endif\]-->/);
+    }
+  });
+
+  test("attached: each message carries only the pictures its HTML names", async () => {
     const attached = await emailArtFor("http://localhost:3000", WEB_DIR, "auto");
     expect(attached.base).toBeNull();
     const { html, inline } = renderEmail(
@@ -336,7 +368,6 @@ describe("where the pictures come from", () => {
       attached,
     );
     expect(html).toContain('src="cid:logo-ink@agentes.chat"');
-    expect(html).not.toContain("@font-face");
     expect(inline.map((p) => p.filename)).toEqual(["logo-ink.png", "logo-bone.png", "sky-band.png", "agent-rose.png"]);
     expect(inline[0]).toMatchObject({ cid: "logo-ink@agentes.chat", contentType: "image/png" });
     expect([...(inline[0]?.content ?? []).slice(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");

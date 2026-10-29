@@ -3435,6 +3435,14 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
+/** A computer the caller may give an agent, with what it offers. */
+export interface BrainMachine {
+  machineId: string;
+  name: string;
+  online: boolean;
+  options: BrainOption[];
+}
+
 /** `GET …/agents/{id}/brain` (its owner or an admin). */
 export interface AgentBrain {
   agentId: string;
@@ -3447,7 +3455,7 @@ export interface AgentBrain {
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
-  machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
+  machines: BrainMachine[];
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;
@@ -3582,8 +3590,10 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
-  /** `failed`: the viewer already has this account on that computer (named `label`). */
-  duplicate?: { label: string };
+  /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
+  duplicate?: { label: string; account?: MachineAccount };
+  /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
+  signedInAs?: string;
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

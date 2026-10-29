@@ -1,6 +1,6 @@
 # 0059. AI accounts belong to people: one account per agent, a plan answers its owner, more providers, official marks
 
-- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first. Amended 2026-10-27: §2 and §4 (one login per agent), §5 (plans are personal where the server provisions the computers)
+- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first. Amended 2026-10-27: §2 and §4 (one login per agent), §5 (plans are personal where the server provisions the computers); 2026-10-28: §6 (no address asked)
 - Date: 2026-10-24
 - Extends: ADR 0018 (providers), ADR 0027 (secrets end to end), ADR 0032 (computer brains), ADR 0041 (accounts per agent)
 - Supersedes in part: ADR 0041 §2 (who adds accounts), §4 (who decides) and §7 (removing); ADR 0032 §5 (when the plan warning shows); ADR 0058 §4 (who drives an agent's computer in system mode while its user holds a sign-in)
@@ -61,6 +61,8 @@ The apps say it where it matters. The plan's panel ends with who the agents answ
 ### 6. The sign-in code never passes through our servers in the clear
 
 ADR 0041's path stays: the provider's own CLI signs in on the computer, the pasted code is sealed in the browser to a key made inside the runner (ADR 0027), and the server relays the ciphertext in memory, never storing or logging it. Claude's flow uses PKCE (S256), so a relayed code is useless without the verifier that never leaves the CLI. The paste is the only hard step: the sign-in opens in a popup, "Paste" sends by itself only when the text ends with this sign-in's state, and an optional "Which account?" email becomes the CLI's login hint (validated, never passed to a shell). Each sign-in runs the provider's CLI on a computer others may share, so a computer runs at most four at once and a person starts at most ten per computer every 15 minutes.
+
+*Amended 2026-10-28:* the apps ask for no address: the account chosen on the provider's own page is the one connected. The API still takes the optional email (older phone apps send it), and signing in again to a signed-out account sends that account's own email as the login hint, unseen. A new sign-in that comes back as an account its person already has on that computer is refused as before, and the answer now carries that account, which they may think with instead for an agent while it is signed in and no agent thinks with it. Signing in again that comes back as another account (an email other than the account's own, or one its person already has there) is refused too: the account stays signed out with its agents, never removed, and the answer says which account came back (`signedInAs`). That login stays in the account's folder until it signs in again or is removed; nothing thinks with a signed-out account.
 
 ### 7. Usage limits, read without touching a token
 

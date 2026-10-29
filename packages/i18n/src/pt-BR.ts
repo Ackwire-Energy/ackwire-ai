@@ -603,7 +603,7 @@ export const ptBR = {
       lead: "Convide por e-mail ou compartilhe o link.",
       leadLink: "Compartilhe o link de convite com eles.",
       emails: "E-mails",
-      placeholder: "nome@empresa.com, outra@empresa.com",
+      placeholder: "nome@empresa.com",
       more: "Mais e-mails…",
       emailsHint: "Cada pessoa recebe um convite por e-mail e entra direto.",
       invalid: "confira",
@@ -1075,9 +1075,8 @@ export const ptBR = {
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
     own: {
-      this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela.",
-      other: "Outra conta do {{brand}}",
+      shared: "A conta que os seus agentes dividem",
+      one: "Uma conta só {{for}} {{name}}",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
     /** Under a plan's sign-in: it changes how the agent treats everyone else. */
@@ -1108,8 +1107,8 @@ export const ptBR = {
     signInFor: "Fazer login {{for}} {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
     otherAccount: {
-      claude_code: "O Claude entrou como {{email}}. Para usar {{wanted}}, saia na página do Claude e tente de novo.",
-      codex: "O ChatGPT entrou como {{email}}. Para usar {{wanted}}, saia na página do ChatGPT e tente de novo.",
+      claude_code: "O Claude entrou como {{email}}, não como {{account}}. Saia na página do Claude e tente de novo.",
+      codex: "O ChatGPT entrou como {{email}}, não como {{account}}. Saia na página do ChatGPT e tente de novo.",
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1291,13 +1290,13 @@ export const ptBR = {
     removeAgentBody: "Para de ler e de responder neste canal. Dá para adicionar de novo depois.",
     removeConfirm: "Tirar do canal",
     replyHeading: "Quando responde",
-    replyAlone: "Sozinho",
+    replyAlone: "Por conta própria",
     replyAloneHelp: "Responde quando o assunto pede, sem precisar de @",
     replyAloneRules: "Também responde a respostas e continuações",
-    replyAloneOff: "Por enquanto, responde só quando mencionado",
-    replyMention: "Quando chamado",
+    replyAloneOff: "Por enquanto, responde só quando alguém menciona",
+    replyMention: "Quando alguém chama",
     replyMentionHelp: "Só responde se alguém escrever @{{handle}}",
-    aloneLine: "Entra na conversa sozinho",
+    aloneLine: "Entra na conversa por conta própria",
     mentionLine: "Espera alguém chamar @{{handle}}",
     readOnly: "Só quem criou o canal e os admins mudam os membros.",
     people: "Pessoas",
@@ -1844,7 +1843,6 @@ export const ptBR = {
         brain: "{{The}} {{name}} agora pensa com {{brain}}.",
         brainMoved: "{{The}} {{name}} agora pensa com {{brain}} no {{computer}}.",
         account: "{{The}} {{name}} agora usa a conta {{account}}.",
-        accountHere: "{{The}} {{name}} agora usa a conta do próprio {{computer}}.",
         computer: "{{The}} {{name}} agora trabalha no {{computer}}.",
         none: "{{The}} {{name}} agora está sem computador.",
         browserOn: "{{The}} {{name}} já pode navegar em sites.",
@@ -1872,7 +1870,6 @@ export const ptBR = {
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
-        thisComputerText: "A que já está no {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
         accountAlso: "Também usada por {{agents}}",
         accountOf: "De {{name}}",
@@ -1921,9 +1918,9 @@ export const ptBR = {
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
             claude_code:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do Claude e entre com a outra.",
+              "O Claude entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
             codex:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do ChatGPT e entre com a outra.",
+              "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -2550,6 +2547,12 @@ export const ptBR = {
       other: "US$ {{input}} / US$ {{output}} por milhão de tokens",
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
+    plans: "Pelo plano, num computador",
+    plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
+    planOnlyOwner:
+      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+    planNotSaved:
+      "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",
@@ -2624,7 +2627,7 @@ export const ptBR = {
     subtitle_other: "Quem faz parte da {{org}}: {{people}} pessoas e {{agents}} agentes.",
     inviteTitle: "Convidar pessoas",
     emails: "E-mails, separados por vírgula",
-    emailsPlaceholder: "nome@empresa.com.br, outra@empresa.com.br",
+    emailsPlaceholder: "nome@empresa.com.br",
     role: "Papel",
     invite: "Convidar",
     invalidEmails: "Nenhum e-mail válido. Use algo como nome@empresa.com.br.",
@@ -3382,7 +3385,7 @@ export const ptBR = {
       codex: "Codex (experimental)",
       codexText: "O Codex programa no computador. Ainda em teste.",
       agent: "{{name}} (o próprio agente)",
-      agentText: "{{name}} programa direto no computador, com as ferramentas dele.",
+      agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
     },
     readOnlyNote: "Você pode ler. Para pedir algo, peça para participar.",
     items_one: "{{done}} de {{count}} item",
@@ -3469,12 +3472,12 @@ export const ptBR = {
       openRef: "Abrir {{ref}} no repositório",
     },
     plan: {
-      cap: "Plano do {{executor}}",
+      cap: "Plano {{of}} {{executor}}",
       label: "Plano",
-      drafting: "O {{executor}} está lendo a pasta no {{computer}} e montando o plano",
+      drafting: "{{The}} {{executor}} está lendo a pasta no {{computer}} e montando o plano",
       empty: "Ainda sem itens. Dá para começar assim mesmo ou pedir um plano em “Mudar algo”.",
       waitPlan: "Libera quando o plano chegar",
-      adjusts: "o {{executor}} vai ajustando a lista conforme avança",
+      adjusts: "{{article}} {{executor}} vai ajustando a lista conforme avança",
       switched: "Agora quem programa é {{executor}}. O plano recomeça.",
       more_one: "+{{count}} item",
       more_other: "+{{count}} itens",
@@ -3744,7 +3747,7 @@ export const ptBR = {
       tabs: "Arquivo",
       missionSub: "Plano e regras · atualizado pelo agentes.chat",
       decisionsSub: "Decisões aprovadas",
-      notesSub: "Anotações do {{executor}}",
+      notesSub: "Anotações {{of}} {{executor}}",
       synced: "sincronizado {{when}}",
       editedKept: "Editado no computador. Mantivemos a versão aprovada.",
       showDiff: "Ver diferença",
@@ -3755,7 +3758,7 @@ export const ptBR = {
       removed: "Linha aprovada",
       empty: "Ainda vazio.",
       foot: "Vale o que foi aprovado no chat. Para mudar, peça na thread.",
-      notesFoot: "O {{executor}} anota aqui o que aprendeu e os próximos passos.",
+      notesFoot: "{{The}} {{executor}} anota aqui o que aprendeu e os próximos passos.",
       open: "Abrir o arquivo",
       check: { doing: "em andamento", waiting: "esperando você", dropped: "fora do plano" },
     },
@@ -3798,7 +3801,7 @@ export const ptBR = {
     new: {
       noEligibleTitle: "Nenhum agente pode rodar uma missão para você ainda",
       noEligibleText: "Conecte um computador a um agente para criar missões. O trabalho roda nele, com o Claude Code.",
-      connectComputer: "Conectar um computador ao {{name}}",
+      connectComputer: "Conectar um computador {{to}} {{name}}",
       connect: "Conectar computador",
       blockedLabel: "Agentes que ainda não podem rodar uma missão",
       reason: {
@@ -3883,15 +3886,15 @@ export const ptBR = {
         removed: "“{{command}}” volta a ser conferido a cada vez",
       },
       defaults: {
-        title: "Próximas missões do {{name}}",
+        title: "Próximas missões {{of}} {{name}}",
         startWith: "Começar com “{{value}}”",
-        isDefault: "Já é o padrão do {{name}}.",
+        isDefault: "Já é o padrão {{of}} {{name}}.",
         today: "Hoje começam com “{{value}}”. As atuais não mudam.",
         use: "Usar como padrão",
         chip: "Padrão",
-        updated: "Padrão do {{name}} atualizado",
+        updated: "Padrão {{of}} {{name}} atualizado",
         updatedDetail: "Próximas missões: {{value}}",
-        cannot: "Só quem cuida do {{name}} ou um admin muda o padrão.",
+        cannot: "Só quem cuida {{of}} {{name}} ou um admin muda o padrão.",
       },
       more: {
         title: "Mais opções",
@@ -3903,7 +3906,7 @@ export const ptBR = {
         claudeText: "Planeja e faz no computador.",
         codex: "Codex",
         codexText: "Faz no computador.",
-        agentText: "O próprio {{name}} faz, com as ferramentas dele.",
+        agentText: "{{The}} {{name}} faz, com as próprias ferramentas.",
         testing: "Em teste",
         locked: "Não dá para trocar depois que a missão começa.",
         open: "Dá para trocar até a missão começar.",
@@ -3981,7 +3984,7 @@ export const ptBR = {
       done: "Pronto",
       handTitle: "Passar a missão para {{name}}?",
       handText:
-        "O computador não muda de dono. Se você emprestar o seu, o {{executor}} continua nele. Se não, {{name}} escolhe um computador próprio.",
+        "O computador não muda de dono. Se você emprestar o seu, {{article}} {{executor}} continua nele. Se não, {{name}} escolhe um computador próprio.",
       lend: "Continuar usando o {{computer}}",
       lendText: "{{name}} passa a decidir tudo. O trabalho segue no computador do agente.",
       handNote: "Você continua na missão podendo decidir.",
@@ -4564,9 +4567,6 @@ export const ptBR = {
     add: {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
-      email: "Qual conta? (opcional)",
-      emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
       openKeys: "Abrir {{site}}",
@@ -5762,12 +5762,12 @@ export const ptBR = {
       forum: { write: "Abre tópicos, lê e posta no fórum." },
       sandbox: { write: "Roda código no computador do agente." },
       browser: {
-        write: "Navega em sites com o próprio navegador, no computador dele. Os logins ficam por agente.",
+        write: "Navega em sites com o próprio navegador, no computador {{hers}}. Os logins ficam por agente.",
       },
       setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
       desktop: {
         write:
-          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
+          "Usa qualquer app na própria tela, no computador {{hers}}, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
       },
     },
   },
@@ -6664,7 +6664,7 @@ export const ptBR = {
     namePlaceholder: "Ex.: Produção",
     url: "Endereço do banco",
     urlHelp: "Começa com postgres://. Fica cifrado no servidor. Ninguém vê depois, nem os agentes.",
-    urlPlaceholder: "postgres://usuario:senha@servidor:5432/banco",
+    urlPlaceholder: "postgres://usuario:senha@host/banco",
     urlInvalid: "Cole um endereço que comece com postgres://, ou preencha os campos em Avançado.",
     howTitle: "Como criar um usuário só de leitura?",
     howText: "Os agentes só fazem consultas, mas um usuário só de leitura garante isso no próprio banco.",
@@ -7526,6 +7526,7 @@ export const ptBR = {
       sentence: "Em {{month}}, {{article}} {{name}} usou {{tokens}} tokens: {{parts}}.",
       accountPart: "{{percent}} na conta {{account}}",
       computerPart: "{{percent}} na conta deste {{computer}}",
+      sharedPart: "{{percent}} na conta que os seus agentes dividem",
       removedPart: "{{percent}} numa conta removida",
       oldPart: "{{percent}} no {{brand}}, de antes das contas",
       apiPart: "{{percent}} pela API",
@@ -7583,6 +7584,9 @@ export const ptBR = {
     ofM: "do",
     toF: "à",
     toM: "ao",
+    /** The agent as a subject ("ela entrou para ajudar"). As an object it is `pronoun` ("com ela"). */
+    sheF: "ela",
+    sheM: "ele",
     pronounF: "ela",
     pronounM: "ele",
     forF: "para a",
@@ -7647,16 +7651,16 @@ export const ptBR = {
     /** Next to the time on a reply of an agent nobody called. */
     joined: {
       label: "entrou na conversa",
-      tip: "Ninguém chamou {{article}} {{name}}. {{Pronoun}} entrou para ajudar.",
+      tip: "Ninguém chamou {{article}} {{name}}. {{She}} entrou para ajudar.",
     },
     work: {
-      see: "Ver o que {{pronoun}} fez",
+      see: "Ver o que {{she}} fez",
       steps_one: "{{count}} passo",
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
       /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
-      block: "O que {{pronoun}} fez",
+      block: "O que {{she}} fez",
       used_one: "Usou {{count}} ferramenta",
       used_other: "Usou {{count}} ferramentas",
       times: "×{{count}}",
@@ -8171,7 +8175,7 @@ export const ptBR = {
       removeSite: "Tirar {{site}}",
       badSite: "Isso não parece um site. Use exemplo.com ou *.exemplo.com.",
       saveFailed: "Não deu para salvar. Tente de novo.",
-      signedIn: "{{The}} {{name}} fica logado nos sites em que entrar, neste computador.",
+      signedIn: "{{The}} {{name}} fica com o login feito nos sites em que entrar, neste computador.",
     },
     machine: {
       ready: "Pronto",
@@ -8188,7 +8192,7 @@ export const ptBR = {
       waitingChip: "Esperando você",
       see: "Ver",
       stop: "Parar",
-      stopConfirm: "Fechar o navegador {{of}} {{name}} agora? O que {{pronoun}} estava fazendo para aqui.",
+      stopConfirm: "Fechar o navegador {{of}} {{name}} agora? O que {{she}} estava fazendo para aqui.",
       stopped: "Navegador {{of}} {{name}} fechado.",
       who: "Quem pode usar",
       whoHelp: "Ligue por agente, na página de cada um.",
@@ -8307,9 +8311,9 @@ export const ptBR = {
       openingHelp: "Na primeira vez neste computador pode levar um minuto.",
       subWorking: "{{name}} · {{now}}",
       subStarting: "{{name}} está abrindo o navegador",
-      subControl: "Você no controle · {{site}} · {{article}} {{name}} pediu",
-      subControlAsked: "Você no controle · {{article}} {{name}} pediu",
-      subTakeover: "Você no controle · {{article}} {{name}} espera",
+      subControl: "Você no controle · {{site}} · {{article}}\u00a0{{name}} pediu",
+      subControlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
+      subTakeover: "Você no controle · {{article}}\u00a0{{name}} espera",
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
@@ -8447,7 +8451,8 @@ export const ptBR = {
     title: "Computador da {{org}}",
     /** The ⓘ on the computer's name. */
     users: "Um usuário para cada agente: cada um tem a própria pasta.",
-    specs: "{{cpus}} CPUs · {{memoryGb}} GB de memória · {{diskGb}} GB de disco",
+    specs:
+      "{{cpus}}\u00a0CPUs\u00a0· {{memoryGb}}\u00a0GB\u00a0de\u00a0memória\u00a0· {{diskGb}}\u00a0GB\u00a0de\u00a0disco",
     chip: {
       preparing: "Sendo preparado",
       capacity: "Na fila",
@@ -8474,7 +8479,7 @@ export const ptBR = {
     status: {
       preparing: "Preparando o computador.",
       capacity: "Esperando um computador disponível",
-      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+      problem: "Algo deu errado ao preparar o computador. Já\u00a0estamos\u00a0cuidando.",
       ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
@@ -8495,7 +8500,7 @@ export const ptBR = {
       late: "Demorando um pouco mais que o previsto",
     },
     email: {
-      you: "Avisamos você em {{email}} quando ele ficar pronto.",
+      you: "Avisamos\u00a0você\u00a0em {{email}} quando\u00a0ele\u00a0ficar\u00a0pronto.",
       here: "Aparece aqui assim que ficar pronto.",
       /** After the capacity wait's line, for owners. */
       short: "Avisamos por e-mail.",
@@ -8504,8 +8509,8 @@ export const ptBR = {
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
     sub: {
-      control: "Você no controle · {{article}} {{name}} espera",
-      controlAsked: "Você no controle · {{article}} {{name}} pediu",
+      control: "Você no controle · {{article}}\u00a0{{name}} espera",
+      controlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
       hidden: "{{person}} no controle",
     },
     state: {
@@ -8535,7 +8540,7 @@ export const ptBR = {
     },
     control: {
       keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
-      notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
     session: {
