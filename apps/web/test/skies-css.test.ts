@@ -33,8 +33,9 @@ test("a service's × ships in the full ink on its sky", async () => {
   expect(await ships("layout.css", "src/styles.css", selector)).toContain("color:var(--ink)");
 });
 
-test("a closed browser's sky takes the empty line's room in the computer window, at every width", async () => {
-  const selector = ".cmp-body:has(> .brw-ac.is-surface.is-closed) > .cmp-steps-row:empty";
+test("a closed browser's sky takes the line's room in the computer window, steps or not, at every width", async () => {
+  // Not only while the line is empty: a run's first step comes before the frame that ends the closed state.
+  const selector = ".cmp-body:has(> .brw-ac.is-surface.is-closed) > .cmp-steps-row";
   const file = "components/computer/computer.css";
   expect(await ships(file, `src/${file}`, selector)).toContain("display:none");
 });
