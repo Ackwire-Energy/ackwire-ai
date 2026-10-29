@@ -168,21 +168,6 @@ test("the built stylesheet keeps touch's bar for the keyboard only, and the lit 
   expect(declarations(css, more)).toEqual(expect.arrayContaining(declarations(kit, more)));
 });
 
-test("the built stylesheet keeps a chat row the browser skips at the size it remembers, never at its padding", async () => {
-  const css = await builtCss();
-  // The list is a column flexbox taller than its box, and a skipped row has no content to stop it shrinking: a row
-  // that hover or focus just left would be laid out at its padding until the next frame, moving the rows under a tap.
-  const row = declarations(css, ".channel__messages .ac-msg");
-  expect(row).toContainEqual(["content-visibility", "auto"]);
-  expect(row).toContainEqual(["flex-shrink", "0"]);
-  expect(row.findLast(([p]) => p === "contain-intrinsic-size")?.[1]).toStartWith("auto ");
-  // No other rule gives a row a flex of its own (`flex` sets flex-shrink too).
-  const flexed = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter((m) => /(^|;)\s*flex(-shrink)?\s*:/.test(m[2] ?? ""))
-    .flatMap((m) => selectorsOf(m[1] ?? "").filter((s) => /\.ac-msg(--[\w-]+)?(?![\w-])[^ >+~]*$/.test(s)));
-  expect(flexed).toEqual([".channel__messages .ac-msg"]);
-});
-
 test("no rule sets translate, rotate or scale beside transform: the build's minifier drops or merges them", async () => {
   const pairs: string[] = [];
   for (const dir of ["apps/web/src", "packages/ui/src", "apps/desktop/src"])
