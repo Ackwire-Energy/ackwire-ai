@@ -308,7 +308,7 @@ export const ptBR = {
       lead: "Eles chegam com instruções, skills, rotinas e memória.",
       sourcesLabel: "De onde vêm os agentes",
       otherName: "Outro app",
-      agenteschatName: "Exportação do agentes.chat",
+      agenteschatName: "agentes.chat",
       where: {
         openbotrun:
           "Solte o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância), ou o .zip em que ele veio.",
