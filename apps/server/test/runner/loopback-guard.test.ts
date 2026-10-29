@@ -18,11 +18,11 @@ const A2: GuardedListener = { port: 45777, uid: 21000 };
 const B: GuardedListener = { port: 50001, uid: 21001 };
 
 /** `ss -Htln -e` lines as the kernel prints them: no `uid:` for root, `uid:<n>` otherwise. */
-function ssOutput(rows: { port: number; uid?: number; state?: string }[]): string {
+function ssOutput(rows: { port: number; uid?: number; state?: string; address?: string }[]): string {
   return rows
     .map((r) => {
       const uid = r.uid === undefined ? "" : ` uid:${r.uid}`;
-      return `${r.state ?? "LISTEN"} 0      0       127.0.0.1:${r.port} 0.0.0.0:*${uid} ino:7953 sk:0`;
+      return `${r.state ?? "LISTEN"} 0      0       ${r.address ?? "127.0.0.1"}:${r.port} 0.0.0.0:*${uid} ino:7953 sk:0`;
     })
     .join("\n");
 }
@@ -89,6 +89,39 @@ test("deduplicates a port/uid seen twice (IPv4 and IPv6 rows) and ignores non-LI
   expect(parseListeners(out, new Set([21000]))).toEqual([{ port: 45891, uid: 21000 }]);
 });
 
+test("a port shared by different agent uids never grants either uid access to the other's address", () => {
+  const listeners = parseListeners(
+    ssOutput([
+      { port: 45891, uid: 21000, address: "127.0.0.1" },
+      { port: 45891, uid: 21001, address: "127.0.0.2" },
+      { port: 50001, uid: 21001, address: "127.0.0.1" },
+    ]),
+    new Set([21000, 21001]),
+  );
+  expect(listeners).toContainEqual({ port: 45891, uid: 21000 });
+  expect(listeners).toContainEqual({ port: 45891, uid: 21001 });
+  const text = renderRuleset(listeners, "reject with tcp reset");
+  expect(text).not.toContain("45891 . 21000");
+  expect(text).not.toContain("45891 . 21001");
+  expect(text).toContain("50001 . 21001");
+  expect(text).toMatch(/guarded \{[^}]*elements = \{ 45891, 50001 \}/s);
+
+  // The decision is also fail-closed across IPv4/IPv6 and wildcard listener rows.
+  for (const address of ["[::1]", "0.0.0.0", "[::]"]) {
+    const mixed = parseListeners(
+      ssOutput([
+        { port: 45891, uid: 21000, address: "127.0.0.1" },
+        { port: 45891, uid: 21001, address },
+      ]),
+      new Set([21000, 21001]),
+    );
+    const rules = renderRuleset(mixed, "reject with tcp reset");
+    expect(rules).not.toContain("45891 . 21000");
+    expect(rules).not.toContain("45891 . 21001");
+    expect(rules).toMatch(/guarded \{[^}]*elements = \{ 45891 \}/s);
+  }
+});
+
 // ── reconcile ────────────────────────────────────────────────────────────────
 
 /** A fake root toolbox: records calls and lets a test read back the applied ruleset. */
@@ -137,6 +170,24 @@ test("reconcile guards the agent's port after reading its uid from ss, and leave
   expect(applied).toContain("elements = { 45891 }");
   // The port 22 (root) listener is not an agent's and is never guarded.
   expect(applied).not.toContain(" 22 ");
+  g.stop();
+});
+
+test("reconcile removes an owner exception when another uid binds the same port", () => {
+  const opts = { listeners: ssOutput([{ port: 45891, uid: 21000, address: "127.0.0.1" }]) };
+  const nft = fakeNft(opts);
+  const { g } = guard(nft.run, [21000, 21001]);
+  g.start();
+  expect(nft.applied()).toContain("45891 . 21000");
+
+  opts.listeners = ssOutput([
+    { port: 45891, uid: 21000, address: "127.0.0.1" },
+    { port: 45891, uid: 21001, address: "127.0.0.2" },
+  ]);
+  g.reconcile();
+  expect(nft.applied()).not.toContain("45891 . 21000");
+  expect(nft.applied()).not.toContain("45891 . 21001");
+  expect(nft.applied()).toMatch(/guarded \{[^}]*elements = \{ 45891 \}/s);
   g.stop();
 });
 
