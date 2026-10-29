@@ -37,6 +37,26 @@ describe("buttons and kbd", () => {
     expect(b.querySelector(".ac-btn__kbd")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("no keyboard hints on a touch screen or at phone width, wherever the kit draws one", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const narrow = css.split("\n@media (max-width: 760px), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    const hidden = narrow.split("{").at(-2)?.split("}").at(-1) ?? "";
+    for (const hint of [
+      ".ac-btn__kbd",
+      ".ac-btn > .ac-kbd",
+      ".ac-composer__send-text .ac-kbd",
+      ".ac-searchfield__hint",
+      ".ac-palette .ac-kbd",
+      ".ac-mo__kbd",
+    ])
+      expect(hidden).toContain(hint);
+    expect(narrow).toMatch(/\.ac-mo__kbd \{\s*display: none;/);
+    // The send choice's line of keys goes with them.
+    expect(css).toMatch(
+      /@media \(max-width: 760px\), \(hover: none\), \(pointer: coarse\) \{\s*\.ac-composer-choice__hint \{\s*display: none;/,
+    );
+  });
+
   test("a Button that toggles stays pushed in while on (aria-pressed), hovered or not; a ghost one keeps its plate", async () => {
     render(<Button aria-pressed>Teclado</Button>);
     expect(body().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("true");
@@ -79,10 +99,45 @@ describe("buttons and kbd", () => {
     expect(off).not.toContain("var(--sunken)");
   });
 
-  test("a chosen option never moves, so a row of options keeps its words on one line in both themes", async () => {
+  test("a chosen option is pressed the same in both themes and never moves, so a row of options keeps its words on one line", async () => {
     const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
-    const lifts = [...tokens.matchAll(/--chosen-lift: ([^;]+);/g)].map((m) => m[1]);
-    expect(lifts).toEqual(["none", "none"]);
+    const blocks = [...tokens.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map(
+      ([, selector, rule]) => ({
+        selector: (selector ?? "").trim().replace(/\s+/g, " "),
+        vars: new Map(
+          [...(rule ?? "").matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [
+            name ?? "",
+            (value ?? "").trim(),
+          ]),
+        ),
+      }),
+    );
+    type Vars = Map<string, string>;
+    const chosen = (vars: Vars) => [...vars.keys()].filter((name) => name.startsWith("chosen-"));
+    // One recipe, in the block both themes share, and each theme gives it its face and its shadow.
+    const defining = blocks.filter((b) => chosen(b.vars).length > 0);
+    expect(defining.map((b) => [b.selector, chosen(b.vars)])).toEqual([
+      [':root, [data-theme="light"]', ["chosen-bg", "chosen-press"]],
+      ['[data-theme="dark"]', ["chosen-bg", "chosen-press"]],
+      [":root, [data-theme]", ["chosen-shadow", "chosen-lift"]],
+    ]);
+    const [light, dark, shared] = defining.map((b) => b.vars) as [Vars, Vars, Vars];
+    expect(light.get("chosen-bg")).toBe("var(--sunken)");
+    expect(light.get("chosen-press")).toBe(
+      "inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12)",
+    );
+    // Dark's face sits between the page and a card, never on its near-black --sunken, where a black shadow can't
+    // show. Its shadow is light's, deeper.
+    const level = (hex = "") => Number.parseInt(hex.slice(1, 3), 16);
+    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("bg")));
+    expect(level(dark.get("chosen-bg"))).toBeLessThan(level(dark.get("raised")));
+    const shape = (press = "") => press.replace(/rgba\([^)]*\)/g, "");
+    expect(shape(dark.get("chosen-press"))).toBe(shape(light.get("chosen-press")));
+    const alphas = (press = "") => [...press.matchAll(/rgba\(0, 0, 0, ([\d.]+)\)/g)].map(([, a]) => Number(a));
+    const lightAlphas = alphas(light.get("chosen-press"));
+    expect(alphas(dark.get("chosen-press")).map((a, i) => a >= 3 * (lightAlphas[i] ?? 1))).toEqual([true, true]);
+    expect(shared.get("chosen-shadow")).toBe("var(--chosen-press), inset 0 0 0 1px var(--line)");
+    expect(shared.get("chosen-lift")).toBe("none");
   });
 });
 

@@ -13,7 +13,6 @@ import {
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
-  type SandboxProvider,
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
@@ -68,8 +67,6 @@ export async function createTestServer(
     /** Fake S3 server and DNS for org buckets. */
     s3Fetch?: S3Fetch;
     resolveHost?: ResolveHost;
-    /** Fake code sandbox (off by default). */
-    sandbox?: SandboxProvider;
     /** Fake GitHub (git smart HTTP and REST) for the git proxy. */
     github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
     /** Answers of the fake judge (judge.ts). Default: every Noul 0. */
@@ -137,7 +134,6 @@ export async function createTestServer(
     deltaFlushMs: 0,
     s3Fetch: options.s3Fetch,
     resolveHost: options.resolveHost,
-    sandbox: options.sandbox ?? null,
     github: options.github,
     judge: createFakeJudge(options.judge),
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
@@ -175,7 +171,7 @@ export async function createTestServer(
         artifacts: engine.artifacts,
         context: engine.context,
         sandbox: engine.sandbox,
-        gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        gitProxy: engine.gitProxy,
         appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
         browserLive: engine.browserLive,

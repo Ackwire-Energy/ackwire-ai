@@ -101,6 +101,12 @@ export function webmailOf(
 /** The text ended as a sentence: a full stop added unless it already ends with one, "!", "?" or "…". */
 export const endSentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
 
+/** `text` around the last `part` in it (a value put into a sentence): what comes before and after, or null. */
+export function around(text: string, part: string): [before: string, after: string] | null {
+  const at = part ? text.lastIndexOf(part) : -1;
+  return at < 0 ? null : [text.slice(0, at), text.slice(at + part.length)];
+}
+
 /** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
 const STOPS = /[.!?…](?=\s)|\n/g;
 

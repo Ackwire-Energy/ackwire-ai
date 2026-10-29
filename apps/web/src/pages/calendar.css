@@ -257,7 +257,8 @@
 }
 .cal-chip[data-source="routine"] {
   --cal-accent: var(--line2);
-  background: var(--sunken);
+  /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen one. */
+  background: var(--chosen-bg);
   color: var(--ink2);
   box-shadow: inset 3px 0 0 var(--cal-accent);
 }
@@ -845,12 +846,5 @@
 @media (max-width: 640px) {
   .cal-page__header {
     padding-top: 12px;
-  }
-}
-
-/* Keyboard shortcuts mean nothing on a touch screen. */
-@media (pointer: coarse) {
-  .cal-page__new .ac-kbd {
-    display: none;
   }
 }

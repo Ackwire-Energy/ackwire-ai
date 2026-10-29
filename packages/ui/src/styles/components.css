@@ -354,6 +354,7 @@ samp {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
 .ac-field__error {
   font-size: 13px;
@@ -1416,6 +1417,16 @@ textarea.ac-input {
 .ac-menu__reaction[data-highlighted] {
   background: var(--surface-sunken);
 }
+/* Every emoji: the add-reaction pill's two icons and colors (`.ac-react--add`). */
+.ac-menu__reaction--more {
+  grid-auto-flow: column;
+  place-content: center;
+  gap: 2px;
+  color: var(--faint);
+}
+.ac-menu__reaction--more[data-highlighted] {
+  color: var(--ink);
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;
@@ -1642,27 +1653,13 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other options of the group step back. A pressed card
-   also takes a check in the corner, while a radio card's own radio already marks it. */
+/* Chosen (--chosen-*), inside the card's own outline (its line2 ring and e1's line), so neither the card nor the gaps
+   around it move. A pressed card also takes a check in the corner, while a radio card's own radio already marks it. */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
+  --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
   background: var(--chosen-bg);
-  box-shadow: var(--chosen-shadow);
-  transform: var(--chosen-lift);
-}
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"]
-  :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
-  > .ac-option:not([aria-pressed="true"], [data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow:
-    0 0 0 1px var(--line2),
-    var(--e1);
+  box-shadow: var(--pressed);
 }
 .ac-option[aria-pressed="true"]::after {
   content: "";
@@ -1696,13 +1693,30 @@ textarea.ac-input {
 .ac-option[aria-pressed="true"]:has(:focus-visible),
 .ac-option[data-state="checked"]:has(:focus-visible),
 .ac-option[aria-pressed="true"]:focus-visible {
-  box-shadow: var(--chosen-shadow), var(--field-ring);
+  box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+/* A radio card's chip ("Em uso", "Em breve") rides on its title's first line, at the card's end: the description
+   under them takes the card's whole width. Where the title's longest word and the chip can't share a line (a
+   decision's narrow cards), the chip drops under the title, on its edge. */
+.ac-option__text:has(> .ac-option__head) {
+  flex: 1;
+}
+.ac-option__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: var(--space-3);
+}
+/* A zero basis: the line breaks only when the longest word can't sit beside the chip, and the title takes the rest
+   of the line, so the chip ends it. */
+.ac-option__head > .ac-option__title {
+  flex: 1 1 0;
 }
 .ac-option__title {
   font-weight: 600;
@@ -1711,15 +1725,18 @@ textarea.ac-input {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
+/* A flex box, so the chip alone sets its height: on a text line's baseline it would leave the row 2px taller. */
 .ac-option__aside {
-  margin-left: auto;
+  display: flex;
   flex: none;
 }
 .ac-option[data-disabled] {
   cursor: not-allowed;
 }
-.ac-option[data-disabled] .ac-option__text {
+/* The option dims, not the chip that says why ("Em breve"). */
+.ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc) {
   opacity: 0.55;
 }
 .ac-pill {
@@ -1844,6 +1861,12 @@ textarea.ac-input {
 }
 .ac-dialog__acts > .ac-btn--glyph:last-child {
   --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
+}
+/* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does (a title with a line under
+   it keeps them on the pair's middle). An app measures that middle for its title's face (`--title-cap-mid`): --cap-mid
+   here would resolve in the actions' own font. */
+.ac-dialog__title + .ac-dialog__acts {
+  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
 }
 .ac-dialog__title {
   margin: 0;
@@ -2604,13 +2627,33 @@ a.ac-list__row:focus-visible {
 /* Agent receipts under a person's message: muted, small; only the avatars carry color */
 .ac-receipt {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin-top: var(--space-1);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+}
+/* The words after the icon flow as text in a column of their own: a wrapped line starts under the words, never under
+   the icon, and balanced lines leave no action alone on the last one. */
+.ac-receipt__words {
+  min-width: 0;
+  text-wrap: balance;
+}
+/* The dot and its action are one piece that wraps whole, the dot 4px from each. The room before the dot is the
+   words', so a line the dot starts starts on the column. */
+.ac-receipt__words > :first-child {
+  margin-inline-end: 4px;
+}
+/* After an ⓘ, 1.5px closer: the ⓘ's circle stops 1.54px inside its box. */
+.ac-receipt__words > .ac-hintline:first-child {
+  margin-inline-end: 2.5px;
+}
+.ac-receipt__then {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
 }
 .ac-receipt__avatars {
   display: inline-flex;
@@ -3655,6 +3698,16 @@ a.ac-list__row:focus-visible {
   width: var(--control-icon-lg);
   height: var(--control-icon-lg);
 }
+/*
+ * A leading icon by its ink. A button that says how much air its icon's drawing leaves before it (`--lead-air`) and
+ * how far to lift it (`--lead-rise`: the capitals' `--cap-mid`, plus as far as its ink's middle sits under its box's)
+ * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
+ * folded to its icon, say), the box places it.
+ */
+:where(.ac-btn > .ac-icon:first-child) {
+  margin-inline-start: calc(-1 * var(--lead-air));
+  translate: 0 calc(-1 * var(--lead-rise));
+}
 /* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
 .ac-btn--icon {
   width: var(--control-h-md);
@@ -4033,8 +4086,9 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-1px);
 }
-/* Head: a key with the icon, title and an optional quiet line, the action on the right. The key (an
-   `.ac-iconline` lead) stays on the title's line when the quiet line wraps under it; the action stays centred. */
+/* Head: the lead (a key with the icon, the title and an optional quiet line), the action on the right. The key (an
+   `.ac-iconline` lead) stays on the title's first line when the title or the quiet line wraps; the action stays
+   centred. */
 .ac-card__head {
   display: flex;
   align-items: flex-start;
@@ -4042,13 +4096,23 @@ a.ac-list__row:focus-visible {
   min-width: 0;
   line-height: 20px;
 }
-/* A title alone sits in the middle of a taller action, and its key with it: already centred on the title's line, the
-   key only rises to the capitals' middle. */
+.ac-card__lead {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+/* A title alone sits in the middle of a taller action, and its key with it. Its first line keeps the middle of the
+   key's 22px, so the key only rises to the capitals' middle, however many lines follow. */
 .ac-card__head:not(:has(.ac-card__sub)) {
   align-items: center;
 }
-.ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key {
+.ac-card__head:not(:has(.ac-card__sub)) .ac-card__key {
   translate: 0 calc(-1 * var(--cap-mid));
+}
+.ac-card__head:not(:has(.ac-card__sub)) .ac-card__key + .ac-card__heading {
+  padding-block: 1px;
 }
 .ac-card__key {
   display: grid;
@@ -4080,6 +4144,7 @@ a.ac-list__row:focus-visible {
   color: var(--muted);
   font-size: 12.5px;
   line-height: 17px;
+  text-wrap: pretty;
 }
 .ac-card__action {
   display: flex;
@@ -4112,16 +4177,34 @@ a.ac-list__row:focus-visible {
 
 /*
  * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
- * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before, and
- * sits on the label's first line where an `.ac-iconline` lead would (the glyph's middle on the capitals' middle),
- * so it stays there when the label wraps. The line sets the label's font size and line height (a field's and a
- * card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
+ * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before. The
+ * label flows as text, every line of it 18px short of the line's end, and the ⓘ follows its last word in that room,
+ * taking none of its own, so it never goes to a line alone; it sits on that line's capitals' middle, as an
+ * `.ac-iconline` lead sits on its line's. A label element is set from each line's top, as the ⓘ is, so the line's
+ * own type never moves it; one with its own icon or logo stays one box. The line sets the label's font size and line
+ * height (a field's and a card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
  */
 .ac-hintline {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 4px;
+  display: inline-block;
   min-width: 0;
+  padding-inline-end: 18px;
+  /* No word alone on a wrapped label's last line. Not `pretty`: Chrome skips it in a paragraph holding a box, as the
+     ⓘ is. */
+  text-wrap: balance;
+}
+.ac-hintline:not(:has(> .ac-hint)) {
+  padding-inline-end: 0;
+}
+.ac-hintline > :first-child:not(.ac-hint) {
+  display: inline;
+  vertical-align: top;
+}
+.ac-hintline > :first-child:not(.ac-hint):has(> .ac-icon, > .ac-brand) {
+  display: inline-flex;
+}
+/* 4px after the last letter (the glyph is 5px inside its target), taking no room of its own. */
+.ac-hintline > .ac-hint {
+  margin-inline: -1px -23px;
 }
 .ac-field > .ac-hintline,
 .ac-field__label-row > .ac-hintline {
@@ -4368,6 +4451,10 @@ a.ac-list__row:focus-visible {
 .ac-msg:hover {
   background: var(--plate-soft);
 }
+/* The row a menu is open for (a tap on touch), a step brighter than a hover. */
+.ac-msg[data-menu-open="true"] {
+  background: var(--plate);
+}
 /*
  * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
  * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
@@ -4378,14 +4465,15 @@ a.ac-list__row:focus-visible {
   /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
   top: calc(6px + var(--cap-top) - var(--cap-mid));
   right: 10px;
-  translate: 0 -50%;
   z-index: var(--z-sticky);
   padding: 3px;
   border: 0;
   border-radius: 13px;
   background: var(--raised);
   box-shadow: var(--e2);
-  transform: translateY(4px);
+  /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
+     `translate` declared beside a `transform`. */
+  transform: translateY(calc(-50% + 4px));
   transition:
     opacity 0.12s,
     transform 0.16s var(--out);
@@ -4394,14 +4482,14 @@ a.ac-list__row:focus-visible {
 .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
-  transform: none;
+  transform: translateY(-50%);
 }
 /* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
   top: calc(4px + 13.175px - var(--cap-mid));
 }
 /* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
-   last one (6px up) is shorter than the bar on touch (46px), so the bar takes that room's middle. */
+   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
 .ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 13.175px;
 }
@@ -4760,7 +4848,7 @@ a.ac-list__row:focus-visible {
   gap: 4px;
   color: var(--faint);
 }
-@media (hover: none), (pointer: coarse) {
+@media (max-width: 760px), (hover: none), (pointer: coarse) {
   .ac-composer-choice__hint {
     display: none;
   }
@@ -5622,7 +5710,8 @@ button.ac-tools__row:focus-visible {
   height: var(--control-h-sm);
   border: 0;
   border-radius: var(--control-r-sm);
-  background: var(--sunken);
+  /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen day. */
+  background: var(--chosen-bg);
   color: var(--ink2);
   font: inherit;
   font-size: 12.5px;
@@ -6293,13 +6382,27 @@ button.ac-tools__row:focus-visible {
   .ac-searchfield--sm .ac-searchfield__input {
     font-size: 16px;
   }
+  /* No keyboard hints: a button's keys (its `kbd` or a key among its words), the send button's, a search field's,
+     the palette's and a menu's. */
+  .ac-btn__kbd,
+  .ac-btn > .ac-kbd,
+  .ac-composer__send-text .ac-kbd,
+  .ac-searchfield__hint,
+  .ac-palette .ac-kbd,
+  .ac-mo__kbd {
+    display: none;
+  }
 }
 
 /* Touch: hover-only actions and small controls. */
 @media (hover: none) {
-  /* The message bar shows on a tap (the row takes focus, see Message.tsx), like keyboard focus. */
-  .ac-msg:focus {
-    outline: none;
+  /* A tap opens the row's menu beside the row (Message.tsx `menu`), so the bar is the keyboard's here: a hover a tap
+     leaves behind, or a tap on a control in the row, would put it on the text. A field one types in is :focus-visible
+     after a tap too, so it doesn't count (`:read-write`). */
+  .ac-msg:is(:hover, :focus-within):not(:has(:focus-visible:not(:read-write)))
+  .ac-msg__actions:not([data-open="true"], :has([aria-expanded="true"])) {
+    opacity: 0;
+    pointer-events: none;
   }
   .ac-msg__actions {
     right: 8px;
@@ -6322,6 +6425,22 @@ button.ac-tools__row:focus-visible {
   .ac-btn--sm.ac-btn--icon {
     min-width: var(--control-h-md);
   }
+  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
+     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-msg__actions {
+    gap: 8px;
+  }
+  .ac-msg__actions .ac-btn--sm {
+    position: relative;
+    min-width: var(--control-h-sm);
+    min-height: var(--control-h-sm);
+    border-radius: var(--control-r-sm);
+  }
+  .ac-msg__actions .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
   .ac-composer__format-btn {
     width: var(--control-h-md);
     height: var(--control-h-md);
@@ -6342,10 +6461,9 @@ button.ac-tools__row:focus-visible {
   .ac-menu__item {
     min-height: 40px;
   }
-  /* No keyboard shortcuts to show on a touch screen. */
-  .ac-composer__send-text .ac-kbd,
-  .ac-btn__kbd {
-    display: none;
+  .ac-menu__reaction {
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -6634,7 +6752,6 @@ button.ac-tools__row:focus-visible {
     inset 0 0 0 1px var(--line2),
     var(--field-ring);
 }
-/* Chosen (--chosen-*: sinks in light, rises in dark); in dark the other rows step back to a flat hairline. */
 .ac-optrow[data-state="checked"] {
   box-shadow: var(--chosen-shadow);
   background: var(--chosen-bg);
@@ -6642,14 +6759,6 @@ button.ac-tools__row:focus-visible {
 }
 .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]) {
-  background: transparent;
-  box-shadow: var(--unchosen-shadow);
-}
-[data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]):hover {
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
 }
 .ac-optrow__dot {
   width: 18px;
@@ -6705,6 +6814,7 @@ button.ac-tools__row:focus-visible {
   font-size: 13px;
   color: var(--muted);
   margin-top: 1px;
+  text-wrap: pretty;
 }
 /* The chosen row's settings: under it, from the row's text edge (padding 16 + dot 18 + gap 12). */
 .ac-optrow__more {

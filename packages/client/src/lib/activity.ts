@@ -56,8 +56,6 @@ export type ActivityKind =
   | "cancelingReminder"
   | "listingReminders"
   | "listingRoutines"
-  | "startingComputer"
-  | "stoppingComputer"
   | "checkingComputer"
   | "writingWiki"
   | "readingWiki"
@@ -134,8 +132,6 @@ const BUILTIN: Record<string, ActivityKind> = {
   cancel_reminder: "cancelingReminder",
   list_reminders: "listingReminders",
   list_routines: "listingRoutines",
-  computer_start: "startingComputer",
-  computer_stop: "stoppingComputer",
   computer_status: "checkingComputer",
   create_wiki_page: "writingWiki",
   update_wiki_page: "writingWiki",
@@ -161,6 +157,8 @@ const CONNECTORS: Record<string, string> = {
   notion: "Notion",
   jira: "Jira",
   stripe: "Stripe",
+  // The org's own mailboxes (`mail_<slug>_<verb>`, ADR 0038), labeled "Email" like their tools.
+  mail: "Email",
 };
 
 /** First words that are verbs, not a connector prefix ("send_email" is a tool, not the app "send"). */

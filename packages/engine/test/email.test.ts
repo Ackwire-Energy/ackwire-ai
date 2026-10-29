@@ -275,6 +275,68 @@ describe("the look", () => {
       "Enviado pelo servidor do agentes.chat em chat.acme.com.",
     );
   });
+
+  test("on a narrow screen the host moves to the next line whole, with the word before it, never split at a hyphen", () => {
+    const box = emailArtAt("https://161-97-103-35.sslip.io");
+    expect(renderEmail(verify, box).html).toContain(
+      'Sent by the agentes.chat server <span style="display:inline-block">at 161-97-103-35.sslip.io.</span></p>',
+    );
+    expect(renderEmail({ ...verify, locale: "pt-BR" }, box).html).toContain(
+      'Enviado pelo servidor do agentes.chat <span style="display:inline-block">em 161-97-103-35.sslip.io.</span></p>',
+    );
+    expect(renderEmail(verify, box).text).toContain("\nSent by the agentes.chat server at 161-97-103-35.sslip.io.\n");
+    // Too long to share a 320 px line with the word before it, which would split it again or leave the word alone on
+    // a line: it moves down alone.
+    for (const host of ["ec2-203-0-113-25.compute-1.amazonaws.com", "agentes.consultoriaempresarialpaulista.com.br"]) {
+      const far = emailArtAt(`https://${host}`);
+      expect(renderEmail(verify, far).html).toContain(
+        `Sent by the agentes.chat server at <span style="display:inline-block">${host}.</span></p>`,
+      );
+      expect(renderEmail({ ...verify, locale: "pt-BR" }, far).html).toContain(
+        `Enviado pelo servidor do agentes.chat em <span style="display:inline-block">${host}.</span></p>`,
+      );
+      expect(renderEmail(verify, far).text).toContain(`\nSent by the agentes.chat server at ${host}.\n`);
+    }
+  });
+
+  test("a closing line's last words move down together: no word alone on the last line, no e-mail split at its hyphen", () => {
+    const code = EMAIL_SAMPLES["join_code.en"] as EmailTemplate;
+    expect(renderEmail(code, art).html).toContain(
+      'ask, <span style="display:inline-block">ignore this email.</span></p>',
+    );
+    expect(renderEmail({ ...code, locale: "pt-BR" }, art).html).toContain(
+      'você, <span style="display:inline-block">ignore este e-mail.</span></p>',
+    );
+    expect(renderEmail(EMAIL_SAMPLES["join_request.pt-BR"] as EmailTemplate, art).html).toContain(
+      'Todos os pedidos <span style="display:inline-block">em espera estão em Membros.</span></p>',
+    );
+    expect(renderEmail({ ...code, locale: "pt-BR" }, art).text).toContain(
+      "\n\nVale por 10 minutos. Se não foi você, ignore este e-mail.\n\n",
+    );
+  });
+
+  test("the card's last block keeps only the room its ink needs: as much under the content as over the headline", () => {
+    for (const [id, sample] of Object.entries(EMAIL_SAMPLES)) {
+      const { html } = renderEmail(sample, art);
+      const card = html.slice(
+        html.indexOf('<td class="card"'),
+        html.indexOf('\n</td></tr>\n<tr><td style="padding:24px 0 0">'),
+      );
+      const last = card.slice(card.lastIndexOf("\n") + 1);
+      // 2 px under a line of text; 6 px under the button for its shadow, 4 in dark, where the shadow doesn't show.
+      expect({ id, last }).toEqual({
+        id,
+        last: expect.stringMatching(
+          /^<p class="mu" style="margin:0 0 2px;|^<table class="end-btn" [^>]*"margin:8px 0 6px">/,
+        ),
+      });
+    }
+    expect(renderEmail(verify, art).html).toContain(".end-btn{margin-bottom:4px!important}");
+    // Between blocks the room stays as it was.
+    expect(renderEmail(EMAIL_SAMPLES["join_request.en"] as EmailTemplate, art).html).toContain(
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px">',
+    );
+  });
 });
 
 describe("the computer ready email's button: its first step", () => {
@@ -322,7 +384,39 @@ describe("where the pictures come from", () => {
     expect(inline).toEqual([]);
   });
 
-  test("attached: each message carries only the pictures its HTML names, and no web font", async () => {
+  test("every email loads the app's face from this server alone, in a rule classic Outlook never reads", async () => {
+    const attached = await emailArtFor("http://localhost:3000", WEB_DIR, "auto");
+    // With the pictures attached nothing is fetched, the face included: no reader could reach that address.
+    for (const [from, a] of [
+      ["https://x.test", art],
+      [null, attached],
+    ] as const) {
+      const { html } = renderEmail(EMAIL_SAMPLES["verify_email.en"] as EmailTemplate, a);
+      const faces = [...html.matchAll(/@font-face\{[^}]*\}/g)].map((m) => m[0]);
+      expect(faces).toEqual(
+        from
+          ? [
+              `@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('${from}/email/source-sans-3-latin.woff2') format('woff2')}`,
+            ]
+          : [],
+      );
+      // Every URL a mail app may fetch is this server's: no font host, no other company.
+      const fetched = [...html.matchAll(/(?:src="|url\(')(https?:\/\/[^"')]+)/g)].map(
+        (m) => new URL(m[1] ?? "").origin,
+      );
+      expect(new Set(fetched)).toEqual(new Set(from ? [from] : []));
+      // Its own style block, inside the comment classic Outlook skips. The face is the stack's first font, and
+      // classic Outlook is told its own.
+      if (from) expect(html).toContain(`<!--[if !mso]><!--><style>${faces[0]}</style><!--<![endif]-->`);
+      expect(html).toContain(
+        "font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+      );
+      expect(html).toContain("<!--[if mso]>");
+      expect(html).toMatch(/<!--\[if mso\]>.*font-family:'Segoe UI',Arial,sans-serif!important.*<!\[endif\]-->/);
+    }
+  });
+
+  test("attached: each message carries only the pictures its HTML names", async () => {
     const attached = await emailArtFor("http://localhost:3000", WEB_DIR, "auto");
     expect(attached.base).toBeNull();
     const { html, inline } = renderEmail(
@@ -336,7 +430,6 @@ describe("where the pictures come from", () => {
       attached,
     );
     expect(html).toContain('src="cid:logo-ink@agentes.chat"');
-    expect(html).not.toContain("@font-face");
     expect(inline.map((p) => p.filename)).toEqual(["logo-ink.png", "logo-bone.png", "sky-band.png", "agent-rose.png"]);
     expect(inline[0]).toMatchObject({ cid: "logo-ink@agentes.chat", contentType: "image/png" });
     expect([...(inline[0]?.content ?? []).slice(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");

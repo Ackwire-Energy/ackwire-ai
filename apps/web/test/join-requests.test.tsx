@@ -105,7 +105,7 @@ describe("an invitation link asks to join", () => {
       "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
     );
     const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
-    expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você e quem te convidou");
     expect(note.hasAttribute("aria-describedby")).toBe(false);
     await type(note, "Designer nova da Paula");
     expect(send.hasAttribute("disabled")).toBe(false);
@@ -576,7 +576,7 @@ describe("Members › Invite people", () => {
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
     expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+      "Num plano, você pode deixar cada um responder a todos na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");
@@ -584,6 +584,18 @@ describe("Members › Invite people", () => {
     expect(invite.querySelector(".ac-card__title + .setup-line")).toBe(line as Element);
     // One agent that answers everyone: someone invited gets an answer, so nothing to say.
     expect((await note("everyone")).line).toBeFalsy();
+  });
+});
+
+describe("Members › Invite people, self-hosted", () => {
+  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
+    const state = seedState({ joinRequests: [], edition: "selfhost" });
+    await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
+    await settle(6);
+    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+    expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
+    expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
+    expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
   });
 });
 

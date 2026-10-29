@@ -30,7 +30,6 @@ test("a big team is only a count with a pointer to find_agent", () => {
     ownerUserId: null,
     audienceMode: "everyone" as const,
     audienceUserIds: [],
-    brain: "model",
   }));
   const text = teamPrompt(team, "a0", null, new Set());
   expect(text).toContain("19 other agents work in this organization.");

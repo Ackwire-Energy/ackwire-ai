@@ -68,6 +68,7 @@ p {
 .page-sub {
   margin: 0;
   color: var(--ink-muted);
+  text-wrap: pretty;
 }
 .stack-4 {
   display: flex;
@@ -165,6 +166,10 @@ p {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: var(--space-3);
+}
+/* Wider columns: a hint with an example (an address, a folder) keeps one line under its field. */
+.grid-fields--wide {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
 .org-badge {
   width: 48px;
@@ -768,6 +773,10 @@ p {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.page__header > p,
+.page__header-text > p {
+  text-wrap: pretty;
 }
 .page__header--row {
   flex-direction: row;
@@ -2419,7 +2428,7 @@ p {
   color: var(--ink2);
   cursor: pointer;
 }
-/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its first line. */
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its line. */
 .ac-hintline:has(> .ac-field__label) {
   font-size: 13px;
   line-height: 18px;
@@ -3144,6 +3153,10 @@ p {
     flex: none;
     gap: 10px;
   }
+  /* The desktop nav's inset lines the header up with its links; over the strip it keeps the page's gutter. */
+  .settings__head {
+    padding: 0;
+  }
   .settings__groups {
     flex-direction: row;
     gap: 4px;
@@ -3174,37 +3187,6 @@ p {
   }
 }
 
-/* The agent's PC: busy chip, step line, inline error. */
-.computer-progress {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-}
-/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
-.computer-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--ink);
-}
-.computer-error .ac-icon {
-  color: var(--ink-muted);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .computer-chip {
-    animation: computer-chip-in 200ms ease-out;
-  }
-}
-@keyframes computer-chip-in {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /*
  * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
@@ -3215,6 +3197,8 @@ p {
 }
 .catalog .ac-dialog__head {
   padding: 24px 28px 14px;
+  /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
+  --title-cap-mid: 0.88px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
@@ -3421,6 +3405,7 @@ p {
   line-height: 18px;
   height: 36px;
   color: var(--ink-muted);
+  text-wrap: pretty;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -3507,6 +3492,12 @@ p {
   position: absolute;
   top: 12px;
   right: 12px;
+  /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
+  translate: none;
+}
+/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
+.catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  color: var(--ink);
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
   width: 64px;
@@ -3611,6 +3602,7 @@ p {
   }
   .catalog .ac-dialog__head {
     padding: 20px 16px 12px;
+    --title-cap-mid: 0.51px;
   }
   .catalog .ac-dialog__title {
     font-size: 24px;
@@ -3749,10 +3741,10 @@ p {
   gap: 12px;
   min-width: 0;
 }
-/* The tile, centred on the title's line, rises to its capitals' middle, as a card's key does. A title that wraps takes
-   `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
+/* The tile, centred on the title's line, rises to its capitals' middle, as the dialog's close does. A title that wraps
+   takes `.ac-captop` (`FlowTitle`): its first line's capitals start at the tile's top. */
 .cflow__title > :first-child {
-  translate: 0 calc(-1 * var(--cap-mid));
+  translate: 0 calc(-1 * var(--title-cap-mid));
 }
 .cflow__title:has(> .ac-captop) {
   align-items: flex-start;
@@ -4036,6 +4028,11 @@ p {
   padding: 0;
   border: 0;
   min-width: 0;
+}
+/* A legend sits outside the fieldset's flex flow, so the gap above doesn't reach it. */
+.mail-rules__group > legend {
+  padding: 0;
+  margin-bottom: 8px;
 }
 .mail-rules__unit {
   display: flex;
@@ -6429,7 +6426,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the workspace's own computer, the other computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -6475,6 +6472,43 @@ a.machine-row__name:hover {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/*
+ * One edge for the wait's words, its icons hanging in a column before it (an icon line's 14 px icon and 8 px gap): the
+ * steps' bar, the step and the time left start where the icon lines' words do, in the computer's window, on setup's
+ * Computer step and on Settings › Computers. Wrapped, a line keeps its phrases whole: the step's own words where they
+ * fit, the rest by the copy's no-break spaces.
+ */
+:is(.setup-wait, .setup-card) > :is(.setup-progress:not(.ac-iconline), .setup-eta) {
+  margin-left: 22px;
+}
+/* On Settings' card they end as far from its right edge as their words start from its left (the window's wait keeps
+   that room after its words, setup's well in its padding). */
+.setup-card > :is(.setup-progress, .setup-eta, .setup-line) {
+  margin-right: 22px;
+}
+:is(.setup-wait, .setup-card) > * {
+  text-wrap: pretty;
+}
+/*
+ * A problem's line ends on a phrase its no-break spaces keep whole ("We're on it."): `pretty` would take it for a
+ * short last line and pull the sentence before's last word under it, so this line wraps plainly.
+ */
+:is(.setup-wait, .setup-card) > .setup-progress--line[data-phase="problem"] {
+  text-wrap: wrap;
+}
+.setup-progress .ac-eyebrow > span {
+  display: inline-block;
+}
+/* Settings › Computers' card: its last line's baseline as far over its foot as its drawing starts under its top. */
+.setup-card > p:last-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 11px);
+}
+@supports (top: 1lh) {
+  .setup-card > p:last-child {
+    margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
   flex-wrap: wrap;
@@ -6501,14 +6535,6 @@ a.machine-row__name:hover {
 }
 .suspended-page__others > h2 {
   flex-basis: 100%;
-}
-.computers-note {
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
-  color: var(--ink-muted);
 }
 .computers-empty {
   display: flex;
@@ -6696,11 +6722,6 @@ a.machine-row__name:hover {
 .computer-machine__name {
   font-weight: 600;
 }
-.computer-target__connect {
-  color: var(--ink-muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 
 /* ---------- Onboarding ----------
  * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
@@ -6730,11 +6751,15 @@ a.machine-row__name:hover {
   display: flex;
   padding: 0 6px;
 }
+/*
+ * Under the steps, never behind them: 46% of the rail's height (100dvh) where the steps leave that much room, else the
+ * room they leave (a short window), out to the rail's edges.
+ */
 .onb__horizon {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 46%;
-  z-index: -1;
+  position: relative;
+  flex: 1 1 0;
+  max-height: 46dvh;
+  margin: auto -16px -24px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -7113,6 +7138,11 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 13px;
 }
+/* Its margin is for the new-agent steps, which have no gap; in a stack spaced by its gap (the agent page's columns,
+   a dialog's body) that gap is its space, as it is the cards' beside it. */
+:is(.agp-col, .ac-dialog__body) > .newag__note {
+  margin: 0;
+}
 .newag__note b {
   color: var(--ink);
   font-weight: 600;
@@ -7216,6 +7246,7 @@ a.machine-row__name:hover {
 .newag__role-desc {
   color: var(--muted);
   font-size: 13.5px;
+  text-wrap: pretty;
 }
 .newag__check {
   position: absolute;
@@ -7238,10 +7269,11 @@ a.machine-row__name:hover {
   opacity: 1;
   transform: none;
 }
+/* Its tile leads the name as a face does: the name's capitals at its top, however the line under it wraps. */
 .newag__role--blank {
   grid-column: 1 / -1;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line2);
@@ -7256,6 +7288,7 @@ a.machine-row__name:hover {
 .newag__role--blank .newag__role-name span {
   color: var(--muted);
   font-size: 13.5px;
+  text-wrap: pretty;
 }
 .newag__blank-icon {
   display: grid;
@@ -7339,7 +7372,8 @@ a.machine-row__name:hover {
   padding: 4px 4px 7px;
   border: 0;
   border-radius: 14px;
-  background: var(--sunken);
+  /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen one. */
+  background: var(--chosen-bg);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font: inherit;
@@ -8119,8 +8153,8 @@ a.machine-row__name:hover {
   gap: 10px;
 }
 /*
- * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
- * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API").
  */
 .agp-brainoff {
   flex: 1;
@@ -8133,11 +8167,42 @@ a.machine-row__name:hover {
 .agp-brainoff b {
   font-weight: 600;
 }
-/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
-.agp-brainshare {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/*
+ * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
+ * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
+ * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
+ * label is in the type of the switches beside it (a plan's panel gives its own).
+ */
+.plan-replies {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 16px;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.plan-replies > :first-child {
+  font-weight: 600;
+}
+.plan-replies > label {
+  cursor: pointer;
+}
+.plan-replies__terms {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.plan-replies > .ac-switch {
+  /* Browsers without the lh unit: the 20px line. */
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .plan-replies > .ac-switch {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 /* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
 .agp-planoffer {
@@ -8145,11 +8210,14 @@ a.machine-row__name:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* "Adicionar conta": the provider's own sign-in, in numbered steps. */
+/* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
+   sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
+   out of one (an agent's brain, Settings). */
 .agp-addacct {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  text-wrap: pretty;
 }
 .agp-addacct:focus {
   outline: none;
@@ -8164,11 +8232,16 @@ a.machine-row__name:hover {
   font-size: 15px;
   font-weight: 650;
 }
-/* A step (an `.ac-iconline`): its number centred on the title's 14/20 line. */
+/*
+ * A step (an `.ac-iconline`): its number centred on the title's 14/20 line. Its words take the row and what acts on it
+ * (a button, the wait) goes under them, in their column, at every width: right under the words it answers, never
+ * across the row from them. As far under them as a field is under its title, nearer than the next group.
+ */
 .agp-addacct__step {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px 12px;
   font-size: 14px;
   line-height: 20px;
 }
@@ -8231,37 +8304,21 @@ a.machine-row__name:hover {
   font-weight: 600;
   color: var(--faint);
 }
-/* At phone width a step's words take the row, and its button goes under them, in their column. */
-@media (max-width: 640px) {
-  .agp-addacct__step {
-    flex-wrap: wrap;
-  }
-  .agp-addacct__step.ac-iconline > .agp-addacct__text {
-    flex-basis: calc(100% - 32px);
-  }
-  .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
-    margin-left: 32px;
-  }
+.agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - 32px);
 }
-/* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
-   many lines follow the title. The list's steps without a button take the same first line, so the numbers are evenly
-   spaced. A touch screen's small button is the ruler's default step. */
-@media (min-width: 641px) {
-  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
-    margin-top: calc((var(--control-h-sm) - 20px) / 2);
-  }
-  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
-    min-height: var(--control-h-sm);
-    padding-top: calc((var(--control-h-sm) - 20px) / 2);
-  }
+.agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: 32px;
 }
-@media (min-width: 641px) and (pointer: coarse) {
-  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
-    margin-top: calc((var(--control-h-md) - 20px) / 2);
-  }
-  :has(> .agp-addacct__step > .ac-btn--sm) > .agp-addacct__step:not(:has(> .ac-btn--sm)) {
-    min-height: var(--control-h-md);
-    padding-top: calc((var(--control-h-md) - 20px) / 2);
+/* With no number, the words are the step's whole row and the title's capitals are its top. */
+.agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+  flex-basis: 100%;
+  /* Browsers without the lh unit: the step's 20px line. */
+  margin-top: calc(var(--cap-top) - 10px);
+}
+@supports (top: 1lh) {
+  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
+    margin-top: calc(var(--cap-top) - 0.5lh);
   }
 }
 
@@ -9508,6 +9565,11 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
+/* On a chosen card such a tile is the pressed face's, as light's sunken is: dark's --sunken would be a hole in it. */
+.ac-optrow[data-state="checked"] .audience-card__icon,
+.ac-optrow[data-state="checked"] .agp-wdlg__key {
+  background: var(--chosen-bg);
+}
 
 /* Budget: the month at a glance (spent, the bar with the 80% alert mark) and the numbers as items. */
 .agp-spent__stats {
@@ -9969,11 +10031,19 @@ html[data-menu-overlay] .shell {
 .ai-panel > .ac-setnote {
   margin: 0;
 }
+/* Under the key's steps a note keeps their columns: its icon centred in the numbers' 20px, its words on the text's. */
+.ai-panel > .agp-addacct__step ~ .ac-setnote {
+  gap: 12px;
+}
+.ai-panel > .agp-addacct__step ~ .ac-setnote > :first-child {
+  margin-inline: calc((20px - 14px) / 2);
+}
 /*
  * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
  * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
- * mark's. The wait's well and the option cards start their 12px of padding before the text's column, so their words
- * are on it too. A note inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ * mark's. The option cards start their 12px of padding before the text's column, so their words are on it too. The
+ * wait's well spans the panel from the mark's edge to the buttons', its words still on the text's column. A note
+ * inside a step's words is the step's, not the panel's: its icon stays on the step's text.
  */
 .ai-panel--plan {
   --lead: 30px;
@@ -10001,6 +10071,11 @@ html[data-menu-overlay] .shell {
 .ai-panel--plan > .grid-options {
   margin-left: calc(var(--text-edge) - var(--space-3));
 }
+/* The account cards keep the chosen card's check clear in both states, so choosing one never rewraps a title and the
+   two cards keep their height. */
+.ai-panel--plan > .grid-options--sm .ac-option__title {
+  padding-right: 22px;
+}
 .ai-panel__head {
   flex-wrap: wrap;
   gap: 12px;
@@ -10019,14 +10094,16 @@ html[data-menu-overlay] .shell {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
+/* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
-  margin-left: calc(var(--text-edge) - 12px);
-  padding: 12px;
+  padding: 12px var(--text-edge);
   /* Short lines: wrapped, they break into two of a length. */
   text-wrap: balance;
 }
+/* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
+   hang in before them. */
 .onb__wait {
-  padding: 12px 14px;
+  padding: 12px 36px 12px 14px;
 }
 /*
  * Lines that stand between hairlines, boxes and buttons keep the panel's 16px to their ink, and the well's lines keep
@@ -10054,6 +10131,30 @@ html[data-menu-overlay] .shell {
   .ai-panel--plan > .ac-setnote {
     margin-block: calc(var(--cap-top) - 0.5lh) calc(var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
+}
+/* The computer ready, where nothing beside the panel says so: a group of its own over a hairline edge to edge, as the
+   head is, its baseline 16px over it as the next group's capitals are under it. */
+.ai-panel--plan > .ai-panel__ready {
+  margin-inline: calc(-1 * var(--card-pad));
+  margin-bottom: 0;
+  padding: 0 var(--card-pad) calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 9px);
+  border-bottom: 1px solid var(--line);
+}
+@supports (top: 1lh) {
+  .ai-panel--plan > .ai-panel__ready {
+    padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
+  }
+}
+/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+   words in the panel's type on the text's. */
+.ai-panel__replies {
+  font-size: 14px;
+  line-height: 20px;
+}
+.ai-panel__replies > .plan-replies {
+  flex: 1;
+  min-width: 0;
+  font-size: inherit;
 }
 /* The Computer step's lines are the well's own, at its gap. */
 .onb__wait > .setup-wait {
@@ -10125,7 +10226,7 @@ html[data-menu-overlay] .shell {
   flex: 1 1 240px;
   margin: 0;
 }
-/* Its two actions (the wrong account's): one under the other when they don't fit, and a long email ends in "…"
+/* Its two actions (an account already there): one under the other when they don't fit, and a long email ends in "…"
    (the note above says it whole). */
 .ai-panel__row > .ac-acts {
   flex-wrap: wrap;
@@ -10135,11 +10236,43 @@ html[data-menu-overlay] .shell {
 .ai-panel__row > .ac-acts > .ac-btn {
   max-width: 100%;
 }
+/* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
+   gap), as a step's button goes under its words. Before the plan's panel's rules, whose text column wins there. */
+.agp-addacct > .ai-panel__row > .ac-setnote {
+  flex-basis: 100%;
+}
+.agp-addacct > .ai-panel__row > :not(.ac-setnote) {
+  margin-left: 22px;
+}
+/* In a plan's panel the row's action is its sign-in's state: under the note's words, on the text's column, as a
+   step's button. */
+.ai-panel--plan .ai-panel__row > .ac-setnote {
+  flex-basis: 100%;
+}
+.ai-panel--plan .ai-panel__row > :not(.ac-setnote) {
+  margin-left: var(--text-edge);
+}
 .ai-panel__use {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* At phone width for whom goes under the name, and a step's button under its words, on the text's column. */
+/* A step's button goes under its words, on the text's column. */
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
+  flex-basis: calc(100% - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+  margin-left: var(--text-edge);
+}
+/* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
+   text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+.ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
+  gap: calc((var(--lead) - 14px) / 2 + 12px);
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+}
+.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
+  margin-left: calc((var(--lead) - 14px) / 2);
+}
+/* At phone width for whom goes under the name, on the text's column. */
 @media (max-width: 640px) {
   .ai-panel__agent {
     flex-basis: calc(100% - var(--text-edge));
@@ -10148,32 +10281,6 @@ html[data-menu-overlay] .shell {
   }
   .ai-panel__agent > .ac-select {
     flex: 1;
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
-    flex-basis: calc(100% - var(--text-edge));
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
-    margin-left: var(--text-edge);
-  }
-  /* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
-     text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
-  .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
-    gap: calc((var(--lead) - 14px) / 2 + 12px);
-    margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
-  }
-  .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
-    margin-left: calc((var(--lead) - 14px) / 2);
-  }
-  /* With no number, the title's capitals are the step's top. */
-  .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
-    flex-basis: 100%;
-    /* Browsers without the lh unit: the step's 20px line. */
-    margin-top: calc(var(--cap-top) - 10px);
-  }
-  @supports (top: 1lh) {
-    .agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {
-      margin-top: calc(var(--cap-top) - 0.5lh);
-    }
   }
 }
 /* Who thinks (the setup, after a plan): each agent and what it thinks with. */
@@ -10201,11 +10308,14 @@ html[data-menu-overlay] .shell {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* A plan's mark beside its name and facts: the name's capitals at the mark's top, its actions in the row's middle. */
-.ai-accounts__row {
+/* A plan's or a key's mark beside its name and facts: the name's capitals at the mark's top, what follows them (a
+   chip, the actions) in the row's middle. */
+.ai-accounts__row,
+.key-row {
   align-items: flex-start;
 }
-.ai-accounts__row > .ac-acts {
+.ai-accounts__row > .ac-acts,
+.key-row > :not(.ac-brand, .list-col) {
   align-self: center;
 }
 .ai-accounts__name {
@@ -10246,12 +10356,15 @@ html[data-menu-overlay] .shell {
 .jev:focus {
   outline: none;
 }
-/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state in the row's middle. */
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state on the tile's middle. */
 .jev__head,
 .jev__key {
   align-items: flex-start;
 }
-.jev__head > .ac-chip,
+/* The tile is 30px, at the row's top. */
+.jev__head > .ac-chip {
+  translate: 0 calc(15px - 50%);
+}
 .jev__key > .ac-acts {
   align-self: center;
 }

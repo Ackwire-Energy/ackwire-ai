@@ -18,8 +18,6 @@ interface Options {
   setup?: Partial<ComputerSetup>;
   /** This server's own computer, on in this workspace. */
   host?: boolean;
-  /** This server has Daytona's sandboxes. */
-  daytona?: boolean;
   signupOpen?: boolean;
   role?: "owner" | "member";
 }
@@ -37,8 +35,6 @@ async function computers(path: string, o: Options = {}) {
     machines.setHost({ machineId: HOST, on: true });
     await api.sandbox.setTarget(ORG_ID, ADA_ID, HOST);
   }
-  const settings = api.sandbox.settings;
-  api.sandbox.settings = async (orgId) => ({ ...(await settings(orgId)), available: o.daytona === true });
   const r = await renderApp(path, { api });
   await settle(10);
   return { ...r, state, api, machines };
@@ -52,12 +48,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     await computers(`/org/${ORG_ID}/settings/computers`, { setup: { step: "installing", specs: null } });
     expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
     expect(region("Computador da Acme")).toBeTruthy();
-    for (const name of [
-      "Outros computadores",
-      "Conectar outro computador",
-      "Qual computador cada agente usa",
-      "Sandboxes da Daytona",
-    ])
+    for (const name of ["Outros computadores", "Conectar outro computador", "Qual computador cada agente usa"])
       expect(region(name)).toBeNull();
     expect(screen().queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
     // The page on how people's own computers work is self-host's alone.
@@ -161,7 +152,7 @@ describe("Configurações → Computadores on self-host", () => {
     // What it all means (pausing, folders, the other ways to connect) is one help page, linked once at the end.
     const how = screen().getByRole("link", { name: "Como os computadores funcionam" });
     const url = new URL(how.getAttribute("href") ?? "");
-    expect(url.origin + url.pathname).toBe("https://agentes.chat/help/computers");
+    expect(url.origin + url.pathname).toBe("https://app.agentes.chat/help/computers");
     expect(url.searchParams.get("lang")).toBe("pt-BR");
     expect(how.className).toBe("ac-link ac-link--muted");
     expect(how.getAttribute("rel")).toBe("noopener noreferrer");
@@ -186,17 +177,11 @@ describe("Configurações → Computadores on self-host", () => {
     expect(region("Computador deste servidor")).toBeNull();
   });
 
-  test("Daytona's sandboxes only on a server that has them; without them an agent with no computer has none", async () => {
-    await computers(`/org/${ORG_ID}/settings/computers`, { daytona: true });
-    expect(region("Sandboxes da Daytona")).toBeTruthy();
-    expect((region("Qual computador cada agente usa") as HTMLElement).textContent).toContain("Sandbox da Daytona");
-    cleanup();
-
+  test("an agent with no computer has none", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`);
-    expect(region("Sandboxes da Daytona")).toBeNull();
     const rows = (region("Qual computador cada agente usa") as HTMLElement).textContent ?? "";
     expect(rows).toContain("Nenhum computador");
-    expect(rows).not.toMatch(/Nuvem|Daytona/);
+    expect(rows).not.toMatch(/Nuvem/);
     cleanup();
 
     await computers(`/org/${ORG_ID}/agents/${ATLAS_ID}`);

@@ -112,6 +112,11 @@ export const featureKeysPtBR = {
   },
   chats: {
     title: "Conversas",
+    serverError: {
+      offline: "Sem internet no celular.",
+      text: "Ele pode estar fora do ar ou fora da sua rede. Suas conversas aparecem sozinhas quando ele voltar.",
+      kept: "Mostrando o que já estava no app.",
+    },
     section: {
       agents: "Agentes",
       channels: "Canais",
@@ -503,7 +508,6 @@ export const featureKeysPtBR = {
     noAgents: "Nenhum agente pode fazer missões ainda. Conecte um computador pelo site.",
     reason: {
       no_computer: "Precisa de um computador conectado",
-      cloud_computer: "Missões num computador na nuvem chegam em breve",
       exec_off: "O computador não deixa rodar comandos",
       runner_outdated: "O computador precisa de uma atualização",
       not_in_audience: "Não atende você",
@@ -626,6 +630,22 @@ export const featureKeysPtBR = {
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
+  },
+  agentEdit: {
+    missing: "Este agente não existe mais.",
+    saved: "Alterações salvas",
+    rolePlaceholder: "Ex.: Atendimento",
+    adminsOnly: "Só admins mudam o nome, o cargo e as instruções.",
+    discardTitle: "Descartar as alterações?",
+    discardText: "O que você mudou ainda não foi salvo.",
+    discard: "Descartar",
+    keepEditing: "Continuar editando",
+  },
+  newAgent: {
+    leaveTitle: "Sair sem criar?",
+    leaveText: "O agente que você começou não será criado.",
+    keepGoing: "Continuar criando",
+    partly: "O agente foi criado, mas parte do que o papel traz não entrou. Ajuste no perfil dele.",
   },
   agent: {
     talk: "Conversar",
@@ -956,6 +976,31 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar o Drive.",
     more: "Mostrar mais",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Toque em Nova página para escrever a primeira.",
+    missing: "Esta página não existe mais ou mudou de nome.",
+    blank: "Página em branco.",
+    folderGone: "Esta pasta não tem mais páginas.",
+    reads_one: "{{count}} vez",
+    reads_other: "{{count}} vezes",
+    taskConflict: "A página mudou e já está atualizada. Marque de novo.",
+    view: "Ver",
+    notSaved: "Prévia · ainda não salva",
+    placeholder: "Escreva aqui. [[ liga outra página.",
+    hideKeyboard: "Esconder o teclado",
+    createLink: "Criar “{{title}}”",
+    discardTitle: "Sair sem salvar?",
+    discardText: "O que você escreveu aqui se perde.",
+    discard: "Descartar",
+    keepWriting: "Continuar escrevendo",
+    conflictText: "A versão salva agora é a v{{version}}. Veja a diferença e escolha qual fica.",
+    conflictDiff: "Diferença: salva → sua",
+    createAndWrite: "Criar e escrever",
+    exists: "Já existe uma página com esse título.",
+    openExisting: "Abrir a página",
+  },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Não deu para carregar as rotinas.",
@@ -1020,7 +1065,7 @@ export const featureKeysPtBR = {
     ownerYou: "Responsável: você",
     nowWaiting: "Espera seu ok: {{title}}",
     did: {
-      title: "O que fez por você",
+      title: "O que {{she}} fez por você",
       month_one: "{{count}} este mês",
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
@@ -1053,7 +1098,7 @@ export const featureKeysPtBR = {
       },
     },
     knows: {
-      title: "O que sabe sobre você",
+      title: "O que {{she}} sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
@@ -1079,7 +1124,7 @@ export const featureKeysPtBR = {
     },
     thinks: "Pensa com",
     uses: {
-      title: "O que pode usar",
+      title: "O que {{she}} pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
       area: {
         context: "Memória",
@@ -1132,10 +1177,8 @@ export const featureKeysPtBR = {
       submit_other: "Trocar {{count}} agentes",
       later: "Agora não",
       on: "Ligado",
-      cloud: "Computador na nuvem",
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
-      cloudDesc: "Um computador isolado na nuvem",
       has: "Tem o {{brains}}",
       and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
@@ -1144,7 +1187,6 @@ export const featureKeysPtBR = {
         offline: "Desconectado",
         paused: "Pausado",
         missing_brain: "Não tem o {{brain}}",
-        unavailable: "Indisponível agora",
         exec_off: "Não deixa rodar comandos",
         runner_old: "Precisa de uma atualização",
         outdated: "Precisa de uma atualização",
@@ -1169,7 +1211,6 @@ export const featureKeysPtBR = {
       target_not_found: "Esse computador não está mais conectado. Escolha outro.",
       target_same: "Escolha um computador diferente do {{computer}}.",
       target_paused: "Esse computador está pausado. Escolha outro.",
-      target_cloud_unavailable: "O computador na nuvem não está disponível agora.",
       not_found: "O {{computer}} não está mais na lista de computadores.",
     },
     card: {
@@ -1430,7 +1471,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem responde",
+    audience: "Para quem {{she}} responde",
     another: "Outra IA",
   },
   crash: {

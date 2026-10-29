@@ -13,6 +13,7 @@ import {
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
+  useAiAccounts,
   useAiStatus,
   useApi,
   useComputer,
@@ -26,9 +27,9 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
+import { groupPlans, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
@@ -80,10 +81,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { CLOUD, useNoComputer } from "@/components/AgentComputer";
+import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
-import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
+import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -126,7 +127,7 @@ function useWork() {
   const machines = useMachines(org.id, owner);
   const granted = (scopes.data ?? []).some((s) => s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE);
   const target = computer.data?.target;
-  const machineId = target?.kind === "machine" ? target.machineId : CLOUD;
+  const machineId = target?.kind === "machine" ? target.machineId : NO_COMPUTER;
   const browserWord: BrowserWord = !granted
     ? "off"
     : !browser.data?.available
@@ -220,7 +221,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? null
       : view?.account
         ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
-        : t("agentPage.work.brain.thisComputer", { computer: view?.computer?.name ?? "" });
+        : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
     !view || (kind !== "claude_code" && kind !== "codex")
@@ -253,21 +254,15 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
   return (
     <div className="agp-work">
-      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label")}>
+      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label", g)}>
         <div className="agp-cells">
           {!member && (
             <Cell
               icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
-              label={
-                choice === "none"
-                  ? t("computer.target.label")
-                  : choice === "cloud"
-                    ? t("agentPage.work.cell.daytona")
-                    : t("agentPage.work.cell.computer")
-              }
+              label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
               value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
-              openLabel={t("agentPage.work.open.computer")}
+              openLabel={t("agentPage.work.open.computer", g)}
               // The Cloud's agents all work on the workspace's own computer: nothing to pick.
               onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
             />
@@ -638,11 +633,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
-  // "Só responde a você" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they say otherwise.
+  // "Responde a todos" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
-  const [asking, setAsking] = useState(false);
   const offId = useId();
-  const shareId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -678,6 +671,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ].filter((a) => a.kind === accountKind && (a.mine || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
+  // The row of the computer it thinks on, where its own sign-in's plan is (a seat has its own words).
+  const thinksOn = home?.machineId ?? view.computer?.machineId;
+  const row = useAiAccounts(org.id, view.canUsePlans && accountKind !== null).data?.computers.find(
+    (c) => c.machineId === thinksOn,
+  );
   // On a coding plan Claude Code keeps its aliases, each running the plan's model.
   const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
   // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
@@ -747,7 +745,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           fallback,
           ...(effortChanged ? { effort: effortToSave } : {}),
           ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
-          ...(shareChanged ? { onlyOwner, ...(onlyOwner ? {} : { acceptPlanTerms: true }) } : {}),
+          ...(shareChanged ? { onlyOwner } : {}),
         });
       }
       refresh();
@@ -755,11 +753,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
-      // On the API it answers its stored audience: `view.onlyOwner` is the gate's, which a personal plan narrows.
-      if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
+      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
+          label: agent.audience?.userIds?.length
+            ? t("aiAccounts.share.letPeople", g)
+            : t("aiAccounts.share.letEveryone", g),
           run: () =>
             void api.agents
               .setBrain(org.id, agent.id, { onlyOwner: false })
@@ -771,7 +770,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             ? t(onlyOwner ? "aiAccounts.share.savedOwner" : "aiAccounts.share.savedEveryone", g)
             : onlyAccount
               ? account === null
-                ? t("agentPage.work.saved.accountHere", { ...g, computer: computerName })
+                ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
+                  t("aiAccounts.done.savedAgent", {
+                    agent: agent.name,
+                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                  })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
                 ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
@@ -835,12 +838,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const accountOptions: SelectOption[] = [
     {
       value: HERE,
-      label: t("agentPage.work.brain.thisComputer", { computer: computerName }),
+      label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
       // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
       disabled: !view.ownSignIn && view.account !== null,
-      description: view.ownSignIn
-        ? t("agentPage.work.brain.thisComputerText", { computer: computerName })
-        : t("aiAccounts.share.hereNotYours", { computer: computerName }),
+      ...(view.ownSignIn ? {} : { description: t("aiAccounts.share.hereNotYours", { computer: computerName }) }),
       leading: accountIcon,
     },
     // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
@@ -941,9 +942,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
     </BrainField>
   );
-  const shareLabel = view.canUsePlans
-    ? t("aiAccounts.share.switch")
-    : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" });
   const also = typeof adding === "object" ? adding : undefined;
   const planRows = (
     <>
@@ -981,49 +979,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
       {accountField}
       {agent.ownerUserId &&
-        (edition === "cloud" ? (
-          // Where the server provisions the computers a plan is personal: nobody lets more people in (ADR 0059 §5).
-          <div className="agp-brainshare">
-            <span className="agp-brainoff ac-hintline">
-              <b>{shareLabel}</b>
-              <InfoHint name={t("common.about", { label: shareLabel })}>{t("aiAccounts.share.fixedHint")}</InfoHint>
-            </span>
-          </div>
+        accountKind &&
+        (view.canUsePlans ? (
+          <PlanReplies
+            on={!onlyOwner}
+            onChange={(on) => setShare({ kind, onlyOwner: !on })}
+            brain={accountKind}
+            plan={signInPlan({ account, accounts }, row, accountKind)}
+            maker={plan?.maker}
+          />
         ) : (
-          <div className="agp-brainshare">
-            <SwitchLabel
-              htmlFor={shareId}
-              label={shareLabel}
-              hint={
-                view.canUsePlans
-                  ? t("aiAccounts.share.hint", g)
-                  : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
-              }
-            />
-            <Switch
-              id={shareId}
-              aria-describedby={`${shareId}-hint`}
-              checked={onlyOwner}
-              // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
-              disabled={!view.canUsePlans && onlyOwner}
-              onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
-            />
-          </div>
+          <PlanRepliesOf on={!onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
         ))}
-      {asking && accountKind && (
-        <SharePlanDialog
-          agentName={agent.name}
-          brain={accountKind}
-          plan={current?.plan ?? null}
-          {...(plan ? { maker: plan.maker } : {})}
-          everyone
-          onAccept={() => {
-            setShare({ kind: accountKind, onlyOwner: false });
-            setAsking(false);
-          }}
-          onKeep={() => setAsking(false)}
-        />
-      )}
       {apiKey && (
         <div className="ac-optcard__foot">
           <SwitchLabel
@@ -1136,13 +1103,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                         ? { provider: also.provider }
                         : {})}
                     email={signedOut ? current?.email : also?.email}
-                    askEmail={!also && (view.ownSignIn || accounts.some((a) => a.mine))}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
                       setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
                       setAccount(a.id);
                       setArrived(a);
+                      setAdding(false);
+                    }}
+                    onUse={(a) => {
+                      setArrived(null);
+                      setAccount(a.id);
                       setAdding(false);
                     }}
                   />
@@ -1201,10 +1172,10 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const setTarget = useSetComputerTarget(org.id);
   const noComputer = useNoComputer();
   const listed = noComputer.pending ? pickable.filter((m) => m.kind !== "managed") : pickable;
-  const cloud = noComputer.choice(work.machineId === CLOUD);
-  // The workspace's own computer on its way stands in the cloud's place: what it will be (every brain, the
-  // browser) and when, never what the cloud computer lacks.
-  const workspace = cloud === "workspace" ? noComputer.setup : null;
+  const none = noComputer.choice(work.machineId === NO_COMPUTER);
+  // The workspace's own computer on its way stands in for no computer: what it will be (every brain, the
+  // browser) and when.
+  const workspace = none === "workspace" ? noComputer.setup : null;
   const [choice, setChoice] = useState(work.machineId);
   // In the desktop app, this computer not yet in the organization (where agents may work on it): connect it
   // from here and pick it (ADR 0036).
@@ -1232,13 +1203,12 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   };
   const also = (id: string) => {
     if (id === work.machineId) return [];
-    if (id === CLOUD && workspace) return [t("computerSetup.agentWaiting", g)];
+    if (id === NO_COMPUTER && workspace) return [t("computerSetup.agentWaiting", g)];
     const m = pickable.find((x) => x.id === id);
     return [
       ...(brain !== "model" && !has(id, brain)
         ? [t("agentPage.work.computer.alsoBrain", { brain: t(`brain.card.${brain}`) })]
         : []),
-      ...(work.granted && id === CLOUD ? [t("agentPage.work.computer.alsoBrowser")] : []),
       ...(m && !m.online ? [t("agentPage.work.computer.alsoOffline", g)] : []),
     ];
   };
@@ -1248,17 +1218,15 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const use = async () => {
     setBusy(true);
     try {
-      await setTarget.mutateAsync({ agentId: agent.id, machineId: choice === CLOUD ? null : choice });
+      await setTarget.mutateAsync({ agentId: agent.id, machineId: choice === NO_COMPUTER ? null : choice });
       // What the new computer can't do goes back to the organization's model (said before, in the dialog).
-      if (brain !== "model" && (choice === CLOUD ? !workspace : !has(choice, brain)))
+      if (brain !== "model" && (choice === NO_COMPUTER ? !workspace : !has(choice, brain)))
         await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       refresh();
       toast.show(
         chosen || workspace
           ? t("agentPage.work.saved.computer", { ...g, computer: chosen ? chosen.name : noComputer.label("workspace") })
-          : cloud === "cloud"
-            ? t("agentPage.work.saved.daytona", g)
-            : t("agentPage.work.saved.none", g),
+          : t("agentPage.work.saved.none", g),
       );
       onClose();
     } catch {
@@ -1283,7 +1251,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("agentPage.work.computer.title", g)}
-      description={t("agentPage.work.computer.sub")}
+      description={t("agentPage.work.computer.sub", g)}
       closeLabel={t("common.close")}
       width={640}
       className="agp-wdlg"
@@ -1294,30 +1262,26 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
           value={choice}
           onValueChange={setChoice}
           options={[
-            ...(cloud
+            ...(none
               ? [
                   {
-                    value: CLOUD,
+                    value: NO_COMPUTER,
                     // Portraits are as wide as their drawings: one column keeps the titles in line.
                     leading: (
                       <span className="machine-row__pic">
-                        {cloud === "none" ? (
+                        {none === "none" ? (
                           <Icon name="dash" size={20} />
                         ) : (
                           <ComputerPortrait
-                            kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                            kind={WORKSPACE_COMPUTER_KIND}
                             state={workspace ? setupPortrait(workspace, false) : "online"}
                           />
                         )}
                       </span>
                     ),
-                    title: noComputer.label(cloud),
-                    description: workspace
-                      ? t(workspace.textKey)
-                      : cloud === "none"
-                        ? t("computer.target.noneText")
-                        : t("computer.target.daytonaText"),
-                    children: note(CLOUD),
+                    title: noComputer.label(none),
+                    description: workspace ? t(workspace.textKey) : t("computer.target.noneText"),
+                    children: note(NO_COMPUTER),
                   },
                 ]
               : []),
@@ -1357,9 +1321,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
             ? t("agentPage.work.computer.useMachine", { computer: chosen.name })
             : workspace
               ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
-              : cloud === "cloud"
-                ? t("agentPage.work.computer.useDaytona")
-                : t("agentPage.work.use")
+              : t("agentPage.work.use")
         }
         onClose={onClose}
         onUse={() => void use()}
@@ -1397,10 +1359,10 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const [typed, setTyped] = useState("");
   const [bad, setBad] = useState(false);
   const [busy, setBusy] = useState(false);
-  // On the cloud the browser needs a connected computer: the first with the browser ready, else any.
+  // With no computer the browser needs a connected one: the first with the browser ready, else any.
   const ready = (m: Machine) => Boolean(m.access?.tools.browser && m.browser?.available);
   const moveTo =
-    mode !== "off" && work.machineId === CLOUD
+    mode !== "off" && work.machineId === NO_COMPUTER
       ? (pickable.find((m) => ready(m) && m.online) ?? pickable.find(ready) ?? pickable[0] ?? null)
       : null;
   const add = () => {
@@ -1414,7 +1376,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const on = mode !== "off";
   const sitesNow = mode === "only" ? sites : [];
   const unchanged = on === work.granted && (!on || JSON.stringify(sitesNow) === JSON.stringify(domains));
-  const noComputer = on && work.machineId === CLOUD && !moveTo;
+  const noComputer = on && work.machineId === NO_COMPUTER && !moveTo;
   // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
   const blocked = noComputer && edition !== "cloud";
   const use = async () => {

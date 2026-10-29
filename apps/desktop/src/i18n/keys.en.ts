@@ -224,7 +224,7 @@ export const desktopEn: DesktopTranslations = {
       start: "agentes.chat didn't start on this {{device}}.",
       database: "The database wasn't prepared.",
       account: "Your account wasn't created.",
-      reach: "Access from your devices didn't turn on: {{reason}}. Try again in Preferences\u00a0›\u00a0Servers.",
+      retry: "Try again in Preferences\u00a0›\u00a0Servers.",
     },
     reason: {
       https: "HTTPS is off on your Tailscale network",
@@ -327,10 +327,6 @@ export const desktopEn: DesktopTranslations = {
     body: "{{host}} asked. They start with no folders of yours and commands off.",
     allow: "Allow",
     notNow: "Not now",
-  },
-  migrate: {
-    cloudTitle: "This {{device}} no longer works for agentes.chat Cloud",
-    cloudBody: "There, agents work on their workspace's own computer, always on. Their folders here stay in {{path}}.",
   },
   tools: {
     claudeName: "Claude Code",

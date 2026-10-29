@@ -91,8 +91,6 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningSkillScriptAny: "code",
   runningCode: "code",
   browsing: "globe",
-  startingComputer: "laptop",
-  stoppingComputer: "laptop",
   checkingComputer: "laptop",
   proposingMission: "flag",
   messagingMission: "flag",

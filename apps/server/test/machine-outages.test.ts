@@ -99,13 +99,13 @@ test("outages and move-agents over HTTP: the contract the apps read", async () =
       brains: ["claude_code"],
       reasonOff: "offline",
     },
-    { kind: "cloud", available: false, brains: [] },
   ]);
 
   // A bad body, an offline target.
-  expect(
-    (await api(`/machines/${air}/move-agents`, { json: { agentIds: [], target: { kind: "cloud" } } })).status,
-  ).toBe(400);
+  res = await api(`/machines/${air}/move-agents`, {
+    json: { agentIds: [], target: { kind: "machine", machineId: off } },
+  });
+  expect(res.status).toBe(400);
   res = await api(`/machines/${air}/move-agents`, {
     json: { agentIds: [agentId], target: { kind: "machine", machineId: off } },
   });

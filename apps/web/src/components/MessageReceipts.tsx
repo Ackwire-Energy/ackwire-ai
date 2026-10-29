@@ -3,6 +3,7 @@ import { type ReceiptPhase, type ReceiptView, receiptView, useModelLabel } from 
 import { joinNames } from "@agenteschat/client/lib/format";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, InfoHint, Popover, ProviderLogo } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
@@ -28,6 +29,18 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   follow_up: "thread",
 };
 
+/** A dot and the action after it: one piece, which wraps whole. */
+function ReceiptAction({ children }: { children: ReactNode }) {
+  return (
+    <span className="ac-receipt__then">
+      <span className="ac-receipt__dot" aria-hidden="true">
+        ·
+      </span>
+      {children}
+    </span>
+  );
+}
+
 /**
  * A person's message's receipt: a small muted check (our icons) at the end of its first line (`part="check"`).
  * Clicking or focusing it opens a popover with each agent and its status, and who picked them. Words only for what
@@ -44,6 +57,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const receipt = useLive((s) => s.receipts[message.id]);
   const view = receiptView(receipt);
   const status = view.status;
+  const callAgent =
+    actions && actions.channelAgents.length > 0 ? (
+      <ReceiptAction>
+        <CallAgentMenu />
+      </ReceiptAction>
+    ) : null;
   const worded =
     view.picking === true ||
     status?.kind === "nobody" ||
@@ -56,8 +75,10 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <span className="ac-receipt__clock">
           <Icon name="waiting" />
         </span>
-        <span>{t("receipts.picking")} ·</span>
-        <CallAgentMenu />
+        <span className="ac-receipt__words">
+          <span>{t("receipts.picking")}</span>
+          {callAgent}
+        </span>
       </div>
     );
   }
@@ -134,54 +155,52 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         </Popover>
       )}
       {status?.kind === "failed" && actions && (
-        <>
-          <span>{t("receipts.failedShort")} ·</span>
-          <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
-            {t("receipts.retry")}
-          </button>
-        </>
+        <span className="ac-receipt__words">
+          <span>{t("receipts.failedShort")}</span>
+          <ReceiptAction>
+            <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
+              {t("receipts.retry")}
+            </button>
+          </ReceiptAction>
+        </span>
       )}
-      {status?.kind === "nobody" &&
-        (mentionNeeded ? (
-          <>
+      {status?.kind === "nobody" && (
+        <span className="ac-receipt__words">
+          {mentionNeeded ? (
             <span className="ac-hintline">
               <span>{t("receipts.mentionNeeded")}</span>
               <InfoHint name={t("common.about", { label: t("routing.title") })}>
                 {t("receipts.mentionNeededHint")}
               </InfoHint>
             </span>
-            <span>·</span>
-            <CallAgentMenu />
-          </>
-        ) : (
-          <>
-            <span>{t("receipts.nobody")} ·</span>
-            <CallAgentMenu />
-          </>
-        ))}
-      {status?.kind === "no_ai" && (
-        <>
-          <span>
-            {t("noAi.receipt")}
-            {connect && " ·"}
-          </span>
-          {connect && (
-            <button
-              type="button"
-              className="ac-receipt__action"
-              onClick={() =>
-                connect.open({
-                  intent: receipt?.noAi?.intent,
-                  provider: receipt?.noAi?.provider,
-                  agentId: status.agents.length === 1 ? status.agents[0] : undefined,
-                  from: message.id,
-                })
-              }
-            >
-              {t("noAi.action")}
-            </button>
+          ) : (
+            <span>{t("receipts.nobody")}</span>
           )}
-        </>
+          {callAgent}
+        </span>
+      )}
+      {status?.kind === "no_ai" && (
+        <span className="ac-receipt__words">
+          <span>{t("noAi.receipt")}</span>
+          {connect && (
+            <ReceiptAction>
+              <button
+                type="button"
+                className="ac-receipt__action"
+                onClick={() =>
+                  connect.open({
+                    intent: receipt?.noAi?.intent,
+                    provider: receipt?.noAi?.provider,
+                    agentId: status.agents.length === 1 ? status.agents[0] : undefined,
+                    from: message.id,
+                  })
+                }
+              >
+                {t("noAi.action")}
+              </button>
+            </ReceiptAction>
+          )}
+        </span>
       )}
     </div>
   );

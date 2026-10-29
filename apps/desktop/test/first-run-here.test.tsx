@@ -283,14 +283,14 @@ describe("Your own server", () => {
       expect(el.textContent).toContain("This Mac becomes the server, while it's on.");
       expect(button("Which one to choose?")?.className).toBe("ac-link ac-link--muted dk-link");
       await press("Which one to choose?");
-      expect(opened).toEqual(["https://agentes.chat/help/run-on-your-computer?lang=en#who"]);
+      expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=en#who"]);
     });
     await firstRun(
       "first",
       async ({ press, opened }) => {
         await press("Usar o seu próprio servidor");
         await press("Qual escolher?");
-        expect(opened).toEqual(["https://agentes.chat/help/run-on-your-computer?lang=pt-BR#who"]);
+        expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=pt-BR#who"]);
       },
       { lang: "pt-BR" },
     );
@@ -386,6 +386,148 @@ describe("Setting it up here", () => {
       },
       { here: { hold: "start", pace: 10 } },
     ));
+
+  test("it stays where it opened: the room above is pinned as it starts, so the slow line grows it downward", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    expect(css.split("\n.dk-fr__setup > :first-child {")[1]?.split("}")[0]).toContain(
+      "margin-top: var(--dk-setup-lead, auto);",
+    );
+    // The room above the computer as the browser lays it out: the auto margin while the block is centred, or the
+    // room pinned on the block.
+    let room = 94;
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle };
+    const real = g.getComputedStyle;
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      el instanceof HTMLElement && el.classList.contains("ac-computer")
+        ? ({
+            marginTop: el.parentElement?.style.getPropertyValue("--dk-setup-lead") || `${room}px`,
+          } as CSSStyleDeclaration)
+        : real(el, pseudo);
+    try {
+      await firstRun(
+        "first",
+        async (screen) => {
+          const { el, until } = screen;
+          await startSetup(screen);
+          await until(() => stepOf(el, "Starting")?.dataset.state === "active");
+          const lead = () =>
+            (el.querySelector(".dk-fr__setup") as HTMLElement).style.getPropertyValue("--dk-setup-lead");
+          expect(lead()).toBe("94px");
+          // Taller with the slow line: left to the browser, the room above would shrink and the block move up.
+          room = 82.6;
+          setSystemTime(new Date(Date.now() + 31_000));
+          try {
+            await until(() => stepOf(el, "Starting")?.querySelector(".dk-fr__stepline"));
+            expect(lead()).toBe("94px");
+          } finally {
+            setSystemTime();
+          }
+        },
+        { here: { hold: "start", pace: 10 } },
+      );
+    } finally {
+      g.getComputedStyle = real;
+    }
+  });
+
+  test("words that would run past the window take the room above, no more: Continue stays in view", async () => {
+    const g = globalThis as { getComputedStyle: typeof getComputedStyle; ResizeObserver: unknown };
+    const real = { style: g.getComputedStyle, observer: g.ResizeObserver };
+    g.getComputedStyle = (el: Element, pseudo?: string | null) =>
+      el instanceof HTMLElement && el.classList.contains("ac-computer")
+        ? ({ marginTop: "94px" } as CSSStyleDeclaration)
+        : real.style(el, pseudo);
+    // What the browser reports as the steps, the bar and the buttons grow or shrink.
+    let resized = () => {};
+    g.ResizeObserver = class {
+      report: () => void;
+      constructor(report: () => void) {
+        this.report = report;
+      }
+      observe(target: Element) {
+        if (target.classList.contains("dk-fr__run")) resized = this.report;
+      }
+      unobserve() {}
+      disconnect() {}
+    };
+    try {
+      await firstRun(
+        "first",
+        async (screen) => {
+          const { el, until, button, press } = screen;
+          await press("Use your own server");
+          await press("Run agentes.chat on this Mac");
+          await until(() => el.querySelector("#here-reach:not([disabled])"));
+          await act(async () => typeInto(el.querySelector('input[type="email"]'), "ana@example.com"));
+          await act(async () => (el.querySelector("#here-reach") as HTMLElement).click());
+          await press("Start agentes.chat");
+          await until(() => el.querySelector(".dk-fr__setup"));
+          const setup = el.querySelector(".dk-fr__setup") as HTMLElement;
+          const lead = () => Number.parseFloat(setup.style.getPropertyValue("--dk-setup-lead"));
+          // The window shows 546 px of the column: the room above, then the rest.
+          let rest = 360;
+          const scroller = setup.parentElement as HTMLElement;
+          Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 546 });
+          Object.defineProperty(scroller, "scrollHeight", {
+            configurable: true,
+            get: () => Math.max(546, lead() + rest),
+          });
+          await act(async () => resized());
+          expect(lead()).toBe(94);
+          await until(() => button("Continue"));
+          const words = setup.querySelector(".dk-fr__problem")?.textContent ?? "";
+          expect(words).toContain("Give that permission once, in the terminal:");
+          // The step first, then where to try again: under the command, last.
+          expect(words.indexOf("sudo tailscale set --operator=$USER")).toBeGreaterThan(words.indexOf("terminal:"));
+          expect(words.endsWith("Copy Try again in Preferences\u00a0›\u00a0Servers.")).toBe(true);
+          expect(setup.querySelector(".dk-fr__cmd + .dk-fr__retry")).not.toBeNull();
+          // Tailscale's words and their command, 60 px more than the window shows: the room above gives those 60.
+          rest = 512;
+          await act(async () => resized());
+          expect(lead()).toBe(34);
+          expect(scroller.scrollHeight).toBe(scroller.clientHeight);
+          // Shorter again (as after Try again), it goes back to where it opened.
+          rest = 360;
+          await act(async () => resized());
+          expect(lead()).toBe(94);
+        },
+        { here: { fail: "reach", reason: "operator", pace: 10 } },
+      );
+    } finally {
+      g.getComputedStyle = real.style;
+      g.ResizeObserver = real.observer;
+    }
+  });
+
+  test("every reason's end gives its fix first, then where to try again on a line of its own", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    // Under a link or words as under a command: never run on after "Turn it on".
+    expect(css.split("\n.dk-fr__problem .dk-fr__retry {")[1]?.split("}")[0]).toContain("display: block;");
+    for (const [reason, fix] of [
+      ["https", "HTTPS is off on your Tailscale network. Turn it on"],
+      ["serve", "Install Tailscale from tailscale.com."],
+    ] as const)
+      await firstRun(
+        "first",
+        async ({ el, until, button, press }) => {
+          await press("Use your own server");
+          await press("Run agentes.chat on this Mac");
+          await until(() => el.querySelector("#here-reach:not([disabled])"));
+          await act(async () => typeInto(el.querySelector('input[type="email"]'), "ana@example.com"));
+          await act(async () => (el.querySelector("#here-reach") as HTMLElement).click());
+          await press("Start agentes.chat");
+          await until(() => button("Continue"));
+          const problem = el.querySelector(".dk-fr__problem") as HTMLElement;
+          expect({ reason, words: problem.textContent }).toEqual({
+            reason,
+            words: expect.stringContaining(`${fix} Try again in Preferences › Servers.`),
+          });
+          // Last: nothing follows it in the problem's words.
+          expect(problem.querySelector(".dk-fr__retry")?.nextSibling).toBeNull();
+        },
+        { here: { fail: "reach", reason, pace: 10 } },
+      );
+  });
 
   test("Cancel stops it, and the form comes back as it was", async () => {
     let cancels = 0;

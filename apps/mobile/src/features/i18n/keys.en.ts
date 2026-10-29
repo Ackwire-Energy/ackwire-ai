@@ -108,6 +108,11 @@ export const featureKeysEn: FeatureTranslations = {
   },
   chats: {
     title: "Chats",
+    serverError: {
+      offline: "No internet on your phone.",
+      text: "It may be down or outside your network. Your chats show up on their own when it's back.",
+      kept: "Showing what was already in the app.",
+    },
     section: {
       agents: "Agents",
       channels: "Channels",
@@ -498,7 +503,6 @@ export const featureKeysEn: FeatureTranslations = {
     noAgents: "No agent can run missions yet. Connect a computer on the website.",
     reason: {
       no_computer: "Needs a connected computer",
-      cloud_computer: "Missions on a cloud computer are coming soon",
       exec_off: "The computer doesn't allow running commands",
       runner_outdated: "The computer needs an update",
       not_in_audience: "Doesn't work with you",
@@ -621,6 +625,22 @@ export const featureKeysEn: FeatureTranslations = {
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
     freeSection: "Free",
+  },
+  agentEdit: {
+    missing: "This agent no longer exists.",
+    saved: "Changes saved",
+    rolePlaceholder: "E.g. Support",
+    adminsOnly: "Only admins change the name, role and instructions.",
+    discardTitle: "Discard your changes?",
+    discardText: "What you changed hasn't been saved yet.",
+    discard: "Discard",
+    keepEditing: "Keep editing",
+  },
+  newAgent: {
+    leaveTitle: "Leave without creating?",
+    leaveText: "The agent you started won't be created.",
+    keepGoing: "Keep creating",
+    partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
   },
   agent: {
     talk: "Chat",
@@ -951,6 +971,31 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't load the Drive.",
     more: "Show more",
   },
+  // Wiki (the rest of its words are the web's, `wiki.*`).
+  wiki: {
+    empty: "Tap New page to write the first one.",
+    missing: "This page no longer exists or was renamed.",
+    blank: "Blank page.",
+    folderGone: "This folder has no pages any more.",
+    reads_one: "{{count}} time",
+    reads_other: "{{count}} times",
+    taskConflict: "The page changed and is up to date now. Check it again.",
+    view: "View",
+    notSaved: "Preview · not saved yet",
+    placeholder: "Write here. [[ links another page.",
+    hideKeyboard: "Hide the keyboard",
+    createLink: "Create “{{title}}”",
+    discardTitle: "Leave without saving?",
+    discardText: "What you wrote here will be lost.",
+    discard: "Discard",
+    keepWriting: "Keep writing",
+    conflictText: "The saved version is now v{{version}}. See the difference and choose which one stays.",
+    conflictDiff: "Difference: saved → yours",
+    createAndWrite: "Create and write",
+    exists: "A page with this title already exists.",
+    openExisting: "Open the page",
+  },
+
   // Rotinas (the rest of its words are the web's, `routines.*`).
   routines: {
     loadFailed: "Couldn't load the routines.",
@@ -1015,7 +1060,7 @@ export const featureKeysEn: FeatureTranslations = {
     ownerYou: "Owner: you",
     nowWaiting: "Needs your ok: {{title}}",
     did: {
-      title: "What it did for you",
+      title: "What {{she}} did for you",
       month_one: "{{count}} this month",
       month_other: "{{count}} this month",
       seeAll: "See all",
@@ -1048,7 +1093,7 @@ export const featureKeysEn: FeatureTranslations = {
       },
     },
     knows: {
-      title: "What it knows about you",
+      title: "What {{she}} knows about you",
       footF: "Tap to correct or forget.",
       footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
@@ -1074,7 +1119,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     thinks: "Thinks with",
     uses: {
-      title: "What it can use",
+      title: "What {{she}} can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },
       area: {
         context: "Memory",
@@ -1085,7 +1130,7 @@ export const featureKeysEn: FeatureTranslations = {
         skills: "Skills",
         schedule: "Routines",
         forum: "Forum",
-        sandbox: "Its own computer",
+        sandbox: "Own computer",
         browser: "Browser",
         desktop: "Computer screen",
       },
@@ -1127,9 +1172,7 @@ export const featureKeysEn: FeatureTranslations = {
       submit_other: "Switch {{count}} agents",
       later: "Not now",
       on: "On",
-      cloud: "Cloud computer",
       cloudTag: "Always on",
-      cloudDesc: "An isolated computer in the cloud",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
       and: " and ",
@@ -1139,7 +1182,6 @@ export const featureKeysEn: FeatureTranslations = {
         offline: "Disconnected",
         paused: "Paused",
         missing_brain: "Doesn't have {{brain}}",
-        unavailable: "Not available right now",
         exec_off: "Doesn't allow running commands",
         runner_old: "Needs an update",
         outdated: "Needs an update",
@@ -1164,7 +1206,6 @@ export const featureKeysEn: FeatureTranslations = {
       target_not_found: "That computer isn't connected anymore. Choose another one.",
       target_same: "Choose a computer other than {{computer}}.",
       target_paused: "That computer is paused. Choose another one.",
-      target_cloud_unavailable: "The cloud computer isn't available right now.",
       not_found: "{{computer}} isn't in the computers list anymore.",
     },
     card: {
@@ -1424,7 +1465,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who it replies to",
+    audience: "Who {{she}} replies to",
     another: "Another AI",
   },
   crash: {

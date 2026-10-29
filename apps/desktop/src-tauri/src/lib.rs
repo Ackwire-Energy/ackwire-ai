@@ -65,12 +65,12 @@ fn is_sign_in_url(url: &str) -> bool {
 
 /// The app's own builds ("Download version …" in Updates), whichever server it opens.
 fn is_app_download(url: &str) -> bool {
-    url.starts_with("https://agentes.chat/api/desktop/download/")
+    url.starts_with("https://app.agentes.chat/api/desktop/download/")
 }
 
 /// The help pages on agentes.chat ("Which one to choose?", "How folders work"), whichever server it opens.
 fn is_help_page(url: &str) -> bool {
-    url.starts_with("https://agentes.chat/help/")
+    url.starts_with("https://app.agentes.chat/help/")
 }
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
@@ -547,21 +547,6 @@ fn migrate_login_item(app: &AppHandle) {
     let _ = app;
 }
 
-/// The servers at start: as they were, or (the first start of an app that keeps a list) from the menu bar
-/// app's homes, whose Cloud ones retire before any runner starts (`runners::migrate`).
-fn starting_servers(app: &AppHandle) -> servers::ServerFile {
-    if let Some(file) = servers::read(app) {
-        return file;
-    }
-    let moved = runners::migrate(app);
-    let mut list = moved.servers;
-    if !moved.retire.is_empty() {
-        list.push(servers::CLOUD.to_string());
-        menus::retired_cloud_homes(app, moved.retired.unwrap_or_else(|| "~/agentes".into()));
-    }
-    servers::ServerFile { current: list.first().cloned(), servers: list }
-}
-
 pub fn run() {
     let builder = tauri::Builder::default()
         // First: a second launch brings the running app's window back; one carrying a link (Windows,
@@ -719,8 +704,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let handle = app.handle().clone();
-            // Before the tray (it lists them) and before any runner (Cloud homes retire first).
-            servers::load(&handle, starting_servers(&handle));
+            // Before the tray (it lists them).
+            servers::load(&handle);
             tray::create(&handle)?;
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
@@ -780,12 +765,12 @@ mod tests {
     #[test]
     fn what_opens_in_the_browser() {
         assert!(is_sign_in_url("https://claude.ai/oauth/authorize?client_id=x"));
-        assert!(is_app_download("https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
-        assert!(!is_app_download("https://agentes.chat.evil.com/api/desktop/download/x"));
+        assert!(is_app_download("https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
+        assert!(!is_app_download("https://app.agentes.chat.evil.com/api/desktop/download/x"));
         assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
-        assert!(is_help_page("https://agentes.chat/help/run-on-your-computer?lang=en#who"));
-        assert!(!is_help_page("https://agentes.chat.evil.com/help/x"));
-        assert!(!is_help_page("https://agentes.chat/helpdesk"));
+        assert!(is_help_page("https://app.agentes.chat/help/run-on-your-computer?lang=en#who"));
+        assert!(!is_help_page("https://app.agentes.chat.evil.com/help/x"));
+        assert!(!is_help_page("https://app.agentes.chat/helpdesk"));
     }
 
     #[cfg(unix)]

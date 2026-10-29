@@ -171,7 +171,6 @@ export * from "./schedule-reader";
 export * from "./schedule-tools";
 export * from "./screen";
 export * from "./search";
-export * from "./secret-helper";
 export * from "./secrets";
 export * from "./session-screening";
 export * from "./setup-tools";

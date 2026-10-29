@@ -55,7 +55,7 @@
   padding: 38px 0 16px;
   box-sizing: border-box;
 }
-/* The step title's ⓘ: the line takes the title's type (`.onb__title`), so the ⓘ sits on its first line's capitals. */
+/* The step title's ⓘ: the line takes the title's type (`.onb__title`), so the ⓘ sits on its line's capitals. */
 .ac-hintline:has(> .newag__title) {
   font-size: var(--onb-title-size);
   line-height: var(--onb-title-leading);

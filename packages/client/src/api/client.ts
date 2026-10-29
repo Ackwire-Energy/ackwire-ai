@@ -39,6 +39,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BrainKind,
+  BrainMachine,
   BrowserHandoff,
   CalendarEvent,
   CalendarEventInput,
@@ -347,6 +348,8 @@ export interface ApiClient {
     /** "Quem pensa": the API, Claude Code or Codex on its computer (its owner or an admin). */
     brain(orgId: string, agentId: string): Promise<AgentBrain>;
     setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
+    /** "Quem pensa" for an agent still being created: the workspace's computers and what each offers (admins). */
+    brainMachines(orgId: string): Promise<BrainMachine[]>;
     runs(
       orgId: string,
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
@@ -467,20 +470,16 @@ export interface ApiClient {
   sandbox: {
     settings(orgId: string): Promise<SandboxSettings>;
     saveSettings(orgId: string, input: SandboxSettingsInput): Promise<SandboxSettings>;
-    /** The agent's PC (404 = this server has no sandbox). */
+    /** Which computer the agent uses. */
     computer(orgId: string, agentId: string): Promise<AgentComputer>;
-    start(orgId: string, agentId: string): Promise<AgentComputer>;
-    stop(orgId: string, agentId: string): Promise<AgentComputer>;
-    /** Deletes the PC and all its files. */
-    remove(orgId: string, agentId: string): Promise<void>;
-    /** Which computer the agent uses: a connected machine, or `null` for the cloud one. */
+    /** Which computer the agent uses: a connected machine, or `null` for none. */
     setTarget(orgId: string, agentId: string, machineId: string | null): Promise<ComputerTarget>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {
     list(orgId: string): Promise<Machine[]>;
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
-    /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
+    /** Revokes its token and disconnects the runner at once; agents on it are left with no computer. */
     remove(orgId: string, machineId: string): Promise<void>;
     /** The server's own computer in this organization; null when the server has none or doesn't serve it. */
     host(orgId: string): Promise<HostComputer | null>;
@@ -1126,13 +1125,6 @@ export interface ApiClient {
     /** Your pending ones, soonest first. */
     list(orgId: string): Promise<Reminder[]>;
     cancel(orgId: string, reminderId: string): Promise<Reminder>;
-  };
-  /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
-  waitlist: {
-    /** `humanCheck`: the bot check's token, when the server has one. */
-    join(input: { email: string; locale: string }, humanCheck?: string): Promise<void>;
-    /** The link in the confirmation email (`?confirm=`); `invalid_token` when unknown or expired. */
-    confirm(input: { token: string }): Promise<void>;
   };
 }
 

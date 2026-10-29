@@ -567,61 +567,6 @@ fn home_config(dir: &std::path::Path) -> Option<serde_json::Value> {
     serde_json::from_str(&text).ok()
 }
 
-/// The first start of an app that opens servers (`servers.json` not written yet), from the homes of the
-/// menu bar app before it: the Cloud no longer uses people's computers, so its homes are retired (stopped and
-/// removed here; their agents' folders stay, `retired` names where); a home of an own server keeps running,
-/// and its server joins the list, the first by organization name being the one open.
-#[derive(Debug, Default, PartialEq)]
-pub struct Move {
-    pub servers: Vec<String>,
-    pub retire: Vec<PathBuf>,
-    pub retired: Option<String>,
-}
-
-pub fn plan_move(homes: &[(PathBuf, serde_json::Value)]) -> Move {
-    let mut own: Vec<(String, String)> = Vec::new();
-    let mut out = Move::default();
-    for (dir, config) in homes {
-        let text = |k: &str| config.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let paired = !text("token").is_empty();
-        let Some(server) = crate::servers::origin_of(&text("server")) else { continue };
-        if !paired {
-            continue;
-        }
-        if server == crate::servers::CLOUD {
-            out.retire.push(dir.clone());
-            if out.retired.is_none() && !text("workspace").is_empty() {
-                out.retired = Some(text("workspace"));
-            }
-        } else {
-            own.push((text("orgName").to_lowercase(), server));
-        }
-    }
-    own.sort();
-    for (_, server) in own {
-        if !out.servers.contains(&server) {
-            out.servers.push(server);
-        }
-    }
-    out
-}
-
-/// Runs `plan_move` on the homes on disk: Cloud homes go before any runner starts.
-pub fn migrate(app: &AppHandle) -> Move {
-    let Ok(root) = orgs_root(app) else { return Move::default() };
-    let homes: Vec<(PathBuf, serde_json::Value)> = app_homes(&root, None)
-        .into_iter()
-        .filter_map(|(_, dir)| home_config(&dir).map(|c| (dir, c)))
-        .collect();
-    let plan = plan_move(&homes);
-    for dir in &plan.retire {
-        if dir.starts_with(&root) && *dir != root {
-            let _ = fs::remove_dir_all(dir);
-        }
-    }
-    plan
-}
-
 /// A home's `config.json` has a machine token: it is signed in (the token itself is never read further).
 fn paired_home(dir: &std::path::Path) -> bool {
     fs::read_to_string(dir.join("config.json"))
@@ -633,8 +578,7 @@ fn paired_home(dir: &std::path::Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{app_homes, drop_unpaired, no_longer_ours, plan_move, LineSplitter, Move};
-    use serde_json::json;
+    use super::{app_homes, drop_unpaired, no_longer_ours, LineSplitter};
     use std::path::PathBuf;
 
     #[test]
@@ -689,32 +633,6 @@ mod tests {
         // Stopped running here: its host home stops (and stays on disk); a pairing in progress goes on.
         assert_eq!(no_longer_ours(&running, &app_homes(&root, None)), vec![host.to_string()]);
         std::fs::remove_dir_all(&root).unwrap();
-    }
-
-    #[test]
-    fn the_move_retires_cloud_homes_and_keeps_own_servers() {
-        let home = |dir: &str, server: &str, org: &str, token: &str| {
-            (
-                PathBuf::from(dir),
-                json!({ "server": server, "orgName": org, "token": token, "workspace": format!("/Users/ana/agentes/{org}") }),
-            )
-        };
-        let plan = plan_move(&[
-            home("/h/1", "https://agentes.chat", "acme", "agm_1"),
-            home("/h/2", "https://zeta.tail1234.ts.net", "Zeta", "agm_2"),
-            home("/h/3", "https://agentes.tail1234.ts.net", "Beta", "agm_3"),
-            home("/h/4", "https://agentes.tail1234.ts.net", "Alfa", "agm_4"),
-            home("/h/5", "https://other.example.com", "Unpaired", ""),
-        ]);
-        assert_eq!(
-            plan,
-            Move {
-                servers: vec!["https://agentes.tail1234.ts.net".into(), "https://zeta.tail1234.ts.net".into()],
-                retire: vec![PathBuf::from("/h/1")],
-                retired: Some("/Users/ana/agentes/acme".into()),
-            }
-        );
-        assert_eq!(plan_move(&[]), Move::default());
     }
 
     fn texts(lines: Vec<Vec<u8>>) -> Vec<String> {

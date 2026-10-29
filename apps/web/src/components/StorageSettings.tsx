@@ -7,6 +7,7 @@ import {
   useTestStorage,
 } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
   Alert,
   Button,
@@ -110,9 +111,10 @@ function PathCode({ path }: { path: string }) {
 /**
  * Settings → Armazenamento (admins only): where files stay unless the workspace brings its own S3-compatible
  * bucket. On the Cloud that is our storage; on a server people run, the server itself, said by where it keeps them.
+ * The option in use also says what the files there take.
  */
 export function StorageSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const admin = can(org.role, "configure");
   const storage = useStorage(org.id, admin);
@@ -159,6 +161,7 @@ export function StorageSection() {
                   // The radio says which is in use until another is picked: then this says it.
                   config.kind === k && choice !== k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined
                 }
+                detail={config.kind === k ? storageUsageLine(t, i18n.language, config) : undefined}
               />
             ))}
             {(["gdrive", "onedrive"] as const).map((k) => (
@@ -328,7 +331,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
         );
       }}
     >
-      <div className="grid-fields">
+      <div className="grid-fields grid-fields--wide">
         <Field
           label={t("storage.endpoint")}
           id="st-endpoint"

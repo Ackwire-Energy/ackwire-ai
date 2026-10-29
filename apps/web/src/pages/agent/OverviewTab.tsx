@@ -268,7 +268,7 @@ export function OverviewTab() {
             // The card inside is the "Como trabalha" region; this only gives it its quiet heading.
             <div className="agp-aside__work">
               <p className="agp-aside__h" aria-hidden="true">
-                {t("agentPage.work.cell.label")}
+                {t("agentPage.work.cell.label", g)}
               </p>
               <WorkCard onOpen={openWork} footer={<Numbers />} />
             </div>
@@ -277,7 +277,7 @@ export function OverviewTab() {
             <CardHead
               id="ov-who"
               icon="person"
-              title={t("agentPage.overview.who")}
+              title={t("agentPage.overview.who", g)}
               action={
                 can("owner") ? (
                   <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "owner")}>
@@ -319,7 +319,7 @@ export function OverviewTab() {
             <CardHead
               id="ov-where"
               icon="channel"
-              title={t("agentPage.overview.where")}
+              title={t("agentPage.overview.where", g)}
               action={
                 can("channels") ? (
                   <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "channels")}>

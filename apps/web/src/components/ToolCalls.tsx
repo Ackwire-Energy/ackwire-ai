@@ -72,8 +72,6 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCode: "code",
   browsing: "globe",
   pcFiles: "file",
-  startingComputer: "computer",
-  stoppingComputer: "computer",
   checkingComputer: "computer",
   proposingMission: "flag",
   messagingMission: "flag",
@@ -87,6 +85,9 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   findingTools: "search",
 };
 
+/** Apps of ours that aren't in the connector catalog (the org's mailboxes): their icon, not an initial. */
+const OWN_APP_ICON: Record<string, IconName> = { email: "mail" };
+
 const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 /** A call's logo: the connector's mark from the catalog (by id or name), or the icon of one of our tools. */
@@ -96,7 +97,13 @@ function useLogo() {
     if (a.kind === "consulting" && a.app) {
       const key = plain(a.app);
       const def = catalog.data?.connectors.find((c) => plain(c.id) === key || plain(c.label) === key) ?? null;
-      return <ConnectorIcon def={def} label={a.app} />;
+      const own = def ? undefined : OWN_APP_ICON[key];
+      if (!own) return <ConnectorIcon def={def} label={a.app} />;
+      return (
+        <span className="tool-logo" aria-hidden="true">
+          <Icon name={own} size={14} />
+        </span>
+      );
     }
     return (
       <span className="tool-logo" aria-hidden="true">

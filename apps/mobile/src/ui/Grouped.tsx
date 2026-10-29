@@ -67,6 +67,8 @@ export interface GroupedRowProps {
   subLines?: number;
   /** Under the small line, in the text column (a second line of facts). */
   below?: ReactNode;
+  /** A line of facts under the small line, in faint, read out with the label (a `below` node is not). */
+  belowText?: string;
   /** A rounded tile with this icon on the left. */
   icon?: IconName;
   /** Anything else on the left (an organization's tile). */
@@ -91,6 +93,7 @@ export function GroupedRow({
   sub,
   subLines = 1,
   below,
+  belowText,
   icon,
   leading,
   value,
@@ -108,7 +111,7 @@ export function GroupedRow({
       onPress={onPress}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
-      accessibilityLabel={value ? `${label}, ${value}` : label}
+      accessibilityLabel={[label, belowText, value].filter(Boolean).join(", ")}
       accessibilityState={{
         disabled,
         ...(toggle !== undefined ? { checked: toggle } : {}),
@@ -132,6 +135,11 @@ export function GroupedRow({
           </Text>
         ) : null}
         {below}
+        {belowText ? (
+          <Text variant="footnote" tone="faint" numberOfLines={2}>
+            {belowText}
+          </Text>
+        ) : null}
       </View>
       {value ? (
         <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>

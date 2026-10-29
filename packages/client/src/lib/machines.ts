@@ -1,4 +1,14 @@
-import type { DeviceLocation, Machine, MachineAccess, MachineFolderGrant, MachineToolName } from "../api/types";
+import type {
+  AccountLoginStatus,
+  DeviceLocation,
+  Machine,
+  MachineAccess,
+  MachineAccount,
+  MachineAccountKind,
+  MachineFolderGrant,
+  MachineToolName,
+} from "../api/types";
+import { errorCode } from "./errors";
 
 /**
  * Connected computers (ADR 0025, ADR 0036): the device code, the commands the
@@ -119,12 +129,11 @@ export function desktopTargetOf(userAgent: string) {
 }
 
 /** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
-export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
+export type ComputerKind = "mac" | "windows" | "linux";
 export type ComputerState = "online" | "paused" | "offline";
 
 /** A machine's `os` → its portrait: Macs, Windows PCs, and everything else drawn as a Linux server. */
-export function computerKind(os: string | null | undefined, cloud = false): ComputerKind {
-  if (cloud) return "cloud";
+export function computerKind(os: string | null | undefined): ComputerKind {
   const v = (os ?? "").toLowerCase();
   if (v === "darwin" || v === "macos" || v === "mac") return "mac";
   if (v === "windows" || v === "win32") return "windows";
@@ -171,4 +180,40 @@ export function isSignInCode(text: string, signInUrl: string): boolean {
   }
   const code = text.trim();
   return Boolean(state) && code.length > (state?.length ?? 0) + 1 && code.endsWith(`#${state}`) && !/\s/.test(code);
+}
+
+/** What starts a sign-in on the computer (`beginAccountLogin`'s options). */
+export interface AccountLoginInput {
+  accountId?: string;
+  email?: string;
+  provider?: string;
+}
+
+/**
+ * Starts a sign-in on the computer: again to `again` (signed out), or a coding plan's key account (`provider`). Claude
+ * takes `hint`, the email of the account it should be, as its CLI's login hint: the account's own when it signs in
+ * again, never asked of the person. A hint the server refuses only steered Claude's page, so it starts without one.
+ */
+export async function beginLogin<T>(
+  begin: (input: AccountLoginInput) => Promise<T>,
+  kind: MachineAccountKind,
+  { again, provider, hint }: { again?: string | undefined; provider?: string | undefined; hint?: string | null },
+): Promise<T> {
+  const input: AccountLoginInput = { ...(again ? { accountId: again } : {}), ...(provider ? { provider } : {}) };
+  if (kind !== "claude_code" || provider || !hint) return begin(input);
+  try {
+    return await begin({ ...input, email: hint });
+  } catch (error) {
+    if (errorCode(error) !== "account.invalid_email") throw error;
+    return begin(input);
+  }
+}
+
+/**
+ * The account a sign-in came back as when its person already has it on that computer (the new sign-in is removed
+ * there): theirs to think with instead, while it is signed in and no agent thinks with it.
+ */
+export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAccount | null {
+  const account = status?.duplicate?.account;
+  return account?.status === "active" && account.usedBy.length === 0 ? account : null;
 }

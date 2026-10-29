@@ -65,16 +65,17 @@ export const envVars = {
     section: "Server",
     example: "https://chat.example.com",
   },
+  LANDING_URL: {
+    schema: z.url().optional(),
+    description:
+      "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting list: that origin may call it (CORS on `/api/waitlist` only), and the confirmation email links there. Unset: no waiting list.",
+    section: "Server",
+    example: "https://agentes.chat",
+  },
   WEB_DIR: {
     schema: z.string().default("./public"),
     description:
       "Directory containing the built web app (single-page app). Served by this server when it exists; otherwise only the API runs.",
-    section: "Server",
-  },
-  LANDING_PAGE: {
-    schema: z.stringbool().default(false),
-    description:
-      "Show the agentes.chat marketing page, with its waiting list and analytics, to signed-out visitors at `/`. Default: on when `PUBLIC_URL` is https://agentes.chat (the official site), off elsewhere (`/` goes to sign-in).",
     section: "Server",
   },
   DATABASE_URL: {
@@ -136,14 +137,14 @@ export const envVars = {
   TERMS_URL: {
     schema: z.url().optional(),
     description:
-      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on https://agentes.chat: its /terms page.",
+      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
     section: "Sign-in",
     example: "https://example.com/terms",
   },
   PRIVACY_URL: {
     schema: z.url().optional(),
     description:
-      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on https://agentes.chat: its /privacy page.",
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
     section: "Sign-in",
     example: "https://example.com/privacy",
   },
@@ -512,7 +513,7 @@ export const envVars = {
   EMAIL_FROM: {
     schema: z.string().optional(),
     description:
-      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
+      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`. On agentes.chat Cloud (https://app.agentes.chat): `agentes.chat <ola@agentes.chat>`.",
     section: "Email",
   },
   EMAIL_ART: {
@@ -645,56 +646,6 @@ export const envVars = {
     description:
       "Path-style bucket URLs (`https://endpoint/bucket/key`), for MinIO, Garage and similar stores. Off: virtual-hosted URLs (`https://bucket.endpoint/key`), as R2 and AWS expect.",
     section: "Storage",
-  },
-  DAYTONA_API_KEY: {
-    schema: z.string().optional(),
-    description:
-      "Daytona API key: sandboxes where agents run code (`run_code`, skill scripts). Platform secret, never sent to a sandbox or a client. Without it the sandbox tools are off.",
-    section: "Sandbox",
-    secret: true,
-  },
-  DAYTONA_API_URL: {
-    schema: z.url().default("https://app.daytona.io/api"),
-    description: "Daytona API base URL.",
-    section: "Sandbox",
-  },
-  DAYTONA_TARGET: {
-    schema: z.string().optional(),
-    description: "Daytona region for new sandboxes (e.g. `us` or `eu`). Default: the Daytona organization's default.",
-    section: "Sandbox",
-  },
-  SANDBOX_SNAPSHOT: {
-    schema: z.string().optional(),
-    description:
-      "Name of our computer snapshot in Daytona (built from infra/sandbox/Dockerfile by `bun apps/server/scripts/sandbox-snapshot.ts`). Unset: the provider's default image, with /workspace created on first start.",
-    section: "Sandbox",
-    example: "agentes-computer-v3",
-  },
-  SANDBOX_AUTO_STOP_MINUTES: {
-    schema: z.coerce.number().int().min(1).max(120).default(10),
-    description: "An agent's computer stops after this many idle minutes (its next use starts it again, files kept).",
-    section: "Sandbox",
-  },
-  SANDBOX_ARCHIVE_AFTER_DAYS: {
-    schema: z.coerce.number().int().min(1).max(30).default(7),
-    description:
-      "A stopped computer is archived after this many days (files kept; starting it takes longer). Computers are never deleted automatically.",
-    section: "Sandbox",
-  },
-  SANDBOX_PRICE_VCPU_HOUR_USD: {
-    schema: z.coerce.number().min(0).default(0.0504),
-    description: "Price of one vCPU per hour, for the sandbox usage recorded per agent (Daytona list price).",
-    section: "Sandbox",
-  },
-  SANDBOX_PRICE_MEMORY_GIB_HOUR_USD: {
-    schema: z.coerce.number().min(0).default(0.0162),
-    description: "Price of one GiB of memory per hour, for sandbox usage.",
-    section: "Sandbox",
-  },
-  SANDBOX_PRICE_DISK_GIB_HOUR_USD: {
-    schema: z.coerce.number().min(0).default(0.000108),
-    description: "Price of one GiB of disk per hour, for sandbox usage.",
-    section: "Sandbox",
   },
   HOST_COMPUTER_TOKEN: {
     schema: z

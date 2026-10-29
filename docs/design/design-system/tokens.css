@@ -17,15 +17,9 @@
   --e3: 0 2px 4px rgba(23, 23, 22, 0.04), 0 24px 56px -16px rgba(23, 23, 22, 0.3), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(10, 10, 10, 0.32);
-  /* Chosen, never a thick ring, and never moved, so a row of options keeps its words on one line. Light: it
-     sinks into the page, like a key held down. Dark: it lights up (brighter face, deeper shadow) and, in a
-     single-choice group, the others step back to a flat hairline (components.css). */
+  /* Chosen: held down into the page like a pressed key (--chosen-shadow below). */
   --chosen-bg: var(--sunken);
-  --chosen-shadow:
-    inset 0 2px 5px rgba(23, 23, 22, 0.16), inset 0 1px 1.5px rgba(23, 23, 22, 0.12), inset 0 0 0 1px var(--line),
-    0 1px 0 rgba(255, 255, 255, 0.7);
-  --chosen-lift: none;
-  --unchosen-shadow: inset 0 0 0 1px var(--line);
+  --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12);
 }
 [data-theme="dark"] {
   --bg: #0f0f0e; --raised: #1c1c1b; --raised-2: #242423; --sunken: #0a0a09;
@@ -42,10 +36,10 @@
   --e3: 0 28px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.5);
-  --chosen-bg: color-mix(in srgb, #fff 7%, var(--raised));
-  --chosen-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.1), 0 14px 28px -8px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --chosen-lift: none;
+  /* On --sunken's near-black a black shadow barely shows and the card reads as a hole: the press sinks a face that
+     isn't black, as far under --raised in lightness as light's is under white, and shadows it deeper. */
+  --chosen-bg: #141413;
+  --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px rgba(0, 0, 0, 0.5);
 }
 :root, [data-theme] {
   /* Names from v1, kept so every component keeps working (they follow the theme). */
@@ -56,6 +50,11 @@
   --success: var(--ink);
   --focus-ring: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink);
   --overlay: var(--e3);
+  /* Chosen, pressed the same in both themes (each theme's --chosen-bg and --chosen-press): held down into the page
+     like a pressed key, inside a hairline (--chosen-press alone for a card that keeps its own outline). Never a thick
+     ring and never moved, so a row of options keeps its words on one line. */
+  --chosen-shadow: var(--chosen-press), inset 0 0 0 1px var(--line);
+  --chosen-lift: none;
   --spring: cubic-bezier(0.34, 1.4, 0.5, 1); --out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
   --radius-sm: 6px; --radius-item: 10px; --radius-md: 10px; --radius-btn: 12px; --radius-lg: 14px;

@@ -34,7 +34,7 @@ import { SwitchComputerDialog } from "../MachineOutages";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { SetupWait, useWaitReader } from "../WorkspaceComputer";
-import { CantShowCover, Stage } from "./covers";
+import { CantShowCover, ScreenNotice, Stage } from "./covers";
 import { type AgentComputerView, useAgentComputer } from "./facts";
 import { DialogHead, DialogHeadContext, type DialogHeadSlots } from "./head";
 import { OpenComputerContext, useOpenComputer } from "./open";
@@ -308,6 +308,9 @@ function ComputerStage({
   const openTools = () => goTo({ tab: "access" });
   const choose = () => goTo({ tab: "settings", sec: "computer" });
 
+  // Under a cover the screen opens from by itself, the screen's line: the screen opens where its cover was. The covers
+  // that stay until someone acts take its room.
+  const notice = <ScreenNotice name={agent.name} />;
   let body: ReactNode;
   let steps: ReactNode = null;
   if (!f || !view.ready) {
@@ -317,6 +320,7 @@ function ComputerStage({
         <Stage>
           <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />
         </Stage>
+        {notice}
       </>
     );
   } else if (view.forbidden) {
@@ -335,6 +339,7 @@ function ComputerStage({
         <Stage>
           <Cover color={color} sky icon="check" text={t("agentComputer.state.ready")} />
         </Stage>
+        {notice}
       </>
     );
   } else if (surface === "held") {
@@ -349,6 +354,7 @@ function ComputerStage({
             help={t("agentComputer.state.heldHelp")}
           />
         </Stage>
+        {notice}
       </>
     );
   } else if (surface === "preparing" && f.setup) {
@@ -445,6 +451,7 @@ function ComputerStage({
               help={t("desktop.state.retrying")}
             />
           </Stage>
+          {notice}
         </>
       ) : (
         <>
@@ -467,6 +474,7 @@ function ComputerStage({
               }
             />
           </Stage>
+          {notice}
           {switching && outage && outages.data && (
             <SwitchComputerDialog open onOpenChange={setSwitching} outage={outage} data={outages.data} />
           )}
@@ -480,6 +488,7 @@ function ComputerStage({
         <Stage>
           <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />
         </Stage>
+        {notice}
       </>
     );
   } else if (!machine) {
@@ -560,7 +569,8 @@ function ComputerStage({
     <DialogHeadContext.Provider value={head}>
       <div className="cmp-body">
         {body}
-        {steps && <div className="cmp-steps-row">{steps}</div>}
+        {/* Under whatever holds the screen's place, kept empty too, so nothing moves when a line comes. */}
+        <div className="cmp-steps-row">{steps}</div>
       </div>
     </DialogHeadContext.Provider>
   );

@@ -92,7 +92,7 @@ export type PlanGate =
   /** The Cloud's computer on its way; `view` null: it said ready and the agent gets it on the next refresh. */
   | { state: "preparing"; view: SetupView | null }
   | { state: "offline" }
-  /** Self-host with no computer for the agent (none connected, or a Daytona sandbox). */
+  /** Self-host with no computer for the agent (none connected). */
   | { state: "missing" }
   | { state: "unsupported"; reason: BrainUnavailable | "keys" }
   /** `owner`: the viewer doesn't own the agent; `computer`: only whoever connected it adds a sign-in there. */
@@ -128,6 +128,14 @@ export function planGate({
   if (!brain.canManageAccounts) return { state: "locked", who: "computer" };
   return { state: "ready" };
 }
+
+/**
+ * The computer's own sign-in can think for the agent with this plan: whoever connected that computer owns the agent,
+ * and Claude Code is signed in there (`computer.own`, the `/ai-accounts` row). ChatGPT's own sign-in isn't reported,
+ * so it is taken as there.
+ */
+export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, computer: AiComputer | undefined) =>
+  brain?.ownSignIn === true && !isPlanId(choice) && (choice !== "claude" || computer?.own?.claude_code !== undefined);
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";

@@ -21,12 +21,13 @@ const FILE_NAME = /^[\w.-]{1,200}$/;
 
 export interface DesktopRelease {
   version: string;
+  /** The download's path here (`/api/desktop/download/…`); the routes put `PUBLIC_URL` in front. */
   url: string;
   sha256: string;
   notes: string;
   publishedAt: string;
   minVersion?: string;
-  /** The Tauri updater bundle and its signature; absent on builds made before the updater. */
+  /** The Tauri updater bundle (a path too) and its signature; absent on builds made before the updater. */
   updater?: { url: string; signature: string };
 }
 
@@ -204,8 +205,7 @@ function releaseReader<T, K extends string>(
  * The newest `desktop-v*` release with a platform's download and checksum (and the updater bundle, when
  * signed): a release may lack a platform, which then keeps the newest one that has it.
  */
-export function createDesktopReleases(options: ReleaseSource & { publicUrl: string }) {
-  const base = options.publicUrl.replace(/\/+$/, "");
+export function createDesktopReleases(options: ReleaseSource) {
   return releaseReader<DesktopRelease, DesktopTarget>({
     ...options,
     prefix: DESKTOP_TAG_PREFIX,
@@ -223,13 +223,13 @@ export function createDesktopReleases(options: ReleaseSource & { publicUrl: stri
       const signature = bundle && sigAsset ? (await text(sigAsset)).trim() : "";
       return {
         version,
-        url: `${base}/api/desktop/download/${version}/${file.name}`,
+        url: `/api/desktop/download/${version}/${file.name}`,
         sha256,
         notes,
         publishedAt: release.published_at ?? release.created_at ?? "",
         ...(minVersion ? { minVersion } : {}),
         ...(bundle && signature
-          ? { updater: { url: `${base}/api/desktop/download/${version}/${bundle.name}`, signature } }
+          ? { updater: { url: `/api/desktop/download/${version}/${bundle.name}`, signature } }
           : {}),
       };
     },
@@ -291,6 +291,8 @@ const Latest = z
  */
 export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases: DesktopReleases) {
   const { rateLimiter } = deps.adapters;
+  // Download links are on `PUBLIC_URL`, whatever address a request came in on.
+  const base = deps.config.PUBLIC_URL.replace(/\/+$/, "");
 
   // The desktop app's web view (origin `tauri://localhost`) reads it with fetch: public data, no credentials.
   api.use("/desktop/latest", async (c, next) => {
@@ -333,7 +335,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       const release = platform ? await releases.latest(platform).catch(() => null) : null;
       if (!release) return apiError(c, 404, "desktop.no_release", "No desktop build for this computer yet");
       const { updater: _, ...latest } = release;
-      return c.json(latest, 200);
+      return c.json({ ...latest, url: `${base}${latest.url}` }, 200);
     },
   );
 
@@ -354,7 +356,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
         version: release.version,
         notes: release.notes,
         pub_date: release.publishedAt,
-        url: release.updater.url,
+        url: `${base}${release.updater.url}`,
         signature: release.updater.signature,
       },
       200,

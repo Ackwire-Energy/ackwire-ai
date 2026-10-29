@@ -99,7 +99,25 @@ const sendText = async (text: string) => {
 describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens on Claude's sign-in for the first agent with no AI", async () => {
     const jev = { by: "jev", mine: "jev", model: null, noSmallModel: null } as const;
-    await open(walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID));
+    const { api } = await open(
+      walters(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), routing: jev } }), ADA_ID),
+    );
+    // The MacBook he connected, its Claude Code signed in there.
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_1",
+          name: "MacBook",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: true },
+          own: { claude_code: { plan: "max" } },
+        },
+      ],
+    });
     const shown = banner();
     // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
     // line is a whole sentence). Jev is what understands that ask.
@@ -123,7 +141,7 @@ describe("no AI connected: above the composer", () => {
     // Ada is Walter's and has no AI: the plan is for her (Atlas isn't his), on the MacBook he connected.
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
+    expect(panel.textContent).toContain("A conta que os seus agentes dividem");
   });
 
   test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {
@@ -146,7 +164,8 @@ describe("no AI connected: above the composer", () => {
     const first = dialog("Conectar uma IA") as HTMLElement;
     expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    // Without the computer's name, in a group of its own over a hairline: never read as part of the account.
+    expect(panel.querySelector(".ai-panel__ready")?.textContent).toBe("O computador está pronto.");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
@@ -181,6 +200,22 @@ describe("no AI connected: above the composer", () => {
     cleanup();
     await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }));
     expect(banner()).toBeNull();
+  });
+
+  test("Connect from an agent's DM is for that agent alone: no For, though the viewer has others with no AI", async () => {
+    const both = () => walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID, ATLAS_ID);
+    await open(both(), `dm/agent/${ADA_ID}`);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
+    const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    expect(within(panel).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
+    cleanup();
+    // Opened from anywhere else, every agent of the viewer's stays a choice.
+    await open(both());
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);
+    const any = dialog("Conectar uma IA") as HTMLElement;
+    expect(within(any).getByRole("combobox", { name: "Agentes que usam este plano" })).toBeTruthy();
   });
 
   test("the agent's page: 'Sem IA' by its name opens Connect for that agent", async () => {
@@ -265,8 +300,8 @@ describe("the agent's no-AI card", () => {
     await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    // Choosing a plan asks nothing: she then answers only him until he shares it (ADR 0059 §5).
-    expect(plan.textContent).toContain("Com o seu plano, a Ada só responde a você.");
+    // Choosing a plan asks nothing: she then answers only him until he turns on Responde a todos (ADR 0059 §5).
+    expect(within(plan).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
     // Claude's sign-in starts on its button, in a window of its own.
     const realOpen = window.open;
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
@@ -353,7 +388,7 @@ describe("receipts and the live block", () => {
       intent: "task",
     });
     const receipt = receiptOf("alguém resume o canal?");
-    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
+    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA·Conectar");
     await click(within(receipt).getByRole("button", { name: "Conectar" }));
     expect(dialog("Conectar uma IA")).not.toBeNull();
   });
@@ -373,7 +408,7 @@ describe("receipts and the live block", () => {
     const receipt = receiptOf("e o login?");
     const check = receipt.querySelector(".ac-receipt__check") as HTMLElement;
     expect(check.getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
-    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
+    expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA·Conectar");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
 
@@ -414,7 +449,7 @@ describe("receipts and the live block", () => {
     expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ninguém vai responder: falta uma IA");
     expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
-      "Ninguém vai responder: falta uma IA ·",
+      "Ninguém vai responder: falta uma IA·Conectar",
     );
   });
 

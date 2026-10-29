@@ -199,7 +199,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
   const brain = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
-    json: { brain: "claude_code", acceptPlanTerms: true, account: login.loginId, effort: "high" },
+    json: { brain: "claude_code", account: login.loginId, effort: "high" },
   });
   expect(brain.status).toBe(200);
   expect(await brain.json()).toMatchObject({
@@ -315,7 +315,11 @@ test("a computer nobody connected: anyone signs in, the account is theirs from t
   const sealedAgain = await sealSecret(again.publicKey, "abc#456", accountCodeAad(again.loginId, orgId));
   await asAdmin(`${base}/account-logins/${again.loginId}/code`, { json: { box: sealedAgain } });
   const duplicate = await asAdmin(`${base}/account-logins/${again.loginId}`);
-  expect(await duplicate.json()).toMatchObject({ state: "failed", duplicate: { label: "Claude Max" } });
+  // Named, and the account itself, with its email for its owner: theirs to think with instead.
+  expect(await duplicate.json()).toMatchObject({
+    state: "failed",
+    duplicate: { label: "Claude Max", account: { id: login.loginId, email: "bia@example.com", mine: true } },
+  });
   expect(runner.accountRequests("remove")).toMatchObject([{ accountId: again.loginId }]);
   expect(await accountRow(again.loginId)).toBeNull();
 

@@ -132,7 +132,7 @@ describe("the menu's banners say only what matters there", () => {
     globalThis.fetch = (async () =>
       Response.json({
         version: "9.9.9",
-        url: "https://agentes.chat/api/desktop/download/9.9.9/agentes_9.9.9_universal.dmg",
+        url: "https://app.agentes.chat/api/desktop/download/9.9.9/agentes_9.9.9_universal.dmg",
       })) as unknown as typeof fetch;
     try {
       await run();

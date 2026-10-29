@@ -118,6 +118,36 @@ describe("Contas de IA", () => {
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
   });
 
+  test("Sign in again: the account's own email goes to Claude's sign-in unseen; another account coming back is said, with Try again only", async () => {
+    const out = { ...WORK, status: "signed_out" as const };
+    const free = { ...WORK, id: "acct_pessoal", label: "Pessoal", email: "walt@gmail.com", usedBy: [], usage: null };
+    const { state, api, rows } = await page([out, free]);
+    fakeMachinesOf.get(api)?.endLogin("login_1", {
+      state: "failed",
+      signedInAs: "walt@gmail.com",
+      duplicate: { label: "Pessoal", account: free },
+    });
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Entrar de novo" }));
+    const dialog = screen().getByRole("dialog", { name: "Trabalho" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(dialog).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args[3])).toEqual([
+      { accountId: "acct_work", email: "walt@acme.com" },
+    ]);
+    expect(shownText(dialog)).toContain(
+      "O Claude entrou como walt@gmail.com, não como walt@acme.com. Saia na página do Claude e tente de novo.",
+    );
+    // No agent here to think with the one that came back: nothing to use it for.
+    expect(within(dialog).queryByRole("button", { name: /^Usar / })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
   test("disconnecting names the agent that thinks with it; renaming saves the new name", async () => {
     const { state, rows } = await page([WORK, MINIMAX]);
     await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Desconectar" }));

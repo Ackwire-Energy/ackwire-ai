@@ -10,7 +10,7 @@ import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
 import { parseReceivePackRequest, pkt, type RefCommand, readPack, walkToOld, ZERO_OID } from "./pack";
 import { agentRepositoryList, repoInList } from "./repos";
 
-const { sandboxes, machines, agents, connectorConnections } = schema;
+const { machines, agents, connectorConnections } = schema;
 
 export const GIT_SCOPES = {
   read: connectorScope("github", "git.read"),
@@ -162,7 +162,7 @@ export async function handleGitProxy(
     : "";
   const now = deps.now?.() ?? new Date();
   const claims = password ? verifyGitToken(deps.secret, password, now) : null;
-  if (!claims || claims.orgId !== params.orgId) {
+  if (!claims || claims.orgId !== params.orgId || claims.kind !== "machine") {
     return text(401, "agentes: sign in with the computer's git credential", {
       "www-authenticate": 'Basic realm="agentes git"',
     });
@@ -173,26 +173,16 @@ export async function handleGitProxy(
     .select({ id: agents.id, handle: agents.handle, archivedAt: agents.archivedAt, machineId: agents.machineId })
     .from(agents)
     .where(and(eq(agents.id, claims.agentId), eq(agents.orgId, claims.orgId)));
-  /** What the audit names as the computer. */
-  let where: { sandboxId: string } | { machineId: string };
-  if (claims.kind === "machine") {
-    // A connected machine (ADR 0024 addendum): still paired, same token, and still this agent's computer.
-    const [machine] = await deps.db
-      .select({ id: machines.id, tokenHash: machines.tokenHash })
-      .from(machines)
-      .where(and(eq(machines.id, claims.sandboxId), eq(machines.orgId, claims.orgId), isNull(machines.deletedAt)));
-    if (!machine?.tokenHash || machineGitGen(machine.tokenHash) !== claims.gen || agent?.machineId !== machine.id) {
-      return revoked();
-    }
-    where = { machineId: machine.id };
-  } else {
-    const [computer] = await deps.db
-      .select()
-      .from(sandboxes)
-      .where(and(eq(sandboxes.id, claims.sandboxId), eq(sandboxes.orgId, claims.orgId), isNull(sandboxes.deletedAt)));
-    if (!computer || computer.agentId !== claims.agentId || computer.gitTokenGen !== claims.gen) return revoked();
-    where = { sandboxId: computer.id };
+  // A connected machine (ADR 0024 addendum): still paired, same token, and still this agent's computer.
+  const [machine] = await deps.db
+    .select({ id: machines.id, tokenHash: machines.tokenHash })
+    .from(machines)
+    .where(and(eq(machines.id, claims.sandboxId), eq(machines.orgId, claims.orgId), isNull(machines.deletedAt)));
+  if (!machine?.tokenHash || machineGitGen(machine.tokenHash) !== claims.gen || agent?.machineId !== machine.id) {
+    return revoked();
   }
+  /** What the audit names as the computer. */
+  const where = { machineId: machine.id };
   if (!agent || agent.archivedAt) return text(403, "agentes: this agent is archived");
   // Work already on a computer reaches GitHub through us: a hold or suspension stops it here too.
   const paused = await standingRefusal(deps.db, claims.orgId, claims.agentId);

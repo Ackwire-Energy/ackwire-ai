@@ -27,7 +27,7 @@ import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 
-type TT = (key: string, options: { defaultValue: string }) => string;
+type TT = (key: string, options: Record<string, string>) => string;
 
 const AREA_ICON: Record<string, IconName> = {
   context: "search",
@@ -97,12 +97,15 @@ export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
   return prefix && tool.name.startsWith(prefix) ? humanize(tool.name.slice(prefix.length)) : tool.label;
 }
 
-/** What a level means for a resource: a sentence for built-in areas, the tools for connectors. */
-export function levelText(t: TFunction, r: AccessResource, level: LevelState) {
+/**
+ * What a level means for a resource: a sentence for built-in areas (in the agent's own words, `agentGrammar`), the
+ * tools for connectors.
+ */
+export function levelText(t: TFunction, r: AccessResource, level: LevelState, g: Record<string, string>) {
   if (level === "none") return t("access.noneText");
   if (level === "custom") return t("access.customText");
   if (r.kind === "builtin") {
-    const text = (t as unknown as TT)(`access.areaText.${r.area}.${level}`, { defaultValue: "" });
+    const text = (t as unknown as TT)(`access.areaText.${r.area}.${level}`, { ...g, defaultValue: "" });
     if (text) return text;
   }
   const names = toolsAt(r, level)

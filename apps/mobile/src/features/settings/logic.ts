@@ -266,7 +266,7 @@ export const peoplesMachines = (list: readonly Machine[]) =>
   list.filter((m) => m.kind !== "managed" && m.kind !== "host");
 
 /** The pickers' value for "no computer" (`machineId` null), as on the web. */
-export const NO_COMPUTER = "cloud";
+export const NO_COMPUTER = "none";
 
 export interface AgentComputerPick {
   /** The computer the agent uses, or `NO_COMPUTER`. */
@@ -280,8 +280,7 @@ export interface AgentComputerPick {
 
 /**
  * "Qual computador cada agente usa", for one agent: admins pick any computer; its owner, the ones they connected (the
- * server checks again). While the workspace's own computer is on its way, "no computer" stands for it. The cloud
- * sandboxes are never offered on the phone.
+ * server checks again). While the workspace's own computer is on its way, "no computer" stands for it.
  */
 export function agentComputerPick(input: {
   agent: Pick<Agent, "id" | "ownerUserId">;
@@ -297,7 +296,7 @@ export function agentComputerPick(input: {
   const choices = machines.filter((m) => input.admin || mine(m.pairedBy?.id) || m.id === value);
   return {
     value,
-    noComputer: noComputerChoice(input.setup, false, value === NO_COMPUTER),
+    noComputer: noComputerChoice(input.setup, value === NO_COMPUTER),
     choices,
     canPick: (input.admin || mine(input.agent.ownerUserId)) && choices.length > 0,
   };

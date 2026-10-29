@@ -22,8 +22,8 @@ import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas
 import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
-import { CantShowCover } from "../computer/covers";
-import { DialogHead, FullButton, useDialogHead, useSayFailed } from "../computer/head";
+import { CantShowCover, ScreenNotice } from "../computer/covers";
+import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useScreenKeys } from "./screen-keys";
@@ -301,6 +301,8 @@ export function DesktopView({
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
   const settled = SETTLED.includes(shown);
+  // A cover only a person's own step changes (`SETTLED`): the window's foot keeps no line under it.
+  const final = settled && !live;
   useEffect(() => setPoll(settled ? 30_000 : 5_000), [settled]);
   const held = shown === "held";
   useEffect(() => onHeld?.(held), [held, onHeld]);
@@ -346,6 +348,7 @@ export function DesktopView({
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
+  const back = useHandBack(handoff?.kind !== "ask");
   // Over a cover the head says nothing the cover says (opening, the pause, why not): only who holds the screen.
   const sub = inControl
     ? ask
@@ -357,24 +360,29 @@ export function DesktopView({
         ? (head?.watching ?? t("agentComputer.sub.watching"))
         : "";
   const retrying = <span>{t("desktop.state.retrying")}</span>;
-  const notice = (
-    <span className="muted">
-      {touch ? "" : `${t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })} `}
-      {t("desktop.control.notice", g)}
+  const notice = <span className="muted">{t("desktop.control.notice", g)}</span>;
+  // What programs there can see comes first: the window keeps the line to one line, and the keys follow only where it
+  // has room for them (desktop.css). agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ after it.
+  const controlLine = (
+    <span className="dsk-words">
+      {edition === "cloud" ? (
+        <span className="ac-hintline">
+          {notice}
+          <InfoHint name={t("common.about", { label: t("desktop.session.check") })}>
+            {t("desktop.session.screening")}
+          </InfoHint>
+        </span>
+      ) : (
+        notice
+      )}
+      {!touch && (
+        <>
+          {" "}
+          <span className="muted">{t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })}</span>
+        </>
+      )}
     </span>
   );
-  // agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ, so the line stays one line.
-  const controlLine =
-    edition === "cloud" ? (
-      <span className="ac-hintline">
-        {notice}
-        <InfoHint name={t("common.about", { label: t("desktop.session.check") })}>
-          {t("desktop.session.screening")}
-        </InfoHint>
-      </span>
-    ) : (
-      notice
-    );
   const again = (
     <Button size="sm" icon="refresh" onClick={retry}>
       {t("desktop.retry")}
@@ -426,6 +434,7 @@ export function DesktopView({
         <Button
           size="sm"
           icon="person"
+          className="cmp-take"
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
         >
@@ -452,7 +461,8 @@ export function DesktopView({
         <Button
           size="sm"
           variant="primary"
-          icon="check"
+          icon={back.icon}
+          className={back.className}
           onClick={() => {
             // The note opens in the dialog, never over the full-screen screen.
             head?.setFull(false);
@@ -466,7 +476,7 @@ export function DesktopView({
   );
 
   return (
-    <div className={["dsk", inControl && "is-control"].filter(Boolean).join(" ")} data-state={shown}>
+    <div className={cx("dsk", inControl && "is-control", final && "is-final")} data-state={shown}>
       <DialogHead
         sub={sub}
         actions={
@@ -582,6 +592,10 @@ export function DesktopView({
             )}
           </div>
         ))}
+      {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
+          sides and the screen opens in place. The ⓘ (what may be checked in control) and the keys come with control;
+          full screen keeps no line. */}
+      {!inControl && !final && !head?.full && <ScreenNotice name={name} />}
     </div>
   );
 }

@@ -47,8 +47,6 @@ export interface AuthConfig {
   ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
-  /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
-  landing?: boolean;
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
@@ -341,8 +339,6 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
-  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
-  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -1167,7 +1163,7 @@ export interface UsageReport {
   defaultAgentBudgetUsd: number;
   totalUsd: number;
   byKind: {
-    kind: "agent" | "router" | "embedding" | "summary" | "sandbox";
+    kind: "agent" | "router" | "embedding" | "summary";
     calls: number;
     partialCalls: number;
     inputTokens: number;
@@ -1519,7 +1515,7 @@ export interface SecretRequest {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site?: string | null;
-  /** null = the agent's cloud computer. */
+  /** The connected machine that holds it. */
   machineId: string | null;
   /** The computer's key for this request; null once it is closed. */
   publicKey: string | null;
@@ -1570,12 +1566,24 @@ export interface StoragePlatform {
   folder: string | null;
 }
 
+/** What the workspace's files take, summed from the sizes recorded as they were written. */
+export interface StorageUsage {
+  /** On this server's storage (`platform`), files in the trash left out. */
+  platformBytes: number;
+  /** In the workspace's own buckets, the trash left out too. */
+  ownBucketBytes: number;
+  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  disk: { sizeBytes: number; freeBytes: number } | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
   platform: StoragePlatform;
+  /** Absent from an older server. */
+  usage?: StorageUsage;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";
@@ -2214,51 +2222,27 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
 }
 
-// ── PC do agente (sandbox): apps/server/src/routes/app/sandboxes.ts; `…/agents/{id}/computer` expected ──
-
-export type SandboxNetwork = "blocked" | "allowlist" | "open";
+// ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──
 
 export interface SandboxSettings {
-  /** A sandbox provider is configured on this server. */
-  available: boolean;
   enabled: boolean;
-  /** Domains the PCs may reach (`*.` wildcards), used when `network` is `allowlist`. */
-  allowDomains: string[];
-  /** No internet, only the listed domains, or open internet. Absent (older servers): follows the list. */
-  network?: SandboxNetwork;
-  /** After a save: running PCs got it now (`live`) or get it when they next start (`next_start`). */
-  networkApply?: "live" | "next_start";
   execTimeoutSeconds: number;
   maxTimeoutSeconds: number;
-  /** Minutes of PC time per day for the whole workspace. */
-  dailyMinutes: number;
   /** Ask a person before running code. */
   requireApproval: boolean;
 }
 
-export type SandboxSettingsInput = Partial<
-  Pick<
-    SandboxSettings,
-    "enabled" | "allowDomains" | "network" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
-  >
->;
+export type SandboxSettingsInput = Partial<Pick<SandboxSettings, "enabled" | "execTimeoutSeconds" | "requireApproval">>;
 
-/** `GET …/agents/{id}/computer`: the agent's own PC. */
+/** `GET …/agents/{id}/computer`: which computer the agent uses (ADR 0025). */
 export interface AgentComputer {
-  status: "running" | "stopped" | "archived" | "none";
-  diskUsedGib: number;
-  createdAt: string | null;
-  lastUsedAt: string | null;
-  /** `provider-default` when the provider can't apply our domain list (plan limitation). */
-  network?: "blocked" | "allowlist" | "open" | "provider-default";
-  /** Which computer the agent uses (ADR 0025). Absent on older servers: the cloud one. */
-  target?: ComputerTarget;
+  target: ComputerTarget;
 }
 
 // ── Connected computers (ADR 0025; apps/server/src/routes/machines.ts) ──────
 
-/** The agent's cloud computer, or a machine someone connected with the runner. */
-export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: string; name: string; online: boolean };
+/** No computer, or a machine someone connected with the runner. */
+export type ComputerTarget = { kind: "none" } | { kind: "machine"; machineId: string; name: string; online: boolean };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -2449,22 +2433,19 @@ export interface MachineOutage {
   waitingRuns: number;
 }
 
-/** Where waiting agents may move: another connected machine, or the cloud computer. */
-export type OutageTarget =
-  | {
-      kind: "machine";
-      machineId: string;
-      name: string;
-      platform: string;
-      /** The workspace's own computer (ADR 0056 §10). */
-      managed?: boolean;
-      online: boolean;
-      brains: ComputerBrain[];
-      /** Why it can't take them now, or null. */
-      reasonOff: "offline" | "paused" | null;
-    }
-  /** The cloud computer: runs only the brains listed (none of the computer brains today). */
-  | { kind: "cloud"; available: boolean; brains: ComputerBrain[] };
+/** Where waiting agents may move: another connected machine. */
+export type OutageTarget = {
+  kind: "machine";
+  machineId: string;
+  name: string;
+  platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
+  online: boolean;
+  brains: ComputerBrain[];
+  /** Why it can't take them now, or null. */
+  reasonOff: "offline" | "paused" | null;
+};
 
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
@@ -2475,7 +2456,7 @@ export interface MachineOutages {
 /** `POST …/machines/{machineId}/move-agents`. */
 export interface MoveAgentsInput {
   agentIds: string[];
-  target: { kind: "machine"; machineId: string } | { kind: "cloud" };
+  target: { kind: "machine"; machineId: string };
 }
 
 export interface MoveAgentsResult {
@@ -3395,13 +3376,8 @@ export interface MissionJoinRequest {
   createdAt: string;
 }
 
-/** Why an agent can't run a mission for you (`cloud_computer`: missions on cloud computers come later). */
-export type MissionIneligibleReason =
-  | "no_computer"
-  | "cloud_computer"
-  | "exec_off"
-  | "runner_outdated"
-  | "not_in_audience";
+/** Why an agent can't run a mission for you. */
+export type MissionIneligibleReason = "no_computer" | "exec_off" | "runner_outdated" | "not_in_audience";
 
 /** An agent for "Nova missão": whether it can run a mission for you, and why not. */
 export interface MissionEligibleAgent {
@@ -3467,6 +3443,14 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
+/** A computer the caller may give an agent, with what it offers. */
+export interface BrainMachine {
+  machineId: string;
+  name: string;
+  online: boolean;
+  options: BrainOption[];
+}
+
 /** `GET …/agents/{id}/brain` (its owner or an admin). */
 export interface AgentBrain {
   agentId: string;
@@ -3479,7 +3463,7 @@ export interface AgentBrain {
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
-  machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
+  machines: BrainMachine[];
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;
@@ -3494,7 +3478,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3583,10 +3567,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
   onlyOwner?: boolean;
-  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
-  acceptPlanTerms?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
   /** The account thinks for another agent: take it from that one. */
@@ -3614,8 +3596,10 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
-  /** `failed`: the viewer already has this account on that computer (named `label`). */
-  duplicate?: { label: string };
+  /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
+  duplicate?: { label: string; account?: MachineAccount };
+  /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
+  signedInAs?: string;
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

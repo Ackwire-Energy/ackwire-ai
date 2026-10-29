@@ -91,7 +91,7 @@ export interface AppOptions {
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
- * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
+ * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
@@ -172,7 +172,6 @@ export function createApp(options: AppOptions) {
       createDesktopReleases({
         token: deps.config.DESKTOP_RELEASES_TOKEN,
         repo: deps.config.DESKTOP_RELEASES_REPO,
-        publicUrl: deps.config.PUBLIC_URL,
         fetch: deps.extras?.desktopFetch,
       }),
     );
@@ -185,7 +184,7 @@ export function createApp(options: AppOptions) {
         fetch: deps.extras?.desktopFetch,
       }),
     );
-    if (deps.config.LANDING_PAGE) registerWaitlist(api, deps);
+    if (deps.config.LANDING_URL) registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 

@@ -1,4 +1,3 @@
-import { landingPtBR } from "./landing";
 import type { Widen } from "./widen";
 
 /**
@@ -207,7 +206,7 @@ export const ptBR = {
       verified: "Verificado",
       code: "Código do e-mail",
       note: "Algo que eles devam saber? (opcional)",
-      noteHelp: "Quem é você, ou quem mandou o link",
+      noteHelp: "Quem é você e quem te convidou",
       send: "Pedir para entrar",
       as: "Você vai pedir como {{email}}.",
       notYou: "Não é você? Sair",
@@ -584,9 +583,6 @@ export const ptBR = {
     computer: {
       title: "Onde a gente vai trabalhar?",
       lead: "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
-      cloud: "Sandbox da Daytona",
-      cloudDesc: "Um computador isolado para cada agente, na Daytona.",
-      cloudReady: "Sandboxes da Daytona ligadas: cada agente ganha a sua.",
       mine: "Outro computador",
       mineDesc: "Um Mac, um PC ou um servidor, conectado com um código.",
       thisMac: "Este {{device}}",
@@ -606,7 +602,7 @@ export const ptBR = {
       lead: "Convide por e-mail ou compartilhe o link.",
       leadLink: "Compartilhe o link de convite com eles.",
       emails: "E-mails",
-      placeholder: "nome@empresa.com, outra@empresa.com",
+      placeholder: "nome@empresa.com",
       more: "Mais e-mails…",
       emailsHint: "Cada pessoa recebe um convite por e-mail e entra direto.",
       invalid: "confira",
@@ -1072,19 +1068,17 @@ export const ptBR = {
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",
       key: "Você envia a chave assim que o computador ficar pronto.",
-      email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
-      ready: "O {{computer}} está pronto.",
+      email: "Avisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
+      ready: "O computador está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
+    /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
+    theComputer: "computador",
     own: {
-      this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela.",
-      other: "Outra conta do {{brand}}",
-      note: "Eles só respondem a você enquanto pensam com o seu plano.",
+      shared: "A conta que os seus agentes dividem",
+      one: "Uma conta só {{for}} {{name}}",
     },
-    /** Under a plan's sign-in: it changes how the agent treats everyone else. */
-    onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
       text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
@@ -1100,19 +1094,13 @@ export const ptBR = {
     for: "Para",
     all: "Todos os agentes",
     agentAria: "Agentes que usam este plano",
-    /** The plan panel's foot: who the agents answer, and where the account stays (its ⓘ). */
-    foot: {
-      one: "Com o seu plano, {{article}} {{name}} só responde a você.",
-      all: "Com o seu plano, os seus agentes só respondem a você.",
-      signIn: "A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
-    },
     each: "Um login por agente, com a mesma conta.",
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
     signInFor: "Fazer login {{for}} {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
     otherAccount: {
-      claude_code: "O Claude entrou como {{email}}. Para usar {{wanted}}, saia na página do Claude e tente de novo.",
-      codex: "O ChatGPT entrou como {{email}}. Para usar {{wanted}}, saia na página do ChatGPT e tente de novo.",
+      claude_code: "O Claude entrou como {{email}}, não como {{account}}. Saia na página do Claude e tente de novo.",
+      codex: "O ChatGPT entrou como {{email}}, não como {{account}}. Saia na página do ChatGPT e tente de novo.",
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1294,13 +1282,13 @@ export const ptBR = {
     removeAgentBody: "Para de ler e de responder neste canal. Dá para adicionar de novo depois.",
     removeConfirm: "Tirar do canal",
     replyHeading: "Quando responde",
-    replyAlone: "Sozinho",
+    replyAlone: "Por conta própria",
     replyAloneHelp: "Responde quando o assunto pede, sem precisar de @",
     replyAloneRules: "Também responde a respostas e continuações",
-    replyAloneOff: "Por enquanto, responde só quando mencionado",
-    replyMention: "Quando chamado",
+    replyAloneOff: "Por enquanto, responde só quando alguém menciona",
+    replyMention: "Quando alguém chama",
     replyMentionHelp: "Só responde se alguém escrever @{{handle}}",
-    aloneLine: "Entra na conversa sozinho",
+    aloneLine: "Entra na conversa por conta própria",
     mentionLine: "Espera alguém chamar @{{handle}}",
     readOnly: "Só quem criou o canal e os admins mudam os membros.",
     people: "Pessoas",
@@ -1313,7 +1301,7 @@ export const ptBR = {
     presence: "Presença",
     offline: "Ainda não entrou",
     localTime: "Hora local",
-    timeIn: "{{time}} ({{zone}})",
+    timeIn: "{{time}} · {{zone}}",
     dm: "Mensagem direta",
     viewProfile: "Ver perfil",
     agent: "Agente",
@@ -1831,7 +1819,6 @@ export const ptBR = {
       cell: {
         label: "Como trabalha",
         computer: "Trabalha no",
-        daytona: "Trabalha na",
         brain: "Pensa com",
         browser: "Navegador",
         effort: "esforço {{level}}",
@@ -1848,9 +1835,7 @@ export const ptBR = {
         brain: "{{The}} {{name}} agora pensa com {{brain}}.",
         brainMoved: "{{The}} {{name}} agora pensa com {{brain}} no {{computer}}.",
         account: "{{The}} {{name}} agora usa a conta {{account}}.",
-        accountHere: "{{The}} {{name}} agora usa a conta do próprio {{computer}}.",
         computer: "{{The}} {{name}} agora trabalha no {{computer}}.",
-        daytona: "{{The}} {{name}} agora trabalha numa sandbox da Daytona.",
         none: "{{The}} {{name}} agora está sem computador.",
         browserOn: "{{The}} {{name}} já pode navegar em sites.",
         browserWaiting: "Falta 1 passo no {{computer}}. Está logo abaixo da frase.",
@@ -1877,7 +1862,6 @@ export const ptBR = {
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
-        thisComputerText: "A que já está no {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
         accountAlso: "Também usada por {{agents}}",
         accountOf: "De {{name}}",
@@ -1906,11 +1890,6 @@ export const ptBR = {
           /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
             "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
-          /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
-          stepOneTip: {
-            claude_code: "Conta errada? Saia na página do Claude e tente de novo.",
-            codex: "Conta errada? Saia na página do ChatGPT e tente de novo.",
-          },
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
@@ -1926,9 +1905,9 @@ export const ptBR = {
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
             claude_code:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do Claude e entre com a outra.",
+              "O Claude entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
             codex:
-              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do ChatGPT e entre com a outra.",
+              "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -1945,11 +1924,9 @@ export const ptBR = {
         browserPending: "Navegador (falta ligar)",
         onlyModel: "Só o modelo da organização",
         alsoBrain: "Volta para o modelo da organização ({{brain}} não está lá)",
-        alsoBrowser: "Deixa de navegar em sites",
         alsoOffline: "Está offline: até ele voltar, {{article}} {{name}} espera",
         connect: "Conectar outro computador",
         useMachine: "Usar o {{computer}}",
-        useDaytona: "Usar uma sandbox da Daytona",
       },
       browserDialog: {
         title: "{{The}} {{name}} pode navegar em sites?",
@@ -2202,8 +2179,6 @@ export const ptBR = {
     computer: {
       hidden: "Só admins e {{owner}} veem o PC deste agente.",
       unavailable: "Este servidor ainda não tem PC para agentes.",
-      adminsPick: "Admins escolhem qualquer computador conectado.",
-      ownerPicks: "Você vê o computador deste servidor e os computadores que conectou.",
       folders: "Pastas no computador",
       foldersOwn: "Usa só a própria pasta no {{machine}}.",
       foldersMore: "Além da própria pasta, usa estas no {{machine}}:",
@@ -2559,6 +2534,12 @@ export const ptBR = {
       other: "US$ {{input}} / US$ {{output}} por milhão de tokens",
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
+    plans: "Pelo plano, num computador",
+    plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
+    planOnlyOwner:
+      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+    planNotSaved:
+      "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",
@@ -2621,9 +2602,9 @@ export const ptBR = {
     and: " e ",
   },
   members: {
-    /** Before inviting, while every agent with an AI answers only the person (a plan is personal). */
+    /** Before inviting, while every agent with an AI answers only the person. */
     agentsOnlyYou: "Seus agentes só respondem a você.",
-    agentsOnlyYouHint: "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
+    agentsOnlyYouHint: "Num plano, você pode deixar cada um responder a todos na página dele.",
     filters: "Filtrar pessoas",
     roleFilter: "Papel",
     rolesCount_one: "{{count}} papel",
@@ -2633,7 +2614,7 @@ export const ptBR = {
     subtitle_other: "Quem faz parte da {{org}}: {{people}} pessoas e {{agents}} agentes.",
     inviteTitle: "Convidar pessoas",
     emails: "E-mails, separados por vírgula",
-    emailsPlaceholder: "nome@empresa.com.br, outra@empresa.com.br",
+    emailsPlaceholder: "nome@empresa.com.br",
     role: "Papel",
     invite: "Convidar",
     invalidEmails: "Nenhum e-mail válido. Use algo como nome@empresa.com.br.",
@@ -2738,7 +2719,6 @@ export const ptBR = {
     drive_read: { label: "Ler arquivos", description: "Ler arquivos do Drive." },
     drive_write: { label: "Criar arquivos", description: "Criar relatórios, tabelas, organogramas e diffs no Drive." },
     issues_write: { label: "Tarefas", description: "Criar e atualizar tarefas." },
-    sandbox_exec: { label: "Rodar código", description: "Rodar comandos num sandbox isolado." },
     github_repo_read: { label: "Ler código", description: "Ler arquivos, commits e buscar no código." },
     github_repo_write: {
       label: "Escrever código",
@@ -3392,7 +3372,7 @@ export const ptBR = {
       codex: "Codex (experimental)",
       codexText: "O Codex programa no computador. Ainda em teste.",
       agent: "{{name}} (o próprio agente)",
-      agentText: "{{name}} programa direto no computador, com as ferramentas dele.",
+      agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
     },
     readOnlyNote: "Você pode ler. Para pedir algo, peça para participar.",
     items_one: "{{done}} de {{count}} item",
@@ -3479,12 +3459,12 @@ export const ptBR = {
       openRef: "Abrir {{ref}} no repositório",
     },
     plan: {
-      cap: "Plano do {{executor}}",
+      cap: "Plano {{of}} {{executor}}",
       label: "Plano",
-      drafting: "O {{executor}} está lendo a pasta no {{computer}} e montando o plano",
+      drafting: "{{The}} {{executor}} está lendo a pasta no {{computer}} e montando o plano",
       empty: "Ainda sem itens. Dá para começar assim mesmo ou pedir um plano em “Mudar algo”.",
       waitPlan: "Libera quando o plano chegar",
-      adjusts: "o {{executor}} vai ajustando a lista conforme avança",
+      adjusts: "{{article}} {{executor}} vai ajustando a lista conforme avança",
       switched: "Agora quem programa é {{executor}}. O plano recomeça.",
       more_one: "+{{count}} item",
       more_other: "+{{count}} itens",
@@ -3754,7 +3734,7 @@ export const ptBR = {
       tabs: "Arquivo",
       missionSub: "Plano e regras · atualizado pelo agentes.chat",
       decisionsSub: "Decisões aprovadas",
-      notesSub: "Anotações do {{executor}}",
+      notesSub: "Anotações {{of}} {{executor}}",
       synced: "sincronizado {{when}}",
       editedKept: "Editado no computador. Mantivemos a versão aprovada.",
       showDiff: "Ver diferença",
@@ -3765,7 +3745,7 @@ export const ptBR = {
       removed: "Linha aprovada",
       empty: "Ainda vazio.",
       foot: "Vale o que foi aprovado no chat. Para mudar, peça na thread.",
-      notesFoot: "O {{executor}} anota aqui o que aprendeu e os próximos passos.",
+      notesFoot: "{{The}} {{executor}} anota aqui o que aprendeu e os próximos passos.",
       open: "Abrir o arquivo",
       check: { doing: "em andamento", waiting: "esperando você", dropped: "fora do plano" },
     },
@@ -3808,12 +3788,11 @@ export const ptBR = {
     new: {
       noEligibleTitle: "Nenhum agente pode rodar uma missão para você ainda",
       noEligibleText: "Conecte um computador a um agente para criar missões. O trabalho roda nele, com o Claude Code.",
-      connectComputer: "Conectar um computador ao {{name}}",
+      connectComputer: "Conectar um computador {{to}} {{name}}",
       connect: "Conectar computador",
       blockedLabel: "Agentes que ainda não podem rodar uma missão",
       reason: {
         no_computer: "Sem computador conectado",
-        cloud_computer: "Numa sandbox da Daytona: missões lá chegam depois",
         exec_off: "Comandos desligados no {{computer}}",
         runner_outdated: "Programa antigo no {{computer}}: atualize",
         not_in_audience: "Não responde você",
@@ -3894,15 +3873,15 @@ export const ptBR = {
         removed: "“{{command}}” volta a ser conferido a cada vez",
       },
       defaults: {
-        title: "Próximas missões do {{name}}",
+        title: "Próximas missões {{of}} {{name}}",
         startWith: "Começar com “{{value}}”",
-        isDefault: "Já é o padrão do {{name}}.",
+        isDefault: "Já é o padrão {{of}} {{name}}.",
         today: "Hoje começam com “{{value}}”. As atuais não mudam.",
         use: "Usar como padrão",
         chip: "Padrão",
-        updated: "Padrão do {{name}} atualizado",
+        updated: "Padrão {{of}} {{name}} atualizado",
         updatedDetail: "Próximas missões: {{value}}",
-        cannot: "Só quem cuida do {{name}} ou um admin muda o padrão.",
+        cannot: "Só quem cuida {{of}} {{name}} ou um admin muda o padrão.",
       },
       more: {
         title: "Mais opções",
@@ -3914,7 +3893,7 @@ export const ptBR = {
         claudeText: "Planeja e faz no computador.",
         codex: "Codex",
         codexText: "Faz no computador.",
-        agentText: "O próprio {{name}} faz, com as ferramentas dele.",
+        agentText: "{{The}} {{name}} faz, com as próprias ferramentas.",
         testing: "Em teste",
         locked: "Não dá para trocar depois que a missão começa.",
         open: "Dá para trocar até a missão começar.",
@@ -3992,7 +3971,7 @@ export const ptBR = {
       done: "Pronto",
       handTitle: "Passar a missão para {{name}}?",
       handText:
-        "O computador não muda de dono. Se você emprestar o seu, o {{executor}} continua nele. Se não, {{name}} escolhe um computador próprio.",
+        "O computador não muda de dono. Se você emprestar o seu, {{article}} {{executor}} continua nele. Se não, {{name}} escolhe um computador próprio.",
       lend: "Continuar usando o {{computer}}",
       lendText: "{{name}} passa a decidir tudo. O trabalho segue no computador do agente.",
       handNote: "Você continua na missão podendo decidir.",
@@ -4532,31 +4511,23 @@ export const ptBR = {
   },
   aiAccounts: {
     share: {
-      switch: "Só responde a você",
+      /** Off by default: the agent replies only to its owner while it thinks with their plan. */
+      switch: "Responde a todos",
+      /** The same switch for every agent a plan's panel connects. */
+      switchAll: "Respondem a todos",
+      /** Off, as someone who isn't the plan's owner sees it. */
       switchOther: "Só responde a {{name}}",
-      /** The switch's ⓘ, on your own plan: the same in both states. */
-      hint: "Os outros veem que {{article}} {{name}} só responde a você. Sem isso, {{article}} {{name}} responde também a outras pessoas, com o seu plano.",
-      /** The switch's ⓘ, on someone else's plan. */
+      /** Who decides, for someone who isn't the plan's owner. */
       onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      title: "Agora {{article}} {{name}} responde a todos",
-      titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
-      body: {
-        claude_code:
-          "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-        codex:
-          "A OpenAI diz que o plano do ChatGPT é para uso pessoal. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
-        seat: {
-          claude_code:
-            "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-          codex:
-            "Os termos da OpenAI dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
-        },
+      /** The line under the switch, and its ⓘ: the plan's terms, in its maker's words, a seat's or a personal plan's. */
+      terms: {
+        line: "Zona cinzenta nos termos do {{provider}}",
+        linePlan: "Zona cinzenta nos termos do plano",
+        own: "Os termos do {{provider}} dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
+        seat: "Os termos do {{provider}} dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
         other:
-          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos. Se continuar, o risco é seu.",
+          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
       },
-      accept: "Responder a todos",
-      acceptPeople: "Continuar",
-      keep: "Manter só comigo",
       savedEveryone: "Agora {{article}} {{name}} responde a todos.",
       savedOwner: "{{The}} {{name}} agora só responde a você.",
       backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
@@ -4564,20 +4535,13 @@ export const ptBR = {
       letPeople: "Liberar de novo",
       ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
       hereNotYours: "Só para agentes de quem conectou o {{computer}}",
-      fixedHint:
-        "Um plano é pessoal, então só responde a quem o conectou. Os outros podem usar o próprio plano ou a chave de API do workspace.",
     },
     errors: {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
-      planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
-      planPersonal: "Um plano é pessoal. Neste workspace, só quem o conectou fala com os agentes que o usam.",
     },
     add: {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
-      email: "Qual conta? (opcional)",
-      emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
       openKeys: "Abrir {{site}}",
@@ -5713,91 +5677,13 @@ export const ptBR = {
   },
   computer: {
     title: "PC {{of}} {{name}}",
-    status: {
-      running: "Ligado",
-      stopped: "Desligado",
-      archived: "Arquivado",
-      none: "Ainda não criado",
-      starting: "Ligando…",
-      stopping: "Desligando…",
-      removing: "Apagando…",
-    },
-    emptyText: "Uma sandbox da Daytona só {{of}} {{name}}, para rodar código e guardar arquivos.",
-    create: "Criar PC {{of}} {{name}}",
-    step: {
-      creating: "Criando a máquina",
-      booting: "Ligando a máquina",
-      preparing: "Preparando o ambiente",
-      ready: "Pronto",
-    },
-    elapsed: "{{seconds}} s",
-    done: {
-      start: "PC {{of}} {{name}} ligado",
-      stop: "PC {{of}} {{name}} desligado",
-      remove: "PC {{of}} {{name}} apagado",
-    },
-    failed: {
-      start: "Não deu para ligar: {{reason}}",
-      stop: "Não deu para desligar: {{reason}}",
-      remove: "Não deu para apagar: {{reason}}",
-    },
-    tooLong: "está demorando mais que o normal.",
-    retry: "Tentar de novo",
-    none: "Criado na primeira vez que o agente rodar código.",
-    facts: "{{disk}} GB em disco · usado {{when}}",
-    never: "nunca",
-    actions: "Ações do PC {{of}} {{name}}",
-    start: "Ligar",
-    stop: "Desligar",
-    remove: "Apagar",
-    removeTitle: "Apagar o PC {{of}} {{name}}?",
-    removeText: "Apaga todos os arquivos do PC {{of}} {{name}}. Um PC novo é criado quando precisar de novo.",
     machineHint: "Quem conectou este computador liga, desliga e pausa nele mesmo.",
     machineOffline: "Offline agora. Peça para quem conectou conferir se ele está ligado e conectado.",
     target: {
       label: "Computador",
-      offlineName: "{{name}} (offline)",
-      offlineText: "Offline agora. O agente avisa até ele voltar",
-      connectHint: "Conectar um computador seu",
       none: "Nenhum computador",
       noneText: "Não roda programas nem guarda arquivos",
-      daytona: "Sandbox da Daytona",
-      daytonaText: "Um computador isolado para este agente, na Daytona",
     },
-  },
-  sandbox: {
-    domainPlaceholder: "api.exemplo.com ou *.exemplo.com",
-    network: { blocked: "Sem internet", allowlist: "Só os sites liberados", open: "Qualquer site" },
-    networkText: {
-      blocked: "O mais seguro: ele não acessa nada fora.",
-      allowlist: "Pacotes e as APIs que os agentes usam.",
-      open: "Chaves e segredos continuam fora dele.",
-    },
-    openWarning: "O agente acessa qualquer site. Chaves e segredos continuam fora da máquina.",
-    needDomain: "Libere pelo menos um site, ou escolha sem internet ou qualquer site.",
-    appliedNow: "Configurações salvas. As sandboxes ligadas já usam a nova regra de internet.",
-    appliedNext: "Configurações salvas. As sandboxes pegam a nova regra de internet na próxima vez que ligarem.",
-    unavailable: "As sandboxes da Daytona ainda não estão disponíveis neste servidor.",
-    notConfigured: "Este servidor ainda não tem sandboxes da Daytona.",
-    enabled: "Os agentes podem usar as sandboxes da Daytona",
-    enabledHelp: "Desligado, só quem tem um computador seu consegue rodar código.",
-    internet: "Internet",
-    internetHelp: "O que a sandbox acessa lá fora. Libere só os sites necessários, até 100. Use *. para subdomínios.",
-    noInternet: "Sem internet.",
-    addDomain: "Adicionar site",
-    add: "Adicionar",
-    domainInvalid: "Use um domínio como api.exemplo.com ou *.exemplo.com.",
-    tooMany: "No máximo {{max}} domínios.",
-    preset: { python: "Pacotes Python", node: "Pacotes Node" },
-    dailyMinutes: "Tempo de uso por dia (minutos)",
-    dailyMinutesHelp: "Somando todos os agentes da organização.",
-    minutesInvalid: "Use de 0 a 1440 minutos.",
-    timeout: "Tempo máximo de cada comando (segundos)",
-    timeoutHelp: "Um comando que passar disso é parado. Até {{max}} segundos.",
-    timeoutInvalid: "Use de 5 a {{max}} segundos.",
-    requireApproval: "Pedir aprovação antes de rodar código",
-    saved: "Configurações das sandboxes salvas.",
-    providerDefault: "O provedor não aplica a lista de domínios neste plano: o PC usa a rede padrão dele.",
   },
   access: {
     matrixTitle: "Acesso dos agentes",
@@ -5851,12 +5737,12 @@ export const ptBR = {
       forum: { write: "Abre tópicos, lê e posta no fórum." },
       sandbox: { write: "Roda código no computador do agente." },
       browser: {
-        write: "Navega em sites com o próprio navegador, no computador dele. Os logins ficam por agente.",
+        write: "Navega em sites com o próprio navegador, no computador {{hers}}. Os logins ficam por agente.",
       },
       setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
       desktop: {
         write:
-          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
+          "Usa qualquer app na própria tela, no computador {{hers}}, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
       },
     },
   },
@@ -6081,8 +5967,14 @@ export const ptBR = {
     onedrive: "OneDrive",
     soon: "Em breve",
     current: "Em uso",
+    // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
+    usage: {
+      files: "{{size}}\u00a0de\u00a0arquivos",
+      none: "Nenhum\u00a0arquivo",
+      free: "{{files}}\u00a0· {{size}}\u00a0livres\u00a0no\u00a0disco",
+    },
     endpoint: "Endpoint",
-    endpointHelp: "Por exemplo, https://s3.amazonaws.com ou https://<conta>.r2.cloudflarestorage.com.",
+    endpointHelp: "Por exemplo, https://s3.amazonaws.com.",
     region: "Região",
     bucket: "Bucket",
     prefix: "Prefixo (opcional)",
@@ -6753,7 +6645,7 @@ export const ptBR = {
     namePlaceholder: "Ex.: Produção",
     url: "Endereço do banco",
     urlHelp: "Começa com postgres://. Fica cifrado no servidor. Ninguém vê depois, nem os agentes.",
-    urlPlaceholder: "postgres://usuario:senha@servidor:5432/banco",
+    urlPlaceholder: "postgres://usuario:senha@host/banco",
     urlInvalid: "Cole um endereço que comece com postgres://, ou preencha os campos em Avançado.",
     howTitle: "Como criar um usuário só de leitura?",
     howText: "Os agentes só fazem consultas, mas um usuário só de leitura garante isso no próprio banco.",
@@ -7163,7 +7055,6 @@ export const ptBR = {
       notFound: "Este arquivo não existe mais ou você não tem acesso.",
     },
     machine: {
-      noLifecycle: "Este agente usa um computador conectado: quem conectou liga e desliga no próprio computador.",
       forbidden: "Só um admin, ou quem conectou o computador, pode fazer isso.",
       notFound: "Este computador não está mais conectado.",
       nameRequired: "Dê um nome ao computador.",
@@ -7173,7 +7064,6 @@ export const ptBR = {
       targetNotFound: "Esse computador não existe mais. Escolha outro.",
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
-      targetCloudUnavailable: "As sandboxes da Daytona não estão disponíveis agora.",
     },
   },
   machines: {
@@ -7323,18 +7213,10 @@ export const ptBR = {
     },
   },
   computers: {
-    cloud: {
-      cardText: "Internet, tempo de uso e aprovação. Valem só para as sandboxes.",
-      note: "Estas regras valem só para as sandboxes da Daytona.",
-      adjust: "Ajustar",
-      summary: "{{network}} · até {{minutes}} min por dia",
-      summaryApproval: "pede aprovação antes de rodar código",
-    },
     agents: {
       title: "Qual computador cada agente usa",
       empty: "Nenhum agente ainda.",
       pick: "Computador de {{name}}",
-      ready: "pronto",
       state: { online: "online", paused: "pausado", offline: "offline" },
       saved: "{{name}} agora usa {{computer}}.",
     },
@@ -7351,9 +7233,6 @@ export const ptBR = {
       /** The title's ⓘ. */
       text: "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
       emptyTitle: "Nenhum outro computador ainda",
-    },
-    daytona: {
-      cardTitle: "Sandboxes da Daytona",
     },
   },
   outage: {
@@ -7391,12 +7270,9 @@ export const ptBR = {
       close: "Fechar",
       none: "Nenhum outro computador pode rodar estes agentes agora. Conecte outro computador ou espere este voltar.",
       on: "Ligado",
-      cloud: "Sandbox da Daytona",
-      cloudText: "Um computador isolado na Daytona, com o repositório do GitHub",
       has: "Tem o {{brains}}",
       block: {
         offline: "Desconectado agora",
-        unavailable: "Não está disponível agora",
         noBrain: "Não roda o {{brains}}",
         reason: "Não pode rodar estes agentes agora",
       },
@@ -7554,7 +7430,7 @@ export const ptBR = {
         artifact: "um arquivo do Drive",
         agent: "um agente",
         machine: "um computador",
-        sandbox: "o computador na nuvem",
+        sandbox: "as configurações de Rodar código",
         connector: "um conector",
         database: "um banco de dados",
         mail_account: "uma conta de e-mail",
@@ -7705,7 +7581,7 @@ export const ptBR = {
     },
     import: {
       title: "Importar",
-      exportTitle: "Exportar este workspace",
+      exportTitle: "Exportar",
       download: "Baixar o arquivo",
       neverLine: "Nunca leva chaves, senhas, logins nem conversas.",
       whatsIn: "O que vai no arquivo",
@@ -7750,7 +7626,7 @@ export const ptBR = {
     defaultBudgetHelp:
       "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     usageTotal: "{{amount}} no total desde {{since}}",
-    kinds: { agent: "Agentes", router: "Roteador", embedding: "Busca", summary: "Resumos", sandbox: "Sandbox" },
+    kinds: { agent: "Agentes", router: "Roteador", embedding: "Busca", summary: "Resumos" },
     usageCalls_one: "{{count}} chamada",
     usageCalls_other: "{{count}} chamadas",
     usageHidden: "Só admins veem o uso da organização.",
@@ -7784,6 +7660,7 @@ export const ptBR = {
       sentence: "Em {{month}}, {{article}} {{name}} usou {{tokens}} tokens: {{parts}}.",
       accountPart: "{{percent}} na conta {{account}}",
       computerPart: "{{percent}} na conta deste {{computer}}",
+      sharedPart: "{{percent}} na conta que os seus agentes dividem",
       removedPart: "{{percent}} numa conta removida",
       oldPart: "{{percent}} no {{brand}}, de antes das contas",
       apiPart: "{{percent}} pela API",
@@ -7841,6 +7718,9 @@ export const ptBR = {
     ofM: "do",
     toF: "à",
     toM: "ao",
+    /** The agent as a subject ("ela entrou para ajudar"). As an object it is `pronoun` ("com ela"). */
+    sheF: "ela",
+    sheM: "ele",
     pronounF: "ela",
     pronounM: "ele",
     forF: "para a",
@@ -7905,16 +7785,16 @@ export const ptBR = {
     /** Next to the time on a reply of an agent nobody called. */
     joined: {
       label: "entrou na conversa",
-      tip: "Ninguém chamou {{article}} {{name}}. {{Pronoun}} entrou para ajudar.",
+      tip: "Ninguém chamou {{article}} {{name}}. {{She}} entrou para ajudar.",
     },
     work: {
-      see: "Ver o que {{pronoun}} fez",
+      see: "Ver o que {{she}} fez",
       steps_one: "{{count}} passo",
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
       /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
-      block: "O que {{pronoun}} fez",
+      block: "O que {{she}} fez",
       used_one: "Usou {{count}} ferramenta",
       used_other: "Usou {{count}} ferramentas",
       times: "×{{count}}",
@@ -7968,8 +7848,6 @@ export const ptBR = {
         cancelingReminder: "Cancelou um lembrete",
         listingReminders: "Viu os lembretes",
         listingRoutines: "Viu as rotinas",
-        startingComputer: "Ligou o PC",
-        stoppingComputer: "Desligou o PC",
         checkingComputer: "Conferiu o PC",
         writingWiki: "Escreveu na wiki",
         readingWiki: "Leu a wiki",
@@ -8033,8 +7911,6 @@ export const ptBR = {
       cancelingReminder: "cancelando um lembrete",
       listingReminders: "vendo os lembretes",
       listingRoutines: "vendo as rotinas",
-      startingComputer: "ligando o PC",
-      stoppingComputer: "desligando o PC",
       checkingComputer: "conferindo o PC",
       writingWiki: "escrevendo na wiki",
       readingWiki: "lendo a wiki",
@@ -8127,7 +8003,6 @@ export const ptBR = {
         'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
     },
   },
-  landing: landingPtBR,
   builtinTools: {
     ask_user: {
       label: "Perguntar à pessoa",
@@ -8291,7 +8166,7 @@ export const ptBR = {
     },
     run_code: {
       label: "Rodar código",
-      description: "Roda Python, Node ou bash no ambiente isolado da conversa.",
+      description: "Roda Python, Node ou bash no computador do agente.",
     },
     write_file: {
       label: "Escrever no ambiente",
@@ -8321,17 +8196,9 @@ export const ptBR = {
       label: "Rodar script de skill",
       description: "Roda um script de uma skill no ambiente.",
     },
-    computer_start: {
-      label: "Ligar o computador",
-      description: "Liga o computador do agente (cria na primeira vez).",
-    },
-    computer_stop: {
-      label: "Desligar o computador",
-      description: "Desliga o computador. Os arquivos ficam.",
-    },
     computer_status: {
       label: "Ver o computador",
-      description: "Diz se está ligado, o disco usado e o custo do mês.",
+      description: "Diz qual é o computador e se ele está respondendo.",
     },
     browser_do: {
       label: "Fazer passos no navegador",
@@ -8441,8 +8308,7 @@ export const ptBR = {
       removeSite: "Tirar {{site}}",
       badSite: "Isso não parece um site. Use exemplo.com ou *.exemplo.com.",
       saveFailed: "Não deu para salvar. Tente de novo.",
-      signedIn: "{{The}} {{name}} fica logado nos sites em que entrar, neste computador.",
-      cloud: "O navegador funciona num computador conectado. Escolha um acima para ligar.",
+      signedIn: "{{The}} {{name}} fica com o login feito nos sites em que entrar, neste computador.",
     },
     machine: {
       ready: "Pronto",
@@ -8459,7 +8325,7 @@ export const ptBR = {
       waitingChip: "Esperando você",
       see: "Ver",
       stop: "Parar",
-      stopConfirm: "Fechar o navegador {{of}} {{name}} agora? O que {{pronoun}} estava fazendo para aqui.",
+      stopConfirm: "Fechar o navegador {{of}} {{name}} agora? O que {{she}} estava fazendo para aqui.",
       stopped: "Navegador {{of}} {{name}} fechado.",
       who: "Quem pode usar",
       whoHelp: "Ligue por agente, na página de cada um.",
@@ -8578,9 +8444,9 @@ export const ptBR = {
       openingHelp: "Na primeira vez neste computador pode levar um minuto.",
       subWorking: "{{name}} · {{now}}",
       subStarting: "{{name}} está abrindo o navegador",
-      subControl: "Você no controle · {{site}} · {{article}} {{name}} pediu",
-      subControlAsked: "Você no controle · {{article}} {{name}} pediu",
-      subTakeover: "Você no controle · {{article}} {{name}} espera",
+      subControl: "Você no controle · {{site}} · {{article}}\u00a0{{name}} pediu",
+      subControlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
+      subTakeover: "Você no controle · {{article}}\u00a0{{name}} espera",
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
@@ -8718,7 +8584,8 @@ export const ptBR = {
     title: "Computador da {{org}}",
     /** The ⓘ on the computer's name. */
     users: "Um usuário para cada agente: cada um tem a própria pasta.",
-    specs: "{{cpus}} CPUs · {{memoryGb}} GB de memória · {{diskGb}} GB de disco",
+    specs:
+      "{{cpus}}\u00a0CPUs\u00a0· {{memoryGb}}\u00a0GB\u00a0de\u00a0memória\u00a0· {{diskGb}}\u00a0GB\u00a0de\u00a0disco",
     chip: {
       preparing: "Sendo preparado",
       capacity: "Na fila",
@@ -8745,7 +8612,7 @@ export const ptBR = {
     status: {
       preparing: "Preparando o computador.",
       capacity: "Esperando um computador disponível",
-      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+      problem: "Algo deu errado ao preparar o computador. Já\u00a0estamos\u00a0cuidando.",
       ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
@@ -8766,7 +8633,7 @@ export const ptBR = {
       late: "Demorando um pouco mais que o previsto",
     },
     email: {
-      you: "Avisamos você em {{email}} quando ele ficar pronto.",
+      you: "Avisamos\u00a0você\u00a0em {{email}} quando\u00a0ele\u00a0ficar\u00a0pronto.",
       here: "Aparece aqui assim que ficar pronto.",
       /** After the capacity wait's line, for owners. */
       short: "Avisamos por e-mail.",
@@ -8775,8 +8642,8 @@ export const ptBR = {
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
     sub: {
-      control: "Você no controle · {{article}} {{name}} espera",
-      controlAsked: "Você no controle · {{article}} {{name}} pediu",
+      control: "Você no controle · {{article}}\u00a0{{name}} espera",
+      controlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",
       hidden: "{{person}} no controle",
     },
     state: {
@@ -8806,7 +8673,7 @@ export const ptBR = {
     },
     control: {
       keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
-      notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
     session: {
@@ -8823,6 +8690,8 @@ export const ptBR = {
       group: "Tela {{of}} {{name}}",
     },
     watch: {
+      /** Under the screen while watching, where whoever watches may not be the one typing. */
+      notice: "Os programas do computador {{of}} {{name}} veem a tela e tudo o que é digitado ou colado nele.",
       step: {
         desktop_open: "Abriu {{detail}}",
         desktop_open_plain: "Abriu um app",

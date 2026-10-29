@@ -41,7 +41,7 @@ export interface ConnectAiRequest {
   intent?: ConnectIntent;
   /** With `api_key`: the provider it named. */
   provider?: string;
-  /** The agent to connect: a plan's panel opens on it, the viewer's other agents one choice away. */
+  /** The agent to connect: the dialog is for it alone. */
   agentId?: string;
   /** The agents to choose from (an agent's card names them); `agentId` is chosen first. */
   agentIds?: string[];
@@ -143,9 +143,13 @@ function ConnectAiDialog({
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org.role, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
-  // An agent's card names whom to choose from; anywhere else every agent of the viewer's stays a choice.
+  // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
+  // so no For offers another. Anywhere else every agent of the viewer's stays a choice.
   const named = request.agentIds?.length ? request.agentIds : null;
-  const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({
+  const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
+  const one = only ? dir.agentById.get(only) : undefined;
+  const pool = one ? [one.id] : named;
+  const agents = (pool ? mine.filter((a) => pool.includes(a.id)) : mine).map((a) => ({
     id: a.id,
     name: a.name,
     appearance: lookOf(a),
@@ -202,9 +206,6 @@ function ConnectAiDialog({
     );
   };
 
-  // Opened for one agent: its name in the title while the plan is for it.
-  const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
-  const one = only ? dir.agentById.get(only) : undefined;
   const theirs = one !== undefined && one.ownerUserId !== me.user.id;
   // Someone else's agent, or no agent of theirs among those: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;

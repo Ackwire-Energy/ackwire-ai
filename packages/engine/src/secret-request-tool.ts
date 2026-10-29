@@ -135,7 +135,7 @@ export function requestSecretTool(opts: {
               site: origin,
               targetKind: file ? "file" : "env",
               targetPath: file ? path : null,
-              machineId: computer.machineId ?? null,
+              machineId: computer.machineId,
               publicKey,
               expiresAt: new Date(Date.now() + SECRET_TTL_MS),
             })

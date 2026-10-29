@@ -61,8 +61,8 @@ export const COMMON_TIMEZONES = [
   "UTC",
 ];
 
-/** English names (the Portuguese ones below are the default). */
-const NAMES_EN: Record<string, string> = {
+/** English names (the Portuguese ones below are the default), one for every zone named there. */
+const NAMES_EN: Record<keyof typeof NAMES, string> = {
   "America/Sao_Paulo": "Brasília time",
   "America/Manaus": "Amazonas time",
   "America/Fortaleza": "Fortaleza time",
@@ -75,23 +75,36 @@ const NAMES_EN: Record<string, string> = {
   "America/Chicago": "Chicago (US Central)",
   "America/Denver": "Denver (US Mountain)",
   "America/Los_Angeles": "Los Angeles (US Pacific)",
+  "America/Toronto": "Toronto",
   "America/Mexico_City": "Mexico City",
+  "America/Argentina/Buenos_Aires": "Buenos Aires",
+  "America/Santiago": "Santiago",
+  "America/Bogota": "Bogotá",
+  "America/Lima": "Lima",
   "America/Montevideo": "Montevideo",
   "America/Asuncion": "Asunción",
   "Europe/Lisbon": "Lisbon",
   "Europe/London": "London",
   "Europe/Madrid": "Madrid",
+  "Europe/Paris": "Paris",
   "Europe/Berlin": "Berlin",
   "Europe/Rome": "Rome",
   "Europe/Amsterdam": "Amsterdam",
   "Atlantic/Azores": "Azores",
+  "Africa/Luanda": "Luanda",
+  "Africa/Maputo": "Maputo",
+  "Asia/Dubai": "Dubai",
   "Asia/Kolkata": "India",
+  "Asia/Singapore": "Singapore",
   "Asia/Shanghai": "Shanghai (China)",
   "Asia/Tokyo": "Tokyo",
+  "Australia/Sydney": "Sydney",
+  "Pacific/Auckland": "Auckland",
 };
-const namesFor = (locale?: string) => (locale && !locale.startsWith("pt") ? NAMES_EN : NAMES);
+const namesFor = (locale?: string): Partial<Record<string, string>> =>
+  locale && !locale.startsWith("pt") ? NAMES_EN : NAMES;
 
-const NAMES: Record<string, string> = {
+const NAMES = {
   "America/Sao_Paulo": "horário de Brasília",
   "America/Manaus": "horário do Amazonas",
   "America/Fortaleza": "horário de Fortaleza",
@@ -129,7 +142,7 @@ const NAMES: Record<string, string> = {
   "Asia/Tokyo": "Tóquio",
   "Australia/Sydney": "Sydney",
   "Pacific/Auckland": "Auckland",
-};
+} satisfies Record<string, string>;
 
 /** "UTC−3", "UTC+5:30", "UTC" for a zone at `at`. */
 export function utcOffset(timeZone: string, at = new Date()): string {
@@ -149,8 +162,7 @@ export function utcOffset(timeZone: string, at = new Date()): string {
 /** "horário de Brasília (UTC−3)"; "UTC"; unknown zones by their IANA name with the offset. */
 export function timezoneLabel(timeZone: string, at = new Date(), locale?: string): string {
   if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
-  const names = namesFor(locale);
-  return `${names[timeZone] ?? NAMES[timeZone] ?? timeZone} (${utcOffset(timeZone, at)})`;
+  return `${namesFor(locale)[timeZone] ?? timeZone} (${utcOffset(timeZone, at)})`;
 }
 
 /** The browser's zone, if it has one. */
@@ -162,9 +174,29 @@ export function browserTimezone(): string | null {
   }
 }
 
-/** "horário de Brasília" (the zone's name, without the offset). */
+/**
+ * "horário de Brasília" (the zone's name, without the offset). A zone we don't name goes by the platform's name in
+ * `locale` ("Horário da Europa Central"): its IANA id only where the platform has no name for it.
+ */
 export const timezoneName = (timeZone: string, locale?: string) =>
-  timeZone === "UTC" || timeZone === "Etc/UTC" ? "UTC" : (namesFor(locale)[timeZone] ?? NAMES[timeZone] ?? timeZone);
+  timeZone === "UTC" || timeZone === "Etc/UTC"
+    ? "UTC"
+    : (namesFor(locale)[timeZone] ?? platformZoneName(timeZone, locale) ?? timeZone);
+
+/**
+ * The platform's name for a zone in `locale` ("Horário do Nepal"). Never a bare offset ("GMT-03:00", what an engine
+ * without zone names gives a city's zone), except for a zone that is only an offset ("Etc/GMT+3").
+ */
+export function platformZoneName(timeZone: string, locale?: string): string | undefined {
+  try {
+    const name = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: "longGeneric" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value;
+    return name && (timeZone.startsWith("Etc/") || !/^(GMT|UTC)/.test(name)) ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** A one-off's moment in its own zone: { weekday: "qui", date: "16/10", time: "09:00", zone: "horário de Brasília" }. */
 export function onceParts(locale: string, at: string, timeZone: string) {
@@ -209,6 +241,6 @@ export function onceParts(locale: string, at: string, timeZone: string) {
 /** The selector's name for a zone: "Horário de Brasília", "Nova York (Leste dos EUA)", "UTC". */
 export function zoneDisplayName(timeZone: string, locale?: string): string | undefined {
   if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
-  const name = namesFor(locale)[timeZone] ?? NAMES[timeZone];
+  const name = namesFor(locale)[timeZone];
   return name ? name.charAt(0).toLocaleUpperCase() + name.slice(1) : undefined;
 }

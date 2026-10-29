@@ -1,6 +1,7 @@
 import type { Agent, AgentAudience } from "@agenteschat/client";
 import {
   useAgents,
+  useBrainMachines,
   useChannels,
   useCreateAgent,
   useCredentials,
@@ -58,6 +59,8 @@ import {
   ModelCards,
   NO_OWNER,
   OwnerSelect,
+  PlanCards,
+  type PlanChoice,
   usd,
 } from "@/components/AgentFields";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -86,6 +89,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+import { useToast } from "@/lib/toast";
 import "./new-agent.css";
 
 /** The icon next to each group of roles on the first step. */
@@ -163,6 +167,8 @@ function NewAgentFlow() {
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
+  const brainMachines = useBrainMachines(org.id);
+  const toast = useToast();
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
@@ -198,6 +204,8 @@ function NewAgentFlow() {
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
   const [model, setModel] = useState<string>(AUTO);
+  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists.
+  const [plan, setPlan] = useState<PlanChoice | null>(null);
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
@@ -255,7 +263,7 @@ function NewAgentFlow() {
     ownerUserId: ownerId,
     audience,
     budget,
-    modelOk: isAuto(model) ? usable.size > 0 : usable.has(model),
+    modelOk: plan !== null || (isAuto(model) ? usable.size > 0 : usable.has(model)),
   };
   const errors = tried.has(step) ? stepErrors(step, check) : [];
   const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
@@ -279,7 +287,11 @@ function NewAgentFlow() {
   const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const budgetShown = amount ?? defaultBudget;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
-  const modelLabel = isAuto(model) ? t("brain.auto.label") : (modelInfo?.label ?? model);
+  const modelLabel = plan
+    ? t(`brain.card.${plan.kind}`)
+    : isAuto(model)
+      ? t("brain.auto.label")
+      : (modelInfo?.label ?? model);
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
@@ -336,6 +348,16 @@ function NewAgentFlow() {
       monthlyBudgetUsd: amount,
       appearance: look,
     });
+    // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
+    // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
+    if (plan) {
+      try {
+        await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
+        await api.agents.setBrain(org.id, agent.id, { brain: plan.kind });
+      } catch {
+        toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
+      }
+    }
     if (joined.length > 0) {
       await api.agents.setChannels(
         org.id,
@@ -622,7 +644,7 @@ function NewAgentFlow() {
               <Icon name="plus" />
             </span>
             <span className="newag__role-name">
-              <b>{t("newAgent.roles.custom.name")}</b>
+              <b className="ac-captop">{t("newAgent.roles.custom.name")}</b>
               <span>{t("newAgent.roles.custom.desc")}</span>
             </span>
           </button>
@@ -947,13 +969,39 @@ function NewAgentFlow() {
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
           <ModelCards
             choices={choices}
-            value={model}
+            value={plan ? undefined : model}
             money
             onChange={(id) => {
               setModel(id);
+              setPlan(null);
               mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
             }}
           />
+          <div className="newag__sect">
+            <div className="ac-hintline">
+              <h2>
+                <Icon name="computer" />
+                {t("newAgent.plans")}
+              </h2>
+              <InfoHint name={t("common.about", { label: t("newAgent.plans") })}>{t("newAgent.plansHelp")}</InfoHint>
+            </div>
+          </div>
+          <PlanCards
+            machines={brainMachines.data ?? []}
+            value={plan}
+            onChange={(choice) => {
+              setPlan(choice);
+              mood.react("happy", 800);
+            }}
+          />
+          {plan && (
+            <span className="small muted">
+              {t("newAgent.planOnlyOwner", {
+                ...g,
+                owner: ownerId === me.user.id ? t("common.you") : (ownerFirst ?? t("common.you")),
+              })}
+            </span>
+          )}
           {errorLine(errorOf("model"))}
           <div className="newag__sect">
             <h2>

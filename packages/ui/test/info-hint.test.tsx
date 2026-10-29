@@ -215,8 +215,8 @@ describe("InfoHint", () => {
     const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     const px = (text: string, prop: string) =>
       Number(text.match(new RegExp(`(?:^|\\s)${prop}:\\s*(-?[\\d.]+)px`))?.[1]);
-    // The 24px target overhangs the glyph's box by its negative margin, and the line's gap takes back part of it.
-    const intoLabel = -px(rule(".ac-hint"), "margin") - px(rule(".ac-hintline"), "gap");
+    // The 24px target starts this far before the label's end (its first margin).
+    const intoLabel = -px(rule(".ac-hintline > .ac-hint"), "margin-inline");
     const ring = rule(".ac-hint:focus-visible");
     expect(ring).not.toContain("box-shadow");
     // An outline drawn inward: its outer edge sits this far inside the target's.
@@ -260,7 +260,34 @@ describe("hints on fields and cards", () => {
     expect(heading.parentElement?.contains(button)).toBe(true);
   });
 
-  test("beside a card's big title (`.ac-card__title`), the line takes the title's type: the ⓘ is on its first line", async () => {
+  test("a wrapped label's ⓘ follows its last word, 4px from it, in the room its lines leave: never alone", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    const px = (text: string) => [...text.matchAll(/(-?[\d.]+)px/g)].map((m) => Number(m[1]));
+    const line = rule(".ac-hintline");
+    const label = rule(".ac-hintline > :first-child:not(.ac-hint)");
+    // The label flows as text in the line, set from each line's top as the ⓘ is.
+    expect(line).toMatch(/display: inline-block;/);
+    expect(label).toMatch(/display: inline;/);
+    expect(label).toMatch(/vertical-align: top;/);
+    expect(rule(".ac-hint")).toMatch(/vertical-align: top;/);
+    // The 24px target around the 14px glyph, its start before the label's end, takes no room on the line: it never
+    // wraps alone. Its glyph starts 4px after the last letter and ends where the room every line leaves ends.
+    const target = px(rule(".ac-hint").match(/width: [^;]+/)?.[0] ?? "")[0] ?? NaN;
+    const glyph = 14;
+    const [start = NaN, end = NaN] = px(rule(".ac-hintline > .ac-hint").match(/margin-inline: [^;]+/)?.[0] ?? "");
+    const room = px(line.match(/padding-inline-end: [^;]+/)?.[0] ?? "")[0];
+    expect(start + target + end).toBe(0);
+    expect(start + (target - glyph) / 2).toBe(4);
+    expect(room).toBe(4 + glyph);
+    // Without an ⓘ the line keeps no room.
+    expect(rule(".ac-hintline:not(:has(> .ac-hint))")).toMatch(/padding-inline-end: 0;/);
+  });
+
+  test("beside a card's big title (`.ac-card__title`), the line takes the title's type: the ⓘ is on its line", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
     const type = (text: string) =>

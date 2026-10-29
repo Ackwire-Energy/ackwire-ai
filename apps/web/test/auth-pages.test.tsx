@@ -128,7 +128,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(router.state.location.search).toEqual({});
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect(panel.textContent).toContain("O computador está pronto.");
   });
 
   test("an account without a password: only the provider it signs in with", async () => {
@@ -621,7 +621,8 @@ describe("A verificação contra robôs (agentes.chat Cloud)", () => {
 });
 
 describe("Onboarding", () => {
-  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}) => {
+  /** `claudeSignedIn`: each computer the person connects has Claude Code signed in there (its own sign-in). */
+  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}, { claudeSignedIn = true } = {}) => {
     const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
@@ -640,6 +641,20 @@ describe("Onboarding", () => {
         ownSignIn: machine !== undefined && machine.kind !== "host",
       };
     };
+    // Each computer's row as the server makes it: its own Claude Code sign-in, where it is signed in there.
+    api.machines.aiAccounts = async () => ({
+      accounts: [],
+      computers: (fakeMachinesOf.get(api)?.all() ?? []).map((m) => ({
+        machineId: m.id,
+        name: m.name,
+        online: m.online,
+        mine: m.kind !== "host",
+        canAdd: true,
+        keys: true,
+        brains: { claude_code: true, codex: true },
+        own: claudeSignedIn && m.kind !== "host" ? { claude_code: {} } : {},
+      })),
+    });
     const r = await renderApp("/onboarding", { api });
     return { ...r, api, state };
   };
@@ -1416,18 +1431,24 @@ describe("Onboarding", () => {
     await click(button(/Criar 1 agente/), 8);
     // Both agents use the connected computer.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
-    // The AI step: the account signed in on that computer, chosen, thinks for every agent; nothing to sign in.
+    // The AI step: the account their agents share, chosen, thinks for every agent; nothing to sign in.
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    const own = within(panel).getByRole("button", { name: /^A conta do Claude com login no MacBook do Walter/ });
+    const own = within(panel).getByRole("button", { name: "A conta que os seus agentes dividem" });
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    // Who they reply to: off, each only the person. Switched on here, the save says everyone (ADR 0059 §5).
+    const replies = within(panel).getByRole("switch", { name: "Respondem a todos" });
+    expect(replies.getAttribute("aria-checked")).toBe("false");
+    await click(replies);
+    expect(replies.getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
     await settle(4);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
-      { brain: "claude_code", fallback: true },
-      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
+      { brain: "claude_code", fallback: true, onlyOwner: false },
     ]);
 
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
@@ -1461,6 +1482,48 @@ describe("Onboarding", () => {
     const posts = calls(state, "chat.post");
     expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
     expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
+  });
+
+  test("computer before the agents, the switch left off: each replies only to the person, as the Team step says", async () => {
+    const { state, api, services } = await start({ agents: [] });
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    // Whoever creates an agent owns it, as the server makes them.
+    for (const a of state.agents) a.ownerUserId = "u-walter";
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("switch", { name: "Respondem a todos" }).getAttribute("aria-checked")).toBe("false");
+    await next();
+    await settle(4);
+    expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
+      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true },
+    ]);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(screen().getByText("Seus agentes só respondem a você.")).toBeTruthy();
+  });
+
+  test("a computer whose Claude Code isn't signed in: no account to share, Claude's sign-in instead, nothing saved on Continue", async () => {
+    const { state, api, services } = await start({}, { claudeSignedIn: false });
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    // Continue would point every agent at a sign-in that isn't there: it waits for one.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
 
   test("optional steps can be skipped: no computer, no invites", async () => {
@@ -1877,8 +1940,12 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__note")).toBeNull();
   });
 
-  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+  test("workspace: the time zone in words, its reason behind its ⓘ, with no line under the field", async () => {
     await start();
+    // Its name as people say it (the IANA id goes to the API only).
+    const zone = [...document.querySelectorAll(".onb__help")].find((p) => p.textContent?.startsWith("Fuso horário"));
+    expect(zone?.textContent).toMatch(/^Fuso horário: .+ · trocar$/);
+    expect(zone?.textContent).not.toMatch(/\w\/\w/);
     await click(button("trocar"), 2);
     const about = button("Sobre Fuso horário");
     const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");

@@ -231,7 +231,7 @@ export const desktopPtBR = {
       start: "O agentes.chat não iniciou neste {{device}}.",
       database: "O banco de dados não foi preparado.",
       account: "A sua conta não foi criada.",
-      reach: "O acesso pelos aparelhos não ligou: {{reason}}. Tente de novo em Preferências\u00a0›\u00a0Servidores.",
+      retry: "Tente de novo em Preferências\u00a0›\u00a0Servidores.",
     },
     reason: {
       https: "o HTTPS está desligado na sua rede do Tailscale",
@@ -338,12 +338,6 @@ export const desktopPtBR = {
     body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados.",
     allow: "Permitir",
     notNow: "Agora não",
-  },
-  /** Coming from the menu bar app: the Cloud no longer uses people's computers. */
-  migrate: {
-    cloudTitle: "Este {{device}} não trabalha mais para o agentes.chat Cloud",
-    cloudBody:
-      "Lá, os agentes trabalham no computador do próprio workspace, sempre ligado. As pastas deles aqui continuam em {{path}}.",
   },
   tools: {
     claudeName: "Claude Code",

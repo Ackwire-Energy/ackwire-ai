@@ -14,6 +14,7 @@ import {
   issueSections,
   issueState,
   latestPr,
+  listState,
   minutesSince,
   passesFilter,
   waitsOnYou,
@@ -53,6 +54,22 @@ const work = (state: NonNullable<Issue["work"]>["state"], steps: { tool: string;
   state,
   since: at(6, NOW),
   steps,
+});
+
+describe("a row's state in the list", () => {
+  test("says only what its section doesn't", () => {
+    // The section already says these.
+    expect(listState(issue({ number: 1 }))).toBeNull();
+    expect(listState(issue({ number: 2, status: "in_progress" }))).toBeNull();
+    expect(listState(issue({ number: 3, status: "in_review" }))).toBeNull();
+    expect(listState(issue({ number: 4, status: "done" }))).toBeNull();
+    // What happens inside a section shows.
+    expect(listState(issue({ number: 5, status: "in_progress", work: work("running") }))).toBe("running");
+    expect(listState(issue({ number: 6, work: work("waiting_input") }))).toBe("waiting");
+    expect(listState(issue({ number: 7, status: "in_progress", work: work("stalled") }))).toBe("stalled");
+    const pr = [{ number: 212, url: "https://x", openedBy: null }];
+    expect(listState(issue({ number: 8, status: "in_review", pullRequests: pr }))).toBe("review");
+  });
 });
 
 describe("issue state", () => {

@@ -45,26 +45,21 @@ export interface MachineOutage {
   waitingRuns: number;
 }
 
-export type OutageTarget =
-  | {
-      kind: "machine";
-      machineId: string;
-      name: string;
-      platform: string;
-      managed: boolean;
-      online: boolean;
-      brains: ComputerBrainKind[];
-      /** Why it can't take agents now: `offline`, `paused`; null when it can. */
-      reasonOff: string | null;
-    }
-  /** The cloud computer runs only the API brain: `brains` is always empty (Claude Code and Codex need a connected computer). */
-  | { kind: "cloud"; available: boolean; brains: ComputerBrainKind[] };
+export type OutageTarget = {
+  kind: "machine";
+  machineId: string;
+  name: string;
+  platform: string;
+  managed: boolean;
+  online: boolean;
+  brains: ComputerBrainKind[];
+  /** Why it can't take agents now: `offline`, `paused`; null when it can. */
+  reasonOff: string | null;
+};
 
 export interface OutageDeps {
   db: Database;
   pubsub?: PubSub;
-  /** A cloud sandbox provider is configured on this server. */
-  cloudAvailable: boolean;
   now?: () => Date;
 }
 
@@ -113,7 +108,7 @@ async function waitingRunsFor(db: Database, orgId: string, machineIds: string[],
  * `GET …/machines/outages`: each offline computer that some agents think on
  * (computer brain pointed at it) or that runs wait for, with only the agents
  * this person may move (admins with `manage_agents`: all; others: their own
- * agents); and every other computer (plus the cloud one) as a place to move them.
+ * agents); and every other computer as a place to move them.
  */
 export async function listMachineOutages(
   deps: OutageDeps,
@@ -225,11 +220,10 @@ export async function listMachineOutages(
         reasonOff: !online ? "offline" : machinePause(m, now) ? "paused" : null,
       };
     });
-  targets.push({ kind: "cloud", available: deps.cloudAvailable, brains: [] });
   return { outages, targets };
 }
 
-export type MoveTarget = { kind: "machine"; machineId: string } | { kind: "cloud" };
+export type MoveTarget = { kind: "machine"; machineId: string };
 
 export interface MoveAgentsResult {
   moved: string[];
@@ -263,23 +257,19 @@ export async function moveAgentsFromMachine(
   const agentIds = [...new Set(input.agentIds)];
   if (agentIds.length === 0) throw new ValidationError("Choose at least one agent", "machine.move_no_agents");
 
-  let to: MachineRow | null = null;
-  if (input.target.kind === "machine") {
-    if (input.target.machineId === from.id) {
-      throw new ConflictError("Choose another computer", "machine.target_same");
-    }
-    to = await getMachine(db, orgId, input.target.machineId);
-    if (!to) throw new ConflictError("That computer isn't in this organization", "machine.target_not_found");
-    if (!machineOnline(to, now)) {
-      throw new ConflictError(`${to.name} is offline`, "machine.target_offline", { name: to.name });
-    }
-    if (machinePause(to, now)) {
-      throw new ConflictError(`${to.name} is paused by its owner`, "machine.target_paused", { name: to.name });
-    }
-  } else if (!deps.cloudAvailable) {
-    throw new ConflictError("Cloud computers are not available on this server", "machine.target_cloud_unavailable");
+  const target = input.target;
+  if (target.machineId === from.id) {
+    throw new ConflictError("Choose another computer", "machine.target_same");
   }
-  const brains = to ? computerBrains(to) : [];
+  const to = await getMachine(db, orgId, target.machineId);
+  if (!to) throw new ConflictError("That computer isn't in this organization", "machine.target_not_found");
+  if (!machineOnline(to, now)) {
+    throw new ConflictError(`${to.name} is offline`, "machine.target_offline", { name: to.name });
+  }
+  if (machinePause(to, now)) {
+    throw new ConflictError(`${to.name} is paused by its owner`, "machine.target_paused", { name: to.name });
+  }
+  const brains = computerBrains(to);
 
   const waiting = await waitingRunsFor(db, orgId, [from.id], agentIds);
   const moved: string[] = [];
@@ -301,7 +291,7 @@ export async function moveAgentsFromMachine(
       continue;
     }
     try {
-      await setAgentComputerTarget(deps, actorId, orgId, agentId, to?.id ?? null);
+      await setAgentComputerTarget(deps, actorId, orgId, agentId, to.id);
       moved.push(agentId);
     } catch (error) {
       if (error instanceof ForbiddenError) skipped.push({ agentId, reason: "forbidden" });
@@ -324,11 +314,11 @@ export async function moveAgentsFromMachine(
     }
     // A mission's main session lives on the mission's own computer: it waits for that one.
     const mission = await missionTurnFor(db, r).catch(() => null);
-    if (mission?.session?.machineId && mission.session.machineId !== to?.id) {
+    if (mission?.session?.machineId && mission.session.machineId !== to.id) {
       stillWaiting++;
       continue;
     }
-    if (await repointWaitingRun(db, r.id, from.id, to?.id ?? null)) resumed++;
+    if (await repointWaitingRun(db, r.id, from.id, to.id)) resumed++;
   }
 
   await recordAudit(db, {
@@ -337,7 +327,7 @@ export async function moveAgentsFromMachine(
     action: "machine.agents_moved",
     target: { type: "machine", id: from.id },
     details: {
-      to: to ? { kind: "machine", machineId: to.id, name: to.name } : { kind: "cloud" },
+      to: { kind: "machine", machineId: to.id, name: to.name },
       moved,
       skipped,
       resumed,
@@ -352,7 +342,7 @@ export async function moveAgentsFromMachine(
         type: "machine.agents_moved",
         machineId: from.id,
         agentIds: moved,
-        target: to ? { kind: "machine", machineId: to.id } : { kind: "cloud" },
+        target: { kind: "machine", machineId: to.id },
       },
     });
   }
@@ -360,12 +350,12 @@ export async function moveAgentsFromMachine(
 }
 
 /**
- * A run that waited for `fromId` now waits for `toId` (null: the cloud
- * computer) and is queued again, under a new wait id: one job for this move
- * (a later move or the old computer's "back" job finds the wait changed and
- * does nothing). False: it no longer waits for that computer.
+ * A run that waited for `fromId` now waits for `toId` and is queued again,
+ * under a new wait id: one job for this move (a later move or the old
+ * computer's "back" job finds the wait changed and does nothing). False: it no
+ * longer waits for that computer.
  */
-async function repointWaitingRun(db: Database, runId: string, fromId: string, toId: string | null) {
+async function repointWaitingRun(db: Database, runId: string, fromId: string, toId: string) {
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select({

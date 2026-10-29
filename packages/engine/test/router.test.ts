@@ -16,6 +16,7 @@ import {
   type RouterStrategy,
   type RoutingCandidate,
   routeMessage,
+  routerPrompt,
   selectAgents,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -104,6 +105,23 @@ describe("parseRouterOutput", () => {
     expect(parseRouterOutput('```json\n{"needs_agent":0}\n```').needs_agent).toBe(0);
     expect(() => parseRouterOutput("not json")).toThrow(RouterOutputError);
     expect(() => parseRouterOutput("[1]")).toThrow(RouterOutputError);
+  });
+});
+
+describe("routerPrompt", () => {
+  test("names a message to the room in both languages, and asks whether each agent has its own answer", () => {
+    const { system, schema: answer } = routerPrompt({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "e agora, vocês dois?" },
+      thread: [],
+      candidates: [cand("dev"), cand("qa")],
+    });
+    const room = system.split("\n").find((line) => line.includes("the whole room"));
+    for (const phrase of ["everyone", "all of you", "gente", "vocês", "agentes"]) expect(room).toContain(`"${phrase}"`);
+    expect(room).toContain("score every agent high");
+    expect(system).toContain("And `for_everyone`:");
+    expect(answer.required).toContain("for_everyone");
   });
 });
 

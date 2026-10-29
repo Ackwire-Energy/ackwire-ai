@@ -1,14 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import {
-  generateSecretKeyPair,
-  MACHINE_PROTOCOL_VERSION,
-  openSecret,
-  orgTopic,
-  type ServerFrame,
-  sealSecret,
-  secretAad,
-} from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secretAad } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
@@ -35,11 +27,10 @@ import {
   type SecretRequestView,
   secretSite,
   setAgentComputerTarget,
-  startAgentComputer,
   type ToolContext,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -52,143 +43,12 @@ afterEach(async () => {
 });
 
 const deps = () => ({ db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" });
-const RUNNER = {
-  hostname: "box",
-  os: "linux",
-  arch: "x64",
-  version: "0.1.0",
-  protocol: MACHINE_PROTOCOL_VERSION,
-  workspace: "/home/u/agentes",
-};
 
 function pair(actorId = f.owner.id, name = "Build box", exec = true) {
   return pairMachine(deps(), actorId, f.org.id, { name, ...RUNNER, exec });
 }
 
 type Request = Extract<ServerFrame, { type: "request" }>;
-
-/**
- * A runner over an in-memory socket: files in a map, commands answered by
- * `exec`, uploads handed to `push`. Replies come on a later tick, like a network.
- */
-function fakeRunner(
-  hub: MachineHub,
-  options: {
-    exec?: (
-      req: Extract<Request, { op: "exec" }>,
-      out: (stream: "stdout" | "stderr", chunk: string) => void,
-    ) => { exitCode: number; stdout: string; stderr: string } | "hang";
-    push?: (req: Extract<Request, { op: "push" }>, bytes: Uint8Array, name: string) => Promise<void>;
-    execAllowed?: boolean;
-    /** A socket whose close never reaches the hub (a runner killed behind a proxy: half-open). */
-    dead?: boolean;
-  } = {},
-) {
-  const sent: ServerFrame[] = [];
-  const files = new Map<string, Uint8Array>();
-  /** Like the real runner: private keys per request, opened values per name. */
-  const keys = new Map<string, string>();
-  const secrets = new Map<string, string>();
-  let closed: { code?: number; reason?: string } | null = null;
-  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
-  const handle = async (req: Request) => {
-    const ok = (data: unknown) => reply({ type: "result", id: req.id, ok: true, data });
-    const fail = (code: string, message: string) =>
-      reply({ type: "result", id: req.id, ok: false, error: { code, message } });
-    switch (req.op) {
-      case "secret": {
-        if (req.action === "keypair") {
-          const pair = await generateSecretKeyPair();
-          keys.set(req.requestId, pair.privateKey);
-          return ok({ publicKey: pair.publicKey });
-        }
-        if (req.action === "deliver") {
-          const key = keys.get(req.requestId);
-          if (!key) return fail("not_found", "This request's key is gone");
-          const value = await openSecret(key, req.box, req.aad).catch(() => null);
-          if (value === null) return fail("bad_request", "The secret couldn't be opened");
-          keys.delete(req.requestId);
-          secrets.set(req.name, value);
-          return ok({ size: Buffer.byteLength(value) });
-        }
-        if (req.action === "discard") keys.delete(req.requestId);
-        if (req.action === "remove") secrets.delete(req.name);
-        return ok({});
-      }
-      case "exec": {
-        if (options.execAllowed === false) return fail("exec_disabled", "commands are off");
-        const r = options.exec?.(req, (stream, chunk) => void reply({ type: "output", id: req.id, stream, chunk })) ?? {
-          exitCode: 0,
-          stdout: `ran: ${req.command}`,
-          stderr: "",
-        };
-        if (r === "hang") return; // answers only to `cancel`
-        return ok({ ...r, timedOut: false });
-      }
-      case "write":
-        files.set(req.path, new Uint8Array(Buffer.from(req.base64, "base64")));
-        return ok({ size: files.get(req.path)?.byteLength });
-      case "read": {
-        const data = files.get(req.path);
-        return ok({ base64: data ? Buffer.from(data).toString("base64") : null, size: data?.byteLength ?? 0 });
-      }
-      case "list":
-        return ok({ entries: [...files.entries()].map(([path, d]) => ({ path, isDir: false, size: d.byteLength })) });
-      case "push": {
-        const data = files.get(req.path);
-        if (!data) return fail("not_found", `no ${req.path}`);
-        const name = req.path.split("/").at(-1) ?? req.path;
-        await options.push?.(req, data, name);
-        return ok({
-          name,
-          size: data.byteLength,
-          sha256: createHash("sha256").update(data).digest("hex"),
-          contentType: "",
-        });
-      }
-    }
-  };
-  const socket = {
-    send(text: string) {
-      const frame = JSON.parse(text) as ServerFrame;
-      sent.push(frame);
-      if (frame.type === "request") setTimeout(() => void handle(frame), 1);
-      if (frame.type === "cancel") {
-        setTimeout(
-          () =>
-            void reply({
-              type: "result",
-              id: frame.id,
-              ok: true,
-              data: { exitCode: 130, stdout: "", stderr: "", timedOut: false, canceled: { killed: true } },
-            }),
-          1,
-        );
-      }
-    },
-    close(code?: number, reason?: string) {
-      closed = { code, reason };
-      if (!options.dead) void hub.close(conn);
-    },
-  };
-  const conn = hub.open(socket);
-  return {
-    conn,
-    sent,
-    files,
-    keys,
-    secrets,
-    closed: () => closed,
-    hello: (token: string, extra: Record<string, unknown> = {}) =>
-      hub.message(
-        conn,
-        JSON.stringify({ type: "hello", token, ...RUNNER, exec: options.execAllowed !== false, ...extra }),
-      ),
-    disconnect: () => hub.close(conn),
-    /** Sends a frame as this runner. */
-    frame: (frame: Record<string, unknown>) => reply(frame),
-  };
-}
 
 /** A `brain.turn` request (the fake runner never answers it by itself). */
 const brainTurn = (runId = crypto.randomUUID()) => ({
@@ -491,7 +351,7 @@ describe("machines and targets", () => {
       online: false,
     });
     expect(events.at(-1)).toMatchObject({ type: "agent.computer", agentId: f.agent.id, target: { kind: "machine" } });
-    expect(await setAgentComputerTarget(deps(), bia.id, f.org.id, f.agent.id, null)).toEqual({ kind: "cloud" });
+    expect(await setAgentComputerTarget(deps(), bia.id, f.org.id, f.agent.id, null)).toEqual({ kind: "none" });
     expect(await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, anaBox.machineId)).toMatchObject({
       kind: "machine",
     });
@@ -501,20 +361,9 @@ describe("machines and targets", () => {
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.computer_target"));
     expect(audit).toHaveLength(3);
 
-    // The computer API says which; cloud start/stop is refused for a machine.
-    const sandboxDeps = {
-      db: f.db,
-      provider: null,
-      pricing: { vcpuHourUsd: 0, memoryGibHourUsd: 0, diskGibHourUsd: 0 },
-      autoStopMinutes: 10,
-      archiveAfterDays: 7,
-    };
-    expect(await getAgentComputer(sandboxDeps, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
-      status: "none",
+    // The computer API says which.
+    expect(await getAgentComputer(f.db, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
       target: { kind: "machine", name: "Ana's box" },
-    });
-    await expect(startAgentComputer(sandboxDeps, f.owner.id, f.org.id, f.agent.id)).rejects.toMatchObject({
-      code: "machine.no_lifecycle",
     });
   });
 });
@@ -688,7 +537,7 @@ describe("tools on a connected machine", () => {
     return outcome.output;
   };
 
-  test("run_code, files and upload_file go to the machine; no usage rows; offline is explained", async () => {
+  test("run_code, files and upload_file go to the machine; offline is explained", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const hub = f.machineHub as MachineHub;
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
@@ -716,7 +565,7 @@ describe("tools on a connected machine", () => {
     await runner.hello(paired.token);
     const ctx = await runCtx();
 
-    // Without a machine and without cloud computers: a clear refusal.
+    // Without a machine: a clear refusal.
     const none = await call(ctx, "run_code", { language: "python", code: "print(42)" });
     expect(none).toMatchObject({ isError: true });
     expect(none.content).toContain("You have no computer");
@@ -756,7 +605,7 @@ describe("tools on a connected machine", () => {
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
     expect(status.content).not.toContain(RUNNER.workspace);
-    // Turning a computer on and off is a sandbox's: a computer of the workspace has no such tools.
+    // No tool turns a computer on or off (ADR 0077): only computer_status.
     expect(listed?.filter((t) => t.name.startsWith("computer_")).map((t) => t.name)).toEqual(["computer_status"]);
 
     // The workspace's own computer is always on.
@@ -769,9 +618,6 @@ describe("tools on a connected machine", () => {
     const ownRunCode = (await f.tools?.list(ctx))?.find((t) => t.name === "run_code");
     expect(ownRunCode?.description).toContain(`Runs on "Build box" (Linux), this workspace's own computer, always on`);
     await kind("connected");
-
-    expect(await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.kind, "sandbox"))).toEqual([]);
-    expect(await f.db.select().from(schema.sandboxes)).toEqual([]);
 
     await runner.disconnect();
     const offline = await call(ctx, "run_code", { language: "bash", code: "ls" });

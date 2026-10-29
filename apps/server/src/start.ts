@@ -4,7 +4,6 @@ import {
   type Adapters,
   createComposioClient,
   createComposioMailConnector,
-  createDaytonaSandboxProvider,
   createDiskBlobStore,
   createExpoPushSender,
   createImapConnectionTester,
@@ -47,7 +46,6 @@ import {
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
-  enablePersonalPlans,
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
@@ -83,6 +81,17 @@ export interface StartOptions {
    * page that points a name of its own at 127.0.0.1 (DNS rebinding) would otherwise reach it.
    */
   ownHostsOnly?: boolean;
+}
+
+/**
+ * The engine's process-wide switches this config sets, every one of them here: `startServer` sets them at boot, and a
+ * test that boots like a given setup (the Cloud) sets them the same way.
+ */
+export function applyBootSwitches(config: Config) {
+  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
+  setRestrictionNotices(config.PUBLIC_URL);
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
 }
 
 /**
@@ -137,14 +146,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
     platformBlobs: platformBlobStore(config, database.db),
-    sandbox: config.DAYTONA_API_KEY
-      ? createDaytonaSandboxProvider({
-          apiKey: config.DAYTONA_API_KEY,
-          apiUrl: config.DAYTONA_API_URL,
-          target: config.DAYTONA_TARGET,
-          snapshot: config.SANDBOX_SNAPSHOT,
-        })
-      : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
@@ -170,7 +171,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
-  log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version };
@@ -195,13 +195,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
-  // Where workspaces get their computer from this server, an agent on a plan answers only its owner.
-  enablePersonalPlans(config.MACHINE_PROVISIONING === "external");
-  // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
-  setRestrictionNotices(config.PUBLIC_URL);
-  // The operator API's events feed records only while that API is on (ADR 0056).
+  applyBootSwitches(config);
   if (config.OPERATOR_API_TOKEN) {
-    enableOperatorEvents();
     // Before the API serves a page: a caller restarting after a restore must find these rows first.
     const adopted = await adoptRestoredOperatorEvents(database.db);
     if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
@@ -279,7 +274,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         talker: engine.talker,
         router: engine.router,
         jevKey: engine.jevKey,
-        gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        gitProxy: engine.gitProxy,
         appleRevoke: appleTokenRevoker(config),
       },
     },

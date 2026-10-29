@@ -2350,7 +2350,7 @@ mod tests {
             moved_page(page("http://127.0.0.1:4310/org/o1/c/c2?m=1#x"), local, public).as_str(),
             "https://ana-mac.tail1234.ts.net/org/o1/c/c2?m=1#x"
         );
-        assert_eq!(moved_page(page("https://agentes.chat/org/o1"), local, public).as_str(), "https://agentes.chat/org/o1");
+        assert_eq!(moved_page(page("https://app.agentes.chat/org/o1"), local, public).as_str(), "https://app.agentes.chat/org/o1");
         assert_eq!(moved_page(page("http://127.0.0.1:4310/x"), local, local).as_str(), "http://127.0.0.1:4310/x");
     }
 

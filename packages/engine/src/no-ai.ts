@@ -263,7 +263,8 @@ export async function answerNow(
     const ready: AnsweringRun[] = [];
     for (const r of allowed) if ((await agentAiState(deps, r.agent, r.run)).state !== "no_ai") ready.push(r);
     if (ready.length === 0) throw stillMissing();
-    // Who the agent answers may have narrowed since (a personal plan answers only its owner, ADR 0059 §5):
+    // Who the agent answers may have narrowed since (an agent moved onto a plan answers only its owner until they
+    // turn on Responde a todos, ADR 0059 §5):
     // a run starts again only for someone it still answers.
     const heard = ready.filter((r) => canTalkTo(r.agent, r.requester));
     const [first] = ready;

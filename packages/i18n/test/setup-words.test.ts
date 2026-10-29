@@ -27,7 +27,7 @@ describe("words true in every setup", () => {
       expect(misplaced(TREES[locale], locale)).toEqual([]);
     });
 
-    test(`${locale}: nobody says the cloud, the landing included`, () => {
+    test(`${locale}: nobody says the cloud, the help pages included`, () => {
       expect(TREES[locale].filter(([, text]) => bannedIn(text, SELFHOST_BANNED).length > 0)).toEqual([]);
     });
   }
@@ -40,6 +40,8 @@ describe("words true in every setup", () => {
   test("the probes: each phrase passes only under its condition", () => {
     expect(misplaced([["storage.text", "Your files stay in our storage"]], "en")).toHaveLength(1);
     expect(misplaced([["storage.agentesText", "Your files stay in our storage"]], "en")).toEqual([]);
+    // Words a line keeps together with no-break spaces are the same phrase.
+    expect(misplaced([["storage.text", "Something went wrong. We're on it."]], "en")).toHaveLength(1);
     expect(misplaced([["storage.agentesText", "This server"]], "en")).toHaveLength(1);
     expect(misplaced([["machines.download.text", "Install it on this Mac"]], "en")).toHaveLength(1);
     expect(misplaced([["machines.download.step1", "Install it on this Mac"]], "en")).toEqual([]);

@@ -1,31 +1,8 @@
-import type {
-  Agent,
-  AgentComputer,
-  ComputerTarget,
-  Machine,
-  SandboxNetwork,
-  SandboxSettings,
-} from "@agenteschat/client";
+import type { Agent, ComputerTarget, Machine } from "@agenteschat/client";
+import { useAgents, useComputer, useComputerSetup, useMachines, useSetComputerTarget } from "@agenteschat/client";
 import {
-  useAgents,
-  useComputer,
-  useComputerAction,
-  useComputerSetup,
-  useMachines,
-  useSandboxSettings,
-  useSaveSandboxSettings,
-  useSetComputerTarget,
-} from "@agenteschat/client";
-import {
-  busyDisplay,
-  busyView,
-  type ComputerAction,
-  type ComputerDisplay,
   type NoComputer,
   noComputerChoice,
-  POLL_MS,
-  READY_FLASH_MS,
-  reached,
   type SetupView,
   setupPending,
   setupPortrait,
@@ -33,7 +10,6 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   computerKind,
@@ -43,258 +19,16 @@ import {
   machineTitle,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import {
-  Button,
-  Card,
-  Checkbox,
-  Chip,
-  ComputerIcon,
-  ComputerPortrait,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Field,
-  Icon,
-  type IconName,
-  InfoHint,
-  Input,
-  List,
-  Menu,
-  MenuItem,
-  RadioCard,
-  RadioGroup,
-  Select,
-  type SelectOption,
-  Switch,
-  Token,
-  TokenList,
-} from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { Card, ComputerIcon, ComputerPortrait, Icon, InfoHint, List, Select, type SelectOption } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { LoadingCards, LoadingLine } from "@/components/Loading";
+import { LoadingLine } from "@/components/Loading";
 import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
-import { ReconnectThisMacButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { SetupProgress } from "@/components/WorkspaceComputer";
-import { useNow } from "@/hooks/useNow";
-import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
-
-const STATUS_ICON: Record<ComputerDisplay, IconName> = {
-  running: "check",
-  stopped: "waiting",
-  archived: "drive",
-  none: "dash",
-  starting: "spinner",
-  stopping: "spinner",
-  removing: "spinner",
-};
-
-/** Presets for the allowlist. */
-export const DOMAIN_PRESETS: { id: "python" | "node"; domains: string[] }[] = [
-  { id: "python", domains: ["pypi.org", "files.pythonhosted.org"] },
-  { id: "node", domains: ["registry.npmjs.org"] },
-];
-export const MAX_DOMAINS = 100;
-
-/** `example.com` or `*.example.com`. */
-export const isDomain = (v: string) =>
-  /^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(v.trim()) && v.trim().length <= 253;
-
-export function ComputerChip({ status }: { status: ComputerDisplay }) {
-  const { t } = useTranslation();
-  const busy = status === "starting" || status === "stopping" || status === "removing";
-  return (
-    // `key`: a new status fades in (no motion when reduced).
-    <Chip
-      key={status}
-      icon={STATUS_ICON[status]}
-      className={busy ? "computer-chip computer-chip--busy" : "computer-chip"}
-      aria-live="polite"
-    >
-      {t(`computer.status.${status}`)}
-    </Chip>
-  );
-}
-
-/** "1,2 GB · usado há 2 h" (its cost counts in the agent's budget; admins see money in Usage). */
-function ComputerFacts({ pc }: { pc: AgentComputer }) {
-  const { t, i18n } = useTranslation();
-  if (pc.status === "none") return <span className="muted">{t("computer.none")}</span>;
-  return (
-    <span className="small muted tabular">
-      {t("computer.facts", {
-        disk: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(pc.diskUsedGib),
-        when: pc.lastUsedAt ? relativeTime(t, i18n.language, pc.lastUsedAt) : t("computer.never"),
-      })}
-    </span>
-  );
-}
-
-interface Busy {
-  action: ComputerAction;
-  since: number;
-  fresh: boolean;
-}
-
-/**
- * Start / stop / delete with instant feedback: the chip changes at once,
- * `GET …/computer` is polled every 2 s until the server (or the
- * `agent.computer` event) says it's done, then a toast. Errors stay inline
- * with "Tentar de novo".
- */
-function useComputerLifecycle(agent: Agent) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const mutation = useComputerAction(org.id);
-  const [busy, setBusy] = useState<Busy | null>(null);
-  const [error, setError] = useState<{ action: ComputerAction; message: string } | null>(null);
-  const [ready, setReady] = useState(false);
-  const pc = useComputer(org.id, agent.id, true, busy ? POLL_MS : false);
-  // The elapsed seconds and the steps move on once a second.
-  const now = useNow(busy !== null ? 1000 : false);
-  const g = agentGrammar(t, agent.name);
-  const view = busy ? busyView(busy.action, busy.since, now, busy.fresh) : null;
-
-  const status = pc.data?.status;
-  useEffect(() => {
-    if (!busy || !reached(busy.action, status)) return;
-    setBusy(null);
-    toast.show(t(`computer.done.${busy.action}`, g));
-    if (busy.action === "start") setReady(true);
-  }, [busy, status, toast, t, g]);
-  useEffect(() => {
-    if (!ready) return;
-    const timer = setTimeout(() => setReady(false), READY_FLASH_MS);
-    return () => clearTimeout(timer);
-  }, [ready]);
-  useEffect(() => {
-    if (busy && view?.tooLong) {
-      setError({ action: busy.action, message: t("computer.tooLong") });
-      setBusy(null);
-    }
-  }, [busy, view?.tooLong, t]);
-
-  const run = (action: ComputerAction) => {
-    setError(null);
-    setReady(false);
-    setBusy({ action, since: Date.now(), fresh: pc.data?.status === "none" });
-    mutation.mutate(
-      { agentId: agent.id, action },
-      {
-        onError: (e) => {
-          setBusy(null);
-          setError({ action, message: e instanceof Error && e.message ? errorText(t, e) : t("common.loadFailed") });
-        },
-      },
-    );
-  };
-  const display: ComputerDisplay | undefined = busy ? busyDisplay[busy.action] : status;
-  return { pc, busy, view, ready, error, run, display };
-}
-type Lifecycle = ReturnType<typeof useComputerLifecycle>;
-
-/** "Criando a máquina · 5 s" while starting; "Pronto" for a moment after. */
-function ComputerProgress({ life }: { life: Lifecycle }) {
-  const { t } = useTranslation();
-  const step = life.ready ? "ready" : life.view?.step;
-  if (!step && life.view?.elapsed == null) return null;
-  return (
-    <span className="computer-progress small muted" role="status">
-      {step && <span>{t(`computer.step.${step}`)}</span>}
-      {life.view?.elapsed != null && (
-        <span className="tabular">{t("computer.elapsed", { seconds: life.view.elapsed })}</span>
-      )}
-    </span>
-  );
-}
-
-function ComputerError({ life }: { life: Lifecycle }) {
-  const { t } = useTranslation();
-  const { error } = life;
-  if (!error) return null;
-  return (
-    <p className="computer-error small" role="alert">
-      <span className="ac-iconline">
-        <Icon name="alert" size={16} />
-        <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
-      </span>
-      <Button size="sm" variant="ghost" onClick={() => life.run(error.action)}>
-        {t("computer.retry")}
-      </Button>
-    </p>
-  );
-}
-
-/** "…": Ligar, Desligar, Apagar (asks first: it deletes every file). */
-function ComputerMenu({ agent, life }: { agent: Agent; life: Lifecycle }) {
-  const { t } = useTranslation();
-  const [confirm, setConfirm] = useState(false);
-  const g = agentGrammar(t, agent.name);
-  const status = life.pc.data?.status;
-  if (!status) return null;
-  return (
-    <>
-      <Menu
-        align="end"
-        label={t("computer.actions", g)}
-        trigger={
-          <Button
-            size="sm"
-            variant="ghost"
-            iconOnly
-            icon="more"
-            aria-label={t("computer.actions", g)}
-            disabled={life.busy !== null}
-          />
-        }
-      >
-        {status !== "running" && (
-          <MenuItem icon="check" onSelect={() => life.run("start")}>
-            {t("computer.start")}
-          </MenuItem>
-        )}
-        {status === "running" && (
-          <MenuItem icon="waiting" onSelect={() => life.run("stop")}>
-            {t("computer.stop")}
-          </MenuItem>
-        )}
-        {status !== "none" && (
-          <MenuItem icon="block" danger onSelect={() => setConfirm(true)}>
-            {t("computer.remove")}
-          </MenuItem>
-        )}
-      </Menu>
-      <Dialog
-        open={confirm}
-        onOpenChange={setConfirm}
-        title={t("computer.removeTitle", g)}
-        description={t("computer.removeText", g)}
-        closeLabel={t("common.close")}
-        width={440}
-      >
-        <DialogFooter>
-          <Button onClick={() => setConfirm(false)}>{t("common.cancel")}</Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              setConfirm(false);
-              life.run("remove");
-            }}
-          >
-            {t("computer.remove")}
-          </Button>
-        </DialogFooter>
-      </Dialog>
-    </>
-  );
-}
-
-/** The computer an agent uses; older servers don't say: the cloud one. */
-export const targetOf = (pc: AgentComputer | undefined): ComputerTarget => pc?.target ?? { kind: "cloud" };
 
 /**
  * "Servidor do escritório · Online": a connected computer, turned on by whoever connected it, or the workspace's
@@ -330,153 +64,38 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   );
 }
 
-export const CLOUD = "cloud";
+export const NO_COMPUTER = "none";
 
 /**
- * The pickers' "no computer" option (`CLOUD`, `machineId` null) as it reads here (`noComputerChoice`): the
- * cloud computer, the workspace's own computer on its way, or no computer at all. Whether this server has
- * the cloud computer is asked only once the workspace's own computer is ready.
+ * The pickers' "no computer" option (`NO_COMPUTER`, `machineId` null) as it reads here (`noComputerChoice`): the
+ * workspace's own computer on its way, or no computer at all.
  */
 export function useNoComputer() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const setupQ = useComputerSetup(org.id);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
-  // Daytona's sandboxes count only where the server has them: no workspace computer on its way.
-  const sandbox = useSandboxSettings(org.id, setupQ.data?.mode === "pair" || setup?.phase === "ready");
-  const cloudAvailable = sandbox.data?.available === true;
   return {
     setup,
     /** The workspace's own computer is on its way: "no computer" stands for it, so its row isn't offered apart. */
     pending: setupPending(setup),
     /** `current`: the agent has no computer now (the option shows for it even when not offered). */
-    choice: (current: boolean) => noComputerChoice(setup, cloudAvailable, current),
+    choice: (current: boolean) => noComputerChoice(setup, current),
     label: (choice: NoComputer) =>
-      choice === "workspace"
-        ? t("computerSetup.title", { org: org.name })
-        : choice === "none"
-          ? t("computer.target.none")
-          : t("computer.target.daytona"),
+      choice === "workspace" ? t("computerSetup.title", { org: org.name }) : t("computer.target.none"),
   };
 }
 
-/** The "no computer" option's line icon: the cloud computer, the workspace's own, or none. */
+/** The "no computer" option's line icon: the workspace's own computer, or none. */
 export function NoComputerIcon({ choice }: { choice: NoComputer }) {
   if (choice === "none") return <Icon name="dash" size={16} />;
-  return <ComputerIcon kind={choice === "workspace" ? WORKSPACE_COMPUTER_KIND : "cloud"} size={16} />;
+  return <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />;
 }
 
-/**
- * "Computador: <máquina>", or the no-computer option as `useNoComputer` names it. Admins pick any
- * machine; the agent's owner, the ones they paired (the server checks again). Offline machines
- * stay selectable, marked. The choice is a draft: the page saves it.
- */
-function ComputerTargetSelect({
-  target,
-  value,
-  onChange,
-  admin,
-}: {
-  target: ComputerTarget;
-  value: string;
-  onChange: (value: string) => void;
-  admin: boolean;
-}) {
-  const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const machines = useMachines(org.id);
-  const noComputer = useNoComputer();
-  const current = target.kind === "machine" ? target.machineId : CLOUD;
-  const list = (machines.data ?? []).filter(
-    (m) =>
-      (admin || m.pairedBy?.id === me.user.id || m.id === current || m.id === value) &&
-      !(noComputer.pending && m.kind === "managed"),
-  );
-  if (machines.isLoading) return <LoadingLine width={200} />;
-  if (list.length === 0 && target.kind === "cloud" && value === CLOUD) {
-    // agentes for Mac: connect this Mac right here and pick it (ADR 0036).
-    if (inDesktopApp() && can(org.role, "post")) {
-      return <ThisMacButton orgId={org.id} canPair folders={false} onConnected={onChange} />;
-    }
-    return (
-      <Link
-        to="/org/$orgId/settings/$section"
-        params={{ orgId: org.id, section: "computers" }}
-        className="small computer-target__connect"
-      >
-        {t("computer.target.connectHint")}
-      </Link>
-    );
-  }
-  const cloud = noComputer.choice(current === CLOUD || value === CLOUD);
-  const options: SelectOption[] = [
-    ...(cloud
-      ? [
-          {
-            value: CLOUD,
-            label: noComputer.label(cloud),
-            description:
-              cloud === "workspace" && noComputer.setup
-                ? t(noComputer.setup.chipKey)
-                : cloud === "none"
-                  ? t("computer.target.noneText")
-                  : t("computer.target.daytonaText"),
-          },
-        ]
-      : []),
-    ...list.map((m) => ({
-      value: m.id,
-      label: m.online ? m.name : t("computer.target.offlineName", { name: m.name }),
-      description: m.online ? t("machines.online") : t("computer.target.offlineText"),
-    })),
-  ];
-  // The current machine may not be in the list yet (just paired, list loading).
-  if (target.kind === "machine" && !options.some((o) => o.value === target.machineId)) {
-    options.push({ value: target.machineId, label: target.name });
-  }
-  return (
-    <Select
-      className="newag__sel"
-      aria-label={t("computer.target.label")}
-      value={value}
-      options={options.map((o) => ({
-        ...o,
-        leading: (
-          <span className="newag__ib">
-            {o.value === CLOUD && cloud ? (
-              <NoComputerIcon choice={cloud} />
-            ) : (
-              <ComputerIcon kind={computerKind(list.find((m) => m.id === o.value)?.os)} size={16} />
-            )}
-          </span>
-        ),
-      }))}
-      onValueChange={onChange}
-      renderValue={(o) => (
-        <span className="newag__sel-value">
-          {o.leading}
-          <span className="newag__sel-text">
-            <b>{o.label}</b>
-            {o.description && <span>{o.description}</span>}
-          </span>
-        </span>
-      )}
-    />
-  );
-}
-
-/**
- * The computer the agent uses, as its portrait: the
- * cloud computer (lit while running or starting) or the connected machine,
- * its kind and pause from the computers list.
- */
-function TargetPortrait({ target, display }: { target: ComputerTarget; display: ComputerDisplay | null | undefined }) {
+/** The connected computer the agent uses, as its portrait: its kind and pause from the computers list. */
+function TargetPortrait({ target }: { target: Extract<ComputerTarget, { kind: "machine" }> }) {
   const { org } = useOrg();
   const machines = useMachines(org.id);
-  if (target.kind === "cloud") {
-    const on = display === "running" || display === "starting" || display === "stopping";
-    return <ComputerPortrait className="agp-pc__logo" kind="cloud" state={on ? "online" : "offline"} />;
-  }
   const m = machines.data?.find((x) => x.id === target.machineId);
   return (
     <ComputerPortrait
@@ -498,43 +117,20 @@ function WaitingForComputer({ view, title }: { view: SetupView; title: string })
 }
 
 /**
- * Configurações › Computador: the agent's PC (status, disk, last use; start,
- * stop and delete for admins) and where it runs. `onMachine` = can choose.
+ * Configurações › Computador: the computer the agent uses (a connected one, the workspace's own on its way, or
+ * none) and the folders it may use there.
  */
-export function AgentComputerPanel({
-  agent,
-  admin,
-  machine,
-  onMachine,
-  machineNote,
-}: {
-  agent: Agent;
-  admin: boolean;
-  /** The chosen computer (a draft): `"cloud"` or a machine id. */
-  machine: string;
-  onMachine?: (value: string) => void;
-  /** Under the picker ("Antes: …"). */
-  machineNote?: ReactNode;
-}) {
+export function AgentComputerPanel({ agent, machineNote }: { agent: Agent; machineNote?: ReactNode }) {
   const { t } = useTranslation();
-  const life = useComputerLifecycle(agent);
+  const { org } = useOrg();
+  const pc = useComputer(org.id, agent.id);
   const noComputer = useNoComputer();
-  const { pc } = life;
-  const g = agentGrammar(t, agent.name);
   if (pc.isLoading) return <LoadingLine width={240} />;
   if (pc.isError || !pc.data) return <p className="small muted">{t("agentPage.computer.unavailable")}</p>;
-  const target = targetOf(pc.data);
-  const empty = pc.data.status === "none" && !life.busy;
-  const choice = target.kind === "cloud" ? noComputer.choice(true) : null;
+  const target = pc.data.target;
+  const choice = target.kind === "machine" ? null : noComputer.choice(true);
   // No computer yet where the workspace's own is on its way: that one is the agent's (its first hello gives it).
   const waiting = choice === "workspace" ? noComputer.setup : null;
-  // The computer's name shows above for a connected computer, the workspace's on its way, or none at all.
-  const named = waiting !== null || choice === "none" || target.kind === "machine";
-  const pick = onMachine ? (
-    <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
-  ) : named ? null : (
-    <span className="agp-ro">{noComputer.label(choice ?? "cloud")}</span>
-  );
   return (
     <div className="agp-pc">
       <div className="agp-pc__now">
@@ -544,60 +140,28 @@ export function AgentComputerPanel({
             kind={WORKSPACE_COMPUTER_KIND}
             state={setupPortrait(waiting, false)}
           />
-        ) : choice === "none" ? null : (
-          <TargetPortrait target={target} display={life.display} />
-        )}
+        ) : target.kind === "machine" ? (
+          <TargetPortrait target={target} />
+        ) : null}
         <span className="agp-pc__text">
           {waiting ? (
             <WaitingForComputer view={waiting} title={noComputer.label("workspace")} />
-          ) : choice === "none" ? (
+          ) : target.kind === "machine" ? (
+            <MachineTargetView target={target} />
+          ) : (
             <span className="stack-4" style={{ gap: 4 }}>
               <span className="computer-machine__name">{t("computer.target.none")}</span>
               <span className="small muted">{t("computer.target.noneText")}</span>
             </span>
-          ) : target.kind === "machine" ? (
-            <MachineTargetView target={target} />
-          ) : empty ? (
-            <span className="muted">{t("computer.emptyText", g)}</span>
-          ) : (
-            life.display && (
-              <span className="row" style={{ gap: 8, alignItems: "center" }}>
-                <ComputerChip status={life.display} />
-                {life.busy ? <ComputerProgress life={life} /> : <ComputerFacts pc={pc.data} />}
-                {!life.busy && life.ready && <ComputerProgress life={life} />}
-              </span>
-            )
-          )}
-          {choice === "cloud" && pc.data.network === "provider-default" && (
-            <span className="small muted">{t("sandbox.providerDefault")}</span>
           )}
         </span>
-        {admin && choice === "cloud" && (
-          <span className="agp-pc__act">
-            {empty ? (
-              <Button size="sm" variant="primary" onClick={() => life.run("start")}>
-                {t("computer.create", g)}
-              </Button>
-            ) : (
-              <ComputerMenu agent={agent} life={life} />
-            )}
-          </span>
-        )}
       </div>
-      <ComputerError life={life} />
-      {(pick || machineNote) && (
+      {machineNote && (
         <div className="stack-4" style={{ gap: 6 }}>
-          {pick && <span className="newag__label">{t("computer.target.label")}</span>}
-          {pick}
           {machineNote}
-          {onMachine && (
-            <span className="small muted">
-              {admin ? t("agentPage.computer.adminsPick") : t("agentPage.computer.ownerPicks")}
-            </span>
-          )}
         </div>
       )}
-      {target.kind === "machine" && <AgentMachineFolders agentId={agent.id} machineId={target.machineId} />}
+      {target.kind === "machine" && <AgentMachineFolders agent={agent} machineId={target.machineId} />}
     </div>
   );
 }
@@ -607,13 +171,14 @@ export function AgentComputerPanel({
  * its computer this agent may use beyond its own, as the machine reported them.
  * Read-only here: granting happens on the computer.
  */
-function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineId: string }) {
+function AgentMachineFolders({ agent, machineId }: { agent: Agent; machineId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machines = useMachines(org.id);
   const m = machines.data?.find((x) => x.id === machineId);
   if (!m) return null;
-  const folders = foldersOfAgent(m.access, agentId);
+  const folders = foldersOfAgent(m.access, agent.id);
+  const g = agentGrammar(t, agent.name);
   return (
     <div className="stack-4" style={{ gap: 6 }} data-agent-folders>
       <span className="ac-hintline">
@@ -632,10 +197,10 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
             : t("agentPage.computer.foldersHidden", { machine: m.name })}
         </span>
       ) : folders.length === 0 ? (
-        <span className="small muted">{t("agentPage.computer.foldersOwn", { machine: m.name })}</span>
+        <span className="small muted">{t("agentPage.computer.foldersOwn", { ...g, machine: m.name })}</span>
       ) : (
         <>
-          <span className="small muted">{t("agentPage.computer.foldersMore", { machine: m.name })}</span>
+          <span className="small muted">{t("agentPage.computer.foldersMore", { ...g, machine: m.name })}</span>
           <ul className="agent-folders">
             {folders.map((f) => (
               <li key={f.path}>
@@ -651,314 +216,10 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
   );
 }
 
-type Draft = Pick<
-  SandboxSettings,
-  "enabled" | "allowDomains" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
-> & { network: SandboxNetwork };
-/** The mode, also for older servers that only send the list. */
-export const networkOf = (s: Pick<SandboxSettings, "network" | "allowDomains">): SandboxNetwork =>
-  s.network ?? (s.allowDomains.length > 0 ? "allowlist" : "blocked");
-const NETWORKS: SandboxNetwork[] = ["blocked", "allowlist", "open"];
-const draftOf = (s: SandboxSettings): Draft => ({
-  enabled: s.enabled,
-  allowDomains: s.allowDomains,
-  network: networkOf(s),
-  execTimeoutSeconds: s.execTimeoutSeconds,
-  dailyMinutes: s.dailyMinutes,
-  requireApproval: s.requireApproval,
-});
-
 /**
- * Configurações → Computadores, "Computador na nuvem" (admins):
- * the card holds the on/off switch (saved at once) and a one-line summary;
- * internet, limits and approval are set in a dialog ("Ajustar"). They apply only
- * to the cloud computer; the person's own computers follow what is allowed on them.
- */
-export function CloudComputerCard() {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const admin = can(org.role, "configure");
-  const settings = useSandboxSettings(org.id, admin);
-  const save = useSaveSandboxSettings(org.id);
-  const [editing, setEditing] = useState(false);
-  if (!admin) return null;
-  const s = settings.data;
-  const head = (actions?: ReactNode, summary?: ReactNode) => (
-    <div className="computers-card__head">
-      <ComputerPortrait kind="cloud" state={s && !s.enabled ? "offline" : "online"} />
-      <span className="computers-card__title">
-        <h2 id="sec-cloud" className="ac-card__title">
-          {t("computers.daytona.cardTitle")}
-        </h2>
-        <span className="small muted">{summary ?? t("computers.cloud.cardText")}</span>
-      </span>
-      {actions}
-    </div>
-  );
-  if (settings.isError) {
-    return (
-      <Card aria-labelledby="sec-cloud" id="nuvem">
-        {head()}
-        <p className="small muted">{t("sandbox.unavailable")}</p>
-      </Card>
-    );
-  }
-  if (!s) {
-    return settings.isLoading ? (
-      <Card aria-labelledby="sec-cloud" id="nuvem">
-        {head()}
-        <LoadingCards count={1} />
-      </Card>
-    ) : null;
-  }
-  const summary = !s.enabled
-    ? t("sandbox.enabledHelp")
-    : [
-        t("computers.cloud.summary", { network: t(`sandbox.network.${networkOf(s)}`), minutes: s.dailyMinutes }),
-        ...(s.requireApproval ? [t("computers.cloud.summaryApproval")] : []),
-      ].join(" · ");
-  const actions = (
-    <span className="row" style={{ gap: 10, alignItems: "center" }}>
-      <Button size="sm" icon="settings" disabled={!s.available} onClick={() => setEditing(true)}>
-        {t("computers.cloud.adjust")}
-      </Button>
-      <Switch
-        checked={s.enabled}
-        disabled={!s.available || save.isPending}
-        aria-label={t("sandbox.enabled")}
-        onCheckedChange={(on) =>
-          save.mutate({ ...draftOf(s), enabled: on }, { onSuccess: () => toast.show(t("sandbox.saved")) })
-        }
-      />
-    </span>
-  );
-  return (
-    <Card aria-labelledby="sec-cloud" id="nuvem">
-      {head(actions, summary)}
-      {!s.available && <p className="small muted">{t("sandbox.notConfigured")}</p>}
-      <CloudComputerDialog open={editing} settings={s} onClose={() => setEditing(false)} />
-    </Card>
-  );
-}
-
-/** "Ajustar": internet, usage time and approval of the cloud computer. */
-function CloudComputerDialog({
-  open,
-  settings: s,
-  onClose,
-}: {
-  open: boolean;
-  settings: SandboxSettings;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const save = useSaveSandboxSettings(org.id);
-  const [draft, setDraft] = useState<Draft>(() => draftOf(s));
-  const [domain, setDomain] = useState("");
-  const [domainError, setDomainError] = useState<string | null>(null);
-  // Every opening starts from what is saved.
-  useEffect(() => {
-    if (!open) return;
-    setDraft(draftOf(s));
-    setDomain("");
-    setDomainError(null);
-  }, [open, s]);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(s));
-  const timeoutOk = draft.execTimeoutSeconds >= 5 && draft.execTimeoutSeconds <= s.maxTimeoutSeconds;
-  const minutesOk = draft.dailyMinutes >= 0 && draft.dailyMinutes <= 1440;
-  const networkOk = draft.network !== "allowlist" || draft.allowDomains.length > 0;
-  const add = (list: string[]) => {
-    const next = [...new Set([...draft.allowDomains, ...list.map((d) => d.trim().toLowerCase())])];
-    if (next.length > MAX_DOMAINS) {
-      setDomainError(t("sandbox.tooMany", { max: MAX_DOMAINS }));
-      return false;
-    }
-    setDraft({ ...draft, allowDomains: next });
-    return true;
-  };
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("computers.daytona.cardTitle")}
-      description={t("computers.cloud.cardText")}
-      closeLabel={t("common.close")}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!dirty) return onClose();
-          if (!timeoutOk || !minutesOk || !networkOk) return;
-          const networkChanged = draft.network !== networkOf(s) || draft.allowDomains.join() !== s.allowDomains.join();
-          save.mutate(draft, {
-            onSuccess: (saved) => {
-              toast.show(
-                networkChanged
-                  ? t(saved.networkApply === "live" ? "sandbox.appliedNow" : "sandbox.appliedNext")
-                  : t("sandbox.saved"),
-              );
-              onClose();
-            },
-          });
-        }}
-      >
-        <DialogBody className="stack-4" style={{ gap: 16 }}>
-          <div className="stack-4" style={{ gap: 8 }}>
-            <span className="ac-field__label">{t("sandbox.internet")}</span>
-            <span className="small muted">{t("sandbox.internetHelp")}</span>
-            <RadioGroup
-              value={draft.network}
-              onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
-              aria-label={t("sandbox.internet")}
-              className="stack-4"
-              style={{ gap: 8 }}
-            >
-              {NETWORKS.map((n) => (
-                <RadioCard
-                  key={n}
-                  value={n}
-                  id={`sb-net-${n}`}
-                  checked={draft.network === n}
-                  title={t(`sandbox.network.${n}`)}
-                  description={t(`sandbox.networkText.${n}`)}
-                />
-              ))}
-            </RadioGroup>
-            {draft.network === "open" && (
-              <p className="sandbox-warning small ac-iconline" role="note">
-                <Icon name="alert" size={16} />
-                {t("sandbox.openWarning")}
-              </p>
-            )}
-          </div>
-          {draft.network === "allowlist" && (
-            <div className="stack-4" style={{ gap: 8 }}>
-              {!networkOk && (
-                <span className="small" style={{ color: "var(--danger)" }}>
-                  {t("sandbox.needDomain")}
-                </span>
-              )}
-              {draft.allowDomains.length > 0 ? (
-                <TokenList label={t("sandbox.internet")}>
-                  {draft.allowDomains.map((d) => (
-                    <li key={d}>
-                      <Token
-                        removeLabel={t("common.removeName", { name: d })}
-                        onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
-                      >
-                        <code>{d}</code>
-                      </Token>
-                    </li>
-                  ))}
-                </TokenList>
-              ) : null}
-              <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-                <Field
-                  label={t("sandbox.addDomain")}
-                  id="sb-domain"
-                  error={domainError ?? undefined}
-                  style={{ flex: "1 1 240px" }}
-                >
-                  <Input
-                    value={domain}
-                    placeholder={t("sandbox.domainPlaceholder")}
-                    onChange={(e) => {
-                      setDomain(e.target.value);
-                      setDomainError(null);
-                    }}
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  style={{ marginTop: 24 }}
-                  onClick={() => {
-                    if (!isDomain(domain)) {
-                      setDomainError(t("sandbox.domainInvalid"));
-                      return;
-                    }
-                    if (add([domain])) setDomain("");
-                  }}
-                >
-                  {t("sandbox.add")}
-                </Button>
-              </div>
-              <div className="row" style={{ gap: 8 }}>
-                {DOMAIN_PRESETS.map((p) => (
-                  <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
-                    {t(`sandbox.preset.${p.id}`)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="grid-fields">
-            <Field
-              label={t("sandbox.dailyMinutes")}
-              id="sb-minutes"
-              help={t("sandbox.dailyMinutesHelp")}
-              error={minutesOk ? undefined : t("sandbox.minutesInvalid")}
-            >
-              <Input
-                inputMode="numeric"
-                value={String(draft.dailyMinutes)}
-                onChange={(e) => setDraft({ ...draft, dailyMinutes: Number(e.target.value.replace(/\D/g, "") || 0) })}
-              />
-            </Field>
-            <Field
-              label={t("sandbox.timeout")}
-              id="sb-timeout"
-              help={t("sandbox.timeoutHelp", { max: s.maxTimeoutSeconds })}
-              error={timeoutOk ? undefined : t("sandbox.timeoutInvalid", { max: s.maxTimeoutSeconds })}
-            >
-              <Input
-                inputMode="numeric"
-                value={String(draft.execTimeoutSeconds)}
-                onChange={(e) =>
-                  setDraft({ ...draft, execTimeoutSeconds: Number(e.target.value.replace(/\D/g, "") || 0) })
-                }
-              />
-            </Field>
-          </div>
-          <span className="row" style={{ gap: 8, alignItems: "center" }}>
-            <Checkbox
-              id="sb-approval"
-              checked={draft.requireApproval}
-              onCheckedChange={(on) => setDraft({ ...draft, requireApproval: on })}
-            />
-            <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
-          </span>
-          <p className="computers-note small ac-iconline" role="note">
-            <Icon name="info" size={16} />
-            <span>{t("computers.cloud.note")}</span>
-          </p>
-        </DialogBody>
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!timeoutOk || !minutesOk || !networkOk || save.isPending}
-            loading={save.isPending}
-          >
-            {t("common.save")}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
-  );
-}
-
-/**
- * "Qual computador cada agente usa": every agent and
- * its computer, changed here at once. The current one comes from the computers
- * list (each says which agents use it); no computer there means the cloud.
- * Admins pick any computer; an agent's owner, the ones they connected (the
- * server checks again). Admins also start, stop and delete a cloud computer.
+ * "Qual computador cada agente usa": every agent and its computer, changed here at once. The current one comes from
+ * the computers list (each says which agents use it); none there means no computer. Admins pick any computer; an
+ * agent's owner, the ones they connected (the server checks again).
  */
 export function AgentComputersCard() {
   const { t } = useTranslation();
@@ -1011,33 +272,29 @@ function AgentComputerRow({
   const setTarget = useSetComputerTarget(org.id);
   const machines = noComputer.pending ? all.filter((m) => m.kind !== "managed") : all;
   const current = machines.find((m) => m.agents.some((a) => a.id === agent.id));
-  const value = current?.id ?? CLOUD;
-  const cloud = noComputer.choice(value === CLOUD);
+  const value = current?.id ?? NO_COMPUTER;
+  const none = noComputer.choice(value === NO_COMPUTER);
   const choices = machines.filter((m) => admin || m.pairedBy?.id === me.user.id || m.id === value);
   const canPick = (admin || agent.ownerUserId === me.user.id) && choices.length > 0;
   const iconOf = (id: string) =>
-    id === CLOUD && cloud ? (
-      <NoComputerIcon choice={cloud} />
+    id === NO_COMPUTER && none ? (
+      <NoComputerIcon choice={none} />
     ) : (
       <ComputerIcon kind={computerKind(machines.find((m) => m.id === id)?.os)} size={16} />
     );
   const host = t("machines.host.label");
   const nameOf = (id: string) => {
     const m = machines.find((x) => x.id === id);
-    return id === CLOUD ? noComputer.label(cloud ?? "cloud") : m ? machineTitle(m, host) : id;
+    return id === NO_COMPUTER ? noComputer.label(none ?? "none") : m ? machineTitle(m, host) : id;
   };
   const options: SelectOption[] = [
-    ...(cloud
+    ...(none
       ? [
           {
-            value: CLOUD,
-            label: noComputer.label(cloud),
+            value: NO_COMPUTER,
+            label: noComputer.label(none),
             description:
-              cloud === "workspace" && noComputer.setup
-                ? t(noComputer.setup.chipKey)
-                : cloud === "none"
-                  ? t("computer.target.noneText")
-                  : t("computers.agents.ready"),
+              none === "workspace" && noComputer.setup ? t(noComputer.setup.chipKey) : t("computer.target.noneText"),
           },
         ]
       : []),
@@ -1052,7 +309,6 @@ function AgentComputerRow({
       <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
       <span className="list-col computers-agent__main">
         <span style={{ fontWeight: 600 }}>{agent.name}</span>
-        {admin && value === CLOUD && cloud === "cloud" && <CloudStatus agent={agent} />}
       </span>
       {canPick ? (
         <Select
@@ -1065,7 +321,7 @@ function AgentComputerRow({
           onValueChange={(v) => {
             if (v === value) return;
             setTarget.mutate(
-              { agentId: agent.id, machineId: v === CLOUD ? null : v },
+              { agentId: agent.id, machineId: v === NO_COMPUTER ? null : v },
               {
                 onSuccess: () => toast.show(t("computers.agents.saved", { name: agent.name, computer: nameOf(v) })),
                 onError: (e) => toast.show(errorText(t, e), "error"),
@@ -1086,18 +342,5 @@ function AgentComputerRow({
         </span>
       )}
     </div>
-  );
-}
-
-/** An agent's cloud computer for admins: its state and Ligar / Desligar / Apagar in "…". */
-function CloudStatus({ agent }: { agent: Agent }) {
-  const life = useComputerLifecycle(agent);
-  return (
-    <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {life.display && <ComputerChip status={life.display} />}
-      {(life.busy || life.ready) && <ComputerProgress life={life} />}
-      <ComputerError life={life} />
-      <ComputerMenu agent={agent} life={life} />
-    </span>
   );
 }

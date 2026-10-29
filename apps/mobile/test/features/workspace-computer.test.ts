@@ -36,7 +36,7 @@ describe("the workspace's own computer on the phone (the switch sheet's card)", 
       tag: "Sempre ligado",
       desc: "Só deste workspace · um usuário para cada agente",
     });
-    expect(computerIcon(option.platform, option.kind === "cloud")).toBe("computerLinux");
+    expect(computerIcon(option.platform)).toBe("computerLinux");
     const en = await translator("en");
     expect(targetText(en, option)).toMatchObject({ desc: "Just for this workspace · one user per agent" });
   });

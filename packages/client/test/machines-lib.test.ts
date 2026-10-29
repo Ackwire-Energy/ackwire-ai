@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
+import { ApiError } from "../src/api/http";
 import { keys } from "../src/api/keys";
+import type { AccountLoginStatus, MachineAccount } from "../src/api/types";
 import {
+  type AccountLoginInput,
   allowFolderCommand,
   allowsInApp,
+  beginLogin,
   commandInReason,
   computerKind,
   computerState,
@@ -12,6 +16,7 @@ import {
   folderName,
   foldersOfAgent,
   formatUserCode,
+  freeDuplicate,
   installCommand,
   isHandheld,
   isPaused,
@@ -34,8 +39,8 @@ describe("connected computers helpers (ADR 0036)", () => {
   });
 
   test("commands: the installer has no code; granting quotes paths that need it", () => {
-    expect(installCommand("https://agentes.chat/")).toBe(
-      "curl -fsSL https://agentes.chat/api/machines/install.sh | sh",
+    expect(installCommand("https://app.agentes.chat/")).toBe(
+      "curl -fsSL https://app.agentes.chat/api/machines/install.sh | sh",
     );
     expect(allowFolderCommand("/Users/you/Projects/loja-v5", "bento")).toBe(
       "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent bento",
@@ -92,10 +97,10 @@ describe("connected computers helpers (ADR 0036)", () => {
   });
 
   test("download link and location", () => {
-    expect(downloadHref("/api/desktop/download/0.2.0/a.dmg", "https://agentes.chat")).toBe(
-      "https://agentes.chat/api/desktop/download/0.2.0/a.dmg",
+    expect(downloadHref("/api/desktop/download/0.2.0/a.dmg", "https://app.agentes.chat")).toBe(
+      "https://app.agentes.chat/api/desktop/download/0.2.0/a.dmg",
     );
-    expect(downloadHref("https://cdn.example/a.dmg", "https://agentes.chat")).toBe("https://cdn.example/a.dmg");
+    expect(downloadHref("https://cdn.example/a.dmg", "https://app.agentes.chat")).toBe("https://cdn.example/a.dmg");
     expect(locationText({ city: "Curitiba", region: null, country: "Brasil" })).toBe("Curitiba, Brasil");
   });
 
@@ -145,7 +150,6 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(computerKind("linux")).toBe("linux");
     expect(computerKind("other")).toBe("linux");
     expect(computerKind(null)).toBe("linux");
-    expect(computerKind("darwin", true)).toBe("cloud");
     expect(computerState({ online: true, paused: null })).toBe("online");
     expect(computerState({ online: false, paused: null })).toBe("offline");
     expect(computerState({ online: true, paused: { until: null } })).toBe("paused");
@@ -171,9 +175,70 @@ describe("connected computers helpers (ADR 0036)", () => {
     applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", access: true } as { type: string });
     expect(stale()).toEqual([true, true]);
     fresh();
-    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "cloud" } } as {
+    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "none" } } as {
       type: string;
     });
     expect(stale()).toEqual([true, true]);
+  });
+
+  test("a sign-in starts with no address asked: Claude's hint is the account's own, dropped if the server refuses it", async () => {
+    const sent: AccountLoginInput[] = [];
+    const begin = async (input: AccountLoginInput) => {
+      sent.push(input);
+      return input;
+    };
+    // A first sign-in names nothing; signing in again names the account, and Claude gets its email as the hint.
+    expect(await beginLogin(begin, "claude_code", {})).toEqual({});
+    expect(await beginLogin(begin, "claude_code", { again: "a1", hint: "walt@acme.com" })).toEqual({
+      accountId: "a1",
+      email: "walt@acme.com",
+    });
+    // ChatGPT and a coding plan's key take no hint.
+    expect(await beginLogin(begin, "codex", { again: "a2", hint: "walt@acme.com" })).toEqual({ accountId: "a2" });
+    expect(await beginLogin(begin, "claude_code", { provider: "zai", hint: "walt@acme.com" })).toEqual({
+      provider: "zai",
+    });
+    // The hint only steered Claude's page: refused, the sign-in starts without it; anything else stays an error.
+    const strict = async (input: AccountLoginInput) => {
+      if (input.email) throw new ApiError(400, "account.invalid_email", "Use a plain email address");
+      return begin(input);
+    };
+    sent.length = 0;
+    expect(await beginLogin(strict, "claude_code", { again: "a1", hint: "o'brien@acme.com" })).toEqual({
+      accountId: "a1",
+    });
+    expect(sent).toEqual([{ accountId: "a1" }]);
+    const offline = async (): Promise<AccountLoginInput> => {
+      throw new ApiError(409, "machine.offline", "Offline");
+    };
+    expect(await beginLogin(offline, "claude_code", { hint: "walt@acme.com" }).catch((e) => e.code)).toBe(
+      "machine.offline",
+    );
+  });
+
+  test("the account a sign-in came back as, already there: theirs to use while it's signed in and thinks for no one", () => {
+    const account: MachineAccount = {
+      id: "a1",
+      kind: "claude_code",
+      label: "Claude Max",
+      email: "walt@acme.com",
+      plan: "max",
+      status: "active",
+      ownerId: "u1",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    };
+    const failed = (duplicate: AccountLoginStatus["duplicate"]): AccountLoginStatus => ({ state: "failed", duplicate });
+    expect(freeDuplicate(failed({ label: "Claude Max", account }))).toBe(account);
+    expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, usedBy: ["Theo"] } }))).toBeNull();
+    expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, status: "signed_out" } }))).toBeNull();
+    // An older server names it only.
+    expect(freeDuplicate(failed({ label: "Claude Max" }))).toBeNull();
+    expect(freeDuplicate({ state: "failed" })).toBeNull();
+    expect(freeDuplicate(undefined)).toBeNull();
   });
 });

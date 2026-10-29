@@ -1,25 +1,23 @@
 import { type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
-import { Button, Logo, Segmented } from "@agenteschat/ui";
+import { type LegalKind, legalDocument } from "@agenteschat/i18n/legal";
+import { Logo, Segmented } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { Fragment, useRef } from "react";
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { type LocaleCode, setLocale, usePageT } from "@/i18n";
+import { type LocaleCode, locales, setLocale, usePageT } from "@/i18n";
 import { useDocumentTitle } from "@/lib/desktop";
-import { Footer } from "@/pages/landing/Footer";
-import { useLandingTheme } from "@/pages/landing/hooks";
-import { LpIcon } from "@/pages/landing/icons";
-import "@/pages/landing/landing.css";
+import "../legal.css";
 import "./help.css";
 
+const LEGAL_KINDS: LegalKind[] = ["terms", "privacy"];
+
 /**
- * A help page (`/help/<slug>`): the background reading a screen of the app links to once, public, in the landing's
- * look and themes. In the language of the link's `?lang=`, else the app's; an unknown page goes to `/`.
+ * A help page (`/help/<slug>`): the background reading a screen of the app links to once, public, laid out like the
+ * Terms (`LegalPage`). In the language of the link's `?lang=`, else the app's; an unknown page goes to `/`.
  */
 export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
-  const root = useRef<HTMLDivElement>(null);
-  const { theme, toggleTheme } = useLandingTheme(root);
   const locale: LocaleCode = lang ?? (i18n.language === "en" ? "en" : "pt-BR");
   const t = usePageT(locale);
   const doc = isHelpSlug(slug) ? helpDocument(slug, locale) : null;
@@ -31,30 +29,25 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
     void navigate({ to: "/help/$slug", params: { slug }, search: { lang: code }, replace: true });
   };
   return (
-    <div className="lp lp-help" data-theme={theme} ref={root} lang={locale}>
-      <header className="lp-nav">
-        <Link className="lp-logo" to="/">
-          <Logo variant="expanded" size={21} />
+    <div className="legal help" lang={locale}>
+      <header className="legal__bar">
+        <Link to="/" aria-label={t("legal.home")}>
+          <Logo size={24} />
         </Link>
         <Segmented
           size="sm"
-          className="lp-lang"
-          label={t("landing.nav.language")}
+          label={t("shell.language")}
           value={locale}
-          options={[
-            { value: "pt-BR" as const, label: t("landing.nav.langPt") },
-            { value: "en" as const, label: t("landing.nav.langEn") },
-          ]}
-          onValueChange={switchTo}
+          onValueChange={(v) => switchTo(v as LocaleCode)}
+          options={locales.map((l) => ({ value: l.code, label: l.label }))}
         />
-        <Button variant="ghost" className="lp-theme-btn" aria-label={t("landing.nav.theme")} onClick={toggleTheme}>
-          <LpIcon name={theme === "light" ? "moon" : "sun"} />
-        </Button>
       </header>
-      <main className="lp-help__main">
-        <article className="lp-help__doc">
-          <h1>{doc.title}</h1>
-          <p className="lp-help__summary">{doc.summary}</p>
+      <main className="page page--narrow">
+        <header className="legal__head">
+          <h1 className="page-title">{doc.title}</h1>
+          <p className="page-sub">{doc.summary}</p>
+        </header>
+        <article className="md help__doc">
           {doc.sections.map((s) => (
             <section key={s.id} id={s.id}>
               <h2>{s.heading}</h2>
@@ -65,8 +58,14 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
             </section>
           ))}
         </article>
+        <footer className="legal__foot help__foot">
+          {LEGAL_KINDS.map((kind) => (
+            <a key={kind} href={`/${kind}`}>
+              {legalDocument(kind, locale).title}
+            </a>
+          ))}
+        </footer>
       </main>
-      <Footer t={t} />
     </div>
   );
 }
@@ -81,7 +80,7 @@ export function Block({ block }: { block: HelpBlock }) {
     );
   if ("code" in block)
     return (
-      <pre>
+      <pre className="md__code">
         <code>{block.code}</code>
       </pre>
     );

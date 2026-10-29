@@ -187,11 +187,12 @@ describe("agent page: its usage (ADR 0063)", () => {
   test("Uso: the month by account, the account it thinks with now with its part, and by account", async () => {
     await go("?tab=usage");
     const month = screen().getByRole("region", { name: "Uso da Ada" });
-    expect(month.textContent).toContain("97% na conta deste MacBook e 2,6% pela API.");
+    // The MacBook's own sign-in, the viewer's: the account their agents share, as the Connect cards name it.
+    expect(month.textContent).toContain("97% na conta que os seus agentes dividem e 2,6% pela API.");
     expect(month.textContent).toContain("Pelo preço da API, seria ≈ US$ 77,00.");
     expect(within(month).getByRole("img", { name: /^Tokens por dia em / })).toBeTruthy();
     const now = screen().getByRole("region", { name: "Agora" });
-    expect(now.textContent).toContain("Conta deste MacBook");
+    expect(now.textContent).toContain("A conta que os seus agentes dividem");
     expect(now.textContent).toContain("divide com Atlas");
     // Its part of each window in full ink, and in words; the estimate says so.
     const week = within(now).getByRole("meter", { name: "Semana" });
@@ -209,7 +210,7 @@ describe("agent page: its usage (ADR 0063)", () => {
   test("a member sees the tokens and the percentages, never money", async () => {
     await go("?tab=usage", asMember());
     const month = screen().getByRole("region", { name: "Uso da Ada" });
-    expect(month.textContent).toContain("97% na conta deste MacBook");
+    expect(month.textContent).toContain("97% na conta que os seus agentes dividem");
     expect(screen().getByRole("region", { name: "Por conta, este mês" }).textContent).toContain("2% do orçamento");
     const shown = ["Uso da Ada", "Agora", "Por conta, este mês"].map(
       (name) => screen().getByRole("region", { name }).textContent,
@@ -431,7 +432,7 @@ describe("agent page: memory and proposals", () => {
   test("the side column is one link to how memory works", async () => {
     await go("?tab=memory");
     const link = screen().getByRole("link", { name: "Como a memória funciona" });
-    expect(link.getAttribute("href")).toBe("https://agentes.chat/help/memory?lang=pt-BR");
+    expect(link.getAttribute("href")).toBe("https://app.agentes.chat/help/memory?lang=pt-BR");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });

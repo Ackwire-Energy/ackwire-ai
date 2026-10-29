@@ -13,7 +13,7 @@ use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, Url};
 
 /// agentes.chat Cloud.
-pub const CLOUD: &str = "https://agentes.chat";
+pub const CLOUD: &str = "https://app.agentes.chat";
 const FILE: &str = "servers.json";
 /// Servers kept in the list; choosing another past this drops the oldest that isn't open.
 const MAX_SERVERS: usize = 20;
@@ -110,8 +110,8 @@ fn path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|d| d.join(FILE))
 }
 
-/// The list on disk; None the first time this version starts (nothing written yet).
-pub fn read(app: &AppHandle) -> Option<ServerFile> {
+/// The list on disk; None before the first start wrote it, or when it can't be read.
+fn read(app: &AppHandle) -> Option<ServerFile> {
     let text = fs::read_to_string(path(app)?).ok()?;
     let mut file: ServerFile = serde_json::from_str(&text).ok()?;
     // Anything that isn't an address the app may open is dropped, whoever wrote it.
@@ -139,8 +139,9 @@ fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, ServerFile> {
     app.state::<Servers>().inner().file.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// At start: the list as it was, or the one the move from the menu bar app made (`runners::migrate`).
-pub fn load(app: &AppHandle, file: ServerFile) {
+/// At start: the list as it was, or none yet (no `servers.json`: the first run).
+pub fn load(app: &AppHandle) {
+    let file = read(app).unwrap_or_default();
     *lock(app) = file.clone();
     write(app, &file);
     for origin in &file.servers {
@@ -266,7 +267,7 @@ mod tests {
             "https://ana:secret@chat.example.com",
             "ftp://files.example.com",
             "agenteschat://connect?server=x",
-            "https://agentes.chat/ x",
+            "https://app.agentes.chat/ x",
             "",
         ] {
             assert_eq!(origin_of(bad), None, "{bad}");

@@ -5,9 +5,8 @@ export const MAX_MENU_LABEL = 120;
 
 /**
  * Everything Rust shows in the app's language: the menu bar, the tray's own menu on Windows and Linux (the
- * server here's line in it too), the system dialog before a page pairs this computer, the notice about retired
- * Cloud homes and the server here's notifications. `{org}`, `{host}`, `{path}` and `{version}` are left for
- * Rust to fill in.
+ * server here's line in it too), the system dialog before a page pairs this computer and the server here's
+ * notifications. `{org}`, `{host}` and `{version}` are left for Rust to fill in.
  */
 export function menuLabels(t: TFunction): Record<string, string> {
   return {
@@ -25,8 +24,6 @@ export function menuLabels(t: TFunction): Record<string, string> {
     pairBody: t("desktop.pair.body", { host: "{host}" }),
     pairAllow: t("desktop.pair.allow"),
     pairNotNow: t("desktop.pair.notNow"),
-    migrateTitle: t("desktop.migrate.cloudTitle"),
-    migrateBody: t("desktop.migrate.cloudBody", { path: "{path}" }),
     serverTitle: t("desktop.server.title"),
     serverRunning: t("desktop.server.running"),
     serverStarting: t("desktop.server.starting"),

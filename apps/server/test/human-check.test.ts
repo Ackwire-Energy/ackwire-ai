@@ -86,7 +86,10 @@ const THROUGH = {
 
 /** An owner with a workspace and its invitation link, on a server with `check` (none: no keys). */
 async function start(check?: ReturnType<typeof turnstile>) {
-  t = await createTestServer({ env: { LANDING_PAGE: "true", ALLOW_SIGNUP: "true" }, humanCheck: check });
+  t = await createTestServer({
+    env: { LANDING_URL: "https://agentes.example", ALLOW_SIGNUP: "true" },
+    humanCheck: check,
+  });
   const owner = browser(t);
   expect((await signUpPassing(owner, "owner@example.com")).status).toBe(200);
   const { orgId } = await seedOrg(owner);

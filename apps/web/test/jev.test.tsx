@@ -139,10 +139,28 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     const section = screen().getByRole("region", { name: "Quem escolhe os agentes" });
     expect(section.textContent).toContain("Cada plano escolhe só nas mensagens de quem o conectou.");
     expect(within(section).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
-      "https://agentes.chat/help/who-answers?lang=pt-BR",
+      "https://app.agentes.chat/help/who-answers?lang=pt-BR",
     );
     expect(screen().queryByRole("region", { name: "Jev" })).toBeNull();
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
+  });
+
+  test("its state sits on TypeSafe's tile's middle, however many lines its name and line take", async () => {
+    await open({ aiStatus: routed("rules"), jev: OFF });
+    const head = card().querySelector(".jev__head") as HTMLElement;
+    expect(head.firstElementChild?.classList.contains("ac-brand--sm")).toBe(true);
+    expect(head.lastElementChild?.classList.contains("ac-chip")).toBe(true);
+    const layout = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    // The 30px tile at the row's top: its middle 15px down. No transform beside it, which the build would merge away.
+    expect(layout).toContain("\n.jev__head > .ac-chip {\n  translate: 0 calc(15px - 50%);\n}");
+    expect(layout).not.toMatch(/\.jev__head > \.ac-chip[^{]*\{[^}]*(align-self|transform)/);
+    const components = await Bun.file(
+      new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
+    ).text();
+    expect(components).toMatch(/\n\.ac-brand--sm \{\n {2}width: 30px;\n {2}height: 30px;/);
   });
 
   test("off: why it helps, then its steps in place, each with its link; a short key isn't offered", async () => {
@@ -161,7 +179,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     ])
       expect(card().textContent).toContain(why);
     expect(within(card()).getByRole("link", { name: "Como o Jev funciona" }).getAttribute("href")).toBe(
-      "https://agentes.chat/help/jev?lang=pt-BR",
+      "https://app.agentes.chat/help/jev?lang=pt-BR",
     );
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
 

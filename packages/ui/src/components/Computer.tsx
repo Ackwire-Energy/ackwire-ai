@@ -24,8 +24,8 @@ export interface ComputerPortraitProps {
 
 /**
  * A computer's portrait, from the one portrait
- * engine (computer/portrait.js): a Mac laptop, a Windows monitor, a Linux
- * tower or the cloud computer, its screen lit, dimmed (paused) or dark
+ * engine (computer/portrait.js): a Mac laptop, a Windows monitor or a Linux
+ * tower, its screen lit, dimmed (paused) or dark
  * (offline). Pixels on a 48×48 grid scaled by whole numbers; it sits directly
  * on the surface, no tile, its box as wide as the drawing (`COMPUTER_ART`).
  * Below 48 px use `ComputerIcon`.
@@ -80,7 +80,6 @@ const ICONS: Record<ComputerKind, IconName> = {
   mac: "computerMac",
   windows: "computerWindows",
   linux: "computerLinux",
-  cloud: "computerCloud",
 };
 
 /** A computer's line icon for 14–20 px, next to text (pickers, chips): pixels don't read that small. */

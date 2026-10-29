@@ -262,8 +262,6 @@ export async function releaseAgents(db: Executor, orgId: string, accountIds: str
 
 export const forgetAgents = (orgId: string, ids: string[]) => {
   for (const id of ids) caches.agents.delete(`${orgId}:${id}`);
-  // The team's cached rows carry each agent's brain, which the audience gate reads.
-  if (ids.length > 0) caches.agents.delete(`${orgId}:team`);
 };
 
 /** The page that shows a machine's accounts refetches them (no emails in the event). */
@@ -375,6 +373,11 @@ interface Settled {
   row: MachineAccountRow | null;
   /** Its owner already has it on this computer: this one is a tombstone now, for the runner to remove. */
   duplicate?: MachineAccountRow;
+  /**
+   * Signed in again, but as another account: `email`, or `duplicate`, one its owner already has here. It stays as it
+   * was, signed out, with its agents.
+   */
+  other?: { email: string | null; duplicate?: MachineAccountRow };
   /** Agents released (a duplicate that some agent already used). */
   released: string[];
   /** Something people see changed. */
@@ -386,7 +389,8 @@ interface Settled {
  * from the app finishes (named after its plan, audited for its owner, who
  * never changes), a known one is refreshed. `dedupe` (the person who signed
  * in is asking, so they hear why): one their own account on this computer
- * already is becomes a tombstone.
+ * already is becomes a tombstone. A known account that signed in as another
+ * one (`other`) keeps what it was, signed out.
  */
 async function settleAccount(
   db: Executor,
@@ -412,6 +416,31 @@ async function settleAccount(
   const keyHint = info.keyHint ?? row.keyHint;
   const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
   const signingIn = row.status === "signing_in";
+  // Signed in again as another account (an email other than its own, or one its owner already has here): it stays
+  // signed out with what it was, so its agents never think with an account nobody chose for them, and Try again signs
+  // in to it once more. Checked on every report, not only when its owner asks: the runner reports a new login at once.
+  // ponytail: that login stays in the account's folder on the computer until it signs in again or is removed (nothing
+  // thinks with a signed-out account); a runner sign-out that keeps the folder, if a stray login there ever matters.
+  if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
+    const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
+    const duplicate = await duplicateOf(db, row, { email, keyHint });
+    if (otherEmail || duplicate) {
+      const [kept] =
+        row.status === "signed_out"
+          ? [row]
+          : await db
+              .update(machineAccounts)
+              .set({ status: "signed_out", updatedAt: now })
+              .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
+              .returning();
+      return {
+        row: kept ?? row,
+        other: { email: info.email ?? null, ...(duplicate ? { duplicate } : {}) },
+        released: [],
+        changed: row.status !== "signed_out",
+      };
+    }
+  }
   const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }) : null;
   if (duplicate) {
     const [gone] = await db
@@ -916,8 +945,13 @@ export interface AccountLoginStatus {
   account?: MachineAccountView;
   /** `failed`: why, for people. */
   error?: string;
-  /** `failed`: the person already has this account on this computer (the new sign-in is removed there). */
-  duplicate?: { label: string };
+  /**
+   * `failed`: the account that signed in is one the person already has on this computer (a new sign-in is removed
+   * there): its name, and the account itself, theirs to think with instead.
+   */
+  duplicate?: { label: string; account: MachineAccountView };
+  /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
+  signedInAs?: string;
 }
 
 const LOGIN_STATES: readonly AccountLoginState[] = ["waiting", "done", "failed", "expired"];
@@ -950,13 +984,28 @@ export async function accountLoginStatus(
   if (info.id !== row.id) return { state: "failed", error: "The computer reported another account." };
   const settled = await deps.db.transaction((tx) => settleAccount(tx, orgId, machine, info, true));
   forgetAgents(orgId, settled.released);
+  if (settled.other) {
+    if (settled.changed) await publishAccountsChanged(deps.pubsub, orgId, machine.id);
+    const { email, duplicate } = settled.other;
+    return {
+      state: "failed",
+      error: "That's another account. This one stays signed out.",
+      ...(email ? { signedInAs: email } : {}),
+      ...(duplicate
+        ? { duplicate: { label: duplicate.label, account: await accountViewOf(deps.db, orgId, duplicate, userId) } }
+        : {}),
+    };
+  }
   if (settled.duplicate) {
     await removeOnComputer(deps, orgId, machine.id, [{ kind: info.kind, id: info.id }]);
     if (settled.changed) await publishAccountsChanged(deps.pubsub, orgId, machine.id);
     return {
       state: "failed",
       error: `That account is already on this computer (${settled.duplicate.label}).`,
-      duplicate: { label: settled.duplicate.label },
+      duplicate: {
+        label: settled.duplicate.label,
+        account: await accountViewOf(deps.db, orgId, settled.duplicate, userId),
+      },
     };
   }
   if (!settled.row || !LISTED_ACCOUNT_STATUSES.includes(settled.row.status)) {
