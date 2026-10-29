@@ -1348,11 +1348,17 @@ describe("the dialog's size (computer.css)", () => {
     // line under it, so the screen opens in its place.
     expect(inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body")).toContain("container-type: size");
     const over = inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before");
-    for (const d of ['content: ""', "flex: 1 1 0", "max-height: calc((100cqh - 100cqw * 900 / 1280) / 2)"]) {
-      expect(over).toContain(d);
-    }
+    for (const d of ['content: ""', "flex: 1 1 0"]) expect(over).toContain(d);
+    expect(over).not.toContain("max-height");
     const under = inSheet(".cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::after");
     for (const d of ['content: ""', "order: 1", "flex: 1 1 0"]) expect(under).toContain(d);
+    // Watching, the box keeps the place where it and its line's room sit in the middle, whatever the agent's steps and
+    // a banner under it take: the room over it no more than that, none given to the room under it.
+    const watching = ".cmp-dialog:not(.is-screen-only) > .cmp-body:has(.dsk-line):not(:has(> .dsk.is-control))";
+    expect(inSheet(`${watching}::before`)).toContain(
+      "max-height: calc((100cqh - 100cqw * 900 / 1280 - 8px - var(--cmp-line) + 4px) / 2)",
+    );
+    expect(inSheet(`${watching}::after`)).toContain("flex-grow: 0");
     // The body's gap next to each, taken back: neither adds a gap of its own.
     expect(over).toContain("margin-bottom: -8px");
     expect(under).toContain("margin-top: -8px");
@@ -1363,10 +1369,10 @@ describe("the dialog's size (computer.css)", () => {
     // The phone's keyboard up, the screen rises to the sheet's top, over it; with less motion asked, it moves at once.
     const keyboard = text.split("@media (max-width: 720px) and (pointer: coarse) {")[1]?.split("\n}\n")[0] ?? "";
     expect(keyboard).toContain(
-      "\n  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before {\n    max-height: 0;\n  }",
+      "\n  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before {\n    flex-grow: 0;\n  }",
     );
     const glide = text.split("@media (max-width: 720px) and (prefers-reduced-motion: no-preference) {")[1] ?? "";
-    expect(glide.split("\n}\n")[0]).toContain("transition: max-height 0.2s var(--out)");
+    expect(glide.split("\n}\n")[0]).toContain("transition: flex-grow 0.2s var(--out)");
     // The agent's page starts at its stage's top: its tools coming under it move nothing.
     expect(sheet).toContain("\n  .cmp-body > .brw-ac.is-surface .brw-ac__stage {\n    place-items: start center;\n  }");
     // With no steps, the line under the screen takes no room on the sheet.
