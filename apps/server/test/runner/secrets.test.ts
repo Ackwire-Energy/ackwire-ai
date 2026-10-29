@@ -97,6 +97,39 @@ test("a file secret is written 600 in the agent's folder and can't be read or up
   expect(existsSync(file)).toBe(false);
 });
 
+test("replacing a file secret removes its old path before it becomes untracked", async () => {
+  const { ws, call, give } = setup();
+  const first = await give(dev, "req-0020-aaaa", "NPM_TOKEN", { kind: "file", path: ".npmrc" }, "old-secret-value");
+  await first.deliver();
+  const oldFile = path.join(ws, "dev-01a142cb", ".npmrc");
+  expect(existsSync(oldFile)).toBe(true);
+
+  const second = await give(dev, "req-0021-bbbb", "NPM_TOKEN", { kind: "file", path: "config/token" }, "new-secret-value");
+  await second.deliver();
+  const newFile = path.join(ws, "dev-01a142cb", "config/token");
+  const staleRead = (await call({ agent: dev, op: "read", path: ".npmrc", maxBytes: 1000 })) as {
+    base64: string | null;
+  };
+  expect(staleRead.base64 === null).toBe(true);
+  expect(existsSync(oldFile)).toBe(false);
+  expect(readFileSync(newFile, "utf8")).toBe("new-secret-value");
+  expect(await errorCode(() => call({ agent: dev, op: "read", path: "config/token", maxBytes: 1000 }))).toBe("bad_request");
+
+  await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN" });
+  expect(existsSync(newFile)).toBe(false);
+});
+
+test("moving a file secret to the environment removes its old plaintext file", async () => {
+  const { ws, call, give } = setup();
+  await (await give(dev, "req-0022-cccc", "API_KEY", { kind: "file", path: "private/key" }, "old-secret-value")).deliver();
+  const oldFile = path.join(ws, "dev-01a142cb", "private/key");
+  expect(existsSync(oldFile)).toBe(true);
+
+  await (await give(dev, "req-0023-dddd", "API_KEY", { kind: "env" }, "new-secret-value")).deliver();
+  expect(existsSync(oldFile)).toBe(false);
+  await call({ agent: dev, op: "secret", action: "remove", name: "API_KEY" });
+});
+
 test("a box for another request, secret or target doesn't open; nothing is stored", async () => {
   const { call, give, home } = setup();
   const sent = await give(dev, "req-0003-cccc", "API_KEY", { kind: "env" });
