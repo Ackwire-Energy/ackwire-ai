@@ -6047,6 +6047,11 @@ export const en: Translations = {
     onedrive: "OneDrive",
     soon: "Coming soon",
     current: "In use",
+    usage: {
+      files: "{{size}}\u00a0of\u00a0files",
+      none: "No\u00a0files",
+      free: "{{files}}\u00a0· {{size}}\u00a0free\u00a0on\u00a0disk",
+    },
     endpoint: "Endpoint",
     endpointHelp: "For example, https://s3.amazonaws.com.",
     region: "Region",

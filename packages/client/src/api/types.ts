@@ -1568,12 +1568,24 @@ export interface StoragePlatform {
   folder: string | null;
 }
 
+/** What the workspace's files take, summed from the sizes recorded as they were written. */
+export interface StorageUsage {
+  /** On this server's storage (`platform`), files in the trash left out. */
+  platformBytes: number;
+  /** In the workspace's own buckets, the trash left out too. */
+  ownBucketBytes: number;
+  /** The disk holding this server's files folder: its size and what is free. Null without a folder. */
+  disk: { sizeBytes: number; freeBytes: number } | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
   platform: StoragePlatform;
+  /** Absent from an older server. */
+  usage?: StorageUsage;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";

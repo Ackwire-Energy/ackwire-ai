@@ -43,6 +43,7 @@ import type {
   ServerTelemetry,
   SignInOptions,
   StoragePlatform,
+  StorageUsage,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -199,6 +200,8 @@ export interface FakeState {
   jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
+  /** What the workspace's files take (`storage.get`'s `usage`); unset = none yet, no disk told. */
+  storageUsage?: StorageUsage;
   /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
   webPushKey?: string;
   /** `push.stale`: the notification ids the server calls stale (read, done, snoozed, gone); unset = none. */
@@ -2002,7 +2005,10 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
       },
     },
-    storage: createMockStorage(() => state.storagePlatform),
+    storage: createMockStorage(
+      () => state.storagePlatform,
+      () => state.storageUsage,
+    ),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,

@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
+import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
@@ -37,11 +38,11 @@ const STEP_ICON: Record<"ok" | "failed" | "skipped", IconName> = { ok: "check", 
 /**
  * Armazenamento (admins), as the web's: where the workspace's files stay. Our storage on the Cloud, this server where
  * people run it (said by where it keeps them), or the workspace's own S3-compatible bucket, tested before it is
- * turned on; once on it, the files kept before can be copied there, or it goes back. Google Drive and OneDrive come
- * later.
+ * turned on; once on it, the files kept before can be copied there, or it goes back. The option in use says what the
+ * files there take. Google Drive and OneDrive come later.
  */
 export function StorageScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const { orgId, org } = useOrg();
   const admin = can(org?.role, "configure");
@@ -55,6 +56,8 @@ export function StorageScreen() {
   const config = edition ? storage.data : undefined;
   const cloud = edition === "cloud";
   const place = t(cloud ? "storage.place.agentes" : "storage.place.server");
+  const usage = config ? storageUsageLine(t, i18n.language, config) : null;
+  const inUse = { value: t("storage.current"), belowText: usage ?? undefined };
   return (
     <SettingsPage title={t("storage.title")}>
       <GroupedFooter>{t("settings.sectionText.storage")}</GroupedFooter>
@@ -79,7 +82,7 @@ export function StorageScreen() {
               label={t(storageKey("agentes", edition))}
               sub={cloud ? t("storage.agentesText") : platformText(t, config.platform)}
               subLines={3}
-              {...(config.kind === "agentes" ? { value: t("storage.current") } : {})}
+              {...(config.kind === "agentes" ? inUse : {})}
               checked={choice === "agentes"}
               onPress={() => setChoice("agentes")}
             />
@@ -87,7 +90,7 @@ export function StorageScreen() {
               label={t("storage.s3")}
               sub={t("storage.s3Text")}
               subLines={2}
-              {...(config.kind === "s3" ? { value: t("storage.current") } : {})}
+              {...(config.kind === "s3" ? inUse : {})}
               checked={choice === "s3"}
               onPress={() => setChoice("s3")}
             />

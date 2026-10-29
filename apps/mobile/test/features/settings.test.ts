@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ComputerSetup, Machine, StorageConfig } from "@agenteschat/client";
 import { type SetupView, setupView } from "@agenteschat/client/lib/computer";
+import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
   agentComputerPick,
   exportFileName,
@@ -373,6 +374,42 @@ describe("Armazenamento", () => {
       "Os arquivos ficam em /var/lib/agentes.",
     );
     expect(platformText(t, { kind: "database", folder: null })).toBe("Os arquivos ficam no banco de dados dele.");
+  });
+
+  test("the option in use says what its files take, and on this server's disk what is free", async () => {
+    const GB = 1024 ** 3;
+    const [pt, en] = [await translator("pt-BR"), await translator("en")];
+    const line = (t: typeof pt, lng: string, over: Partial<StorageConfig>) =>
+      storageUsageLine(t, lng, { ...config, kind: "agentes", s3: null, ...over })?.replaceAll("\u00a0", " ");
+    const usage = {
+      platformBytes: 2.4 * GB,
+      ownBucketBytes: 1.2 * GB,
+      disk: { sizeBytes: 256 * GB, freeBytes: 38 * GB },
+    };
+    expect(line(pt, "pt-BR", { usage })).toBe("2,4 GB de arquivos · 38 GB livres no disco");
+    expect(line(en, "en", { usage })).toBe("2.4 GB of files · 38 GB free on disk");
+    // On its own bucket: what the bucket holds, and no disk.
+    expect(line(pt, "pt-BR", { kind: "s3", usage })).toBe("1,2 GB de arquivos");
+    // In this server's database or bucket, or on the Cloud: what the workspace keeps there.
+    const held = (platformBytes: number) => ({ platformBytes, ownBucketBytes: 0, disk: null });
+    expect(line(en, "en", { usage: held(300 * 1024 ** 2) })).toBe("300 MB of files");
+    expect(line(pt, "pt-BR", { usage: held(0) })).toBe("Nenhum arquivo");
+    expect(line(en, "en", { usage: { ...held(0), disk: { sizeBytes: 4096 * GB, freeBytes: 1536 * GB } } })).toBe(
+      "No files · 1.5 TB free on disk",
+    );
+    // A first short document: bytes, plural in both languages.
+    expect(line(en, "en", { usage: held(7) })).toBe("7 bytes of files");
+    expect(line(pt, "pt-BR", { usage: held(820) })).toBe("820 bytes de arquivos");
+    // A server from before it says nothing, and no line shows.
+    expect(line(pt, "pt-BR", {})).toBeUndefined();
+  });
+
+  test("VoiceOver reads the line with its option: it is part of the row's label", () => {
+    const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
+    expect(src("ui/Grouped.tsx")).toContain(
+      'accessibilityLabel={[label, belowText, value].filter(Boolean).join(", ")}',
+    );
+    expect(src("features/settings/StorageScreen.tsx")).toContain("belowText: usage ?? undefined");
   });
 
   test("the form from the saved bucket, keys blank (kept), and what the server gets", () => {
