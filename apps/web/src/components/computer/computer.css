@@ -588,7 +588,7 @@
   .cmp-body > .brw-ac.is-surface .brw-ac__stage {
     place-items: start center;
   }
-  /* The sheet's body measures its room, so the box's top is as far under it as the box's foot is over the sheet's. */
+  /* The sheet's body measures its room: the box's top as far under the body's top as the box's foot is over its foot. */
   .cmp-dialog:not(.is-screen-only) > .cmp-body {
     container-type: size;
   }
