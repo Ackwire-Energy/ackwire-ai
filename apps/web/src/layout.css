@@ -7138,6 +7138,11 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 13px;
 }
+/* Its margin is for the new-agent steps, which have no gap; in a stack spaced by its gap (the agent page's columns,
+   a dialog's body) that gap is its space, as it is the cards' beside it. */
+:is(.agp-col, .ac-dialog__body) > .newag__note {
+  margin: 0;
+}
 .newag__note b {
   color: var(--ink);
   font-weight: 600;
