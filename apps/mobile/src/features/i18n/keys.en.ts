@@ -108,6 +108,11 @@ export const featureKeysEn: FeatureTranslations = {
   },
   chats: {
     title: "Chats",
+    serverError: {
+      offline: "No internet on your phone.",
+      text: "It may be down or outside your network. Your chats show up on their own when it's back.",
+      kept: "Showing what was already in the app.",
+    },
     section: {
       agents: "Agents",
       channels: "Channels",
