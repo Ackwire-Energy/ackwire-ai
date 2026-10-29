@@ -18,3 +18,8 @@ ALTER TABLE "notes" ALTER COLUMN "title" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "notes" DROP COLUMN "legacy";
 DELETE FROM "notes" WHERE "title" = '';
 ALTER TABLE "notes" DROP CONSTRAINT "notes_org_id_fk";
+ALTER TABLE "notes" DROP COLUMN "old"; -- deploy-safe: nothing reads "old" since the release before the last
+ALTER TABLE "notes" DROP COLUMN "older";--> statement-breakpoint
+ALTER TABLE "notes" ADD COLUMN "kind" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "notes" ADD COLUMN "rank" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "notes" ADD COLUMN IF NOT EXISTS "note" text;

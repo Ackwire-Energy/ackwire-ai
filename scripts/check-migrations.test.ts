@@ -5,7 +5,7 @@ import { unsafeStatements } from "./check-migrations";
 
 const read = (path: string) => readFileSync(join(import.meta.dir, "..", path), "utf8");
 
-test("drops, renames, type changes and SET NOT NULL are caught by line, unless their statement says nothing reads it", () => {
+test("drops, renames, type changes, SET NOT NULL and new NOT NULL columns without a default are caught by line, unless their statement says nothing needs it", () => {
   expect(unsafeStatements(read("scripts/check-migrations.fixture.sql"))).toEqual([
     "8: drops",
     "9: drops",
@@ -16,8 +16,10 @@ test("drops, renames, type changes and SET NOT NULL are caught by line, unless t
     "14: changes a column's type",
     "15: sets NOT NULL",
     "16: drops",
-    // The marker covers its own statement, not the next ones.
+    // The marker covers its own statement, not the next ones: on the line before it or at the end of its line.
     "20: drops",
+    "22: drops",
+    "23: adds a NOT NULL column without a default",
   ]);
 });
 
