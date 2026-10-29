@@ -195,6 +195,9 @@ export function createAuth(deps: {
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 15 * 60, max: 10 },
         "/request-password-reset": { window: 15 * 60, max: 3 },
+        // The app opens one hand-over request per sign-in; keep it cheap for an unauthenticated caller.
+        "/desktop/open": { window: 60, max: 10 },
+        "/desktop/request": { window: 60, max: 30 },
         // The app's window asks every 2 s while the browser signs in.
         "/desktop/redeem": { window: 60, max: 40 },
         "/desktop/handoff": { window: 60, max: 10 },
