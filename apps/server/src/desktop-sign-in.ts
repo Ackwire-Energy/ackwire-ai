@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
@@ -6,41 +6,111 @@ import { z } from "zod";
 
 /**
  * Social sign-in for the Mac app's window (ADR 0036). Google and Apple refuse
- * embedded web views, so the window opens the sign-in in the person's
- * browser and waits. The window keeps a random verifier and sends only its
- * SHA-256 (the challenge) along; once signed in, the browser registers that
- * challenge for its user (`/desktop/handoff`). The window polls
- * `/desktop/redeem` with the verifier and, on a match, gets a session of its
- * own (the browser's stays where it is). Nothing travels in a URL that
- * would sign anyone in: without the verifier the challenge is worthless.
+ * embedded web views, so the window opens the sign-in in the person's browser
+ * and waits. The hand-over is a device-style exchange so that a sign-in is only
+ * ever moved to a window the person is actually using, never to one chosen by
+ * whoever crafted the link:
  *
- * A handoff needs a fresh sign-in (a session made in the last few minutes),
- * so a link that skips the provider can't hand over an old browser session.
+ * 1. The window asks the server to `open` a request, sending only the challenge
+ *    (the SHA-256 of a verifier it keeps). It gets back a random `requestId` and
+ *    a short human `code`, and shows the code.
+ * 2. The window opens the browser at `/desktop/sign-in?request=<requestId>` and
+ *    polls `/desktop/redeem` with the verifier.
+ * 3. After the provider sign-in, the browser reads the request's `code`, shows it,
+ *    and asks the person to confirm it matches the code on their computer. Only
+ *    then does it call `/desktop/handoff` with the request id.
+ * 4. `handoff` accepts only a request that a window opened, still pending and not
+ *    expired, and only from a fresh browser session. It consumes the request and
+ *    records the hand-over for the challenge. `redeem` then returns a session to
+ *    the window that holds the matching verifier.
+ *
+ * Nothing is handed over on its own: a link that jumps straight to the page still
+ * stops at the confirmation, and the verifier never leaves the window, so the
+ * request id and code alone cannot sign anyone in.
  */
 export const HANDOFF_PREFIX = "desktop-handoff:";
-/** How long the window has to pick the session up. */
+export const REQUEST_PREFIX = "desktop-request:";
+/** How long the window has to pick the session up once handed over. */
 const HANDOFF_TTL_MS = 10 * 60_000;
+/** How long a request stays open for the browser to confirm. */
+const REQUEST_TTL_MS = 10 * 60_000;
 /** How recent the browser's sign-in must be to hand it over. */
 const FRESH_SIGN_IN_MS = 10 * 60_000;
-/** 32 random bytes and their SHA-256, both base64url (43 characters). */
+/** 32 random bytes and their SHA-256, both base64url (43 characters): challenge, verifier and request id. */
 const KEY = /^[A-Za-z0-9_-]{43}$/;
+/** Unambiguous code alphabet (no I/O/0/1) for the match the person reads off both screens. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 8;
 
 export const desktopChallenge = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
+
+/** A short code the person compares between the app window and the browser (`KQ7M-3XPF`). */
+export function newConfirmationCode(): string {
+  const bytes = randomBytes(CODE_LENGTH);
+  let code = "";
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    if (i === CODE_LENGTH / 2) code += "-";
+    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+type RequestRecord = { challenge: string; code: string };
+
+function parseRequest(value: string | undefined): RequestRecord | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as RequestRecord;
+    if (typeof parsed?.challenge === "string" && typeof parsed?.code === "string") return parsed;
+  } catch {
+    // A malformed record is treated as no request.
+  }
+  return null;
+}
 
 export function desktopSignIn() {
   return {
     id: "desktop-sign-in",
     endpoints: {
+      // The window opens a request bound to its challenge and gets the id and the code to show.
+      desktopOpen: createAuthEndpoint(
+        "/desktop/open",
+        { method: "POST", body: z.object({ challenge: z.string().regex(KEY) }) },
+        async (ctx) => {
+          const requestId = randomBytes(32).toString("base64url");
+          const code = newConfirmationCode();
+          await ctx.context.internalAdapter.createVerificationValue({
+            identifier: REQUEST_PREFIX + requestId,
+            value: JSON.stringify({ challenge: ctx.body.challenge, code } satisfies RequestRecord),
+            expiresAt: new Date(Date.now() + REQUEST_TTL_MS),
+          });
+          return ctx.json({ requestId, code });
+        },
+      ),
+      // The browser reads the request's code to show it; it is for the person to match, not a secret.
+      desktopRequestCode: createAuthEndpoint(
+        "/desktop/request",
+        { method: "POST", body: z.object({ requestId: z.string().regex(KEY) }) },
+        async (ctx) => {
+          const found = await ctx.context.internalAdapter.findVerificationValue(REQUEST_PREFIX + ctx.body.requestId);
+          const request = found && found.expiresAt >= new Date() ? parseRequest(found.value) : null;
+          return ctx.json({ code: request?.code ?? null });
+        },
+      ),
+      // After the person confirms the code, the fresh browser session hands itself over for the window's challenge.
       desktopHandoff: createAuthEndpoint(
         "/desktop/handoff",
-        { method: "POST", body: z.object({ challenge: z.string().regex(KEY) }), use: [sessionMiddleware] },
+        { method: "POST", body: z.object({ requestId: z.string().regex(KEY) }), use: [sessionMiddleware] },
         async (ctx) => {
           const { session } = ctx.context.session;
           if (Date.now() - new Date(session.createdAt).getTime() > FRESH_SIGN_IN_MS) {
             throw new APIError("FORBIDDEN", { message: "Sign in again to continue in the app" });
           }
+          const found = await ctx.context.internalAdapter.consumeVerificationValue(REQUEST_PREFIX + ctx.body.requestId);
+          const request = found && found.expiresAt >= new Date() ? parseRequest(found.value) : null;
+          if (!request) return ctx.json({ ok: false });
           await ctx.context.internalAdapter.createVerificationValue({
-            identifier: HANDOFF_PREFIX + ctx.body.challenge,
+            identifier: HANDOFF_PREFIX + request.challenge,
             value: session.userId,
             expiresAt: new Date(Date.now() + HANDOFF_TTL_MS),
           });

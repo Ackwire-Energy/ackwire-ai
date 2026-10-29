@@ -266,6 +266,19 @@
   text-align: center;
   text-wrap: balance;
 }
+/* The sign-in code the person matches between the app window and the browser. */
+.auth__code {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+.auth__codeValue {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text);
+}
 .auth__fine a {
   color: var(--muted);
 }
