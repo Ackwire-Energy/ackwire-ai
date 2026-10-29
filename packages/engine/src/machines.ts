@@ -13,7 +13,7 @@ import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -206,8 +206,7 @@ export async function requireComputerDriver(
   orgId: string,
   agentId: string,
 ): Promise<MachineRow> {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [agent] = await db
     .select({
       machineId: agents.machineId,
@@ -485,12 +484,15 @@ export async function removeMachine(
       .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
       .returning({ id: agents.id });
     const ids = rows.map((r) => r.id);
-    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`).
+    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`). A connected
+    // computer's token hash stays too: a removed row never authenticates (`authenticateMachine`), and
+    // the token is how that computer proves it is this machine when it asks to come back
+    // (`startDeviceCode`, ADR 0036 §5). The workspace's own computers lose it.
     await tx
       .update(machines)
       .set({
         deletedAt: now,
-        tokenHash: null,
+        ...(machine.kind === "connected" ? {} : { tokenHash: null }),
         online: false,
         connectedReplica: null,
         previousAgentIds: ids,

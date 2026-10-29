@@ -260,7 +260,7 @@ describe("agent page: who edits what", () => {
     expect(saveBar()).toBeNull();
   });
 
-  test("the owner changes the look, access, audience and computer; the save sends only what they may", async () => {
+  test("the owner changes the look, audience and computer, not access; the save sends only what they may", async () => {
     const { state } = await go("?tab=settings", asOwner());
     expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(document.body.textContent).toContain("Você é responsável da Ada");
@@ -270,6 +270,10 @@ describe("agent page: who edits what", () => {
     await openTab(/^Instruções/);
     expect(screen().queryByRole("textbox", { name: "Instruções" })).toBeNull();
     expect(document.body.textContent).toContain("Só admins editam as instruções.");
+    // Access is an admin's call, like the agent's scopes: the owner reads it.
+    await openTab(/^Ferramentas/);
+    expect(screen().queryByRole("radiogroup", { name: "Nível em GitHub" })).toBeNull();
+    expect(document.body.textContent).toContain("Só admins dão ou tiram acessos e repositórios.");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(updates(state)).toEqual([{ appearance: { color: "rose", eyes: "round", accessory: "none" } }]);

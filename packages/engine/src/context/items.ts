@@ -374,13 +374,46 @@ export async function listContextItems(
     .limit(Math.min(filter.limit ?? 100, 500));
 }
 
-/** Agent memories: the agent's owner or admins. Org-wide items: admins (`configure`). */
+/** Whether someone who reads `visible` may see an item: every channel it came from (org-wide ones too). */
+export const itemVisibleIn = (item: Pick<ContextItem, "channelIds">, visible: readonly string[]) =>
+  item.channelIds.every((c) => visible.includes(c));
+
+/**
+ * Every version of an agent's items a person may see (archived and superseded
+ * included), with the channels they read, for "What Ada knows": the same rule
+ * as `listContextItems`, so an item learned in a DM or private channel stays there.
+ */
+export async function listAgentMemoryRows(db: Database, actorId: string, orgId: string, agentId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  const items = await db
+    .select()
+    .from(contextItems)
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.agentId, agentId),
+        arrayContained(contextItems.channelIds, visible),
+      ),
+    );
+  return { items, visible };
+}
+
+/**
+ * Agent memories: the agent's owner or admins. Org-wide items: admins (`configure`).
+ * An owner who isn't an admin changes only items they can see (the edit answers
+ * with the content); to them the others don't exist.
+ */
 async function requireEdit(db: Database, actorId: string, item: ContextItem) {
   const membership = await requirePermission(db, actorId, item.orgId, "read");
   if (can(membership.role, "configure")) return;
   if (item.agentId) {
     const agent = await getAgent(db, item.orgId, item.agentId);
-    if (agent?.ownerUserId === actorId) return;
+    if (agent?.ownerUserId === actorId) {
+      if (item.channelIds?.length && !itemVisibleIn(item, await userVisibleChannels(db, item.orgId, actorId)))
+        throw new NotFoundError("Item not found");
+      return;
+    }
   }
   throw new ForbiddenError("Only the agent's owner or an admin can change this");
 }
@@ -512,7 +545,7 @@ export async function revertMemoryChange(db: Database, actorId: string, orgId: s
   const item = await loadItem(db, orgId, itemId);
   await requirePermission(db, actorId, orgId, "read");
   const visible = await userVisibleChannels(db, orgId, actorId);
-  if (!item.channelIds.every((c) => visible.includes(c))) throw new NotFoundError("Item not found");
+  if (!itemVisibleIn(item, visible)) throw new NotFoundError("Item not found");
   const [previous] = await db
     .select()
     .from(contextItems)

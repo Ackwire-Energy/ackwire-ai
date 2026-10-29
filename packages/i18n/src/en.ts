@@ -2000,8 +2000,9 @@ export const en: Translations = {
     readOnly: {
       member: "You see how {{name}} works. Only admins edit.",
       memberOwner: "You see how {{name}} works. Who edits: admins and {{owner}} (owner).",
-      owner: "You own {{name}}: you change the look, access, who can talk and the computer. The rest, only admins.",
+      owner: "You own {{name}}: you change the look, who can talk and the computer. The rest, only admins.",
       ownerInstructions: "Only admins edit the instructions. As the owner, you approve proposed changes.",
+      ownerAccess: "Only admins give or take away access and repositories.",
     },
     status: {
       idle: "Available",

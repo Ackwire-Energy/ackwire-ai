@@ -27,7 +27,7 @@ import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, InfoHint, LineIcon, Segmented, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
@@ -602,7 +602,6 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory();
-  const meId = useMeId();
   const { org } = useOrg();
   const agent = dir.agentById.get(agentId);
   const access = useAgentAccess(orgId, agentId);
@@ -610,7 +609,8 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   const [failed, setFailed] = useState(false);
   const resource = access.data ? resourcesOf(access.data).find((r) => r.id === `connector:${connectionId}`) : undefined;
   const current = saving ?? (resource ? levelOf(resource) : "none");
-  const mayChange = can(org?.role, "manage_agents") || Boolean(meId && agent?.ownerUserId === meId);
+  // Giving an agent a connector is an admin's call, like its scopes (the server checks it again).
+  const mayChange = can(org?.role, "manage_agents");
   const choose = (level: Level) => {
     if (!resource || level === current) return;
     setSaving(level);

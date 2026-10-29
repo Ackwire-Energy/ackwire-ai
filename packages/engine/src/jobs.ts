@@ -50,6 +50,7 @@ import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
+import { activateDeliveredSecret } from "./secrets";
 import { indexSource, reindexOrg } from "./search";
 import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
@@ -403,6 +404,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
+    },
+    "secret.activate": async (job) => {
+      if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");
+      await activateDeliveredSecret({ ...deps.sandbox, pubsub: deps.pubsub }, orgOf(job), String(job.payload.requestId));
     },
     "search.index": async (job) => {
       if (!deps.search) return;

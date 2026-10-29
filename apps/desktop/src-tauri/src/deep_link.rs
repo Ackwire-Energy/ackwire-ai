@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_deep_link::DeepLinkExt;
 
-const SCHEME: &str = "agenteschat";
+pub const SCHEME: &str = "agenteschat";
 /// A connect link is short (a server and a token or a claim); anything longer isn't one.
 const MAX_LINK: usize = 2048;
 

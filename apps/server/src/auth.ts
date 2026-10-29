@@ -78,6 +78,7 @@ export function createAuth(deps: {
   // The phone app (ADR 0035); Expo Go and dev builds use `exp://` outside production.
   const appOrigins = [APP_SCHEME, ...(config.NODE_ENV !== "production" ? ["exp://", "exp://**"] : [])];
   const apple = appleSignIn(config);
+  const authorizations = socialAuthorizations(config, apple?.clientId ?? null);
 
   return betterAuth({
     appName: "agentes.chat",
@@ -212,6 +213,14 @@ export function createAuth(deps: {
       // Checked before the endpoint runs so the person sees the real reason.
       // The database hook below also guards social sign-in.
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === EXPO_PROXY_PATH) {
+          const target =
+            (ctx.query as { authorizationURL?: unknown } | undefined)?.authorizationURL ??
+            (ctx.request ? new URL(ctx.request.url).searchParams.get("authorizationURL") : undefined);
+          if (!expoProxyAllowed(target, authorizations, ctx.context.baseURL)) {
+            throw new APIError("BAD_REQUEST", { message: "Invalid authorizationURL" });
+          }
+        }
         const action = HUMAN_ACTIONS[ctx.path];
         // Before the sign-up policy: a bot gets the cheap refusal first.
         if (action && ctx.headers) {
@@ -288,6 +297,59 @@ export type SessionUser = { id: string; name: string; email: string; image?: str
 export async function sessionUser(auth: Auth, headers: Headers): Promise<SessionUser | null> {
   const session = await auth.api.getSession({ headers });
   return session ? (session.user as SessionUser) : null;
+}
+
+/**
+ * The Expo plugin's `/expo-authorization-proxy` (the phone app's social sign-in, ADR 0035) redirects to any
+ * https address and signs that address's `state` into the visitor's state cookie: an open redirect, and a way
+ * to plant someone else's sign-in on a victim. It only goes on to a configured provider's own authorization
+ * endpoint, for our client id and our callback, so the provider sends the person nowhere but back here.
+ */
+const EXPO_PROXY_PATH = "/expo-authorization-proxy";
+
+export interface SocialAuthorization {
+  id: string;
+  /** Better Auth's authorization endpoint for the provider (origin + path). */
+  endpoint: string;
+  clientId: string;
+}
+
+function socialAuthorizations(config: Config, appleClientId: string | null): SocialAuthorization[] {
+  const list: SocialAuthorization[] = [];
+  if (config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET) {
+    const endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+    list.push({ id: "google", endpoint, clientId: config.GOOGLE_CLIENT_ID });
+  }
+  if (config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) {
+    const endpoint = "https://github.com/login/oauth/authorize";
+    list.push({ id: "github", endpoint, clientId: config.GITHUB_CLIENT_ID });
+  }
+  if (appleClientId) {
+    list.push({ id: "apple", endpoint: "https://appleid.apple.com/auth/authorize", clientId: appleClientId });
+  }
+  return list;
+}
+
+/** Whether the proxy may go on to `target` (`EXPO_PROXY_PATH`). `authBaseURL`: Better Auth's, with its path. */
+export function expoProxyAllowed(target: unknown, allowed: SocialAuthorization[], authBaseURL: string): boolean {
+  if (typeof target !== "string" || target.includes("#")) return false;
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  const one = (name: string) => {
+    const values = url.searchParams.getAll(name);
+    return values.length === 1 ? values[0] : null;
+  };
+  const endpoint = `${url.origin}${url.pathname}`;
+  const base = authBaseURL.replace(/\/$/, "");
+  return allowed.some(
+    (p) =>
+      p.endpoint === endpoint && one("client_id") === p.clientId && one("redirect_uri") === `${base}/callback/${p.id}`,
+  );
 }
 
 /** Better Auth's paths that a bot check guards (ADR 0075), with the action their widget runs. */

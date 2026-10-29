@@ -46,6 +46,7 @@ test("people upload files as is: download with the real name and type, versions,
   );
   expect(file.headers.get("x-content-type-options")).toBe("nosniff");
   expect(file.headers.get("content-security-policy")).toBe("sandbox");
+  expect(file.headers.get("cache-control")).toBe("private, no-store, no-transform");
   expect(new Uint8Array(await file.arrayBuffer())).toEqual(PDF);
   expect((await api(`/artifacts/${a.id}/file?format=pdf`)).status).toBe(400);
 

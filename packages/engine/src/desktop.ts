@@ -6,7 +6,7 @@ import {
   STREAM_LIMITS,
   type StreamRequest,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, gt, inArray, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import {
   agentUsesScreen,
@@ -27,7 +27,7 @@ import { getMachine, machineOnline, requireComputerDriver } from "./machines";
 import { orgStanding, standingRefusal } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
-const { agents, browserHandoffs } = schema;
+const { agents, browserHandoffs, sessions } = schema;
 
 const refused = (code: number, reason: string) => ({ refused: code, reason });
 
@@ -137,10 +137,18 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
 }
 
 /**
- * The broker's `recheck`: the stream's close when its person lost it (`streamAccess`); a control stream
- * still open keeps its holder's control alive (`touchControl`).
+ * The broker's `recheck`: the stream's close when its person lost it (`streamAccess`) or signed out (the
+ * session it was opened with is gone or expired, read from the database); a control stream still open keeps
+ * its holder's control alive (`touchControl`).
  */
 export async function recheckStream(db: Database, stream: Stream) {
+  if (stream.sessionToken) {
+    const [alive] = await db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(and(eq(sessions.token, stream.sessionToken), gt(sessions.expiresAt, new Date())));
+    if (!alive) return refused(STREAM_CLOSE.forbidden, "signed_out");
+  }
   const access = await streamAccess(db, stream);
   if ("refused" in access) return access;
   if (access.control) await touchControl(db, access.control, stream.userId).catch(() => {});

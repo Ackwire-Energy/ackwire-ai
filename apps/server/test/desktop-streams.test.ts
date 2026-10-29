@@ -221,6 +221,29 @@ test("bytes go both ways through the computer's data socket; the audit keeps who
   runner.ws.close();
 });
 
+test("signing out stops terminal input on its next frame and closes an idle desktop stream", async () => {
+  const { owner, machine, desktop, terminal } = await seeded();
+  const runner = await connectRunner(machine.token);
+  const watch = openViewer(desktop, owner);
+  const shell = openViewer(terminal, owner);
+  await until(() => runner.data.length === 2 && runner.data.every((link) => link.ready), "both data sockets");
+  const watchClosed = new Promise<number>((resolve) =>
+    watch.socket.addEventListener("close", (event) => resolve(event.code)),
+  );
+  const shellClosed = new Promise<number>((resolve) =>
+    shell.socket.addEventListener("close", (event) => resolve(event.code)),
+  );
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  await Bun.sleep(2_100); // Incoming frames recheck the session at most every two seconds.
+  shell.socket.send(new Uint8Array([65]));
+  expect(await Promise.race([shellClosed, Bun.sleep(5_000).then(() => -1)])).toBe(STREAM_CLOSE.forbidden);
+  expect(runner.data.every((link) => link.got.length === 0)).toBe(true);
+  expect(await Promise.race([watchClosed, Bun.sleep(20_000).then(() => -1)])).toBe(STREAM_CLOSE.forbidden);
+  await until(() => runner.data.every((link) => link.closed !== null), "both runner stream closes");
+  expect(runner.data.map((link) => link.closed)).toEqual([STREAM_CLOSE.forbidden, STREAM_CLOSE.forbidden]);
+  runner.ws.close();
+}, 30_000);
+
 test("a terminal: the resize reaches the computer and the shell's exit the person; only who paired it opens one", async () => {
   const { owner, machine, terminal, invite } = await seeded();
   const runner = await connectRunner(machine.token);

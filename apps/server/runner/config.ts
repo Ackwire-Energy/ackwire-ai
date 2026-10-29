@@ -44,6 +44,12 @@ export interface RunnerConfig {
   mode?: "user" | "system";
   /** System mode: the uids agent users get, `[first, last]` (default `DEFAULT_AGENT_UID_RANGE`). */
   agentUidRange?: [number, number];
+  /**
+   * After "leave" (unpair): the token `machineId` had, never used to connect,
+   * only sent as proof when pairing again with the same server reconnects
+   * that machine (ADR 0036 §5). Dropped by the next pairing.
+   */
+  previousToken?: string;
 }
 
 export { SYSTEM_RUNNER_HOME } from "@agenteschat/adapters/command-policy";
@@ -148,6 +154,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(text(raw.orgName, 200) ? { orgName: text(raw.orgName, 200) } : {}),
     ...(raw.mode === "system" || raw.mode === "user" ? { mode: raw.mode } : {}),
     ...(uids ? { agentUidRange: uids } : {}),
+    ...(text(raw.previousToken, 4000) ? { previousToken: text(raw.previousToken, 4000) } : {}),
   };
 }
 

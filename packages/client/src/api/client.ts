@@ -1087,6 +1087,8 @@ export interface ApiClient {
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
     /** The agent's open request or take over on that screen (the browser by default), if any. */
     agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
+    /** Whether this person may drive that screen (take over, open a page, type); watching needs less (ADR 0040). */
+    agentControl(orgId: string, agentId: string, screen?: ScreenKind): Promise<boolean>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;

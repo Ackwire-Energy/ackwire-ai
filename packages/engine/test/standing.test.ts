@@ -28,6 +28,7 @@ import {
   postPersonMessage,
   type RouterStrategy,
   removeMember,
+  requireBrowserAccess,
   requireChannelAccess,
   requirePermission,
   resendInvitation,
@@ -186,6 +187,32 @@ describe("hold", () => {
 });
 
 describe("suspended", () => {
+  test("browser and desktop access stop on suspension, while hold remains readable", async () => {
+    f = await setup();
+    const access = (screen: "browser" | "desktop") =>
+      requireBrowserAccess(f.db, f.owner.id, f.org.id, f.agent.id, undefined, screen);
+
+    await access("browser");
+    await standing("hold");
+    await access("browser");
+    await access("desktop");
+
+    await standing("suspended");
+    for (const screen of ["browser", "desktop"] as const) {
+      await expect(access(screen)).rejects.toMatchObject({ code: "org.suspended", params: { reason: REASON } });
+    }
+
+    await standing("suspended", "silent");
+    await expect(access("browser")).rejects.toMatchObject({
+      code: "org.suspended",
+      message: "This workspace is unavailable for now.",
+      params: undefined,
+    });
+
+    await standing("active");
+    await access("browser");
+  }, 75_000);
+
   test("every permission check refuses with org.suspended; back to active it works", async () => {
     f = await setup();
     await standing("suspended");
