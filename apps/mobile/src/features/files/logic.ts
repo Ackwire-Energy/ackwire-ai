@@ -176,7 +176,11 @@ export function driveWebUrl(apiUrl: string, orgId: string, id: string, version?:
 
 /** A download URL the server returned: signed (absolute, no session needed) or ours (relative, needs it). */
 export function resolveDownloadUrl(apiUrl: string, url: string): { uri: string; needsSession: boolean } {
-  if (/^https?:\/\//i.test(url)) return { uri: url, needsSession: url.startsWith(apiUrl.replace(/\/+$/, "")) };
+  if (/^https?:\/\//i.test(url)) {
+    // A signed storage URL can share the API URL's text prefix without sharing
+    // its origin. Never send the app session cookie to that host.
+    return { uri: url, needsSession: new URL(url).origin === new URL(apiUrl).origin };
+  }
   const base = apiUrl.replace(/\/+$/, "");
   return { uri: `${base}${url.startsWith("/") ? "" : "/"}${url}`, needsSession: true };
 }
