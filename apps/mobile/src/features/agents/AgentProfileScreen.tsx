@@ -61,6 +61,7 @@ import {
   spendOf,
   usesOf,
 } from "./logic";
+import { openAgentEdit } from "./AgentEditScreen";
 import { MonthPixels } from "./MonthPixels";
 import { workTitle } from "./work";
 
@@ -517,7 +518,12 @@ function Profile({ id }: { id: string }) {
         </Section>
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
-        <PushedHeader plate solid={false} />
+        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
+        <PushedHeader
+          plate
+          solid={false}
+          {...(decides && agent ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } } : {})}
+        />
       </View>
     </View>
   );

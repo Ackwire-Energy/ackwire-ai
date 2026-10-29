@@ -79,3 +79,47 @@ export function wikiTree<T extends { folder: string; title: string }>(pages: T[]
   sort(root);
   return root;
 }
+
+// The editor (web and phone): the `[[` being typed, and the toolbar's marks.
+
+/** `[[que` right before the caret (no `]]` yet): the link being typed. */
+export function wikiQuery(text: string, caret: number): { start: number; query: string } | null {
+  const before = text.slice(0, caret);
+  const at = before.lastIndexOf("[[");
+  if (at < 0) return null;
+  const query = before.slice(at + 2);
+  if (/[\]\n[]/.test(query) || query.length > 80) return null;
+  return { start: at, query };
+}
+
+/** Wraps the selection (or inserts a placeholder) and returns the new text and selection. */
+export function wrapSelection(text: string, start: number, end: number, before: string, after = before, empty = "") {
+  const selected = text.slice(start, end) || empty;
+  const next = text.slice(0, start) + before + selected + after + text.slice(end);
+  return { text: next, start: start + before.length, end: start + before.length + selected.length };
+}
+
+/** Prefixes each selected line ("## ", "- ", "- [ ] "). */
+export function prefixLines(text: string, start: number, end: number, prefix: string) {
+  const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+  const block = text.slice(lineStart, end);
+  const prefixed = block
+    .split("\n")
+    .map((l) => (l.startsWith(prefix) ? l : prefix + l))
+    .join("\n");
+  const next = text.slice(0, lineStart) + prefixed + text.slice(end);
+  return { text: next, start: start + prefix.length, end: lineStart + prefixed.length };
+}
+
+/** Checks or unchecks the task on line `line` (`- [ ]` ↔ `- [x]`); the text as it was when that line is no task. */
+export function toggleTask(body: string, line: number): string {
+  const lines = body.split("\n");
+  const at = lines[line];
+  if (at === undefined) return body;
+  const next = at.replace(/^(\s*[-*]\s+\[)([ xX])\]/, (_m, open: string, mark: string) =>
+    mark === " " ? `${open}x]` : `${open} ]`,
+  );
+  if (next === at) return body;
+  lines[line] = next;
+  return lines.join("\n");
+}
