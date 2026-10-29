@@ -137,7 +137,8 @@ export async function personUpgrade(
   const session = await deps.auth.api.getSession({ headers: req.headers, query: { disableCookieCache: true } });
   if (!session) return new Response("Sign in to continue", { status: 401 });
   const user = session.user as SessionUser;
-  if (!(await getMembership(deps.db, user.id, orgId))) {
+  const membership = await getMembership(deps.db, user.id, orgId);
+  if (!membership || membership.standing?.state === "suspended") {
     return new Response("Not a member of this organization", { status: 403 });
   }
   return { ...user, sessionToken: session.session.token };
@@ -434,6 +435,9 @@ export function createRealtime(deps: RealtimeDeps) {
             if (event.type === "channel.archived") return drop(event.channelId, "archived");
             if (event.type === "org.broadcast") {
               if (ws.readyState === 1) send(ws, { type: "event", scope: "org", event: event.event });
+              if (event.event.type === "org.standing" && event.event.state === "suspended" && ws.readyState === 1) {
+                ws.close(4403, "organization suspended");
+              }
               return;
             }
             if (event.type !== "membership.revoked" || event.userId !== user.id) return;

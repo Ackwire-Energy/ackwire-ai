@@ -13,7 +13,7 @@ import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -206,8 +206,7 @@ export async function requireComputerDriver(
   orgId: string,
   agentId: string,
 ): Promise<MachineRow> {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [agent] = await db
     .select({
       machineId: agents.machineId,

@@ -12,7 +12,7 @@ import type { IssueWorkMeta } from "./issue-work";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
 import { notifyIssueChanged, notifyIssueComment } from "./notification-producers";
-import { can, getMembership } from "./organizations";
+import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { toolDetail } from "./tool-detail";
@@ -209,8 +209,7 @@ async function canSee(
 
 async function requireOrgMember(db: Database, actor: IssueActor, orgId: string) {
   if (actor.type !== "person") return null;
-  const membership = await getMembership(db, actor.userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actor.userId, orgId);
   return membership;
 }
 
