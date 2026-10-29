@@ -250,6 +250,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Chrome draws that "…" only when the field has it as well. */
+  .ac-composer textarea:placeholder-shown {
+    text-overflow: ellipsis;
+  }
 }
 /* Agent page: one column below the desktop (AgentPage moves "Como trabalha" under the name there). */
 @media (max-width: 1100px) {

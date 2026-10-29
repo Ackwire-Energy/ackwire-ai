@@ -1396,12 +1396,13 @@ textarea.ac-input {
   background-color: Highlight;
   color: HighlightText;
 }
+/* The line under the reactions is a separator's length (`.ac-menu__separator`, 8px in from each side). */
 .ac-menu__reactions {
   display: flex;
   gap: 2px;
-  padding-bottom: 2px;
+  padding-bottom: 3px;
   margin-bottom: 2px;
-  border-bottom: 1px solid var(--line);
+  background: linear-gradient(var(--line), var(--line)) 50% 100% / calc(100% - 16px) 1px no-repeat;
 }
 .ac-menu__reaction {
   display: grid;
@@ -5112,12 +5113,16 @@ a.ac-list__row:focus-visible {
   max-width: calc(100vw - 32px);
   padding: 8px;
 }
+/* Its popover stops at a menu's 280px (`.ac-menu`): only the grid gives up height, so it is the one scroll and its last
+   row stays inside. */
 .ac-emoji {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
 }
 .ac-emoji__search {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5145,6 +5150,7 @@ a.ac-list__row:focus-visible {
   color: var(--faint);
 }
 .ac-emoji__tabs {
+  flex: none;
   display: flex;
   justify-content: space-between;
 }

@@ -1018,16 +1018,16 @@ export const ptBR = {
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
     banner: {
-      org: "Os agentes ainda não têm uma IA.",
+      org: "Os agentes ainda não têm uma\u00a0IA.",
       orgHint: "Você também pode pedir no chat, como “usar meu plano do Claude”.",
       orgAction: "Conectar uma IA",
     },
-    agent: "{{name}} não vai responder porque não tem uma IA conectada.",
+    agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
       answering: "{{name}} está respondendo…",
-      stillMissing: "Ainda falta conectar uma IA para {{name}}.",
+      stillMissing: "Ainda falta conectar uma IA para\u00a0{{name}}.",
     },
     action: "Conectar",
     locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",
