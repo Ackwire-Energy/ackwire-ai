@@ -41,7 +41,7 @@ Every source is parsed into a `MigrationBundle` (`packages/client/src/api/types.
 - `update`: made by an earlier import, still there, hash changed (a channel also when an agent it lists arrives now: only that agent joins);
 - `skip` with a reason: `exists`, `model_not_in_catalog`, `invalid_skill`, `schedule_unsupported`, `schedule_in_past`, `secret_like`, `agent_not_picked`, `channel_not_picked`, `invalid`, `failed`.
 
-On a create or update, `reason` is a note: `model_not_in_catalog` (the workspace's default model instead), `exists` (an existing public channel the agents join). `trimmed` names fields cut to our limits; `renamedTo` the free handle an agent got.
+On a create or update, `reason` is a note: `model_not_in_catalog` (the workspace's default model instead), `exists` (an existing public channel the agents join). `trimmed` names fields cut to our limits; `renamedTo` the handle an agent gets when it isn't the bundle's (taken, or an id).
 
 `planImport` is pure: it compares the bundle with `loadImportState` (the provenance rows of this package, every handle including archived agents and people, skill names including deleted ones, channel names). A dry run writes nothing.
 
@@ -55,7 +55,7 @@ One apply creates or updates at most 200 items (`import.too_many_items`). A big 
 
 - Rows belong to the person who imported. Many packages have generic ids (OpenClaw's default agent `main`, a folder named `.openclaw` or `.hermes`), so someone else's package lands as new items with the next free handles, never as updates to what another person brought. The cost: when two admins import the same team package, the second gets copies, which the preview shows as new.
 
-- Matching by name alone breaks once a handle got a suffix (`scout` → `scout2`); the table finds it.
+- Matching by name alone breaks once a handle got a suffix (`scout` → `scout-2`); the table finds it.
 - It is what tells an update which rows it may touch: only what the import made. Something with the same name that it didn't make is never changed.
 - `adopted`: a channel that already existed, which the import only joined its agents to. A future rollback must never delete it.
 - Known limit: if the process dies between creating an item and writing its row, a re-run sees a name it didn't make (`exists`, or a suffixed handle).
@@ -64,7 +64,7 @@ One apply creates or updates at most 200 items (`import.too_many_items`). A big 
 ### 4. Rules
 
 - **Permission:** `manage_agents` for the whole import, dry runs included (admins).
-- **Handles:** taken by an agent or a person the import didn't make → the next free one (`scout2`), reported in `renamedTo`.
+- **Handles:** the bundle's, unless it is an id another app gave its agent (`agent-e9665a97-c8d5-…`, OpenBot.run's): then one from the name, as an agent made here gets it (`Otávio Ofertas` → `otavioofertas`); an agent still named "New agent" (or by its id) takes it from its role, else from the first sentence of its instructions, else `newagent`. The bundle keeps the id, so the hash of an earlier import of the same file still matches. Taken by an agent or a person the import didn't make → the next free one (`scout-2`). Either way `renamedTo` says the handle it gets. The handles someone chose come before the ones made from names, so a name never takes a chosen handle, and they are given over every agent of the bundle, picked or not: unticking an agent never moves another's handle, and a chunk carries every agent.
 - **Channels:** a public channel with the name → the imported agents join it; its topic is never changed. A private channel, a forum or an archived one with the name → `exists` (agents never join a private channel through an import, also not one an earlier import made and someone made private since). After creation the topic belongs to the people in it: the hash leaves it out.
 - **Skills:** land off for every agent unless their `skill:key` is in `enableSkills`, and never become defaults for new agents; a skill the import made and someone deleted comes back the same way (its old assignments off). A name held by a skill the import didn't make → `exists` (saving would write a new version over it).
 - **Routines:** always land paused; an update keeps them on or off as the person left them. A one-off (`at`, or the picker's `once`) becomes a one-time rule, so it still fires once when turned on. A zone the source leaves out is the importer's, then the workspace's. A routine posts where its agent is: it joins its channel with auto-reply off if it isn't there yet. A channel target that isn't coming → `channel_not_picked`; `null` posts in the importer's DM with the agent.

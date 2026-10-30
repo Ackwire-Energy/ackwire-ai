@@ -5,7 +5,14 @@ import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated"
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { Count, Icon, LIST_INSET, Text, weights } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { HOME_SECTIONS, type HomeSection, parseCollapsed, toggleCollapsed } from "./logic";
+import {
+  HOME_SECTIONS,
+  type HomeSection,
+  parseCollapsed,
+  parseHomeCollapsed,
+  toggleCollapsed,
+  toggleHomeCollapsed,
+} from "./logic";
 
 /**
  * The sections the person collapsed, remembered across launches: Conversas' by default, or another list's
@@ -29,6 +36,19 @@ export function useCollapsedSections<K extends string = HomeSection>(
   return { collapsed, toggle };
 }
 
+/** Conversas' closed sections, remembered: the fixed ones and the channel categories (any key, ADR 0080). */
+export function useHomeCollapsed() {
+  const [collapsed, setCollapsed] = useState<string[]>(() => parseHomeCollapsed(readValueSync(STORED.homeCollapsed)));
+  const toggle = useCallback((key: string) => {
+    setCollapsed((list) => {
+      const next = toggleHomeCollapsed(list, key);
+      void writeValue(STORED.homeCollapsed, next.length > 0 ? JSON.stringify(next) : null);
+      return next;
+    });
+  }, []);
+  return { collapsed, toggle };
+}
+
 /**
  * A section of Conversas: the title, its count (medium, faint) and a chevron that
  * turns when collapsed; tapping the header collapses or opens it.
@@ -38,12 +58,21 @@ export function CollapsibleSection({
   count,
   collapsed,
   onToggle,
+  onLongPress,
+  holdLabel,
+  kept,
   children,
 }: {
   title: string;
   count: number;
   collapsed: boolean;
   onToggle: () => void;
+  /** A channel category's header: its menu (admins). */
+  onLongPress?: () => void;
+  /** What the long press does, for screen readers. */
+  holdLabel?: string;
+  /** Shown while closed (a category's unread channels). */
+  kept?: ReactNode;
   children: ReactNode;
 }) {
   const c = useColors();
@@ -54,6 +83,16 @@ export function CollapsibleSection({
     <View>
       <Pressable
         onPress={onToggle}
+        {...(onLongPress
+          ? {
+              onLongPress,
+              delayLongPress: 380,
+              accessibilityActions: [{ name: "menu", label: holdLabel ?? title }],
+              onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
+                if (e.nativeEvent.actionName === "menu") onLongPress();
+              },
+            }
+          : {})}
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityState={{ expanded: !collapsed }}
@@ -68,7 +107,7 @@ export function CollapsibleSection({
           <Icon name="chev" size={16} color={c.faint} />
         </Animated.View>
       </Pressable>
-      {collapsed ? null : children}
+      {collapsed ? (kept ?? null) : children}
     </View>
   );
 }

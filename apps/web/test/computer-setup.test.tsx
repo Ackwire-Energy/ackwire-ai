@@ -1366,7 +1366,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
       "Todos os agentes",
     );
-    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Respondem a todos");
+    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Atendem outras pessoas");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -1616,10 +1616,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(r.state.agents.map((a) => a.audience?.mode)).toEqual(["owner", "owner", "owner", "owner"]);
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
-    const note = () => screen().queryByText("Seus agentes só respondem a você.")?.closest(".setup-line");
+    const note = () => screen().queryByText("Seus agentes só atendem você.")?.closest(".setup-line");
     expect(note()).toBeTruthy();
-    expect(hintOf("Seus agentes só respondem a você.").text).toBe(
-      "Num plano, você pode deixar cada um responder a todos na página dele.",
+    expect(hintOf("Seus agentes só atendem você.").text).toBe(
+      "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     );
     // It comes before the invitations it's about.
     const emails = screen().getByLabelText("E-mails");

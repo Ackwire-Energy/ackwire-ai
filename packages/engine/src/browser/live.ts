@@ -204,6 +204,8 @@ export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   /** Tests: how long input is gathered before it goes (`INPUT_BATCH_MS`). */
   inputBatchMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
+  /** Starts the agent's Chrome on that computer before its next command (ADR 0040 §11). Never waited on. */
+  warm?(at: { orgId: string; agentId: string; machineId: string }): void;
 }
 
 /**
@@ -541,6 +543,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         viewer.send({ type: "browser.unavailable", agentId, reason: "no_computer" });
         return () => {};
       }
+      // Someone opened the agent's computer: its browser gets ready for the agent's next command meanwhile.
+      deps.warm?.({ orgId, agentId, machineId });
       if (!deps.hub.isLocal(machineId)) {
         // Held by another replica (or not connected): frames only flow where the socket is.
         const machine = await getMachineById(deps.db, machineId);

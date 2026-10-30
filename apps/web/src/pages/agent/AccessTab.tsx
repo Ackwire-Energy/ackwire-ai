@@ -120,6 +120,9 @@ export function AccessTab() {
             <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
               {t("agentPage.access.onlyRead")}
             </Button>
+            <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
+              {t("access.level.write")}
+            </Button>
           </span>
         )}
       </Toolbar>

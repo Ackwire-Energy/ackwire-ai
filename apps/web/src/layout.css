@@ -153,6 +153,10 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* What the person already has leads the picker: its line starts it, with no room over it. */
+.ai-picker__or:first-child {
+  margin-top: 0;
+}
 /* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
 .grid-options--plans > .ai-picker__key {
   grid-column: 1 / -1;
@@ -969,16 +973,26 @@ p {
   color: var(--ink-muted);
   vertical-align: 1px;
 }
-/* "Adicionar pessoa ou agente": the last row of the channel's member list. */
+/*
+ * "Adicionar pessoa ou agente": the last row of the channel's member list. Light: a dashed key the avatars' size
+ * and the rows' weight; it darkens on hover. The list keeps some air under it.
+ */
 .member-row--add {
   width: calc(100% + 16px);
+  margin-top: 4px;
   border: 0;
   background: transparent;
   font: inherit;
-  font-weight: 600;
-  color: var(--ink2);
+  font-weight: 500;
+  color: var(--ink-muted);
   text-align: left;
   cursor: pointer;
+}
+.member-row--add:hover {
+  color: var(--ink);
+}
+.ac-dialog__list:has(> .member-row--add:last-child) {
+  padding-bottom: 16px;
 }
 .member-row--add:focus-visible {
   outline: none;
@@ -989,10 +1003,23 @@ p {
   place-items: center;
   width: 32px;
   height: 32px;
+  box-sizing: border-box;
   flex: none;
-  border-radius: 30%;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 30% 30% 30% 9%;
+  color: var(--ink-muted);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.member-row__plus .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.member-row--add:hover .member-row__plus {
+  border-style: solid;
+  border-color: var(--ink-muted);
+  color: var(--ink);
 }
 .member-group {
   display: flex;
@@ -2443,6 +2470,10 @@ p {
   max-height: 200px;
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
+}
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+.ac-dialog__body > .people-picker:last-child .people-picker__results {
+  border-bottom: 0;
 }
 
 /*
@@ -3905,6 +3936,28 @@ p {
   display: flex;
   flex-direction: column;
   font-weight: 600;
+}
+/* "Todos os agentes": the main choice, raised over the agents' own rows, which line up with its content. */
+.cflow-agent--all {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.cflow-agent--all + .cflow-agents > .cflow-agent {
+  padding-right: 14px;
+  padding-left: 14px;
+}
+.cflow-agent__all-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-agent);
+  background: var(--sunken);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .cflow__asks {
   display: flex;
@@ -7586,6 +7639,11 @@ a.machine-row__name:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* The line under the plan cards ("No plano, … só a você"): the steps have no gap, so it sits as far below them as
+   an error line or a note does. */
+.newag__models + .small {
+  margin-top: 12px;
+}
 .newag__model {
   gap: 6px;
   padding: 14px 16px;
@@ -8223,10 +8281,11 @@ a.machine-row__name:hover {
   font-weight: 600;
 }
 /*
- * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
- * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
- * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
- * label is in the type of the switches beside it (a plan's panel gives its own).
+ * "Atende outras pessoas" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with
+ * the switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's
+ * is; under them the line saying whom the agent answers, the plan's terms behind its ⓘ, under the switch too, so the
+ * sentence has the whole width on a phone. The label is in the type of the switches beside it (a plan's panel gives
+ * its own).
  */
 .plan-replies {
   display: grid;
@@ -9772,8 +9831,57 @@ html[data-menu-overlay] .shell {
   transition: opacity 0.15s;
 }
 .sidebar__section-head:hover .sidebar__section-add,
-.sidebar__section-add:focus-visible {
+.sidebar__section-add:focus-visible,
+.sidebar__section-add[data-state="open"] {
   opacity: 1;
+}
+/*
+ * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
+ * one (the rule above hides the rest).
+ */
+.sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
+  display: flex;
+}
+.sidebar__new-category {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar__new-category:hover {
+  color: var(--ink);
+}
+/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
+.sidebar [data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--ink);
+}
+.sidebar [data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.sidebar [data-drop="into"] {
+  background: var(--plate);
+}
+.channel-category__channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.channel-category__channel .ac-icon {
+  color: var(--faint);
+}
+/* The fields above a list keep their height; the list is what scrolls. */
+.channel-category__fields {
+  flex: none;
+  overflow: visible;
+}
+.channel-category__add {
+  margin-top: 4px;
+}
+.channel-details__archive {
+  color: var(--danger);
 }
 @media (hover: none) {
   .sidebar__section-add {
@@ -10210,7 +10318,7 @@ html[data-menu-overlay] .shell {
     padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
 }
-/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+/* Who the agents answer ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
    words in the panel's type on the text's. */
 .ai-panel__replies {
   font-size: 14px;
