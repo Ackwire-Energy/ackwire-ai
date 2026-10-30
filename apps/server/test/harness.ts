@@ -140,6 +140,7 @@ export async function createTestServer(
     toolsOnDemand: false,
     emailArt: options.emailArt,
     jevFetch: options.jevFetch,
+    routerQuietMs: 0,
   });
   // As at boot: the saved Jev key is read before anything serves.
   await engine.jevKey.ready();

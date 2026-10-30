@@ -9,17 +9,21 @@ import {
   DEFAULT_ROUTER_POLICY,
   drainOutbox,
   insertMessage,
+  insertMessageWithRuns,
   listMessages,
   parseRouterOutput,
   postPersonMessage,
+  ROUTER_QUIET_MS,
+  ROUTER_SLICE,
   RouterOutputError,
   type RouterStrategy,
   type RoutingCandidate,
+  type RoutingInput,
   routeMessage,
   routerPrompt,
   selectAgents,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -122,6 +126,20 @@ describe("routerPrompt", () => {
     expect(room).toContain("score every agent high");
     expect(system).toContain("And `for_everyone`:");
     expect(answer.required).toContain("for_everyone");
+  });
+
+  test("marks who each message names, what it decides on, and a person alone with its agent", () => {
+    const { prompt } = routerPrompt({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "Ana", body: "boa tarde walter\ncomo esta hoje", names: ["Walter"] },
+      thread: [{ author: "@ada", body: "Campanha publicada." }],
+      candidates: [cand("ada")],
+      aloneWith: "ada",
+    });
+    expect(prompt).toContain("<history>\n[@ada]: Campanha publicada.\n</history>");
+    expect(prompt).toContain("<message>\n[Ana, names Walter]: boa tarde walter\ncomo esta hoje\n</message>");
+    expect(prompt).toContain("This person is the only one here with @ada");
   });
 });
 
@@ -492,5 +510,226 @@ describe("LLM strategy (end to end through the outbox)", () => {
     await post("hello");
     await drainOutbox(f.db, handlers);
     expect(f.provider.calls[0]?.request.model).toBe("claude-sonnet-5-5");
+  });
+});
+
+describe("what the router reads, and a person's messages in a row", () => {
+  /** #general with Walter, a person, and Ada, an agent, besides Ana and Dev. */
+  async function team(reply?: NonNullable<Parameters<typeof setup>[0]>["reply"]) {
+    f = await setup({ reply });
+    const walter = await addMember(f.db, f.org.id, "member", "Walter");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+    const ada = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Marketing", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ada.id });
+    return { ada };
+  }
+  const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+  const say = (body: string, secondsAgo: number) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body,
+      createdAt: ago(secondsAgo),
+    });
+  const byAda = (adaId: string, body: string, secondsAgo: number) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: adaId, runId: null, hop: 1 },
+      body,
+      createdAt: ago(secondsAgo),
+    });
+  /** A judge that records what it read and, as Jev's question asks it to, follows the agent just talked to. */
+  function judge() {
+    const inputs: RoutingInput[] = [];
+    const strategy: RouterStrategy = {
+      name: "judge",
+      async decide(input) {
+        inputs.push(input);
+        return {
+          agents: input.candidates.map((c) => ({
+            agentId: c.agentId,
+            score: c.handle === input.continuityHandle ? 0.6 : 0.1,
+          })),
+          needsAgent: 0.2,
+        };
+      },
+    };
+    return { strategy, inputs };
+  }
+  const deps = (strategy: RouterStrategy) => ({
+    db: f.db,
+    strategy,
+    policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 },
+    quietMs: ROUTER_QUIET_MS,
+  });
+  const route = (strategy: RouterStrategy, messageId: string) =>
+    routeMessage(deps(strategy), { orgId: f.org.id, messageId });
+
+  test("'boa tarde walter' then 'como esta hoje': one decision on both, for Walter, and no agent", async () => {
+    const { ada } = await team();
+    // Ada spoke here a few minutes ago, to someone else.
+    await byAda(ada.id, "Campanha publicada.", 240);
+    const greeting = await say("boa tarde walter", 11);
+    const then = await say("como esta hoje", 10);
+    const { strategy, inputs } = judge();
+    expect((await route(strategy, greeting.id)).skipped).toBe("continued");
+    expect((await route(strategy, then.id)).selected).toEqual([]);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.message).toEqual({
+      id: then.id,
+      author: "ana",
+      body: "boa tarde walter\ncomo esta hoje",
+      names: ["Walter"],
+    });
+    // Speaking to Walter, Ana continues no talk with Ada.
+    expect(inputs[0]?.continuityHandle).toBeNull();
+    expect(inputs[0]?.thread).toEqual([{ author: "@ada", body: "Campanha publicada." }]);
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    expect(decisions.map((d) => [d.messageId, d.selectedAgentIds])).toEqual([[then.id, []]]);
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+  });
+
+  test("'boa tarde walter' then '@ada como está hoje': Ada answers, once, and no judge is asked", async () => {
+    const { ada } = await team();
+    await byAda(ada.id, "Campanha publicada.", 240);
+    const greeting = await say("boa tarde walter", 11);
+    const { message: asked } = await insertMessageWithRuns(
+      f.db,
+      {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId: f.owner.id },
+        body: "@ada como está hoje",
+        createdAt: ago(10),
+      },
+      { startRuns: true },
+    );
+    const { strategy, inputs } = judge();
+    expect((await route(strategy, greeting.id)).skipped).toBe("continued");
+    expect((await route(strategy, asked.id)).skipped).toBe("has_mentions");
+    expect(inputs).toEqual([]);
+    expect(await f.db.select().from(schema.routingDecisions)).toEqual([]);
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => [r.agentId, r.trigger, r.triggerMessageId])).toEqual([[ada.id, "mention", asked.id]]);
+  });
+
+  test("'alguém sabe como configurar o deploy?' goes, after the quiet moment, to the agent it is for", async () => {
+    const routerCalls: { system: string; prompt: string }[] = [];
+    await team((req) => {
+      if (!req.outputSchema) return { chunks: ["Configuro sim."] };
+      routerCalls.push({ system: systemText(req.system ?? ""), prompt: textOf(req.messages[0]?.content ?? "") });
+      return {
+        chunks: [
+          '{"needs_agent":0.9,"for_everyone":0.1,"scores":[{"handle":"dev","score":0.9},{"handle":"ada","score":0.1}],"reason":"deploy"}',
+        ],
+      };
+    });
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", quietMs: 300 },
+    });
+    const asked = await post("alguém sabe como configurar o deploy?");
+    await drainOutbox(f.db, handlers);
+    // The first call is Ana's question (Dev's answer is routed after it, for anyone else to chime in).
+    expect(routerCalls[0]?.system).toContain(
+      'asks it or anyone something it can help with ("does anyone know…", "alguém sabe…")',
+    );
+    expect(routerCalls[0]?.prompt).toContain("<message>\n[ana]: alguém sabe como configurar o deploy?\n</message>");
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => [r.agentId, r.trigger, r.triggerMessageId])).toEqual([[f.agent.id, "router", asked.id]]);
+  });
+
+  test("the slice: the newest messages of the conversation, oldest first, each with its author and who it names", async () => {
+    const { ada } = await team();
+    await say("de manhã", 3 * 3600);
+    for (let i = 14; i >= 1; i--) {
+      if (i === 3) await byAda(ada.id, "Walter, a campanha saiu.", i * 60);
+      else await say(i === 2 ? "valeu ada" : `mensagem ${i}`, i * 60);
+    }
+    const asked = await say("e o deploy?", 0);
+    const { strategy, inputs } = judge();
+    await route(strategy, asked.id);
+    const thread = inputs[0]?.thread ?? [];
+    expect(thread).toHaveLength(ROUTER_SLICE.messages);
+    expect(thread.slice(0, 2)).toEqual([
+      { author: "ana", body: "mensagem 12" },
+      { author: "ana", body: "mensagem 11" },
+    ]);
+    expect(thread.slice(-3)).toEqual([
+      { author: "@ada", body: "Walter, a campanha saiu.", names: ["Walter"] },
+      { author: "ana", body: "valeu ada", names: ["@ada"] },
+      { author: "ana", body: "mensagem 1" },
+    ]);
+    expect(inputs[0]?.message).toEqual({ id: asked.id, author: "ana", body: "e o deploy?" });
+  });
+
+  test("the slice's size: nothing older than 30 minutes, each message cut, about 4,000 characters in all", async () => {
+    await team();
+    await say("antiga", 31 * 60);
+    for (let i = 10; i >= 1; i--) await say(`${i} ${"x".repeat(1000)}`, i * 60);
+    const asked = await say("e agora?", 0);
+    const { strategy, inputs } = judge();
+    await route(strategy, asked.id);
+    const thread = inputs[0]?.thread ?? [];
+    expect(thread.some((l) => l.body === "antiga")).toBe(false);
+    for (const l of thread) expect(l.body).toHaveLength(ROUTER_SLICE.charsPerMessage);
+    expect(thread.every((l) => l.body.endsWith("…"))).toBe(true);
+    // The newest that fit: 8 messages of 500 characters.
+    expect(thread.map((l) => l.body.split(" ")[0])).toEqual(["8", "7", "6", "5", "4", "3", "2", "1"]);
+    expect(thread.reduce((n, l) => n + l.body.length, 0)).toBeLessThanOrEqual(ROUTER_SLICE.chars);
+  });
+
+  test("two messages within 2 s get one decision, on both, once the person stops", async () => {
+    f = await setup();
+    const { strategy, inputs } = judge();
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", strategy, quietMs: 600 },
+    });
+    const events = f.listen(f.general.id);
+    await post("o build quebrou");
+    const draining = drainOutbox(f.db, handlers);
+    await Bun.sleep(150);
+    const second = await post("de novo");
+    await draining;
+    await drainOutbox(f.db, handlers);
+    expect(inputs.map((i) => i.message.body)).toEqual(["o build quebrou\nde novo"]);
+    // Ana is alone here with Dev: what she writes to the room is for it.
+    expect(inputs[0]?.aloneWith).toBe("dev");
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    expect(decisions.map((d) => d.messageId)).toEqual([second.id]);
+    // The receipt is under the last message only.
+    const routed = events.filter((e) => e.type === "message.routed") as unknown as { messageId: string }[];
+    expect(routed.map((e) => e.messageId)).toEqual([second.id]);
+  });
+
+  test("a quote reply to an agent, then one more line: still a reply to that agent when the rules decide", async () => {
+    await team();
+    const report = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      body: "O deploy de ontem falhou na migração.",
+    });
+    const quoted = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "não funcionou de novo",
+      replyTo: report.id,
+    });
+    const more = await post("deu erro 500");
+    const failing: RouterStrategy = { name: "boom", decide: async () => Promise.reject(new Error("down")) };
+    const quick = { db: f.db, strategy: failing, policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 }, quietMs: 300 };
+    expect((await routeMessage(quick, { orgId: f.org.id, messageId: quoted.id })).skipped).toBe("continued");
+    expect(await routeMessage(quick, { orgId: f.org.id, messageId: more.id })).toMatchObject({
+      selected: [f.agent.id],
+      decidedBy: { step: "rule", rule: "reply" },
+    });
   });
 });
