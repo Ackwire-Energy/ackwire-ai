@@ -1,9 +1,19 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
@@ -15,6 +25,7 @@ import { type HandlerContext, handleRequest, type RequestScope } from "../../run
 import { readLines } from "../../runner/lines";
 import type { FetchLike } from "../../runner/push";
 import { RelayCount } from "../../runner/streams";
+import { agentSecrets } from "../../runner/secrets";
 import {
   BROWSER_LEASE_MS,
   Supervisor,
@@ -25,6 +36,7 @@ import {
   type WorkerState,
   workerCommand,
   workerHome,
+  retireLegacyPending,
 } from "../../runner/supervisor";
 import { runWorker, WorkerLink } from "../../runner/worker";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
@@ -1913,6 +1925,84 @@ test.if(posix)("a worker's home: its agent's own, in a folder nobody else can li
   expect(statSync(dir).uid).toBe(me.uid);
   expect(workerHome(base, me)).toBe(dir);
 });
+
+test.if(posix)("system broker keeps pending material out of the worker and installs only after activation", async () => {
+  const t = realWorkers();
+  t.sup.boot();
+  t.sup.attach();
+  const requestId = "broker-0001-aaaa";
+  const name = "BROKER_TEST_KEY";
+  const target = { kind: "env" as const };
+  const value = "broker-secret-value";
+  const key = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId }, scope().scope);
+  const aad = secretAad({ requestId, orgId: "org-1", name, target });
+  const box = await sealSecret(key.publicKey!, value, aad);
+  expect(await t.sup.secret({ op: "secret", agent: ANA, action: "deliver", requestId, name, target, aad, box }, scope().scope))
+    .toEqual({ size: value.length });
+  expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(true);
+  expect(existsSync(path.join(t.ownHome, "secrets", "a1b2c3d4", "keys", requestId))).toBe(false);
+  expect(await agentSecrets(path.join(t.ownHome, "secrets"), ANA)).toBeNull();
+  const order = `2026-10-29T00:00:00.000Z|${requestId}`;
+  expect(await t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope))
+    .toEqual({ size: value.length });
+  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBe(value);
+  expect(await agentSecrets(path.join(t.ownHome, "secrets"), BIA)).toBeNull();
+  expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(false);
+
+  const declined = "broker-0002-bbbb";
+  const declinedKey = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId: declined }, scope().scope);
+  const declinedAad = secretAad({ requestId: declined, orgId: "org-1", name: "OTHER_KEY", target });
+  const declinedBox = await sealSecret(declinedKey.publicKey!, "never-installed", declinedAad);
+  await t.sup.secret({ op: "secret", agent: ANA, action: "deliver", requestId: declined, name: "OTHER_KEY", target, aad: declinedAad, box: declinedBox }, scope().scope);
+  // A failed DB transaction or a decline sends discard rather than activate.
+  await t.sup.secret({ op: "secret", agent: ANA, action: "discard", requestId: declined }, scope().scope);
+  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env.OTHER_KEY).toBeUndefined();
+  await t.sup.secret({ op: "secret", agent: ANA, action: "remove", name, throughOrder: order }, scope().scope);
+  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBeUndefined();
+  expect((await agentSecrets(path.join(t.home, "secret-broker"), ANA))?.env[name]).toBeUndefined();
+  expect(await errorCode(() => t.sup.secret({ op: "secret", agent: ANA, action: "remove", name }, scope().scope)))
+    .toBe("bad_request");
+});
+
+test.if(posix && process.platform === "linux" && process.getuid?.() === 0)(
+  "upgrade retires old pending keys and boxes without following agent symlinks or losing active values",
+  async () => {
+    const base = path.join(tempDir("legacy-worker-homes-"), "agents");
+    dirs.push(path.dirname(base));
+    const me: AgentUser = { id: ANA.id, user: "ag-a1b2c3d4", uid: 0 };
+    const home = workerHome(base, me);
+    const own = path.join(home, "secrets", "a1b2c3d4");
+    mkdirSync(path.join(own, "keys"), { recursive: true });
+    mkdirSync(path.join(own, "staged"), { recursive: true });
+    writeFileSync(path.join(own, "keys", "legacy-0001"), "old-private-key");
+    writeFileSync(path.join(own, "staged", "legacy-0001"), "old-sealed-box");
+    writeFileSync(path.join(own, "store.json"), '{"secrets":[]}');
+    const outside = path.join(base, "sentinel");
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, "keep"), "untouched");
+    linkSync(path.join(outside, "keep"), path.join(own, "keys", "linked"));
+    retireLegacyPending(base, home, me);
+    expect(existsSync(path.join(own, "keys"))).toBe(false);
+    expect(existsSync(path.join(own, "staged"))).toBe(false);
+    expect(readFileSync(path.join(own, "store.json"), "utf8")).toBe('{"secrets":[]}');
+    expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
+    const broker = setup();
+    expect(await errorCode(() => broker.sup.secret({
+      op: "secret", agent: ANA, action: "activate", requestId: "legacy-0001",
+      order: "2026-10-29T00:00:00.000Z|legacy-0001",
+    }, scope().scope))).toBe("not_found");
+    symlinkSync(outside, path.join(own, "keys"));
+    expect(() => retireLegacyPending(base, home, me)).toThrow();
+    expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
+    mkdirSync(path.join(own, "keys"));
+    writeFileSync(path.join(own, "keys", "replanted"), "old-key");
+    expect(() => retireLegacyPending(base, home, me, (name) => {
+      if (name !== "keys") return;
+      mkdirSync(path.join(own, "keys"));
+      writeFileSync(path.join(own, "keys", "replanted"), "old-key");
+    })).toThrow("recreated");
+  },
+);
 
 test("lines: split across chunks, UTF-8 kept whole, and a line too long is skipped without being held", async () => {
   const stream = new PassThrough();

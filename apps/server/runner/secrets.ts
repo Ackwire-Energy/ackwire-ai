@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/adapters/secret-box";
 import { errnoCode, RunnerError } from "./errors";
 import { touchesGitInternals } from "./git-guard";
-import { agentFolderName, resolveInWorkspace } from "./paths";
+import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "./paths";
 
 /**
  * Each agent's secrets on this machine (ADR 0027), outside the workspace so
@@ -28,6 +28,15 @@ interface Stored {
 }
 
 type Staged = Extract<SecretRequest, { action: "deliver" }>;
+/** Root sends this to the worker only after the server committed delivery. */
+export type ActivatedSecret = {
+  action: "install";
+  requestId: string;
+  name: string;
+  target: Stored["target"];
+  value: string;
+  order: string;
+};
 
 const REQUEST_ID = /^[a-zA-Z0-9-]{8,64}$/;
 /** Keys of requests nobody answered (expired, canceled) are dropped after this. */
@@ -87,6 +96,24 @@ const orderFile = (dir: string, name: string) => {
   if (!SECRET_NAME.test(name)) throw new RunnerError("bad_request", "Invalid secret name");
   return path.join(dir, "orders", name);
 };
+const removedFile = (dir: string, name: string) => {
+  if (!SECRET_NAME.test(name)) throw new RunnerError("bad_request", "Invalid secret name");
+  return path.join(dir, "removed-through", name);
+};
+async function removedThrough(dir: string, name: string) {
+  return readFile(removedFile(dir, name), "utf8").catch((err) => {
+    if (errnoCode(err) === "ENOENT") return "";
+    throw err;
+  });
+}
+async function markRemovedThrough(dir: string, name: string, order: string) {
+  if (order <= await removedThrough(dir, name)) return;
+  const file = removedFile(dir, name);
+  await ensureDir(path.dirname(file));
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, order, { mode: 0o600 });
+  await rename(tmp, file);
+}
 async function latestOrder(dir: string, name: string, stored: Stored | undefined) {
   const persisted = await readFile(orderFile(dir, name), "utf8").catch((err) => {
     if (errnoCode(err) === "ENOENT") return "";
@@ -131,7 +158,8 @@ export async function handleSecret(
   root: string,
   agent: AgentScope | undefined,
   workspaceReal: string,
-  req: SecretRequest,
+  req: SecretRequest | ActivatedSecret,
+  options: { storageOnly?: boolean } = {},
 ): Promise<MachineReplies["secret"]> {
   if (!agent) throw new RunnerError("bad_request", "Secrets belong to an agent");
   const dir = dirOf(root, agent);
@@ -141,7 +169,7 @@ export async function handleSecret(
   secretQueues.set(dir, current);
   await previous;
   try {
-    return await handleSecretLocked(dir, workspaceReal, req);
+    return await handleSecretLocked(dir, workspaceReal, req, options);
   } finally {
     release();
     if (secretQueues.get(dir) === current) secretQueues.delete(dir);
@@ -151,7 +179,8 @@ export async function handleSecret(
 async function handleSecretLocked(
   dir: string,
   workspaceReal: string,
-  req: SecretRequest,
+  req: SecretRequest | ActivatedSecret,
+  options: { storageOnly?: boolean },
 ): Promise<MachineReplies["secret"]> {
   switch (req.action) {
     case "keypair": {
@@ -175,7 +204,10 @@ async function handleSecretLocked(
         privateKey = await readFile(file, "utf8");
       } catch (err) {
         if (errnoCode(err) === "ENOENT")
-          throw new RunnerError("not_found", "This request's key is gone (it expired or was answered)");
+          throw new RunnerError(
+            "not_found",
+            "This request's key is gone (it expired or predates the secure broker); ask the owner to reissue it",
+          );
         throw err;
       }
       let value: string;
@@ -185,9 +217,11 @@ async function handleSecretLocked(
         throw new RunnerError("bad_request", "The secret couldn't be opened (wrong key or altered on the way)");
       }
       if (target.kind === "file") {
-        const resolved = await resolveInWorkspace(workspaceReal, target.path);
+        const resolved = options.storageOnly
+          ? { rel: normalizeRequestPath(target.path), abs: target.path }
+          : await resolveInWorkspace(workspaceReal, target.path);
         if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
-        // Like the `write` op: a repository's git dir is the runner's own git's settings (`git-guard.ts`).
+        // The worker rechecks symlinks at committed installation time.
         if (touchesGitInternals(target.path, resolved.abs)) {
           throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
         }
@@ -227,7 +261,7 @@ async function handleSecretLocked(
           return { superseded: true };
         }
         if (own && current?.requestId === req.requestId) return { size: Buffer.byteLength(own.value) };
-        throw new RunnerError("not_found", "This request has no staged secret");
+        throw new RunnerError("not_found", "This request has no staged secret; ask the owner to reissue it");
       }
       if (delivery.action !== "deliver" || delivery.requestId !== req.requestId)
         throw new RunnerError("bad_request", "Invalid staged secret");
@@ -238,64 +272,33 @@ async function handleSecretLocked(
         delivery.target.kind === "file" ? { kind: "file", path: delivery.target.path } : { kind: "env" };
       checkAad(delivery.aad, delivery.requestId, delivery.name, target);
       const current = (await readStore(dir)).filter((s) => s.name === delivery.name).at(-1);
+      if ((await removedThrough(dir, delivery.name)) >= req.order) {
+        await cancelStaged(dir, req.requestId);
+        return { superseded: true };
+      }
       if ((await latestOrder(dir, delivery.name, current ?? undefined)) > req.order) {
         await cancelStaged(dir, req.requestId);
         return { superseded: true };
       }
-      let fileTarget: string | null = null;
-      if (target.kind === "file") {
-        const resolved = await resolveInWorkspace(workspaceReal, target.path);
-        if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
-        if (touchesGitInternals(target.path, resolved.abs)) {
-          throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
-        }
-        target.path = resolved.rel;
-        fileTarget = resolved.abs;
-      }
-      await ensureDir(dir);
-      await writeOrder(dir, delivery.name, req.order);
-      const before = await readStore(dir);
-      const next = before.filter((s) => s.name !== delivery.name);
-      next.push({ name: delivery.name, target, value, deliveredAt: new Date().toISOString(), requestId: req.requestId, order: req.order });
-      // A replacement can move a secret to another file or to the environment.
-      // Keep every old file in the store (and therefore in file guards and
-      // redaction) until its plaintext has been overwritten or removed.
-      const livePaths = new Set(next.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])));
-      const oldFiles = before.filter((s) => s.name === delivery.name && s.target.kind === "file");
-      const filesToRemove = oldFiles.filter((s) => s.target.kind === "file" && !livePaths.has(s.target.path));
-      await writeStore(dir, [...oldFiles, ...next]);
-      // The DB already guards the file path, and the store records the value
-      // before any workspace write that might fail halfway through.
-      if (fileTarget) {
-        await mkdir(path.dirname(fileTarget), { recursive: true });
-        await writeFile(fileTarget, value, { mode: 0o600 });
-        await chmod(fileTarget, 0o600).catch(() => undefined);
-      }
-      if (oldFiles.length > 0) {
-        let allRemoved = true;
-        for (const old of filesToRemove) {
-          if (old.target.kind !== "file") continue;
-          try {
-            const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
-            if (resolved.exists) await rm(resolved.abs, { force: true });
-          } catch {
-            // Retain the old entry so reads/uploads stay blocked and a later
-            // remove or replacement can try the cleanup again.
-            allRemoved = false;
-          }
-        }
-        if (allRemoved) await writeStore(dir, next);
-      }
+      const installed = await installLocked(dir, workspaceReal, {
+        action: "install", requestId: req.requestId, name: delivery.name, target, value, order: req.order,
+      }, options);
       await rm(file, { force: true });
       await rm(staged, { force: true });
-      return { size: Buffer.byteLength(value) };
+      return installed;
     }
+    case "install":
+      return installLocked(dir, workspaceReal, req, options);
     case "discard":
       await rm(keyFile(dir, req.requestId), { force: true });
       await rm(stagedFile(dir, req.requestId), { force: true });
       return {};
     case "remove": {
       const secrets = await readStore(dir);
+      // A worker install already sent by root may arrive after this removal.
+      // The server's throughOrder fences the entire removed generation, even
+      // when its request id was omitted from the requestIds list.
+      if (req.throughOrder) await markRemovedThrough(dir, req.name, req.throughOrder);
       const selected = (s: Stored) => s.name === req.name &&
         (!req.requestIds || (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
           (req.throughOrder !== undefined && (s.order ?? "") <= req.throughOrder));
@@ -303,7 +306,7 @@ async function handleSecretLocked(
       const otherPaths = new Set(
         secrets.flatMap((s) => (!selected(s) && s.target.kind === "file" ? [s.target.path] : [])),
       );
-      for (const old of gone) {
+      for (const old of options.storageOnly ? [] : gone) {
         if (old.target.kind !== "file" || otherPaths.has(old.target.path)) continue;
         const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
         if (resolved.exists) await rm(resolved.abs, { force: true });
@@ -321,6 +324,95 @@ async function handleSecretLocked(
     default:
       throw new RunnerError("bad_request", "Unknown secret action");
   }
+}
+
+/** Persist a value after the DB decision; the root broker mirrors only the store, the worker writes files. */
+async function installLocked(
+  dir: string,
+  workspaceReal: string,
+  req: ActivatedSecret,
+  options: { storageOnly?: boolean },
+): Promise<MachineReplies["secret"]> {
+  // Removal may have won while a root-to-worker install was still in flight.
+  if (await stat(canceledFile(dir, req.requestId)).then(() => true, (err) => {
+    if (errnoCode(err) === "ENOENT") return false;
+    throw err;
+  })) return { superseded: true };
+  if ((await removedThrough(dir, req.name)) >= req.order) return { superseded: true };
+  if (!SECRET_NAME.test(req.name) || isReservedSecretName(req.name))
+    throw new RunnerError("bad_request", "Invalid secret name");
+  if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
+    throw new RunnerError("bad_request", "Invalid secret delivery order");
+  const target = req.target.kind === "file"
+    ? { kind: "file" as const, path: req.target.path }
+    : { kind: "env" as const };
+  const current = (await readStore(dir)).filter((s) => s.name === req.name).at(-1);
+  if ((await latestOrder(dir, req.name, current)) > req.order) return { superseded: true };
+  let fileTarget: string | null = null;
+  if (target.kind === "file") {
+    const resolved = options.storageOnly
+      ? { rel: normalizeRequestPath(target.path), abs: target.path }
+      : await resolveInWorkspace(workspaceReal, target.path);
+    if (resolved.rel === "") throw new RunnerError("bad_request", "Can't write a secret over the workspace");
+    if (touchesGitInternals(target.path, resolved.abs))
+      throw new RunnerError("bad_request", "A secret can't be written inside a .git folder");
+    target.path = resolved.rel;
+    fileTarget = resolved.abs;
+  }
+  await ensureDir(dir);
+  await writeOrder(dir, req.name, req.order);
+  const before = await readStore(dir);
+  const next = before.filter((s) => s.name !== req.name);
+  next.push({
+    name: req.name,
+    target,
+    value: req.value,
+    deliveredAt: new Date().toISOString(),
+    requestId: req.requestId,
+    order: req.order,
+  });
+  const livePaths = new Set(next.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])));
+  const oldFiles = before.filter((s) => s.name === req.name && s.target.kind === "file");
+  const filesToRemove = oldFiles.filter((s) => s.target.kind === "file" && !livePaths.has(s.target.path));
+  await writeStore(dir, [...oldFiles, ...next]);
+  if (!options.storageOnly && fileTarget) {
+    await mkdir(path.dirname(fileTarget), { recursive: true });
+    await writeFile(fileTarget, req.value, { mode: 0o600 });
+    await chmod(fileTarget, 0o600).catch(() => undefined);
+  }
+  if (oldFiles.length > 0) {
+    let allRemoved = true;
+    for (const old of options.storageOnly ? [] : filesToRemove) {
+      if (old.target.kind !== "file") continue;
+      try {
+        const resolved = await resolveInWorkspace(workspaceReal, old.target.path);
+        if (resolved.exists) await rm(resolved.abs, { force: true });
+      } catch {
+        allRemoved = false;
+      }
+    }
+    if (allRemoved) await writeStore(dir, next);
+  }
+  return { size: Buffer.byteLength(req.value) };
+}
+
+/** The root broker's activated value for an internal worker install, never for an agent protocol request. */
+export async function activatedSecret(
+  root: string,
+  agent: AgentScope,
+  requestId: string,
+): Promise<ActivatedSecret | null> {
+  const secrets = await readStore(dirOf(root, agent));
+  const stored = secrets.find((s) => s.requestId === requestId);
+  if (!stored?.order) return null;
+  return {
+    action: "install",
+    requestId,
+    name: stored.name,
+    target: stored.target,
+    value: stored.value,
+    order: stored.order,
+  };
 }
 
 /** What commands of this agent get: env values, and a redactor for everything that leaves the machine. */
