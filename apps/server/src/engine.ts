@@ -256,7 +256,8 @@ export function buildEngine(o: EngineOptions) {
       createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
-      createAskAgentToolSource({ pubsub: adapters.pubsub }),
+      // An agent with no AI connected is refused at once: its answer would never come.
+      createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
