@@ -22,9 +22,10 @@ import {
   type PlanGate,
   planGate,
   signInAgainPlan,
+  signsInOnce,
   signsInPerAgent,
 } from "../src/lib/no-ai";
-import { LOGIN_PER_AGENT } from "../src/lib/plans";
+import { LOGIN_PER_AGENT, SHARED_SIGN_INS } from "../src/lib/plans";
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -256,6 +257,29 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(set("claude")).toEqual(["ada", "theo", "cy"]);
     expect(set("chatgpt")).toEqual([]);
     expect(set("zai", [{ id: "ada" }, { id: "bo" }])).toEqual([]);
+  });
+
+  test("one sign-in for all of them where the computer says so: ChatGPT's too", () => {
+    // Where each agent is its own OS user, Claude's sign-in and plans' keys think for all; ChatGPT's not yet.
+    expect(SHARED_SIGN_INS).toEqual({ claude_code: true, key: true });
+    const sharing = { shares: { claude_code: true, codex: true, key: true } };
+    expect(signsInOnce("chatgpt", sharing)).toBe(true);
+    expect(signsInOnce("zai", { shares: { claude_code: true, codex: false, key: false } })).toBe(false);
+    expect(signsInOnce("claude", undefined)).toBe(false);
+    const sharedOn = (id: string | null) => id === "m1";
+    const once = (choice: PlanChoice) =>
+      allAgents({
+        choice,
+        agents: team,
+        aiOf: (id) => ai[id] ?? null,
+        machineOf: (id) => machines[id] ?? "m1",
+        sharedOn,
+      }).map((a) => a.id);
+    expect(once("chatgpt")).toEqual(["ada", "theo"]);
+    // Elsewhere ChatGPT's still thinks for one agent.
+    expect(
+      allAgents({ choice: "chatgpt", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m2", sharedOn }),
+    ).toEqual([]);
   });
 
   test("the panel opens on the agent asked for, then all of them while two have no AI, then the first with no AI", () => {

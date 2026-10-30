@@ -1023,13 +1023,23 @@ kept only in the folder (`provider.json`, mode 600); the server keeps its last 4
 turn's requests go comes from the runner's own list of plans, not from anything a project can set.
 Each person adds them in **Settings → AI accounts**.
 
+**One sign-in for all of your agents.** An account signed in once on a computer thinks for every agent
+you give it there, with no other sign-in (**Use for…** in **Settings → AI accounts**, or the account
+in an agent's **Who thinks**). With every agent running as the runner's own user, that is any account.
+With `install.sh --system`, a Claude sign-in made for all agents is `claude setup-token`'s token,
+kept in the account's folder (`token.json`, mode 600), which only root opens, and a coding plan's key
+stays in `provider.json` there the same way; each turn's CLI gets it in its environment only, in a
+folder of that agent's own. A ChatGPT sign-in there still thinks for one agent. Disconnecting a Claude
+account deletes its token from the computer: to end it on Claude too, revoke it in Claude's settings.
+
 **Who can reach an account.** With every agent running as the runner's own user (the default
 install), any agent on that computer could reach every account folder there; the runner keeps them
-out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user,
-and an account folder belongs to the user of the agent that thinks with it, only while it does.
-Taking control of an agent's desktop or opening its terminal is a shell as that user: in the default
-install only the person who paired the computer can, and with `--system` admins and the agent's
-owner can, but only its owner while the agent thinks with their plan.
+out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user:
+a sign-in made for all agents stays root's, and its token or key reaches only the turns of the agents
+that think with it; any other account folder belongs to the user of the agent that thinks with it,
+only while it does. Taking control of an agent's desktop or opening its terminal is a shell as that
+user: in the default install only the person who paired the computer can, and with `--system` admins
+and the agent's owner can, but only its owner while the agent thinks with their plan.
 
 **Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
 computer's backups: they hold sign-ins. The server's database never has them.

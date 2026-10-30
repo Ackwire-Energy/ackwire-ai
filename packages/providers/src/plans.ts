@@ -138,13 +138,14 @@ export const planAliases = (plan: CodingPlan): PlanAlias[] =>
 export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.keyPattern).test(key);
 
 /**
- * The accounts that may have one login per agent, the same account signed in again for each (on a computer where
- * every agent is its own OS user, a sign-in folder belongs to one agent at a time). A coding plan's key has no
- * refresh token, so its copies never sign each other out. Claude's sign-ins may too (ADR 0059 §2, amended
- * 2026-10-30), though a new sign-in or a token refresh can sign the account's other logins out: such a login reads
- * as signed out from its next turn on, for its owner to sign in again. ChatGPT's stay one agent per account (OpenAI
- * documents one `auth.json` per runner). Set back to false, a kind refuses a new login of an account already there
- * again; logins made meanwhile keep thinking, each for its agent.
+ * The accounts that may have one login per agent, the same account signed in again for each, where a login thinks
+ * for one agent: on a runner before protocol 27, and on a computer where every agent is its own OS user for a
+ * login made before it or with `SHARED_SIGN_INS` off. A coding plan's key has no refresh token, so its copies never
+ * sign each other out. Claude's sign-ins may too (ADR 0059 §2, amended 2026-10-30), though a new sign-in or a token
+ * refresh can sign the account's other logins out: such a login reads as signed out from its next turn on, for its
+ * owner to sign in again. ChatGPT's stay one agent per account (OpenAI documents one `auth.json` per runner). Set
+ * back to false, a kind refuses a new login of an account already there again; logins made meanwhile keep
+ * thinking, each for its agent.
  */
 export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
   claude_code: true,
@@ -155,3 +156,21 @@ export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", b
 /** Whether an account (its CLI's kind, and a coding plan's `provider` for a key) may have one login per agent. */
 export const loginPerAgent = (kind: string, provider?: string | null) =>
   isPlanId(provider) ? LOGIN_PER_AGENT.key : kind === "codex" ? LOGIN_PER_AGENT.codex : LOGIN_PER_AGENT.claude_code;
+
+/**
+ * Where each agent is its own OS user (system mode), whether a new sign-in is made once for every agent of its
+ * owner on that computer (ADR 0059 §2, amended 2026-10-30, protocol 27): root keeps it and hands each turn what
+ * its CLI needs. For Claude that is the token `claude setup-token` makes, which the runner then keeps: set
+ * `claude_code` to false to go back to one login per agent there. ChatGPT's sign-in still thinks for one agent
+ * there. Where every agent is the runner's own user, any sign-in thinks for all of them, as the computer's own
+ * always has. Accounts made for all agents keep thinking when a kind is switched off, until signed in again or
+ * removed.
+ */
+export const SHARED_SIGN_INS: Readonly<Record<"claude_code" | "key", boolean>> = {
+  claude_code: true,
+  key: true,
+};
+
+/** Whether a new sign-in of an account (its CLI's kind, and a coding plan's `provider`) is made for all agents. */
+export const sharedSignIn = (kind: string, provider?: string | null) =>
+  isPlanId(provider) ? SHARED_SIGN_INS.key : kind === "claude_code" && SHARED_SIGN_INS.claude_code;

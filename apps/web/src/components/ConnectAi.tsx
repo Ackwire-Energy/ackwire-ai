@@ -1,5 +1,5 @@
 import type { ConnectIntent } from "@agenteschat/client";
-import { keys, useAddCredential, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { keys, useAddCredential, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -12,6 +12,7 @@ import {
   defaultTarget,
   gateDims,
   type PlanChoice,
+  signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
@@ -163,7 +164,21 @@ function ConnectAiDialog({
   const aiOf = (id: string): AgentAi => linked[id] ?? agentAi(dir.agentById.get(id), aiStateOf(status.data, id));
   const hasAi = (id: string) => aiOf(id) !== null;
   const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
-  const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
+  const accounts = useAiAccounts(org.id);
+  const setOf = (c: AiChoice) =>
+    c === "key"
+      ? []
+      : allAgents({
+          choice: c,
+          agents,
+          aiOf,
+          machineOf,
+          sharedOn: (id) =>
+            signsInOnce(
+              c,
+              accounts.data?.computers.find((m) => m.machineId === id),
+            ),
+        });
   // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
   const [pickedTarget, setPickedTarget] = useState<string>();
   // Held once a sign-in starts (`onStart`): every move it makes gives an agent an AI, which would move the default.

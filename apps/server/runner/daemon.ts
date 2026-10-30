@@ -872,6 +872,11 @@ export class RunnerDaemon implements RequestObserver {
               },
             }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
+        grant: (kind, accountId) => this.accounts.grant(kind, accountId),
+        usage: (kind, accountId, info) =>
+          kind === "codex"
+            ? this.accounts.noteCodexRateLimits(accountId, info)
+            : this.accounts.noteRateLimit(accountId, info),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         ...this.opts.workers,

@@ -3576,14 +3576,18 @@ export interface MachineAccount {
   ownerName: string | null;
   /** The viewer owns it: only they rename it or pick it for an agent. */
   mine: boolean;
-  /** Names of the agents that think with it (one at most). */
+  /** Names of the agents that think with it (one at most, unless `shared`). */
   usedBy: string[];
+  /** Their ids, in the same order (absent: an older server). */
+  usedByIds?: string[];
   /** Its plan's usage limits; null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
   provider: string | null;
   /** The last 4 of a key account's key (its owner only). */
   keyHint: string | null;
+  /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
+  shared?: boolean;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
@@ -3602,6 +3606,8 @@ export interface AiComputer {
   canAdd: boolean;
   /** Its runner takes coding plans' keys. */
   keys: boolean;
+  /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
+  shares?: { claude_code: boolean; codex: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
   /**

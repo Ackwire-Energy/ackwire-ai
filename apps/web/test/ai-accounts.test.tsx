@@ -5,7 +5,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -301,5 +301,42 @@ describe("Contas de IA: a plan with a login per agent", () => {
       { accountId: "acct_lia", provider: "zai" },
     ]);
     expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("an account for all of Walter's agents there: Use for Atlas too gives it, no sign-in; Disconnect says to revoke the token on Claude", async () => {
+    const state = seedState();
+    for (const a of state.agents) a.ownerUserId = "u-walter";
+    state.aiStatus = { any: false, agents: [{ agentId: ATLAS_ID, state: "no_ai", reason: "no_key" }] };
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({
+      id: "machine_1",
+      name: "MacBook",
+      mode: "system",
+      agents: state.agents.slice(0, 2).map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
+    });
+    const all = {
+      ...base,
+      id: "acct_all",
+      label: "Claude",
+      email: null,
+      usedBy: ["Ada"],
+      usedByIds: [ADA_ID],
+      shared: true,
+    };
+    machines?.setAiAccounts({ accounts: [all], computers: [MAC] });
+    await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
+    await settle(6);
+    const row = document.querySelector(".ai-accounts__row") as HTMLElement;
+    expect(row.textContent).toContain("Ada pensa com ela");
+    await click(within(row).getByRole("button", { name: "Usar também para o Atlas" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args)).toEqual([
+      [ORG_ID, ATLAS_ID, { brain: "claude_code", account: "acct_all" }],
+    ]);
+    expect(state.calls.some((c) => c.method === "machines.beginAccountLogin")).toBe(false);
+    await click(within(row).getByRole("button", { name: "Desconectar" }));
+    const dialog = screen().getByRole("dialog");
+    expect(dialog.textContent).toContain("Para encerrar também no Claude, revogue nas configurações do Claude.");
   });
 });

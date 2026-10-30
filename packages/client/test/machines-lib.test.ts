@@ -236,6 +236,9 @@ describe("connected computers helpers (ADR 0036)", () => {
     const failed = (duplicate: AccountLoginStatus["duplicate"]): AccountLoginStatus => ({ state: "failed", duplicate });
     expect(freeDuplicate(failed({ label: "Claude Max", account }))).toBe(account);
     expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, usedBy: ["Theo"] } }))).toBeNull();
+    // One for all of the person's agents there thinks for this one too.
+    const forAll = { ...account, usedBy: ["Theo"], shared: true };
+    expect(freeDuplicate(failed({ label: "Claude Max", account: forAll }))).toBe(forAll);
     expect(freeDuplicate(failed({ label: "Claude Max", account: { ...account, status: "signed_out" } }))).toBeNull();
     // An older server names it only.
     expect(freeDuplicate(failed({ label: "Claude Max" }))).toBeNull();

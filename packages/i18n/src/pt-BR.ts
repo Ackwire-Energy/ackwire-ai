@@ -1201,6 +1201,10 @@ export const ptBR = {
     agentAria: "Agentes que usam este plano",
     each: "Um login por agente, com a mesma conta.",
     eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
+    once: "Um login só para todos.",
+    onceHint: "Todos dividem os limites do seu plano.",
+    use: "Usar {{label}}",
+    another: "Outra conta",
     signInFor: "Fazer login {{for}} {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
     otherAccount: {
@@ -4762,6 +4766,9 @@ export const ptBR = {
         "{{agents}} deixam de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectNone: "O {{computer}} sai da conta e apaga o que guardava dela.",
       disconnected: "{{label}} desconectada.",
+      useFor: "Usar também {{for}} {{name}}",
+      useForMenu: "Usar para…",
+      revokeOnClaude: "Para encerrar também no Claude, revogue nas configurações do Claude.",
     },
     usage: {
       window: {

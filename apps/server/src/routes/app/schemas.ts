@@ -481,12 +481,19 @@ export const MachineAccount = z
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
-    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
+    usedBy: z.array(z.string()).openapi({
+      description: "Names of the agents that think with it (one at most, unless `shared`).",
+    }),
+    usedByIds: z.array(z.uuid()).openapi({ description: "Their ids, in the same order." }),
     usage: PlanUsage.nullable().openapi({ description: "Its plan's usage limits; null: not known yet." }),
     provider: z.string().nullable().openapi({
       description: "A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in.",
     }),
     keyHint: z.string().nullable().openapi({ description: "The last 4 of a key account's key; only for its owner." }),
+    shared: z.boolean().openapi({
+      description:
+        "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 27); else for one.",
+    }),
   })
   .openapi("MachineAccount", {
     description:

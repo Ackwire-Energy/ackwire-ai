@@ -83,15 +83,18 @@ export interface OfferAccount {
   status: string;
   usedBy: readonly string[];
   usage: PlanMeterUsage | null;
+  /** It thinks for every agent its owner gives it on that computer. */
+  shared?: boolean;
 }
 
 /**
  * At the limit, the owner's other accounts that could think instead: of the
  * same kind and plan maker (another maker's models would think instead),
- * signed in, not at their own limit and free. One another agent thinks with
- * is never offered (an account serves one agent; moving plans between agents
- * to dodge a limit isn't). Most headroom first, unknown usage last. Shared by
- * the web's and the phone's agent settings.
+ * signed in, not at their own limit, and free or made for all of the owner's
+ * agents there. A login another agent thinks with is never offered (it serves
+ * one agent; moving plans between agents to dodge a limit isn't). Most
+ * headroom first, unknown usage last. Shared by the web's and the phone's
+ * agent settings.
  */
 export function limitOffers<A extends OfferAccount>(
   accounts: readonly A[],
@@ -108,7 +111,7 @@ export function limitOffers<A extends OfferAccount>(
         (a.provider ?? null) === provider &&
         a.id !== current &&
         a.status === "active" &&
-        a.usedBy.length === 0,
+        (a.usedBy.length === 0 || a.shared === true),
     )
     .map((account) => ({ account, plan: account.usage ? planState(account.usage, now) : null }))
     .filter((o) => o.plan?.state !== "limited")

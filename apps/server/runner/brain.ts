@@ -30,7 +30,7 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf, yieldRoute } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, type AccountGrant, accountEnv, planKeyOf, yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -847,10 +847,10 @@ export function runTurnOnProcess(
     /** Each `rate_limit_event` of the turn (`rate_limit_info`). */
     onRateLimit?: (info: Record<string, unknown>) => void;
     /**
-     * A coding plan's key: refused once is refused (Claude Code would retry for minutes), so the turn ends
-     * at once as `not_logged_in`.
+     * A credential that never refreshes (a coding plan's key, a Claude token): refused once is refused (Claude
+     * Code would retry for minutes), so the turn ends at once as `not_logged_in`, with these words.
      */
-    keyAccount?: boolean;
+    refused?: string;
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
@@ -957,16 +957,9 @@ export function runTurnOnProcess(
       if (followUp) clearTimeout(followUp);
       followUp = null;
       const parsed = proc.parser.push(line);
-      if (parsed.authRetry && opts.keyAccount) {
+      if (parsed.authRetry && opts.refused) {
         proc.kill();
-        finish({
-          final: {
-            type: "error",
-            code: "not_logged_in",
-            message: "The plan refused its key. Paste a new key in AI accounts.",
-            retryable: true,
-          },
-        });
+        finish({ final: { type: "error", code: "not_logged_in", message: opts.refused, retryable: true } });
         return;
       }
       // The next turn began: it reads the notices that came before it.
@@ -1057,6 +1050,8 @@ export interface BrainManagerOptions {
    */
   accounts?: {
     accountDir(kind: AccountKind, id: string): string | null;
+    /** System mode, in a worker (protocol 27): this agent's own folder for an account root keeps (`AccountGrant`). */
+    agentHome?(kind: AccountKind, id: string): string | null;
     noteRateLimit?(key: string, info: unknown): void;
   };
   /** The local MCP bridge (where the daemon listens and how to start `agentes-runner mcp`). */
@@ -1118,6 +1113,10 @@ export interface BrainTurnContext {
   accountHome?: string;
   /** Set by the manager (protocol 20): that folder's coding plan and key. */
   planKey?: { provider: PlanId; key: string };
+  /** System mode, in a worker (protocol 27): what root handed this turn for its account. */
+  grant?: AccountGrant;
+  /** Set by the manager from `grant`: the account's Claude token, in the CLI's env only. */
+  oauthToken?: string;
 }
 
 /** A session is remembered per account: the same id in another account's folder is another session. */
@@ -1152,18 +1151,21 @@ export function carryClaudeSession(claudeHome: string, cwd: string, session: str
   }
 }
 
-/** The turn's redaction also hides the plan's key (an agent's shell could print it: it is in the env). */
-function withKeyRedacted(
-  secrets: TaskSecrets | null | undefined,
-  plan: { provider: PlanId; key: string },
-): TaskSecrets {
-  const name = planOf(plan.provider)?.claudeCode.tokenEnv ?? "PLAN_KEY";
+/** The turn's redaction also hides the sign-in it was given (an agent's shell could print it: it is in the env). */
+function withRedacted(secrets: TaskSecrets | null | undefined, secret: { name: string; value: string }): TaskSecrets {
   const before = secrets?.redact ?? ((text: string) => text);
   return {
     env: secrets?.env ?? {},
-    redact: (text) => redactSecrets(before(text), [{ name, value: plan.key }]),
+    redact: (text) => redactSecrets(before(text), [secret]),
   };
 }
+
+const planKeyName = (plan: { provider: PlanId }) => planOf(plan.provider)?.claudeCode.tokenEnv ?? "PLAN_KEY";
+
+/** What a turn says when its account's token is refused. */
+export const TOKEN_REFUSED = "Claude refused this account's sign-in. Sign in again in AI accounts.";
+/** What a turn says when root has nothing to sign its account in with (signed out on the computer). */
+const ACCOUNT_SIGNED_OUT = "This account is signed out on this computer. Sign in again in AI accounts.";
 
 const errorEvent = (code: string, message: string, retryable: boolean): WireBrainEvent => ({
   type: "error",
@@ -1269,17 +1271,29 @@ export class BrainManager {
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
       cwd = resolved.abs;
     }
-    // ADR 0041: the account's folder or nothing (never the machine's own sign-in instead).
+    // ADR 0041: the account's folder or nothing (never the machine's own sign-in instead). One root keeps
+    // (protocol 27) thinks in this agent's own folder for it, with what root handed over.
     const account: unknown = req.account;
     if (account !== undefined && account !== null && account !== "") {
       if (!isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-      const home = this.opts.accounts?.accountDir("claude_code", account);
+      const grant = ctx.grant;
+      if (grant?.kind === "none") return errorEvent("not_logged_in", ACCOUNT_SIGNED_OUT, true);
+      const home = grant
+        ? this.opts.accounts?.agentHome?.("claude_code", account)
+        : this.opts.accounts?.accountDir("claude_code", account);
       if (!home) return errorEvent("account_missing", ACCOUNT_MISSING_MESSAGE.claude_code, false);
-      const planKey = await planKeyOf(home);
+      const planKey =
+        grant?.kind === "key" ? { provider: grant.provider, key: grant.key } : grant ? null : await planKeyOf(home);
+      const token = grant?.kind === "token" ? grant.token : undefined;
       ctx = {
         ...ctx,
         accountHome: home,
-        ...(planKey ? { planKey, secrets: withKeyRedacted(ctx.secrets, planKey) } : {}),
+        ...(planKey
+          ? { planKey, secrets: withRedacted(ctx.secrets, { name: planKeyName(planKey), value: planKey.key }) }
+          : {}),
+        ...(token
+          ? { oauthToken: token, secrets: withRedacted(ctx.secrets, { name: "CLAUDE_CODE_OAUTH_TOKEN", value: token }) }
+          : {}),
       };
     }
     const key = `${ctx.agent.id}:${session}`;
@@ -1294,6 +1308,7 @@ export class BrainManager {
   }
 
   private signature(cwd: string, req: BrainTurnRequest, ctx: BrainTurnContext) {
+    const secret = ctx.planKey?.key ?? ctx.oauthToken;
     return JSON.stringify({
       cwd,
       model: req.model ?? null,
@@ -1301,9 +1316,9 @@ export class BrainManager {
       perm: req.permissions ?? null,
       // Folders allowed or removed on the machine: the process restarts (resumed) with the new `--add-dir`s.
       dirs: ctx.grants ?? [],
-      // Another account or effort: a new process (in the other account, a new session); a new key too.
+      // Another account or effort: a new process (in the other account, a new session); a new key or token too.
       account: ctx.accountHome ? (req.account ?? null) : null,
-      key: ctx.planKey ? createHash("sha256").update(ctx.planKey.key).digest("hex").slice(0, 16) : null,
+      key: secret ? createHash("sha256").update(secret).digest("hex").slice(0, 16) : null,
       effort: isBrainEffort(req.effort) ? req.effort : null,
     });
   }
@@ -1422,7 +1437,11 @@ export class BrainManager {
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
         onRateLimit: (info) => this.opts.accounts?.noteRateLimit?.(usageKey, info),
-        ...(ctx.planKey ? { keyAccount: true } : {}),
+        ...(ctx.planKey
+          ? { refused: "The plan refused its key. Paste a new key in AI accounts." }
+          : ctx.oauthToken
+            ? { refused: TOKEN_REFUSED }
+            : {}),
         ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
@@ -1507,6 +1526,7 @@ export class BrainManager {
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
+    if (ctx.oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = ctx.oauthToken;
     const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();

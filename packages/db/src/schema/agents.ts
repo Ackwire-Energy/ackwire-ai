@@ -1,17 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  bigint,
-  boolean,
-  foreignKey,
-  index,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uniqueIndex,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { bigint, boolean, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { machineAccounts, machines } from "./machines";
 import { organizations } from "./tenancy";
@@ -117,7 +105,9 @@ export const agents = pgTable(
      * The account its computer brain runs with (ADR 0041), on its machine and
      * of its brain's kind (checked in code); null = the computer's own sign-in.
      * Cleared when the agent changes computer or brain kind, or the account goes.
-     * An account thinks for one agent at most (ADR 0059 §2).
+     * An account the runner doesn't say thinks for all of its owner's agents
+     * (`machine_accounts.shared`) thinks for one at most (ADR 0059 §2, checked
+     * in code under a lock on the account's row).
      */
     brainAccountId: uuid(),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
@@ -149,9 +139,6 @@ export const agents = pgTable(
       columns: [t.orgId, t.brainAccountId],
       foreignColumns: [machineAccounts.orgId, machineAccounts.id],
     }),
-    uniqueIndex("agents_brain_account_unique")
-      .on(t.orgId, t.brainAccountId)
-      .where(sql`${t.brainAccountId} is not null and ${t.archivedAt} is null`),
   ],
 );
 

@@ -1,14 +1,14 @@
 // A fake `claude` for brain tests: speaks stream-json in and out like
 // `claude -p --input-format stream-json --output-format stream-json`.
 // Each start appends its argv, $CLAUDE_CONFIG_DIR, its folder, $ANTHROPIC_API_KEY,
-// $ANTHROPIC_AUTH_TOKEN and its `--settings` file's `env` to $FAKE_CLAUDE_LOG
-// (one JSON line).
+// $ANTHROPIC_AUTH_TOKEN, $CLAUDE_CODE_OAUTH_TOKEN and its `--settings` file's `env` to
+// $FAKE_CLAUDE_LOG (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
 // "RATE" says the 5-hour window is at 84%; "STEER…" and "BGSELF" below (live
-// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN (as an
-// agent's shell could print it), "KEY401" is refused by the endpoint and retries for good
+// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN and "ECHOTOKEN" with
+// $CLAUDE_CODE_OAUTH_TOKEN (as an agent's shell could print them), "KEY401" is refused by the endpoint and retries for good
 // (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
@@ -25,6 +25,7 @@ if (log) {
   const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
   const authToken = process.env.ANTHROPIC_AUTH_TOKEN ?? null;
+  const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null;
   const baseUrl = process.env.ANTHROPIC_BASE_URL ?? null;
   const at = args.indexOf("--settings");
   let settingsEnv = null;
@@ -33,7 +34,7 @@ if (log) {
   } catch {}
   appendFileSync(
     log,
-    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, baseUrl, settingsEnv })}\n`,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, baseUrl, settingsEnv })}\n`,
   );
 }
 const flag = (name) => {
@@ -269,7 +270,9 @@ async function answer(line) {
   }
   const said = prompt.includes("ECHOKEY")
     ? [`token ${process.env.ANTHROPIC_AUTH_TOKEN} `, "printed"]
-    : ["Hello ", "world"];
+    : prompt.includes("ECHOTOKEN")
+      ? [`token ${process.env.CLAUDE_CODE_OAUTH_TOKEN} `, "printed"]
+      : ["Hello ", "world"];
   for (const text of said) {
     out({
       type: "stream_event",
@@ -304,7 +307,8 @@ async function answer(line) {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: prompt.includes("ECHOKEY") ? said.join("") : `echo ${turns}: ${prompt}${steered}`,
+    result:
+      prompt.includes("ECHOKEY") || prompt.includes("ECHOTOKEN") ? said.join("") : `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
     ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),

@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { accountChoices, groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
+import {
+  accountChoices,
+  agentsToGive,
+  endsOnClaude,
+  groupPlans,
+  ownSignInName,
+  ownSignIns,
+  planWordOf,
+  signInPlan,
+} from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
@@ -106,6 +115,14 @@ describe("accountChoices: an agent's account choice, one entry per account", () 
     ]);
   });
 
+  test("one made for all of its owner's agents there is offered as it is, other agents on it or not", () => {
+    expect(choice([claude("s", { usedBy: ["Theo"], shared: true })], [null])).toEqual([["s", ["Theo"], false]]);
+    // A login of the account for this agent alone still comes first.
+    expect(choice([claude("s", { usedBy: ["Theo"], shared: true }), claude("a")], ["a"])).toEqual([
+      ["a", ["Theo"], false],
+    ]);
+  });
+
   test("the login chosen comes before the one the agent thinks with", () => {
     const logins = [claude("a", { usedBy: ["Ada"] }), claude("b")];
     expect(choice(logins, ["b", "a"])).toEqual([["b", ["Ada"], false]]);
@@ -190,5 +207,43 @@ describe("the computer's own sign-in by name", () => {
       }) as unknown as Parameters<typeof usageSourcePart>[2];
     expect(usageSourcePart(t, "en", source(true))).toBe("97% on the account your agents share");
     expect(usageSourcePart(t, "en", source(false))).toBe("97% on MacBook's own account");
+  });
+});
+
+describe("an account for all of its owner's agents", () => {
+  const ana = "u_ana";
+  const agents = [
+    { id: "ada", ownerUserId: ana },
+    { id: "theo", ownerUserId: ana },
+    { id: "lia", ownerUserId: ana },
+    { id: "bo", ownerUserId: "u_bia" },
+    { id: "cy", ownerUserId: ana },
+  ];
+  const machine = { agents: ["ada", "theo", "lia", "bo"].map((id) => ({ id, name: id, handle: id })) };
+  const give = (over: Partial<MachineAccount> = {}, onKey: (id: string) => boolean = (id) => id === "lia") =>
+    agentsToGive({
+      account: login("s", { shared: true, usedBy: ["Ada"], usedByIds: ["ada"], ...over }),
+      agents,
+      machine,
+      viewerId: ana,
+      onKey,
+    }).map((a) => a.id);
+
+  test("Use for…: the owner's agents on its computer not on it yet, never one on the API key", () => {
+    // Theo; not Ada (on it), Lia (on the key), Bo (Bia's) nor Cy (another computer).
+    expect(give()).toEqual(["theo"]);
+    expect(give({}, () => false)).toEqual(["theo", "lia"]);
+    // One made for one agent, or someone else's: nothing to give.
+    expect(give({ shared: false })).toEqual([]);
+    expect(give({ mine: false })).toEqual([]);
+  });
+
+  test("disconnecting ends it on Claude only through Claude's settings: a token, where each agent is its own user", () => {
+    const token = login("t", { shared: true, provider: null, keyHint: null });
+    expect(endsOnClaude(token, { mode: "system" })).toBe(true);
+    expect(endsOnClaude(token, { mode: "single" })).toBe(false);
+    expect(endsOnClaude({ ...token, provider: "zai" }, { mode: "system" })).toBe(false);
+    expect(endsOnClaude({ ...token, shared: false }, { mode: "system" })).toBe(false);
+    expect(endsOnClaude({ ...token, kind: "codex" }, { mode: "system" })).toBe(false);
   });
 });

@@ -108,7 +108,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       : t("aiAccounts.done.savedAgent", { agent: name, label: lowerFirst(t("connectAi.own.shared"), i18n.language) });
     const others = a ? takenFrom(a, name) : [];
     if (!a || others.length === 0) return void save({ account: a?.id ?? null }, done);
-    // One account thinks for one agent: picking another agent's takes it from that one.
+    // A login made for one agent thinks for one: picking another agent's takes it from that one.
     Alert.alert(a.label, t("agentPage.work.brain.accountMove", { agents: others.join(", ") }), [
       { text: t("common.cancel"), style: "cancel" },
       { text: t("mobile.ai.moveHere"), onPress: () => void save({ account: a.id, moveAccount: true }, done) },
@@ -165,6 +165,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   />
                   {accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also }) => {
                     const others = takenFrom(a, name);
+                    const along = a.shared === true ? a.usedBy.filter((n) => n !== name) : [];
                     const about = !a.mine
                       ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
                       : also
@@ -173,9 +174,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                           ? t("agentPage.work.brain.accountSignedOut")
                           : others.length
                             ? t("agentPage.work.brain.accountMove", { agents: others.join(", ") })
-                            : a.keyHint
-                              ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-                              : (a.email ?? undefined);
+                            : along.length
+                              ? t("agentPage.work.brain.accountAlso", { agents: joinNames(along, t("newAgent.and")) })
+                              : a.keyHint
+                                ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                                : (a.email ?? undefined);
                     return (
                       <GroupedRow
                         key={a.id}

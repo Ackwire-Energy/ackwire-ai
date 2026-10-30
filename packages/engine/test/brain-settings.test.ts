@@ -260,7 +260,7 @@ describe("a plan answers its owner until it replies to everyone (Responde a todo
 });
 
 describe("a plan thinks only for its owner's agents, one account each", () => {
-  test("the owner's accounts only; both the account and the agent the caller's; another agent's with moveAccount", async () => {
+  test("the owner's accounts only; both the account and the agent the caller's; another agent's with moveAccount, unless for all", async () => {
     const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
     await account(ANAS, fx.owner.id);
     await account(BIAS, bia.id);
@@ -311,13 +311,16 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
     // Theo goes back to the computer's own sign-in, Ana's like Theo.
     expect(await row(theo.id)).toMatchObject({ brainAccountId: null, brain: "claude_code" });
     expect((await audits("account.moved"))[0]?.details).toEqual({ from: theo.id, to: fx.agent.id });
-    // The database holds the rule too: one agent per account.
-    const twice = await fx.db
-      .update(schema.agents)
-      .set({ brainAccountId: ANAS })
-      .where(eq(schema.agents.id, theo.id))
-      .catch((e) => e);
-    expect(twice).toBeInstanceOf(Error);
+    // Theo can't take it back without moving it: a login made for one agent thinks for one.
+    const back = await setAgentBrain(deps, fx.owner.id, fx.org.id, theo.id, { account: ANAS }).catch((e) => e);
+    expect(back).toMatchObject({ code: "account.in_use", params: { agentId: fx.agent.id } });
+
+    // One the runner made for all of Ana's agents there thinks for both, with no move.
+    await fx.db.update(schema.machineAccounts).set({ shared: true }).where(eq(schema.machineAccounts.id, ANAS));
+    const both = await setAgentBrain(deps, fx.owner.id, fx.org.id, theo.id, { account: ANAS });
+    expect(both.accounts.find((a) => a.id === ANAS)?.usedBy.sort()).toEqual(["Dev", "Theo"]);
+    expect(await row(fx.agent.id)).toMatchObject({ brainAccountId: ANAS });
+    expect(await audits("account.moved")).toHaveLength(1);
   });
 
   test("the computer's own sign-in: only for its pairer's agents; an account that goes sends the others to the API", async () => {

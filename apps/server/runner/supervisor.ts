@@ -33,6 +33,7 @@ import {
   type RunnerTask,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
@@ -178,6 +179,8 @@ export type WorkerLinkFrame =
   | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } }
   /** From the worker: what its agent's Chrome sent and received since it last said (protocol 23). */
   | { type: "browser.traffic"; up: number; down: number }
+  /** From the worker: a turn's plan usage (`rate_limit_event`, Codex's rate limits), for the account it thinks with. */
+  | { type: "usage"; kind: "claude_code" | "codex"; account: string; info: unknown }
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
@@ -227,6 +230,13 @@ export interface SupervisorOptions {
   prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
+  /**
+   * Protocol 27: what a brain turn or route on an account root keeps gets with it (`AccountManager.grant`); null for
+   * one whose folder is lent instead.
+   */
+  grant?: (kind: "claude_code" | "codex", accountId: string) => Promise<AccountGrant | null>;
+  /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
+  usage?: (kind: "claude_code" | "codex", accountId: string, info: unknown) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
@@ -343,24 +353,25 @@ export class Supervisor {
   }
 
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
-  async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
+  async run(sent: MachineRequest, scope: RequestScope): Promise<unknown> {
+    // A grant is root's alone to give: never one the server put in the request.
+    const { grant: _forged, ...clean } = sent as MachineRequest & { grant?: unknown };
+    const req = clean as MachineRequest;
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
     if (this.closed) throw new RunnerError("dropped", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
-    // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
-    if (
-      (req.op === "brain.turn" || req.op === "brain.route") &&
-      typeof req.account === "string" &&
-      req.account &&
-      this.opts.lend
-    ) {
-      await this.opts
-        .lend(req.kind === "codex" ? "codex" : "claude_code", req.account, w.user.uid)
-        .catch((err: unknown) =>
-          this.opts.log(
-            `[${w.user.user}] couldn't hand it its account: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+    let grant: AccountGrant | null = null;
+    // Its turn gets the account root keeps with it, or reads the account's folder as the agent's user; a folder it
+    // can't have is `account_missing` there.
+    if ((req.op === "brain.turn" || req.op === "brain.route") && typeof req.account === "string" && req.account) {
+      const kind = req.kind === "codex" ? "codex" : "claude_code";
+      const account = req.account;
+      const failed = (err: unknown) =>
+        this.opts.log(
+          `[${w.user.user}] couldn't hand it its account: ${err instanceof Error ? err.message : String(err)}`,
         );
+      grant = (await this.opts.grant?.(kind, account).catch(failed)) ?? null;
+      if (!grant) await this.opts.lend?.(kind, account, w.user.uid).catch(failed);
     }
     await this.ready(w, scope.signal);
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
@@ -381,7 +392,7 @@ export class Supervisor {
       };
       w.inflight.set(id, entry);
       scope.signal.addEventListener("abort", onAbort, { once: true });
-      this.send(w, { ...req, type: "request", id });
+      this.send(w, { ...req, type: "request", id, ...(grant ? { grant } : {}) } as ServerFrame);
     });
   }
 
@@ -935,6 +946,17 @@ export class Supervisor {
     if (!w.ready) return;
     if (f?.type === "browser.desktop") {
       w.browserLeaseAt = (this.opts.now ?? Date.now)();
+      return;
+    }
+    // Only for the account a turn this worker runs now thinks with.
+    if (f?.type === "usage") {
+      const kind = f.kind === "codex" ? "codex" : "claude_code";
+      const account = typeof f.account === "string" ? f.account : "";
+      const ours = [...w.inflight.values()].some(
+        (e) =>
+          e.req.op === "brain.turn" && e.req.account === account && (e.req.kind === "codex") === (kind === "codex"),
+      );
+      if (account && ours) this.opts.usage?.(kind, account, f.info);
       return;
     }
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;

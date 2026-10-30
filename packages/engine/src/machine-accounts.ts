@@ -18,9 +18,29 @@ import {
   type PubSub,
   parseSecretBox,
   type RunnerAccountInfo,
+  SHARED_ACCOUNTS_PROTOCOL,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
-import { isPlanId, loginPerAgent, type PlanId, planOf } from "@agenteschat/providers/plans";
+import {
+  and,
+  count,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  schema,
+  sql,
+} from "@agenteschat/db";
+import {
+  isPlanId,
+  loginPerAgent,
+  type PlanId,
+  planOf,
+  SHARED_SIGN_INS,
+  sharedSignIn,
+} from "@agenteschat/providers/plans";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -62,9 +82,11 @@ const { machineAccounts, agents, machines, users } = schema;
  * of `@agenteschat/providers/plans`). The key goes sealed from the browser to
  * the computer and stays there; we keep its last 4 as the runner says them.
  *
- * Logins per agent: a login thinks for one agent, and an account whose plan
- * allows it (`LOGIN_PER_AGENT`) has one login per agent, the same account
- * signed in again. Its logins share one name, told apart by the account's
+ * One sign-in for all agents (protocol 27, ADR 0059 §2): a login the runner
+ * says is `shared` thinks for every agent its owner gives it there. Any other
+ * login thinks for one agent, and an account whose plan allows it
+ * (`LOGIN_PER_AGENT`) may have one login per agent, the same account signed
+ * in again. Logins of one account share one name, told apart by the account's
  * email or key's last 4 (`sameAccountWhere`), and a rename renames them all.
  */
 
@@ -89,12 +111,16 @@ export interface MachineAccountView {
   mine: boolean;
   /** Names of the agents that think with it. */
   usedBy: string[];
+  /** Their ids, in the same order. */
+  usedByIds: string[];
   /** The plan's usage limits as last reported (protocol 19); null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`…); null: the CLI's own sign-in. */
   provider: string | null;
   /** The last 4 of a key account's key, for its owner's eyes only. */
   keyHint: string | null;
+  /** It thinks for every agent its owner gives it on that computer (protocol 27); else for one. */
+  shared: boolean;
 }
 
 /** An account on a computer, by what the runner needs to remove it. */
@@ -156,7 +182,7 @@ const statusOf = (v: string): MachineAccountStatus => (v === "active" ? "active"
 
 function accountView(
   row: MachineAccountRow,
-  usedBy: string[],
+  using: { id: string; name: string }[],
   viewerId: string | null,
   ownerName: string | null,
 ): MachineAccountView {
@@ -171,10 +197,12 @@ function accountView(
     ownerId: row.createdBy,
     ownerName,
     mine,
-    usedBy,
+    usedBy: using.map((a) => a.name),
+    usedByIds: using.map((a) => a.id),
     usage: row.usage ?? null,
     provider: row.provider,
     keyHint: mine ? row.keyHint : null,
+    shared: row.shared,
   };
 }
 
@@ -212,7 +240,7 @@ export async function listMachineAccounts(
     .orderBy(machineAccounts.createdAt, machineAccounts.id);
   if (rows.length === 0) return [];
   const using = await deps.db
-    .select({ name: agents.name, accountId: agents.brainAccountId })
+    .select({ id: agents.id, name: agents.name, accountId: agents.brainAccountId })
     .from(agents)
     .where(
       and(
@@ -228,7 +256,7 @@ export async function listMachineAccounts(
   return rows.map(({ account, ownerName }) =>
     accountView(
       account,
-      using.filter((a) => a.accountId === account.id).map((a) => a.name),
+      using.filter((a) => a.accountId === account.id),
       viewerId,
       ownerName,
     ),
@@ -362,11 +390,16 @@ async function sameAccount(db: Executor, row: AccountKey & Pick<MachineAccountRo
 }
 
 /**
- * The login of this account its owner already has here, which makes this one a duplicate. None where the
- * account may have one login per agent (`LOGIN_PER_AGENT`).
+ * The login of this account its owner already has here, which makes this one a duplicate: always for a login
+ * that thinks for all agents (`shared`, the one already there can too), else unless the account may have one
+ * login per agent (`LOGIN_PER_AGENT`).
  */
-const duplicateOf = async (db: Executor, row: AccountKey & Pick<MachineAccountRow, "id">, same: AccountIdentity) =>
-  loginPerAgent(row.kind, row.provider) ? null : sameAccount(db, row, same);
+const duplicateOf = async (
+  db: Executor,
+  row: AccountKey & Pick<MachineAccountRow, "id">,
+  same: AccountIdentity,
+  shared: boolean,
+) => (!shared && loginPerAgent(row.kind, row.provider) ? null : sameAccount(db, row, same));
 
 interface Settled {
   /** The account as stored now; null: it isn't this computer's. */
@@ -407,14 +440,15 @@ async function settleAccount(
   if (!row || row.machineId !== machine.id || row.kind !== info.kind)
     return { row: null, released: [], changed: false };
   if (row.status === "removing") {
-    const duplicate = await duplicateOf(db, row, row);
+    const duplicate = await duplicateOf(db, row, row, row.shared);
     return { row, ...(duplicate ? { duplicate } : {}), released: [], changed: false };
   }
-  // A signed-out CLI may not say its email or plan any more: keep what we knew.
+  // A signed-out CLI may not say its email or plan any more: keep what we knew. A token says neither.
   const email = info.email ?? row.email;
   const plan = info.plan ?? row.plan;
   const keyHint = info.keyHint ?? row.keyHint;
   const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
+  const shared = info.shared === true;
   const signingIn = row.status === "signing_in";
   // Signed in again as another account (an email other than its own, or one its owner already has here where an
   // account has one login): it stays signed out with what it was, so its agents never think with an account nobody
@@ -426,28 +460,29 @@ async function settleAccount(
   if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
     const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
     const duplicate = await sameAccount(db, row, { email, keyHint });
-    if (otherEmail || (duplicate && !loginPerAgent(row.kind, row.provider))) {
+    if (otherEmail || (duplicate && (shared || !loginPerAgent(row.kind, row.provider)))) {
       const [kept] =
-        row.status === "signed_out"
+        row.status === "signed_out" && row.shared === shared
           ? [row]
           : await db
               .update(machineAccounts)
-              .set({ status: "signed_out", updatedAt: now })
+              .set({ status: "signed_out", shared, updatedAt: now })
               .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
               .returning();
+      const released = await unshare(db, orgId, row, shared, now);
       return {
         row: kept ?? row,
         other: { email: info.email ?? null, ...(duplicate ? { duplicate } : {}) },
-        released: [],
-        changed: row.status !== "signed_out",
+        released,
+        changed: row.status !== "signed_out" || row.shared !== shared,
       };
     }
   }
-  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }) : null;
+  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }, shared) : null;
   if (duplicate) {
     const [gone] = await db
       .update(machineAccounts)
-      .set({ status: "removing", email, plan, keyHint, updatedAt: now })
+      .set({ status: "removing", email, plan, keyHint, shared, updatedAt: now })
       .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
       .returning();
     const released = await releaseAgents(db, orgId, [row.id], now);
@@ -462,7 +497,7 @@ async function settleAccount(
       defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)
-      .set({ email, plan, keyHint, status, label, ...usage, updatedAt: now })
+      .set({ email, plan, keyHint, status, label, shared, ...usage, updatedAt: now })
       .where(
         and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id), eq(machineAccounts.status, "signing_in")),
       )
@@ -478,14 +513,20 @@ async function settleAccount(
     });
     return { row: done, released: [], changed: true };
   }
-  const same = email === row.email && plan === row.plan && keyHint === row.keyHint && status === row.status;
+  const same =
+    email === row.email &&
+    plan === row.plan &&
+    keyHint === row.keyHint &&
+    status === row.status &&
+    shared === row.shared;
   if (same && !info.usage) return { row, released: [], changed: false };
   const [fresh] = await db
     .update(machineAccounts)
-    .set({ email, plan, keyHint, status, ...usage, updatedAt: now })
+    .set({ email, plan, keyHint, status, shared, ...usage, updatedAt: now })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
     .returning();
-  return { row: fresh ?? row, released: [], changed: !same || usageMoved(row.usage, info.usage) };
+  const released = await unshare(db, orgId, row, shared, now);
+  return { row: fresh ?? row, released, changed: !same || usageMoved(row.usage, info.usage) };
 }
 
 /**
@@ -551,7 +592,9 @@ export async function syncMachineAccounts(
         continue;
       }
       if (row) {
-        if ((await settleAccount(tx, orgId, machine, a, false, now)).changed) changed = true;
+        const settled = await settleAccount(tx, orgId, machine, a, false, now);
+        if (settled.changed) changed = true;
+        released.push(...settled.released);
         continue;
       }
       const [elsewhere] = await tx
@@ -564,7 +607,7 @@ export async function syncMachineAccounts(
         const provider = isPlanId(a.provider) ? a.provider : null;
         const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
         const same = await sameAccount(tx, candidate, a);
-        if (same && !loginPerAgent(a.kind, provider)) {
+        if (same && (a.shared === true || !loginPerAgent(a.kind, provider))) {
           remove.push({ kind: a.kind, id: a.id });
           continue;
         }
@@ -579,6 +622,7 @@ export async function syncMachineAccounts(
             keyHint: a.keyHint ?? null,
             status: a.loggedIn ? "active" : "signed_out",
             usage: a.usage ?? null,
+            shared: a.shared === true,
           })
           .onConflictDoNothing()
           .returning({ id: machineAccounts.id });
@@ -597,6 +641,7 @@ export async function syncMachineAccounts(
                 plan: a.plan ?? elsewhere.plan,
                 keyHint: a.keyHint ?? elsewhere.keyHint,
                 status: a.loggedIn ? "active" : "signed_out",
+                shared: a.shared === true,
                 ...(a.usage ? { usage: a.usage } : {}),
                 updatedAt: now,
               },
@@ -680,6 +725,33 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
   );
 }
 
+/**
+ * Whether a new sign-in of that kind on the computer thinks for all of its owner's agents there (protocol 27):
+ * every one where the agents are the runner's own user; where each is its own OS user (system mode), as
+ * `SHARED_SIGN_INS` says (never ChatGPT's yet).
+ */
+export function sharesSignIns(
+  machine: Pick<MachineRow, "protocol" | "executors">,
+  which: "claude_code" | "codex" | "key",
+): boolean {
+  if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
+  return machine.executors?.mode !== "system" || (which !== "codex" && SHARED_SIGN_INS[which]);
+}
+
+/**
+ * The runner no longer says the account thinks for all agents (signed in again for one, or an older runner): a
+ * login for one agent never thinks for two, so when more than one does, they all let it go and their owner picks
+ * again. The agents released.
+ */
+async function unshare(db: Executor, orgId: string, row: MachineAccountRow, shared: boolean, now: Date) {
+  if (!row.shared || shared) return [];
+  const [using] = await db
+    .select({ n: count() })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), eq(agents.brainAccountId, row.id), isNull(agents.archivedAt)));
+  return (using?.n ?? 0) > 1 ? releaseAgents(db, orgId, [row.id], now) : [];
+}
+
 /** A turn ran with it (best effort, after the turn). */
 export async function touchMachineAccount(db: Executor, orgId: string, accountId: string) {
   await db
@@ -733,12 +805,13 @@ const runnerOld = (machine: Pick<MachineRow, "name">) =>
     name: machine.name,
   });
 
-/** On a runner that knows accounts (`protocol`: and what is asked of it), and online now. */
+/** On a runner that knows accounts (`protocol`: and what is asked of it), and online now: the protocol it speaks. */
 async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow, protocol = ACCOUNTS_PROTOCOL) {
   if (machine.protocol < protocol) throw runnerOld(machine);
   const status = await deps.hub.status(machine.id);
   if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
   if (status.protocol < protocol) throw runnerOld(machine);
+  return status.protocol;
 }
 
 const loginIdOf = (loginId: string) => {
@@ -850,7 +923,9 @@ export async function beginAccountLogin(
   } else if (!mayAddAccounts(machine, userId)) {
     throw new ForbiddenError("Only the person who connected this computer can add accounts to it", "account.not_owner");
   }
-  await requireLive(deps, machine, plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL);
+  const protocol = await requireLive(deps, machine, plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL);
+  // Once for every agent of its owner there, where the runner can (protocol 27).
+  const shared = protocol >= SHARED_ACCOUNTS_PROTOCOL && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
   const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();
@@ -880,6 +955,7 @@ export async function beginAccountLogin(
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
       ...(plan ? { provider } : {}),
+      ...(shared ? { shared: true } : {}),
     });
   } catch (error) {
     await fail();

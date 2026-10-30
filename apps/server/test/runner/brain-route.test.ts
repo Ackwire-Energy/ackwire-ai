@@ -169,6 +169,28 @@ test.skipIf(!posix)(
   },
 );
 
+test.skipIf(!posix)(
+  "an account root keeps: the route thinks in the agent's own folder for it, with root's token; never with its key",
+  async () => {
+    const { tmp, deps, claude } = folders();
+    const own = tempDir("route-own-");
+    dirs.push(own);
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const accounts = { accountDir: () => tmp, agentHome: () => own };
+    const reply = await routeWithPlan(request(), { ...deps, accounts, grant: { kind: "token", token: TOKEN } });
+    expect(reply).toMatchObject({ model: "claude-haiku-5-5" });
+    const [start] = claude();
+    expect(start?.configDir).toBe(own);
+    expect(start?.oauthToken).toBe(TOKEN);
+    expect(start?.baseUrl).toBe("https://api.anthropic.com");
+    const key = { kind: "key" as const, provider: "zai" as const, key: "zai-key-1234567890abcdef" };
+    expect(await errorCode(() => routeWithPlan(request(), { ...deps, accounts, grant: key }))).toBe("not_allowed");
+    expect(await errorCode(() => routeWithPlan(request(), { ...deps, accounts, grant: { kind: "none" } }))).toBe(
+      "not_found",
+    );
+  },
+);
+
 test.skipIf(!posix)("Codex answers with the newest Luna its sign-in lists, the system prompt leading", async () => {
   const { home, deps, codex } = folders();
   const reply = await routeWithPlan(request({ kind: "codex", account: ACCOUNT }), deps);

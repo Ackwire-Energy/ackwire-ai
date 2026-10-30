@@ -64,9 +64,10 @@ describe("the agent's AI", () => {
     expect(thinkingUsage({ ...base, account: null }, "codex")).toBeUndefined();
   });
 
-  test("picking an account another agent thinks with takes it from that one", () => {
+  test("picking an account another agent thinks with takes it from that one, unless it is for all of them", () => {
     expect(takenFrom(account("a", { usedBy: ["Infra"] }), "Dev")).toEqual(["Infra"]);
     expect(takenFrom(account("a", { usedBy: ["Dev"] }), "Dev")).toEqual([]);
+    expect(takenFrom(account("a", { usedBy: ["Infra"], shared: true }), "Dev")).toEqual([]);
   });
 
   test("under Responde a todos: a gray area in the plan's terms, and their words for a plan, a seat or a maker", async () => {

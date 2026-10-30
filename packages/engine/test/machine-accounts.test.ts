@@ -14,6 +14,7 @@ import {
   type PlanUsage,
   type RunnerAccountInfo,
   type ServerFrame,
+  SHARED_ACCOUNTS_PROTOCOL,
   sealSecret,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
@@ -165,28 +166,36 @@ function fakeHub(
 }
 
 /** A runner that signs Claude Code in: a key per sign-in, `done` once its code arrived, with `account()`'s answer. */
-function signingRunner(machineId: string, account: (loginId: string) => Omit<RunnerAccountInfo, "id" | "kind">) {
+function signingRunner(
+  machineId: string,
+  account: (loginId: string) => Omit<RunnerAccountInfo, "id" | "kind">,
+  over: Partial<MachineStatus> = {},
+) {
   const keys = new Map<string, string>();
   const codes = new Map<string, string>();
   return {
     codes,
-    ...fakeHub(machineId, async (req) => {
-      if (req.action === "begin") {
-        const pair = await generateSecretKeyPair();
-        keys.set(req.loginId, pair.privateKey);
-        return { url: "https://claude.ai/oauth/authorize?code=true", publicKey: pair.publicKey };
-      }
-      if (req.action === "code") {
-        codes.set(req.loginId, await openSecret(keys.get(req.loginId) ?? "", req.box, req.aad));
+    ...fakeHub(
+      machineId,
+      async (req) => {
+        if (req.action === "begin") {
+          const pair = await generateSecretKeyPair();
+          keys.set(req.loginId, pair.privateKey);
+          return { url: "https://claude.ai/oauth/authorize?code=true", publicKey: pair.publicKey };
+        }
+        if (req.action === "code") {
+          codes.set(req.loginId, await openSecret(keys.get(req.loginId) ?? "", req.box, req.aad));
+          return {};
+        }
+        if (req.action === "status") {
+          return codes.has(req.loginId)
+            ? { state: "done", account: { id: req.loginId, kind: "claude_code", ...account(req.loginId) } }
+            : { state: "waiting" };
+        }
         return {};
-      }
-      if (req.action === "status") {
-        return codes.has(req.loginId)
-          ? { state: "done", account: { id: req.loginId, kind: "claude_code", ...account(req.loginId) } }
-          : { state: "waiting" };
-      }
-      return {};
-    }),
+      },
+      over,
+    ),
   };
 }
 
@@ -362,9 +371,11 @@ test("signing in: the person who connected the computer; the code is sealed to i
       ownerName: "ana",
       mine: true,
       usedBy: [],
+      usedByIds: [],
       usage: null,
       provider: null,
       keyHint: null,
+      shared: false,
     },
   });
   // Polled again: the same account, added once.
@@ -500,6 +511,8 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
       mine: true,
       canAdd: true,
       keys: true,
+      // A runner before protocol 27: a sign-in thinks for one agent.
+      shares: { claude_code: false, codex: false, key: false },
       brains: { claude_code: expect.any(Boolean), codex: expect.any(Boolean) },
       // Its Claude Code is signed in on its own, with no plan or usage known yet.
       own: { claude_code: {} },
@@ -1134,7 +1147,7 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
   // Sending the same account back is no change (allowed for anyone who edits the brain).
   expect((await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { account: CLAUDE_ID })).account).toBe(CLAUDE_ID);
 
-  // One agent per account: another agent of the owner's can't take it, not even in the database.
+  // A login made for one agent thinks for one: another agent of the owner's can't take it.
   const [theo] = await f.db
     .insert(schema.agents)
     .values({
@@ -1151,13 +1164,6 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
   const taken = await setAgentBrain(deps, f.owner.id, f.org.id, theo.id, { account: CLAUDE_ID }).catch((e) => e);
   expect(taken).toBeInstanceOf(ConflictError);
   expect(taken.code).toBe("account.in_use");
-  expect(
-    await f.db
-      .update(schema.agents)
-      .set({ brainAccountId: CLAUDE_ID })
-      .where(eq(schema.agents.id, theo.id))
-      .catch((e) => e),
-  ).toBeInstanceOf(Error);
   // An archived agent doesn't count.
   await f.db
     .update(schema.agents)
@@ -1299,4 +1305,139 @@ test("refreshing usage: the caller's own accounts, and their computers' own sign
   // Only members ask.
   const stranger = await addUser(f.db, "zed");
   expect(await refreshAiAccounts(live.deps, stranger.id, f.org.id).catch((e) => e)).toBeInstanceOf(ForbiddenError);
+});
+
+test("one sign-in for all agents (protocol 27): asked for, it thinks for two agents, once; out and gone for both", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const runner = signingRunner(
+    machineId,
+    () => ({ loggedIn: true, email: "ana@example.com", plan: "max", shared: true }),
+    { protocol: SHARED_ACCOUNTS_PROTOCOL },
+  );
+  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  expect(runner.calls[0]).toEqual({
+    op: "account",
+    action: "begin",
+    kind: "claude_code",
+    loginId: login.loginId,
+    shared: true,
+  });
+  expect(status).toMatchObject({ state: "done", account: { id: login.loginId, label: "Claude Max", shared: true } });
+  // The computer shares every new sign-in: each of the person's agents there is one click away.
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
+    claude_code: true,
+    codex: true,
+    key: true,
+  });
+
+  // Two agents think with it, with no move and no sign-in.
+  const [theo] = await f.db
+    .insert(schema.agents)
+    .values({
+      orgId: f.org.id,
+      name: "Theo",
+      handle: "theo",
+      model: "claude-sonnet-5-5",
+      ownerUserId: f.owner.id,
+      machineId,
+      brain: "claude_code",
+    })
+    .returning();
+  if (!theo) throw new Error("no agent");
+  await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, machineId);
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { brain: "claude_code", account: login.loginId });
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, theo.id, { account: login.loginId });
+  expect((await agentRow()).brainAccountId).toBe(login.loginId);
+  expect((await agentRow(theo.id)).brainAccountId).toBe(login.loginId);
+  const [listed] = await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id);
+  expect(listed).toMatchObject({ usedBy: ["Dev", "Theo"], usedByIds: [f.agent.id, theo.id], shared: true });
+  expect(await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.moved"))).toEqual([]);
+
+  // The same account signed in again here is the one already there.
+  const again = await signIn(runner, f.owner.id, machineId);
+  expect(again.status).toMatchObject({ state: "failed", duplicate: { account: { id: login.loginId } } });
+  expect(runner.calls.at(-1)).toEqual({
+    op: "account",
+    action: "remove",
+    kind: "claude_code",
+    accountId: again.login.loginId,
+  });
+
+  // Signed out on the computer: for both agents at once (they stay on it, for one sign-in again).
+  const sync = (accounts: RunnerAccountInfo[]) =>
+    syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, accounts);
+  await sync([{ id: login.loginId, kind: "claude_code", loggedIn: false, shared: true }]);
+  expect(await accountRow(login.loginId)).toMatchObject({ status: "signed_out", shared: true });
+  expect([(await agentRow()).brainAccountId, (await agentRow(theo.id)).brainAccountId]).toEqual([
+    login.loginId,
+    login.loginId,
+  ]);
+  await sync([{ id: login.loginId, kind: "claude_code", loggedIn: true, shared: true }]);
+
+  // Disconnected: both let it go.
+  await removeMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, login.loginId);
+  expect([(await agentRow()).brainAccountId, (await agentRow(theo.id)).brainAccountId]).toEqual([null, null]);
+});
+
+test("an account the runner no longer says is for all agents: the two agents on it let it go, then it thinks for one", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const ONE_ID = "0193dddd-0000-4000-8000-000000000005";
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { shared: true });
+  await addAccount(machineId, ONE_ID, "claude_code", { shared: true, email: "ana.two@example.com" });
+  const [theo] = await f.db
+    .insert(schema.agents)
+    .values({
+      orgId: f.org.id,
+      name: "Theo",
+      handle: "theo",
+      model: "claude-sonnet-5-5",
+      ownerUserId: f.owner.id,
+      machineId,
+      brain: "claude_code",
+      brainAccountId: CLAUDE_ID,
+    })
+    .returning();
+  if (!theo) throw new Error("no agent");
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: CLAUDE_ID })
+    .where(eq(schema.agents.id, f.agent.id));
+  // One login can't think for two: both agents go back to picking (an older runner, or signed in again for one).
+  await syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, [
+    { id: CLAUDE_ID, kind: "claude_code", loggedIn: true },
+    { id: ONE_ID, kind: "claude_code", loggedIn: true },
+  ]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject({ shared: false });
+  expect([(await agentRow()).brainAccountId, (await agentRow(theo.id)).brainAccountId]).toEqual([null, null]);
+  // Made for one agent again, it thinks for one: a second agent is refused.
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { account: ONE_ID });
+  const taken = await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, theo.id, { account: ONE_ID }).catch((e) => e);
+  expect(taken).toMatchObject({ code: "account.in_use" });
+});
+
+test("where each agent is its own OS user, the switch decides: Claude's sign-ins and plans' keys for all, ChatGPT's not yet", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { ...m?.executors, mode: "system" } })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
+    claude_code: true,
+    codex: false,
+    key: true,
+  });
+  // An older runner shares nothing.
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: SHARED_ACCOUNTS_PROTOCOL - 1 })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
+    claude_code: false,
+    codex: false,
+    key: false,
+  });
 });

@@ -12,7 +12,7 @@ import {
   ROUTE_LIMITS,
   ROUTE_TIMEOUT_MS,
 } from "@agenteschat/adapters/machine-protocol";
-import { accountEnv, planKeyOf, routesRunning, signInKey } from "./accounts";
+import { type AccountGrant, accountEnv, planKeyOf, routesRunning, signInKey } from "./accounts";
 import { accountSettingsEnv } from "./brain";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -172,8 +172,13 @@ export function codexRouteUsage(stdout: string) {
 }
 
 export interface RouteDeps {
-  /** The account folders: root's, or those lent to this agent's worker. */
-  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  /** The account folders: root's, or those lent to this agent's worker, and its own for one root keeps. */
+  accounts?: {
+    accountDir(kind: AccountKind, id: string): string | null;
+    agentHome?(kind: AccountKind, id: string): string | null;
+  };
+  /** System mode, in a worker (protocol 27): what root handed this route for its account. */
+  grant?: AccountGrant;
   /** The processes kept for turns: a sign-in with one open is busy. */
   brains?: { holds(account: string | null): boolean };
   codexApp?: { holds(account: string | null): boolean };
@@ -212,7 +217,12 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   }
   const account = req.account ?? null;
   if (account !== null && !isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-  const home = account ? deps.accounts?.accountDir(req.kind, account) : null;
+  if (account && deps.grant?.kind === "none") throw new RunnerError("not_found", "That account is signed out here");
+  const home = !account
+    ? null
+    : deps.grant
+      ? deps.accounts?.agentHome?.(req.kind, account)
+      : deps.accounts?.accountDir(req.kind, account);
   if (account && !home) throw new RunnerError("not_found", "That account isn't on this computer anymore");
   const key = signInKey(req.kind, home);
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
@@ -231,7 +241,7 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
 }
 
 async function route(req: BrainRouteRequest, deps: RouteDeps, home: string | null, key: string) {
-  if (home && (await planKeyOf(home))) {
+  if (home && (deps.grant?.kind === "key" || (!deps.grant && (await planKeyOf(home))))) {
     throw new RunnerError("not_allowed", "A sign-in made with a key doesn't pick who answers");
   }
   const dir = mkdtempSync(path.join(deps.tmpDir ?? os.tmpdir(), "agentes-route-"));
@@ -248,8 +258,9 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
   const systemFile = path.join(o.dir, "system.txt");
   writeFileSync(systemFile, req.system, { mode: 0o600 });
   // An account's folder is the CLI's home, and requests go only to Claude's own endpoint.
+  const token = o.grant?.kind === "token" ? { CLAUDE_CODE_OAUTH_TOKEN: o.grant.token } : {};
   const env = o.home
-    ? { ...accountEnv("claude_code", o.home), ...accountSettingsEnv(undefined, "haiku") }
+    ? { ...accountEnv("claude_code", o.home), ...accountSettingsEnv(undefined, "haiku"), ...token }
     : process.env;
   const started = Date.now();
   const run = await runCli(o.claudeCommand ?? ["claude"], claudeRouteArgs({ systemFile, schema: req.schema }), {

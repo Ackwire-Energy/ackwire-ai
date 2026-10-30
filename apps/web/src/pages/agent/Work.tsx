@@ -691,8 +691,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Signing in to it again is its owner's.
   const signedOut = current?.status === "signed_out" && current.mine;
   const accountChanged = accountsOn && account !== view.account;
-  // One account thinks for one agent: picking another agent's takes it from that one ("Mover para cá").
-  const moving = accountChanged && current?.usedBy.some((n) => n !== agent.name) === true;
+  // A login made for one agent thinks for one: picking another agent's takes it from that one ("Mover para cá"). One
+  // made for all of its owner's agents there thinks for this one too.
+  const moving = accountChanged && current?.shared !== true && current?.usedBy.some((n) => n !== agent.name) === true;
   // An automatic model picks the effort too; a fixed one takes the ramp's level.
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
@@ -843,19 +844,21 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ...(view.ownSignIn ? {} : { description: t("aiAccounts.share.hereNotYours", { computer: computerName }) }),
       leading: accountIcon,
     },
-    // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
-    // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
+    // One option per account: the login of it this agent has, one for all of its owner's agents, or a free one.
+    // Else, where its plan allows a login per agent, one more for this agent ("Also used by Ada"); else another
+    // agent's, moved here.
     ...accountChoices(accounts, [account, view.account]).map(({ login: a, usedBy, also }) => {
-      // One login thinks for one agent.
-      const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
+      const others = a.usedBy.filter((n) => n !== agent.name);
       const about = !a.mine
         ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
         : also
           ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
           : a.status === "signed_out"
             ? t("agentPage.work.brain.accountSignedOut")
-            : others
-              ? t("agentPage.work.brain.accountMove", { agents: others })
+            : others.length > 0
+              ? a.shared === true
+                ? t("agentPage.work.brain.accountAlso", { agents: joinNames(others, t("newAgent.and")) })
+                : t("agentPage.work.brain.accountMove", { agents: others.join(", ") })
               : a.keyHint
                 ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
                 : a.email;

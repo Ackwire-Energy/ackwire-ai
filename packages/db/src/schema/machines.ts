@@ -262,6 +262,11 @@ export const machineAccounts = pgTable(
     orgName: text(),
     /** The plan's usage limits, as the runner last reported them. */
     usage: jsonb().$type<MachinePlanUsage>(),
+    /**
+     * The runner says it thinks for all of its owner's agents on that computer (protocol 27, ADR 0059 §2); else a
+     * login thinks for one agent.
+     */
+    shared: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp({ withTimezone: true }),

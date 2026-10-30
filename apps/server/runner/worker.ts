@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import {
+  type AccountKind,
   type AgentScope,
   LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
@@ -11,7 +12,7 @@ import {
   parseAccess,
   parsePause,
 } from "@agenteschat/adapters/machine-protocol";
-import { lentAccounts } from "./accounts";
+import { agentAccountHome, grantOf, lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
@@ -66,6 +67,8 @@ export interface WorkerOptions {
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
   desktop?: Pick<DesktopManagerOptions, "system" | "command">;
+  /** Tests: how Claude Code starts for brain turns. */
+  claudeCommand?: string[];
   /** Tests: how `agent-browser` and Chrome start, and Chrome's debugging endpoint. */
   browser?: Pick<
     BrowserManagerOptions,
@@ -272,6 +275,11 @@ export class WorkerLink {
     });
   };
 
+  /** A turn's plan usage, for root to keep with the account (root takes it only for a turn it sent here). */
+  usage(kind: AccountKind, account: string, info: unknown) {
+    this.write(JSON.stringify({ type: "usage", kind, account, info } satisfies WorkerLinkFrame));
+  }
+
   /** What its agent's Chrome sent and received since the last time (protocol 23); nothing when it moved nothing. */
   traffic({ up, down }: { up: number; down: number }) {
     if (up > 0 || down > 0) this.write(JSON.stringify({ type: "browser.traffic", up, down } satisfies WorkerLinkFrame));
@@ -364,18 +372,33 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     idleMs: state.limits.brainIdleMinutes * 60_000,
     maxProcesses: state.limits.brainMaxProcesses,
   });
-  // The account folders root lends to this agent's user for its turns (`AccountManager.lendTo`).
-  const accounts = lentAccounts();
+  // The account folders root lends to this agent's user for its turns (`AccountManager.lendTo`), and its own
+  // folder for an account root keeps, whose credential comes with each turn (`AccountManager.grant`). What the
+  // turns say about the plan's usage goes to root, which keeps the accounts.
+  const accounts = {
+    ...lentAccounts(),
+    agentHome: (kind: AccountKind, id: string) => agentAccountHome(home, kind, id),
+    noteRateLimit: (account: string, info: unknown) => link.usage("claude_code", account, info),
+  };
   const brains = new BrainManager({
     root: path.join(home, "brains"),
     mcp: mcpCommand,
     accounts,
+    ...(o.claudeCommand ? { claudeCommand: o.claudeCommand } : {}),
     ...brainLimits(),
     ...(cli ? { spawn: cli } : {}),
     log,
   });
   const codexRuns = new Map<string, McpTaskInfo>();
-  const codexApp = new CodexAppServers({ runs: codexRuns, ...brainLimits(), ...(cli ? { spawn: cli } : {}), log });
+  const codexApp = new CodexAppServers({
+    runs: codexRuns,
+    ...brainLimits(),
+    ...(cli ? { spawn: cli } : {}),
+    onRateLimits: (account, rateLimits) => {
+      if (account) link.usage("codex", account, rateLimits);
+    },
+    log,
+  });
   const mcp = new McpBridge({
     socketPath,
     task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
@@ -481,10 +504,14 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     mcp,
     log,
     dial: link.dial,
-    handler: (ctx, req, scope) =>
-      req.agent?.id === o.agentId
-        ? handleRequest(ctx, req, scope)
-        : Promise.reject(new RunnerError("not_allowed", "This worker serves another agent")),
+    handler: (ctx, req, scope) => {
+      if (req.agent?.id !== o.agentId) {
+        return Promise.reject(new RunnerError("not_allowed", "This worker serves another agent"));
+      }
+      // Root's, on the request it relays (it never passes on one the server sent).
+      const grant = grantOf((req as { grant?: unknown }).grant);
+      return handleRequest(grant ? { ...ctx, grant } : ctx, req, scope);
+    },
     onBrowserHandoff: (frame) => browser.setHandoff(frame.agentId, frame.handoff),
     onState: (s) => {
       if (s === "online") return;

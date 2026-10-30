@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 26;
+export const MACHINE_PROTOCOL_VERSION = 27;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -327,6 +327,18 @@ export const DESKTOP_TEXT_PROTOCOL = 25;
 /** The most text one `desktop.text` answers (characters). */
 export const DESKTOP_TEXT_MAX = 16_000;
 
+/**
+ * From this protocol on (ADR 0059 §2, amended 2026-10-30): one sign-in thinks
+ * for every agent its owner gives it on the computer. Accounts say so
+ * (`RunnerAccountInfo.shared`): where every agent is the runner's own user,
+ * all of them; where each agent is its own OS user (system mode), those made
+ * for all agents (`begin` with `shared`), which root keeps and never lends: a
+ * Claude sign-in there is `claude setup-token`'s token, and root hands each
+ * turn what its CLI needs over the agent's worker link. The server never
+ * sends `shared` to an older runner.
+ */
+export const SHARED_ACCOUNTS_PROTOCOL = 27;
+
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
 export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
@@ -356,6 +368,8 @@ export interface RunnerAccountInfo {
   provider?: string;
   /** Protocol 20: the last 4 characters of a key account's key. */
   keyHint?: string;
+  /** Protocol 27: it thinks for several of its owner's agents at once. */
+  shared?: boolean;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -409,8 +423,17 @@ export type AccountRequest =
    * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
+   * Protocol 27, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
    */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
+  | {
+      action: "begin";
+      kind: AccountKind;
+      loginId: string;
+      again?: boolean;
+      email?: string;
+      provider?: string;
+      shared?: boolean;
+    }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
@@ -1759,6 +1782,7 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
       ...(usage ? { usage } : {}),
       ...(provider ? { provider } : {}),
       ...(keyHint ? { keyHint } : {}),
+      ...(a.shared === true ? { shared: true } : {}),
     });
   }
   return out;

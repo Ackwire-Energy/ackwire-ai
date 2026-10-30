@@ -21,11 +21,11 @@ export interface PlanSignIn {
 
 /**
  * The plan sign-ins that may pick who answers, `userId`'s own (or anyone's, for `ai-status`), Claude before
- * ChatGPT, the most recently used first: an active CLI sign-in the person made (never a coding plan's key),
- * lent to one of their own agents, and the computer's own Claude Code sign-in where the person paired that
- * computer, one of their agents thinks with it and it is signed in with a plan (`claude.ai`). Codex doesn't
- * say how it is signed in, so a computer's own Codex sign-in never counts. Only computers online now that
- * speak `brain.route`, aren't paused and would run it: not on Windows, and with that CLI switched on there.
+ * ChatGPT, the most recently used first: an active CLI sign-in the person made (never a coding plan's key)
+ * that one of their own agents thinks with, once, and the computer's own Claude Code sign-in where the person
+ * paired that computer, one of their agents thinks with it and it is signed in with a plan (`claude.ai`). Codex
+ * doesn't say how it is signed in, so a computer's own Codex sign-in never counts. Only computers online now
+ * that speak `brain.route`, aren't paused and would run it: not on Windows, and with that CLI switched on there.
  */
 export async function planSignInsOf(
   db: Executor,
@@ -87,20 +87,19 @@ export async function planSignInsOf(
       )
       .orderBy(asc(agents.createdAt)),
   ]);
-  const found: (PlanSignIn & { usedAt: number })[] = lent.flatMap((r) =>
-    r.ownerId && isAccountKind(r.kind)
-      ? [
-          {
-            machineId: r.machineId,
-            agent: { id: r.agentId, handle: r.handle },
-            accountId: r.accountId,
-            kind: r.kind,
-            ownerId: r.ownerId,
-            usedAt: r.usedAt?.getTime() ?? 0,
-          },
-        ]
-      : [],
-  );
+  const found: (PlanSignIn & { usedAt: number })[] = [];
+  for (const r of lent) {
+    // One per account: one made for all agents thinks for several of them (protocol 27).
+    if (!r.ownerId || !isAccountKind(r.kind) || found.some((s) => s.accountId === r.accountId)) continue;
+    found.push({
+      machineId: r.machineId,
+      agent: { id: r.agentId, handle: r.handle },
+      accountId: r.accountId,
+      kind: r.kind,
+      ownerId: r.ownerId,
+      usedAt: r.usedAt?.getTime() ?? 0,
+    });
+  }
   // One per computer: its own sign-in is one folder, whichever agent thinks with it.
   for (const r of own) {
     if (!r.ownerId || found.some((s) => s.machineId === r.machineId && s.accountId === null)) continue;

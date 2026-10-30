@@ -48,6 +48,7 @@ import {
   ownSignInFor,
   type PlanChoice,
   planLabel,
+  signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
@@ -748,7 +749,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const hasAi = (id: string) => aiOf(id) !== null;
   // The crew shares one computer here.
   const setOf = (c: AiChoice) =>
-    c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
+    c === "key"
+      ? []
+      : allAgents({
+          choice: c,
+          agents: crewAgents,
+          aiOf,
+          machineOf: () => null,
+          sharedOn: () => signsInOnce(c, gates.row),
+        });
   // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
   const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.ai] };
   // With no set, the agent whose computer the panel reads, "All agents" too.

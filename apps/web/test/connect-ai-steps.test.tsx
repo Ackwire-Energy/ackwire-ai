@@ -1109,6 +1109,49 @@ describe("All agents: one plan for the team, a login per agent", () => {
     expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com Claude Max.");
   });
 
+  test("Claude for all where one sign-in thinks for all of them: one sign-in, then every agent on that account", async () => {
+    const SHARING: AiComputer = { ...MAC, shares: { claude_code: true, codex: true, key: true } };
+    const { state, machines, dialog } = await connect({ crew: true, computers: [SHARING] });
+    machines?.endLogin("login_1", { state: "done", account: { ...claudeMax, shared: true } });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("combobox").textContent).toBe("Todos os agentes");
+    expect(hintOf("Um login só para todos.", panel).text).toBe("Todos dividem os limites do seu plano.");
+    expect(shownText(panel)).not.toContain("Um login por agente");
+    // No one at a time: one sign-in, its own words.
+    expect(within(panel).queryByRole("button", { name: "Fazer login para a Ada" })).toBeNull();
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com Claude" })));
+    await settle(8);
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(1);
+    expect(calls(state, "agents.setBrain").map((c) => [c.args[1], c.args[2]])).toEqual([
+      [ADA_ID, { brain: "claude_code", account: "acct_max" }],
+      [ATLAS_ID, { brain: "claude_code", account: "acct_max" }],
+      [LIA_ID, { brain: "claude_code", account: "acct_max" }],
+    ]);
+    expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com Claude Max.");
+  });
+
+  test("an account of the plan that already thinks for all of the person's agents: Use it, with no sign-in", async () => {
+    const SHARING: AiComputer = { ...MAC, shares: { claude_code: true, codex: true, key: true } };
+    const shared = { ...claudeMax, shared: true, usedBy: ["Atlas"] };
+    const { state, dialog } = await connect({ brain: { accounts: [shared] }, computers: [SHARING] });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    const use = within(panel).getByRole("button", { name: /^Usar Claude Max/ });
+    expect(use.querySelector(".ac-option__desc")?.textContent).toBe("Também usada por Atlas");
+    // The sign-in waits behind Another account.
+    expect(within(panel).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Outra conta" }));
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    await click(use);
+    await settle(4);
+    expect(calls(state, "agents.setBrain")[0]?.args).toEqual([
+      ORG_ID,
+      ADA_ID,
+      { brain: "claude_code", account: "acct_max" },
+    ]);
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
+    expect(dialog.textContent).toContain("Ada agora pensa com Claude Max.");
+  });
+
   test("an agent on the API key stays out of All agents: a plan would make it answer only its owner", async () => {
     const { state, dialog, tile, services } = await connect({ crew: true });
     state.aiStatus = {
