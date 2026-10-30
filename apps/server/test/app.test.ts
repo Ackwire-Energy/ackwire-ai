@@ -77,3 +77,13 @@ test("the OpenAPI document lists the app API", async () => {
   }
   await t.close();
 });
+
+test("the API explorer is served off production only; the OpenAPI document stays", async () => {
+  const dev = await createTestServer();
+  expect((await dev.app.request("/api/reference")).status).toBe(200);
+  await dev.close();
+  const prod = await createTestServer({ env: { NODE_ENV: "production" } });
+  expect((await prod.app.request("/api/reference")).status).toBe(404);
+  expect((await prod.app.request("/api/openapi.json")).status).toBe(200);
+  await prod.close();
+});
