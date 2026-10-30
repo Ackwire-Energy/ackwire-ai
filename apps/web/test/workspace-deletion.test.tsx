@@ -63,17 +63,17 @@ describe("deleting a workspace (Configurações › Geral)", () => {
 
   test("the name, typed with its invisible characters ignored, then the proof, before it deletes", async () => {
     // A co-owner put a zero-width space in the name: typing it plainly still confirms.
-    const { state } = await open(`/org/${ORG_ID}/settings`, { name: "Ac​me" });
+    const { state, router } = await open(`/org/${ORG_ID}/settings`, { name: "Ac\u200bme" });
     await click(screen().getByRole("button", { name: "Apagar workspace…" }));
     await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Apagar Ac​me?" });
+    const dialog = screen().getByRole("dialog", { name: "Apagar Ac\u200bme?" });
     expect(dialog.textContent).toContain("Qualquer dono pode restaurar até");
     expect(dialog.textContent).toContain("Todos perdem o acesso agora e recebem um email");
     const submit = within(dialog).getByRole("button", { name: "Apagar workspace" });
     expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Digite Ac​me para confirmar"), "acm");
+    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), "acm");
     expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Digite Ac​me para confirmar"), " ACME ");
+    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), " ACME ");
     // No sign-in in the last 10 minutes: the password too.
     expect(submit.hasAttribute("disabled")).toBe(true);
     await type(within(dialog).getByLabelText("Sua senha"), "correct horse battery");
@@ -85,8 +85,10 @@ describe("deleting a workspace (Configurações › Geral)", () => {
       { password: "correct horse battery" },
     ]);
     // Its closing screen takes its place at once.
-    expect(screen().getByRole("heading", { name: "Ac​me está sendo apagado" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Ac\u200bme está sendo apagado" })).toBeTruthy();
     expect(screen().queryByRole("dialog")).toBeNull();
+    // Out of the address too: restored, Geral doesn't open the dialog again.
+    expect(router.state.location.search).not.toHaveProperty("delete");
   });
 
   test("a fresh sign-in needs no password; an account without one and an old session signs in again", async () => {

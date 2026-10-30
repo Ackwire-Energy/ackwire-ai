@@ -4,13 +4,13 @@ import { around, emailTypoFix, excerpt, namesMatch, webmailOf } from "../src/lib
 
 test("a name typed to confirm: any case, spaces around, width forms and invisible characters ignored", () => {
   expect(namesMatch("acme  ", "Acme")).toBe(true);
-  expect(namesMatch("Ａｃｍｅ", "Acme")).toBe(true);
+  expect(namesMatch("\uff21\uff43\uff4d\uff45", "Acme")).toBe(true);
   // A co-owner's zero-width space or soft hyphen in the name can't make it untypeable.
-  expect(namesMatch("Acme Corp", "Ac​me Cor­p")).toBe(true);
+  expect(namesMatch("Acme Corp", "Ac\u200bme Cor\u00adp")).toBe(true);
   expect(namesMatch("Acme", "Acme Corp")).toBe(false);
   expect(namesMatch("", "Acme")).toBe(false);
   // A name of nothing but those needs nothing typed.
-  expect(namesMatch("", "​⁠")).toBe(true);
+  expect(namesMatch("", "\u200b\u2060")).toBe(true);
 });
 
 test("a misspelled webmail domain gets one fix; anything else is left alone", () => {
