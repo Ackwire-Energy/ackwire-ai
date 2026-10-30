@@ -8,6 +8,7 @@ import {
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, gt, inArray, isNull, lte, or, schema } from "@agenteschat/db";
+import { type NoticePrefs, noticeOn, readNoticePrefs } from "./notice-prefs";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
 import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
@@ -20,29 +21,13 @@ const { pushDevices, notifications, agents, users, approvals, sessions } = schem
  * `push.send` job; the job renders the text per device language and sends
  * through the `PushSender` adapter (phones) and the `WebPushSender` (browsers).
  *
- * What pushes: everything in "Esperando você" (approval, agent question,
- * forum turn), mentions, DMs from a person, and missions or routines that
- * stopped or failed. Not what is read, done or snoozed by the time the job
- * runs. Grouped notifications push once per group while unread (only the
- * event that opened the row pushes). Something not waiting on the person
- * waits `PUSH_ACTIVE_DELAY_MS` while they have the app open (ADR 0071 §7):
- * read meanwhile, it never pushes.
+ * What pushes: what the person chose in this workspace (`noticeOn`, ADR 0071 §8; by default everything in
+ * "Esperando você", mentions, DMs from a person, an agent's answer to them, and missions or routines that
+ * stopped or failed). Not what is read, done or snoozed by the time the job runs. Grouped notifications push
+ * once per group while unread (only the event that opened the row pushes). Something not waiting on the
+ * person waits `PUSH_ACTIVE_DELAY_MS` while they have the app open (ADR 0071 §5): read meanwhile, it never
+ * pushes.
  */
-
-export const PUSH_KINDS: ReadonlySet<string> = new Set([
-  "approval",
-  "agent_question",
-  "forum_turn",
-  "mention",
-  "dm",
-  "mission_stopped",
-  "routine_failed",
-  "routine_paused",
-  "routine_stalled",
-  "machine_connected",
-  "browser_handoff",
-  "computer_ready",
-]);
 
 /** Expo keeps receipts for a day and has most ready within 15 minutes: ask then. */
 export const PUSH_RECEIPTS_DELAY_MS = 15 * 60_000;
@@ -73,23 +58,30 @@ export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
 
 type NotificationRow = typeof notifications.$inferSelect;
 
-/** Whether a notification should be on the person's phone (now). */
+/** Whether a notification should be on the person's devices (now), given their choices in its workspace. */
 export function pushWorthy(
   row: Pick<NotificationRow, "kind" | "waiting" | "readAt" | "doneAt" | "snoozedUntil">,
   now: Date,
+  prefs: NoticePrefs = {},
 ): boolean {
-  if (!row.waiting && !PUSH_KINDS.has(row.kind)) return false;
+  if (!noticeOn(prefs, row.kind, row.waiting)) return false;
   if (row.readAt || row.doneAt) return false;
   return !(row.snoozedUntil && row.snoozedUntil.getTime() > now.getTime());
 }
 
 /**
- * Called by `notify` for each row it created or merged into: the first event
- * of a group (count 1) of a pushing kind enqueues `push.send`, when the
- * person has a phone or a browser registered.
+ * Called by `notify` for each row it created or merged into (with the person's choices, read there): the
+ * first event of a group (count 1) the person wants on their devices enqueues `push.send`, when they have
+ * a phone or a browser registered.
  */
-export async function enqueuePush(db: Database, row: NotificationRow, now = new Date()): Promise<boolean> {
-  if (row.count !== 1 || !pushWorthy(row, now)) return false;
+export async function enqueuePush(
+  db: Database,
+  row: NotificationRow,
+  now = new Date(),
+  prefs?: NoticePrefs,
+): Promise<boolean> {
+  if (row.count !== 1) return false;
+  if (!pushWorthy(row, now, prefs ?? (await readNoticePrefs(db, row.orgId, row.userId)))) return false;
   const [device] = await db
     .select({ id: pushDevices.id })
     .from(pushDevices)
@@ -293,7 +285,7 @@ export async function deliverPush(
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const [row] = await db.select().from(notifications).where(eq(notifications.id, notificationId));
-  if (!row || !pushWorthy(row, now)) return none;
+  if (!row || !pushWorthy(row, now, await readNoticePrefs(db, row.orgId, row.userId))) return none;
   const targets = await pushTargets(db, row.userId, now);
   // A browser whose session is over hears nothing more (ADR 0071); signing in there again subscribes it anew.
   if (targets.ended.length > 0) {

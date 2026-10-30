@@ -173,8 +173,9 @@ describe("who takes the click", () => {
 });
 
 /**
- * Every kind the server pushes (`PUSH_KINDS` in packages/engine/src/push.ts, plus `join_request`, the one other
- * that waits on a person), with the source its producer writes (notification-producers.ts, invite-requests.ts).
+ * Every kind the server may push (`NOTICE_KINDS` in packages/engine/src/notice-prefs.ts: by default or once the
+ * person turns its category on), with the source its producer writes (notification-producers.ts,
+ * invite-requests.ts).
  */
 const PUSHED: { kind: AppNotification["kind"]; n: Partial<AppNotification>; to: string }[] = [
   {
@@ -214,11 +215,28 @@ const PUSHED: { kind: AppNotification["kind"]; n: Partial<AppNotification>; to: 
   },
   { kind: "computer_ready", n: { source: { machineId: "pc1" } }, to: "/org/$orgId/settings/computers/$machineId" },
   { kind: "join_request", n: { waiting: true, source: { label: "Acme" } }, to: "/org/$orgId/settings/$section" },
+  {
+    kind: "agent_reply",
+    n: { actors: [{ type: "agent", id: "ag1" }], source: { channelId: "d1", dmId: "d1", messageId: "m1" } },
+    to: "/org/$orgId/dm/agent/$agentId",
+  },
+  {
+    kind: "agent_reply",
+    n: { actors: [{ type: "agent", id: "ag1" }], source: { channelId: "c1", messageId: "m1", label: "geral" } },
+    to: "/org/$orgId/c/$channelId",
+  },
+  {
+    kind: "thread_reply",
+    n: { source: { channelId: "c1", threadId: "t1", messageId: "m1" } },
+    to: "/org/$orgId/threads/$threadId",
+  },
+  { kind: "issue_assigned", n: { source: { issueId: "i1", issueNumber: 6 } }, to: "/org/$orgId/issues/$number" },
+  { kind: "reaction", n: { source: { channelId: "c1", messageId: "m1" } }, to: "/org/$orgId/c/$channelId" },
 ];
 
 describe("every pushed kind opens a real page", () => {
   for (const { kind, n, to } of PUSHED) {
-    test(kind, () => {
+    test(`${kind} → ${to}`, () => {
       const target = openTarget(notification({ id: ID, kind, ...n }));
       expect(target?.to).toBe(to as never);
       expect(ROUTES.has(to)).toBe(true);

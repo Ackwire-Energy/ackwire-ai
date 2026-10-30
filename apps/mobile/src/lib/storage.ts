@@ -40,7 +40,7 @@ export const STORED = {
   pushAsked: "push-asked",
   /** The person turned notifications off in the app (no silent re-registration). */
   pushOff: "push-off",
-  /** How many times our notifications sheet opened by itself (lib/push-offer.ts). */
+  /** How many times our notifications sheet opened by itself (@agenteschat/client/lib/push-offer). */
   pushOffers: "push-offers",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
