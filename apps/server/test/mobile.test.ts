@@ -47,7 +47,11 @@ describe("app sessions: CSRF without an Origin", () => {
     await signUp(owner, "owner@example.com");
     const create = (init: Parameters<Browser>[1]) => owner("/api/app/organizations", init);
 
-    expect((await create({ json: { name: "Web" } })).status).toBe(201);
+    const web = await create({ json: { name: "Web" } });
+    expect(web.status).toBe(201);
+    // Set up, so the phone's is a workspace of its own (one still being set up comes back instead).
+    const { organization } = (await web.json()) as { organization: { id: string } };
+    await owner(`/api/app/organizations/${organization.id}/onboarding`, { method: "PATCH", json: { finished: true } });
     const foreign = await create({ json: { name: "X" }, origin: "https://evil.example" });
     expect(foreign.status).toBe(403);
     expect(await errorCode(foreign)).toBe("bad_origin");

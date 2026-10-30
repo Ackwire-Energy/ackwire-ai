@@ -2,6 +2,10 @@ import { sql } from "drizzle-orm";
 import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
+/** The onboarding's steps, in order (the apps' `ONBOARDING_STEPS`, `packages/client/src/lib/onboarding.ts`). */
+export const ONBOARDING_STEPS = ["workspace", "context", "import", "computer", "agents", "team", "done"] as const;
+export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
 /**
  * Top-level tenant. agentes.chat Cloud has many; a self-hosted install usually
  * has one. Every tenant-owned table carries `org_id` (docs/adr/0002-editions-and-modules.md).
@@ -28,6 +32,14 @@ export const organizations = pgTable("organizations", {
   standingNotice: text().$type<"shown" | "silent">().notNull().default("shown"),
   /** When `standing` last changed; null: never. */
   standingChangedAt: timestamp({ withTimezone: true }),
+  /** The furthest step its owner's onboarding reached (`done` for one set up any other way). */
+  onboardingStep: text().$type<OnboardingStep>().notNull().default("done"),
+  /**
+   * When its owner finished the onboarding; null while they haven't, and the apps open the onboarding instead of
+   * the workspace. Only a workspace made through the app starts null (`createOrganization` with `onboarding`): the
+   * default counts every other one, and every one made before the onboarding was kept, as set up.
+   */
+  onboardedAt: timestamp({ withTimezone: true }).defaultNow(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

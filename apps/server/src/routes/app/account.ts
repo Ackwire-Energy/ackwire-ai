@@ -20,6 +20,7 @@ import {
   listMembers,
   listMemberships,
   needsWorkspaceAllowance,
+  ONBOARDING_STEPS,
   orgLogoFile,
   previewInvitation,
   queueInvitationEmail,
@@ -28,6 +29,7 @@ import {
   removeOrgLogo,
   requirePermission,
   revokeInvitation,
+  saveOnboarding,
   setAvatar,
   setMyLocale,
   setOrgLogo,
@@ -35,6 +37,7 @@ import {
   signInOptions,
   toldReason,
   USER_LOCALES,
+  unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
@@ -305,12 +308,14 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password, verified, creates] = await Promise.all([
+      const [memberships, password, verified, creates, unfinished] = await Promise.all([
         listMemberships(db, user.id),
         hasPassword(db, user.id),
         isEmailVerified(db, user.id),
         canCreateWorkspace(db, user.id, workspacePolicy(config)),
+        unfinishedWorkspaces(db, user.id),
       ]);
+      const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
       return c.json(
         {
           user: {
@@ -322,15 +327,21 @@ export function accountRoutes(deps: AppDeps) {
             emailVerified: verified,
             canCreateWorkspace: creates,
           },
-          organizations: memberships.map((m) => ({
-            id: m.orgId,
-            name: m.orgName,
-            role: m.role,
-            logo: m.orgLogo ?? null,
-            ...(m.standing
-              ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
-              : {}),
-          })),
+          organizations: memberships.map((m) => {
+            const setup = onboardingOf(m.orgId);
+            return {
+              id: m.orgId,
+              name: m.orgName,
+              role: m.role,
+              logo: m.orgLogo ?? null,
+              ...(m.standing
+                ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
+                : {}),
+              ...(setup
+                ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
+                : {}),
+            };
+          }),
         },
         200,
       );
@@ -603,7 +614,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Refused with 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078).",
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other. Refused with 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078).",
       request: {
         body: body(
           z.object({
@@ -616,15 +627,30 @@ export function accountRoutes(deps: AppDeps) {
       },
       responses: {
         201: json(z.object({ organization: Organization, generalChannelId: z.uuid() }), "Created"),
+        200: json(
+          z.object({ organization: Organization, generalChannelId: z.uuid() }),
+          "The workspace they are still setting up, as it is",
+        ),
         ...errors,
       },
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const userId = c.get("user").id;
-      const { organization, general } = await createOrganization(db, userId, input, {
+      const { organization, general, existing } = await createOrganization(db, userId, input, {
         needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
+        onboarding: true,
       });
+      const created = {
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          role: "owner" as const,
+          context: organization.context,
+        },
+        generalChannelId: general.id,
+      };
+      if (existing) return c.json(created, 200);
       if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {
         await updateOrgSettings(db, c.get("user").id, organization.id, {
@@ -632,19 +658,35 @@ export function accountRoutes(deps: AppDeps) {
           ...(timezone && isValidTimeZone(timezone) ? { timezone } : {}),
         });
       }
-      return c.json(
-        {
-          organization: {
-            id: organization.id,
-            name: organization.name,
-            role: "owner" as const,
-            context: organization.context,
-          },
-          generalChannelId: general.id,
-        },
-        201,
-      );
+      return c.json(created, 201);
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/onboarding",
+      tags,
+      security,
+      summary: "Save how far you got in setting up your workspace",
+      description:
+        "Its owner only (403 for anyone else). `step`: the furthest step reached, saved as each one is passed (a skipped one counts); it only moves forward, so an earlier one changes nothing. `finished`: the onboarding is over, for good. Until then the apps open the onboarding instead of the workspace (`onboarding` in `GET /me`).",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ step: z.enum(ONBOARDING_STEPS).optional(), finished: z.literal(true).optional() })),
+      },
+      responses: {
+        200: json(
+          z.object({
+            step: z.enum(ONBOARDING_STEPS).openapi({ description: "The furthest step reached." }),
+            finished: z.boolean(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await saveOnboarding(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
   );
 
   app.openapi(

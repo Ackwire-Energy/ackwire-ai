@@ -121,14 +121,23 @@ function cloudBrowser(t: TestServer): Browser {
   });
 }
 
+/** Makes a workspace and finishes setting it up (one still being set up comes back instead of a new one). */
+async function makeWorkspace(b: Browser, name: string) {
+  const res = await b("/api/app/organizations", { json: { name } });
+  if (res.status === 201) {
+    const { organization } = (await res.clone().json()) as { organization: { id: string } };
+    await b(`/api/app/organizations/${organization.id}/onboarding`, { method: "PATCH", json: { finished: true } });
+  }
+  return res;
+}
+
 test("an invitation's link: sign-up for its address, then workspaces (agentes.chat Cloud)", async () => {
   const t = await server({ MACHINE_PROVISIONING: "external", PUBLIC_URL: CLOUD });
   const owner = cloudBrowser(t);
   await signUp(owner, "owner@acme.test");
   // The first account runs the installation: no invitation needed for its workspaces.
   expect((await me(owner)).canCreateWorkspace).toBe(true);
-  for (const name of ["Acme", "Acme Labs"])
-    expect((await owner("/api/app/organizations", { json: { name } })).status).toBe(201);
+  for (const name of ["Acme", "Acme Labs"]) expect((await makeWorkspace(owner, name)).status).toBe(201);
 
   const access = await invite(t, "ana@acme.test");
   const anon = cloudBrowser(t);
@@ -158,11 +167,11 @@ test("an invitation's link: sign-up for its address, then workspaces (agentes.ch
 
   // The link reached her mailbox: her address counts as confirmed.
   expect(await me(ana)).toMatchObject({ canCreateWorkspace: true, emailVerified: true });
-  const first = await ana("/api/app/organizations", { json: { name: "Ana's" } });
+  const first = await makeWorkspace(ana, "Ana's");
   expect(first.status).toBe(201);
   const { organization } = (await first.json()) as { organization: { id: string } };
   // As many as she likes: the first is the one recorded.
-  expect((await ana("/api/app/organizations", { json: { name: "Another" } })).status).toBe(201);
+  expect((await makeWorkspace(ana, "Another")).status).toBe(201);
   expect((await invitation(t, "ana@acme.test"))?.workspaceId).toBe(organization.id);
   expect((await me(ana)).canCreateWorkspace).toBe(true);
 });
@@ -200,7 +209,7 @@ test("agentes.chat Cloud: a member makes no workspace until the address is allow
   expect((await bia(await confirmationLink(t, "bia@acme.test"))).status).toBe(302);
   expect((await me(bia)).canCreateWorkspace).toBe(true);
   for (const name of ["Bia's", "Bia Labs"]) {
-    expect((await bia("/api/app/organizations", { json: { name } })).status).toBe(201);
+    expect((await makeWorkspace(bia, name)).status).toBe(201);
   }
   // Allowing again sends nothing.
   expect(await outcome("bia@acme.test")).toEqual({
