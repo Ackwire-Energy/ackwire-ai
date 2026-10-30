@@ -21,6 +21,7 @@ import {
   openDm,
   postPersonMessage,
   resolveNotifications,
+  setNoticePref,
   snoozeNotification,
   updateIssue,
   ValidationError,
@@ -138,6 +139,17 @@ test("an agent's answer reaches the person who asked, merged per conversation; r
   // Read in the conversation: it leaves the inbox.
   await markChannelRead(f.db, f.owner.id, f.org.id, dm.id, new Date(), f.pubsub);
   expect((await inbox(f.owner.id)).items).toEqual([]);
+});
+
+test("the realtime event says whether it reaches the person's devices, by their choices", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const events = hear(bia.id);
+  await post(f.owner.id, "@bia olha isso");
+  await setNoticePref(f.db, f.org.id, bia.id, "mentions", false);
+  await post(f.owner.id, "@bia e isso");
+  const alerts = events.filter((e) => e.type === "notification.upserted").map((e) => e.alert);
+  expect(alerts).toEqual([true, false]);
 });
 
 test("reactions to my message merge (also within 30 min after reading); my own reactions don't count", async () => {

@@ -4,13 +4,35 @@
  * done / snooze, and "Marcar tudo como lido". Same rules as the contract:
  * done and snoozed ones are hidden, waiting ones first, then the newest.
  */
-import type { ApiClient, AppNotification, NotificationCounts, NotificationFilter } from "@agenteschat/client";
+import type {
+  ApiClient,
+  AppNotification,
+  NoticePrefs,
+  NotificationCounts,
+  NotificationFilter,
+} from "@agenteschat/client";
 import { compareNotifications, matchesFilter, NOTIFICATION_FILTERS } from "@agenteschat/client/lib/notifications";
 import { MockNotFoundError } from "./context";
 
 export interface FakeInbox {
   items: AppNotification[];
+  /** The person's choices (`/notification-prefs`); the server's defaults when absent. */
+  prefs?: NoticePrefs;
 }
+
+const DEFAULT_PREFS: NoticePrefs = {
+  categories: [
+    { id: "waiting", on: true },
+    { id: "replies", on: true },
+    { id: "mentions", on: true },
+    { id: "threads", on: false },
+    { id: "tasks", on: false },
+    { id: "routines", on: true },
+    { id: "computers", on: true },
+    { id: "reactions", on: false },
+  ],
+  phones: 0,
+};
 
 const counts = (items: AppNotification[], now: number): NotificationCounts =>
   Object.fromEntries(
@@ -93,6 +115,17 @@ export function createFakeNotifications(
           ids.push(n.id);
         }
       return { ids };
+    },
+    prefs: async (orgId) => {
+      log("notifications.prefs", orgId);
+      inbox.prefs ??= structuredClone(DEFAULT_PREFS);
+      return structuredClone(inbox.prefs);
+    },
+    setPref: async (orgId, category, on) => {
+      log("notifications.setPref", orgId, category, on);
+      inbox.prefs ??= structuredClone(DEFAULT_PREFS);
+      inbox.prefs.categories = inbox.prefs.categories.map((c) => (c.id === category ? { ...c, on } : c));
+      return structuredClone(inbox.prefs);
     },
   };
 }

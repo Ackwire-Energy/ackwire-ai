@@ -6,6 +6,7 @@ import type { IconName } from "@agenteschat/ui";
 // the sections without loading the page itself.
 
 export type SettingsSection =
+  | "notifications"
   | "general"
   | "members"
   | "audit"
@@ -19,7 +20,7 @@ export type SettingsSection =
   | "billing"
   | "import";
 
-export type SettingsGroup = "org" | "agents" | "costs";
+export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
 /** The settings sub-nav, in order and in groups, with who can open each on this server. */
 export const SETTINGS_SECTIONS: {
@@ -28,6 +29,8 @@ export const SETTINGS_SECTIONS: {
   group: SettingsGroup;
   allowed: (role: Role, server: AuthConfig | undefined) => boolean;
 }[] = [
+  // Mine, not the workspace's: what reaches my devices as a notification here (ADR 0071 §8).
+  { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
   // What agents did and people changed: admins only (it shows everyone's work).
@@ -52,7 +55,7 @@ export const SETTINGS_SECTIONS: {
   { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
 ];
 
-export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
+export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 

@@ -739,6 +739,33 @@ export const ptBR = {
       privacy: "Este servidor não tem página de privacidade",
     },
   },
+  noticePrefs: {
+    whereTitle: "Onde chegam",
+    whatTitle: "O que avisa",
+    browser: "Este navegador",
+    phone: "Celular",
+    phoneOn: "No app do celular, com o aparelho bloqueado também",
+    phoneOff: "Ative no app do celular, em Você › Notificações",
+    mac: "App do Mac",
+    macHelp: "Enquanto o app estiver aberto, mesmo em segundo plano",
+    on: "Ligado",
+    off: "Desligado",
+    failed: "Não deu para salvar. Tente de novo.",
+    loadFailed: "Não deu para carregar suas escolhas agora.",
+    category: {
+      waiting: {
+        title: "Esperando você",
+        help: "Aprovações, perguntas dos agentes, sua vez no fórum, pedidos de ajuda no navegador",
+      },
+      replies: { title: "Respostas dos agentes", help: "Quando um agente responde o que você pediu" },
+      mentions: { title: "Menções e mensagens diretas", help: "Quando chamam você ou mandam mensagem" },
+      threads: { title: "Threads que você segue", help: "Respostas nas threads em que você escreveu ou que segue" },
+      tasks: { title: "Tarefas", help: "Tarefa para você, comentários e quando muda de etapa" },
+      routines: { title: "Rotinas e missões", help: "Quando param, falham ou esperam o computador" },
+      computers: { title: "Computadores", help: "Um computador novo entrou ou o do workspace ficou pronto" },
+      reactions: { title: "Reações", help: "Quando reagem a uma mensagem sua" },
+    },
+  },
   webPushAsk: {
     title: "Saiba quando um agente precisar de você",
     text:
@@ -7581,11 +7608,13 @@ export const ptBR = {
   settings: {
     nav: "Seções das configurações",
     group: {
+      you: "Você",
       org: "Workspace",
       agents: "Agentes",
       costs: "Custos e dados",
     },
     section: {
+      notifications: "Notificações",
       general: "Geral",
       members: "Membros e convites",
       access: "Agentes e acesso",
@@ -7600,6 +7629,7 @@ export const ptBR = {
       billing: "Plano e cobrança",
     },
     sectionText: {
+      notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
       access: "O que cada agente pode usar: um nível por conector.",

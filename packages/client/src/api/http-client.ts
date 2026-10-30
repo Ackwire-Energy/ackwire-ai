@@ -108,6 +108,8 @@ import type {
   MissionSummary,
   Model,
   MoveAgentsResult,
+  NoticeCategory,
+  NoticePrefs,
   NotificationCount,
   NotificationPage,
   OpenConsult,
@@ -1024,6 +1026,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AppNotification>(`${org(orgId)}/notifications/${enc(id)}/snooze`, { json: { until } }),
       readAll: (orgId, filter) =>
         request<{ ids: string[] }>(`${org(orgId)}/notifications/read-all`, { json: filter ? { filter } : {} }),
+      prefs: (orgId) => request<NoticePrefs>(`${org(orgId)}/notification-prefs`),
+      setPref: (orgId, category, on) =>
+        request<NoticePrefs>(`${org(orgId)}/notification-prefs`, { method: "PUT", json: { category, on } }),
     },
     forum: {
       list: async (orgId) => (await request<{ topics: ForumTopic[] }>(`${org(orgId)}/forum/topics`)).topics,

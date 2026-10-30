@@ -728,6 +728,33 @@ export const en: Translations = {
       privacy: "This server has no privacy page",
     },
   },
+  noticePrefs: {
+    whereTitle: "Where they arrive",
+    whatTitle: "What notifies you",
+    browser: "This browser",
+    phone: "Phone",
+    phoneOn: "In the phone app, even with the phone locked",
+    phoneOff: "Turn them on in the phone app, under You › Notifications",
+    mac: "Mac app",
+    macHelp: "While the app is open, even in the background",
+    on: "On",
+    off: "Off",
+    failed: "Couldn't save that. Try again.",
+    loadFailed: "Couldn't load your choices right now.",
+    category: {
+      waiting: {
+        title: "Waiting for you",
+        help: "Approvals, agents' questions, your turn in the forum, requests for help in the browser",
+      },
+      replies: { title: "Agents' replies", help: "When an agent answers what you asked" },
+      mentions: { title: "Mentions and direct messages", help: "When someone calls you or sends you a message" },
+      threads: { title: "Threads you follow", help: "Replies in threads you wrote in or follow" },
+      tasks: { title: "Tasks", help: "Tasks for you, comments and when one changes stage" },
+      routines: { title: "Routines and missions", help: "When they stop, fail or wait for their computer" },
+      computers: { title: "Computers", help: "A new computer joined or the workspace's one is ready" },
+      reactions: { title: "Reactions", help: "When someone reacts to a message of yours" },
+    },
+  },
   webPushAsk: {
     title: "Know when an agent needs you",
     text:
@@ -7538,11 +7565,13 @@ export const en: Translations = {
   settings: {
     nav: "Settings sections",
     group: {
+      you: "You",
       org: "Workspace",
       agents: "Agents",
       costs: "Costs and data",
     },
     section: {
+      notifications: "Notifications",
       general: "General",
       members: "Members and invitations",
       access: "Agents and access",
@@ -7557,6 +7586,8 @@ export const en: Translations = {
       billing: "Plan and billing",
     },
     sectionText: {
+      notifications:
+        "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
       members: "Who is in the workspace, and invitations.",
       access: "What each agent can use: one level per connector.",

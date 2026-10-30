@@ -10576,3 +10576,14 @@ html[data-menu-overlay] .shell {
   flex-direction: column;
   gap: 4px;
 }
+
+/* Configurações › Notificações (NoticePrefs.tsx, ADR 0071 §8): settings rows with the kind's icon before its name
+   and a switch or a chip at the end. */
+.notice-prefs__icon {
+  flex: none;
+}
+.notice-prefs__control {
+  flex: none;
+  display: flex;
+  align-items: center;
+}

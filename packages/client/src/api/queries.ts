@@ -77,6 +77,8 @@ import type {
   Message,
   MessageMemory,
   MoveAgentsInput,
+  NoticeCategory,
+  NoticePrefs,
   NotificationCount,
   NotificationEvent,
   NotificationFilter,
@@ -2695,6 +2697,32 @@ export const useNotificationCount = (orgId: string) => {
     meta: { quiet: true },
   });
 };
+
+/** What reaches my devices as a notification in this workspace (ADR 0071 §8). */
+export const useNoticePrefs = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.noticePrefs(orgId), queryFn: () => api.notifications.prefs(orgId) });
+};
+
+/** One category on or off: the switch moves at once, and goes back if the server refuses. */
+export function useSetNoticePref(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ category, on }: { category: NoticeCategory; on: boolean }) =>
+      api.notifications.setPref(orgId, category, on),
+    onMutate: async ({ category, on }) => {
+      await qc.cancelQueries({ queryKey: keys.noticePrefs(orgId) });
+      const before = qc.getQueryData<NoticePrefs>(keys.noticePrefs(orgId));
+      qc.setQueryData<NoticePrefs>(keys.noticePrefs(orgId), (prefs) =>
+        prefs ? { ...prefs, categories: prefs.categories.map((c) => (c.id === category ? { ...c, on } : c)) } : prefs,
+      );
+      return { before };
+    },
+    onError: (_error, _input, context) => qc.setQueryData(keys.noticePrefs(orgId), context?.before),
+    onSuccess: (prefs) => qc.setQueryData(keys.noticePrefs(orgId), prefs),
+  });
+}
 
 const listCaches = (qc: QC, orgId: string) =>
   qc.getQueriesData<NotificationPages>({ queryKey: [...keys.notifications(orgId), "list"] });
