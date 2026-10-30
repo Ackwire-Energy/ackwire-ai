@@ -4,6 +4,7 @@ import { schema } from "@agenteschat/db";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
+  type ConnectorConnection,
   type CustomDeps,
   connectCustomServer,
   connectorIconFile,
@@ -16,6 +17,7 @@ import {
   NotFoundError,
   readIcon,
   refreshCustomServer,
+  refreshServerIcon,
 } from "../src";
 import { addUser, type Fixture, setup } from "./fixtures";
 
@@ -101,6 +103,61 @@ function iconMcp(icons: McpIcon[]) {
 }
 
 describe("a custom server's own icon", () => {
+  test("concurrent refreshes that fetch different icons leave no orphan blob", async () => {
+    f = await setup();
+    const blobs = createPostgresBlobStore(f.db);
+    const images: Record<string, Uint8Array> = {
+      "https://tickets.example.com/o.png": pngSized(64, 64),
+      "https://tickets.example.com/x.png": pngSized(72, 72),
+      "https://tickets.example.com/y.png": pngSized(80, 80),
+    };
+    const httpFor = (url: string) => (async () => new Response(images[url])) as unknown as typeof fetch;
+    const deps: CustomDeps = {
+      db: f.db,
+      keyWrappers: [f.keyWrapper],
+      publicUrl: "https://chat.example.com",
+      resolveHost: async () => ["93.184.216.34"],
+      http: httpFor("https://tickets.example.com/o.png"),
+      connect: iconMcp([{ src: "https://tickets.example.com/o.png", sizes: ["64x64"] }]).connect,
+      blobs,
+    };
+    const started = await connectCustomServer(deps, f.owner.id, f.org.id, {
+      serverUrl: SERVER,
+      apiKey: "tk_secret_12345",
+      label: "Tickets",
+    });
+    if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+    const id = started.server.id;
+    const prefix = `orgs/${f.org.id}/connector-icons/${id}/`;
+    expect(await blobs.list(prefix)).toHaveLength(1);
+
+    // Both refreshes read the icon the connect stored (stale) and fetch a different new icon.
+    const stale = {
+      id,
+      orgId: f.org.id,
+      serverUrl: SERVER,
+      icon: started.server.iconUrl,
+    } as unknown as ConnectorConnection;
+    const iconDeps = (url: string) => ({
+      db: f.db,
+      blobs,
+      resolveHost: async () => ["93.184.216.34"],
+      http: httpFor(url),
+    });
+    await refreshServerIcon(iconDeps("https://tickets.example.com/x.png"), stale, {
+      icons: [{ src: "https://tickets.example.com/x.png", sizes: ["64x64"] }],
+    });
+    await refreshServerIcon(iconDeps("https://tickets.example.com/y.png"), stale, {
+      icons: [{ src: "https://tickets.example.com/y.png", sizes: ["64x64"] }],
+    });
+
+    // The refresh that lost the compare-and-set deleted its own new blob: only the winner's icon remains.
+    const left = await blobs.list(prefix);
+    expect(left).toHaveLength(1);
+    const [row] = await f.db.select().from(schema.connectorConnections);
+    expect(left[0]).toBe(`${prefix}${row?.icon?.split("/").pop()}`);
+  });
+
   test("kept on connect, served to members only, replaced, and dropped when the server stops listing one", async () => {
     f = await setup();
     // Postgres: the store a self-hosted server without a bucket or a files folder uses (it refuses unknown keys).
