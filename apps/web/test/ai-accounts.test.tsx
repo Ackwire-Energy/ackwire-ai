@@ -209,7 +209,11 @@ describe("Contas de IA: a plan with a login per agent", () => {
     };
     const { rows } = await page([team], "owner", [own]);
     const [mine, account] = rows();
-    expect(mine?.textContent).toContain("Claude Max");
+    // The computer's own sign-in reads like an account: its maker's name, then its plan once.
+    expect([mine, account].map((r) => r?.querySelector(".ai-accounts__name")?.textContent)).toEqual([
+      "Claude · Max",
+      "Trabalho · Team",
+    ]);
     expect(mine?.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 5%");
     const meter = account?.querySelector(".ac-planmeter--compact") as HTMLElement;
     expect(meter.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40% · 5h 12%");

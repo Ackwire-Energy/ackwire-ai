@@ -3,7 +3,7 @@ import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
-import { readJsonNoFollow } from "./json-file";
+import { readSmallJson } from "./json-file";
 
 /**
  * Which coding CLIs this machine has (protocol 7, ADR 0029): `claude` and
@@ -54,6 +54,13 @@ const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) 
 const ULTRA_TIER = "default_claude_max_20x";
 /** `.claude.json` also holds the CLI's projects: one larger than this isn't read. */
 const CLAUDE_CONFIG_MAX_BYTES = 4 * 1024 * 1024;
+/** Claude Code's `subscriptionType` for each organization type, as the CLI maps them. */
+const CLAUDE_ORG_PLANS = new Map([
+  ["claude_pro", "pro"],
+  ["claude_max", "max"],
+  ["claude_team", "team"],
+  ["claude_enterprise", "enterprise"],
+]);
 
 /**
  * Claude's plan as Anthropic names it (`pro`, `max`, `ultra`, `team`, `enterprise`): Claude Code's
@@ -66,14 +73,28 @@ export function claudePlan(subscriptionType: unknown, tier: () => unknown): stri
 }
 
 /**
- * The rate-limit tier of the organization Claude Code is signed in to, which `auth status` doesn't say: the CLI
- * keeps it in its config folder's `.claude.json` (`oauthAccount`). Undefined until a session there wrote it.
+ * The organization Claude Code is signed in to, as the CLI keeps it in its config folder's `.claude.json`
+ * (`oauthAccount`): its type and rate-limit tier, which `auth status` doesn't say. Its sign-in writes both, and they
+ * are missing only where its bootstrap call there failed or was skipped (offline, nonessential traffic off, another
+ * provider). `own`: the computer's own config, read through a link as Claude Code reads it; an account folder's never
+ * is.
  */
-export function claudeTier(configDir: string): unknown {
-  const config = readJsonNoFollow(join(configDir, ".claude.json"), CLAUDE_CONFIG_MAX_BYTES) as {
-    oauthAccount?: { organizationRateLimitTier?: unknown };
+function claudeOrganization(configDir: string, own = false) {
+  const config = readSmallJson(join(configDir, ".claude.json"), CLAUDE_CONFIG_MAX_BYTES, own) as {
+    oauthAccount?: { organizationType?: unknown; organizationRateLimitTier?: unknown };
   } | null;
-  return config?.oauthAccount?.organizationRateLimitTier;
+  return config?.oauthAccount;
+}
+
+/** The rate-limit tier of the organization Claude Code is signed in to (`claudeOrganization`). */
+export const claudeTier = (configDir: string, own = false): unknown =>
+  claudeOrganization(configDir, own)?.organizationRateLimitTier;
+
+/** The plan as `claudePlan` names it from `.claude.json` alone, for a folder where no CLI may run. */
+export function claudeKeptPlan(configDir: string): string | undefined {
+  const org = claudeOrganization(configDir);
+  const type = typeof org?.organizationType === "string" ? CLAUDE_ORG_PLANS.get(org.organizationType) : undefined;
+  return claudePlan(type, () => org?.organizationRateLimitTier);
 }
 
 /**
@@ -84,7 +105,7 @@ export function claudeTier(configDir: string): unknown {
  */
 export function claudeAuth(
   run: Run = defaultRun,
-  tier: () => unknown = () => claudeTier(process.env.CLAUDE_CONFIG_DIR || homedir()),
+  tier: () => unknown = () => claudeTier(process.env.CLAUDE_CONFIG_DIR || homedir(), true),
 ): { loggedIn?: boolean; authMethod?: string; plan?: string } {
   try {
     const r = run("claude", ["auth", "status", "--json"]);

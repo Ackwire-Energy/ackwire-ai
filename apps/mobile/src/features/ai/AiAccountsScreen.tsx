@@ -1,6 +1,6 @@
 import type { AiAccounts as AiAccountsView, Credential } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi, useCredentials, useSettings, useUpdateSettings } from "@agenteschat/client";
-import { accountTitle, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, ownSignIns } from "@agenteschat/client/lib/ai-accounts";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
@@ -173,7 +173,7 @@ export function AiAccountsScreen() {
               <Row
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                title={accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
                 subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (

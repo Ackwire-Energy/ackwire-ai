@@ -25,8 +25,8 @@ import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-
 import { isPlanId, type PlanId, planKeyFits, planOf } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { claudePlan, claudeTier, resolveCommand } from "./executors";
-import { readJsonNoFollow } from "./json-file";
+import { claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { readSmallJson } from "./json-file";
 import {
   codexUsage,
   fetchPlanKeyUsage,
@@ -67,8 +67,9 @@ import {
  * - System mode (`lending`): a folder belongs to the OS user of the agent
  *   that thinks with it, only while it does (`lendTo`, `keepLent`), else to
  *   root. Root never runs a CLI against what an agent's user could write: such
- *   a folder's status is what its turns said, signing in again starts it over,
- *   and removing it signs nothing out.
+ *   a folder's status is what its turns said and its plan what Claude Code
+ *   keeps there (`claudeKeptPlan`), signing in again starts it over, and
+ *   removing it signs nothing out.
  */
 
 /** A fresh look at every account's status happens at most this often (each one runs the CLI). */
@@ -150,7 +151,7 @@ export const SYSTEM_ACCOUNTS_ROOT = path.join(AGENT_WORKER_HOMES, "accounts");
 
 /** A key account's plan and key (`provider.json`); null when the folder isn't one. Never through a link or a pipe. */
 export async function planKeyOf(dir: string): Promise<{ provider: PlanId; key: string } | null> {
-  const o = readJsonNoFollow(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200) as Record<string, unknown> | null;
+  const o = readSmallJson(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200) as Record<string, unknown> | null;
   return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
 }
 
@@ -852,14 +853,18 @@ export class AccountManager {
   /**
    * One account's status (never throws: unknown is signed out). Refused in a turn since it last signed in
    * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a folder an agent's
-   * user had, as its turns last said; any other, as its CLI says.
+   * user had, as its turns last said, with the plan Claude Code keeps there (that user could write it, so it is only
+   * ever one of the plans' words); any other, as its CLI says.
    */
   private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
     const refused = existsSync(this.marker(kind, id, "invalid"));
     const plan = kind === "claude_code" ? await planKeyOf(dir) : null;
     if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4) };
-    if (refused || this.lentTo(kind, id) !== null) return { id, kind, loggedIn: !refused };
+    if (refused || this.lentTo(kind, id) !== null) {
+      const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
+      return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}) };
+    }
     const env = this.env(kind, dir);
     const r = await runCli(this.command(kind), STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
     // Codex says it on stderr.

@@ -109,7 +109,7 @@ test("Claude's plans by Anthropic's names: a Max on the 20x tier is Ultra, every
   expect(claudePlan("pro", tier("default_claude_ai"))).toBe("pro");
   expect(claudePlan("max", tier("default_claude_max_5x"))).toBe("max");
   expect(claudePlan("max", tier("default_claude_max_20x"))).toBe("ultra");
-  // The tier not written yet: a Max stays Max.
+  // No tier known: a Max stays Max.
   expect(claudePlan("max", tier())).toBe("max");
   // A Team seat on the premium tier is still Team.
   expect(claudePlan("team", tier("default_claude_max_20x"))).toBe("team");
@@ -437,7 +437,7 @@ test.if(posix)(
       m.invalidate();
       return (await m.list())[0]?.plan;
     };
-    // No session there yet, so no tier: Max.
+    // No tier kept there (the CLI's sign-in couldn't fetch it): Max.
     expect(await plan()).toBe("max");
     writeFileSync(config, ultra);
     expect(await plan()).toBe("ultra");
@@ -628,11 +628,49 @@ test.if(posix)("system mode: a pipe an agent's user leaves where a key would be 
   mkdirSync(dir, { recursive: true });
   expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
   expect(spawnSync("mkfifo", [path.join(dir, "provider.json")]).status).toBe(0);
+  expect(spawnSync("mkfifo", [path.join(dir, ".claude.json")]).status).toBe(0);
   expect(await planKeyOf(dir)).toBeNull();
   m.invalidate();
   const listed = await Promise.race([m.list(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
   expect(listed).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
 });
+
+test.if(posix)(
+  "system mode: a folder an agent's user had lists the plan Claude Code keeps there, never through a link, with no CLI",
+  async () => {
+    const { m, root, runs } = setup({ lending: { chown: async () => {} } });
+    const id = LOGIN(56);
+    const dir = path.join(root, "claude_code", id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    const config = path.join(dir, ".claude.json");
+    const kept = (organizationType: string, organizationRateLimitTier?: string) =>
+      JSON.stringify({ oauthAccount: { organizationType, organizationRateLimitTier } });
+    const listed = async () => {
+      m.invalidate();
+      return (await m.list())[0];
+    };
+    expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
+    // Nothing kept there: no plan, so the server keeps the one it knew.
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    writeFileSync(config, kept("claude_max", "default_claude_max_20x"));
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, plan: "ultra" });
+    writeFileSync(config, kept("claude_max", "default_claude_max_5x"));
+    expect((await listed())?.plan).toBe("max");
+    writeFileSync(config, kept("claude_team", "default_claude_max_20x"));
+    expect((await listed())?.plan).toBe("team");
+    // Root's again (no agent thinks with it now): still read, never run.
+    await m.keepLent(new Map());
+    writeFileSync(config, kept("claude_max", "default_claude_max_20x"));
+    expect((await listed())?.plan).toBe("ultra");
+    const elsewhere = path.join(path.dirname(root), "elsewhere.json");
+    writeFileSync(elsewhere, kept("claude_pro"));
+    rmSync(config);
+    symlinkSync(elsewhere, config);
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    expect(runs()).toHaveLength(0);
+  },
+);
 
 test.if(posix)("system mode: a sign-in in progress is lent to nobody; without lending nothing is", async () => {
   const chown = async () => {};

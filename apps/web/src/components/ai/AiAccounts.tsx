@@ -1,12 +1,6 @@
 import type { AiAccounts as AiAccountsView } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi } from "@agenteschat/client";
-import {
-  accountTitle,
-  groupPlans,
-  ownSignIns,
-  type PlanAccount,
-  planWordOf,
-} from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, groupPlans, ownSignIns, type PlanAccount } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
@@ -115,7 +109,7 @@ export function AiAccountsSection() {
               <ProviderLogo id={o.kind} size="sm" />
               <span className="list-col">
                 <span className="ai-accounts__name ac-captop">
-                  {[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                  {accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
                 </span>
                 <span className="small muted">{t("aiAccounts.page.ownOn", { computer: o.computer })}</span>
                 {o.usage && <PlanMeter usage={o.usage} text={meterText} compact />}
