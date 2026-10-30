@@ -1347,7 +1347,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const presence = shown?.presence ?? null;
   const presenceWord = presence ? t(`presence.${presence}`) : undefined;
   const line = shown?.status ? personLine(shown.status) : null;
-  // No line: away, busy or hidden say so; online offers to set one.
+  // How you appear is the badge's (and the title's); under your name only your line, or the offer to write one.
   const chosen = presence === "away" || presence === "busy" || presence === "hidden" ? presenceWord : undefined;
   const who = [me.user.name, line?.text ?? chosen].filter(Boolean).join(" · ");
   // Closes the menu first, then does what was picked (a dialog opens over the app, not over the menu).
@@ -1384,7 +1384,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           {line ? (
             <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
           ) : (
-            <StatusLine text={chosen ?? t("presence.setStatus")} empty={!chosen} className="sidebar__user-line" />
+            <StatusLine text={t("presence.setStatus")} empty className="sidebar__user-line" />
           )}
           {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>

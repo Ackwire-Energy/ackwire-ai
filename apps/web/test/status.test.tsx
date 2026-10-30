@@ -119,9 +119,10 @@ describe("Definir status", () => {
     await settle(4);
     expect(setStatusCalls(state)).toEqual([[ORG_ID, { availability: "hidden", status: null }]]);
     expect(screen().getByText("Você aparece como oculto")).toBeTruthy();
-    // To myself: hidden (the dotted outline), and the row says so.
+    // To myself: hidden (the dotted outline) says it; under my name only the offer to write a line, the word in the title.
     expect(badgeOf(account())).toBe("hidden");
-    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Oculto");
+    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Definir status");
+    expect(account().getAttribute("title")).toContain("Oculto");
   });
 
   test("the account menu's first item: my line, when it clears, how I appear", async () => {
