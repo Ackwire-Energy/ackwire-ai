@@ -34,6 +34,7 @@ export * from "./calendar";
 export * from "./calendar-tools";
 export * from "./cancel";
 export * from "./capabilities";
+export * from "./channel-categories";
 export * from "./channels";
 export * from "./chat-tools";
 export * from "./connectors/catalog";

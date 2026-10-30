@@ -280,3 +280,35 @@ test("a group the judge expects goes in as it is, with no directory when nothing
   expect(names).toContain("list_issues");
   expect(names).not.toContain("find_tools");
 });
+
+test("a run whose judge lists the browser starts the agent's browser while it thinks; any other run, never", async () => {
+  const warmed: unknown[] = [];
+  let browser = true;
+  f = await setup({
+    toolsOnDemand: true,
+    issueTools: true,
+    toolSources: [{ name: "browser", tools: async () => [tool("browser_read", "browser:use")] }],
+    judge: (kind, _id, _state, q) =>
+      kind === "tool_groups" && JSON.stringify(q.instructions).includes("Browser:") && browser ? 0.9 : 0,
+    reply: () => ({ chunks: ["ok"] }),
+    warmBrowser: (at) => warmed.push(at),
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "issues:read" },
+    { connectionId: null, scope: "browser:use" },
+  ]);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev abre o site da loja",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
+  expect(warmed).toEqual([{ orgId: f.org.id, agentId: f.agent.id, threadRootId: run?.threadRootId }]);
+
+  browser = false;
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev quais issues estão abertas?",
+  });
+  await drainOutbox(f.db, f.handlers);
+  expect(f.provider.calls).toHaveLength(2);
+  expect(warmed).toHaveLength(1);
+});

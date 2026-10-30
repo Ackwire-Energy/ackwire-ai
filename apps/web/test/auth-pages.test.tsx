@@ -1737,7 +1737,7 @@ describe("Onboarding", () => {
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     // Who they reply to: off, each only the person. Switched on here, the save says everyone (ADR 0059 §5).
-    const replies = within(panel).getByRole("switch", { name: "Respondem a todos" });
+    const replies = within(panel).getByRole("switch", { name: "Atendem outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
     await click(replies);
     expect(replies.getAttribute("aria-checked")).toBe("true");
@@ -1795,7 +1795,9 @@ describe("Onboarding", () => {
     await settle(6);
     await next();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).getByRole("switch", { name: "Respondem a todos" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(panel).getByRole("switch", { name: "Atendem outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
     await next();
     await settle(4);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
@@ -1803,7 +1805,7 @@ describe("Onboarding", () => {
       { brain: "claude_code", fallback: true },
     ]);
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
-    expect(screen().getByText("Seus agentes só respondem a você.")).toBeTruthy();
+    expect(screen().getByText("Seus agentes só atendem você.")).toBeTruthy();
   });
 
   test("a computer whose Claude Code isn't signed in: no account to share, Claude's sign-in instead, nothing saved on Continue", async () => {

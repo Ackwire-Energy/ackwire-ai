@@ -331,6 +331,81 @@ export function useAddCredential(orgId: string) {
 
 export const useChannels = (orgId: string) => useQuery(channelsQuery(useApi(), orgId));
 
+/** The sidebar's channel categories, in order (ADR 0080). */
+export const channelCategoriesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
+    queryKey: keys.channelCategories(orgId),
+    queryFn: () => api.chat.categories(orgId),
+    staleTime: 30_000,
+  });
+export const useChannelCategories = (orgId: string) => useQuery(channelCategoriesQuery(useApi(), orgId));
+
+/** After any layout change: the channels (their category and order) and the categories refetch. */
+function refreshLayout(qc: QueryClient, orgId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) }),
+  ]);
+}
+
+/** Admins: a new category at the end, optionally taking channels along. */
+export function useCreateChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; channelIds?: string[] }) => api.chat.createCategory(orgId, input),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useRenameChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; name: string }) =>
+      api.chat.renameCategory(orgId, input.categoryId, input.name),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useDeleteChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: string) => api.chat.deleteCategory(orgId, categoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function usePlaceChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; beforeCategoryId: string | null }) =>
+      api.chat.placeCategory(orgId, input.categoryId, input.beforeCategoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+/**
+ * Puts a channel in a category (null: none), before another channel or at its end. The list moves at once
+ * (the channel takes its new category) and refetches for the exact order.
+ */
+export function usePlaceChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channelId: string; categoryId: string | null; beforeChannelId?: string | null }) =>
+      api.chat.place(orgId, input.channelId, { categoryId: input.categoryId, beforeChannelId: input.beforeChannelId }),
+    onMutate: (input) => {
+      qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+        list?.map((c) => (c.id === input.channelId ? { ...c, categoryId: input.categoryId } : c)),
+      );
+    },
+    onSettled: () => refreshLayout(qc, orgId),
+  });
+}
+
 export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.channelMembers(orgId, channelId),
@@ -1301,6 +1376,16 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { name?: string; topic?: string }) => api.chat.update(orgId, channelId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
+/** Archives a channel (creator or admin): it leaves the list. */
+export function useArchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.archive(orgId, channelId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }

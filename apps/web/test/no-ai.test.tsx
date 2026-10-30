@@ -209,7 +209,9 @@ describe("no AI connected: above the composer", () => {
     const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(within(panel).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(panel).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
     cleanup();
     // Opened from anywhere else, every agent of the viewer's stays a choice.
     await open(both());
@@ -300,8 +302,10 @@ describe("the agent's no-AI card", () => {
     await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    // Choosing a plan asks nothing: she then answers only him until he turns on Responde a todos (ADR 0059 §5).
-    expect(within(plan).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
+    // Choosing a plan asks nothing: she then answers only him until he turns on Atende outras pessoas (ADR 0059 §5).
+    expect(within(plan).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
     // Claude's sign-in starts on its button, in a window of its own.
     const realOpen = window.open;
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };

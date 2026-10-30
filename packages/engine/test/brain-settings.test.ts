@@ -121,7 +121,7 @@ describe("brain settings", () => {
 /*
  * ADR 0059 §2–3 and §5: a plan thinks only for its owner's agents, one
  * account per agent, and an agent on a plan answers only its owner until the
- * owner turns on "Responde a todos".
+ * owner turns on "Atende outras pessoas".
  */
 let f: Fixture | undefined;
 afterEach(async () => {
@@ -173,7 +173,7 @@ describe("Criar agente: what a new agent could think with", () => {
   });
 });
 
-describe("a plan answers its owner until it replies to everyone (Responde a todos)", () => {
+describe("a plan answers its owner until it answers other people (Atende outras pessoas)", () => {
   test("onto a plan it answers only its owner; turning it on asks nothing and is audited as who may talk to it", async () => {
     const { fx, deps, bia, caio, row, audits } = await world();
     await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [bia.id] });
