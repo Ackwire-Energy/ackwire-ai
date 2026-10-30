@@ -1,11 +1,11 @@
-import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
 import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { planName, planOf } from "@agenteschat/client/lib/plans";
+import { accountPlan, planName, planOf } from "@agenteschat/client/lib/plans";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -18,7 +18,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, Te
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
-import { accountKindOf, agentAccounts, takenFrom, thinkingUsage } from "./logic";
+import { accountKindOf, agentAccounts, modelInput, modelRows, takenFrom, thinkingUsage } from "./logic";
 import { openConnectAi } from "./NoAiCard";
 import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
@@ -37,12 +37,45 @@ const PLAN_INTENT = { claude_code: "claude", codex: "chatgpt" } as const;
 /** Opens an agent's AI. */
 export const openAgentAi = (agentId: string) => router.push(`/agent-ai/${agentId}` as never);
 
+/** Opens an agent's model, from its AI. */
+const openAgentModel = (agentId: string) => router.push(`/agent-model/${agentId}` as never);
+
+/** Saves a change to the agent's AI at once and says so (or that it failed). */
+function useSaveBrain(agentId: string) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const save = async (input: AgentBrainInput, done: string) => {
+    setBusy(true);
+    try {
+      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
+      toast({ title: done, icon: "check" });
+    } catch {
+      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } finally {
+      for (const key of [
+        keys.agentBrain(orgId, agentId),
+        keys.agents(orgId),
+        keys.aiAccounts(orgId),
+        keys.aiStatus(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
+      setBusy(false);
+    }
+  };
+  return { busy, save };
+}
+
+/** The plan of the account the agent thinks with, which names its models. */
+const thinkingPlan = (view: AgentBrain) => accountPlan(view.accounts.find((a) => a.id === view.account));
+
 export function AgentAiScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const dir = useDirectory();
@@ -54,7 +87,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   // As on the web: its owner and admins load it, members don't.
   const allowed = (meId !== null && agent?.ownerUserId === meId) || can(org?.role, "manage_agents");
   const brain = useAgentBrain(orgId, agentId, allowed);
-  const [busy, setBusy] = useState(false);
+  const { busy, save } = useSaveBrain(agentId);
   // Looking at the plan: its usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -67,27 +100,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     (c) => c.machineId === view?.computer?.machineId,
   );
   const thinks = brainLine(t, agent?.brain, t("brain.model"));
-  const refresh = () => {
-    for (const key of [
-      keys.agentBrain(orgId, agentId),
-      keys.agents(orgId),
-      keys.aiAccounts(orgId),
-      keys.aiStatus(orgId),
-    ])
-      void qc.invalidateQueries({ queryKey: key });
-  };
-  const save = async (input: AgentBrainInput, done: string) => {
-    setBusy(true);
-    try {
-      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
-      toast({ title: done, icon: "check" });
-    } catch {
-      toast({ title: t("agentPage.work.failed"), icon: "x" });
-    } finally {
-      refresh();
-      setBusy(false);
-    }
-  };
+  const model = view && kind ? modelRows(t, view, thinkingPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
   // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
@@ -199,6 +212,19 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 {accountNote ? <GroupedFooter>{accountNote}</GroupedFooter> : null}
               </>
             ) : null}
+            {kind ? (
+              <>
+                <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
+                <GroupedList>
+                  <GroupedRow
+                    label={model?.label ?? view.effectiveModel ?? ""}
+                    {...(model?.sub ? { sub: model.sub } : {})}
+                    chevron
+                    onPress={() => openAgentModel(agentId)}
+                  />
+                </GroupedList>
+              </>
+            ) : null}
             {usage ? (
               <>
                 <GroupedHeader>{t("agentPage.tabs.usage")}</GroupedHeader>
@@ -260,6 +286,58 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               </>
             ) : null}
           </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * The agent's model, pushed from its AI ("Modelo"): Automático, or one of its brain's models (every model of its
+ * coding plan, with what each is sold as). A tap saves at once.
+ */
+export function AgentModelScreen({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const c = useColors();
+  const insets = useSafeAreaInsets();
+  const dir = useDirectory();
+  const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
+  const brain = useAgentBrain(orgId, agentId);
+  const { busy, save } = useSaveBrain(agentId);
+  const view = brain.data;
+  const rows = view ? modelRows(t, view, thinkingPlan(view)) : [];
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("agentPage.work.brain.planModel")} solid={false} grouped />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
+      >
+        {brain.isPending ? (
+          <ActivityIndicator color={c.muted} style={styles.loading} />
+        ) : !view || view.brain === "model" ? (
+          <Note icon="x">{t("common.loadFailed")}</Note>
+        ) : (
+          <GroupedList>
+            {rows.map((r) => (
+              <GroupedRow
+                key={r.value}
+                label={r.label}
+                {...(r.sub ? { sub: r.sub } : {})}
+                checked={r.checked}
+                disabled={busy}
+                onPress={() => {
+                  if (r.checked) return;
+                  const done = t("agentPage.work.saved.brain", {
+                    ...g,
+                    brain: `${t(`brain.card.${view.brain}`)} · ${r.label}`,
+                  });
+                  void save(modelInput(r.value, view), done);
+                }}
+              />
+            ))}
+          </GroupedList>
         )}
       </ScrollView>
     </View>

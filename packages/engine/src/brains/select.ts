@@ -1,5 +1,7 @@
 import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
+import { isAutoModel } from "@agenteschat/providers";
+import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
@@ -236,6 +238,7 @@ export async function brainAccountFor(
       label: machineAccounts.label,
       status: machineAccounts.status,
       kind: machineAccounts.kind,
+      provider: machineAccounts.provider,
     })
     .from(machineAccounts)
     .where(
@@ -247,7 +250,12 @@ export async function brainAccountFor(
     );
   if (!row || row.kind !== kind) return undefined;
   // A sign-in still in progress or an account being removed can't think: as good as signed out.
-  return { id: row.id, label: row.label, status: row.status === "active" ? "active" : "signed_out" };
+  return {
+    id: row.id,
+    label: row.label,
+    status: row.status === "active" ? "active" : "signed_out",
+    ...(row.provider ? { provider: row.provider } : {}),
+  };
 }
 
 /**
@@ -416,6 +424,10 @@ export async function resolveBrain(
     machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
     brainAccountFor(deps.db, agent, kind, machineId),
   ]);
+  // A plan's model kept while another account thinks (or none): what that one runs instead, so no turn asks a
+  // provider for a model it doesn't have.
+  const runs =
+    kind === "claude_code" && model && !isAutoModel(model) ? claudeCodeModel(planOf(account?.provider), model) : model;
   const effort = brainEffortFor(agent, kind);
   const unavailable =
     machineId && !deps.machines
@@ -440,7 +452,7 @@ export async function resolveBrain(
   return {
     kind,
     ...base,
-    ...(model ? { model } : {}),
+    ...(runs ? { model: runs } : {}),
     ...(session ? { session } : {}),
     ...(unavailable ? { unavailable } : {}),
     ...(account ? { account } : {}),

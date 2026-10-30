@@ -804,6 +804,80 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
   });
 });
 
+describe("Quem pensa: a coding plan's models", () => {
+  /** Ada thinks with Claude Code on the MacBook, with Walter's key account of `provider`. */
+  async function onPlan(provider: string, patch: Partial<AgentBrain> = {}) {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    const account: MachineAccount = {
+      id: "acct_plan",
+      kind: "claude_code",
+      label: "Plano",
+      email: null,
+      plan: null,
+      status: "active",
+      ownerId: "u-walter",
+      ownerName: "Walter Nogueira",
+      mine: true,
+      usedBy: ["Ada"],
+      usage: null,
+      provider,
+      keyHint: "4f2a",
+    };
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, {
+        brain: "claude_code",
+        effectiveModel: "sonnet",
+        account: "acct_plan",
+        accounts: [account],
+        ...patch,
+      });
+    await open(state, api);
+    return state;
+  }
+
+  test("every model of the plan in a select, each with what it's sold as; one by id is saved by its id", async () => {
+    const state = await onPlan("opencode");
+    const d = await brainDialog();
+    expect(within(d).queryByRole("radiogroup", { name: "Modelo" })).toBeNull();
+    const trigger = within(d).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toBe("MiniMax M3");
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const options = screen()
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(options).toHaveLength(25);
+    expect(options.slice(0, 4)).toEqual([
+      "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
+      "MiniMax M3",
+      "Claude Haiku 5.5",
+      "MiniMax M3.1 Flash",
+    ]);
+    expect(options).toContain("DeepSeek V4.1 FlashEconômico");
+    expect(options).toContain("Kimi K3.1 ProTopo de linha");
+    await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", model: "deepseek-v4.1-flash" });
+    expect(document.body.textContent).toContain("A Ada agora pensa com Claude Code · DeepSeek V4.1 Flash.");
+  });
+
+  test("the cell names the plan's model it runs; a plan with few models keeps the segments", async () => {
+    await onPlan("kimi", { model: "k3-256k", effectiveModel: "k3-256k" });
+    expect(sentence().textContent).toContain("K3 256K");
+    cleanup();
+    await onPlan("zai", { model: "opus", effectiveModel: "opus" });
+    const d = await brainDialog();
+    const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
+    expect(models.map((r) => r.textContent)).toEqual(["Automático", "GLM-5.3", "GLM-5.3 Flash"]);
+    // An alias the plan leaves out runs its main model: shown as that one.
+    expect(models[1]?.getAttribute("aria-checked")).toBe("true");
+  });
+});
+
 describe("Onde trabalha and the browser (their dialogs)", () => {
   test("each computer says what it has; choosing one saves at once", async () => {
     const state = seedState();

@@ -43,10 +43,9 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
+  brainModelChoice,
+  brainModelChoices,
   isPlanId,
-  planAliases,
-  planModel as planModelOf,
-  planModelOptions,
   planName,
   planOf,
 } from "@agenteschat/client/lib/plans";
@@ -201,17 +200,17 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
   const shownPlanModel = view ? view.effectiveModel : (agent.brain?.model ?? null);
-  // A coding plan's account: its maker's model thinks (under Claude Code's alias).
+  // A coding plan's account: its maker's model thinks.
   const thinkingAccount = view?.account ? view.accounts.find((a) => a.id === view.account) : undefined;
   const plan =
     kind === "claude_code" ? (view ? accountPlan(thinkingAccount) : planOf(agent.brain?.provider)) : undefined;
+  const effectiveChoice = view?.effectiveModel ? brainModelChoice(kind, plan, view.effectiveModel) : null;
   const planModel = isAuto(shownPlanModel)
     ? t("brain.auto.label")
     : view
-      ? plan
-        ? planModelOf(plan, view.effectiveModel).label
-        : (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
-          view.effectiveModel)
+      ? (brainModelChoices(plan, view.options.find((o) => o.kind === kind)?.models ?? []).find(
+          (c) => c.value === effectiveChoice,
+        )?.label ?? view.effectiveModel)
       : shownPlanModel;
   // The account only when the computer has more than one of that kind.
   const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
@@ -562,6 +561,8 @@ type ShownEffort = (typeof EFFORTS)[number];
 /** A stored `xhigh` shows as Alto, no effort (or an automatic one) as Médio (the default). */
 const shownEffort = (e: BrainEffortSetting | null): ShownEffort =>
   e === "xhigh" ? "high" : e === null || isAuto(e) ? "medium" : e;
+/** The most choices the model's segmented control holds (Automático and Claude's three); more go in a select. */
+const MODEL_SEGMENTS = 4;
 
 function BrainDialog({ onClose }: { onClose: () => void }) {
   const work = useWork();
@@ -675,8 +676,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const row = useAiAccounts(org.id, view.canUsePlans && accountKind !== null).data?.computers.find(
     (c) => c.machineId === thinksOn,
   );
-  // On a coding plan Claude Code keeps its aliases, each running the plan's model.
+  // On a coding plan Claude Code runs the plan's models: any of them, or the ones its aliases name.
   const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
+  const modelOptions = brainModelChoices(plan, option?.models ?? []);
   // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
   const usage = accountKind
     ? account === null
@@ -716,9 +718,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const modelName = (value: string | null) =>
     isAuto(value)
       ? t("brain.auto.label")
-      : plan
-        ? planModelOf(plan, value).label
-        : (option?.models.find((m) => m.value === value)?.label ?? value ?? "");
+      : (modelOptions.find((c) => c.value === brainModelChoice(kind, plan, value ?? ""))?.label ?? value ?? "");
   const brainName = (k: BrainKind) =>
     k === "model"
       ? isAuto(model)
@@ -833,7 +833,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
-  const shownModel = planModel ?? option?.defaultModel ?? "";
+  const shownModel = brainModelChoice(kind, plan, planModel ?? option?.defaultModel ?? "");
   const accountOptions: SelectOption[] = [
     {
       value: HERE,
@@ -939,25 +939,40 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
-        <Segmented
-          className="agp-brainseg"
-          label={t("agentPage.work.brain.planModel")}
-          // An alias the plan leaves out runs its main model: shown as that one.
-          value={
-            plan && !isAuto(shownModel) && !planAliases(plan).some((a) => a === shownModel) ? "sonnet" : shownModel
-          }
-          onValueChange={setPlanModel}
-          options={[
-            { value: AUTO, label: t("brain.auto.label") },
-            ...(plan
-              ? planModelOptions(plan)
-              : (option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))),
-          ]}
-        />
-        {isAuto(planModel) && (
-          <SettingNote icon="bulb" live>
-            {t("brain.auto.hint")}
-          </SettingNote>
+        {modelOptions.length + 1 <= MODEL_SEGMENTS ? (
+          <>
+            <Segmented
+              className="agp-brainseg"
+              label={t("agentPage.work.brain.planModel")}
+              value={shownModel}
+              onValueChange={setPlanModel}
+              options={[
+                { value: AUTO, label: t("brain.auto.label") },
+                ...modelOptions.map(({ value, label }) => ({ value, label })),
+              ]}
+            />
+            {isAuto(planModel) && (
+              <SettingNote icon="bulb" live>
+                {t("brain.auto.hint")}
+              </SettingNote>
+            )}
+          </>
+        ) : (
+          <Select
+            className="agp-brainsel"
+            aria-label={t("agentPage.work.brain.planModel")}
+            value={shownModel}
+            onValueChange={setPlanModel}
+            renderValue={pickerValue}
+            options={[
+              { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint") },
+              ...modelOptions.map(({ value, label, tag }) => ({
+                value,
+                label,
+                ...(tag ? { description: t(`brain.modelTag.${tag}`) } : {}),
+              })),
+            ]}
+          />
         )}
       </BrainField>
       {!isAuto(planModel) && (

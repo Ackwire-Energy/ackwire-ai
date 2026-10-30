@@ -5764,6 +5764,8 @@ export const ptBR = {
     notAvailableNow: "Escolhido, mas indisponível agora.",
     offline: "O {{computer}} está offline agora.",
     modelLabel: "Modelo",
+    /** What a coding plan's model is sold as, beside its name. */
+    modelTag: { cheap: "Econômico", fast: "Rápido", smart: "Topo de linha" },
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",

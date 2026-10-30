@@ -5728,6 +5728,8 @@ export const en: Translations = {
     notAvailableNow: "Chosen, but unavailable right now.",
     offline: "{{computer}} is offline right now.",
     modelLabel: "Model",
+    /** What a coding plan's model is sold as, beside its name. */
+    modelTag: { cheap: "Cheap", fast: "Fast", smart: "Flagship" },
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",
     hidden: "{{owner}} or an admin chooses who thinks.",

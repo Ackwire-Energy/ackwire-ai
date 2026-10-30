@@ -10,17 +10,34 @@
  * Settings as each maker documents them for Claude Code (read 2026-10-24):
  * docs.z.ai/devpack/tool/claude, kimi.com/code/docs (third-party tools, Claude
  * Code), platform.minimax.io/docs/coding-plan/claude-code and
- * opencode.ai/v2/docs/console/harnesses/claude-code.
+ * opencode.ai/v2/docs/console/harnesses/claude-code. Each plan's models as its
+ * maker lists them (read 2026-10-30): docs.z.ai/devpack/overview,
+ * kimi.com/code/docs/en/kimi-code/models.html,
+ * platform.minimax.io/docs/coding-plan/intro, and opencode.ai/v2/docs/console/go
+ * with its live list (opencode.ai/inference/go/v1/models).
  */
 
-/** Claude Code's model aliases: an agent on a plan keeps its alias (`--model sonnet`), the plan names the model. */
+/** Claude Code's model aliases: "Automático" picks one per run, and the plan names the model each one runs. */
 export type PlanAlias = "opus" | "sonnet" | "haiku";
 export const PLAN_ALIASES: readonly PlanAlias[] = ["opus", "sonnet", "haiku"];
 
+/**
+ * How the picker sells a model, from its plan's or maker's own words: `smart` its maker's flagship, `fast` its
+ * maker's high-speed version, `cheap` one the plan's limits stretch furthest with.
+ */
+export type PlanModelTag = "cheap" | "fast" | "smart";
+
 export interface PlanModel {
-  /** What Claude Code sends for the alias (`ANTHROPIC_DEFAULT_SONNET_MODEL`); `[1m]`: a 1M-token window. */
+  /** What Claude Code sends (`--model`, or `ANTHROPIC_DEFAULT_SONNET_MODEL` for its alias); `[1m]`: a 1M-token window. */
   id: string;
   label: string;
+  /**
+   * The alias it runs for ("Automático"'s tiers, and an agent that chose the alias): `sonnet` on exactly one
+   * model, the others at most once; an alias the plan leaves out runs `sonnet`'s model. Without one, it runs only
+   * when chosen.
+   */
+  alias?: PlanAlias;
+  tag?: PlanModelTag;
 }
 
 export interface CodingPlan {
@@ -41,8 +58,8 @@ export interface CodingPlan {
     baseUrl: string;
     /** The variable Claude Code reads the key from. */
     tokenEnv: "ANTHROPIC_AUTH_TOKEN" | "ANTHROPIC_API_KEY";
-    /** The aliases offered, with what each runs; one left out runs `sonnet`'s model. */
-    models: { sonnet: PlanModel } & Partial<Record<Exclude<PlanAlias, "sonnet">, PlanModel>>;
+    /** Every model of the plan that answers through Claude Code, the ones its aliases run first. */
+    models: readonly PlanModel[];
     /** The maker's other documented settings. */
     env?: Readonly<Record<string, string>>;
   };
@@ -60,10 +77,11 @@ export const CODING_PLANS = {
     claudeCode: {
       baseUrl: "https://api.z.ai/api/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
-      models: {
-        sonnet: { id: "glm-5.3[1m]", label: "GLM-5.3" },
-        haiku: { id: "glm-5.3-flash[1m]", label: "GLM-5.3 Flash" },
-      },
+      // Every tier has both; Flash spends about a third of GLM-5.3's credits per token.
+      models: [
+        { id: "glm-5.3[1m]", label: "GLM-5.3", alias: "sonnet", tag: "smart" },
+        { id: "glm-5.3-flash[1m]", label: "GLM-5.3 Flash", alias: "haiku", tag: "cheap" },
+      ],
       env: { API_TIMEOUT_MS: "3000000" },
     },
     usage: { url: "https://api.z.ai/api/monitor/usage/quota/limit", auth: "raw" },
@@ -77,11 +95,17 @@ export const CODING_PLANS = {
     claudeCode: {
       baseUrl: "https://api.kimi.ai/coding/",
       tokenEnv: "ANTHROPIC_API_KEY",
-      // Every membership with coding quota has `kimi-for-coding`; K3.1 Pro needs Plus or above.
-      models: {
-        opus: { id: "k3.1-pro", label: "K3.1 Pro" },
-        sonnet: { id: "kimi-for-coding", label: "Kimi for Coding" },
-      },
+      // Every membership with coding quota has `kimi-for-coding`; K3.1 Pro and both K3 need Plus or above, the
+      // high-speed versions Pro or above (about 2× and 3× the quota of their regular ones). K3 256K spends about
+      // half of K3's.
+      models: [
+        { id: "kimi-for-coding", label: "Kimi for Coding", alias: "sonnet" },
+        { id: "k3.1-pro", label: "K3.1 Pro", alias: "opus", tag: "smart" },
+        { id: "k3.1-pro-highspeed", label: "K3.1 Pro Highspeed", tag: "fast" },
+        { id: "kimi-for-coding-highspeed", label: "Kimi for Coding Highspeed", tag: "fast" },
+        { id: "k3", label: "K3" },
+        { id: "k3-256k", label: "K3 256K", tag: "cheap" },
+      ],
     },
     usage: { url: "https://api.kimi.com/coding/v1/usages", auth: "bearer" },
   },
@@ -94,7 +118,7 @@ export const CODING_PLANS = {
     claudeCode: {
       baseUrl: "https://api.minimax.io/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
-      models: { sonnet: { id: "MiniMax-M3.1-Flash[1m]", label: "MiniMax M3.1 Flash" } },
+      models: [{ id: "MiniMax-M3.1-Flash[1m]", label: "MiniMax M3.1 Flash", alias: "sonnet" }],
     },
   },
   opencode: {
@@ -107,10 +131,36 @@ export const CODING_PLANS = {
     claudeCode: {
       baseUrl: "https://opencode.ai/inference/go/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
-      models: {
-        sonnet: { id: "minimax-m3", label: "MiniMax M3" },
-        haiku: { id: "claude-haiku-5-5", label: "Claude Haiku 5.5" },
-      },
+      // Go answers in Anthropic's format for every model, translating the others. Each model has its own
+      // monthly cap; `cheap`: 20,000 or more requests a month on Go by OpenCode's own estimates. Left out: the
+      // free models (for a limited time) and the ones that train on what they're sent. DeepSeek's models answer
+      // only once the OpenCode workspace allows the Global region.
+      models: [
+        { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet" },
+        { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", alias: "haiku" },
+        { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash" },
+        { id: "glm-5.3", label: "GLM-5.3", tag: "smart" },
+        { id: "glm-5.3-flash", label: "GLM-5.3 Flash", tag: "cheap" },
+        { id: "glm-5.2", label: "GLM-5.2" },
+        { id: "kimi-k3.1-pro", label: "Kimi K3.1 Pro", tag: "smart" },
+        { id: "kimi-k3", label: "Kimi K3" },
+        { id: "kimi-k2.7-code", label: "Kimi K2.7 Code" },
+        { id: "qwen3.8-max", label: "Qwen3.8 Max", tag: "smart" },
+        { id: "qwen3.8-flash", label: "Qwen3.8 Flash", tag: "cheap" },
+        { id: "qwen3.7-plus", label: "Qwen3.7 Plus", tag: "cheap" },
+        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", tag: "smart" },
+        { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", tag: "cheap" },
+        { id: "mimo-v2.6-pro", label: "MiMo V2.6 Pro" },
+        { id: "mimo-v2.6-flash", label: "MiMo V2.6 Flash", tag: "cheap" },
+        { id: "gpt-6-luna", label: "GPT-6 Luna", tag: "cheap" },
+        { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+        { id: "gemini-4-argon", label: "Gemini 4 Argon", tag: "smart" },
+        { id: "grok-4.7", label: "Grok 4.7" },
+        { id: "longcat-2.0", label: "LongCat 2.0", tag: "cheap" },
+        { id: "hy3", label: "Hy3", tag: "cheap" },
+        { id: "hy4-preview", label: "Hy4 Preview" },
+        { id: "step-5-preview", label: "Step 5 Preview" },
+      ],
       // Its models that aren't Claude refuse some of Claude Code's betas; the OpenCode CLI, if the agent runs
       // it, reads no project config that could point it elsewhere.
       env: { CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1", OPENCODE_DISABLE_PROJECT_CONFIG: "1" },
@@ -124,15 +174,41 @@ export const PLAN_IDS = Object.keys(CODING_PLANS) as PlanId[];
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Object.hasOwn(CODING_PLANS, v);
 export const planOf = (id: unknown): CodingPlan | undefined => (isPlanId(id) ? CODING_PLANS[id] : undefined);
 
-/** The model an alias runs on a plan; `auto`, an alias the plan leaves out or none: `sonnet`'s. */
-export function planModel(plan: CodingPlan, alias: string | null | undefined): PlanModel {
-  const models: Partial<Record<string, PlanModel>> = plan.claudeCode.models;
-  return (alias ? models[alias] : undefined) ?? plan.claudeCode.models.sonnet;
+const isAlias = (v: unknown): v is PlanAlias => PLAN_ALIASES.some((a) => a === v);
+
+/**
+ * The model a stored value runs on a plan: one of its models by id, the model of an alias, else (`auto`, an alias
+ * the plan leaves out, another plan's model, none) `sonnet`'s.
+ */
+export function planModel(plan: CodingPlan, value: string | null | undefined): PlanModel {
+  const { models } = plan.claudeCode;
+  const byAlias = isAlias(value) ? models.find((m) => m.alias === value) : undefined;
+  return (
+    models.find((m) => m.id === value) ??
+    byAlias ??
+    models.find((m) => m.alias === "sonnet") ??
+    (models[0] as PlanModel)
+  );
 }
 
-/** The aliases a plan offers, in Claude Code's order. */
-export const planAliases = (plan: CodingPlan): PlanAlias[] =>
-  PLAN_ALIASES.filter((a) => plan.claudeCode.models[a] !== undefined);
+/** What a plan's model is stored and chosen as: its alias where it has one (portable to Claude), else its id. */
+export const planModelValue = (m: PlanModel): string => m.alias ?? m.id;
+
+/** Every coding plan's model ids: what an agent on Claude Code may store besides Claude's own. */
+export const isPlanModelId = (v: string) =>
+  Object.values<CodingPlan>(CODING_PLANS).some((p) => p.claudeCode.models.some((m) => m.id === v));
+
+/**
+ * The `--model` of a Claude Code turn for a stored value: an alias as is (on a plan, the plan names its model);
+ * with a plan, one of its models by id; without one, a Claude id. Anything else (another plan's model, none) runs
+ * `sonnet`.
+ */
+export function claudeCodeModel(plan: CodingPlan | undefined, value: unknown): string {
+  if (isAlias(value)) return value;
+  if (typeof value !== "string") return "sonnet";
+  if (plan) return plan.claudeCode.models.some((m) => m.id === value) ? value : "sonnet";
+  return /^claude-/.test(value) ? value : "sonnet";
+}
 
 /** A pasted key that fits the plan: one line, the plan's shape. */
 export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.keyPattern).test(key);

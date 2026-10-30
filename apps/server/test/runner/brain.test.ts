@@ -25,7 +25,6 @@ import {
   claudeBrainArgs,
   claudeCapabilities,
   fallbackModelFor,
-  planAlias,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
@@ -888,15 +887,27 @@ test.if(posix)(
       expect(runs()[4]?.apiKey).toBe("sk-ant-stray");
       await turn(5, "hi", { personalMcp: true, session: { id: SESSION(5), resume: false } });
       expect(runs()[5]?.settingsEnv).toBeNull();
+
+      // One of the plan's models chosen by id: Claude Code runs it, its subagents too; the aliases keep theirs.
+      await turn(6, "hi", { account: KIMI_ACCOUNT, model: "k3-256k", session: { id: SESSION(6), resume: false } });
+      const picked = runs()[6];
+      expect(flag(picked, "--model")).toBe("k3-256k");
+      expect(picked?.args).not.toContain("--fallback-model");
+      expect(picked?.settingsEnv).toMatchObject({
+        CLAUDE_CODE_SUBAGENT_MODEL: "k3-256k",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "k3.1-pro",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "kimi-for-coding",
+      });
+      // Another plan's model runs the plan's own sonnet.
+      await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });
+      expect(flag(runs()[7], "--model")).toBe("sonnet");
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
   },
 );
 
-test("plan aliases and the pinned env without a plan", () => {
-  expect(planAlias("haiku")).toBe("haiku");
-  for (const other of [undefined, "auto", "claude-opus-5-5", "glm-5.3"]) expect(planAlias(other)).toBe("sonnet");
+test("the pinned env without a plan", () => {
   const env = accountSettingsEnv(undefined, "opus", { HTTP_PROXY: "http://p:1", PATH: "/bin" });
   expect(env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
   expect(env.HTTP_PROXY).toBe("http://p:1");

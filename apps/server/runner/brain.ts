@@ -24,8 +24,8 @@ import {
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import {
   type CodingPlan,
+  claudeCodeModel,
   PLAN_ALIASES,
-  type PlanAlias,
   type PlanId,
   planModel,
   planOf,
@@ -73,7 +73,8 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   the project's settings the agent can write. A key account (protocol 20)
  *   thinks through its plan's endpoint: its key in the process env (never in
  *   a file the CLI reads, and redacted from everything sent), its model
- *   aliases mapped to the plan's models, no fallback model.
+ *   aliases mapped to the plan's models, no fallback model. `--model` is the
+ *   agent's alias, or one of the plan's models by id (`claudeCodeModel`).
  * - Protocol 15 (live steering): `steer` writes messages into the turn in
  *   progress as stream-json user lines (each with its `uuid`); Claude Code
  *   reads them at its next tool boundary (`priority: "next"`; "now" for an
@@ -571,9 +572,6 @@ export function accountSettingsEnv(
   env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
   return { ...env, ...plan.claudeCode.env };
 }
-
-/** A plan turn's `--model`: its alias (the plan names the model), `sonnet` for anything else. */
-export const planAlias = (model: unknown): PlanAlias => PLAN_ALIASES.find((a) => a === model) ?? "sonnet";
 
 /** The argv of a brain turn's Claude Code (spawned without a shell: nothing needs quoting). */
 export function claudeBrainArgs(l: ClaudeLaunch): string[] {
@@ -1507,7 +1505,7 @@ export class BrainManager {
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
-    const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
+    const model = plan ? claudeCodeModel(plan, req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");
