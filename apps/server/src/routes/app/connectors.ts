@@ -165,7 +165,8 @@ export function connectorRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Connect with an API key (admins)",
-      description: "Replaces an existing connection of the same connector; agents keep their grants.",
+      description:
+        "Replaces an existing connection of the same connector; agents keep their grants. A first connection is every agent's, whole (`connector:*`); sensitive tools still ask for approval.",
       request: {
         params: OrgParams,
         body: body(

@@ -20,6 +20,7 @@ import type {
   AgentMailbox,
   AgentMailboxInput,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -48,6 +49,7 @@ import type {
   CalendarEventPatch,
   CalendarRange,
   Channel,
+  ChannelCategory,
   ChannelMember,
   CommandApproval,
   ComputerSetup,
@@ -81,6 +83,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportInput,
   ImportPlan,
   Instance,
@@ -325,6 +328,10 @@ export interface ApiClient {
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
+    /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
+    proposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** Says no to it (who may create agents): the card stays, marked denied. */
+    denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0080): owners and admins, archived or not. */
@@ -401,6 +408,8 @@ export interface ApiClient {
   imports: {
     /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** What this workspace brought from other apps, by source package (admins). */
+    sources(orgId: string): Promise<ImportedSource[]>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };
@@ -408,14 +417,33 @@ export interface ApiClient {
     channels(orgId: string): Promise<Channel[]>;
     createChannel(
       orgId: string,
-      input: { name: string; topic?: string; visibility?: "public" | "private" },
+      input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
     ): Promise<Channel>;
+    /** The sidebar's categories, in order (ADR 0080). */
+    categories(orgId: string): Promise<ChannelCategory[]>;
+    /** Admins: a category at the end, optionally taking `channelIds` along. */
+    createCategory(orgId: string, input: { name: string; channelIds?: string[] }): Promise<ChannelCategory>;
+    renameCategory(orgId: string, categoryId: string, name: string): Promise<ChannelCategory>;
+    /** Its channels go on top, with no category. */
+    deleteCategory(orgId: string, categoryId: string): Promise<void>;
+    /** Before `beforeCategoryId`, or to the end (null). */
+    placeCategory(orgId: string, categoryId: string, beforeCategoryId: string | null): Promise<void>;
+    /** Into `categoryId` (null: none), before `beforeChannelId` or at the end. */
+    place(
+      orgId: string,
+      channelId: string,
+      input: { categoryId: string | null; beforeChannelId?: string | null },
+    ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
     update(
       orgId: string,
       channelId: string,
       input: { name?: string; topic?: string; visibility?: "public" | "private" },
     ): Promise<Channel>;
+    /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
+    archive(orgId: string, channelId: string): Promise<void>;
+    /** "Desfazer" right after archiving. */
+    unarchive(orgId: string, channelId: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
     roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;

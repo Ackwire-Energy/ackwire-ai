@@ -353,7 +353,7 @@ export function SettingsTab({
                 />
                 {blocked && (
                   <SettingNote icon="lock" live>
-                    {t("aiAccounts.share.ownerOnly", { ...g, owner: ownerFirst ?? "" })}
+                    {t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
                   </SettingNote>
                 )}
                 {errors.audience && (

@@ -240,15 +240,17 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.querySelector(".agp-addacct__step")?.classList.contains("ac-iconline")).toBe(false);
     expect(panel.querySelector(".agp-addacct__step > i")).toBeNull();
     expect(shownText(panel)).not.toMatch(/Abre a página|nunca vê a senha|senha vai só/);
-    // Who the agent replies to, once, as the panel's foot: "Responde a todos", off, with Claude's terms a gray area in a
-    // line and their words behind its ⓘ (no lock note above it).
+    // Whom the agent answers, once, as the panel's foot: "Atende outras pessoas", off, the line saying she answers
+    // only the person on their plan, and Claude's terms behind its ⓘ (no lock note above it).
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
     expect(panel.lastElementChild).toBe(foot);
     expect(foot.firstElementChild?.getAttribute("data-icon") ?? foot.querySelector("svg")).toBeTruthy();
-    expect(shownText(foot)).toBe("Responde a todosZona cinzenta nos termos do Claude");
-    expect(within(foot).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Zona cinzenta nos termos do Claude", foot).text).toBe(
-      "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
+    expect(shownText(foot)).toBe("Atende outras pessoasA Ada só atende você, pelo seu plano do Claude.");
+    expect(within(foot).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+    expect(hintOf("os termos do plano", foot).text).toBe(
+      "Os planos do Claude são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Claude.",
     );
     expect(panel.classList.contains("ai-panel--plan")).toBe(true);
     expect(panel.querySelectorAll(".ac-setnote")).toHaveLength(0);
@@ -306,10 +308,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     );
     const safe = hintOf("Cole a chave aqui", panel);
     expect(safe.text).toBe("A chave vai criptografada para o MacBook e\u00a0fica\u00a0só\u00a0lá.");
-    // The foot's terms are the plan's maker's.
+    // The foot names the plan, and its terms are the plan's maker's.
     const foot = panel.querySelector(".ac-card__foot") as HTMLElement;
-    expect(hintOf("Zona cinzenta nos termos do plano", foot).text).toBe(
-      "Z.ai diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
+    expect(shownText(foot)).toBe("Atende outras pessoasA Ada só atende você, pelo seu plano GLM Coding.");
+    expect(hintOf("os termos do plano", foot).text).toBe(
+      "Z.ai diz que o plano é só de quem assina. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do plano.",
     );
     expect(shownText(panel)).not.toMatch(/Fica em|Num plano de equipe|criptografada|só de quem assina/);
     expect(within(panel).getByLabelText("Chave do GLM Coding").getAttribute("aria-describedby")).toBe(
@@ -535,14 +538,14 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Small columns, so the two cards sit side by side on the panel's text column in the setup too.
     expect(own.parentElement?.className).toBe("grid-options grid-options--sm");
     // Who it replies to is the foot's, once, either way.
-    expect(within(dialog).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
+    expect(within(dialog).getAllByRole("switch", { name: "Atende outras pessoas" })).toHaveLength(1);
     // One just for Ada: its title alone; then the sign-in, which asks for no address: Claude's own page does.
     const one = within(dialog).getByRole("button", { name: "Uma conta só para a Ada" });
     expect(one.textContent).toBe("Uma conta só para a Ada");
     await click(one);
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    expect(within(dialog).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
+    expect(within(dialog).getAllByRole("switch", { name: "Atende outras pessoas" })).toHaveLength(1);
     expect(panel.querySelector("input")).toBeNull();
     expect(within(panel).queryByRole("textbox")).toBeNull();
     expect(shownText(panel)).not.toMatch(/Qual conta|Email da conta|opcional/);
@@ -577,7 +580,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const panel = () => within(dialog).getByRole("region", { name: /^Seu plano do/ });
     expect(within(dialog).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(panel()).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    expect(within(panel()).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
+    expect(within(panel()).getAllByRole("switch", { name: "Atende outras pessoas" })).toHaveLength(1);
     // ChatGPT's own sign-in isn't reported: its cards stay.
     await click(tile("ChatGPT"));
     expect(within(panel()).getByRole("button", { name: "A conta que os seus agentes dividem" })).toBeTruthy();
@@ -977,18 +980,21 @@ describe("Conectar uma IA: one picker, plans first", () => {
   });
 });
 
-describe("Responde a todos, in the plan's panel", () => {
-  const replies = (inside: HTMLElement, name = "Responde a todos") => within(inside).getByRole("switch", { name });
+describe("Atende outras pessoas, in the plan's panel", () => {
+  const replies = (inside: HTMLElement, name = "Atende outras pessoas") => within(inside).getByRole("switch", { name });
 
   test("off by default; on before the sign-in, the move carries it; after, it changes at once", async () => {
     const { state, machines, dialog, tile } = await connect();
     await click(tile("ChatGPT"));
     const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    const line = () => panel.querySelector(".plan-replies__terms > span")?.textContent;
     expect(replies(panel).getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Zona cinzenta nos termos do ChatGPT", panel).text).toContain("Os termos do ChatGPT dizem");
-    // Nothing thinks with the plan yet: nothing to save.
+    expect(line()).toBe("A Ada só atende você, pelo seu plano do ChatGPT.");
+    expect(hintOf("os termos do plano", panel).text).toContain("Os planos do ChatGPT são para uso pessoal.");
+    // Nothing thinks with the plan yet: nothing to save, and the line already says what on does.
     await click(replies(panel));
     expect(replies(panel).getAttribute("aria-checked")).toBe("true");
+    expect(line()).toBe("A Ada atende quem pode falar com ela, pelo seu plano do ChatGPT.");
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
     machines?.endLogin("login_1", {
       state: "done",
@@ -1031,8 +1037,11 @@ describe("Responde a todos, in the plan's panel", () => {
       ada: { brain: { kind: "claude_code", model: "Sonnet" } },
     });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
-    expect(hintOf("Zona cinzenta nos termos do Claude", panel).text).toBe(
-      "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
+    expect(panel.querySelector(".plan-replies__terms > span")?.textContent).toBe(
+      "A Ada atende quem pode falar com ela, pelo seu assento do Claude.",
+    );
+    expect(hintOf("os termos do plano", panel).text).toBe(
+      "Cada assento do Claude é de uma pessoa só. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Claude.",
     );
   });
 });
@@ -1054,9 +1063,9 @@ describe("All agents: one plan for the team, a login per agent", () => {
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
     // Claude and a coding plan: all of them, by default, with their faces and names.
-    for (const [plan, name] of [
-      ["Claude", "Seu plano do Claude"],
-      ["GLM Coding", "GLM Coding Plan"],
+    for (const [plan, name, which] of [
+      ["Claude", "Seu plano do Claude", "plano do Claude"],
+      ["GLM Coding", "GLM Coding Plan", "plano GLM Coding"],
     ] as const) {
       await click(tile(plan));
       const panel = within(dialog).getByRole("region", { name });
@@ -1065,8 +1074,11 @@ describe("All agents: one plan for the team, a login per agent", () => {
       expect(options.map((o) => o.textContent)).toEqual(["Todos os agentesAda, Atlas e Lia", "Ada", "Atlas", "Lia"]);
       expect(options[0]?.querySelectorAll(".ac-avatar-stack > .ac-avatar")).toHaveLength(3);
       expect(options[1]?.querySelectorAll(".ac-avatar")).toHaveLength(1);
-      // Who it's for, and who they reply to, once (the list's still open, so the rest is hidden from the tree).
-      expect(within(panel).getAllByRole("switch", { name: "Respondem a todos", hidden: true })).toHaveLength(1);
+      // Who it's for, and whom they answer, once (the list's still open, so the rest is hidden from the tree).
+      expect(within(panel).getAllByRole("switch", { name: "Atendem outras pessoas", hidden: true })).toHaveLength(1);
+      expect(panel.querySelector(".plan-replies__terms > span")?.textContent).toBe(
+        `Só atendem você, pelo seu ${which}.`,
+      );
       await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
       await settle(2);
     }

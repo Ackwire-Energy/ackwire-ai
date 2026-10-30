@@ -207,7 +207,8 @@ export function agoOf(iso: string, now = Date.now()): Ago {
 
 /**
  * "Este mês": money only when the API gives it to this person (ADR 0026: members
- * see a percentage), else the share of the budget used.
+ * see a percentage), else the share of the budget used, as the server says it
+ * (`formatPercent` writes it, "<1%" for a little).
  */
 export type Spend =
   | { kind: "money"; spentUsd: number; budgetUsd: number; fraction: number }
@@ -228,7 +229,7 @@ export function spendOf(input: {
       budgetUsd: budget,
       fraction: Math.min(1, Math.max(0, input.usage.costUsd / budget)),
     };
-  return { kind: "percent", percent: Math.round(Math.max(0, input.budgetUsedPercent)), fraction };
+  return { kind: "percent", percent: Math.max(0, input.budgetUsedPercent), fraction };
 }
 
 /** "Pode usar": the apps it may use (granted or inherited), then the built-in groups, by label. */

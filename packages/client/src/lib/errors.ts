@@ -11,6 +11,8 @@ import { endSentence } from "./text";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "agent_proposal.decided": "errors.agentProposal.decided",
+  "agent_proposal.expired": "errors.agentProposal.expired",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",

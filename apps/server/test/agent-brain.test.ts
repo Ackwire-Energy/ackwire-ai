@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, type PlanUsage, type PlanWindowKind, type ServerFrame } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { eq, schema } from "@agenteschat/db";
 import { applyBootSwitches } from "../src/start";
@@ -155,7 +155,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     onlyOwner: true,
     ownSignIn: true,
   });
-  // "Responde a todos": on with nothing to accept, and Bia may talk to it.
+  // "Atende outras pessoas": on with nothing to accept, and Bia may talk to it.
   const canTalk = async () =>
     ((await (await asBia("/agents")).json()) as { agents: { id: string; canTalk: boolean }[] }).agents.find(
       (a) => a.id === agentId,
@@ -251,7 +251,11 @@ test("where the server provisions the computers (the Cloud), an agent on a plan 
 
 test("the agent list says who thinks: the brain, its model's label, the computer only for admins and the owner", async () => {
   const { api, asBia, agentId } = await workspace();
-  type Listed = { id: string; model: string; brain?: { kind: string; model: string | null; computer?: string } };
+  type Listed = {
+    id: string;
+    model: string;
+    brain?: { kind: string; model: string | null; computer?: string; account?: string };
+  };
   const listed = async (as: typeof api) =>
     ((await (await as("/agents")).json()) as { agents: Listed[] }).agents.find((a) => a.id === agentId);
   expect((await listed(api))?.brain).toEqual({ kind: "model", model: null });
@@ -259,16 +263,81 @@ test("the agent list says who thinks: the brain, its model's label, the computer
   const mac = await pairMac(api);
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
   await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code" } });
-  expect((await listed(api))?.brain).toEqual({ kind: "claude_code", model: "Sonnet", computer: "mac" });
+  // Its owner connected the computer, so the computer's own sign-in thinks for it (named by its plan, not known yet).
+  expect((await listed(api))?.brain).toEqual({
+    kind: "claude_code",
+    model: "Sonnet",
+    computer: "mac",
+    account: "Claude",
+  });
   // A member: the brain and its model, not the computer.
-  expect((await listed(asBia))?.brain).toEqual({ kind: "claude_code", model: "Sonnet" });
+  expect((await listed(asBia))?.brain).toEqual({ kind: "claude_code", model: "Sonnet", account: "Claude" });
   await api(`/agents/${agentId}/brain`, { method: "PUT", json: { model: "opus" } });
   expect((await listed(api))?.brain?.model).toBe("Opus");
   // An edit answers with it too.
   const edited = (await (
     await api(`/agents/${agentId}`, { method: "PATCH", json: { role: "Marketing" } })
   ).json()) as Listed;
-  expect(edited.brain).toEqual({ kind: "claude_code", model: "Opus", computer: "mac" });
+  expect(edited.brain).toEqual({ kind: "claude_code", model: "Opus", computer: "mac", account: "Claude" });
+});
+
+test("the agent list carries a plan agent's account and its last windows, for everyone (ADR 0063 §5)", async () => {
+  const { api, asBia, agentId, orgId } = await workspace();
+  type Listed = { id: string; brain?: { account?: string; usage?: PlanUsage } };
+  const brainOf = async (as: typeof api) =>
+    ((await (await as("/agents")).json()) as { agents: Listed[] }).agents.find((a) => a.id === agentId)?.brain;
+  const usage = (kind: PlanWindowKind, usedPercent: number): PlanUsage => ({
+    windows: [{ kind, usedPercent, resetsAt: "2099-01-01T14:00:00.000Z" }],
+    source: "probe",
+    at: "2026-10-30T12:00:00.000Z",
+  });
+  const mac = await pairMac(api);
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code" } });
+
+  // The computer's own sign-in: its plan and windows as the runner said them.
+  const week = usage("seven_day", 40);
+  await t.db
+    .update(schema.machines)
+    .set({ executors: { claude: { version: "2.1.0", plan: "max" }, ownUsage: { claude_code: week } } })
+    .where(eq(schema.machines.id, mac.machineId));
+  expect(await brainOf(api)).toMatchObject({ account: "Claude Max", usage: week });
+  expect(await brainOf(asBia)).toMatchObject({ account: "Claude Max", usage: week });
+
+  // Its own account: that account's name and windows; before any window is known, the name alone.
+  const [owner] = await t.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "owner@example.com"));
+  const accountId = crypto.randomUUID();
+  await t.db.insert(schema.machineAccounts).values({
+    id: accountId,
+    orgId,
+    machineId: mac.machineId,
+    kind: "claude_code",
+    label: "Claude Team 2",
+    plan: "team",
+    createdBy: owner?.id ?? null,
+  });
+  await t.db.update(schema.agents).set({ brainAccountId: accountId }).where(eq(schema.agents.id, agentId));
+  const unknown = await brainOf(asBia);
+  expect(unknown?.account).toBe("Claude Team 2");
+  expect(unknown && "usage" in unknown).toBe(false);
+  const hours = usage("five_hour", 12);
+  await t.db.update(schema.machineAccounts).set({ usage: hours }).where(eq(schema.machineAccounts.id, accountId));
+  expect(await brainOf(asBia)).toMatchObject({ account: "Claude Team 2", usage: hours });
+
+  // Someone else's agent on that computer: its own sign-in isn't theirs, so no plan and nothing to show.
+  const [bia] = await t.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "bia@example.com"));
+  await t.db
+    .update(schema.agents)
+    .set({ brainAccountId: null, ownerUserId: bia?.id ?? null })
+    .where(eq(schema.agents.id, agentId));
+  const theirs = await brainOf(asBia);
+  expect(theirs && ("account" in theirs || "usage" in theirs)).toBe(false);
 });
 
 test("a new agent starts on Automático on every brain; one with a fixed model keeps the brain's default", async () => {

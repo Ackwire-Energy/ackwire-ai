@@ -243,7 +243,7 @@ export function EventDialog({
             label={t("calendar.form.participants")}
             searchLabel={t("calendar.form.participantsSearch")}
             hint={t("calendar.form.participantsHelp")}
-            emptyText={t("calendar.form.participantsEmpty")}
+            emptyText={() => t("calendar.form.participantsEmpty")}
             selected={picked}
             onChange={setPicked}
           />

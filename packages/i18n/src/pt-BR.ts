@@ -564,8 +564,8 @@ export const ptBR = {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
       paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
-      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0079). */
-      confirming: "Pagamento recebido. Ativando o plano do agentes.chat deste workspace.",
+      /** Back from paying, for a minute at most, until the billing service lifts the workspace's hold (ADR 0079). */
+      confirming: "Confirmando o pagamento do plano do agentes.chat deste workspace.",
       leadNoComputer:
         "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     },
@@ -745,7 +745,7 @@ export const ptBR = {
     browser: "Este navegador",
     phone: "Celular",
     phoneOn: "No app do celular, com o aparelho bloqueado também",
-    phoneOff: "Ative no app do celular, em Você › Notificações",
+    phoneOff: "Ative no app do celular, em Você\u00a0›\u00a0Notificações",
     mac: "App do Mac",
     macHelp: "Enquanto o app estiver aberto, mesmo em segundo plano",
     on: "Ligado",
@@ -1017,6 +1017,15 @@ export const ptBR = {
     topicLabel: "Descrição do canal",
     topicPlaceholder: "Sobre o que é este canal?",
     noTopic: "Sem descrição",
+    nameLabel: "Nome",
+    nameHelp: "Muda para todo mundo. Os links antigos continuam funcionando.",
+    nameTaken: "Já existe #{{name}}.",
+    generalName: "O #general mantém o nome.",
+    archive: "Arquivar canal",
+    archived: "#{{channel}} arquivado. A conversa fica guardada.",
+    detailsSub: "{{category}} · {{visibility}}",
+    visibilityPublic: "Público",
+    visibilityPrivate: "Privado",
     actions: "Ações da mensagem de {{name}}",
     helpful: "Útil",
     notHelpful: "Não ajudou",
@@ -1139,6 +1148,12 @@ export const ptBR = {
       api_key: "Adicionar uma chave de API",
     },
     titleFor: "Conectar uma IA {{for}} {{name}}",
+    /** What the person already has, before the new sign-ins: accounts on the agent's computer, the workspace's keys. */
+    have: {
+      title: "Já conectadas",
+      titleFor: "Já conectadas, {{for}} {{name}}",
+      other: "Ou conecte outra",
+    },
     orPayGo: "Ou pague pelo uso",
     plan: {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Team ou Enterprise" },
@@ -1227,6 +1242,14 @@ export const ptBR = {
     },
     connect: "Conectar",
     connected: "Conectado",
+    agentProposal: {
+      title: "{{agent}} propõe um novo agente",
+      review: "Revisar",
+      created: "Criado",
+      aiAccount: "Pensa com {{account}}",
+      aiModel: "Pensa com o modelo do workspace",
+      aiNone: "Sem IA ainda. Conecte uma depois de criar",
+    },
   },
   dm: {
     subtitle: "{{role}} · de {{owner}}",
@@ -1364,6 +1387,54 @@ export const ptBR = {
     selected_one: "{{count}} selecionado",
     selected_other: "{{count}} selecionados",
     create: "Criar #{{name}}",
+  },
+  channelCategories: {
+    newCategory: "Nova categoria",
+    newCategoryHelp: "Entra no fim da lista. Dá para arrastar depois.",
+    newCategoryDesc: "Junta canais sob um nome na barra lateral de todo mundo.",
+    name: "Nome",
+    namePlaceholder: "ex.: Produto",
+    nameEmpty: "Dê um nome para a categoria.",
+    nameTaken: "Já existe a categoria {{name}}.",
+    channels: "Canais que vão para ela",
+    channelsSearch: "Buscar canal",
+    channelsEmpty: "Nenhum canal com “{{q}}”.",
+    inCategory: "Hoje em {{name}}",
+    noCategory: "Sem categoria",
+    noCategoryDesc: "No topo, sem cabeçalho",
+    create: "Criar categoria",
+    createWith_one: "Criar com {{count}} canal",
+    createWith_other: "Criar com {{count}} canais",
+    created: "{{name}} criada.",
+    rename: "Renomear",
+    renameTitle: "Renomear categoria",
+    save: "Salvar",
+    delete: "Excluir categoria",
+    deleteDesc: "Os canais voltam para o topo",
+    deleted_one: "{{name}} excluída. {{count}} canal voltou para o topo.",
+    deleted_other: "{{name}} excluída. {{count}} canais voltaram para o topo.",
+    deletedEmpty: "{{name}} excluída.",
+    undo: "Desfazer",
+    collapseAll: "Fechar todas",
+    expandAll: "Abrir todas",
+    newChannelHere: "Novo canal aqui",
+    newChannelIn: "Novo canal em {{name}}",
+    category: "Categoria",
+    categoryHelp: "Onde o canal aparece na barra lateral de todo mundo.",
+    newCategoryOption: "Nova categoria…",
+    move: "Mover para…",
+    moveTitle: "Mover #{{channel}}",
+    moveDesc: "Muda o lugar do canal na barra lateral de todo mundo. Quem participa continua igual.",
+    moveSearch: "Buscar categoria",
+    moveEmpty: "Nenhuma categoria com “{{q}}”.",
+    moveTo: "Mover para {{name}}",
+    moveSame: "Mover",
+    moveNow: "Agora",
+    moveEmptyCategory: "Ainda sem canais",
+    moveCreate: "Criar “{{name}}”",
+    moved: "#{{channel}} agora está em {{name}}.",
+    newWithChannel: "Nova categoria com este canal",
+    editChannel: "Editar canal",
   },
   channelMembers: {
     addRow: "Adicionar pessoa ou agente",
@@ -2650,7 +2721,7 @@ export const ptBR = {
     plans: "Pelo plano, num computador",
     plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
     planOnlyOwner:
-      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+      "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",
@@ -2709,12 +2780,15 @@ export const ptBR = {
     openProfile: "Abrir perfil",
     createAnother: "Criar outro agente",
     adminsOnly: "Só admins e donos criam agentes. Peça a um admin da {{org}}.",
+    proposalClosed: "Esta proposta já foi decidida ou expirou.",
+    proposalNoAccess: "Só quem está na conversa vê esta proposta.",
+    backToChat: "Voltar para a conversa",
     and: " e ",
   },
   members: {
     /** Before inviting, while every agent with an AI answers only the person. */
-    agentsOnlyYou: "Seus agentes só respondem a você.",
-    agentsOnlyYouHint: "Num plano, você pode deixar cada um responder a todos na página dele.",
+    agentsOnlyYou: "Seus agentes só atendem você.",
+    agentsOnlyYouHint: "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     filters: "Filtrar pessoas",
     roleFilter: "Papel",
     rolesCount_one: "{{count}} papel",
@@ -4628,33 +4702,46 @@ export const ptBR = {
   },
   aiAccounts: {
     share: {
-      /** Off by default: the agent replies only to its owner while it thinks with their plan. */
-      switch: "Responde a todos",
+      /** Off by default: the agent answers only its owner while it thinks with their plan. */
+      switch: "Atende outras pessoas",
       /** The same switch for every agent a plan's panel connects. */
-      switchAll: "Respondem a todos",
+      switchAll: "Atendem outras pessoas",
       /** Off, as someone who isn't the plan's owner sees it. */
-      switchOther: "Só responde a {{name}}",
-      /** Who decides, for someone who isn't the plan's owner. */
-      onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      /** The line under the switch, and its ⓘ: the plan's terms, in its maker's words, a seat's or a personal plan's. */
-      terms: {
-        line: "Zona cinzenta nos termos do {{provider}}",
-        linePlan: "Zona cinzenta nos termos do plano",
-        own: "Os termos do {{provider}} dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
-        seat: "Os termos do {{provider}} dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
-        other:
-          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
+      switchOther: "Só atende {{owner}}",
+      /** Who decides, for someone who isn't the plan's owner: under the switch, and in "Quem pode falar". */
+      onOther:
+        "{{The}} {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com {{pronoun}}.",
+      /** Under the switch, by its state: whom the agent answers and on which plan. `*All`: every agent of a panel. */
+      line: {
+        off: "{{The}} {{name}} só atende você, pelo seu {{plan}}.",
+        on: "{{The}} {{name}} atende quem pode falar com {{pronoun}}, pelo seu {{plan}}.",
+        offAll: "Só atendem você, pelo seu {{plan}}.",
+        onAll: "Atendem quem pode falar com eles, pelo seu {{plan}}.",
       },
-      savedEveryone: "Agora {{article}} {{name}} responde a todos.",
-      savedOwner: "{{The}} {{name}} agora só responde a você.",
-      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
-      letEveryone: "Liberar para todos",
-      letPeople: "Liberar de novo",
-      ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
+      /** The line's plan, after "pelo seu": a personal plan, a seat (Team, Enterprise) or a coding plan by its name. */
+      plan: {
+        own: "plano do {{provider}}",
+        seat: "assento do {{provider}}",
+        coding: "plano {{label}}",
+      },
+      /** The line's ⓘ (`about` names it): the plan's terms, in its maker's words, a seat's or a personal plan's. */
+      terms: {
+        about: "os termos do plano",
+        own: "Os planos do {{provider}} são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do {{provider}}.",
+        seat: "Cada assento do {{provider}} é de uma pessoa só. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do {{provider}}.",
+        other:
+          "{{maker}} diz que o plano é só de quem assina. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do plano.",
+      },
+      savedEveryone: "Agora {{article}} {{name}} atende outras pessoas.",
+      savedOwner: "{{The}} {{name}} agora só atende você.",
+      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só atende você.",
+      letEveryone: "Deixar {{article}} {{name}} atender todos",
+      letPeople: "Deixar {{article}} {{name}} atender outras pessoas",
       hereNotYours: "Só para agentes de quem conectou o {{computer}}",
     },
     errors: {
-      planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
+      planOwnerOnly:
+        "Só o responsável por {{agentName}} libera para mais gente: {{agentName}} atende pelo plano dessa pessoa.",
     },
     add: {
       paste: "Colar",
@@ -4727,8 +4814,16 @@ export const ptBR = {
         monthly: "Mês",
         other: "Outro limite",
       },
-      resetsAt: "volta às {{time}}",
-      resetsOn: "volta {{day}} às {{time}}",
+      short: {
+        five_hour: "5h",
+        seven_day: "semana",
+        seven_day_opus: "Opus",
+        seven_day_sonnet: "Sonnet",
+        monthly: "mês",
+        other: "outro",
+      },
+      resetsAt: "renova às {{time}}",
+      resetsOn: "renova {{day}} às {{time}}",
       almost: "Quase no limite",
       limited: "No limite",
       limitedUntil: "No limite até {{when}}",
@@ -6243,6 +6338,8 @@ export const ptBR = {
       close: "Fechar detalhe",
       can: "O que os agentes poderão fazer",
       afterText: "Nenhum agente usa até você escolher.",
+      allText: "Ao conectar, todos os agentes podem usar. Você muda isso depois.",
+      keepText: "Os agentes mantêm o acesso que já têm. Você muda isso depois.",
       again: "Conectar outra conta",
       connected: "Já conectado",
       how: "Como funciona",
@@ -6727,6 +6824,8 @@ export const ptBR = {
     withKey: "Conectar com uma chave de API",
     needsKey: "Este servidor não aceita OAuth. Conecte com uma chave de API.",
     nothingYet: "Nada fica disponível para os agentes até o passo 3.",
+    allCanUse: "Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.",
+    keepAccess: "Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.",
     reaching: "Falando com o servidor…",
     listing: "Listando as ferramentas…",
     almost: "Quase lá…",
@@ -6735,6 +6834,10 @@ export const ptBR = {
     all: "Todos:",
     allLevel: "Todos: {{level}}",
     levelOf: "Nível de {{name}}",
+    everyone: "Todos os agentes",
+    everyoneCount_one: "{{count}} agente",
+    everyoneCount_other: "{{count}} agentes",
+    everyoneLevel: "Nível de todos os agentes",
     noAgents: "Nenhum agente ainda. Libere quando quiser em “Quem usa”.",
     asksCount_one: "{{count}} ação sempre pede aprovação no chat.",
     asksCount_other: "{{count}} ações sempre pedem aprovação no chat.",
@@ -7081,6 +7184,10 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    agentProposal: {
+      decided: "Alguém já decidiu esta proposta.",
+      expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+    },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você.",
@@ -7991,6 +8098,7 @@ export const ptBR = {
         readingForum: "Leu o fórum",
         creatingChannel: "Criou um canal",
         offeringConnectAi: "Ofereceu conectar uma IA",
+        proposingAgent: "Propôs um agente",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
         findingTools: "Procurou ferramentas",
@@ -8054,6 +8162,7 @@ export const ptBR = {
       readingForum: "lendo o fórum",
       creatingChannel: "criando um canal",
       offeringConnectAi: "preparando a conexão de uma IA",
+      proposingAgent: "propondo um agente",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
       findingTools: "procurando ferramentas",
@@ -8120,6 +8229,7 @@ export const ptBR = {
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       action_connect_ai: "Conectar uma IA",
+      agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
@@ -8297,6 +8407,10 @@ export const ptBR = {
     offer_connect_ai: {
       label: "Oferecer conectar uma IA",
       description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    propose_agent: {
+      label: "Propor um agente",
+      description: "Posta um card com um novo agente para revisar. Uma pessoa cria.",
     },
     create_channel: {
       label: "Criar canal",
