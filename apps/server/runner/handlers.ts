@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node
 import path from "node:path";
 import {
   type AgentScope,
+  browserSetupOf,
   type FileEntry,
   isStreamId,
   isTerminalSize,
@@ -22,7 +23,7 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import { routeWithPlan } from "./brain-route";
-import type { BrowserManager } from "./browser";
+import { type BrowserManager, browserSetupText } from "./browser";
 import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
@@ -82,6 +83,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "browser.act",
   "browser.batch",
   "browser.capture",
+  "browser.warm",
   "browser.stream.start",
   "desktop.session.start",
   "desktop.look",
@@ -125,6 +127,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "browser.input": "agent",
   "browser.batch": "agent",
   "browser.capture": "agent",
+  "browser.warm": "agent",
   // Root's: a stream's data socket needs the machine token, which no worker holds, and a desktop's password file
   // must be one its agent can't rewrite.
   "desktop.session.start": "machine",
@@ -456,6 +459,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     req.op === "browser.act" ||
     req.op === "browser.batch" ||
     req.op === "browser.capture" ||
+    req.op === "browser.warm" ||
     req.op === "browser.stop" ||
     req.op === "browser.stream.start" ||
     req.op === "browser.stream.stop" ||
@@ -636,9 +640,9 @@ const onDesktop = (ctx: HandlerContext, req: { desktop?: unknown }) => req.deskt
 
 /**
  * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
- * `browser.capture` from protocol 17 (ADR 0054). Needs the machine's browser
- * switch on; stopping (the browser, its live view) always goes, so Stop works
- * even after the switch went off.
+ * `browser.capture` from protocol 17 (ADR 0054), `browser.warm` from 27.
+ * Needs the machine's browser switch on; stopping (the browser, its live view)
+ * always goes, so Stop works even after the switch went off.
  */
 async function handleBrowser(
   ctx: HandlerContext,
@@ -649,6 +653,7 @@ async function handleBrowser(
         | "browser.act"
         | "browser.batch"
         | "browser.capture"
+        | "browser.warm"
         | "browser.stop"
         | "browser.stream.start"
         | "browser.stream.stop"
@@ -674,6 +679,9 @@ async function handleBrowser(
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
+    case "browser.warm":
+      requireTool(ctx, "browser");
+      return browser.warm(req.agent, ctx.workspaceReal, onDesktop(ctx, req));
     case "browser.stream.start":
       requireTool(ctx, "browser");
       return browser.streamStart(req.agent, req.mode);
@@ -971,6 +979,8 @@ function describeOp(req: MachineRequest): string {
       const commands = Array.isArray(req.commands) ? req.commands.map((c) => String(c?.command ?? "")) : [];
       return `browser.batch ${commands.join(", ").slice(0, 200)}`;
     }
+    case "browser.warm":
+      return `browser.warm${req.desktop === true ? " (desktop)" : ""}`;
     case "browser.stream.start":
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
@@ -1080,11 +1090,13 @@ export class RequestRunner {
     if (turn) this.turns++;
     const controller = new AbortController();
     this.inflight.set(id, controller);
-    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
+    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`) and
+    // what it waited on first (`(install 28.1 s, launch 1.4 s)`).
     const timed =
       req.op === "browser.act" ||
       req.op === "browser.batch" ||
       req.op === "browser.capture" ||
+      req.op === "browser.warm" ||
       req.op === "browser.input" ||
       req.op === "desktop.look" ||
       req.op === "desktop.act" ||
@@ -1125,7 +1137,12 @@ export class RequestRunner {
           // An input batch says how many events the browser didn't confirm.
           const unconfirmed = typeof data?.failed === "number" && data.failed > 0 ? data.failed : 0;
           const failed = !outcome.ok || data?.success === false;
-          const note = failed ? " (failed)" : unconfirmed ? ` (failed: ${unconfirmed})` : "";
+          const setup = browserSetupOf(data?.setup);
+          const notes = [
+            failed ? "failed" : unconfirmed ? `failed: ${unconfirmed}` : "",
+            setup ? browserSetupText(setup) : "",
+          ].filter(Boolean);
+          const note = notes.length > 0 ? ` (${notes.join(", ")})` : "";
           this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${note}`);
         }
         this.observe(() => this.observer?.finished(id, req, outcome));

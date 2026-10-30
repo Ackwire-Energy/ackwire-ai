@@ -9,12 +9,20 @@ import {
   readFileSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserUrl } from "@agenteschat/adapters/machine-protocol";
 import { lastLine } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
-import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION, shQuote } from "../../runner/install-script";
+import {
+  installScript,
+  RUNNER_BUN_SHA256,
+  RUNNER_BUN_VERSION,
+  SYSTEM_BROWSER_DIR,
+  shQuote,
+} from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
 import { removeDirs, tempDir } from "./helpers";
 
@@ -412,6 +420,7 @@ function rootLinux() {
   const at = (dir: string) => path.join(pc.home, "system", dir);
   const script = installScript("https://agentes.test")
     .replace(RUNNER_BUN_SHA256["linux-aarch64"], createHash("sha256").update(FAKE_ZIP).digest("hex"))
+    .replaceAll(shQuote(SYSTEM_BROWSER_DIR), shQuote(at("opt/browser")))
     .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
     .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
     .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")));
@@ -451,6 +460,174 @@ test.skipIf(process.platform === "win32")(
     expect(modes("022")).toEqual(strict);
   },
   // Two whole installs, each a shell running real tools.
+  30_000,
+);
+
+/** What the fake downloads serve for agent-browser and for Chrome for Testing's zip. */
+const FAKE_AB = "not really agent-browser";
+const FAKE_CHROME_ZIP = "not really Chrome for Testing";
+const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
+const CHROME = "156.0.7000.12";
+
+/**
+ * Root on x86_64 Linux with its Bun already at the pinned version, a curl that serves agent-browser and Chrome for
+ * Testing's zip, an unzip that lays Chrome out with the modes an archive may carry, and the installer pinned to what
+ * those serve (`chrome: false`: no Chrome pinned).
+ */
+function rootX64(chrome = true) {
+  const pc = rootLinux();
+  writeFileSync(path.join(pc.fake, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', {
+    mode: 0o755,
+  });
+  mkdirSync(pc.at("opt/bin"), { recursive: true });
+  writeFileSync(pc.at("opt/bin/bun"), fakeBun(RUNNER_BUN_VERSION, true), { mode: 0o755 });
+  writeFileSync(
+    path.join(pc.fake, "curl"),
+    `#!/bin/sh
+while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift 2 ;; -*) shift ;; *) url=$1; shift ;; esac; done
+echo "curl $url" >> "$LOG"
+case "$url" in
+  *agent-browser*) printf '%s' '${FAKE_AB}' > "$out" ;;
+  *chrome-linux64.zip) printf '%s' '${FAKE_CHROME_ZIP}' > "$out" ;;
+  *) printf '#!/usr/bin/env node\\n' > "$out" ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    path.join(pc.fake, "unzip"),
+    `#!/bin/sh
+while [ $# -gt 0 ]; do case "$1" in -d) dir=$2; shift 2 ;; -*) shift ;; *) zip=$1; shift ;; esac; done
+echo "unzip $zip" >> "$LOG"
+mkdir -p "$dir/chrome-linux64/locales"
+printf chrome > "$dir/chrome-linux64/chrome" && chmod 775 "$dir/chrome-linux64/chrome"
+printf sandbox > "$dir/chrome-linux64/chrome_sandbox" && chmod 4755 "$dir/chrome-linux64/chrome_sandbox"
+printf icu > "$dir/chrome-linux64/icudtl.dat"
+printf pak > "$dir/chrome-linux64/locales/en-US.pak" && chmod 600 "$dir/chrome-linux64/locales/en-US.pak"
+`,
+    { mode: 0o755 },
+  );
+  for (const tool of ["ls", "head", "cat", "printf"]) {
+    const real = Bun.which(tool);
+    if (real && !existsSync(path.join(pc.sys, tool))) symlinkSync(real, path.join(pc.sys, tool));
+  }
+  const script = pc.script
+    .replace(AGENT_BROWSER_SHA256["linux-x64"], sha256(FAKE_AB))
+    .replace(/^CHROME_VERSION=.*$/m, `CHROME_VERSION=${shQuote(chrome ? CHROME : "")}`)
+    .replace(/^CHROME_SHA256=.*$/m, `CHROME_SHA256=${shQuote(chrome ? sha256(FAKE_CHROME_ZIP) : "")}`);
+  const browser = (p = "") => pc.at(path.join("opt/browser", p));
+  const run = (text = script) => pc.install(text, ["--system", "--no-pair", "--no-start"]);
+  return { ...pc, script, browser, run };
+}
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system on x86_64: the agents' browser, shared, root's, the same under any umask, and fetched once",
+  () => {
+    const install = (umask: string) => {
+      const pc = rootX64();
+      mkdirSync(pc.at("bin"), { recursive: true, mode: 0o755 });
+      const r = pc.run(`umask ${umask}\n${pc.script}`);
+      expect(r.status).toBe(0);
+      const modes = Object.fromEntries(
+        readdirSync(pc.browser(), { recursive: true })
+          .map(String)
+          .map((p) => [p, (lstatSync(pc.browser(p)).mode & 0o7777).toString(8)]),
+      );
+      return { pc, r, modes };
+    };
+    const { pc, r, modes } = install("077");
+    expect(r.log).toContain(`curl ${agentBrowserUrl("linux-x64")}\n`);
+    expect(r.log).toContain(
+      `curl https://storage.googleapis.com/chrome-for-testing-public/${CHROME}/linux64/chrome-linux64.zip\n`,
+    );
+    expect(r.out).toContain(
+      `The agents' browser: agent-browser ${AGENT_BROWSER_VERSION} and Chrome for Testing ${CHROME} (SHA-256 checked)`,
+    );
+    // Every agent's user runs them; nobody but root changes them, nothing runs set-user or set-group.
+    const chrome = `chrome-${CHROME}`;
+    expect(modes).toEqual({
+      [`agent-browser-${AGENT_BROWSER_VERSION}`]: "755",
+      [chrome]: "755",
+      [`${chrome}/.sha256`]: "644",
+      [`${chrome}/chrome-linux64`]: "755",
+      [`${chrome}/chrome-linux64/chrome`]: "755",
+      [`${chrome}/chrome-linux64/chrome_sandbox`]: "755",
+      [`${chrome}/chrome-linux64/icudtl.dat`]: "644",
+      [`${chrome}/chrome-linux64/locales`]: "755",
+      [`${chrome}/chrome-linux64/locales/en-US.pak`]: "644",
+    });
+    expect(lstatSync(pc.browser()).mode & 0o777).toBe(0o755);
+    expect(readFileSync(pc.browser(`${chrome}/.sha256`), "utf8")).toBe(`${sha256(FAKE_CHROME_ZIP)}\n`);
+    expect(install("022").modes).toEqual(modes);
+    // Again: what is there at its checksum stays, nothing is downloaded.
+    const again = pc.run();
+    expect(again.status).toBe(0);
+    expect(again.log.split("chrome-linux64.zip").length).toBe(2);
+    expect(again.log.split("agent-browser-linux-x64").length).toBe(2);
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system: a browser download that isn't the pinned one installs nothing of it and stops the install",
+  () => {
+    const pc = rootX64();
+    const r = pc.run(pc.script.replace(sha256(FAKE_CHROME_ZIP), "0".repeat(64)));
+    expect(r.status).toBe(1);
+    expect(r.err.trimEnd().split("\n").pop()).toBe(
+      "■  the Chrome for Testing download didn't match its checksum, so it was not installed",
+    );
+    expect(r.log).not.toContain("unzip");
+    expect(readdirSync(pc.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+
+    const ab = rootX64();
+    const refused = ab.run(ab.script.replace(sha256(FAKE_AB), "0".repeat(64)));
+    expect(refused.status).toBe(1);
+    expect(refused.err.trimEnd().split("\n").pop()).toBe(
+      "■  the agent-browser download didn't match its checksum, so it was not installed",
+    );
+    expect(readdirSync(ab.browser())).toEqual([]);
+    // The runner comes after: nothing of it changed either.
+    expect(existsSync(ab.at("opt/agentes-runner.mjs"))).toBe(false);
+
+    // No Chrome pinned: agent-browser alone, and each agent installs Chrome at its browser's first use.
+    const alone = rootX64(false);
+    const r3 = alone.run();
+    expect(r3.status).toBe(0);
+    expect(r3.out).toContain("each agent installs Chrome for Testing at its browser's first use");
+    expect(r3.log).not.toContain("chrome-linux64.zip");
+    expect(readdirSync(alone.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system: a new pin keeps the build installed last before it, for a runner not restarted yet; older ones go",
+  () => {
+    const pc = rootX64();
+    const day = 86_400;
+    const old = (name: string, daysAgo: number, dir = true) => {
+      const p = pc.browser(name);
+      if (dir) mkdirSync(path.join(p, "chrome-linux64"), { recursive: true });
+      else writeFileSync(p, "old", { mode: 0o755 });
+      const t = Date.now() / 1000 - daysAgo * day;
+      utimesSync(p, t, t);
+    };
+    mkdirSync(pc.browser(), { recursive: true });
+    old("agent-browser-0.37.0", 2, false);
+    old("agent-browser-0.38.0", 1, false);
+    old("chrome-150.0.1", 2);
+    old("chrome-155.0.1", 1);
+    old(".chrome-155.0.1.new", 1);
+    old(".agent-browser-0.38.0.download", 1, false);
+    expect(pc.run().status).toBe(0);
+    expect(readdirSync(pc.browser()).sort()).toEqual([
+      "agent-browser-0.38.0",
+      `agent-browser-${AGENT_BROWSER_VERSION}`,
+      "chrome-155.0.1",
+      `chrome-${CHROME}`,
+    ]);
+  },
   30_000,
 );
 

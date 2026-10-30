@@ -1,3 +1,4 @@
+import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserUrl } from "@agenteschat/adapters/machine-protocol";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
 
@@ -98,6 +99,20 @@ export const BROWSER_APT_PACKAGES = [
 /** System mode: the runner and its Bun (root's, readable by the agents' users), and the command on the PATH. */
 export const SYSTEM_RUNNER_DIR = "/opt/agentes-runner";
 export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
+/**
+ * System mode on x86_64: `agent-browser-<version>` and `chrome-<version>/chrome-linux64/chrome` (the layout of
+ * `agent-browser install`, whose folder name says Chrome's version), root's, for every agent's user to run.
+ */
+export const SYSTEM_BROWSER_DIR = `${SYSTEM_RUNNER_DIR}/browser`;
+
+/**
+ * The Chrome for Testing build `--system` installs for every agent: what `agent-browser install` fetches (Chrome
+ * for Testing's Stable channel on the day it is pinned) and the SHA-256 of its `chrome-linux64.zip`. Google
+ * publishes only MD5 and CRC32C for these files, so a new pin is that zip downloaded once, its `sha256sum`, and its
+ * `openssl md5 -binary | base64` compared with the bucket's `md5Hash`. Null: `--system` installs `agent-browser`
+ * alone, and each agent installs Chrome at its browser's first use.
+ */
+export const TESTING_CHROME: { version: string; sha256: string } | null = null;
 
 /**
  * The installer served at `GET /api/machines/install.sh`:
@@ -122,7 +137,10 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `--system` (Linux, root) installs the runner for the whole computer, each
  * agent as its own OS user: `BROWSER_APT_PACKAGES` (without apt it names
  * them), the pinned Bun and the bundle in
- * `SYSTEM_RUNNER_DIR`, the launcher at `SYSTEM_LAUNCHER`, the home
+ * `SYSTEM_RUNNER_DIR`, on x86_64 the pinned `agent-browser` and
+ * `TESTING_CHROME` in `SYSTEM_BROWSER_DIR` (each checked against its SHA-256,
+ * so no agent downloads them at its browser's first use), the launcher at
+ * `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
  * `--desktop` adds `DESKTOP_APT_PACKAGES` (then `DESKTOP_LOOK_APT_PACKAGES`,
@@ -168,6 +186,11 @@ DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
 LOOK_PACKAGES=${shQuote(DESKTOP_LOOK_APT_PACKAGES.join(" "))}
 CJK_PACKAGES=${shQuote(DESKTOP_CJK_APT_PACKAGES.join(" "))}
 DOCK_PACKAGES=${shQuote(DESKTOP_DOCK_APT_PACKAGES.join(" "))}
+AB_VERSION=${shQuote(AGENT_BROWSER_VERSION)}
+AB_SHA256=${shQuote(AGENT_BROWSER_SHA256["linux-x64"])}
+AB_URL=${shQuote(agentBrowserUrl("linux-x64"))}
+CHROME_VERSION=${shQuote(TESTING_CHROME?.version ?? "")}
+CHROME_SHA256=${shQuote(TESTING_CHROME?.sha256 ?? "")}
 
 DIR=""
 NAME=""
@@ -387,6 +410,78 @@ get_bun() {
   t_step "Bun $BUN_VERSION (SHA-256 checked)"
 }
 
+# In $1, every $2-<version> but $3 and the one installed last before it (a runner not restarted yet may still run
+# that one), and whatever an interrupted install left (.$2-*).
+prune() {
+  KEEP=$(ls -1dt "$1/$2"-* 2>/dev/null | grep -vxF "$3" | head -n 1)
+  for OLD in "$1/$2"-* "$1/.$2"-*; do
+    case "$OLD" in "$3" | "$KEEP" | "$1/$2-*" | "$1/.$2-*") ;; *) rm -rf "$OLD" ;; esac
+  done
+}
+
+# The agents' browser in $BROWSER_DIR, for every agent's user to run and root alone to write: the pinned
+# agent-browser and Chrome for Testing build, each checked against its SHA-256 before it is installed, so no agent
+# downloads them at its browser's first use. What is already there at those checksums is kept. Only on x86_64:
+# Chrome for Testing has no Linux build for arm.
+get_browser() {
+  case "$(uname -m)" in x86_64 | amd64) ;; *) return 0 ;; esac
+  mkdir -p "$BROWSER_DIR"
+  chown 0:0 "$BROWSER_DIR"
+  chmod 755 "$BROWSER_DIR"
+  AB="$BROWSER_DIR/agent-browser-$AB_VERSION"
+  if [ ! -f "$AB" ] || [ "$(sha256 "$AB")" != "$AB_SHA256" ]; then
+    TMP="$BROWSER_DIR/.agent-browser-$AB_VERSION.download"
+    t_run "Downloading agent-browser $AB_VERSION" download "$AB_URL" "$TMP" || {
+      t_tail "$T_LOG"
+      rm -f "$TMP"
+      die "downloading agent-browser failed"
+    }
+    if [ "$(sha256 "$TMP")" != "$AB_SHA256" ]; then
+      rm -f "$TMP"
+      die "the agent-browser download didn't match its checksum, so it was not installed"
+    fi
+    chmod 755 "$TMP"
+    mv -f "$TMP" "$AB"
+  fi
+  prune "$BROWSER_DIR" agent-browser "$AB"
+  if [ -z "$CHROME_SHA256" ]; then
+    t_step "agent-browser $AB_VERSION (SHA-256 checked); each agent installs Chrome for Testing at its browser's first use"
+    return 0
+  fi
+  CHROME="$BROWSER_DIR/chrome-$CHROME_VERSION"
+  # Written last, before the folder takes its name: a folder that has it is whole.
+  if [ "$(cat "$CHROME/.sha256" 2>/dev/null || true)" != "$CHROME_SHA256" ]; then
+    # Unzipped by unzip, which keeps the executables' modes (Python's zipfile doesn't).
+    command -v unzip >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && t_run "Installing unzip" apt_install unzip; } ||
+      die "installing Chrome for Testing needs unzip"
+    ZIP="$BROWSER_DIR/.chrome-$CHROME_VERSION.zip"
+    STAGE="$BROWSER_DIR/.chrome-$CHROME_VERSION.new"
+    rm -rf "$STAGE"
+    t_run "Downloading Chrome for Testing $CHROME_VERSION" download "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION/linux64/chrome-linux64.zip" "$ZIP" || {
+      t_tail "$T_LOG"
+      rm -f "$ZIP"
+      die "downloading Chrome for Testing failed"
+    }
+    if [ "$(sha256 "$ZIP")" != "$CHROME_SHA256" ]; then
+      rm -f "$ZIP"
+      die "the Chrome for Testing download didn't match its checksum, so it was not installed"
+    fi
+    if ! unzip -q "$ZIP" -d "$STAGE" || [ ! -f "$STAGE/chrome-linux64/chrome" ]; then
+      rm -rf "$ZIP" "$STAGE"
+      die "unpacking Chrome for Testing failed"
+    fi
+    rm -f "$ZIP"
+    # The same modes under any umask: readable by everyone, written by root alone, nothing set-user or set-group.
+    chmod -R u+rwX,go+rX,go-w,ug-s "$STAGE"
+    printf '%s\\n' "$CHROME_SHA256" > "$STAGE/.sha256"
+    chmod 644 "$STAGE/.sha256"
+    rm -rf "$CHROME"
+    mv "$STAGE" "$CHROME"
+  fi
+  prune "$BROWSER_DIR" chrome "$CHROME"
+  t_step "The agents' browser: agent-browser $AB_VERSION and Chrome for Testing $CHROME_VERSION (SHA-256 checked)"
+}
+
 # This server's computer replaces the service a connected runner in $RUNNER_HOME runs as (the root unit,
 # or the launchd agent's label), which would leave that connection's server without this computer.
 not_connected_for_host() {
@@ -409,6 +504,7 @@ install_system() {
     die "--system installs the runner for the whole computer: run it as root (curl -fsSL $SERVER/api/machines/install.sh | sudo sh -s -- --system)"
   [ "$(uname -s)" = Linux ] || die "--system is for Linux"
   SYSTEM_DIR=${shQuote(SYSTEM_RUNNER_DIR)}
+  BROWSER_DIR=${shQuote(SYSTEM_BROWSER_DIR)}
   RUNNER_HOME=${shQuote(SYSTEM_RUNNER_HOME)}
   not_connected_for_host
   start_frame
@@ -421,6 +517,7 @@ install_system() {
   chmod 755 "$SYSTEM_DIR" "$SYSTEM_DIR/bin"
   chmod 700 "$RUNNER_HOME"
   get_bun
+  get_browser
   get_runner
   set -- service install --system --no-start
   if [ -n "$UID_RANGE" ]; then set -- "$@" --agent-uid-range "$UID_RANGE"; fi

@@ -1,3 +1,4 @@
+import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
 import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
@@ -23,6 +24,32 @@ export function normalizeRequestPath(input: string): string {
   const parts = p.split("/").filter((s) => s !== "" && s !== ".");
   if (parts.includes("..")) throw new RunnerError("outside_workspace", `${input} leaves the workspace ('..')`);
   return parts.join("/");
+}
+
+/**
+ * Whether only root, or this process's own user, can change `target`: it and every folder above it are no links,
+ * owned by one of the two and writable by nobody else. A sticky folder of root's (`/tmp`) passes above it, since
+ * nobody else can replace what isn't theirs there. False on Windows, which has no owners to check.
+ */
+export function ownedSafely(target: string): boolean {
+  const uid = process.getuid?.();
+  if (uid === undefined) return false;
+  const resolved = path.resolve(target);
+  let at = resolved;
+  for (;;) {
+    let st: ReturnType<typeof lstatSync>;
+    try {
+      st = lstatSync(at);
+    } catch {
+      return false;
+    }
+    if (st.isSymbolicLink() || (st.uid !== 0 && st.uid !== uid)) return false;
+    const sticky = at !== resolved && st.isDirectory() && st.uid === 0 && (st.mode & 0o1000) !== 0;
+    if (st.mode & 0o022 && !sticky) return false;
+    const up = path.dirname(at);
+    if (up === at) return true;
+    at = up;
+  }
 }
 
 /** True when `target` is `root` or below it (case-insensitive on Windows). */
