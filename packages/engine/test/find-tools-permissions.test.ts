@@ -173,7 +173,11 @@ test("the request_permission call find_tools suggests is the one the card grants
   expect(run?.status).toBe("done");
 });
 
-test('the desktop, which "all tools" never covers, is named with what giving it means', async () => {
+const DESKTOP_DO =
+  "- desktop_do: Does several steps on the agent's desktop in one go (open an app, click, type, press keys), checking each one.";
+const RUN_CODE = `permission "sandbox:run" (Run code: Run code and skill scripts on the agent's computer (files kept between conversations).)`;
+
+test('the desktop, which "all tools" never covers, is named with what giving it means, and with the Run code it needs', async () => {
   f = await setup({
     issueTools: true,
     permissionTools: true,
@@ -182,10 +186,40 @@ test('the desktop, which "all tools" never covers, is named with what giving it 
     ],
   });
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "*" }]);
-  const text = await findTools(await nothingLoaded(), "click a button in an app");
-  expect(text).toContain(
-    `${NOT_YET}ask a person with request_permission (the permission as written here, and why), if the request needs it.\n- permission "desktop:use" (Use its desktop: Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.), for:\n  - desktop_do: Does several steps on the agent's desktop in one go (open an app, click, type, press keys), checking each one.\n`,
+  const ctx = await nothingLoaded();
+  expect(await findTools(ctx, "click a button in an app")).toContain(
+    `${NOT_YET}ask a person with request_permission (the permission as written here, and why), if the request needs it.\n- permission "desktop:use" (Use its desktop: Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.) and ${RUN_CODE}, for:\n  ${DESKTOP_DO}\n`,
   );
+
+  // Its own permission given, Run code is what's left to ask for: named, and a call says so.
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "desktop:use" }]);
+  expect(await findTools(ctx, "click a button in an app")).toContain(`\n- ${RUN_CODE}, for:\n  ${DESKTOP_DO}\n`);
+  const call = await f.tools?.invoke(ctx, { toolUseId: "tu_desktop", name: "desktop_do", input: { steps: [] } });
+  expect(call?.type === "result" ? call.output.content : "").toBe(
+    "Not allowed: this agent lacks the scope sandbox:run. If the request needs it, ask for it with request_permission",
+  );
+});
+
+test("use_tool with the name of a tool not allowed yet answers as a direct call does", async () => {
+  await browserAgent();
+  const r = await f.tools?.invoke(await nothingLoaded(), {
+    toolUseId: "tu_use",
+    name: "use_tool",
+    input: { tool: "browser_open", arguments: { url: "https://example.com" } },
+  });
+  expect(r?.type === "result" ? r.output.content : "").toBe(
+    "Not allowed: this agent lacks the scope browser:use. If the request needs it, ask for it with request_permission",
+  );
+});
+
+test("a tool the run's policy refuses anyway is never named as not allowed yet", async () => {
+  await browserAgent();
+  const ctx = await nothingLoaded();
+  // A routine's background run, which only reads: the browser is refused whatever its grants.
+  await f.db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, ctx.runId));
+  const text = await findTools(ctx, "open a web page");
+  expect(text).toStartWith('No other tool matches "open a web page".');
+  expect(text).not.toContain("browser_open");
 });
 
 test("a run that can't call request_permission is never told to", async () => {

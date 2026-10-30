@@ -42,8 +42,11 @@ export const directoryRole = (tool: ToolDefinition | undefined) => (tool ? roles
 /** A tool the agent may not use, as `find_tools` names it: its name and what it does, never its input. */
 export interface BlockedTool {
   tool: ToolDefinition;
-  /** What a person turns on for it, as `request_permission` takes it; null: an admin turned this tool off by name. */
-  permission: { id: string; label: string } | null;
+  /**
+   * Every permission a person turns on for it, each as `request_permission` takes it; null: an admin turned
+   * this tool, or one it needs, off by name.
+   */
+  permissions: { id: string; label: string }[] | null;
 }
 
 /** Read when `find_tools` runs. `ask`: the tool that asks a person for a permission, when this run may call it. */
@@ -441,9 +444,9 @@ function findTools(
   // What it does in one sentence, never its input: nothing here is a way to call it.
   const named = (t: ToolDefinition) => `- ${t.name}: ${oneLine(t.description.split(/(?<=[.!?])\s/)[0] ?? "", 200)}`;
   const byPermission = new Map<string, string[]>();
-  for (const { tool, permission } of notAllowed) {
-    if (!permission) continue;
-    const head = `- permission "${permission.id}" (${permission.label}), for:`;
+  for (const { tool, permissions } of notAllowed) {
+    if (!permissions) continue;
+    const head = `- ${permissions.map((p) => `permission "${p.id}" (${p.label})`).join(" and ")}, for:`;
     byPermission.set(head, [...(byPermission.get(head) ?? []), `  ${named(tool)}`]);
   }
   if (byPermission.size > 0) {
@@ -453,7 +456,7 @@ function findTools(
     const lines = [...byPermission].flatMap(([head, entries]) => [head, ...entries]);
     parts.push(`Not allowed for you yet: ${how}\n${lines.join("\n")}`);
   }
-  const turnedOff = notAllowed.flatMap(({ tool, permission }) => (permission ? [] : [named(tool)]));
+  const turnedOff = notAllowed.flatMap(({ tool, permissions }) => (permissions ? [] : [named(tool)]));
   if (turnedOff.length > 0) {
     parts.push(`Turned off for you by an admin; only an admin can turn them back on:\n${turnedOff.join("\n")}`);
   }
