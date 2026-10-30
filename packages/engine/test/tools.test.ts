@@ -290,6 +290,15 @@ describe("approval flow (end to end)", () => {
     };
   };
 
+  test("a reply with no tool calls says so (meta.work.steps 0), so the apps leave out its work", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Hi, how can I help?"] }) });
+    await post(f, "@dev hi");
+    await drainOutbox(f.db, f.handlers);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["@dev hi", "Hi, how can I help?"]);
+    expect(main[1]?.meta?.work).toMatchObject({ steps: 0 });
+  });
+
   test("mention → tool call → approval → approve → resumed run → merged", async () => {
     const gh = fakeGithub();
     f = await setup({ toolSources: [gh.source], reply: script });
@@ -313,6 +322,8 @@ describe("approval flow (end to end)", () => {
       "Tests pass, merging.",
       "Approval request: Merge PR #42 in acme/app",
     ]);
+    // Its reply came after a tool call: "Ver o que ele fez" has something to show.
+    expect((main[1]?.meta?.work as { steps: number }).steps).toBeGreaterThan(0);
     // The card carries the agent's reason (ADR 0053 §8).
     expect(main[2]?.meta).toEqual({
       approvalId: approval?.id,

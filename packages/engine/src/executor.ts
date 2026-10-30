@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { and, count, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   isAutoModel,
@@ -139,7 +139,17 @@ import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentActions, agentRuns, approvals, agentQuestions, messages, routineRuns, secretRequests, users } = schema;
+const {
+  agentActions,
+  agentRunSteps,
+  agentRuns,
+  approvals,
+  agentQuestions,
+  messages,
+  routineRuns,
+  secretRequests,
+  users,
+} = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
 
@@ -754,12 +764,18 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0.
+    const [calls] = await tx
+      .select({ n: count() })
+      .from(agentRunSteps)
+      .where(and(eq(agentRunSteps.runId, run.id), eq(agentRunSteps.kind, "tool_call")));
+    const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };
     const m = await postAgentMessage(
       tx,
       run,
       threadId,
       said,
-      { ...meta, ...runMeta, ...tagged, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
+      { ...meta, ...runMeta, ...tagged, work, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
       createdAt,
     );
     await linkRunChecks(
