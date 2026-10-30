@@ -94,7 +94,7 @@ export const mobilePtBR = {
       on: "Ativar avisos",
       later: "Agora não",
       done: "Avisos ativados",
-      failed: "Não deu para ativar os avisos. Tente de novo em Você › Notificações.",
+      failed: "Não deu para ativar os avisos. Tente de novo em Você\u00a0›\u00a0Notificações.",
       someone: "Um agente",
       examples: "Exemplos de avisos",
       now: "agora",
