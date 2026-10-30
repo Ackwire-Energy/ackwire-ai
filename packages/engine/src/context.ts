@@ -371,7 +371,13 @@ export async function buildRunContext(
         .from(channelMembers)
         .leftJoin(users, eq(users.id, channelMembers.userId))
         .leftJoin(agents, eq(agents.id, channelMembers.agentId))
-        .where(eq(channelMembers.channelId, run.channelId))
+        // An archived agent keeps its memberships, but nothing reaches it: never named as here.
+        .where(
+          and(
+            eq(channelMembers.channelId, run.channelId),
+            or(isNull(channelMembers.agentId), isNull(agents.archivedAt)),
+          ),
+        )
         .orderBy(asc(channelMembers.createdAt)),
     ) as Promise<
       {

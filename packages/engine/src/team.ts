@@ -1,4 +1,4 @@
-import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, gte, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
@@ -6,13 +6,15 @@ import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { agentDesktopUseStatus } from "./desktop/status";
+import { editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
+import { parseMentionHandles } from "./messages";
 import { requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
-import type { ToolDefinition, ToolSource } from "./tools/types";
+import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
+const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, organizationMembers, users } = schema;
 
 /**
  * Each agent's scopes, with a whole-connection grant (`connector:*`) named
@@ -116,6 +118,68 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
 }
 
 export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team`);
+
+/** Handles of the org's archived agents (per-process cache; archiving drops it). */
+function loadArchived(db: Database, orgId: string): Promise<string[]> {
+  return caches.agents.getOrLoad(`${orgId}:archived`, async () =>
+    (
+      await db
+        .select({ handle: agents.handle })
+        .from(agents)
+        .where(
+          and(
+            eq(agents.orgId, orgId),
+            isNotNull(agents.archivedAt),
+            // A person may hold that handle now (people's handles don't check agents'): the @ is theirs.
+            sql`not exists (select 1 from ${organizationMembers} om
+              where om.org_id = ${orgId}::uuid and om.handle = ${agents.handle})`,
+          ),
+        )
+    ).map((r) => r.handle),
+  ) as Promise<string[]>;
+}
+
+/** Handles offered for one that no agent here has. */
+const CLOSEST_HANDLES = 3;
+
+/**
+ * A tool's answer for `@handles` (lower case, without the @) that reach no agent here: an archived one says so,
+ * so the run stops trying it and tells the person; any other gets the closest handles among the agents the
+ * person behind the run can talk to (the ones `find_agent` lists).
+ */
+export async function noAgentText(ctx: ToolContext, handles: string[]): Promise<string> {
+  const person = await personBehindCall(ctx);
+  const [archived, team] = await Promise.all([loadArchived(ctx.db, ctx.orgId), loadTeam(ctx.db, ctx.orgId)]);
+  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person)).map((a) => a.handle);
+  return handles
+    .map((h) => {
+      if (archived.includes(h)) {
+        return `@${h} is archived: nothing you send reaches it. Don't try it again. If the work needs it, tell the person.`;
+      }
+      const closest = others
+        .map((o) => ({ o, d: editDistance(h, o) }))
+        .sort((x, y) => x.d - y.d)
+        .slice(0, CLOSEST_HANDLES)
+        .map((x) => `@${x.o}`);
+      return `No agent @${h} here.${closest.length > 0 ? ` Closest handles: ${closest.join(", ")}.` : ""}`;
+    })
+    .join(" ");
+}
+
+/**
+ * "# Archived agents": the archived agents that what a run reads still names (its instructions, its notes, the
+ * conversation), so it neither asks nor mentions them and tells the person when its work counted on one. Empty
+ * when it names none.
+ */
+export async function archivedAgentsPrompt(db: Database, orgId: string, texts: string[]): Promise<string> {
+  const named = new Set(texts.flatMap((t) => parseMentionHandles(t)));
+  if (named.size === 0) return "";
+  const gone = (await loadArchived(db, orgId)).filter((h) => named.has(h)).map((h) => `@${h}`);
+  if (gone.length === 0) return "";
+  const one = gone.length === 1;
+  const them = one ? "it" : "them";
+  return `# Archived agents\n${gone.join(", ")} ${one ? "is" : "are"} archived: nothing you send reaches ${them}. Don't ask or mention ${them}. If your instructions, notes or this conversation count on ${one ? "it" : "one"}, tell the person.`;
+}
 
 /**
  * "# Your team" for the system prompt: the other agents the person

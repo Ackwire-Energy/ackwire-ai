@@ -31,6 +31,7 @@ import { timezoneName } from "./rrule";
 import { replyThreadOf } from "./runs";
 import { describeWhen, parseWhen } from "./schedule";
 import { localDateTimeOf } from "./schedule-reader";
+import { noAgentText } from "./team";
 import { hasScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -576,7 +577,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           if (handle === "all") agentId = undefined;
           else if (handle) {
             const found = team.find((a) => a.handle === handle);
-            if (!found) return { content: `There is no agent @${handle} in this organization.`, isError: true };
+            if (!found) return { content: await noAgentText(ctx, [handle]), isError: true };
             agentId = found.id;
           }
           const mineOnly = agentId === ctx.agentId;

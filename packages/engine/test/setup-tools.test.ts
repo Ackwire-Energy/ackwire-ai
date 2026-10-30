@@ -171,7 +171,7 @@ describe("offer_connect_ai", () => {
       expect(out.content).toContain("Invalid input");
     }
     const unknown = await call(f, ctx, "offer_connect_ai", { agents: ["@dev", "@nobody"], why: "Conectar." });
-    expect(unknown).toMatchObject({ isError: true, content: "No agent @nobody in this organization." });
+    expect(unknown).toMatchObject({ isError: true, content: "No agent @nobody here." });
     expect(await cards(f)).toEqual([]);
     // Google's plans can't be used in other products: Gemini comes as an API key.
     await call(f, ctx, "offer_connect_ai", { what: "api_key", provider: "gemini", why: "Sua chave do Gemini." });
@@ -288,7 +288,7 @@ describe("create_channel", () => {
     });
     expect(await call(f, ctx, "create_channel", { name: "x", agents: ["@nobody"] })).toMatchObject({
       isError: true,
-      content: "No agent @nobody in this organization.",
+      content: "No agent @nobody here.",
     });
     expect((await call(f, ctx, "create_channel", { topic: "sem nome" })).content).toContain("Invalid input");
     expect(await channelNamed(f, "x")).toBeUndefined();

@@ -62,3 +62,16 @@ Incident (#tech): "@atlas, when an error comes in ask @ada to analyze it and wri
 
 Evals: `ops-addressee-routine-mentions-other-agent`, `ops-consulted-on-behalf-edits-routine`, `dev-reads-other-agent-routine` (`packages/engine/eval/behavior-cases.json`; the harness now seeds other agents, routines and consultations).
 
+## Addendum (2026-10-30): archived agents are out of reach
+
+Archiving an agent (`archiveAgent`) keeps its channel memberships, history and memory. Runs kept reaching for it: the channel's members in "Where you are" came from the memberships with no archived check, so the other agents saw it as present, with what it could do, and mentioned or asked it. `ask_agent` and `tell_agent` answered "There is no agent @x in this organization" both for an archived agent and for a handle nobody has.
+
+**1. Rosters.** What a run reads of its channel's members leaves archived agents out, as "# Your team" and `find_agent` (`loadTeam`) already did. Archiving drops the cached members of the org's channels at once.
+
+**2. One answer for a handle that reaches no agent** (`noAgentText` in `team.ts`), in every tool that takes agents' handles: `ask_agent`, `tell_agent`, `add_agent_to_channel`, `list_routines`, `offer_connect_ai`, `create_channel`, `suggest_forum_topic` and `open_forum_topic`. An archived agent: "@x is archived: nothing you send reaches it. Don't try it again. If the work needs it, tell the person." Any other handle: "No agent @x here." with up to three closest handles (edit distance) among the agents the person behind the run can talk to, the ones `find_agent` lists.
+
+**3. Named in what the run reads.** When the instructions, memory, wiki pages or the conversation name an archived agent's @handle, a "# Archived agents" block says it is archived, not to ask or mention it, and to tell the person when the work counted on it. A handle that a person holds now is not called archived (people's handles don't check agents'). The archived handles are cached per process like the team, so a run costs no extra statement on a warm server.
+
+**4. Unchanged.** A mention of an archived agent already started nothing (the message insert, the mention dispatch and the router skip archived agents), and the "@" pickers on the web and the phone list only active agents (`GET …/agents`).
+
+Not done: restoring an archived agent (there is no restore, so the refusal points to none). Issue assignees and calendar participants, where one field takes people and agents, still answer that nobody has the name.

@@ -213,7 +213,7 @@ describe("ask_agent", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await consultations()).toHaveLength(0);
     const results = f.provider.calls.map((c) => lastText(c.request)).filter((t) => t.includes("tool_result"));
-    expect(results.some((t) => t.includes("There is no agent @ghost"))).toBe(true);
+    expect(results.some((t) => t.includes("No agent @ghost here."))).toBe(true);
     expect(results.some((t) => t.includes("That is you"))).toBe(true);
   });
 

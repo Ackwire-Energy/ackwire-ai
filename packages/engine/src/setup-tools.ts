@@ -10,6 +10,7 @@ import { insertMessage, messageView } from "./messages";
 import { personBehindCall } from "./requester";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
+import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const { agentActions, agentRuns, messages } = schema;
@@ -57,8 +58,8 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
-const noAgents = (missing: string[]): ToolOutput => ({
-  content: `No agent ${missing.map((h) => `@${h}`).join(", ")} in this organization.`,
+const noAgents = async (ctx: ToolContext, missing: string[]): Promise<ToolOutput> => ({
+  content: await noAgentText(ctx, missing),
   isError: true,
 });
 
@@ -119,7 +120,7 @@ export function createSetupToolSource(deps: { pubsub?: PubSub }): ToolSource {
           const what = Object.hasOwn(STEPS, str(input.what)) ? (input.what as ConnectAiStep) : undefined;
           const provider = what === "api_key" && isKnownProvider(str(input.provider)) ? str(input.provider) : "";
           const named = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
-          if (named.missing.length > 0) return noAgents(named.missing);
+          if (named.missing.length > 0) return noAgents(ctx, named.missing);
           let targets = named.rows;
           if (targets.length === 0 && (what === "claude" || what === "chatgpt")) {
             const self = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
@@ -211,7 +212,7 @@ export function createSetupToolSource(deps: { pubsub?: PubSub }): ToolSource {
             return { content: `You already created ${MAX_CHANNELS_PER_RUN} channels in this turn.`, isError: true };
           }
           const agents = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
-          if (agents.missing.length > 0) return noAgents(agents.missing);
+          if (agents.missing.length > 0) return noAgents(ctx, agents.missing);
           const people = new Map<string, string>();
           for (const who of Array.isArray(input.people) ? input.people.map(str) : []) {
             const matches = await findMember(ctx, who);
