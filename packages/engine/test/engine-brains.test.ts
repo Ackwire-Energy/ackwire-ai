@@ -30,6 +30,7 @@ import {
   listMessages,
   listThreads,
   listWorkingRuns,
+  MAX_COMPUTER_DROPS,
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
@@ -890,6 +891,86 @@ test("a turn its computer's return resumed, cut by a server shutdown, goes on at
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
   expect(seen.length).toBe(3);
   expect((await timeline(f)).at(-1)?.body).toBe("Voltei.");
+});
+
+test("a resumed computer turn is told what each cut-off call ran on: a command's first line, a file's path", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  let online = true;
+  const { brain, seen } = scriptedComputerBrain(async function* (n) {
+    if (n === 0) {
+      online = false;
+      yield {
+        type: "tool_call",
+        id: "b-1",
+        name: "Bash",
+        input: { command: "git push origin main\necho done" },
+        executed: { content: "pushed" },
+      };
+      yield {
+        type: "tool_call",
+        id: "e-1",
+        name: "Edit",
+        input: { file_path: "src/app.ts" },
+        executed: { content: "ok" },
+      };
+      yield { type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true };
+      return;
+    }
+    yield { type: "done", text: "Pronto." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  await post(f, "@dev publica");
+  await drainOutbox(f.db, handlers);
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(2);
+  expect(seen[1]?.trigger).toContain("do not repeat: Bash (git push origin main), Edit (src/app.ts).");
+});
+
+test("drops caused by our own server stopping aren't the computer's: the turn resumes past the drop limit", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n <= MAX_COMPUTER_DROPS
+      ? [
+          {
+            type: "error",
+            code: "machine_offline",
+            message: "The connection to the computer MacBook dropped while this ran.",
+            retryable: true,
+            serverStop: true,
+          },
+        ]
+      : [{ type: "done", text: "Pronto." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  // One more cut than the limit allows the computer itself, and still the same session to the end.
+  expect(seen.length).toBe(MAX_COMPUTER_DROPS + 2);
+  // Each turn sent again reads what cut it: our server, not the computer.
+  expect(seen[1]?.trigger).toContain("cut off because the server restarted");
+  expect(seen.at(-1)?.trigger).toContain("cut off because the server restarted");
+  expect((await timeline(f)).at(-1)?.body).toBe("Pronto.");
+  const drops = await f.db
+    .select({ data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
+  expect(drops.filter((s) => s.data.reason === "brain_dropped" && s.data.serverStop === true)).toHaveLength(
+    MAX_COMPUTER_DROPS + 1,
+  );
 });
 
 test("a message to a run parked for its computer: looked at again now; resumes with it, or parks again quietly", async () => {

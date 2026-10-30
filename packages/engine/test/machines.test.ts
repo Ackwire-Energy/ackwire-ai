@@ -18,6 +18,7 @@ import {
   grantScopes,
   listAgentSecrets,
   listMachines,
+  MachineDroppedError,
   type MachineHub,
   MachineOfflineError,
   MachineRequestError,
@@ -26,13 +27,16 @@ import {
   receiveMachineUpload,
   removeAgentSecret,
   renameMachine,
+  SERVER_STOP_TASK_GRACE_MS,
   type SecretRequestView,
   secretSite,
   setAgentComputerTarget,
+  TASK_OFFLINE_GRACE_MS,
   type ToolContext,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { type FakeRunnerOptions, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { until } from "./stream-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -163,6 +167,221 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(runner.closed()).toMatchObject({ code: 4408 });
     const [row] = await f.db.select().from(schema.machines);
     expect(row).toMatchObject({ online: false, connectedReplica: null });
+  });
+
+  test("a silent runner is dropped two heartbeats after its last pong, as the runner drops a silent server", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-s", heartbeatMs: 100 });
+    hubs.push(hub);
+    const paired = await pair();
+    const runner = fakeRunner(hub, { dead: true });
+    await runner.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    // Gone at the second heartbeat (200 ms), not the fourth.
+    expect(await within(turn, 300)).toBeInstanceOf(MachineDroppedError);
+    expect(runner.closed()).toMatchObject({ code: 4408 });
+  });
+
+  test("a request cut by its socket closing fails as dropped (it may have run); our own stop says it is ours", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-d" });
+    hubs.push(hub);
+    const paired = await pair();
+    const exec = { op: "exec" as const, command: "make deploy", timeoutSeconds: 60, stream: false };
+    const runner = fakeRunner(hub, { exec: () => "hang" });
+    await runner.hello(paired.token);
+    const cut = hub.call(paired.machineId, exec);
+    await Bun.sleep(5);
+    await runner.disconnect();
+    const error = await within(cut);
+    expect(error).toBeInstanceOf(MachineDroppedError);
+    expect(error).toMatchObject({ serverStop: false });
+    expect((error as Error).message).toContain("may have had effects");
+    // Nothing is sent to a computer that is away: offline, in the plain words.
+    const away = await hub.call(paired.machineId, exec).catch((e: unknown) => e);
+    expect(away).toBeInstanceOf(MachineOfflineError);
+    expect(away).not.toBeInstanceOf(MachineDroppedError);
+
+    // Our own stop: the same, marked as ours; its tasks get a long backstop instead of the usual grace, and
+    // the apps hear after the usual grace that it is still away (an outage then).
+    const again = fakeRunner(hub, { exec: () => "hang" });
+    await again.hello(paired.token);
+    const stopped = hub.call(paired.machineId, exec);
+    await Bun.sleep(5);
+    await hub.stop();
+    expect(await within(stopped)).toMatchObject({ serverStop: true });
+    const jobs = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "machine.tasks_offline"));
+    await until(async () => (await jobs()).length === 3, "the stop's offline jobs");
+    const graces = (await jobs())
+      .map((j) => ({ ms: j.nextAttemptAt.getTime() - j.createdAt.getTime(), payload: j.payload }))
+      .sort((a, b) => a.ms - b.ms);
+    expect(graces[0]?.ms).toBeLessThan(TASK_OFFLINE_GRACE_MS + 5000);
+    expect(graces[1]?.ms).toBeLessThan(TASK_OFFLINE_GRACE_MS + 5000);
+    expect(graces.slice(0, 2).map((g) => g.payload)).toContainEqual({
+      machineId: paired.machineId,
+      statusOnly: true,
+    });
+    expect(graces[2]?.payload).toEqual({ machineId: paired.machineId });
+    expect(graces[2]?.ms).toBeGreaterThan(SERVER_STOP_TASK_GRACE_MS - 5000);
+  });
+
+  test("the agent's process gone mid-request (`dropped` from the runner) is a drop, in the runner's words", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    await Bun.sleep(5);
+    const req = runner.sent.find((s) => s.type === "request" && s.op === "brain.turn") as Request;
+    const message = "The agent's worker on this computer stopped while this ran.";
+    await runner.frame({ type: "result", id: req.id, ok: false, error: { code: "dropped", message } });
+    const error = await within(turn);
+    expect(error).toBeInstanceOf(MachineDroppedError);
+    expect((error as Error).message).toBe(message);
+  });
+
+  test("a hello that fails on our side closes the socket without a refusal, so the runner dials again", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    // The database is away for a moment while the runner says hello.
+    const db = f.db as unknown as Record<string, unknown>;
+    db.select = () => {
+      throw new Error("database away");
+    };
+    try {
+      await runner.hello(paired.token);
+    } finally {
+      delete db.select;
+    }
+    expect(runner.sent).toEqual([]);
+    expect(runner.closed()).toMatchObject({ code: 1011 });
+    const back = fakeRunner(hub);
+    await back.hello(paired.token);
+    expect(back.sent[0]).toMatchObject({ type: "welcome", machineId: paired.machineId });
+  });
+
+  test("an mcp.call sent again under its callId runs once: the copy waits for the first answer", async () => {
+    f = await setup({ machines: true });
+    // The first run is in this process: the copy waits on it, however long it takes.
+    const hub = createMachineHub({
+      db: f.db,
+      pubsub: f.pubsub,
+      replicaId: "replica-m",
+      rpcPollMs: 10,
+      mcpRepeatWaitMs: 5,
+    });
+    hubs.push(hub);
+    let runs = 0;
+    let finish = () => {};
+    hub.setMissionHooks({
+      mcp: async (_machineId, frame) => {
+        runs++;
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        return { ok: true, text: `posted: ${String(frame.args.text)}` };
+      },
+    });
+    const paired = await pair();
+    const call = { type: "mcp.call", callId: "call-1", taskId: "t", tool: "post_message", args: { text: "oi" } };
+    const first = fakeRunner(hub);
+    await first.hello(paired.token);
+    await first.frame(call);
+    await until(() => runs === 1, "the first run");
+    // The link drops while it runs; the runner sends the call again on its new socket.
+    const second = fakeRunner(hub);
+    await second.hello(paired.token);
+    await second.frame(call);
+    await Bun.sleep(30);
+    finish();
+    await until(() => second.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(runs).toBe(1);
+    expect(second.sent.find((s) => s.type === "mcp.result")).toEqual({
+      type: "mcp.result",
+      callId: "call-1",
+      ok: true,
+      text: "posted: oi",
+    });
+    // Later copies get the same answer at once.
+    await second.frame(call);
+    await until(() => second.sent.filter((s) => s.type === "mcp.result").length === 2, "a later copy's answer");
+    expect(runs).toBe(1);
+  });
+
+  test("a copy whose first run died with its server hears soon that it was cut off, and nothing runs again", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({
+      db: f.db,
+      pubsub: f.pubsub,
+      replicaId: "replica-c",
+      rpcPollMs: 5,
+      mcpRepeatWaitMs: 50,
+    });
+    hubs.push(hub);
+    let runs = 0;
+    hub.setMissionHooks({
+      mcp: async () => {
+        runs++;
+        return { ok: true, text: "posted" };
+      },
+    });
+    const paired = await pair();
+    // What a server that crashed mid-call leaves: the call taken, no answer.
+    await f.db
+      .insert(schema.machineMcpCalls)
+      .values({ orgId: f.org.id, machineId: paired.machineId, callId: "call-9" });
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const at = Date.now();
+    await runner.frame({ type: "mcp.call", callId: "call-9", taskId: "t", tool: "post_message", args: { text: "oi" } });
+    await until(() => runner.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(Date.now() - at).toBeLessThan(2000);
+    expect(runner.sent.find((s) => s.type === "mcp.result")).toMatchObject({
+      callId: "call-9",
+      ok: false,
+      error: { code: "bridge.cut_off", message: expect.stringContaining("it may have run in part") },
+    });
+    expect(runs).toBe(0);
+  });
+
+  test("our own stop lets a task's call in flight store its answer: the copy on the next server gets it", async () => {
+    f = await setup({ machines: true });
+    let runs = 0;
+    const mcp = async () => {
+      runs++;
+      await Bun.sleep(50);
+      return { ok: true as const, text: "posted" };
+    };
+    const old = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-old" });
+    old.setMissionHooks({ mcp });
+    const paired = await pair();
+    const call = { type: "mcp.call", callId: "call-5", taskId: "t", tool: "post_message", args: { text: "oi" } };
+    const runner = fakeRunner(old);
+    await runner.hello(paired.token);
+    await runner.frame(call);
+    await until(() => runs === 1, "the first run");
+    await old.stop();
+    await old.drain(2000);
+    const [row] = await f.db.select().from(schema.machineMcpCalls).where(eq(schema.machineMcpCalls.callId, "call-5"));
+    expect(row?.result).toEqual({ ok: true, text: "posted" });
+
+    const next = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-new", mcpRepeatWaitMs: 5 });
+    hubs.push(next);
+    next.setMissionHooks({ mcp });
+    const back = fakeRunner(next);
+    await back.hello(paired.token);
+    await back.frame(call);
+    await until(() => back.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(back.sent.find((s) => s.type === "mcp.result")).toEqual({
+      type: "mcp.result",
+      callId: "call-5",
+      ok: true,
+      text: "posted",
+    });
+    expect(runs).toBe(1);
   });
 
   test("a pong's browser traffic is stored with when it came, with or without a load (protocol 23)", async () => {
@@ -403,6 +622,7 @@ describe("hub", () => {
       machineId: paired.machineId,
       name: "Build box",
       heartbeatMs: 25_000,
+      mcpOnce: true,
     });
     const [row] = await f.db.select().from(schema.machines);
     expect(row).toMatchObject({
@@ -625,6 +845,17 @@ describe("tools on a connected machine", () => {
     const offline = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(offline).toMatchObject({ isError: true });
     expect(offline.content).toContain("The computer Build box is offline. Ask its owner to start the runner.");
+    // The workspace's own computer has no runner for anyone to start: it comes back by itself.
+    await kind("managed");
+    const away = await call(ctx, "run_code", { language: "bash", code: "ls" });
+    expect(away.content).toContain(
+      "The computer Build box isn't answering right now. It usually comes back within minutes.",
+    );
+    expect(away.content).not.toContain("runner");
+    const folder = await call(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
+    expect(folder).toMatchObject({ isError: true });
+    expect(folder.content).toContain("isn't answering right now. It usually comes back within minutes.");
+    expect(folder.content).not.toContain("runner");
   });
 
   test("commands turned off on the machine are explained", async () => {

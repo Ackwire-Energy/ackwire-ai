@@ -3683,8 +3683,14 @@ export const ptBR = {
       more_other: "+{{count}} itens editados",
     },
     notice: {
-      machine_offline_one: "{{computer}} ficou offline: “{{title}}” parou até ele voltar. Nada se perde.",
-      machine_offline_other: "{{computer}} ficou offline: {{count}} tarefas pararam até ele voltar. Nada se perde.",
+      machine_offline_one:
+        "{{computer}} ficou offline: “{{title}}” continua rodando lá se só a conexão caiu. Se o computador reiniciou, ela parou e não retoma sozinha.",
+      machine_offline_other:
+        "{{computer}} ficou offline: {{count}} tarefas continuam rodando lá se só a conexão caiu. Se o computador reiniciou, elas pararam e não retomam sozinhas.",
+      machine_offline_resumes_one:
+        "{{computer}} ficou offline: “{{title}}” continua rodando lá se só a conexão caiu, e retoma de onde parou se o computador reiniciou.",
+      machine_offline_resumes_other:
+        "{{computer}} ficou offline: {{count}} tarefas continuam rodando lá se só a conexão caiu, e retomam de onde pararam se o computador reiniciou.",
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto",

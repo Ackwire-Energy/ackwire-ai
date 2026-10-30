@@ -350,3 +350,23 @@ export const machineRpc = pgTable(
   },
   (t) => [index().on(t.createdAt)],
 );
+
+/**
+ * A machine's `mcp.call`s by their `callId`, kept about 10 minutes: the runner sends a call cut by a
+ * reconnect again under the same id, and it runs once (the copy gets this answer). `result` null: running.
+ */
+export const machineMcpCalls = pgTable(
+  "machine_mcp_calls",
+  {
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    callId: text().notNull(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    result: jsonb().$type<Record<string, unknown>>(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.machineId, t.callId] }), index().on(t.createdAt)],
+);

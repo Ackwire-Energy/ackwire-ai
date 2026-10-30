@@ -74,6 +74,9 @@ const RUN_DRAIN_MS = 20_000;
 /** How long the other jobs running here get at least (as long as the runs take, if longer) before they go back. */
 const JOB_DRAIN_MS = 5_000;
 
+/** How long the `agentes` tool calls of computers' tasks still running here get at least to store their answers. */
+const MCP_DRAIN_MS = 5_000;
+
 export interface StartOptions {
   edition: Edition;
   modules?: AgentesModule[];
@@ -361,7 +364,9 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     engine.streams.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance. The other
     // jobs running here get as long, 5 s at least, then go back to the queue, due at once, instead of waiting out
-    // their lease. Both at once, so the whole stop fits the container's stop grace (40 s in docker-compose.yml).
+    // their lease. A task's call cut by the stop is sent again to the next instance, which answers it from what is
+    // stored: the calls still running here get as long too, 5 s at least, to store their answers. All at once, so the
+    // whole stop fits the container's stop grace (40 s in docker-compose.yml).
     const runs = drainLocalRuns(RUN_DRAIN_MS);
     const [interrupted, handed] = await Promise.all([
       runs,
@@ -371,6 +376,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         });
         return 0;
       }),
+      engine.machineHub.drain(MCP_DRAIN_MS),
     ]);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
     if (handed > 0) log.info("jobs handed back for the next instance", { jobs: handed });

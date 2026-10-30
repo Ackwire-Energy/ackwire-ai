@@ -190,6 +190,30 @@ test("protocol 23: the browsers' traffic rides on the next pong once per new sum
   await done;
 });
 
+test("the welcome says whether the server runs a task's call once: the MCP side hears it before the tasks", async () => {
+  const heard: string[] = [];
+  const { sockets, connection } = setup({
+    mcp: { attach: (_send, server) => heard.push(`mcp ${server?.mcpOnce}`), detach() {}, result() {} },
+    tasks: { list: () => [], attach: () => heard.push("tasks"), detach() {}, ack() {} },
+  });
+  const done = connection.run();
+  const open = async (i: number, welcome: Partial<Extract<ServerFrame, { type: "welcome" }>>) => {
+    await waitFor(() => sockets.length === i + 1);
+    const s = sock(sockets, i);
+    s.handlers.onOpen();
+    await waitFor(() => s.sent.length === 1);
+    s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25_000, ...welcome });
+  };
+  await open(0, { mcpOnce: true });
+  expect(heard).toEqual(["mcp true", "tasks"]);
+  // An older server says nothing: a call cut by a drop isn't sent to it again.
+  connection.reconnect();
+  await open(1, {});
+  expect(heard.slice(2)).toEqual(["mcp false", "tasks"]);
+  connection.stop();
+  await done;
+});
+
 test("tasks: hello carries the journal, each welcome re-sends unacknowledged task.done, task.ack marks it", async () => {
   const done = { taskId: "t1", exitCode: 0, seconds: 3 };
   let delivered = false;

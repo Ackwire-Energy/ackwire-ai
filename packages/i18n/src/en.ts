@@ -3653,8 +3653,14 @@ export const en: Translations = {
       more_other: "+{{count}} edited items",
     },
     notice: {
-      machine_offline_one: "{{computer}} went offline: “{{title}}” stopped until it's back. Nothing is lost.",
-      machine_offline_other: "{{computer}} went offline: {{count}} tasks stopped until it's back. Nothing is lost.",
+      machine_offline_one:
+        "{{computer}} went offline: “{{title}}” keeps running there if only the connection dropped. If the computer restarted, it stopped and won't resume by itself.",
+      machine_offline_other:
+        "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped. If the computer restarted, they stopped and won't resume by themselves.",
+      machine_offline_resumes_one:
+        "{{computer}} went offline: “{{title}}” keeps running there if only the connection dropped, and resumes where it stopped if the computer restarted.",
+      machine_offline_resumes_other:
+        "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped",
       machine_task_resume_waits: "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready",
       machine_task_done: "“{{title}}” finished in {{span}} on {{computer}}",
