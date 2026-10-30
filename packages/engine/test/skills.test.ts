@@ -181,6 +181,20 @@ describe("import", () => {
     expect(again.version).toBe(2);
   });
 
+  test("two files that collapse to one path are refused (no shared blob key, no undercounted size)", async () => {
+    f = await setup();
+    // `a.md` and `./a.md` both normalize to `a.md`: without the guard the big one overwrites the small one
+    // on disk while its row is dropped, so the metered size (1 byte) no longer matches 100 KB on disk.
+    await expect(
+      importSkillZip(
+        skillDeps(),
+        f.owner.id,
+        f.org.id,
+        zip({ "SKILL.md": SKILL_MD, "a.md": "x", "./a.md": "y".repeat(100_000) }),
+      ),
+    ).rejects.toThrow(/share the path/);
+  });
+
   test("a GitHub folder URL, fetched within limits; non-GitHub and private addresses are refused", async () => {
     f = await setup();
     const fetched: string[] = [];
