@@ -137,6 +137,8 @@ describe("a workspace being deleted: a screen of its own", () => {
     expect(
       within(screen().getByRole("navigation", { name: "Seus outros workspaces" })).getByRole("link", { name: "Beta" }),
     ).toBeTruthy();
+    // Someone whose only workspace is going isn't stuck there for 7 days.
+    expect(screen().getByRole("link", { name: "Novo workspace" }).getAttribute("href")).toBe("/onboarding");
     await click(screen().getByRole("button", { name: "Restaurar workspace" }));
     await settle(6);
     expect(state.calls.filter((c) => c.method === "orgs.restore")).toHaveLength(1);

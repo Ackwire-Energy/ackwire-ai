@@ -196,8 +196,11 @@ function OtherWorkspaces({ org, me, create = false }: { org: OrgSummary; me: Me;
         </Button>
       ))}
       {create && (
-        <Button variant="ghost" icon="plus" asChild>
-          <Link to="/onboarding">{t("shell.newWorkspace")}</Link>
+        <Button variant="ghost" asChild>
+          <Link to="/onboarding">
+            <Icon name="plus" />
+            {t("shell.newWorkspace")}
+          </Link>
         </Button>
       )}
     </nav>
