@@ -240,10 +240,10 @@ describe("Canal", () => {
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     await act(async () =>
-      fireEvent.change(within(dialog).getByLabelText("Descrição do canal"), { target: { value: "Código e deploys" } }),
+      fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Código e deploys" } }),
     );
     // Saves on blur, without a button.
-    await act(async () => fireEvent.blur(within(dialog).getByLabelText("Descrição do canal")));
+    await act(async () => fireEvent.blur(within(dialog).getByLabelText("Descrição")));
     await settle(4);
     expect(state.calls.find((c) => c.method === "chat.update")?.args[2]).toEqual({ topic: "Código e deploys" });
   });
