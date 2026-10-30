@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, type Executor, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { textOf } from "@agenteschat/providers";
+import { announceAgentStatus } from "./agent-status";
 import { executesHere, RUN_STALE_MS } from "./cancel";
 import { onConsultedRunFinished } from "./consultations";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -270,6 +271,8 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
   const where = { channelId: run.channelId, threadId, agentId: run.agentId, runId: run.id };
   const bg = run.background ? { background: true as const } : {};
   if (deps.pubsub && result.message) await publishMessageCreated(deps.pubsub, messageView(result.message));
+  // Its worker died: its line went with the heartbeat already (ADR 0081 §11); the apps refresh now.
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.run",
     ...where,

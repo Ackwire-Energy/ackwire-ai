@@ -1,6 +1,6 @@
 # 0081. Presence and written status, for people and agents
 
-- Status: Proposed (built: the server and the shared client, before §7–§11; the screens are being designed)
+- Status: Proposed (built: the server, the shared client and §7–§11; the web and phone screens in the same change)
 - Date: 2026-10-30
 - Code: `packages/engine/src/member-status.ts`, `packages/engine/src/agent-status.ts` (`set_status`, `loadAgentStatuses`), `packages/engine/src/team.ts` (`find_agent`), `packages/engine/src/tools/run-policy.ts` (kind `self`), `packages/db/src/schema/tenancy.ts` (`organization_members.availability`, `status_*`), `packages/db/src/schema/agents.ts` (`agents.status_*`), `apps/server/src/routes/app/management.ts` (`/people`, `PUT …/me/status`), `apps/server/src/routes/app/agents.ts` (`GET …/agent-status`), `apps/server/src/realtime/ws.ts`, `packages/client/src/api/queries.ts` (`useSetMyStatus`, `useAgentStatuses`)
 
@@ -25,7 +25,7 @@ Presence was one boolean: a person with a WebSocket open was "online". People as
    - who it answers, only in a public channel ("Respondendo no #campanhas"); a DM or a private channel is only "Numa conversa privada" (a status is seen by the whole workspace: it never carries a private name or text);
    - what it does, from the tool groups it may use ("Pesquisando na web", "Programando", "Lendo o Drive", "Analisando dados", "Escrevendo na wiki").
    The trigger message goes into Jev's state only (untrusted, never shown). `none` or no Jev (a self-host without a TypeSafe key): the first fact that applies, in the order above, or no line.
-9. **Busy from the start.** In the same request, a `score` question rates how heavy the work is (a quick answer · a few short steps · minutes of work · long work in the background). Two top levels with probability ≥ 0.6 mark the run busy at once, instead of after 2 minutes. Without Jev, the 2-minute rule (§3) alone. The judge gets `score` as its third question type (`judge.ts`; the LLM fallback answers a level).
+9. **Busy from the start.** In the same request (`statusQuestions`, answered in `chooseToolGroups`, applied by `startRunStatus`), a `score` question rates how heavy the work is (a quick answer · a few short steps · minutes of work · long work in the background). Two top levels with probability ≥ 0.6 mark the run busy at once, instead of after 2 minutes. Without Jev, the 2-minute rule (§3) alone. The judge gets `score` as its third question type (`judge.ts`; the LLM fallback answers a level).
 10. **It moves with the work.** When a run starts a step in another tool group, the automatic line is picked again from the candidates (code only, at most once every 30 s). An agent's own line is checked then: a `noul` ("does the line still describe the step it is on?"); under 0.3, the automatic line takes its place. Waiting on an approval, an answer or its computer, the line becomes "Esperando aprovação" / "Esperando resposta" / "Esperando o computador", and the agent reads `online`, not busy.
 11. **Nothing can stick.** Every line is checked when read, never cleaned up by a job:
    - a run-bound line shows only while its run is active, and a `running` run counts only with a heartbeat from the last 90 s (a dead worker's run stops counting at once; recovery fails or requeues it within a minute, `recovery.ts`);

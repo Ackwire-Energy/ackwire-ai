@@ -1,5 +1,5 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
-import { type AgentStatusView, loadAgentStatuses } from "./agent-status";
+import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
@@ -219,7 +219,8 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
 function presenceNote(s: AgentStatusView | undefined) {
   if (!s) return "";
   const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
-  return ` (${what}${s.status ? `: ${s.status.text.replace(/[()\n]/g, " ")}` : ""})`;
+  const line = s.status ? lineInEnglish(s.status) : null;
+  return ` (${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""})`;
 }
 
 /** Consultations shown on the team screen: the last day. */

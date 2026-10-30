@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import { type StatusCandidate, type StatusPick, statusQuestions } from "./agent-status";
 import type { Judge } from "./judge";
 import { deferrableGroups, type ToolGroup, toolGroupKey } from "./tools/directory";
 import type { ToolDefinition } from "./tools/types";
@@ -31,6 +32,8 @@ export interface ToolGroupChoice {
   source: "judge" | "timeout" | "error" | "none";
   /** Groups loaded without asking (`keptToolGroups`). */
   kept: string[];
+  /** The agent's line and how heavy the work is (ADR 0081 §8–9), when `status` candidates were given and Jev answered. */
+  status?: StatusPick;
 }
 
 const describeGroup = (g: ToolGroup) =>
@@ -61,6 +64,8 @@ export async function chooseToolGroups(
     tools: ToolDefinition[];
     /** Groups loaded without asking the judge (`keptToolGroups`). */
     keep?: string[];
+    /** The run's candidate lines (`statusCandidates`): Jev also picks one and rates the work, in this request. */
+    status?: StatusCandidate[];
     timeoutMs?: number;
   },
 ): Promise<ToolGroupChoice> {
@@ -68,8 +73,9 @@ export async function chooseToolGroups(
   const kept = all.filter((g) => input.keep?.includes(g.key)).map((g) => g.key);
   const groups = all.filter((g) => !kept.includes(g.key));
   const none = (source: ToolGroupChoice["source"]): ToolGroupChoice => ({ groups: kept, scores: {}, source, kept });
-  if (groups.length === 0) return none("none");
-  const questions = Object.fromEntries(
+  const asksStatus = (input.status?.length ?? 0) > 0;
+  if (groups.length === 0 && !asksStatus) return none("none");
+  const groupQuestions = Object.fromEntries(
     groups.map((g, i) => [
       `g${i}`,
       {
@@ -103,7 +109,8 @@ export async function chooseToolGroups(
           message: input.message.slice(0, 2000),
           recent: input.recent.map((m) => m.slice(0, 400)).join("\n"),
         },
-        questions,
+        // Same state, one call: the line and the weight ride on the request a run makes anyway (ADR 0081 §8).
+        questions: { ...groupQuestions, ...(asksStatus ? statusQuestions(input.status ?? []) : {}) },
       }),
       timeout,
     ]);
@@ -115,7 +122,12 @@ export async function chooseToolGroups(
       scores[g.key] = Math.round(p * 1000) / 1000;
       if (p >= TOOL_GROUP_THRESHOLD) chosen.push(g.key);
     });
-    return { groups: chosen, scores, source: "judge", kept };
+    const line = answers.status_line?.choice;
+    const weight = answers.status_weight?.probabilities ?? {};
+    const status = asksStatus
+      ? { line: line && line !== "none" ? line : null, heavy: (weight["2"] ?? 0) + (weight["3"] ?? 0) }
+      : undefined;
+    return { groups: chosen, scores, source: groups.length > 0 ? "judge" : "none", kept, ...(status ? { status } : {}) };
   } catch {
     return none("error");
   } finally {

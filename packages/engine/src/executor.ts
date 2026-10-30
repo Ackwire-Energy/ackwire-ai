@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { announceAgentStatus, type StatusCandidate, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
 import { publishApproval } from "./approvals";
@@ -603,6 +604,8 @@ async function executeRunInner(
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
     });
+    // Its line ends with the run (checked on read); the apps refresh now (ADR 0081 §11).
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
       channelId: run.channelId,
@@ -763,6 +766,8 @@ async function executeRunInner(
       .catch(() => fallbackChoice("error"));
   };
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
+  // What the agent shows it is doing (ADR 0081 §8): lines from facts everyone may see, picked by Jev below.
+  const statusLines = needsContext ? await statusCandidates(db, run, granted).catch(() => [] as StatusCandidate[]) : [];
   if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
     const [recent, keep] = await Promise.all([
       recentMessages(),
@@ -777,9 +782,13 @@ async function executeRunInner(
       recent,
       tools: granted,
       keep,
+      status: statusLines,
     });
     ctx.loadedGroups = toolChoice.groups;
     tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  }
+  if (needsContext) {
+    await startRunStatus({ db, pubsub: deps.pubsub }, run, statusLines, toolChoice?.status ?? null).catch(() => {});
   }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
@@ -1732,7 +1741,9 @@ async function executeRunInner(
       }
       const turnTools = firstTurn ? tools : await listRunTools(deps, ctx);
       firstTurn = false;
-      const toolScope: RunToolScope | null = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
+      const toolScope: RunToolScope | null = deps.tools
+        ? { deps: { db, pubsub: deps.pubsub, judge }, tools: deps.tools, ctx, where, turnTools }
+        : null;
 
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(

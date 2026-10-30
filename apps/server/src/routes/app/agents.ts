@@ -321,7 +321,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Each agent's presence (online, busy, away, offline) and what it says it is doing",
       description:
-        "From its work (ADR 0081): `busy` on a routine, a task or a run going for over 2 minutes, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status` is the agent's own line (`set_status`), gone when the run that wrote it ends unless it set `until`. Refreshed on `agent.status` events and every few seconds while open.",
+        "From its work (ADR 0081): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -331,7 +331,37 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 presence: z.enum(["online", "busy", "away", "offline"]),
                 status: z
-                  .object({ text: z.string(), emoji: z.string().nullable(), until: z.string().nullable() })
+                  .object({
+                    by: z.enum(["self", "auto", "wait"]).openapi({
+                      description: "Its own words (`text`), a line picked for its run, or what its run waits on.",
+                    }),
+                    text: z.string().nullable(),
+                    kind: z
+                      .enum([
+                        "task",
+                        "routine",
+                        "mission",
+                        "channel",
+                        "private",
+                        "browsing",
+                        "coding",
+                        "files",
+                        "wiki",
+                        "planning",
+                        "data",
+                        "mail",
+                        "connector",
+                        "computer",
+                        "waiting_approval",
+                        "waiting_answer",
+                        "waiting_computer",
+                      ])
+                      .nullable()
+                      .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
+                    subject: z.string().nullable(),
+                    emoji: z.string().nullable(),
+                    until: z.string().nullable(),
+                  })
                   .nullable(),
                 activeAt: z.string().nullable(),
               }),
