@@ -14,7 +14,7 @@ afterEach(async () => {
  * SQL statements; transaction BEGIN/COMMIT are not counted. Raise these only
  * on purpose.
  */
-test("claim → model request stays within 12 statements; a whole mention run within 21", async () => {
+test("claim → model request stays within 13 statements; a whole mention run within 23", async () => {
   let beforeModel = -1;
   f = await setup({
     reply: (req) => {
@@ -40,10 +40,12 @@ test("claim → model request stays within 12 statements; a whole mention run wi
   expect(beforeModel).toBeGreaterThan(0);
   // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
   // 12 since the run stores the brain it runs with (ADR 0053 §10).
-  expect(beforeModel).toBeLessThanOrEqual(12);
+  // 13 since a run's context lists the agent's open tasks (one statement, read while the thread is).
+  expect(beforeModel).toBeLessThanOrEqual(13);
   expect(profile).not.toBeNull();
   const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };
   // 22 since the reply carries how many tool calls the run made, so the apps leave "Ver o que ele fez" out at 0.
-  expect(p.total.queries).toBeLessThanOrEqual(22);
+  // 23 with the open tasks.
+  expect(p.total.queries).toBeLessThanOrEqual(23);
   expect(p.stages.map((s) => s.stage)).toEqual(["claim", "context", "model#1", "persist", "events"]);
 });

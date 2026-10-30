@@ -1075,6 +1075,69 @@ export async function mirrorReplyToIssue(
   await commentIssue(deps, { type: "agent", agentId: run.agentId, channelId: run.channelId }, run.orgId, issueId, text);
 }
 
+/**
+ * A run started in an issue's work thread (or on its start message) works on that issue, as if it had
+ * touched it with a tool: the issue shows it working instead of stalled.
+ */
+export async function linkRunToIssue(
+  deps: IssueDeps,
+  run: { id: string; orgId: string; agentId: string },
+  issueId: string,
+) {
+  const [issue] = await deps.db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.id, issueId), eq(issues.orgId, run.orgId)));
+  if (issue) await startedWork(deps, issue, run.agentId, [run.id]);
+}
+
+const OPEN_TASKS_SHOWN = 5;
+
+/**
+ * A run's reminder of the agent's open tasks: issues assigned to it, not done or canceled, that it can see
+ * from the run's channel, newest activity first. Null when there are none.
+ */
+export async function openTasksBrief(db: Database, orgId: string, agentId: string, channelId: string) {
+  const rows = await db
+    .select({
+      number: issues.number,
+      title: issues.title,
+      status: issues.status,
+      criteria: issues.criteria,
+      channelId: issues.channelId,
+    })
+    .from(issues)
+    .where(
+      and(
+        eq(issues.orgId, orgId),
+        eq(issues.assigneeType, "agent"),
+        eq(issues.assigneeId, agentId),
+        inArray(issues.status, [...OPEN_FOR_WORK]),
+      ),
+    )
+    .orderBy(desc(issues.updatedAt))
+    // ponytail: with more than 15 of the newest 20 hidden from this channel, fewer than 5 show.
+    .limit(OPEN_TASKS_SHOWN * 4);
+  const actor: IssueActor = { type: "agent", agentId, channelId };
+  const lines: string[] = [];
+  for (const r of rows) {
+    if (lines.length === OPEN_TASKS_SHOWN) break;
+    // An issue of a private channel or DM stays out where the agent can't read it: its title would leak there.
+    if (!(await canSee(db, actor, orgId, r.channelId, { type: "agent", id: agentId }))) continue;
+    const done = r.criteria.filter((c) => c.done).length;
+    lines.push(
+      `- #${r.number} ${r.title} (${r.status}${r.criteria.length ? `, criteria ${done}/${r.criteria.length}` : ""})`,
+    );
+  }
+  if (lines.length === 0) return null;
+  return [
+    "# Your open tasks",
+    "Issues assigned to you, latest activity first:",
+    ...lines,
+    "When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (`comment_issue`), each criterion as you meet it and its status (`update_issue`). That also ties your run to it, so the team sees you working on it.",
+  ].join("\n");
+}
+
 registerDocumentBuilder("issue", async (db, orgId, id) => {
   const [i] = await db
     .select()

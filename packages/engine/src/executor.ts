@@ -74,7 +74,7 @@ import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessa
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
-import { mirrorReplyToIssue } from "./issues";
+import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
@@ -917,6 +917,7 @@ async function executeRunInner(
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),
     ]);
+    if (context.issueId) await linkRunToIssue({ db, pubsub: deps.pubsub }, run, context.issueId).catch(() => {});
     const system: ContextBlock[] = [...context.system];
     if (contextDeps && context.stats.truncated) {
       // Long thread: the summary stands in for what didn't fit.
