@@ -2,6 +2,7 @@ import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sq
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
+import type { ToolDefinition } from "./types";
 
 const { agentScopes, agents, mailAccounts, dbConnections } = schema;
 
@@ -184,6 +185,17 @@ export function impliedByWrite(scope: string) {
 export const NOT_IN_ALL: ReadonlySet<string> = new Set(["sandbox:run", "browser:use", "desktop:use"]);
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
+
+/** `toolAccess` with the tool it needs too (`ToolDefinition.needs`): the first not allowed decides, `of` says which. */
+export function accessWithNeeds(
+  granted: Set<string>,
+  tool: Pick<ToolDefinition, "name" | "scope" | "connectionId" | "needs">,
+) {
+  const own = toolAccess(granted, tool);
+  return tool.needs && isAllowed(own)
+    ? { state: toolAccess(granted, tool.needs), of: tool.needs }
+    : { state: own, of: tool };
+}
 
 /** The agent's grants straight from the database (no cache): for checks right before a call runs. */
 export async function freshGrantedKeys(db: Executor, orgId: string, agentId: string) {

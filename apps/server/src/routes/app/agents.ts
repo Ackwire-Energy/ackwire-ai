@@ -539,7 +539,7 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Responde a todos\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
+                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,

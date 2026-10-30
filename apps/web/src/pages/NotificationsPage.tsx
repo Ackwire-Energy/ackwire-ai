@@ -16,7 +16,7 @@ import {
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
-import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
+import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   allItems,
@@ -118,13 +118,6 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
     : a.type === "agent"
       ? (dir.agentById.get(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
-
-/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people. */
-function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
-  const shown = names.slice(0, max);
-  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
-  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
-}
 
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
 function Face({

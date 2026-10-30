@@ -783,7 +783,7 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
   });
 
-  test("on the Cloud too, the plan's owner lets it reply to everyone: the switch, its line and ⓘ", async () => {
+  test("on the Cloud too, the plan's owner lets it answer other people: the switch, its line and ⓘ", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, true);
@@ -793,9 +793,10 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
     await open(state, api);
     const d = await brainDialog();
-    const replies = within(d).getByRole("switch", { name: "Responde a todos" });
+    const replies = within(d).getByRole("switch", { name: "Atende outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Zona cinzenta nos termos do Claude", d).text).toContain("Os termos do Claude dizem");
+    expect(shownText(d)).toContain("A Ada só atende você, pelo seu plano do Claude.");
+    expect(hintOf("os termos do plano", d).text).toContain("Os planos do Claude são para uso pessoal.");
     expect(shownText(d)).not.toContain("Um plano é pessoal");
     await click(replies);
     await click(within(d).getByRole("button", { name: "Usar" }));

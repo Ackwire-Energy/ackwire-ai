@@ -229,7 +229,7 @@ export interface AgentBrainView {
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
-  /** Nobody but its owner talks to it ("Responde a todos" off, ADR 0059 §5). */
+  /** Nobody but its owner talks to it ("Atende outras pessoas" off, ADR 0059 §5). */
   onlyOwner: boolean;
   /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
   canUsePlans: boolean;
@@ -380,7 +380,7 @@ export interface AgentBrainInput {
   model?: unknown;
   fallback?: unknown;
   /**
-   * "Responde a todos" turned off (ADR 0059 §5): true, only its owner talks
+   * "Atende outras pessoas" turned off (ADR 0059 §5): true, only its owner talks
    * to it; false, whoever its "who can talk" list lets in (everyone with no
    * list). Omitted = keep it; a switch onto a plan makes it its owner's only,
    * and only the plan's owner lets more people in (`planSharing`).

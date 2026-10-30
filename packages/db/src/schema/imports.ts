@@ -6,7 +6,7 @@ import { organizations } from "./tenancy";
  * What an import made (ADR 0055): one row per item of a source package, so
  * importing the same package again updates or keeps what it made instead of
  * duplicating it, and never touches what it didn't make. Matching by name
- * alone would break once a taken handle got a suffix (`scout` → `scout2`).
+ * alone would break once a taken handle got a suffix (`scout` → `scout-2`).
  * Rows belong to the person who imported: many packages have generic ids (a
  * default agent `main`, a folder named `.openclaw`), so someone else's
  * package must land as new items, never as updates to theirs.

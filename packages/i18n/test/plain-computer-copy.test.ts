@@ -76,15 +76,21 @@ const SELFHOST_ONLY = [
 ];
 
 /**
- * "Responde a todos", its line and its ⓘ (ADR 0059 §5): beside every plan's sign-in and on every agent's page on a
- * plan, the Cloud's included, so they're checked against both editions' words.
+ * "Atende outras pessoas", its line and its ⓘ (ADR 0059 §5): beside every plan's sign-in and on every agent's page on
+ * a plan, with New agent's note on a plan, the Cloud's included, so they're checked against both editions' words.
  */
+const PLAN_LINES = ["off", "on", "offAll", "onAll"].map((k) => `aiAccounts.share.line.${k}`);
+const PLAN_TERMS = ["own", "seat", "other"].map((k) => `aiAccounts.share.terms.${k}`);
 const PLAN_REPLIES = [
   "aiAccounts.share.switch",
   "aiAccounts.share.switchAll",
   "aiAccounts.share.switchOther",
   "aiAccounts.share.onOther",
-  ...["line", "linePlan", "own", "seat", "other"].map((k) => `aiAccounts.share.terms.${k}`),
+  ...PLAN_LINES,
+  ...["own", "seat", "coding"].map((k) => `aiAccounts.share.plan.${k}`),
+  "aiAccounts.share.terms.about",
+  ...PLAN_TERMS,
+  "newAgent.planOnlyOwner",
 ];
 
 /** Every key a Cloud workspace shows where a computer is named, past the `computerSetup.` and `agentComputer.` ones. */
@@ -292,16 +298,19 @@ describe("computer copy", () => {
     );
   });
 
-  test("an agent on a plan replies to everyone once its owner says so: nothing to accept, the terms a gray area", () => {
+  test("an agent on a plan answers other people once its owner says so: nothing to accept, the terms behind the ⓘ", () => {
     for (const strings of [ptBR, en]) {
       const values = valuesOf(strings);
       const words = PLAN_REPLIES.map((k) => values.get(k) ?? "");
       expect(words.every(Boolean)).toBe(true);
-      // No risk to take on, nothing to accept or confirm, no rule that a plan only answers its owner.
-      expect(words.filter((v) => /risk|risco|accept|aceit|confirm|personal|pessoal/i.test(v))).toEqual([]);
-      // The line under the switch is a few words; its ⓘ says what the terms say.
-      for (const k of ["line", "linePlan"])
-        expect((values.get(`aiAccounts.share.terms.${k}`) ?? "").split(" ").length).toBeLessThanOrEqual(7);
+      // No risk to take on, nothing to accept or confirm.
+      expect(words.filter((v) => /risk|risco|accept|aceit|confirm/i.test(v))).toEqual([]);
+      // The switch and its line say whom the agent answers, on which plan, never a rule that a plan only answers its
+      // owner: only the ⓘ says what the providers' terms say, and that it's a gray area.
+      const ours = PLAN_REPLIES.filter((k) => !k.startsWith("aiAccounts.share.terms."));
+      expect(ours.filter((k) => /personal|pessoal|terms|termos|gray|cinzenta/i.test(values.get(k) ?? ""))).toEqual([]);
+      for (const k of PLAN_LINES) expect(values.get(k)).toContain("{{plan}}");
+      for (const k of PLAN_TERMS) expect(values.get(k)).toMatch(/gray area|zona cinzenta/);
       // Nothing is left of the confirmation, the fixed note or the refusal they replace.
       const gone =
         /^aiAccounts\.share\.(title|body|accept|keep|fixedHint|hint)\b|^connectAi\.(onlyYou|foot)\b|^connectAi\.own\.note$|^aiAccounts\.errors\.plan(Personal|TermsRequired)$/;
@@ -310,8 +319,8 @@ describe("computer copy", () => {
   });
 
   test("'responde a' only says whom an agent replies to, never whose agent it is", () => {
-    // The pages that say whom an agent replies to ("Responde a todos", "Quem pode falar") also name its owner: there
-    // "responde a Lucas", or "Responde a" over the owner's name, would read as whom it replies to.
+    // The pages that say whom an agent replies to ("Atende outras pessoas", "Quem pode falar") also name its owner:
+    // there "responde a Lucas", or "Responde a" over the owner's name, would read as whom it replies to.
     for (const [strings, replies] of [
       [ptBR, /\bresponde a\b/i],
       [en, /\b(answers|replies) to\b/i],

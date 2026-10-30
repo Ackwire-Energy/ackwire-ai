@@ -1737,7 +1737,7 @@ describe("Onboarding", () => {
     expect(own.getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     // Who they reply to: off, each only the person. Switched on here, the save says everyone (ADR 0059 §5).
-    const replies = within(panel).getByRole("switch", { name: "Respondem a todos" });
+    const replies = within(panel).getByRole("switch", { name: "Atendem outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
     await click(replies);
     expect(replies.getAttribute("aria-checked")).toBe("true");
@@ -1795,7 +1795,9 @@ describe("Onboarding", () => {
     await settle(6);
     await next();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).getByRole("switch", { name: "Respondem a todos" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(panel).getByRole("switch", { name: "Atendem outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
     await next();
     await settle(4);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
@@ -1803,7 +1805,7 @@ describe("Onboarding", () => {
       { brain: "claude_code", fallback: true },
     ]);
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
-    expect(screen().getByText("Seus agentes só respondem a você.")).toBeTruthy();
+    expect(screen().getByText("Seus agentes só atendem você.")).toBeTruthy();
   });
 
   test("a computer whose Claude Code isn't signed in: no account to share, Claude's sign-in instead, nothing saved on Continue", async () => {
@@ -1889,7 +1891,7 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.create")).toHaveLength(1);
   });
 
-  test("a reload opens the step this tab was on, one before the furthest too", async () => {
+  test("a reload never opens behind the furthest step reached, even where this tab had gone back", async () => {
     const { state, api } = await start();
     await toComputer(state);
     await skip();
@@ -1897,8 +1899,8 @@ describe("Onboarding", () => {
     await click(button("Voltar"), 4);
     cleanup();
     await renderApp("/onboarding", { api });
-    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
-    expect(progress()).toBe("Faltam 3 etapas");
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(progress()).toBe("Faltam 2 etapas");
   });
 
   test("a tab left open follows the one that got further, with the team it made; once that one finishes, the workspace opens", async () => {
@@ -1931,7 +1933,7 @@ describe("Onboarding", () => {
   });
 
   /** An owner whose workspace is being set up, at `step`, with these agents in it. */
-  const settingUpAt = (step: "agents" | "team" | "done", agents: Partial<Agent>[] = []) => {
+  const settingUpAt = (step: "import" | "agents" | "team" | "done", agents: Partial<Agent>[] = []) => {
     const base = seedState().agents[0] as Agent;
     const state = seedState({ agents: agents.map((a, i) => ({ ...base, id: `a${i}`, ...a })) });
     if (state.me)
@@ -1968,7 +1970,7 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.create")).toHaveLength(0);
   });
 
-  test("its saved state can't be read: the page says so, and Tentar de novo opens it where it was", async () => {
+  test("its saved state can't be read: the page says so, and Tentar de novo opens it at the first step still waiting", async () => {
     const { api } = settingUpAt("agents", [THEO, ADA]);
     let down = true;
     const list = api.agents.list;
@@ -1980,8 +1982,32 @@ describe("Onboarding", () => {
     expect(document.body.textContent).toContain("Não foi possível carregar. Confira a conexão e tente de novo.");
     down = false;
     await click(button("Tentar de novo"), 8);
-    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    // Its team made already: past the agents' step, at the computer's.
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(router.state.location.pathname).toBe("/onboarding");
+  });
+
+  test("a team creation cut short opens where it was: the guide made with the rest, an import never applied read again", async () => {
+    // Theo made, cut short before Ada: the agents step again, opened afresh or back from the billing service, where
+    // keeping the team makes her.
+    for (const path of ["/onboarding", `/org/${ORG_ID}/onboarding`]) {
+      const { state, api } = settingUpAt("agents", [THEO]);
+      await renderApp(path, { api });
+      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      await next();
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(calls(state, "agents.create").map((c) => (c.args[1] as { handle: string }).handle)).toEqual(["ada"]);
+      cleanup();
+    }
+
+    // The team made, the import picked on its step never applied: that step again, its file read again.
+    const { api } = settingUpAt("import", [THEO, ADA]);
+    await renderApp("/onboarding", { api });
+    expect(screen().getByRole("heading", { name: "Já usa agentes em outro app?" })).toBeTruthy();
+    expect(document.querySelector(".onb__answer .imp-drop")).not.toBeNull();
+    // Only the workspace and its context done.
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(rail.querySelectorAll("li[data-done]")).toHaveLength(2);
   });
 
   test("finished on another device while this window is still on it: Continue opens the workspace, Send posts nothing again", async () => {
@@ -2553,18 +2579,25 @@ describe("Onboarding", () => {
     // Picked, not in yet: a reload comes back to the import step, where the file is read again.
     const saved = () => calls(state, "orgs.saveOnboarding").map((c) => c.args[1]);
     expect(saved()).toEqual([{ step: "import" }, { step: "import" }]);
+    // In with the team: every step after it is saved as it's reached.
     await keepOnly();
     await keyAndCreate(/Criar 2 agentes/);
-    expect(saved().at(-1)).toEqual({ step: "team" });
+    expect(saved()).toEqual(["import", "import", "computer", "ai", "team"].map((step) => ({ step })));
     await next();
     expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
     expect(document.querySelectorAll(".imp-report a")).toHaveLength(0);
 
-    // Opened again: the rail says what the import brought, not that it was skipped.
+    // Opened again: the rail says what the import brought, not that it was skipped, and so does its step.
     cleanup();
     await renderApp("/onboarding", { api });
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Morgan e Scout");
+    await click(railStep(/^Trazer seus agentes/), 6);
+    expect(document.querySelector(".onb__answer .imp-head__title")?.textContent).toBe("Veio do OpenMausBot");
+    expect(document.querySelector(".onb__answer .imp-head__sub")?.textContent).toBe(
+      "2 agentes · 3 skills · 1 canal · 2 rotinas · 2 memórias",
+    );
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
   test("import: an OpenBot GitHub link is read by the backend; a bad link says so; skipping the step drops it", async () => {

@@ -417,6 +417,12 @@ export interface Channel {
   visibility: "public" | "private";
   isMember: boolean;
   createdAt: string;
+  /** Who created it: may change it and its members, like admins. */
+  createdByUserId?: string | null;
+  /** Its sidebar category (ADR 0080); null or absent: on top, with none. */
+  categoryId?: string | null;
+  /** Order inside its category, from 0. */
+  position?: number;
   /**
    * Channel list only (`chat.channels`): messages since you last read it
    * (since you joined, if never), not yours; a thread reply counts only in a
@@ -425,6 +431,14 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
+export interface ChannelCategory {
+  id: string;
+  name: string;
+  /** Order in the sidebar, from 0. */
+  position: number;
 }
 
 /** A channel's latest top-level message, for the conversation list. */
@@ -3048,7 +3062,7 @@ export interface ImportItemResult {
   reason?: ImportSkipReason;
   /** Fields cut to fit our limits. */
   trimmed?: string[];
-  /** An agent whose handle was taken gets the next free one. */
+  /** The @handle an agent gets (or got) when it isn't the bundle's: that one was taken, or is an id. */
   renamedTo?: string;
   /** The row created or updated (after an apply). */
   targetId?: string;
@@ -3069,6 +3083,13 @@ export interface ImportInput {
 
 export interface ImportPlan {
   items: ImportItemResult[];
+}
+
+/** A source package this workspace brought things from, with how many of each kind came. */
+export interface ImportedSource {
+  app: string;
+  ref: string;
+  counts: Record<ImportItemKind, number>;
 }
 
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
@@ -3534,7 +3555,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
+  /** Nobody but the agent's owner talks to it ("Atende outras pessoas" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3623,7 +3644,9 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
+  /**
+   * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
+   */
   onlyOwner?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;

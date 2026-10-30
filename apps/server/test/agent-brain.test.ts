@@ -155,7 +155,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     onlyOwner: true,
     ownSignIn: true,
   });
-  // "Responde a todos": on with nothing to accept, and Bia may talk to it.
+  // "Atende outras pessoas": on with nothing to accept, and Bia may talk to it.
   const canTalk = async () =>
     ((await (await asBia("/agents")).json()) as { agents: { id: string; canTalk: boolean }[] }).agents.find(
       (a) => a.id === agentId,
