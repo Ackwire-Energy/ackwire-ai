@@ -55,11 +55,13 @@ export function fallbackChoice(source: Exclude<AutoChoice["source"], "judge">): 
   return { tier: "medium", effort: "medium", reason: `${why[source]}: medium tier, medium effort.`, source };
 }
 
+/** Never the small tier: with a long tool list, the smallest models miss tools they have and give up on the task. */
+const ACTING =
+  "acting for the person with tools (opening a site, taking a screenshot, clicking or filling in a page, running a command, changing files, sending something)";
+
 const TIER_CRITERIA: Record<ModelTier, string> = {
-  small:
-    "A quick, simple turn: a greeting or thanks, a short factual answer, a status, a yes/no, a small lookup or a one-line edit. Little reasoning.",
-  medium:
-    "Everyday work: an answer that needs some care, a few tool calls, a summary, an ordinary fix, document or routine check.",
+  small: `A quick, simple turn that only answers: a greeting or thanks, a short factual answer, a status, a yes/no. Little reasoning. Never ${ACTING}.`,
+  medium: `Everyday work: an answer that needs some care, ${ACTING}, a few tool calls, a summary, an ordinary fix, document or routine check.`,
   large:
     "Hard or high-stakes work: deep reasoning, a long multi-step task, planning, a subtle bug, writing or reviewing substantial code, or a mistake would be costly.",
 };

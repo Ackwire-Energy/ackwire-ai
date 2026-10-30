@@ -37,6 +37,7 @@ import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
 import { browserOnDesktop, handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
 import { type AgentBrowserStatus, agentBrowserStatus, browserUnavailableText } from "./status";
 import {
@@ -116,6 +117,8 @@ export interface BrowserToolDeps {
   /** Tests: the memory of targets per site (default: one per source, in memory). */
   targets?: TargetCache;
   now?: () => number;
+  /** Our public base URL: a shared screenshot goes to its upload URL there, as `upload_file`'s files do. */
+  publicUrl?: string;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -991,40 +994,41 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_screenshot",
-      `${BROWSER_TOOL_INFO.browser_screenshot.description} For checking how something looks; to know what the page says, browser_read is faster and exact.`,
+      `${BROWSER_TOOL_INFO.browser_screenshot.description} For checking how something looks; to know what the page says, browser_read is faster and exact. When people want to see it (a screenshot here, in the chat), give \`share\`: in the same call it goes to the Drive and shows in this conversation with your reply.`,
       {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "Where in your folder (default `screenshots/<time>.png`).",
+            description: "Where in your folder (a .png; default `screenshots/<time>.png`).",
             maxLength: 1000,
           },
           full_page: { type: "boolean", description: "The whole page, not only what fits the window." },
+          share: SHARE_INPUT,
         },
         additionalProperties: false,
       },
-      (input, ctx) => {
+      async (input, ctx) => {
         const given = str(input.path);
-        const path = given
+        const chosen = given
           ? agentFolderPath(given)
           : `screenshots/${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-        if (!path) {
-          return Promise.resolve({
-            content: "Give a path inside your own folder (relative, without `..`).",
-            isError: true,
-          });
-        }
-        return run(
-          ctx,
-          {
-            command: "screenshot",
-            args: [path, ...(input.full_page === true ? ["--full"] : [])],
-            timeoutSeconds: COMMAND_SECONDS,
-          },
-          () => `Saved ${path} in your folder.`,
-          () => ({ path }),
-        );
+        if (!chosen) return { content: "Give a path inside your own folder (relative, without `..`).", isError: true };
+        // The image is a PNG, whatever the name asked for; and agent-browser's `screenshot [selector] [path]` reads a
+        // lone name without a slash or an image extension (`notes.txt`, `code`) as a selector, not where to save it.
+        const path = /\.png$/i.test(chosen) ? chosen : `${chosen.replace(/\.[^./]*$/, "")}.png`;
+        const linked = await linkFor(ctx);
+        if (!linked.ok) return { content: linked.text, isError: true };
+        const r = await linked.link.act({
+          command: "screenshot",
+          args: [path, ...(input.full_page === true ? ["--full"] : [])],
+          timeoutSeconds: COMMAND_SECONDS,
+        });
+        if (!r.ok) return { content: r.text, isError: true };
+        const url = urlOf(r.data);
+        const saved = { content: `Saved ${path} in your folder.`, data: { ...(url ? { url } : {}), path } };
+        if (input.share !== true) return { ...saved, content: `${saved.content} ${SHARE_HINT}` };
+        return shareSavedFile(deps, ctx, linked.status.machineId, path, saved);
       },
     ),
     tool(

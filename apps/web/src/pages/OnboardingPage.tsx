@@ -307,19 +307,20 @@ function useGuideMood() {
   };
 }
 
-/**
- * The onboarding: the steps on a rail (the pixel sky
- * on top fills as they get done); each step is one calm screen hosted by an
- * agent of the team, who asks in a speech bubble (introducing itself the first
- * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
- * back from its plan, opened at the AI step; `paid`: back from paying for it.
- */
 /** The step this tab was on in `orgId`'s onboarding (`STORAGE_KEYS.onboardingStep`); null when it was on none. */
 function stepHere(orgId: string): number | null {
   const at = stepIndex((sessionStore.get(`${STORAGE_KEYS.onboardingStep}.${orgId}`) ?? "") as OnboardingStepId);
   return at >= 0 ? at : null;
 }
 
+/**
+ * The onboarding: the steps on a rail (the pixel sky
+ * on top fills as they get done); each step is one calm screen hosted by an
+ * agent of the team, who asks in a speech bubble (introducing itself the first
+ * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
+ * back from the billing service, opened at the step this tab was on, else the furthest the server has; `paid`: back
+ * from paying for it.
+ */
 export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnboarding | null; paid?: boolean }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
