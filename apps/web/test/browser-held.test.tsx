@@ -133,10 +133,24 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
     await settle(3);
     expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
-    expect(cards()).toEqual([card]);
+    expect(cards()).toHaveLength(1);
+    expect(cards()[0]).toBe(card);
     expect(card.classList.contains("is-control")).toBe(false);
     expect(card.classList.contains("is-open")).toBe(true);
     expect(within(card).getByRole("button", { name: "Assumir" })).toBeTruthy();
+  });
+
+  test("who may only watch gets no Assumir: Parar stays", async () => {
+    const api = createFakeApi(seedState());
+    fakeBrowserOf.get(api)?.watchOnly.add(ADA_ID);
+    const { ev } = await browsing(api);
+    const run = { threadId: null, runId: "r-watch", agentId: ADA_ID };
+    await ev({ type: "agent.thinking", ...run });
+    await ev({ type: "agent.tool", ...run, tool: "browser_open" });
+    await settle(3);
+    const card = cards()[0] as HTMLElement;
+    expect(within(card).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Assumir" })).toBeNull();
   });
 
   test("Parar by someone else reaches every viewer: the card says who stopped it", async () => {
