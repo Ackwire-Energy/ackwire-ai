@@ -214,9 +214,10 @@ const BUNDLE = {
 type Plan = { items: { kind: string; key: string; action: string; reason?: string; targetId?: string }[] };
 
 describe("imports and the export", () => {
-  test("plan, apply, apply again; admins only; the bundle is checked", async () => {
+  test("plan, apply, apply again; what came, by source; admins only; the bundle is checked", async () => {
     const { b, orgId } = await owner({});
     const imports = `/api/app/organizations/${orgId}/imports`;
+    const sources = async () => ((await (await b(imports)).json()) as { sources: unknown[] }).sources;
     const dry = await b(imports, { json: { bundle: BUNDLE, dryRun: true } });
     expect(dry.status).toBe(200);
     expect(((await dry.json()) as Plan).items.map((i) => `${i.kind}:${i.action}`)).toEqual([
@@ -231,6 +232,8 @@ describe("imports and the export", () => {
         (await (await b(`/api/app/organizations/${orgId}/agents`)).json()) as { agents: { handle: string }[] }
       ).agents.map((a) => a.handle);
     expect(await agents()).toEqual(["dev"]);
+    // Planned only: nothing came yet.
+    expect(await sources()).toEqual([]);
 
     const applied = (await (await b(imports, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
     expect(applied.items.every((i) => i.action === "create" && i.targetId)).toBe(true);
@@ -241,6 +244,10 @@ describe("imports and the export", () => {
     expect(routines.routines.map((r) => [r.name, r.active])).toEqual([["Resumo", false]]);
     const again = (await (await b(imports, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
     expect(again.items.map((i) => i.action)).toEqual(Array(5).fill("unchanged"));
+    // What came, once, by the package it came from.
+    expect(await sources()).toEqual([
+      { app: "openmausbot", ref: "pkg-sales", counts: { agent: 1, skill: 1, channel: 1, routine: 1, note: 1 } },
+    ]);
 
     expect((await b(imports, { json: { bundle: { ...BUNDLE, format: "other" }, dryRun: true } })).status).toBe(400);
     expect((await b(imports, { json: { bundle: { ...BUNDLE, version: 2 }, dryRun: true } })).status).toBe(400);
@@ -248,10 +255,12 @@ describe("imports and the export", () => {
     // A member: refused, the import and the export.
     const member = await joinByInvitation(t as TestServer, b, orgId, "member@example.com");
     expect((await member(imports, { json: { bundle: BUNDLE, dryRun: true } })).status).toBe(403);
+    expect((await member(imports)).status).toBe(403);
     expect((await member(`/api/app/organizations/${orgId}/export`)).status).toBe(403);
 
     const anon = browser(t as TestServer);
     expect((await anon(imports, { json: { bundle: BUNDLE, dryRun: true } })).status).toBe(401);
+    expect((await anon(imports)).status).toBe(401);
     expect((await anon(`/api/app/organizations/${orgId}/export`)).status).toBe(401);
   });
 
@@ -281,6 +290,10 @@ describe("imports and the export", () => {
     expect(plan.items.filter((i) => i.action !== "create").map((i) => [i.kind, i.action, i.reason])).toEqual([
       ["channel", "update", "exists"],
     ]);
+    // The channel it found here was joined, not brought: it isn't counted as what came.
+    expect(await (await other(into)).json()).toEqual({
+      sources: [{ app: "agenteschat", ref: orgId, counts: { agent: 2, skill: 1, channel: 1, routine: 1, note: 1 } }],
+    });
     const copy = (await (
       await other(`/api/app/organizations/${created.organization.id}/export`)
     ).json()) as typeof exported;

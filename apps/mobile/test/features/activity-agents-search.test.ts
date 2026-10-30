@@ -299,7 +299,9 @@ describe("who is working", () => {
       fraction: 12.4 / 50,
     });
     const part = spendOf({ budgetUsedPercent: 41.6 });
-    expect(part).toMatchObject({ kind: "percent", percent: 42 });
+    // As the server says it: the screen formats it ("42%", "<1%"), never rounding a little down to 0%.
+    expect(part).toMatchObject({ kind: "percent", percent: 41.6 });
+    expect(spendOf({ budgetUsedPercent: 0.3 })).toMatchObject({ kind: "percent", percent: 0.3 });
     expect(part.fraction).toBeCloseTo(0.416);
     expect(spendOf({ budgetUsedPercent: 140, usage: null })).toMatchObject({ kind: "percent", fraction: 1 });
   });

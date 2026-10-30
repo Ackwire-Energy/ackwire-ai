@@ -48,8 +48,6 @@ export const STORAGE_KEYS = {
   noAiOpened: "agentes.noAi.opened",
   /** Prefix (`.<orgId>`, in `sessionStore`): the agents the onboarding imported there, with their models (JSON). */
   onboardingImports: "agentes.onboarding.imports",
-  /** Prefix (`.<orgId>`, in `sessionStore`): the onboarding step this tab is on there, where a reload opens it. */
-  onboardingStep: "agentes.onboarding.step",
   /** In `sessionStore`: the address this tab signed up with, when the server emailed it a confirmation link. */
   confirmationSent: "agentes.confirmation.sent",
   /** In `sessionStore`: my messages waiting for the connection (the shared `outbox`), kept through a reload. */

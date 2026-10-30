@@ -1,16 +1,21 @@
-import type { Agent, AgentGroup } from "@agenteschat/client";
+import type { Agent, AgentGroup, Channel, ChannelCategory } from "@agenteschat/client";
 import {
   agentStateIn,
   keys,
   runningAgents,
   useAgentGroups,
+  useChannelCategories,
   useChannels,
   useConnections,
+  useCreateChannelCategory,
+  useDeleteChannelCategory,
   useDms,
   useMachineOutages,
   useMissionList,
   useNotificationCount,
   useOverview,
+  usePlaceChannel,
+  usePlaceChannelCategory,
   usePrefetchMessages,
   usePrefetchRecent,
   useSkills,
@@ -37,12 +42,16 @@ import {
   DialogFooter,
   Field,
   Icon,
+  type IconName,
   Kbd,
+  Menu,
+  MenuItem,
   MenuOverlay,
   MenuOverlayGroup,
   MenuOverlayItem,
   MenuOverlayRow,
   MenuOverlaySeparator,
+  MenuSeparator,
   modKey,
   Popover,
   Segmented,
@@ -54,7 +63,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
+  type DragEvent,
   Fragment,
+  type HTMLAttributes,
   type ReactNode,
   useEffect,
   useLayoutEffect,
@@ -69,6 +80,7 @@ import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { requestChannelDetails } from "@/lib/channel-details";
 import {
   contextMenuHandler,
   copyText,
@@ -96,6 +108,7 @@ import {
   GroupNameDialog,
   useAgentDrag,
 } from "./AgentGroups";
+import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
@@ -176,28 +189,13 @@ export function Sidebar() {
   const dir = useDirectory(orgId);
   const channels = useChannels(orgId);
   const overview = useOverview(orgId);
-  const [creatingChannel, setCreatingChannel] = useState(false);
+  // A new channel: `true` with no category, or the category whose + opened it.
+  const [creatingChannel, setCreatingChannel] = useState<boolean | string>(false);
   useEffect(() => {
     const open = () => setCreatingChannel(true);
     window.addEventListener(NEW_CHANNEL_EVENT, open);
     return () => window.removeEventListener(NEW_CHANNEL_EVENT, open);
   }, []);
-  const toast = useToast();
-  // The desktop app's right click on a channel (lib/context-menu.ts).
-  const channelMenu = (c: { id: string; name: string }) =>
-    contextMenuHandler(() => [
-      { kind: "header", label: `#${c.name}` },
-      {
-        kind: "item",
-        id: "copy-link",
-        label: t("contextMenu.copyLink"),
-        icon: "link",
-        run: () =>
-          void copyText(`${window.location.origin}/org/${orgId}/c/${c.id}`, () =>
-            toast.show(t("contextMenu.linkCopied")),
-          ),
-      },
-    ]);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
   // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
   const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
@@ -413,45 +411,13 @@ export function Sidebar() {
 
         <span className="sidebar__divider" aria-hidden="true" />
 
-        <SidebarSection
-          id="channels"
-          label={t("shell.channels")}
+        <SidebarChannels
+          channels={(channels.data ?? []).filter((c) => !dmChannels.has(c.id))}
+          loading={channels.isLoading}
           sections={sections}
-          action={
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              icon="plus"
-              className="sidebar__section-add"
-              aria-label={t("newChannel.open")}
-              onClick={() => setCreatingChannel(true)}
-            />
-          }
-        >
-          {channels.isLoading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
-          {(channels.data ?? [])
-            .filter((c) => !dmChannels.has(c.id))
-            .map((c) => (
-              <Link
-                key={c.id}
-                to="/org/$orgId/c/$channelId"
-                params={{ orgId, channelId: c.id }}
-                className="sidebar__item"
-                title={`#${c.name}`}
-                onMouseEnter={() => prefetch(c.id)}
-                onFocus={() => prefetch(c.id)}
-                onClick={() => markOpen(c.id)}
-                onContextMenu={channelMenu(c)}
-              >
-                <Icon name="channel" className="sidebar__channel-icon" />
-                <span className="sidebar__channel-abbr" aria-hidden="true">
-                  {channelInitials(c.name)}
-                </span>
-                <span className="sidebar__item-label">{c.name}</span>
-              </Link>
-            ))}
-        </SidebarSection>
+          onNewChannel={(categoryId) => setCreatingChannel(categoryId ?? true)}
+          onPrefetch={prefetch}
+        />
 
         {dir.loading && dir.agents.length === 0 && (
           // Loading: the same header as the open category, so nothing jumps when the list arrives.
@@ -565,7 +531,11 @@ export function Sidebar() {
         )}
       </div>
 
-      <NewChannelDialog open={creatingChannel} onOpenChange={setCreatingChannel} />
+      <NewChannelDialog
+        open={creatingChannel !== false}
+        onOpenChange={(open) => setCreatingChannel(open)}
+        category={typeof creatingChannel === "string" ? creatingChannel : null}
+      />
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
       {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
@@ -591,7 +561,8 @@ export function Sidebar() {
   );
 }
 
-type SectionId = "channels" | "agents" | "people" | `group:${string}`;
+/** The fixed sections, a channel category as `category:<id>` (ADR 0080) and a group of agents as `group:<id>`. */
+type SectionId = "channels" | "agents" | "people" | `category:${string}` | `group:${string}`;
 
 /** Which sidebar categories are closed, remembered per browser. */
 function useSidebarSections() {
@@ -611,7 +582,18 @@ function useSidebarSections() {
       storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
       return next;
     });
-  return { isOpen: (id: SectionId) => !closed.has(id), toggle };
+  /** "Fechar todas" / "Abrir todas" for the channel categories. */
+  const setAll = (ids: SectionId[], open: boolean) =>
+    setClosed((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (open) next.delete(id);
+        else next.add(id);
+      }
+      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
+      return next;
+    });
+  return { isOpen: (id: SectionId) => !closed.has(id), toggle, setAll };
 }
 
 /**
@@ -626,6 +608,8 @@ function SidebarSection({
   summary,
   action,
   drop,
+  className,
+  headProps,
   children,
 }: {
   id: SectionId;
@@ -634,13 +618,16 @@ function SidebarSection({
   summary?: ReactNode;
   action?: ReactNode;
   drop?: ReturnType<ReturnType<typeof useAgentDrag>["zone"]>;
+  className?: string;
+  /** A channel category's header: its right click and dragging. */
+  headProps?: HTMLAttributes<HTMLDivElement>;
   children: ReactNode;
 }) {
   const open = sections.isOpen(id);
-  const bodyId = `sidebar-section-${id}`;
+  const bodyId = `sidebar-section-${id.replace(":", "-")}`;
   return (
-    <div className="sidebar__group sidebar__section" data-open={open} {...drop}>
-      <div className="sidebar__section-head">
+    <div className={cx("sidebar__group sidebar__section", className)} data-open={open} {...drop}>
+      <div className="sidebar__section-head" {...headProps}>
         <button
           type="button"
           className="sidebar__section-toggle"
@@ -658,6 +645,410 @@ function SidebarSection({
         {children}
       </div>
     </div>
+  );
+}
+
+/** Where a dragged channel or category would land: the row or header it is over, and how. */
+type DropMark = { key: string; where: "before" | "after" | "into" } | null;
+type Dragging = { kind: "channel" | "category"; id: string };
+/** One thing a category's ⋯ (and its right click) can do. */
+interface CategoryAction {
+  id: string;
+  label: string;
+  icon: IconName;
+  run: () => void;
+  danger?: boolean;
+  description?: string;
+}
+const CATEGORY_KEY = "category:";
+
+/**
+ * The channels (ADR 0080). With no categories, the "Canais" section as before. With them, the channels with
+ * none come first with no header, then one section per category, like Agentes; closed, a category keeps the
+ * open channel and the unread ones in sight (CSS). Admins arrange the categories; a channel's creator or an
+ * admin moves it by dragging, from its right click in the desktop app ("Mover para…") or in its details.
+ */
+function SidebarChannels({
+  channels,
+  loading,
+  sections,
+  onNewChannel,
+  onPrefetch,
+}: {
+  channels: Channel[];
+  loading: boolean;
+  sections: ReturnType<typeof useSidebarSections>;
+  /** The + of a category (its id) or of "Canais" (null). */
+  onNewChannel: (categoryId: string | null) => void;
+  onPrefetch: (channelId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const orgId = org.id;
+  const toast = useToast();
+  const navigate = useNavigate();
+  const categories = useChannelCategories(orgId);
+  const place = usePlaceChannel(orgId);
+  const placeCategory = usePlaceChannelCategory(orgId);
+  const removeCategory = useDeleteChannelCategory(orgId);
+  const recreate = useCreateChannelCategory(orgId);
+  const admin = can(org.role, "configure");
+  const mayCreate = can(org.role, "create_channels");
+  const mayMove = (c: Channel) => c.createdByUserId === me.user.id || can(org.role, "manage_members");
+  const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
+  const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
+  const [moving, setMoving] = useState<Channel | null>(null);
+  const drag = useRef<Dragging | null>(null);
+  const [mark, setMark] = useState<DropMark>(null);
+  const failed = (e: unknown) => toast.show(e instanceof Error ? e.message : String(e), "error");
+
+  const list = categories.data ?? [];
+  const known = new Set(list.map((c) => c.id));
+  // A channel whose category isn't loaded yet (or is gone) shows with the ones with none.
+  const categoryOf = (c: Channel) => (c.categoryId && known.has(c.categoryId) ? c.categoryId : null);
+  const loose = channels.filter((c) => categoryOf(c) === null);
+  const inCategory = (id: string) => channels.filter((c) => categoryOf(c) === id);
+  const categoryIds = list.map((c) => `${CATEGORY_KEY}${c.id}` as SectionId);
+
+  // ── Dragging: a channel onto a channel (before/after) or a header (into); a header onto a header ──
+  const endDrag = () => {
+    drag.current = null;
+    setMark(null);
+  };
+  const startDrag = (e: DragEvent, what: Dragging) => {
+    drag.current = what;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", what.id);
+  };
+  const half = (e: DragEvent) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientY > r.top + r.height / 2 ? "after" : "before";
+  };
+  const over = (e: DragEvent, key: string, where: "before" | "after" | "into") => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    if (mark?.key !== key || mark.where !== where) setMark({ key, where });
+  };
+  const overChannel = (e: DragEvent, c: Channel) => {
+    const d = drag.current;
+    if (d?.kind === "channel" && d.id !== c.id) over(e, `channel:${c.id}`, half(e));
+  };
+  const overCategory = (e: DragEvent, category: ChannelCategory) => {
+    const d = drag.current;
+    if (d?.kind === "channel") over(e, `${CATEGORY_KEY}${category.id}`, "into");
+    else if (d?.kind === "category" && d.id !== category.id) over(e, `${CATEGORY_KEY}${category.id}`, half(e));
+  };
+  const overLoose = (e: DragEvent) => {
+    if (drag.current?.kind === "channel") over(e, "loose", "into");
+  };
+  const drop = (e: DragEvent) => {
+    const d = drag.current;
+    const m = mark;
+    endDrag();
+    if (!d || !m) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (d.kind === "category") {
+      const target = m.key.slice(CATEGORY_KEY.length);
+      const i = list.findIndex((c) => c.id === target);
+      const before = m.where === "before" ? target : (list[i + 1]?.id ?? null);
+      if (before !== d.id) placeCategory.mutate({ categoryId: d.id, beforeCategoryId: before }, { onError: failed });
+      return;
+    }
+    if (m.key === "loose") return place.mutate({ channelId: d.id, categoryId: null }, { onError: failed });
+    if (m.key.startsWith(CATEGORY_KEY)) {
+      const categoryId = m.key.slice(CATEGORY_KEY.length);
+      if (!sections.isOpen(`${CATEGORY_KEY}${categoryId}` as SectionId))
+        sections.toggle(`${CATEGORY_KEY}${categoryId}` as SectionId);
+      return place.mutate({ channelId: d.id, categoryId }, { onError: failed });
+    }
+    const target = channels.find((c) => `channel:${c.id}` === m.key);
+    if (!target) return;
+    const categoryId = categoryOf(target);
+    const siblings = categoryId ? inCategory(categoryId) : loose;
+    const i = siblings.findIndex((c) => c.id === target.id);
+    const before = m.where === "before" ? target.id : (siblings[i + 1]?.id ?? null);
+    if (before !== d.id) place.mutate({ channelId: d.id, categoryId, beforeChannelId: before }, { onError: failed });
+  };
+  const dropMark = (key: string) => (mark?.key === key ? mark.where : undefined);
+
+  // ── Menus: the desktop app's right click (lib/context-menu.ts) and a category's ⋯ ──
+  const channelMenu = (c: Channel) =>
+    contextMenuHandler(() => {
+      const entries: MenuEntry[] = [{ kind: "header", label: `#${c.name}` }];
+      if (admin)
+        entries.push({
+          kind: "item",
+          id: "edit",
+          label: t("channelCategories.editChannel"),
+          icon: "edit",
+          run: () => {
+            requestChannelDetails(c.id);
+            void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } });
+          },
+        });
+      if (mayMove(c) && list.length > 0)
+        entries.push({
+          kind: "item",
+          id: "move",
+          label: t("channelCategories.move"),
+          icon: "move",
+          run: () => setMoving(c),
+        });
+      if (admin)
+        entries.push({
+          kind: "item",
+          id: "new-category",
+          label: t("channelCategories.newWithChannel"),
+          icon: "layers",
+          run: () => setNewCategory({ withChannel: c.id }),
+        });
+      entries.push(
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "copy-link",
+          label: t("contextMenu.copyLink"),
+          icon: "link",
+          run: () =>
+            void copyText(`${window.location.origin}/org/${orgId}/c/${c.id}`, () =>
+              toast.show(t("contextMenu.linkCopied")),
+            ),
+        },
+      );
+      return entries;
+    });
+  const deleteCategory = (category: ChannelCategory) => {
+    const taken = inCategory(category.id).map((c) => c.id);
+    const next = list[list.findIndex((c) => c.id === category.id) + 1]?.id ?? null;
+    removeCategory.mutate(category.id, {
+      onError: failed,
+      onSuccess: () =>
+        toast.show(
+          taken.length
+            ? t("channelCategories.deleted", { name: category.name, count: taken.length })
+            : t("channelCategories.deletedEmpty", { name: category.name }),
+          "info",
+          {
+            label: t("channelCategories.undo"),
+            // Undo: the same name and channels, back in its place.
+            run: () =>
+              recreate.mutate(
+                { name: category.name, channelIds: taken },
+                {
+                  onError: failed,
+                  onSuccess: (again) => {
+                    if (next) placeCategory.mutate({ categoryId: again.id, beforeCategoryId: next });
+                  },
+                },
+              ),
+          },
+        ),
+    });
+  };
+  const allClosed = categoryIds.every((id) => !sections.isOpen(id));
+  const categoryActions = (category: ChannelCategory) => {
+    const actions: CategoryAction[] = [];
+    if (mayCreate)
+      actions.push({
+        id: "new-channel",
+        label: t("channelCategories.newChannelHere"),
+        icon: "plus",
+        run: () => onNewChannel(category.id),
+      });
+    if (admin)
+      actions.push({
+        id: "rename",
+        label: t("channelCategories.rename"),
+        icon: "edit",
+        run: () => setRenaming(category),
+      });
+    actions.push({
+      id: "fold",
+      label: allClosed ? t("channelCategories.expandAll") : t("channelCategories.collapseAll"),
+      icon: "list",
+      run: () => sections.setAll(categoryIds, allClosed),
+    });
+    if (admin)
+      actions.push(
+        {
+          id: "new-category",
+          label: t("channelCategories.newCategory"),
+          icon: "layers",
+          run: () => setNewCategory({}),
+        },
+        {
+          id: "delete",
+          label: t("channelCategories.delete"),
+          description: t("channelCategories.deleteDesc"),
+          icon: "trash",
+          danger: true,
+          run: () => deleteCategory(category),
+        },
+      );
+    return actions;
+  };
+
+  const row = (c: Channel) => {
+    const unread = c.unreadCount ?? 0;
+    return (
+      <Link
+        key={c.id}
+        to="/org/$orgId/c/$channelId"
+        params={{ orgId, channelId: c.id }}
+        className="sidebar__item"
+        title={`#${c.name}`}
+        data-unread={unread > 0}
+        data-drop={dropMark(`channel:${c.id}`)}
+        draggable={list.length > 0 && mayMove(c)}
+        onDragStart={(e) => startDrag(e, { kind: "channel", id: c.id })}
+        onDragEnd={endDrag}
+        onDragOver={(e) => overChannel(e, c)}
+        onDrop={drop}
+        onMouseEnter={() => onPrefetch(c.id)}
+        onFocus={() => onPrefetch(c.id)}
+        onClick={() => markOpen(c.id)}
+        onContextMenu={channelMenu(c)}
+      >
+        <Icon name="channel" className="sidebar__channel-icon" />
+        <span className="sidebar__channel-abbr" aria-hidden="true">
+          {channelInitials(c.name)}
+        </span>
+        <span className="sidebar__item-label">{c.name}</span>
+        {unread > 0 && <UnreadCount count={unread} />}
+      </Link>
+    );
+  };
+  const addButton = (categoryId: string | null, label: string) =>
+    mayCreate ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        icon="plus"
+        className="sidebar__section-add"
+        aria-label={label}
+        title={label}
+        onClick={() => onNewChannel(categoryId)}
+      />
+    ) : null;
+  const dialogs = (
+    <>
+      <NewCategoryDialog
+        open={newCategory !== null}
+        onOpenChange={(open) => !open && setNewCategory(null)}
+        withChannel={newCategory?.withChannel}
+      />
+      <RenameCategoryDialog category={renaming} onOpenChange={(open) => !open && setRenaming(null)} />
+      <MoveChannelDialog channel={moving} onOpenChange={(open) => !open && setMoving(null)} canCreate={admin} />
+    </>
+  );
+  const newCategoryRow = admin && (
+    <button type="button" className="sidebar__item sidebar__new-category" onClick={() => setNewCategory({})}>
+      <Icon name="plus" />
+      <span className="sidebar__item-label">{t("channelCategories.newCategory")}</span>
+    </button>
+  );
+
+  if (list.length === 0) {
+    return (
+      <>
+        <SidebarSection
+          id="channels"
+          label={t("shell.channels")}
+          sections={sections}
+          action={addButton(null, t("newChannel.open"))}
+        >
+          {loading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
+          {channels.map(row)}
+        </SidebarSection>
+        {!loading && newCategoryRow}
+        {dialogs}
+      </>
+    );
+  }
+  return (
+    <>
+      {/* biome-ignore lint/a11y/useSemanticElements: the channels with no category, a drop target, not a form group */}
+      <div
+        className="sidebar__group"
+        role="group"
+        aria-label={t("shell.channels")}
+        data-drop={dropMark("loose")}
+        onDragOver={overLoose}
+        onDrop={drop}
+      >
+        {loose.map(row)}
+      </div>
+      {list.map((category) => {
+        const actions = categoryActions(category);
+        return (
+          <SidebarSection
+            key={category.id}
+            id={`${CATEGORY_KEY}${category.id}`}
+            label={category.name}
+            sections={sections}
+            className="sidebar__section--category"
+            headProps={
+              {
+                draggable: admin,
+                "data-drop": dropMark(`${CATEGORY_KEY}${category.id}`),
+                onDragStart: (e) => startDrag(e, { kind: "category", id: category.id }),
+                onDragEnd: endDrag,
+                onDragOver: (e) => overCategory(e, category),
+                onDrop: drop,
+                onContextMenu: contextMenuHandler(() => [
+                  { kind: "header", label: category.name },
+                  ...actions.map(
+                    (a): MenuEntry => ({
+                      kind: "item",
+                      id: a.id,
+                      label: a.label,
+                      icon: a.icon,
+                      danger: a.danger,
+                      run: a.run,
+                    }),
+                  ),
+                ]),
+              } as HTMLAttributes<HTMLDivElement>
+            }
+            action={
+              <>
+                {addButton(category.id, t("channelCategories.newChannelIn", { name: category.name }))}
+                <Menu
+                  align="start"
+                  label={category.name}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="more"
+                      className="sidebar__section-add"
+                      aria-label={category.name}
+                    />
+                  }
+                >
+                  {actions.map((a) => (
+                    <Fragment key={a.id}>
+                      {a.id === "new-category" && <MenuSeparator />}
+                      <MenuItem icon={a.icon} danger={a.danger} description={a.description} onSelect={a.run}>
+                        {a.label}
+                      </MenuItem>
+                    </Fragment>
+                  ))}
+                </Menu>
+              </>
+            }
+          >
+            {inCategory(category.id).map(row)}
+          </SidebarSection>
+        );
+      })}
+      {newCategoryRow}
+      {dialogs}
+    </>
   );
 }
 

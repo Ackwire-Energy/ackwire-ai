@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -87,7 +87,12 @@ describe("connectors the agent can't use yet", () => {
       apiKey: "hm_secret_12345",
       label: "himetrica",
     });
-    await createApiKeyConnection(deps, f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_secret_123456" });
+    const github = await createApiKeyConnection(deps, f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    // Taken away from Dev (a new connection is every agent's).
+    await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, github.id));
     const handlers = createJobHandlers({
       ...f.jobDeps,
       tools: createToolGateway({ sources: [createConnectorToolSource(deps)] }),
@@ -122,6 +127,8 @@ describe("connectors the agent can't use yet", () => {
     });
     if (started.status !== "connected") throw new Error("expected connected");
     expect(started.server.tools.find((t) => t.name === "merge_pull_request")?.suggestedAccess).toBe("approval");
+    // Taken away from Dev (a new server is every agent's).
+    await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, started.server.id));
     const accepted = await acceptCustomSuggestion(deps, f.owner.id, f.org.id, started.server.id);
     expect(accepted.server.tools.every((t) => t.access !== null)).toBe(true);
     expect(accepted.server.tools.find((t) => t.name === "merge_pull_request")?.access).toBe("approval");

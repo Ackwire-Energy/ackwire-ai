@@ -22,6 +22,7 @@ import type {
   AgentGroup,
   AgentMailbox,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -42,6 +43,7 @@ import type {
   CalendarEvent,
   CalendarRange,
   Channel,
+  ChannelCategory,
   ChannelMember,
   CommandApproval,
   ComputerSetup,
@@ -58,6 +60,7 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  FormerAgent,
   ForumPost,
   ForumSuggestion,
   ForumTopic,
@@ -66,6 +69,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportPlan,
   Instance,
   Invitation,
@@ -438,9 +442,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
+      proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
+      denyProposal: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      purge: (orgId, agentId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
+      former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,
       models: () => request<{ models: Model[]; defaultModel: string }>("/api/app/models"),
       credentials: async (orgId) =>
         (await request<{ credentials: Credential[] }>(`${org(orgId)}/credentials`)).credentials,
@@ -500,11 +510,29 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
+      sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {
       channels: async (orgId) => (await request<{ channels: Channel[] }>(`${org(orgId)}/channels`)).channels,
       createChannel: (orgId, input) => request<Channel>(`${org(orgId)}/channels`, { json: input }),
+      categories: async (orgId) =>
+        (await request<{ categories: ChannelCategory[] }>(`${org(orgId)}/channel-categories`)).categories,
+      createCategory: (orgId, input) => request<ChannelCategory>(`${org(orgId)}/channel-categories`, { json: input }),
+      renameCategory: (orgId, categoryId, name) =>
+        request<ChannelCategory>(`${org(orgId)}/channel-categories/${enc(categoryId)}`, {
+          method: "PATCH",
+          json: { name },
+        }),
+      deleteCategory: (orgId, categoryId) =>
+        request<void>(`${org(orgId)}/channel-categories/${enc(categoryId)}`, { method: "DELETE" }),
+      placeCategory: (orgId, categoryId, beforeCategoryId) =>
+        request<void>(`${org(orgId)}/channel-categories/${enc(categoryId)}/place`, {
+          method: "PUT",
+          json: { beforeCategoryId },
+        }),
+      place: (orgId, channelId, input) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
@@ -530,6 +558,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
           json: {},
         }),
+      archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
+      unarchive: (orgId, channelId) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>

@@ -2,6 +2,7 @@ import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sq
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
+import type { ToolDefinition } from "./types";
 
 const { agentScopes, agents, mailAccounts, dbConnections } = schema;
 
@@ -185,6 +186,17 @@ export const NOT_IN_ALL: ReadonlySet<string> = new Set(["sandbox:run", "browser:
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
 
+/** `toolAccess` with the tool it needs too (`ToolDefinition.needs`): the first not allowed decides, `of` says which. */
+export function accessWithNeeds(
+  granted: Set<string>,
+  tool: Pick<ToolDefinition, "name" | "scope" | "connectionId" | "needs">,
+) {
+  const own = toolAccess(granted, tool);
+  return tool.needs && isAllowed(own)
+    ? { state: toolAccess(granted, tool.needs), of: tool.needs }
+    : { state: own, of: tool };
+}
+
 /** The agent's grants straight from the database (no cache): for checks right before a call runs. */
 export async function freshGrantedKeys(db: Executor, orgId: string, agentId: string) {
   return loadScopeKeys(db, orgId, agentId);
@@ -252,7 +264,7 @@ export async function setAgentScopes(
   const [agent] = await db
     .select({ id: agents.id })
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
   if (!agent) throw new NotFoundError("Agent not found");
   // Mail grants stay as they are (the mail API manages them); any sent back here are ignored.
   const mail = await mailConnectionIds(

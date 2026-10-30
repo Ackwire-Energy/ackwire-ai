@@ -41,6 +41,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AgentProposalDecision,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -263,6 +264,12 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
+/** Agents no longer in the team: the directories name their old messages with these (fresh with `useAgents`). */
+export const useFormerAgents = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
+};
+
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();
@@ -302,7 +309,31 @@ export function useCreateAgent(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AgentInput) => api.agents.create(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
+    onSuccess: (_agent, input) => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // Made from a card: the card says so (its conversation gets the change live too).
+      if (input.proposal) void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, input.proposal) });
+    },
+  });
+}
+
+/** An agent's proposal of a new agent (ADR 0081), by its card's message; `null` id: none. */
+export function useAgentProposal(orgId: string, messageId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentProposal(orgId, messageId ?? ""),
+    queryFn: () => api.agents.proposal(orgId, messageId ?? ""),
+    enabled: Boolean(messageId),
+  });
+}
+
+/** "Recusar" on an agent's proposal: the card shows it at once. */
+export function useDenyAgentProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.denyProposal(orgId, messageId),
+    onSuccess: (proposal) => cacheAgentProposal(qc, orgId, proposal, proposal),
   });
 }
 
@@ -377,6 +408,81 @@ export function useAgentGroupAction(orgId: string) {
 // ── Chat ────────────────────────────────────────────────────────────────────
 
 export const useChannels = (orgId: string) => useQuery(channelsQuery(useApi(), orgId));
+
+/** The sidebar's channel categories, in order (ADR 0080). */
+export const channelCategoriesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
+    queryKey: keys.channelCategories(orgId),
+    queryFn: () => api.chat.categories(orgId),
+    staleTime: 30_000,
+  });
+export const useChannelCategories = (orgId: string) => useQuery(channelCategoriesQuery(useApi(), orgId));
+
+/** After any layout change: the channels (their category and order) and the categories refetch. */
+function refreshLayout(qc: QueryClient, orgId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) }),
+  ]);
+}
+
+/** Admins: a new category at the end, optionally taking channels along. */
+export function useCreateChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; channelIds?: string[] }) => api.chat.createCategory(orgId, input),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useRenameChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; name: string }) =>
+      api.chat.renameCategory(orgId, input.categoryId, input.name),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useDeleteChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: string) => api.chat.deleteCategory(orgId, categoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function usePlaceChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; beforeCategoryId: string | null }) =>
+      api.chat.placeCategory(orgId, input.categoryId, input.beforeCategoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+/**
+ * Puts a channel in a category (null: none), before another channel or at its end. The list moves at once
+ * (the channel takes its new category) and refetches for the exact order.
+ */
+export function usePlaceChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channelId: string; categoryId: string | null; beforeChannelId?: string | null }) =>
+      api.chat.place(orgId, input.channelId, { categoryId: input.categoryId, beforeChannelId: input.beforeChannelId }),
+    onMutate: (input) => {
+      qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+        list?.map((c) => (c.id === input.channelId ? { ...c, categoryId: input.categoryId } : c)),
+      );
+    },
+    onSettled: () => refreshLayout(qc, orgId),
+  });
+}
 
 export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
@@ -560,6 +666,25 @@ export function cacheReceipts(
 }
 
 /**
+ * A card's meta changed (`patch` gives the keys that change, from the meta it has): that message in every loaded
+ * list of its channel.
+ */
+export function cacheMessageMeta(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  patch: (meta: Record<string, unknown>) => Record<string, unknown>,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch(m.meta ?? {}) } } : m));
+  });
+}
+
+/**
  * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
  * the message's `meta.forumSuggestion` in every loaded list of that channel.
  */
@@ -570,14 +695,29 @@ export function cacheForumSuggestion(
   messageId: string,
   suggestion: ForumSuggestion,
 ) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) =>
-      m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), forumSuggestion: suggestion } } : m,
-    );
-  });
+  cacheMessageMeta(qc, orgId, channelId, messageId, () => ({ forumSuggestion: suggestion }));
+}
+
+/**
+ * An agent's proposal of a new agent was decided (ADR 0081): the decision on its card in the chat, which already
+ * holds the draft, and its own query again.
+ */
+export function cacheAgentProposal(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  { state, agentId, decidedByUserId, decidedAt }: AgentProposalDecision,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: {
+      ...(meta.actionCard as Record<string, unknown> | undefined),
+      state,
+      agentId,
+      decidedByUserId,
+      decidedAt,
+    },
+  }));
+  void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
 }
 
 /** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */
@@ -872,7 +1012,12 @@ export function useConnectWithKey(orgId: string) {
   return useMutation({
     mutationFn: (input: { connector: string; apiKey: string; serverUrl?: string; label?: string }) =>
       api.connectors.connectWithKey(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+    // A new connection is every agent's: their access trees change too.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+      ]),
   });
 }
 
@@ -893,11 +1038,12 @@ export function useCompleteOAuth(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
-    // It may finish a catalog connection or a server connected by address (their own list).
+    // It may finish a catalog connection or a server connected by address (their own list), every agent's.
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
         qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
       ]),
   });
 }
@@ -1346,6 +1492,16 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   });
 }
 
+/** Archives a channel (creator or admin): it leaves the list. */
+export function useArchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.archive(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 // ── Direct messages ─────────────────────────────────────────────────────────
 
 export const useDms = (orgId: string) => {
@@ -1548,7 +1704,8 @@ export function useCustomServerAction(orgId: string) {
     connect: useMutation({
       mutationFn: (input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string }) =>
         api.customConnectors.connect(orgId, input),
-      onSuccess: done,
+      // A new server is every agent's: their access trees change too.
+      onSuccess: () => Promise.all([done(), qc.invalidateQueries({ queryKey: keys.access(orgId) })]),
     }),
     refresh: useMutation({ mutationFn: (id: string) => api.customConnectors.refresh(orgId, id), onSuccess: done }),
     save: useMutation({

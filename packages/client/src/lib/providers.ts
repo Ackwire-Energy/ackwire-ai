@@ -143,3 +143,7 @@ export function modelChoices(models: Model[], credentials: Credential[], platfor
  */
 export const AUTO = "auto";
 export const isAuto = (value: string | null | undefined) => value === AUTO;
+
+/** A workspace key runs this agent model: Automático (it follows the key), or one of the key's provider's. */
+export const keyRuns = (key: Pick<Credential, "provider">, model: string | undefined, models: readonly Model[]) =>
+  isAuto(model) || models.some((m) => m.id === model && m.provider === key.provider);

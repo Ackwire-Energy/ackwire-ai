@@ -32,7 +32,7 @@ import {
   type TargetCache,
 } from "../screen";
 import type { JsonSchema } from "../tools/json-schema";
-import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
+import { accessWithNeeds, grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
@@ -416,6 +416,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     description,
     inputSchema,
     scope: DESKTOP_SCOPE,
+    needs: RUN_CODE,
     execute: async (input, ctx) =>
       (await waitIfPersonInControl(ctx.db, ctx, deps.pubsub, "desktop")) ?? execute(input, ctx),
   });
@@ -546,9 +547,10 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     name: "desktop",
     async tools(ctx) {
       if (!hub) return [];
-      // Most agents have no desktop: the cached grants decide before any lookup.
+      // Most agents have no desktop: the cached grants decide before any lookup. Without them (its own, or
+      // Run code's) the gateway keeps these from the agent, and `find_tools` names them as not allowed yet.
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
+      if (!definitions.some((t) => isAllowed(accessWithNeeds(granted, t).state))) return definitions;
       const gate = await gateOf(ctx, granted);
       if ("refused" in gate) return [];
       if (!(await agentDesktopUseStatus(ctx.db, hub, ctx.orgId, ctx.agentId)).available) return [];
