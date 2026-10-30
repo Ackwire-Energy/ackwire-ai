@@ -6,6 +6,9 @@ import type { RolePermission } from "./permissions";
  * the order. Pure, for the web and the phone app.
  */
 
+/** The permission areas (`PERMISSION_AREAS` on the server). */
+export type PermissionAreaId = "chat" | "agents" | "tools" | "knowledge" | "org";
+
 /** An area's level: nothing past `everyone` ("Como Todos"), its "use" keys, all of them, or a mix. */
 export type AreaLevel = "none" | "use" | "manage" | "custom";
 

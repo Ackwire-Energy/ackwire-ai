@@ -43,6 +43,7 @@ import { getMessage, insertMessageWithRuns, messageView, replyExcerpt } from "./
 import { resolveRoutinePaused } from "./notification-producers";
 import { can, getMembership, requirePermission } from "./organizations";
 import { PermanentJobError } from "./outbox";
+import { maySql } from "./permissions";
 import {
   type RoutineAccess,
   type RoutineBrief,
@@ -504,7 +505,7 @@ async function viewerRights(
   const [member, owners, channelRows, joined] = await Promise.all([
     lookup(viewerId ? [viewerId] : [], () =>
       db
-        .select({ role: organizationMembers.role })
+        .select({ may: maySql(orgId, viewerId ?? "", "manage_routines") })
         .from(organizationMembers)
         .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, viewerId ?? ""))),
     ),
@@ -532,7 +533,7 @@ async function viewerRights(
     ),
   ]);
   const [me] = member;
-  const admin = me ? can(me, "manage_routines") : false;
+  const admin = me?.may === true;
   const ownerOf = new Map(owners.map((a) => [a.id, a.ownerUserId]));
   const publicChannels = new Set(
     channelRows.filter((c) => c.kind === "channel" && c.visibility === "public").map((c) => c.id),

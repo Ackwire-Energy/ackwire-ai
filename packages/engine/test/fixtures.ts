@@ -22,8 +22,8 @@ import {
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
-  createDefaultRoles,
   createBlobStoreResolver,
+  createDefaultRoles,
   createCalendarToolSource,
   createChatToolSource,
   createContextToolSource,
@@ -105,7 +105,9 @@ export async function makeAdmin(db: Database, orgId: string, userId: string) {
 export async function addMember(db: Database, orgId: string, role: TestRole, name: string = role) {
   const user = await addUser(db, name);
   await ensureRoles(db, orgId);
-  await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role: role === "owner" ? "owner" : "member" });
+  await db
+    .insert(schema.organizationMembers)
+    .values({ orgId, userId: user.id, role: role === "owner" ? "owner" : "member" });
   if (role === "admin") await makeAdmin(db, orgId, user.id);
   return user;
 }

@@ -344,7 +344,8 @@ describe("guards and permissions", () => {
     const owner = { id: "a", name: "A", role: "owner" as const, permissions: ["read", "manage_owners", "configure"] };
     expect(can(owner, "manage_owners")).toBe(true);
     // No list: nothing (the server checks every request anyway).
-    expect(can({ id: "c", name: "C", role: "owner" as const }, "read")).toBe(false);
+    const unresolved: { role: "owner"; permissions?: string[] } = { role: "owner" };
+    expect(can(unresolved, "read")).toBe(false);
     expect(can(undefined, "read")).toBe(false);
   });
 });

@@ -181,6 +181,12 @@ export const ptBR = {
       knowledge: "Wiki e arquivos",
       org: "Workspace",
     },
+    administrator: {
+      title: "Administrador",
+      desc: "Pode tudo, menos o que é só do dono.",
+      short: "tudo",
+      say: "pode tudo, menos o que é só do dono",
+    },
     post: { title: "Mandar mensagens", desc: "Escrever e reagir nos canais em que está.", short: "mandar mensagens", say: "manda mensagens" },
     create_channels: { title: "Criar canais", desc: "Abertos ou fechados.", short: "criar canais", say: "cria canais" },
     manage_channels: {
@@ -723,16 +729,6 @@ export const ptBR = {
         another: "Importar outro arquivo",
       },
       errors: {
-    role: {
-      nameRequired: "O papel precisa de um nome.",
-      nameLong: "No máximo {{max}} letras.",
-      tooMany: "Este workspace já tem {{max}} papéis.",
-      grantForbidden: "Você só dá o que você mesmo pode fazer.",
-      aboveYou: "Só quem está acima deste papel muda isso.",
-      base: "Todo workspace mantém o papel Todos.",
-      unknown: "Esse papel não existe mais.",
-      orderIncomplete: "A lista de papéis mudou. Recarregue e tente de novo.",
-    },
         empty: "Não achamos nada para ler aí. Confira se escolheu a pasta ou o arquivo certo.",
         tooLarge: "É grande demais para ler aqui. Tente só a pasta dos agentes, sem o resto.",
         unknown:
@@ -7355,6 +7351,16 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    role: {
+      nameRequired: "O papel precisa de um nome.",
+      nameLong: "No máximo {{max}} letras.",
+      tooMany: "Este workspace já tem {{max}} papéis.",
+      grantForbidden: "Você só dá o que você mesmo pode fazer.",
+      aboveYou: "Só quem está acima deste papel muda isso.",
+      base: "Todo workspace mantém o papel Todos.",
+      unknown: "Esse papel não existe mais.",
+      orderIncomplete: "A lista de papéis mudou. Recarregue e tente de novo.",
+    },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você.",

@@ -18,6 +18,7 @@ import {
   isEveryone,
   levelOf,
   levelOptions,
+  type PermissionAreaId,
   peopleWith,
   sortRoles,
   summaryKeys,
@@ -297,9 +298,9 @@ function RolePage({
     const line = admin
       ? t("rolesPage.viaAdmin")
       : reach.length
-        ? listFormat(i18n.language, reach.map((k) => t(`permissions.${k}.short`)))
+        ? listFormat(i18n.language, reach.map((k) => t(`permissions.${k as RolePermission}.short`)))
         : t("rolesPage.nothing");
-    const label = t(`permissions.areas.${a.id}`);
+    const label = t(`permissions.areas.${a.id as PermissionAreaId}`);
     return (
       <div key={a.id} className="roles-area" data-off={admin || undefined}>
         <div className="roles-area__top">
@@ -904,7 +905,7 @@ function AddPeopleDialog({
   );
 }
 
-const TEMPLATES: { id: string; keys: RolePermission[]; icon: string; color: string }[] = [
+const TEMPLATES: { id: "blank" | "mod" | "agents" | "costs"; keys: RolePermission[]; icon: string; color: string }[] = [
   { id: "blank", keys: [], icon: "bolt", color: "graphite" },
   { id: "mod", keys: ["create_channels", "manage_channels"], icon: "flag", color: "teal" },
   {

@@ -174,6 +174,12 @@ export const en: Translations = {
       knowledge: "Wiki and files",
       org: "Workspace",
     },
+    administrator: {
+      title: "Administrator",
+      desc: "Can do everything but what only the owner does.",
+      short: "everything",
+      say: "can do everything but what only the owner does",
+    },
     post: { title: "Send messages", desc: "Write and react in the channels they're in.", short: "send messages", say: "sends messages" },
     create_channels: { title: "Create channels", desc: "Open or private.", short: "create channels", say: "creates channels" },
     manage_channels: {
@@ -717,16 +723,6 @@ export const en: Translations = {
         another: "Import another file",
       },
       errors: {
-    role: {
-      nameRequired: "A role needs a name.",
-      nameLong: "At most {{max}} characters.",
-      tooMany: "This workspace already has {{max}} roles.",
-      grantForbidden: "You can only give what you can do yourself.",
-      aboveYou: "Only someone above this role changes it.",
-      base: "Every workspace keeps the Everyone role.",
-      unknown: "That role isn't there anymore.",
-      orderIncomplete: "The roles changed. Reload and try again.",
-    },
         empty: "There's nothing to read there. Check that you picked the right folder or file.",
         tooLarge: "It's too big to read here. Try just the agents' folder, without the rest.",
         unknown:
@@ -7315,6 +7311,16 @@ export const en: Translations = {
     downloadOnly: "No preview for this type of file. Download it to open.",
   },
   errors: {
+    role: {
+      nameRequired: "A role needs a name.",
+      nameLong: "At most {{max}} characters.",
+      tooMany: "This workspace already has {{max}} roles.",
+      grantForbidden: "You can only give what you can do yourself.",
+      aboveYou: "Only someone above this role changes it.",
+      base: "Every workspace keeps the Everyone role.",
+      unknown: "That role isn't there anymore.",
+      orderIncomplete: "The roles changed. Reload and try again.",
+    },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
       full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you.",

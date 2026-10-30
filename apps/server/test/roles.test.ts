@@ -9,7 +9,7 @@ beforeEach(async () => {
 afterEach(() => t.close());
 
 type Workspace = { id: string; role: string; permissions: string[]; rank: number | null };
-type Role = { id: string; kind: string; name: string; permissions: string[]; editable: boolean };
+type Role = { id: string; kind: string; name: string; permissions: string[]; editable: boolean; givable: boolean };
 
 const userIdOf = async (b: Browser) => ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
 
@@ -87,7 +87,7 @@ test("a member who may not manage roles nor people can't create a role or give o
   expect((await roles(ana)).map((r) => r.name)).toEqual(["Admin", "everyone"]);
 });
 
-test("every member reads the roles; only who manages them, above the role, sees it editable", async () => {
+test("every member reads the roles; only who stands above a role may change it or give it", async () => {
   const { owner, ana, api, roles } = await start();
   const { id } = (await (
     await api(owner, "/roles", { json: { name: "Support", permissions: ["manage_routines"] } })
@@ -100,7 +100,9 @@ test("every member reads the roles; only who manages them, above the role, sees 
   ]);
   expect(asOwner.find((r) => r.id === id)).toMatchObject({ permissions: ["manage_routines"], editable: true });
   expect(asOwner.every((r) => r.editable)).toBe(true);
+  // The base role is everyone's already: nobody gives it.
+  expect(asOwner.map((r) => r.givable)).toEqual([true, true, false]);
   const asAna = await roles(ana);
-  expect(asAna.find((r) => r.id === id)).toMatchObject({ name: "Support", editable: false });
-  expect(asAna.some((r) => r.editable)).toBe(false);
+  expect(asAna.find((r) => r.id === id)).toMatchObject({ name: "Support", editable: false, givable: false });
+  expect(asAna.some((r) => r.editable || r.givable)).toBe(false);
 });
