@@ -96,6 +96,8 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const id = typeof s.data.toolUseId === "string" ? s.data.toolUseId : `${s.seq}`;
     const result = results.get(id);
     const a = toolActivity(name);
+    // A reaction already shows on the message it reacts to: never a step (the server's `meta.work` skips it too).
+    if (a.kind === "reacting") continue;
     const app = a.kind === "consulting" ? a.app : DRIVE.includes(a.kind) ? "Drive" : undefined;
     if (app && !connectors.includes(app)) connectors.push(app);
     const input = (s.data.input ?? {}) as Record<string, unknown>;
@@ -303,7 +305,8 @@ const sameLine = (a: ToolLine, b: { kind: ActivityKind; app?: string; tool: stri
 /**
  * The live work as the block's items: a call followed by the same kind of call (no code, nothing said in
  * between, neither failed) is one line counting both, so five browser steps read "Usou o navegador ×5".
- * `stopped`: the run was stopped, so the call still running shows as stopped.
+ * Reactions are left out, as in `workFromSteps`. `stopped`: the run was stopped, so the call still running shows
+ * as stopped.
  */
 export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
   const items: ToolItem[] = [];
@@ -317,6 +320,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
       return;
     }
     const a = toolActivity(w.tool, w.connector, w.detail);
+    if (a.kind === "reacting") return;
     // Held (it waits on a person, so it never ran) reads like a call stopped before it ended.
     const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
     const hasCode = Boolean(w.code) || w.output.length > 0;
