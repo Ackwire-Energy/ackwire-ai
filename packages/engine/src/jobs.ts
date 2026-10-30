@@ -400,7 +400,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait } : ctx),
+        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait, jobId: job.id } : ctx),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);

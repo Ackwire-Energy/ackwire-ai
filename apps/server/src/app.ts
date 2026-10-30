@@ -66,6 +66,8 @@ export interface AppOptions {
   version: string;
   modules: AgentesModule[];
   pingDatabase: () => Promise<void>;
+  /** True once the server is shutting down: `/api/health` answers 503. */
+  draining?: () => boolean;
   /** Needed when modules register routes. */
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
@@ -114,6 +116,7 @@ export function createApp(options: AppOptions) {
     edition: options.edition,
     modules: options.modules.map((m) => m.name),
     pingDatabase: options.pingDatabase,
+    draining: options.draining,
   });
 
   if (options.services) {

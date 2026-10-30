@@ -27,6 +27,22 @@ test("health reports database state", async () => {
   expect((await down.request("/api/health")).status).toBe(503);
 });
 
+test("health answers 503 once the server is shutting down, so a proxy stops sending requests first", async () => {
+  let draining = false;
+  const app = createApp({
+    edition: "selfhost",
+    version: "1",
+    modules: [],
+    pingDatabase: async () => {},
+    draining: () => draining,
+  });
+  expect((await app.request("/api/health")).status).toBe(200);
+  draining = true;
+  const res = await app.request("/api/health");
+  expect(res.status).toBe(503);
+  expect(await res.json()).toMatchObject({ status: "draining", database: "ok" });
+});
+
 test("unknown API routes return the JSON error shape", async () => {
   const app = createApp({ edition: "selfhost", version: "1", modules: [], pingDatabase: async () => {} });
   const res = await app.request("/api/nope");

@@ -71,6 +71,8 @@ import { startWorkers } from "./workers";
 
 /** On SIGTERM, how long runs in progress get to finish before they are handed to the next instance. */
 const RUN_DRAIN_MS = 20_000;
+/** How long the other jobs running here get at least (as long as the runs take, if longer) before they go back. */
+const JOB_DRAIN_MS = 5_000;
 
 export interface StartOptions {
   edition: Edition;
@@ -252,10 +254,12 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     rateLimiter: adapters.rateLimiter,
     humanCheck: adapters.humanCheck,
   });
+  let stopping = false;
   const app = createApp({
     edition,
     version,
     modules,
+    draining: () => stopping,
     moduleContext: ctx,
     services: {
       db: database.db,
@@ -338,23 +342,38 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
 
   for (const module of modules) await module.onStart?.(ctx);
 
-  let stopping = false;
   const shutdown = async (signal: string) => {
     if (stopping) return;
     stopping = true;
     log.info("shutting down", { signal });
-    // No new jobs; HTTP stops taking requests (the new deploy serves them). Not awaited: the
-    // promise resolves only once every socket is closed, and browser tabs never close theirs.
+    // No new jobs, from now on: one started during the delay below would be cut by the drain.
     workers.stop();
+    // `/api/health` answers 503 from now on: the proxy's health check takes this instance out before it stops
+    // listening, and holds new requests for the next one instead of failing them.
+    if (config.SHUTDOWN_DELAY_MS > 0) await Bun.sleep(config.SHUTDOWN_DELAY_MS);
+    // HTTP stops taking requests (the new deploy serves them). Not awaited: the
+    // promise resolves only once every socket is closed, and browser tabs never close theirs.
     telemetry.stop();
     void server.stop();
     void operator?.stop();
     // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
     engine.streams.stop();
-    // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
-    const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
+    // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance. The other
+    // jobs running here get as long, 5 s at least, then go back to the queue, due at once, instead of waiting out
+    // their lease. Both at once, so the whole stop fits the container's stop grace (40 s in docker-compose.yml).
+    const runs = drainLocalRuns(RUN_DRAIN_MS);
+    const [interrupted, handed] = await Promise.all([
+      runs,
+      workers.drain(Promise.all([runs, Bun.sleep(JOB_DRAIN_MS)])).catch((error: unknown) => {
+        log.warn("couldn't hand this instance's jobs back: they come back when their lease ends", {
+          error: String(error),
+        });
+        return 0;
+      }),
+    ]);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
+    if (handed > 0) log.info("jobs handed back for the next instance", { jobs: handed });
     // Browser tabs, left open so they saw those runs finish, reconnect to the next instance.
     await server.stop(true);
     for (const module of modules) await module.onStop?.();
@@ -362,8 +381,22 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     await database.close();
     process.exit(0);
   };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+  const stop = (signal: string) =>
+    void shutdown(signal).catch((error: unknown) => {
+      log.error("shutdown failed", { error: String(error) });
+      process.exit(1);
+    });
+  process.on("SIGTERM", () => stop("SIGTERM"));
+  process.on("SIGINT", () => stop("SIGINT"));
+  // Once it serves, a stray rejection or exception (a database blip under a callback nobody awaits) is logged
+  // instead of ending the process with every run in progress. Not before: a failed boot must still exit, and a
+  // rejected top-level `await startServer()` would come here and leave the process hanging.
+  process.on("unhandledRejection", (reason) =>
+    log.error("unhandled rejection", { error: String(reason), stack: (reason as Error | null)?.stack }),
+  );
+  process.on("uncaughtException", (error) =>
+    log.error("uncaught exception", { error: String(error), stack: error.stack }),
+  );
 
   return { server, config };
 }

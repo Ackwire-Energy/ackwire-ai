@@ -515,6 +515,13 @@ export function createRealtime(deps: RealtimeDeps) {
         let denied: string | null;
         try {
           denied = await authorizeSubscription(deps.db, ws.data.user.id, ws.data.orgId, channelId);
+        } catch (error) {
+          // The check couldn't run (the database is away): the tab reconnects, which subscribes again and
+          // catches up on what it missed.
+          deps.log.warn("channel subscription check failed", { error: String(error) });
+          send(ws, { type: "error", code: "unavailable", channelId });
+          ws.close(1011, "try again");
+          return;
         } finally {
           ws.data.pending.delete(channelId);
         }
