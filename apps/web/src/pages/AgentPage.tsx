@@ -39,6 +39,7 @@ import { useApi } from "@/api/context";
 import { resourceName, useConnectedById, useSetLevels } from "@/components/AccessLevels";
 import { audienceValid } from "@/components/AgentAudience";
 import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields";
+import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -148,6 +149,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const [edits, setEdits] = useState<Edits>({});
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   /** The dialog of the sentence under the name that is open (who thinks, where it works, the browser). */
   const [work, setWork] = useState<WorkDialog | null>(null);
   /** The repositories picker: open, with a repository to add ("Liberar"). */
@@ -533,17 +535,21 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     if (closeRequest) closeRef.current?.();
   }, [closeRequest]);
 
-  /* ---------- Archiving ---------- */
+  /* ---------- Archiving and deleting ---------- */
 
+  /** Out of the team: its page closes on the workspace (its unsaved changes go with it). */
+  const leave = () => {
+    setEdits({});
+    dirtyRef.current = false;
+    void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
+  };
   const archive = useMutation({
     mutationFn: () => api.agents.archive(org.id, agent.id),
     onSuccess: () => {
       setArchiving(false);
-      setEdits({});
-      dirtyRef.current = false;
       toast.show(t("agentPage.archive.done", g));
       void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
-      void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
+      leave();
     },
   });
 
@@ -650,6 +656,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
                     section={section}
                     onSection={(sec) => goTo("settings", sec)}
                     onArchive={() => setArchiving(true)}
+                    onDelete={() => setDeleting(true)}
                   />
                 )}
               </div>
@@ -721,6 +728,8 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
           </Button>
         </DialogFooter>
       </Dialog>
+
+      <DeleteAgentDialog agent={deleting ? agent : null} onClose={() => setDeleting(false)} onDeleted={leave} />
     </AgentEditProvider>
   );
 }

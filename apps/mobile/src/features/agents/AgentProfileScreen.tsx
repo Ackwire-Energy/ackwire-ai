@@ -26,6 +26,7 @@ import {
   AgentAvatar,
   Button,
   Card,
+  EmptyState,
   Icon,
   type IconName,
   PixelOrbit,
@@ -93,6 +94,18 @@ const AREA_ICON: Record<string, IconName> = {
  * admins), what it can use in plain levels and the approval rule, and its month last.
  */
 export function AgentProfileScreen({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const agent = useDirectory().anyAgent(id);
+  // No longer in the team (archived or deleted): its messages name it, it has no profile.
+  if (agent?.former) {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        <PushedHeader title={agent.name} solid={false} />
+        <EmptyState icon="agent" title={t("profile.former")} />
+      </View>
+    );
+  }
   return (
     <SheetHostProvider>
       <Profile id={id} />

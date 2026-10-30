@@ -898,6 +898,7 @@ export const en: Translations = {
     feedTitle: "Conversations between agents",
     feedWindow: "last 24 h",
     feedEmpty: "No agent asked another for help in the last 24 h.",
+    archived: "Archived",
     consultation: {
       open: "Waiting for the answer",
       answered: "Answered",
@@ -1386,6 +1387,7 @@ export const en: Translations = {
     can: "Can",
     budgetUsed: "{{percent}} of the budget used this month",
     spendLabel: "Budget used this month",
+    former: "No longer in this workspace",
   },
   mentions: {
     list: "People and agents",
@@ -2291,6 +2293,16 @@ export const en: Translations = {
       title: "Archive {{name}}?",
       text: "{{name}} leaves the agent list and the channels, and routines stop. Conversations, memory and history are kept.",
       done: "{{name}} was archived.",
+    },
+    delete: {
+      action: "Delete {{name}}",
+      button: "Delete",
+      help: "For good. Its messages stay, with its name and face.",
+      title: "Delete {{name}} for good?",
+      goes: "Goes now: instructions, memory, routines, access, budget, channels and its sign-in on the computer.",
+      stays: "Stays: its messages and threads, with its name and face, and its usage in the reports.",
+      typeName: "Type {{name}} to confirm",
+      done: "{{name}} was deleted.",
     },
     leave: {
       title: "Leave without saving?",

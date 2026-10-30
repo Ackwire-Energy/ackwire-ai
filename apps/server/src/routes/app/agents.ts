@@ -11,12 +11,14 @@ import {
   canViewCost,
   createAgent,
   createCredential,
+  deleteAgent,
   deleteCredential,
   getAgent,
   getAgentBrain,
   getTeam,
   listAgents,
   listCredentials,
+  listFormerAgents,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
@@ -55,6 +57,7 @@ import {
   BrainKind,
   BrainMachine,
   Credential,
+  FormerAgent,
   Model,
   ProviderId,
   Usage,
@@ -269,6 +272,22 @@ export function agentRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
+      path: "/organizations/{orgId}/former-agents",
+      tags,
+      security,
+      summary: "Agents no longer in the team (archived or deleted): the name, role and look their messages still show",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ agents: z.array(FormerAgent) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await listFormerAgents(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
       path: "/organizations/{orgId}/ai-status",
       tags,
       security,
@@ -454,13 +473,21 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}",
       tags,
       security,
-      summary: "Archive an agent",
-      request: { params: AgentParams },
+      summary: "Archive an agent (or delete it for good with ?purge=true)",
+      description:
+        "Deleting (ADR 0080) is permanent and works on archived agents too: its instructions, memory, routines, grants, budget, channels and login on its computer go, its work stops and its DMs close; its messages, usage and audit rows stay, named by a tombstone that frees its handle. Owners and admins.",
+      request: { params: AgentParams, query: z.object({ purge: z.stringbool().optional() }) },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await archiveAgent(db, c.get("user").id, orgId, agentId);
+      const actor = c.get("user").id;
+      if (c.req.valid("query").purge) {
+        const hub = deps.extras?.sandbox?.machines?.hub ?? null;
+        await deleteAgent({ db, pubsub: adapters.pubsub, hub, mail: adapters.mail }, actor, orgId, agentId);
+        return c.body(null, 204);
+      }
+      await archiveAgent(db, actor, orgId, agentId);
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
     },

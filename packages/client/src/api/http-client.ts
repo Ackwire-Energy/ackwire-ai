@@ -57,6 +57,7 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  FormerAgent,
   ForumPost,
   ForumSuggestion,
   ForumTopic,
@@ -418,6 +419,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      purge: (orgId, agentId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
+      former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,
       models: () => request<{ models: Model[]; defaultModel: string }>("/api/app/models"),
       credentials: async (orgId) =>
         (await request<{ credentials: Credential[] }>(`${org(orgId)}/credentials`)).credentials,

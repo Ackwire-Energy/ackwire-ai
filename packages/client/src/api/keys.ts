@@ -19,6 +19,8 @@ export const keys = {
   limits: (orgId: string) => ["org", orgId, "members", "limits"] as const,
   invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
+  /** Under `agents`: archiving or deleting one refreshes both. */
+  formerAgents: (orgId: string) => ["org", orgId, "agents", "former"] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
   /** Under `credentials`: a key added, rotated or removed refreshes it too. */

@@ -19,6 +19,7 @@ import type {
   ConnectorDef,
   Credential,
   Edition,
+  FormerAgent,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -142,6 +143,8 @@ export interface FakeState {
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
   agents: Agent[];
+  /** Agents no longer in the team (`agents.former`); a purge moves one here. */
+  former?: FormerAgent[];
   channels: Channel[];
   channelMembers: Record<string, ChannelMember[]>;
   messages: Message[];
@@ -1206,6 +1209,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { ...agent };
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
+      purge: async (orgId, agentId) => {
+        log("agents.purge", orgId, agentId);
+        const was =
+          state.agents.find((a) => a.id === agentId) ?? state.former?.find((a) => a.id === agentId && !a.deleted);
+        if (!was) throw new ApiError(404, "not_found", "Agent not found");
+        state.agents = state.agents.filter((a) => a.id !== agentId);
+        state.former = [
+          ...(state.former ?? []).filter((a) => a.id !== agentId),
+          { id: was.id, name: was.name, role: was.role, appearance: was.appearance ?? null, deleted: true },
+        ];
+      },
+      former: async () => state.former ?? [],
       models: async () => ({
         defaultModel: "claude-sonnet-5-5",
         models: [

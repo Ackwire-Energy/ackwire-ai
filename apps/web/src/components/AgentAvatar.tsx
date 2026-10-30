@@ -58,7 +58,7 @@ function LiveAgentAvatar({
   const live = useStreams((s) => agentStateIn(s, agentId, channelId));
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const known = dir.agentById.get(agentId);
+  const known = dir.anyAgent(agentId);
   return (
     <Avatar
       kind="agent"

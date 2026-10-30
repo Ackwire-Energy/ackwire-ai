@@ -181,8 +181,22 @@ function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void })
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const agent = dir.agentById.get(agentId);
+  const agent = dir.anyAgent(agentId);
   if (!agent) return <p className="small muted">{t("channel.unknownAgent")}</p>;
+  // No longer in the team (archived or deleted): who it was, nothing to do with it.
+  if (agent.former) {
+    return (
+      <div className="profile-card__body">
+        <div className="profile-card__head">
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+          <div className="list-col">
+            <span className="profile-card__name">{agent.name}</span>
+            <span className="small muted">{t("profile.former")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return <AgentCardBody agent={agent} onDone={onDone} />;
 }
 

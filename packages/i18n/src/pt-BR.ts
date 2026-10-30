@@ -909,6 +909,7 @@ export const ptBR = {
     feedTitle: "Conversas entre agentes",
     feedWindow: "últimas 24 h",
     feedEmpty: "Nenhum agente pediu ajuda a outro nas últimas 24 h.",
+    archived: "Arquivados",
     consultation: {
       open: "Esperando a resposta",
       answered: "Respondeu",
@@ -1407,6 +1408,7 @@ export const ptBR = {
     can: "Pode",
     budgetUsed: "{{percent}} do orçamento usado este mês",
     spendLabel: "Orçamento usado no mês",
+    former: "Não faz mais parte deste workspace",
   },
   mentions: {
     list: "Pessoas e agentes",
@@ -2316,6 +2318,16 @@ export const ptBR = {
       title: "Arquivar {{article}} {{name}}?",
       text: "{{The}} {{name}} sai da lista de agentes e dos canais, e as rotinas param. Conversas, memória e histórico ficam guardados.",
       done: "{{The}} {{name}} foi arquivad{{article}}.",
+    },
+    delete: {
+      action: "Apagar {{article}} {{name}}",
+      button: "Apagar",
+      help: "De vez. As mensagens ficam, com o nome e o rosto.",
+      title: "Apagar {{article}} {{name}} de vez?",
+      goes: "Sai agora: instruções, memória, rotinas, acessos, orçamento, canais e o login no computador.",
+      stays: "Fica: as mensagens e threads, com o nome e o rosto, e o uso nos relatórios.",
+      typeName: "Digite {{name}} para confirmar",
+      done: "{{The}} {{name}} foi apagad{{article}}.",
     },
     leave: {
       title: "Sair sem salvar?",

@@ -9270,6 +9270,20 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 12.5px;
 }
+.agp-dz + .agp-dz {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+/* Deleting an agent: what goes and what stays, over the name to type. */
+.agp-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink2);
+}
 /* The save bar and its list of changes */
 .agp-savebar {
   position: sticky;

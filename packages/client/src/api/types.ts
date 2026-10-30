@@ -324,6 +324,18 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
+  /** No longer in the team (ADR 0080): only its name, role and look, from `FormerAgent`. */
+  former?: "archived" | "deleted";
+}
+
+/** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
+export interface FormerAgent {
+  id: string;
+  name: string;
+  role: string;
+  appearance: AgentLookInput | null;
+  /** Deleted for good; false: archived (an admin may still delete it). */
+  deleted: boolean;
 }
 
 /** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */

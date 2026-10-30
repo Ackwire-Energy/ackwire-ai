@@ -114,6 +114,17 @@ export const AgentAppearance = z
   })
   .openapi("AgentAppearance");
 
+/** An agent no longer in the team (archived or deleted, ADR 0080): what its messages and reports still show. */
+export const FormerAgent = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    role: z.string(),
+    appearance: AgentAppearance.nullable(),
+    deleted: z.boolean().openapi({ description: "Deleted for good; false: archived (an admin may still delete it)." }),
+  })
+  .openapi("FormerAgent");
+
 export const Agent = z
   .object({
     id: z.uuid(),
