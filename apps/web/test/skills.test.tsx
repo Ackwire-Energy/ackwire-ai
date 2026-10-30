@@ -31,6 +31,16 @@ const settings = async (state = seedState(), api = createFakeApi(state)) => {
   await settle(8);
   return { state, api, section: () => screen().getByRole("region", { name: "Skills" }) };
 };
+/** The seeded library (3 skills) and `count` more: "Extra 1", "Extra 2"… */
+const withExtras = async (count: number) => {
+  const state = seedState();
+  const api = createFakeApi(state);
+  await api.skills.list(ORG_ID);
+  for (let i = 1; i <= count; i++) {
+    await api.skills.create(ORG_ID, { name: `Extra ${i}`, description: "x", body: "# x" });
+  }
+  return { state, api };
+};
 
 describe("Configurações → Skills", () => {
   test("the library: name, description, source, version and how many agents use it", async () => {
@@ -139,12 +149,7 @@ describe("Configurações → Skills", () => {
   });
 
   test("long libraries: 'Ver todas' opens a search dialog", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    await api.skills.list(ORG_ID);
-    for (let i = 1; i <= 5; i++) {
-      await api.skills.create(ORG_ID, { name: `Extra ${i}`, description: "x", body: "# x" });
-    }
+    const { state, api } = await withExtras(5);
     const { section } = await settings(state, api);
     await click(within(section()).getByRole("button", { name: "Ver todas as 8 skills" }));
     const dialog = screen().getByRole("dialog", { name: "Skills" });
@@ -200,6 +205,54 @@ describe("agent skills", () => {
     ).toBe("true");
   });
 
+  test("Ferramentas e acesso: past 6 skills a search that only hides pills; a skill switched on stays on", async () => {
+    const { state, api } = await withExtras(3);
+    const { services } = await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(8);
+    const section = () => screen().getByRole("region", { name: "Skills" });
+    const pills = () => [...section().querySelectorAll(".ac-pill")].map((p) => p.textContent);
+    const checked = (name: RegExp) => within(section()).getByRole("checkbox", { name }).getAttribute("aria-checked");
+    const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
+    // Six skills: the pills alone, as before.
+    expect(pills()).toHaveLength(6);
+    expect(within(section()).queryByRole("searchbox")).toBeNull();
+
+    const seventh = await api.skills.create(ORG_ID, { name: "Extra 4", description: "x", body: "# x" });
+    await act(() => services.queryClient.invalidateQueries());
+    await settle(4);
+    const search = within(section()).getByRole("searchbox", { name: "Buscar skill" }) as HTMLInputElement;
+    await type(search, "extra 4");
+    expect(pills()).toEqual(["Extra 4"]);
+    // Typing switches nothing on.
+    expect(checked(/Extra 4/)).toBe("false");
+    expect(saveBar()).toBeNull();
+
+    await click(within(section()).getByRole("checkbox", { name: /Extra 4/ }));
+    // Accents don't matter. Extra 4 is hidden now, and still on.
+    await type(search, "relatorio");
+    expect(pills()).toEqual(["Relatório semanal"]);
+    await type(search, "nada assim");
+    expect(pills()).toEqual([]);
+    expect(section().textContent).toContain("Nenhuma skill com “nada assim”.");
+    await click(within(section()).getByRole("button", { name: "Limpar busca" }));
+    expect(search.value).toBe("");
+    expect(pills()).toHaveLength(7);
+    expect(checked(/Extra 4/)).toBe("true");
+    expect(checked(/Revisão de PR/)).toBe("true");
+    expect(section().textContent).toContain("Antes: 1 ligada");
+
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(6);
+    const sent = state.calls.find((c) => c.method === "skills.setForAgent")?.args[2] as {
+      skillId: string;
+      enabled: boolean;
+    }[];
+    expect(sent).toHaveLength(7);
+    const on = sent.filter((x) => x.enabled).map((x) => x.skillId);
+    expect(on).toHaveLength(2);
+    expect(on).toContain(seventh.id);
+  });
+
   test("Criar agente: optional Skills under the tools, the ones on for new agents already checked", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
@@ -207,6 +260,8 @@ describe("agent skills", () => {
     await startAs("QA");
     await proceed(2);
     const step = screen().getByRole("region", { name: /^Skills/ });
+    // Three skills: no search.
+    expect(within(step).queryByRole("searchbox")).toBeNull();
     // "Ligar em agentes novos" skills start checked.
     expect(
       within(step)
