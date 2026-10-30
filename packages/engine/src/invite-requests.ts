@@ -38,6 +38,7 @@ import {
   sendInvitation,
 } from "./organizations";
 import { enqueue, type OutboxJob } from "./outbox";
+import { closedOrg } from "./standing";
 
 const {
   organizationInvitations,
@@ -924,8 +925,9 @@ export async function forgetJoinCodeEmail(db: Executor, job: OutboxJob) {
 
 /**
  * Someone opened an expired email invitation and asks for a new one (public: the token is the proof). The person
- * who invited them is told by email; if they can no longer invite, the org's admins are. Once per invitation. An
- * invitation link has no such request: whoever holds one asks to join instead (ADR 0068).
+ * who invited them is told by email; if they can no longer invite, the org's admins are. Once per invitation, and
+ * never from a workspace closed to its people (suspended or being deleted). An invitation link has no such request:
+ * whoever holds one asks to join instead (ADR 0068).
  */
 export async function requestNewInvitation(db: Database, publicUrl: string, token: string, now = new Date()) {
   const [invitation] = await db
@@ -940,10 +942,10 @@ export async function requestNewInvitation(db: Database, publicUrl: string, toke
   const recipientIds =
     inviter && inviterId && can(inviter.role, "manage_members") ? [inviterId] : await adminIds(db, invitation.orgId);
   const [org] = await db
-    .select({ name: organizations.name })
+    .select({ name: organizations.name, closed: closedOrg })
     .from(organizations)
     .where(eq(organizations.id, invitation.orgId));
-  if (!org || recipientIds.length === 0) return;
+  if (!org || org.closed || recipientIds.length === 0) return;
   const people = await db
     .select({ email: users.email, locale: users.locale })
     .from(users)

@@ -104,6 +104,11 @@ export function createAuth(deps: {
     appName: "agentes.chat",
     baseURL: config.PUBLIC_URL,
     basePath: "/api/auth",
+    // Over HTTP each would tell any session whether a password is right, with none of the limit `deletionProof` keeps:
+    // a stolen session could guess the account's password there, then prove it's them with it. No app calls them,
+    // `deletionProof` calls `verifyPassword` in this process (which this leaves open), and a forgotten password is
+    // reset by email.
+    disabledPaths: ["/verify-password", "/change-password"],
     // Derived from AGENTES_SECRET so self-hosters manage a single secret.
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).

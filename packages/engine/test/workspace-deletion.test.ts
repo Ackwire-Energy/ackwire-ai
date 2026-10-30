@@ -52,11 +52,13 @@ import {
   previewInvitation,
   purgeWorkspace,
   removeMember,
+  requestNewInvitation,
   requireBrowserAccess,
   requireChannelAccess,
   requirePermission,
   restoreWorkspace,
   revokeManagedMachine,
+  routeMessage,
   runErrorDetail,
   scheduleDeletion,
   setBillingHold,
@@ -289,6 +291,28 @@ describe("a workspace being deleted is closed", () => {
     expect(await listMemberships(f.db, bia.id)).toEqual([]);
   });
 
+  test("asking for a new invitation tells nobody there, and the router asks no agent to answer in it", async () => {
+    f = await setup();
+    const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "zoe@example.com", role: "member" });
+    await f.db.update(schema.organizationInvitations).set({ expiresAt: new Date(Date.now() - 1000) });
+    await closing(f.org.id);
+    await requestNewInvitation(f.db, "https://chat.example.com", token);
+    expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"))).toEqual([]);
+
+    const message = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "anyone?",
+    });
+    const strategy = { name: "spy", decide: async () => ({ agents: [] }) };
+    const routed = await routeMessage(
+      { db: f.db, strategy, policy: { minScore: 0.5, maxAgents: 2, maxHops: 3 } },
+      { orgId: f.org.id, messageId: message.id },
+    );
+    expect(routed).toEqual({ runs: [], skipped: "org_deleting" });
+  });
+
   test("work stops at once: a run fails and says why, a routine's slot passes, a job fails for good", async () => {
     f = await setup();
     const routine = await channelRoutine(f);
@@ -348,6 +372,10 @@ describe("a workspace being deleted is closed", () => {
     await onManagedMachineHello({ ...deps, readyEmail }, machine);
     const emails = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"));
     expect(emails).toEqual([]);
+    // Nor ready at all: no agent gets it, and no owner hears of it in the app or on a phone.
+    expect((await f.db.select().from(schema.machineProvisioning)).map((p) => p.state)).toEqual(["waiting"]);
+    expect((await f.db.select({ machineId: schema.agents.machineId }).from(schema.agents))[0]?.machineId).toBeNull();
+    expect(await f.db.select().from(schema.notifications)).toEqual([]);
 
     const heard: Record<string, unknown>[] = [];
     f.pubsub.subscribe(orgTopic(f.org.id), (e) => {
@@ -626,6 +654,24 @@ describe("restoring a workspace", () => {
       params: { orgId: second },
     });
   });
+
+  test("a restore begun before the date that gets the lock after it is refused: the purge may have begun", async () => {
+    f = await setup();
+    await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    await f.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: sql`now() + interval '300 milliseconds'` })
+      .where(eq(schema.organizations.id, f.org.id));
+    // Its transaction begins now, and it waits past the date (for a purge holding the workspace's lock).
+    const waits = {
+      transaction: (run: (tx: unknown) => Promise<unknown>) =>
+        f.db.transaction(async (tx) => {
+          await Bun.sleep(600);
+          return run(tx);
+        }),
+    } as unknown as DeletionDeps["db"];
+    expect(await refused(restoreWorkspace({ db: waits }, f.owner.id, f.org.id))).toBe("org.not_restorable");
+  });
 });
 
 /** A row in each table the purge deletes by hand, all of the fixture's workspace. */
@@ -669,6 +715,8 @@ async function rowsPurgedByHand() {
   });
   await f.db.insert(schema.wikiLinks).values({ orgId, fromType: "message", fromId: message.id, toSlug: "launch" });
   await f.db.insert(schema.contextUsage).values({ orgId, runId: run.id, itemId: crypto.randomUUID() });
+  // A run restarted since (its row deleted) left its memory's use behind.
+  await f.db.insert(schema.contextUsage).values({ orgId, runId: crypto.randomUUID(), itemId: crypto.randomUUID() });
 }
 
 const countOf = async (table: string) =>
@@ -682,7 +730,7 @@ async function githubGrant() {
     if (url.startsWith("https://github.com/login/oauth/access_token")) {
       return Response.json({ access_token: "gho_token_1", token_type: "bearer", scope: "repo" });
     }
-    if (url.includes("/applications/gh-client/grant")) return new Response(null, { status: 204 });
+    if (url.includes("/applications/gh-client/token")) return new Response(null, { status: 204 });
     return new Response("not found", { status: 404 });
   }) as unknown as typeof fetch;
   const deps: ConnectorDeps = {
@@ -744,7 +792,7 @@ describe("the purge", () => {
     expect(await orgRow()).toBeNull();
     expect(await f.db.select().from(schema.channels)).toEqual([]);
     for (const table of PURGED_BY_HAND) expect({ table, rows: await countOf(table) }).toEqual({ table, rows: 0 });
-    expect(github.revoked()).toEqual(["https://api.github.com/applications/gh-client/grant"]);
+    expect(github.revoked()).toEqual(["https://api.github.com/applications/gh-client/token"]);
     expect(await feedOf("organization.deleted")).toMatchObject([
       { orgId: f.org.id, userId: f.owner.id, data: { requestedAt: requestedAt?.toISOString(), via: "owner" } },
     ]);
@@ -839,6 +887,33 @@ describe("the purge", () => {
       { message: "workspace deletion went on with grants not revoked", orgId: f.org.id, ids: [box.id] },
     ]);
   });
+  test("a mailbox another workspace still uses keeps the grant they share; one nobody else uses loses it", async () => {
+    f = await setup();
+    const box = (address: string, externalAccountId: string, orgId = f.org.id) => ({
+      orgId,
+      provider: "gmail",
+      via: "composio",
+      address,
+      status: "active",
+      externalAccountId,
+    });
+    const team = await createOrganization(f.db, f.owner.id, { name: "Team" });
+    await f.db
+      .insert(schema.mailAccounts)
+      .values([
+        box("me@example.com", "ca_1"),
+        box("team@example.com", "ca_2"),
+        box("me@example.com", "ca_3", team.organization.id),
+      ]);
+    const composio = createFakeComposioClient();
+    const mail = { composio: { client: composio.client, connector: createFakeMailConnector().connector }, imap: null };
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(true);
+    expect(composio.state.deletedAccounts.sort()).toEqual(["ca_1", "ca_2"]);
+    expect(composio.state.grantsKept).toEqual(["ca_1"]);
+  });
+
   test("a hold that commits while the purge revokes grants wins: the workspace stays, its grants revoked", async () => {
     f = await setup();
     await f.db.insert(schema.mailAccounts).values({

@@ -323,9 +323,9 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       }
     },
 
-    async deleteConnectedAccount(id) {
-      // Also revokes the grant at Google/Microsoft: the person disconnected it.
-      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=true`, undefined, {
+    async deleteConnectedAccount(id, options) {
+      const revoke = options?.revoke !== false;
+      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=${revoke}`, undefined, {
         allowNotFound: true,
       });
     },

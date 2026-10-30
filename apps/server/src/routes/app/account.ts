@@ -281,7 +281,11 @@ export function accountRoutes(deps: AppDeps) {
             closed: z
               .literal(true)
               .optional()
-              .openapi({ description: "A link turned off, expired, or whose workspace is paused: nobody can ask." }),
+              .openapi({
+                description:
+                  "A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being " +
+                  "deleted: nobody can ask or join.",
+              }),
             you: z
               .object({
                 member: z.boolean(),
@@ -531,9 +535,26 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "Until when this session's own sign-in proves it's them, with no password. Null: sign in again, or give the password.",
             }),
-            closes: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({
-              description: "Workspaces only they are in: they close now and are deleted for good 7 days later.",
-            }),
+            closes: z
+              .array(
+                z.object({
+                  id: z.uuid(),
+                  name: z.string(),
+                  deletion: z
+                    .object({
+                      dueAt: z
+                        .string()
+                        .nullable()
+                        .openapi({ description: "When it goes for good; null once that date passed." }),
+                    })
+                    .optional()
+                    .openapi({ description: "It is being deleted already, and keeps its date." }),
+                }),
+              )
+              .openapi({
+                description:
+                  "Workspaces only they are in: they close now and are deleted for good 7 days later, or on their own date when already being deleted.",
+              }),
             leaves: z
               .array(z.object({ id: z.uuid(), name: z.string(), role: Role }))
               .openapi({ description: "Workspaces with others in them, which they leave." }),
@@ -568,11 +589,16 @@ export function accountRoutes(deps: AppDeps) {
         signInFreshUntil(deps.auth, c.req.raw.headers, user.id),
         pinnedOwner(db),
       ]);
+      const now = Date.now();
       return c.json(
         {
           password,
           freshUntil: iso(freshUntil),
           ...plan,
+          // As `GET /me` says it: no date once it passed.
+          closes: plan.closes.map(({ dueAt, ...org }) =>
+            dueAt ? { ...org, deletion: { dueAt: dueAt.getTime() > now ? dueAt.toISOString() : null } } : org,
+          ),
           serverOwner: owner === user.id,
         },
         200,

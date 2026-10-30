@@ -4,6 +4,7 @@ import {
   ConflictError,
   completeComposioConnect,
   createImapAccount,
+  createOrganization,
   ForbiddenError,
   getAgentMail,
   listAgentScopes,
@@ -236,9 +237,29 @@ test("disconnecting removes the agents' mail grants and Composio's account; othe
 
   await revokeMailAccount(deps, f.owner.id, f.org.id, gmail.accountId);
   expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId]);
+  // Nobody else uses that mailbox: its grant at Google goes too.
+  expect(composio.state.grantsKept).toEqual([]);
   expect((await listAgentScopes(f.db, f.org.id, f.agent.id)).map((g) => g.scope)).toEqual(["context:read"]);
   expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toEqual([]);
   expect(await getAgentMail(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
+});
+
+test("disconnecting a mailbox another workspace also connected leaves their shared grant at Google alone", async () => {
+  m = await mailSetup();
+  const { f, deps, composio } = m;
+  const gmail = await gmailAccount(m);
+  const other = await createOrganization(f.db, f.owner.id, { name: "Other" });
+  await f.db.insert(schema.mailAccounts).values({
+    orgId: other.organization.id,
+    provider: "gmail",
+    via: "composio",
+    address: "team@example.com",
+    status: "active",
+    externalAccountId: "ca_other",
+  });
+  await revokeMailAccount(deps, f.owner.id, f.org.id, gmail.accountId);
+  expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId]);
+  expect(composio.state.grantsKept).toEqual([gmail.connectedAccountId]);
 });
 
 test("agent policies are normalised; sending without asking needs allowed recipients", async () => {

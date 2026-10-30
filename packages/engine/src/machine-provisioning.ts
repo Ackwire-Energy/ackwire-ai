@@ -12,7 +12,7 @@ import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
-import { openOrg, STANDING_COLUMNS, workRefusal } from "./standing";
+import { openOrg, orgStanding, STANDING_COLUMNS, workRefusal } from "./standing";
 
 const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
 
@@ -569,7 +569,8 @@ async function queueReadyEmail(
  * A managed computer said hello (the hub calls this for every machine). The first time since it was issued
  * it becomes the workspace's ready computer: the agents with no computer get it (later reconnects leave
  * whatever people chose since), its members hear it, and its owners are told (and emailed after a long
- * wait, when the server sends email: `readyEmail`).
+ * wait, when the server sends email: `readyEmail`). Not while the workspace is being deleted, which asks for no
+ * computer: one restored gets its computer back, which says hello again.
  */
 export async function onManagedMachineHello(
   deps: { db: Database; pubsub?: PubSub; readyEmail?: ReadyEmailDeps | null },
@@ -577,6 +578,7 @@ export async function onManagedMachineHello(
 ) {
   if (machine.kind !== "managed") return;
   const { orgId } = machine;
+  if ((await orgStanding(deps.db, orgId)).deletionDueAt) return;
   const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
   const ready = {

@@ -89,7 +89,7 @@ describe("GitHub with our OAuth app", () => {
       if (url.startsWith("https://github.com/login/oauth/access_token")) {
         return Response.json({ access_token: "gho_token_1", token_type: "bearer", scope: "repo,read:org,workflow" });
       }
-      if (url.includes("/applications/gh-client/grant")) return new Response(null, { status: 204 });
+      if (url.includes("/applications/gh-client/token")) return new Response(null, { status: 204 });
       return new Response("not found", { status: 404 });
     }) as unknown as typeof fetch;
     const deps: ConnectorDeps = {
@@ -106,7 +106,7 @@ describe("GitHub with our OAuth app", () => {
     const { connection } = await completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" });
     expect(await revokeAtProvider(deps, f.org.id, connection.id)).toBe(true);
     const revoke = calls.find((c) => c.method === "DELETE");
-    expect(revoke?.url).toBe("https://api.github.com/applications/gh-client/grant");
+    expect(revoke?.url).toBe("https://api.github.com/applications/gh-client/token");
     expect(revoke?.auth).toBe(`Basic ${Buffer.from("gh-client:gh-secret").toString("base64")}`);
     expect(JSON.parse(revoke?.body ?? "{}")).toEqual({ access_token: "gho_token_1" });
 

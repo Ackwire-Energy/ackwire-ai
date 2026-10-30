@@ -207,10 +207,10 @@ export async function createOrganization(
   options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
   return db.transaction(async (tx) => {
-    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
-    // Their row, locked: a deletion of the account waits for this workspace, or this finds the account gone (a cached
-    // session cookie outlives it).
+    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan. A
+    // deletion of the account waits for this workspace, or this finds the account gone (a cached session cookie
+    // outlives it).
+    await lockWorkspacesOf(tx, userId);
     const [me] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
     if (!me) throw new UnauthorizedError();
     const theirs = await tx
@@ -731,6 +731,13 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
 export const lockOrgMembers = (tx: Executor, orgId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
 
+/**
+ * The lock on what workspaces a person has: creating one, restoring one and deleting their account take it first, so
+ * each sees the others' commits (a workspace made in another tab closes with the account, or finds it gone).
+ */
+export const lockWorkspacesOf = (tx: Executor, userId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
+
 /** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
 export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
@@ -885,6 +892,8 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
     await import("./workspace-deletion");
   const { plan, closed, released, removed } = await db.transaction(async (tx) => {
+    // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
+    await lockWorkspacesOf(tx, userId);
     const mine = await tx
       .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)
@@ -1212,8 +1221,8 @@ const inviteLogo = (token: string, logo: string | null) => {
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization and its logo,
  * who invited (their name), the role and its first agents. Only for a valid token, which reached the person.
- * A link that was turned off, expired, or whose workspace is paused or being deleted says only that (`closed`),
- * never why.
+ * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
+ * workspace being deleted, say only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -1222,6 +1231,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       orgName: organizations.name,
       orgLogo: organizations.logo,
       open: openOrg,
+      deleting: sql<boolean>`${organizations.deletionDueAt} is not null`,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
@@ -1260,6 +1270,18 @@ export async function previewInvitation(db: Database, token: string, now = new D
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
+  // Nobody joins a workspace being deleted: its name only, and that it's closed, as for a link.
+  if (row.deleting) {
+    return {
+      orgName: row.orgName,
+      email: "",
+      role: "member" as const,
+      kind: "email" as const,
+      invitedBy: null,
+      agents: [],
+      closed: true as const,
+    };
+  }
   return {
     orgName: row.orgName,
     email: row.email,

@@ -460,8 +460,8 @@ export async function applyComposioStateFor(
   if (remote.status === "active" && remote.address) {
     const address = normalizeAddress(remote.address);
     if (!(await assertAddressFree(deps.db, row.orgId, address, row.id))) {
-      // The same mailbox is connected already: this second connection goes away.
-      await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+      // The same mailbox is connected already: this second connection goes away, and the grant they share stays.
+      await composio.client.deleteConnectedAccount(row.externalAccountId, { revoke: false }).catch(() => {});
       await deps.db
         .update(mailAccounts)
         .set({ status: "needs_reconnect", lastError: "already_connected", revokedAt: now, updatedAt: now })
@@ -623,19 +623,41 @@ export async function updateMailAccount(
 }
 
 /**
- * Composio forgets a mailbox: its triggers, then its connected account, which also revokes the grant at Google or
- * Microsoft. A 404 counts as done. Every call is tried, and the first failure is thrown after them.
+ * Composio forgets a mailbox: its triggers, then its connected account, which with `revoke` also revokes the grant at
+ * Google or Microsoft. A 404 counts as done. Every call is tried, and the first failure is thrown after them.
  */
 export async function forgetAtComposio(
   client: Pick<ComposioClient, "deleteTrigger" | "deleteConnectedAccount">,
   externalAccountId: string | null,
   triggerIds: string[],
+  revoke = true,
 ) {
   const failures: unknown[] = [];
   for (const id of triggerIds) await client.deleteTrigger(id).catch((error: unknown) => failures.push(error));
   if (externalAccountId)
-    await client.deleteConnectedAccount(externalAccountId).catch((error: unknown) => failures.push(error));
+    await client.deleteConnectedAccount(externalAccountId, { revoke }).catch((error: unknown) => failures.push(error));
   if (failures.length > 0) throw failures[0];
+}
+
+/**
+ * Whether another connection still in use, in this workspace or another, reaches the same mailbox through Composio:
+ * they share one grant at Google or Microsoft, so forgetting this one must leave that grant alone.
+ */
+export async function composioGrantShared(db: Pick<Database, "select">, box: { id: string; address: string }) {
+  if (!box.address) return false;
+  const [other] = await db
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(
+      and(
+        eq(mailAccounts.via, "composio"),
+        eq(mailAccounts.address, box.address),
+        isNull(mailAccounts.revokedAt),
+        ne(mailAccounts.id, box.id),
+      ),
+    )
+    .limit(1);
+  return Boolean(other);
 }
 
 /**
@@ -649,7 +671,8 @@ export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: 
   const composio = composioOf(deps);
   if (row.via === "composio" && composio) {
     const triggers = watches.flatMap((w) => (w.externalTriggerId ? [w.externalTriggerId] : []));
-    await forgetAtComposio(composio.client, row.externalAccountId, triggers).catch(() => {});
+    const revoke = !(await composioGrantShared(deps.db, row));
+    await forgetAtComposio(composio.client, row.externalAccountId, triggers, revoke).catch(() => {});
   }
   const now = new Date();
   await deps.db.transaction(async (tx) => {

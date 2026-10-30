@@ -111,6 +111,16 @@ describe("proof that it's you", () => {
     expect((await deleteOrg(bia, theirs.orgId, { password: "correct horse battery" })).status).toBe(202);
   });
 
+  test("past the limit, an old session can't try passwords on the sign-in service's own routes either", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    await signedInAnHourAgo((await meOf(owner)).user.id);
+    const right = { password: "correct horse battery" };
+    expect((await owner("/api/auth/verify-password", { json: right })).status).toBe(404);
+    const change = { currentPassword: right.password, newPassword: "another fake password" };
+    expect((await owner("/api/auth/change-password", { json: change })).status).toBe(404);
+  });
+
   test("an account without a password signs in again: its old session can't delete nor add a password, a fresh one can", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
@@ -230,12 +240,18 @@ describe("deleting an account", () => {
     const solo = await workspace(bia, "Solo");
     const team = await workspace(bia, "Team");
     await joinByInvitation(t, bia, team, "owner@example.com", { as: owner });
+    // One being deleted already keeps its own date.
+    const old = await workspace(bia, "Old");
+    const { deletion } = (await (await deleteOrg(bia, old)).json()) as { deletion: { dueAt: string } };
 
     const plan = await (await bia("/api/app/account/deletion")).json();
     expect(plan).toEqual({
       password: true,
       freshUntil: expect.any(String),
-      closes: [{ id: solo, name: "Solo" }],
+      closes: [
+        { id: solo, name: "Solo" },
+        { id: old, name: "Old", deletion },
+      ],
       leaves: [
         { id: orgId, name: "Acme", role: "admin" },
         { id: team, name: "Team", role: "owner" },

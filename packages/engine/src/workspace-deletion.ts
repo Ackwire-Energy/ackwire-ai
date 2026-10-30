@@ -25,12 +25,13 @@ import { forgetInstallationTokens } from "./git/github-app";
 import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
 import type { MachineHub } from "./machine-hub";
 import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
-import { forgetAtComposio } from "./mail/accounts";
+import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
 import { recordOperatorEvent } from "./operator-events";
 import {
   getMembership,
   getOrganization,
   lockOrgMembers,
+  lockWorkspacesOf,
   type MemberRole,
   type Membership,
   queueOrgFilesPurge,
@@ -61,7 +62,6 @@ const {
   usageRecords,
   wikiLinks,
   contextUsage,
-  agentRuns,
   mailAccounts,
   mailWatches,
   connectorConnections,
@@ -76,7 +76,8 @@ const {
  * everyone at once, like a suspended one (`closedRefusal`). Any owner may restore it until its date. At the date the
  * `org.delete` job deletes it for good: its computers' AI sign-ins first, then the grants it holds at Composio and
  * GitHub, then its rows in one transaction. The date is the point of no return, by the database's clock: restoring
- * works only before it and the purge only after it, so neither can undo the other.
+ * works only before it and the purge only after it, each checked under the workspace's `org-members` lock once it has
+ * it, so neither can undo the other.
  */
 
 /** Days a deleted workspace stays closed, and restorable by any owner, before it goes for good. */
@@ -113,8 +114,13 @@ export const keptFromDeletion = (
 ) => refusesNewWorkspace(org) || org.deletionHoldAt !== null;
 /** `keptFromDeletion` in SQL. */
 const keptOrg = sql<boolean>`(${heldOrg} or ${organizations.deletionHoldAt} is not null)`;
-/** Its date passed, by the database's clock. */
-const pastDue = sql<boolean>`${organizations.deletionDueAt} <= now()`;
+/**
+ * Its date passed, by the database's clock when the statement runs: after the lock it waited for, never when its
+ * transaction began. Restoring reads the same clock the same way (`restorable`).
+ */
+const pastDue = sql<boolean>`${organizations.deletionDueAt} <= statement_timestamp()`;
+/** `pastDue`'s other side: a restore is still in time. */
+const restorable = sql<boolean>`${organizations.deletionDueAt} > statement_timestamp()`;
 
 export interface DeletionDeps {
   db: Database;
@@ -277,14 +283,14 @@ export async function afterClosing(deps: DeletionDeps, closed: Closed) {
  */
 export async function restoreWorkspace(deps: DeletionDeps, actorId: string, orgId: string) {
   await deps.db.transaction(async (tx) => {
-    // `createOrganization`'s lock: the plan rule below can't race a new workspace of theirs.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${actorId}`}))`);
+    // The plan rule below can't race a new workspace of theirs.
+    await lockWorkspacesOf(tx, actorId);
     await lockOrgMembers(tx, orgId);
     const [org] = await tx
       .select({
         name: organizations.name,
         standing: STANDING_COLUMNS,
-        restorable: sql<boolean>`${organizations.deletionDueAt} > now()`,
+        restorable,
         role: organizationMembers.role,
       })
       .from(organizations)
@@ -397,10 +403,16 @@ export interface PurgeDeps {
 export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { finalAttempt?: boolean } = {}) {
   const { db } = deps;
   const dueColumns = { ...STANDING_COLUMNS, deletionHoldAt: organizations.deletionHoldAt };
-  const [org] = await db
-    .select(dueColumns)
-    .from(organizations)
-    .where(and(eq(organizations.id, orgId), pastDue));
+  // Under the lock restoring takes: a restore under way commits first and is seen here, and a later one finds its date
+  // passed, so nothing below is ever undone.
+  const [org] = await db.transaction(async (tx) => {
+    await lockOrgMembers(tx, orgId);
+    return tx
+      .select(dueColumns)
+      .from(organizations)
+      .where(and(eq(organizations.id, orgId), pastDue))
+      .for("update");
+  });
   if (!org || keptFromDeletion(org)) return false;
 
   const released = await db.transaction((tx) => releaseOrgAccounts(tx, orgId));
@@ -430,12 +442,9 @@ export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { 
     await tx.delete(threadReflections).where(eq(threadReflections.orgId, orgId));
     await tx.delete(usageRecords).where(eq(usageRecords.orgId, orgId));
     await tx.delete(wikiLinks).where(eq(wikiLinks.orgId, orgId));
-    // No index on its org_id: through the workspace's runs, the first column of its primary key.
-    await tx
-      .delete(contextUsage)
-      .where(
-        inArray(contextUsage.runId, tx.select({ id: agentRuns.id }).from(agentRuns).where(eq(agentRuns.orgId, orgId))),
-      );
+    // By its org_id, not through the runs: a run deleted earlier (a restarted one) leaves its rows behind.
+    // ponytail: no index on context_usage.org_id, one scan per purge; index it if purges get slow.
+    await tx.delete(contextUsage).where(eq(contextUsage.orgId, orgId));
     const via = await requestedVia(tx, orgId);
     await recordOperatorEvent(tx, {
       type: "organization.deleted",
@@ -515,8 +524,9 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
 
 /**
  * Revokes the grants a workspace holds outside: Composio forgets its mailboxes (their triggers, and the accounts, which
- * revokes them at Google or Microsoft) and GitHub its OAuth grants. Each is marked as it goes, so a retry skips it.
- * Returns the ids of the mailboxes and connections that failed; never a token.
+ * revokes them at Google or Microsoft unless another connection still uses the same mailbox) and GitHub its OAuth
+ * tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the mailboxes and connections that failed;
+ * never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const { db } = deps;
@@ -524,7 +534,7 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const composio = deps.mail?.composio;
   if (composio) {
     const boxes = await db
-      .select({ id: mailAccounts.id, externalAccountId: mailAccounts.externalAccountId })
+      .select({ id: mailAccounts.id, address: mailAccounts.address, externalAccountId: mailAccounts.externalAccountId })
       .from(mailAccounts)
       .where(and(eq(mailAccounts.orgId, orgId), eq(mailAccounts.via, "composio")));
     const watches = await db
@@ -535,7 +545,7 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
       const triggers = watches.flatMap((w) => (w.accountId === box.id && w.triggerId ? [w.triggerId] : []));
       if (!box.externalAccountId && triggers.length === 0) continue;
       try {
-        await forgetAtComposio(composio.client, box.externalAccountId, triggers);
+        await forgetAtComposio(composio.client, box.externalAccountId, triggers, !(await composioGrantShared(db, box)));
       } catch {
         left.push(box.id);
         continue;
@@ -657,8 +667,11 @@ export async function workspaceDeletions(db: Executor, orgIds: string[]) {
 
 /** What deleting an account does, workspace by workspace (`accountDeletionPlan`). */
 export interface AccountDeletionPlan {
-  /** Only they are in it: it closes with the account (one being deleted keeps its date) and goes later. */
-  closes: { id: string; name: string }[];
+  /**
+   * Only they are in it: it closes with the account and goes later. One already being deleted keeps its date
+   * (`dueAt`; null for the others, which go `WORKSPACE_DELETION_DAYS` after the account).
+   */
+  closes: { id: string; name: string; dueAt: Date | null }[];
   /** Others are in it: they leave it. */
   leaves: { id: string; name: string; role: MemberRole }[];
   /** They are its only owner, others are in it, and it isn't being deleted: the account can't go yet. */
@@ -704,7 +717,7 @@ export async function accountDeletionPlan(db: Executor, userId: string): Promise
   for (const org of mine) {
     const count = counts.find((c) => c.orgId === org.id);
     if (Number(count?.members ?? 0) <= 1) {
-      plan.closes.push({ id: org.id, name: org.name });
+      plan.closes.push({ id: org.id, name: org.name, dueAt: org.dueAt });
       continue;
     }
     plan.leaves.push({ id: org.id, name: org.name, role: org.role });
