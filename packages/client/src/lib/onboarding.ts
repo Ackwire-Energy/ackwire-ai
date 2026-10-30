@@ -24,6 +24,20 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
 
 /**
+ * Where a resumed onboarding opens: the furthest step the server keeps, or further where the workspace shows the
+ * person got there (an older app could have saved a step behind them). Its agents are made once the import and
+ * agents steps are behind them, and a computer of its own (`ownComputer`) with no plan left to pay for (`unpaid`)
+ * gives its step nothing to wait for.
+ */
+export function resumeAt(
+  saved: OnboardingStepId,
+  workspace: { agents: number; ownComputer: boolean; unpaid: boolean },
+) {
+  const shown = workspace.agents === 0 ? "workspace" : workspace.ownComputer && !workspace.unpaid ? "ai" : "computer";
+  return Math.max(stepIndex(saved), stepIndex(shown));
+}
+
+/**
  * Whether the server's answer to a step just saved (`saveOnboarding`) says the onboarding went further in another
  * window or on another device, or was finished there: the app asks for `me` again and follows it.
  */

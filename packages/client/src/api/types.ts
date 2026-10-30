@@ -3067,6 +3067,13 @@ export interface ImportPlan {
   items: ImportItemResult[];
 }
 
+/** A source package this workspace brought things from, with how many of each kind came. */
+export interface ImportedSource {
+  app: string;
+  ref: string;
+  counts: Record<ImportItemKind, number>;
+}
+
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }

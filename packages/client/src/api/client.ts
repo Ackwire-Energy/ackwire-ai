@@ -80,6 +80,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportInput,
   ImportPlan,
   Instance,
@@ -396,6 +397,8 @@ export interface ApiClient {
   imports: {
     /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** What this workspace brought from other apps, by source package (admins). */
+    sources(orgId: string): Promise<ImportedSource[]>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };

@@ -65,6 +65,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportPlan,
   Instance,
   Invitation,
@@ -477,6 +478,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
+      sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {

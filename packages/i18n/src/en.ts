@@ -556,8 +556,8 @@ export const en: Translations = {
       title: "Which AI will they use?",
       lead: "Sign in with your AI plan: no\u00a0API\u00a0key needed.",
       paid: "Your agentes.chat plan is active. Their computer is on its way.",
-      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0079). */
-      confirming: "Payment received. Starting this workspace's agentes.chat plan.",
+      /** Back from paying, for a minute at most, until the billing service lifts the workspace's hold (ADR 0079). */
+      confirming: "Confirming the payment for this workspace's agentes.chat plan.",
       leadNoComputer: "Your agents think with an API\u00a0key, or with your AI plan on a computer you connect.",
     },
     jev: {

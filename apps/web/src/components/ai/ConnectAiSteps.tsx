@@ -10,7 +10,7 @@ import {
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { lowerFirst, NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
 import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
@@ -281,9 +281,10 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
                 {
                   value: ALL_AGENTS,
                   label: t("connectAi.all"),
-                  description: joinNames(
+                  description: namesText(
+                    t,
                     all.map((a) => a.name),
-                    t("newAgent.and"),
+                    NAMES_SHOWN,
                   ),
                   leading: <AvatarStack>{all.slice(0, 3).map(face)}</AvatarStack>,
                 },
@@ -467,9 +468,10 @@ function PlanSteps({
         <SettingNote icon="check" live>
           {everyone
             ? t("connectAi.doneAll", {
-                names: joinNames(
+                names: namesText(
+                  t,
                   forWhom.map((a) => a.name),
-                  t("newAgent.and"),
+                  NAMES_SHOWN,
                 ),
                 label: account?.label ?? brand,
               })
@@ -486,9 +488,10 @@ function PlanSteps({
         <SettingNote icon="check" live>
           {everyone
             ? t("connectAi.doneAll", {
-                names: joinNames(
+                names: namesText(
+                  t,
                   todo.map((a) => a.name),
-                  t("newAgent.and"),
+                  NAMES_SHOWN,
                 ),
                 label,
               })
@@ -906,9 +909,10 @@ export function WhoThinks({ rows, onKey }: { rows: WhoRow[]; onKey: () => void }
           <Button size="sm" onClick={onKey}>
             <ProviderStack ids={KEY_MARKS.slice(0, 2)} />
             {t("connectAi.who.keyFor", {
-              names: joinNames(
+              names: namesText(
+                t,
                 missing.map((r) => r.name),
-                t("newAgent.and"),
+                NAMES_SHOWN,
               ),
             })}
           </Button>

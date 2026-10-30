@@ -1889,7 +1889,7 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.create")).toHaveLength(1);
   });
 
-  test("a reload opens the step this tab was on, one before the furthest too", async () => {
+  test("a reload never opens behind the furthest step reached, even where this tab had gone back", async () => {
     const { state, api } = await start();
     await toComputer(state);
     await skip();
@@ -1897,8 +1897,8 @@ describe("Onboarding", () => {
     await click(button("Voltar"), 4);
     cleanup();
     await renderApp("/onboarding", { api });
-    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
-    expect(progress()).toBe("Faltam 3 etapas");
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(progress()).toBe("Faltam 2 etapas");
   });
 
   test("a tab left open follows the one that got further, with the team it made; once that one finishes, the workspace opens", async () => {
@@ -1980,7 +1980,8 @@ describe("Onboarding", () => {
     expect(document.body.textContent).toContain("Não foi possível carregar. Confira a conexão e tente de novo.");
     down = false;
     await click(button("Tentar de novo"), 8);
-    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    // Its team made already: past the agents' step, at the computer's.
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(router.state.location.pathname).toBe("/onboarding");
   });
 
@@ -2553,18 +2554,25 @@ describe("Onboarding", () => {
     // Picked, not in yet: a reload comes back to the import step, where the file is read again.
     const saved = () => calls(state, "orgs.saveOnboarding").map((c) => c.args[1]);
     expect(saved()).toEqual([{ step: "import" }, { step: "import" }]);
+    // In with the team: every step after it is saved as it's reached.
     await keepOnly();
     await keyAndCreate(/Criar 2 agentes/);
-    expect(saved().at(-1)).toEqual({ step: "team" });
+    expect(saved()).toEqual(["import", "import", "computer", "ai", "team"].map((step) => ({ step })));
     await next();
     expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
     expect(document.querySelectorAll(".imp-report a")).toHaveLength(0);
 
-    // Opened again: the rail says what the import brought, not that it was skipped.
+    // Opened again: the rail says what the import brought, not that it was skipped, and so does its step.
     cleanup();
     await renderApp("/onboarding", { api });
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Morgan e Scout");
+    await click(railStep(/^Trazer seus agentes/), 6);
+    expect(document.querySelector(".onb__answer .imp-head__title")?.textContent).toBe("Veio do OpenMausBot");
+    expect(document.querySelector(".onb__answer .imp-head__sub")?.textContent).toBe(
+      "2 agentes · 3 skills · 1 canal · 2 rotinas · 2 memórias",
+    );
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
   test("import: an OpenBot GitHub link is read by the backend; a bad link says so; skipping the step drops it", async () => {

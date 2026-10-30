@@ -22,6 +22,7 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
+  ImportedSource,
   ImportItemKind,
   ImportItemResult,
   Instance,
@@ -162,6 +163,8 @@ export interface FakeState {
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
+  /** Each item an applied import brought, as the server keeps them (`imports.sources`). */
+  imported?: { app: string; ref: string; kind: ImportItemKind }[];
   online: Set<string>;
   memories: Memory[];
   proposals: Proposal[];
@@ -1459,7 +1462,26 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         for (const c of bundle.channels) add("channel", c.key, c.name);
         for (const r of bundle.routines) add("routine", r.key, r.name);
         for (const n of bundle.notes) add("note", n.key, n.title || n.content.split("\n")[0]?.slice(0, 80) || n.key);
+        if (!input.dryRun) {
+          state.imported = [
+            ...(state.imported ?? []),
+            ...items.map((i) => ({ app: bundle.source.app, ref: bundle.source.ref, kind: i.kind })),
+          ];
+        }
         return { items };
+      },
+      sources: async (orgId) => {
+        log("imports.sources", orgId);
+        const sources: ImportedSource[] = [];
+        for (const { app, ref, kind } of state.imported ?? []) {
+          let source = sources.find((x) => x.app === app && x.ref === ref);
+          if (!source) {
+            source = { app, ref, counts: { agent: 0, skill: 0, channel: 0, routine: 0, note: 0 } };
+            sources.push(source);
+          }
+          source.counts[kind] += 1;
+        }
+        return sources;
       },
       exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
     },
