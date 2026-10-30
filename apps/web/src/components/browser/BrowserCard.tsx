@@ -932,7 +932,7 @@ export function BrowserCard({
                     {[...steps].reverse().map((s, i) => {
                       const now = i === 0 && s.running;
                       return (
-                        <li key={s.id} className={now ? "is-now" : undefined}>
+                        <li key={s.id} className={now ? "ac-iconline is-now" : "ac-iconline"}>
                           {now ? <PixelSpinner size={14} color={color} /> : <Icon name={iconOf(s.tool)} size={14} />}
                           <span>{stepText(t, s)}</span>
                           {s.since && <small>{formatTime(i18n.language, new Date(s.since).toISOString())}</small>}

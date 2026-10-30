@@ -1488,7 +1488,7 @@
   }
 }
 .brw-ac.brw-mf.is-control {
-  background: linear-gradient(135deg, #3a3a3c, #1c1c1e);
+  background: linear-gradient(135deg, var(--frame-control-a), var(--frame-control-b));
 }
 .brw-mf__top {
   position: relative;
@@ -1498,7 +1498,7 @@
   gap: 8px;
   min-height: 40px;
   padding: 4px 6px 4px 8px;
-  color: #fff;
+  color: var(--frame-ink);
   font-size: 13px;
 }
 .brw-mf__site {
@@ -1526,7 +1526,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #fff;
+  background: var(--site-paper);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .brw-site-icon img {
@@ -1536,7 +1536,7 @@
   object-fit: contain;
 }
 .brw-site-icon--letter {
-  color: #111;
+  color: var(--site-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -1562,7 +1562,7 @@
   text-overflow: ellipsis;
 }
 .brw-mf__now:focus-visible {
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--frame-ink);
 }
 .brw-mf__acts {
   display: flex;
@@ -1640,7 +1640,7 @@
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   gap: 9px;
-  align-items: center;
+  align-items: start;
   padding: 6px 8px;
   border-radius: 9px;
   color: var(--muted);
