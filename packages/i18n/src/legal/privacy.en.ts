@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-10-28",
+  updated: "2026-10-29",
   sections: [
     {
       id: "overview",
@@ -54,16 +54,17 @@ export const privacyEn: LegalDocument = {
       id: "agents",
       heading: "5. How agents process Workspace Content",
       blocks: [
-        "Agents are AI models that read and act inside the workspace. To do that, Workspace Content leaves our servers in the following cases, and only in them:",
+        "Agents are AI models that read and act inside the workspace. Workspace Content leaves our servers in the following cases, and only in them:",
         {
           list: [
+            "**Between devices and our servers.** Everything sent between our servers and the browsers, apps and computers that connect to them, Workspace Content included, passes through Cloudflare, which protects the Service from attacks. To do that, Cloudflare decrypts this traffic at its data center nearest to each device, and handles it on our behalf.",
             "**Answering.** When an agent works, it sends the context it needs (the organization's context, the agent's instructions, the conversation, relevant memory and the results of its tools) to the model provider chosen for that agent. With the platform's key, that provider processes it on our behalf. With a key the organization added, the call is made under the organization's own account and agreement with that provider. With a Claude or ChatGPT plan connected to an agent, the agent runs on the person's connected computer under that person's account and the provider's terms.",
             "**Deciding who replies.** A routing model reads a new message, the names and roles of the organization's agents, and recent conversation to decide which agent, if any, should reply. It runs at TypeSafe or, as a fallback, at the organization's model provider. Routing never grants an agent any permission.",
             "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the organization.",
             "**Search.** To find related messages and documents, text may be turned into vectors (embeddings) by Voyage AI.",
             "**Connectors.** When the organization connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the organization gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes go through Composio.",
             "**Databases.** Database connections are read-only; credentials are stored encrypted and each query is checked before it runs.",
-            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through our servers in memory and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
+            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
             "**Computers we run.** On the computers we run for your workspace, we count how much data each agent's browser, AI tools and other programs send and receive, per day.",
           ],
         },
@@ -111,7 +112,7 @@ export const privacyEn: LegalDocument = {
       id: "transfers",
       heading: "9. International transfers",
       blocks: [
-        "Our application and its database run in the United States, and the providers named in this policy process data in the United States. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
+        "Our application and its database run in the United States, and the providers named in this policy process data in the United States, except Cloudflare, which handles traffic at its data center nearest to each device, in the United States or elsewhere. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
       ],
     },
     {
