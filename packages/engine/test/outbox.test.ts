@@ -13,6 +13,7 @@ import {
   MissingCredentialError,
   PermanentJobError,
   processOutbox,
+  releaseJobs,
   renewLease,
   retryDelayMs,
 } from "../src";
@@ -86,6 +87,56 @@ test("a running job's lease is renewed: a handler that outlives the lease is not
   expect([row?.status, row?.lockedBy, row?.attempts]).toEqual(["done", "a", 1]);
 });
 
+test("a claim is fenced by its attempt too: the same worker's later claim of the job isn't its earlier one's", async () => {
+  await enqueue(db, job());
+  const [early] = await claimJobs(db, { workerId: "w" });
+  // Its lease ran out (no renewal got through while the database was away) and the same worker claimed it again.
+  const [later] = await claimJobs(db, { workerId: "w", now: at(DEFAULT_LEASE_MS + 1000) });
+  expect(later?.id).toBe(early?.id ?? "");
+  const stale = early as NonNullable<typeof early>;
+  expect(await renewLease(db, stale)).toBe(false);
+  expect(await completeJob(db, stale)).toBe(false);
+  await failJob(db, stale, new Error("late"), { retryable: true });
+  await failJob(db, stale, Object.assign(new Error("stopping"), { handback: true }), { retryable: true });
+  expect((await rows())[0]).toMatchObject({ status: "processing", lockedBy: "w", attempts: 2, lastError: null });
+  expect(await completeJob(db, later as NonNullable<typeof later>)).toBe(true);
+});
+
+test("a handler's `owned` is about its own claim, not its worker's", async () => {
+  await enqueue(db, job("k"));
+  const owned: { first?: boolean; second?: boolean } = {};
+  const goOn = Promise.withResolvers<void>();
+  const answered = Promise.withResolvers<void>();
+  const first = processOutbox(
+    db,
+    {
+      k: async (_job, ctx) => {
+        await goOn.promise;
+        owned.first = await ctx.owned?.();
+        answered.resolve();
+      },
+    },
+    { workerId: "w" },
+  );
+  while ((await rows())[0]?.status !== "processing") await Bun.sleep(5);
+  // Its lease runs out and the same worker claims the job again while the first handler still runs.
+  await db.update(schema.outbox).set({ lockedUntil: at(-1000) });
+  await processOutbox(
+    db,
+    {
+      k: async (_job, ctx) => {
+        owned.second = await ctx.owned?.();
+        goOn.resolve();
+        await answered.promise;
+      },
+    },
+    { workerId: "w" },
+  );
+  await first;
+  expect(owned).toEqual({ first: false, second: true });
+  expect((await rows())[0]).toMatchObject({ status: "done", attempts: 2 });
+});
+
 test("renewLease does not extend a job another worker took over", async () => {
   await enqueue(db, job());
   const [a] = await claimJobs(db, { workerId: "a" });
@@ -116,6 +167,73 @@ test("failures retry with backoff, then fail after max attempts", async () => {
   expect(await failJob(db, second as NonNullable<typeof second>, new Error("e2"), { retryable: true })).toBe("failed");
   [row] = await rows();
   expect([row?.status, row?.lastError]).toEqual(["failed", "e2"]);
+});
+
+test("a handback (its worker is shutting down) is due again at once and spends no attempt", async () => {
+  await enqueue(db, job("run"));
+  const outcomes: string[] = [];
+  await processOutbox(
+    db,
+    {
+      run: async () => {
+        throw Object.assign(new Error("stopped by a shutdown"), { handback: true });
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  expect(outcomes).toEqual(["retry"]);
+  expect((await rows())[0]).toMatchObject({
+    status: "pending",
+    attempts: 0,
+    lockedBy: null,
+    lastError: "stopped by a shutdown",
+  });
+  expect(await claimJobs(db, { workerId: "next" })).toHaveLength(1);
+});
+
+test("a stopping worker hands its running jobs back: due at once for the next one, the attempt not spent", async () => {
+  await enqueue(db, job("a"));
+  await enqueue(db, job("b"));
+  expect(await claimJobs(db, { workerId: "stopping" })).toHaveLength(2);
+  await enqueue(db, job("c"));
+  expect(await claimJobs(db, { workerId: "other" })).toHaveLength(1);
+
+  expect(await releaseJobs(db, "stopping")).toBe(2);
+  const next = await claimJobs(db, { workerId: "next" });
+  expect(next.map((j) => [j.kind, j.attempts]).sort()).toEqual([
+    ["a", 1],
+    ["b", 1],
+  ]);
+  // Another worker's job stays with it.
+  expect((await rows()).find((r) => r.kind === "c")).toMatchObject({ status: "processing", lockedBy: "other" });
+});
+
+test("a job whose failure can't be recorded (the database went away) doesn't reject the pump", async () => {
+  await enqueue(db, job("flaky"));
+  const update = db.update;
+  const outcomes: string[] = [];
+  const pump = createOutboxPump(
+    db,
+    {
+      flaky: async () => {
+        // The database goes away mid-job: recording the failure fails too.
+        db.update = (() => {
+          throw new Error("connection refused");
+        }) as unknown as typeof db.update;
+        throw new Error("connection refused");
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  try {
+    expect(await pump.pump()).toBe(1);
+    await pump.idle();
+  } finally {
+    db.update = update;
+  }
+  expect(outcomes).toEqual(["retry"]);
+  // Still leased to the worker: it comes back when the lease ends.
+  expect((await rows())[0]).toMatchObject({ status: "processing", lockedBy: "w" });
 });
 
 test("a lease that expires after the final attempt marks the job failed", async () => {

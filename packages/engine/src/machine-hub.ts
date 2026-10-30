@@ -50,6 +50,7 @@ import {
   authenticateMachine,
   getMachineById,
   MACHINE_CONTROL_TOPIC,
+  MachineDroppedError,
   MachineOfflineError,
   machineAgents,
   machineOnline,
@@ -61,7 +62,7 @@ import {
 import { enqueue } from "./outbox";
 import { assertCanWork, standingRefusal } from "./standing";
 
-const { machines, machineRpc } = schema;
+const { machines, machineRpc, machineMcpCalls } = schema;
 
 /**
  * The live side of connected computers (ADR 0025): one WebSocket per machine,
@@ -191,8 +192,10 @@ export interface MachineHubDeps {
   helloTimeoutMs?: number;
   /** Cross-replica callers read the `machine_rpc` row this often (the signal usually comes first). */
   rpcPollMs?: number;
-  /** A machine offline this long has its running tasks interrupted (default 60 s). */
+  /** A machine offline this long has its running tasks interrupted (default `TASK_OFFLINE_GRACE_MS`). */
   taskOfflineGraceMs?: number;
+  /** A repeated `mcp.call` whose first run is in another process waits this long for its answer (default 30 s). */
+  mcpRepeatWaitMs?: number;
   /** A brain turn with no frame of its own (event, tool call) for this long fails (default `BRAIN_IDLE_TIMEOUT_MS`). */
   brainIdleMs?: number;
   /** A cross-replica caller checks this often that the replica it asked still holds the socket (default 5 s). */
@@ -270,12 +273,29 @@ const pauseOf = (p: RunnerPause | undefined): { until: string | null } | null =>
 /** `machine_rpc` rows older than this are deleted (opportunistically). */
 export const MACHINE_RPC_KEEP_MS = 60 * 60_000;
 
+/**
+ * An `mcp.call`'s answer is kept this long by its `callId` (`machine_mcp_calls`): the runner sends a call
+ * cut by a reconnect again within its own timeout (6 minutes), and the copy gets the first answer.
+ */
+export const MCP_CALL_KEEP_MS = 10 * 60_000;
+
+/**
+ * A repeated call whose first run is in another process waits this long for its answer: a replica that stops
+ * writes it before it closes (`drain`), one that crashed never does. Well inside the bridge's own 6 minutes.
+ */
+const MCP_REPEAT_WAIT_MS = 30_000;
+
+const MCP_CUT_OFF =
+  "This call was cut off before it finished (the server restarted or lost the connection): it may have run in part. Check before doing it again.";
+
+type McpOutcome = { ok: true; text: string } | { ok: false; error: { code: string; message: string } };
+
+/** After our own server stops, a computer still away this long has its running tasks interrupted. */
+export const SERVER_STOP_TASK_GRACE_MS = 10 * 60_000;
+
 /** What missions plug into the hub (ADR 0029): the `agentes` MCP calls of their tasks, and a machine coming back. */
 export interface MachineMissionHooks {
-  mcp?(
-    machineId: string,
-    frame: Extract<RunnerFrame, { type: "mcp.call" }>,
-  ): Promise<{ ok: true; text: string } | { ok: false; error: { code: string; message: string } }>;
+  mcp?(machineId: string, frame: Extract<RunnerFrame, { type: "mcp.call" }>): Promise<McpOutcome>;
   /** `mcp.list` (protocol 8, ADR 0032): the tools of the token's run or task. */
   mcpList?(
     machineId: string,
@@ -306,13 +326,18 @@ export function createMachineHub(deps: MachineHubDeps) {
   const helloTimeoutMs = deps.helloTimeoutMs ?? HELLO_TIMEOUT_MS;
   const rpcPollMs = deps.rpcPollMs ?? 500;
   const taskOfflineGraceMs = deps.taskOfflineGraceMs ?? TASK_OFFLINE_GRACE_MS;
+  const mcpRepeatWaitMs = deps.mcpRepeatWaitMs ?? MCP_REPEAT_WAIT_MS;
   const brainIdleMs = deps.brainIdleMs ?? BRAIN_IDLE_TIMEOUT_MS;
   const rpcLivenessMs = deps.rpcLivenessMs ?? 5000;
   /** Sockets on this replica, by machine id. */
   const local = new Map<string, MachineConnection>();
   /** Cross-replica requests this replica is running, to cancel them. */
   const running = new Map<string, AbortController>();
+  /** `mcp.call`s this process answers, by machine and `callId`: a copy sent here waits on the same answer. */
+  const mcpCalls = new Map<string, Promise<McpOutcome>>();
   let lastCleanup = 0;
+  /** `stop()` ran: every socket closing from now on is our own stop, not the computer's drop. */
+  let stopping = false;
   const subscriptions: Unsubscribe[] = [];
   let hooks: MachineMissionHooks = {};
   let browserHooks: MachineBrowserHooks = {};
@@ -338,22 +363,29 @@ export function createMachineHub(deps: MachineHubDeps) {
     } catch {}
   };
 
-  const markOffline = async (machineId: string, orgId: string | null) => {
+  const markOffline = async (conn: MachineConnection, serverStop: boolean) => {
+    const machineId = conn.machineId as string;
     const [row] = await db
       .update(machines)
-      .set({ online: false, connectedReplica: null, updatedAt: new Date() })
+      // Its last sign of life is its last pong (`last_seen_at` is written at most every 40 s while it is up).
+      .set({ online: false, connectedReplica: null, lastSeenAt: new Date(conn.lastPong), updatedAt: new Date() })
       .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
       .returning({ orgId: machines.orgId });
     if (!row) return false;
-    await publishMachineStatus(pubsub, row.orgId ?? orgId, machineId, false);
+    await publishMachineStatus(pubsub, row.orgId ?? conn.orgId, machineId, false);
     // Its running tasks become interrupted if it isn't back after the grace (any replica's worker runs it).
-    await enqueue(db, {
-      orgId: row.orgId,
-      kind: "machine.tasks_offline",
-      payload: { machineId },
-      dedupeKey: `machine.tasks_offline:${machineId}:${Date.now()}`,
-      runAt: new Date(Date.now() + taskOfflineGraceMs),
-    }).catch(() => undefined);
+    // Our own stop: the runner dials the next server by itself and its tasks run on meanwhile, so only one
+    // still away after a long backstop has them interrupted; it shows as an outage after the usual grace.
+    const later = (ms: number, statusOnly: boolean) =>
+      enqueue(db, {
+        orgId: row.orgId,
+        kind: "machine.tasks_offline",
+        payload: statusOnly ? { machineId, statusOnly } : { machineId },
+        dedupeKey: `machine.tasks_offline:${machineId}:${statusOnly ? "status:" : ""}${Date.now()}`,
+        runAt: new Date(Date.now() + ms),
+      }).catch(() => undefined);
+    if (serverStop) await later(taskOfflineGraceMs, true);
+    await later(serverStop ? SERVER_STOP_TASK_GRACE_MS : taskOfflineGraceMs, false);
     return true;
   };
 
@@ -390,7 +422,23 @@ export function createMachineHub(deps: MachineHubDeps) {
     send(conn, { type: "task.ack", taskId: frame.taskId });
   }
 
+  /**
+   * A hello that fails on our side (the database away a moment) closes the socket without a refusal: a
+   * `refused` frame would stop the runner for good, a plain close makes it dial again.
+   */
   async function hello(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "hello" }>) {
+    try {
+      await accept(conn, frame);
+    } catch (error) {
+      deps.log?.warn("runner hello failed", { machineId: conn.machineId, error: String(error) });
+      try {
+        conn.socket.close(1011, "server error");
+      } catch {}
+      await closeConn(conn).catch(() => undefined);
+    }
+  }
+
+  async function accept(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "hello" }>) {
     if (conn.machineId || conn.authing) return;
     conn.authing = true;
     if (frame.protocol < MIN_RUNNER_PROTOCOL) {
@@ -489,7 +537,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
-    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
+    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs, mcpOnce: true });
     // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
     const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
     await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
@@ -499,7 +547,10 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
     if (frame.protocol >= BROWSER_PROTOCOL) browserHooks.connected?.(machine.id);
     conn.pingTimer = setInterval(() => {
-      if (Date.now() - conn.lastPong > 3 * heartbeatMs) {
+      // The runner redials after two heartbeats without a ping. Checked once a heartbeat, a pong older than
+      // one and a half heartbeats means the ping sent a heartbeat ago went unanswered: both ends give up on
+      // the link at about the same time, so this side stops sending work into it.
+      if (Date.now() - conn.lastPong > 1.5 * heartbeatMs) {
         try {
           conn.socket.close(MACHINE_CLOSE.timeout, "no pong");
         } catch {}
@@ -598,7 +649,7 @@ export function createMachineHub(deps: MachineHubDeps) {
   /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
   function mcpCall(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.call" }>) {
     const machineId = conn.machineId as string;
-    const run = async () =>
+    const run = async (): Promise<McpOutcome> =>
       (await refused(conn)) ??
       (hooks.mcp
         ? hooks.mcp(machineId, frame)
@@ -606,7 +657,7 @@ export function createMachineHub(deps: MachineHubDeps) {
             ok: false as const,
             error: { code: "mission.unavailable", message: "Missions are not available on this server." },
           });
-    void run()
+    void mcpOnce(conn, frame.callId, run)
       .catch((error: unknown) => ({
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
@@ -615,10 +666,58 @@ export function createMachineHub(deps: MachineHubDeps) {
         send(
           conn,
           out.ok
-            ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text.slice(0, 50_000) }
+            ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text }
             : { type: "mcp.result", callId: frame.callId, ok: false, error: out.error },
         ),
       );
+  }
+
+  /**
+   * One run per `callId` (`machine_mcp_calls`): the runner sends a call cut by a reconnect again under the
+   * same id, and that copy gets the first run's answer. Run here: the copy waits on it. Run by another
+   * process: the copy waits a short while for its answer to land, then hears it was cut off.
+   */
+  function mcpOnce(conn: MachineConnection, callId: string, run: () => Promise<McpOutcome>): Promise<McpOutcome> {
+    const id = `${conn.machineId}:${callId}`;
+    const here = mcpCalls.get(id);
+    if (here) return here;
+    const out = answerOnce(conn, callId, run).finally(() => mcpCalls.delete(id));
+    mcpCalls.set(id, out);
+    return out;
+  }
+
+  async function answerOnce(
+    conn: MachineConnection,
+    callId: string,
+    run: () => Promise<McpOutcome>,
+  ): Promise<McpOutcome> {
+    void pruneRows();
+    const machineId = conn.machineId as string;
+    const key = and(eq(machineMcpCalls.machineId, machineId), eq(machineMcpCalls.callId, callId));
+    const [first] = await db
+      .insert(machineMcpCalls)
+      .values({ orgId: conn.orgId as string, machineId, callId })
+      .onConflictDoNothing()
+      .returning({ callId: machineMcpCalls.callId });
+    if (first) {
+      const out: McpOutcome = await run().catch((error: unknown) => ({
+        ok: false as const,
+        error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
+      }));
+      const kept = out.ok ? { ok: true as const, text: out.text.slice(0, 50_000) } : out;
+      await db
+        .update(machineMcpCalls)
+        .set({ result: kept })
+        .where(key)
+        .catch(() => undefined);
+      return kept;
+    }
+    for (const until = Date.now() + mcpRepeatWaitMs; ; ) {
+      const [row] = await db.select({ result: machineMcpCalls.result }).from(machineMcpCalls).where(key);
+      if (row?.result) return row.result as McpOutcome;
+      if (!row || Date.now() >= until) return { ok: false, error: { code: "bridge.cut_off", message: MCP_CUT_OFF } };
+      await Bun.sleep(rpcPollMs);
+    }
   }
 
   /** `mcp.list` (protocol 8): answered with `mcp.tools`; never blocks other frames. */
@@ -730,7 +829,10 @@ export function createMachineHub(deps: MachineHubDeps) {
         settle(frame) {
           cleanup();
           if (frame.ok) resolve(frame.data as MachineReplies[Op]);
-          else reject(new MachineRequestError(frame.error.code, frame.error.message));
+          // The agent's process there went away mid-request (its worker stopped, the runner is stopping).
+          else if (frame.error.code === "dropped") {
+            reject(new MachineDroppedError(conn.name, { message: frame.error.message }));
+          } else reject(new MachineRequestError(frame.error.code, frame.error.message));
         },
         fail(error) {
           cleanup();
@@ -746,21 +848,25 @@ export function createMachineHub(deps: MachineHubDeps) {
     for (const p of conn.pending.values()) if (p.brain && match(p.brain)) p.touch?.();
   }
 
-  async function cleanupRpc() {
+  async function pruneRows() {
     if (Date.now() - lastCleanup < 10 * 60_000) return;
     lastCleanup = Date.now();
     await db
       .delete(machineRpc)
       .where(lt(machineRpc.createdAt, new Date(Date.now() - MACHINE_RPC_KEEP_MS)))
       .catch(() => undefined);
+    await db
+      .delete(machineMcpCalls)
+      .where(lt(machineMcpCalls.createdAt, new Date(Date.now() - MCP_CALL_KEEP_MS)))
+      .catch(() => undefined);
   }
 
   async function callRemote<Op extends MachineOp>(
-    machine: { id: string; orgId: string; name: string; connectedReplica: string },
+    machine: { id: string; orgId: string; name: string; kind?: string; connectedReplica: string },
     request: Extract<MachineRequest, { op: Op }>,
     options: MachineCallOptions = {},
   ): Promise<MachineReplies[Op]> {
-    void cleanupRpc();
+    void pruneRows();
     const [rpc] = await db
       .insert(machineRpc)
       .values({ orgId: machine.orgId, machineId: machine.id, request: request as unknown as Record<string, unknown> })
@@ -787,7 +893,13 @@ export function createMachineHub(deps: MachineHubDeps) {
           const reply = row.reply as RpcReply | null;
           if (reply?.ok) return reply.data as MachineReplies[Op];
           const error = reply && !reply.ok ? reply.error : { code: "internal", message: "no reply" };
-          if (error.code === "offline") throw new MachineOfflineError(machine.name);
+          if (error.code === "offline") throw new MachineOfflineError(machine.name, machine.kind);
+          if (error.code === "dropped" || error.code === "server_stop") {
+            throw new MachineDroppedError(machine.name, {
+              serverStop: error.code === "server_stop",
+              message: error.message,
+            });
+          }
           throw new MachineRequestError(error.code as MachineErrorCode, error.message);
         }
         // The replica asked no longer holds the socket (the runner came back elsewhere, or that replica
@@ -807,7 +919,10 @@ export function createMachineHub(deps: MachineHubDeps) {
             // No row: the answer landed meanwhile (read on the next pass).
             if (gone) {
               onAbort();
-              throw new MachineOfflineError(machine.name);
+              // Already being served there when that replica went: it may have run.
+              throw row?.status === "running"
+                ? new MachineDroppedError(machine.name)
+                : new MachineOfflineError(machine.name, machine.kind);
             }
             continue;
           }
@@ -854,16 +969,17 @@ export function createMachineHub(deps: MachineHubDeps) {
         const data = await callLocal(conn, request, { signal: controller.signal });
         reply = { ok: true, data };
       } catch (error) {
-        reply =
-          error instanceof MachineOfflineError
-            ? { ok: false, error: { code: "offline", message: error.message } }
-            : {
-                ok: false,
-                error: {
-                  code: error instanceof MachineRequestError ? error.code : "internal",
-                  message: error instanceof Error ? error.message : String(error),
-                },
-              };
+        const code =
+          error instanceof MachineDroppedError
+            ? error.serverStop
+              ? "server_stop"
+              : "dropped"
+            : error instanceof MachineOfflineError
+              ? "offline"
+              : error instanceof MachineRequestError
+                ? error.code
+                : "internal";
+        reply = { ok: false, error: { code, message: error instanceof Error ? error.message : String(error) } };
       } finally {
         running.delete(rpcId);
       }
@@ -884,12 +1000,16 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.closed = true;
     if (conn.helloTimer) clearTimeout(conn.helloTimer);
     if (conn.pingTimer) clearInterval(conn.pingTimer);
-    for (const p of [...conn.pending.values()]) p.fail(new MachineOfflineError(conn.name || "computer"));
+    // Sent and not answered: the runner aborts what still runs, but it may already have had effects.
+    // `serverStop`: this server is stopping (a restart), not the computer or its network.
+    const serverStop = stopping;
+    for (const p of [...conn.pending.values()])
+      p.fail(new MachineDroppedError(conn.name || "computer", { serverStop }));
     conn.pending.clear();
     if (conn.machineId && local.get(conn.machineId) === conn) {
       local.delete(conn.machineId);
       browserHooks.closed?.(conn.machineId);
-      await markOffline(conn.machineId, conn.orgId).catch(() => undefined);
+      await markOffline(conn, serverStop).catch(() => undefined);
     }
   }
 
@@ -1080,9 +1200,9 @@ export function createMachineHub(deps: MachineHubDeps) {
         return callLocal(conn, await withAgentName(conn.orgId, request), options);
       }
       const row = await getMachineById(db, machineId);
-      if (!row || row.deletedAt) throw new MachineOfflineError(row?.name ?? "computer");
+      if (!row || row.deletedAt) throw new MachineOfflineError(row?.name ?? "computer", row?.kind);
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
-        throw new MachineOfflineError(row.name);
+        throw new MachineOfflineError(row.name, row.kind);
       }
       if (isNewWork(request)) {
         await assertCanWork(db, row.orgId, request.agent?.id);
@@ -1137,16 +1257,36 @@ export function createMachineHub(deps: MachineHubDeps) {
       return true;
     },
 
-    /** Stops listening and closes every socket (shutdown, tests). */
+    /** Stops listening and closes every socket (shutdown, tests): drops of our own, not the computers'. */
     async stop() {
+      stopping = true;
       for (const off of subscriptions) off();
       subscriptions.length = 0;
       for (const conn of [...local.values()]) {
+        // Started before the socket's own close can run it: awaited here, its offline row and jobs are written
+        // before the database closes.
+        const closed = closeConn(conn);
         try {
           conn.socket.close(1001, "server stopping");
         } catch {}
-        await closeConn(conn);
+        await closed;
       }
+    },
+
+    /**
+     * After `stop()`: waits (at most `ms`) for the `mcp.call`s still running here, so their answers are stored
+     * before the database closes and the runner's copy on the next server gets them instead of a cut-off.
+     */
+    async drain(ms: number) {
+      if (mcpCalls.size === 0) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        Promise.allSettled([...mcpCalls.values()]),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ms);
+        }),
+      ]);
+      clearTimeout(timer);
     },
   };
   return hub;

@@ -3,6 +3,7 @@ import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink, codexVersion
 import { computerPrompt } from "../src/brains/prompt";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
 import { MachineRequestError } from "../src/machine-hub";
+import { MachineDroppedError } from "../src/machines";
 
 const SESSION = "0193aaaa-0000-7000-8000-00000000c0de";
 
@@ -150,6 +151,14 @@ test("the turn always ends once: a runner failure is an error, a silent end is d
     const refused = await collect(brain(link({ fail: refusal })).run(turn(), io()));
     expect(refused).toMatchObject([{ type: "error", code: "busy", retryable: true }]);
   }
+  // Cut by the link dropping (or the agent's worker stopping) waits for the computer; our own stop says so.
+  const dropped = await collect(brain(link({ fail: new MachineDroppedError("mac") })).run(turn(), io()));
+  expect(dropped).toEqual([expect.objectContaining({ type: "error", code: "machine_offline", retryable: true })]);
+  expect("serverStop" in (dropped[0] ?? {})).toBe(false);
+  const ours = await collect(
+    brain(link({ fail: new MachineDroppedError("mac", { serverStop: true }) })).run(turn(), io()),
+  );
+  expect(ours).toMatchObject([{ type: "error", code: "machine_offline", serverStop: true }]);
   const silent = await collect(brain(link({ events: [{ type: "text_delta", text: "Hi" }] })).run(turn(), io()));
   expect(silent.at(-1)).toEqual({ type: "done", text: "Hi", session: { id: SESSION } });
   const errored = await collect(

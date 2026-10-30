@@ -1,5 +1,5 @@
 {
-  "id": "e46520c1-32bd-41ee-8b71-1f7e675c60c7",
+  "id": "2e5afcfb-49f7-4f7d-831b-2f20f38d4260",
   "prevId": "4e7da38f-e81c-43ab-8060-26b57e137b3e",
   "version": "7",
   "dialect": "postgresql",
@@ -5945,6 +5945,101 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.machine_mcp_calls": {
+      "name": "machine_mcp_calls",
+      "schema": "",
+      "columns": {
+        "machine_id": {
+          "name": "machine_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "machine_mcp_calls_created_at_index": {
+          "name": "machine_mcp_calls_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "machine_mcp_calls_machine_id_machines_id_fk": {
+          "name": "machine_mcp_calls_machine_id_machines_id_fk",
+          "tableFrom": "machine_mcp_calls",
+          "tableTo": "machines",
+          "columnsFrom": [
+            "machine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "machine_mcp_calls_org_id_organizations_id_fk": {
+          "name": "machine_mcp_calls_org_id_organizations_id_fk",
+          "tableFrom": "machine_mcp_calls",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "machine_mcp_calls_machine_id_call_id_pk": {
+          "name": "machine_mcp_calls_machine_id_call_id_pk",
+          "columns": [
+            "machine_id",
+            "call_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -14991,48 +15086,6 @@
         "standing_changed_at": {
           "name": "standing_changed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_members": {
-          "name": "limit_members",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_storage_bytes": {
-          "name": "limit_storage_bytes",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_upload_bytes_per_day": {
-          "name": "limit_upload_bytes_per_day",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_platform_nano_usd": {
-          "name": "limit_platform_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limits_updated_at": {
-          "name": "limits_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_month": {
-          "name": "platform_alert_month",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_percent": {
-          "name": "platform_alert_percent",
-          "type": "smallint",
           "primaryKey": false,
           "notNull": false
         },

@@ -14,7 +14,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   const m = meta ?? {};
   const interrupted = m.interrupted as { text?: unknown } | undefined;
   if (interrupted && typeof interrupted === "object" && typeof interrupted.text === "string") {
-    const note = `_${t("chat.body.interrupted", { defaultValue: "Interrupted by a server update. Ask again to continue." })}_`;
+    const note = `_${t("chat.body.interrupted", { defaultValue: "Interrupted by a server restart. Ask again to continue." })}_`;
     return interrupted.text ? `${interrupted.text}\n\n${note}` : note;
   }
   // A computer brain stopped mid-turn after its tools ran: what it wrote, then which tools it used.

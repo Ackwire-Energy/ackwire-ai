@@ -60,6 +60,7 @@ import {
   useThreadMessages,
   useThreadMission,
   useUpdateChannel,
+  useWaiting,
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
@@ -155,7 +156,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox";
+import { browserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
@@ -638,8 +639,6 @@ function ChannelView({
 
   const toast = useToast();
   const qc = useQueryClient();
-  // Failed copies already looked at (so a server refusal is never queued later as "offline").
-  const seenFailed = useRef(new Set<string>());
   const post = usePostMessage(org.id, channel.id, {
     me: { id: me.user.id },
     mentioned,
@@ -665,48 +664,15 @@ function ChannelView({
       const fresh = agents.filter((id) => !atWork(id));
       if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
     },
-    onSent: (message, local) => {
-      if (local.clientId) outbox.remove(local.clientId);
-      live.retarget(local.id, message.id);
-    },
-    // A thread archived meanwhile (`thread.archived`): say so in the person's language.
+    onSent: (message, local) => live.retarget(local.id, message.id),
+    // A thread archived meanwhile (`thread.archived`): say so in the person's language. Without a connection
+    // (or with the server restarting) it waits instead, "sai quando a conexão voltar" (`useSendWaiting`).
     onFailed: (error) => {
       if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
-      // No connection: the message waits ("sai quando a internet voltar") and goes out when it is back.
-      // The copy turns "failed" right after this callback; pick it up then.
-      const offline = failedOffline(error);
-      queueMicrotask(() => {
-        for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
-          if (m.local !== "failed" || !m.clientId || seenFailed.current.has(m.clientId)) continue;
-          seenFailed.current.add(m.clientId);
-          if (offline) outbox.add(m.clientId);
-        }
-      });
     },
   });
   const { send, retry } = sendHelpers(post);
-  // Back online (the socket reopened, or the browser says so): what waited goes out, in order.
   const status = useConnectionStatus();
-  const flushOutbox = useRef(() => {});
-  flushOutbox.current = () => {
-    if (browserOffline()) return;
-    for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
-      if (m.local !== "failed" || !outbox.has(m.clientId ?? undefined)) continue;
-      if (m.clientId) {
-        outbox.remove(m.clientId);
-        seenFailed.current.delete(m.clientId);
-      }
-      retry(m);
-    }
-  };
-  useEffect(() => {
-    if (status === "open") flushOutbox.current();
-  }, [status]);
-  useEffect(() => {
-    const online = () => flushOutbox.current();
-    window.addEventListener("online", online);
-    return () => window.removeEventListener("online", online);
-  }, []);
 
   const api = useApi();
   // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once.
@@ -2533,7 +2499,7 @@ function useAfter(ms: number, on: boolean) {
 }
 
 /**
- * Above the composer when the connection drops: "Sem internet. O que você mandar sai sozinho quando
+ * Above the composer when the connection drops: "Sem conexão. O que você mandar sai sozinho quando
  * voltar." (what is sent meanwhile waits and goes out on its own), then "Conectado de novo" for 1.6 s.
  * A socket that only reconnects for a moment says nothing.
  */
@@ -2812,7 +2778,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   // stays put when a tool call turns it into narration (and the answer, with no tools, starts there too).
   const wordsOnTop = !opening.said && opening.work.length === 0;
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
-  const queued = useQueued(m.local === "failed" ? (m.clientId ?? undefined) : undefined);
+  const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
   const slowSend = useAfter(500, local === "pending");
   // The streamed row it replaces was already on screen: take its place without sliding in again.

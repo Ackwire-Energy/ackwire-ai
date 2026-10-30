@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu workspace e os seus direitos.",
-  updated: "2026-10-28",
+  updated: "2026-10-29",
   sections: [
     {
       id: "overview",
@@ -55,16 +55,17 @@ export const privacyPtBR: LegalDocument = {
       id: "agents",
       heading: "5. Como os agentes tratam o Conteúdo do Workspace",
       blocks: [
-        "Agentes são modelos de IA que leem e agem dentro do workspace. Para isso, o Conteúdo do Workspace sai dos nossos servidores nos casos abaixo, e só neles:",
+        "Agentes são modelos de IA que leem e agem dentro do workspace. O Conteúdo do Workspace sai dos nossos servidores nos casos abaixo, e só neles:",
         {
           list: [
+            "**Entre os aparelhos e os nossos servidores.** Tudo o que trafega entre os nossos servidores e os navegadores, apps e computadores que se conectam a eles, inclusive o Conteúdo do Workspace, passa pela Cloudflare, que protege o Serviço contra ataques. Para isso, a Cloudflare decifra esse tráfego no data center dela mais próximo de cada aparelho, e o trata em nosso nome.",
             "**Para responder.** Quando um agente trabalha, ele envia o contexto de que precisa (o contexto do workspace, as instruções do agente, a conversa, a memória relevante e os resultados das ferramentas) ao provedor de modelo escolhido para esse agente. Com uma chave de API que o workspace adicionou, a chamada é feita na conta do próprio workspace e sob o contrato dele com esse provedor. Com um plano de IA, como o do Claude ou o do ChatGPT, conectado a um agente, o agente trabalha na conta da pessoa que conectou o plano e sob os termos do provedor.",
             "**Para decidir quem responde.** Um modelo de roteamento lê a mensagem nova, os nomes e papéis dos agentes do workspace e a conversa recente para decidir qual agente deve responder, se algum. Ele roda na TypeSafe ou, como alternativa, no provedor de modelo do workspace. O roteamento nunca dá permissão nenhuma a um agente.",
             "**Memória.** Os agentes guardam memória das conversas (resumos, fatos e lições) para melhorar com o tempo. Algumas avaliações sobre a memória (se algo vale ser guardado, ou se contradiz o que o agente já sabe) são feitas pela TypeSafe. A memória pode ser vista e apagada na página do agente, e é apagada junto com o workspace.",
             "**Busca.** Para encontrar mensagens e documentos relacionados, o texto pode ser transformado em vetores (embeddings) pela Voyage AI.",
             "**Conectores.** Quando o workspace conecta um serviço (como GitHub, Google, Linear, Sentry, uma caixa de e-mail ou qualquer servidor MCP), guardamos os tokens de acesso cifrados e lemos ou escrevemos nesse serviço só dentro dos escopos que o workspace deu a cada agente. O serviço conectado trata esses dados sob os próprios termos. Conexões com caixas do Gmail e do Outlook passam pela Composio.",
             "**Bancos de dados.** Conexões com bancos de dados são só de leitura; as credenciais ficam cifradas e cada consulta é verificada antes de rodar.",
-            "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pelos nossos servidores em memória e não é gravada; um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
+            "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pela Cloudflare e pela memória dos nossos servidores, e não é gravada; um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
             "**O computador do workspace.** Na agentes.chat Cloud, os agentes de um workspace trabalham num computador que mantemos para esse workspace, hospedado pela Contabo na União Europeia. Contamos o volume de dados que o navegador, as ferramentas de IA e os outros programas de cada agente enviam e recebem nele, por dia. O computador é apagado depois que o plano do agentes.chat do workspace termina, como os Termos de uso descrevem.",
           ],
         },
@@ -113,7 +114,7 @@ export const privacyPtBR: LegalDocument = {
       id: "transfers",
       heading: "9. Transferências internacionais",
       blocks: [
-        "A nossa aplicação e o banco de dados rodam nos Estados Unidos, e os provedores citados nesta política tratam dados nos Estados Unidos, exceto os computadores dos workspaces, que a Contabo hospeda na União Europeia. Para dados sujeitos à LGPD, usamos as garantias contratuais do artigo 33. Quando dados pessoais sujeitos ao GDPR ou ao UK GDPR são transferidos para um terceiro país, usamos as Cláusulas Contratuais Padrão da Comissão Europeia e o Adendo do Reino Unido.",
+        "A nossa aplicação e o banco de dados rodam nos Estados Unidos, e os provedores citados nesta política tratam dados nos Estados Unidos, exceto os computadores dos workspaces, que a Contabo hospeda na União Europeia, e a Cloudflare, que trata o tráfego no data center dela mais próximo de cada aparelho, nos Estados Unidos ou em outro país. Para dados sujeitos à LGPD, usamos as garantias contratuais do artigo 33. Quando dados pessoais sujeitos ao GDPR ou ao UK GDPR são transferidos para um terceiro país, usamos as Cláusulas Contratuais Padrão da Comissão Europeia e o Adendo do Reino Unido.",
       ],
     },
     {

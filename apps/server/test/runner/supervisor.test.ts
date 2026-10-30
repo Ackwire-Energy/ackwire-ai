@@ -797,7 +797,8 @@ test("a worker that stops fails what it ran and starts again with a backoff", as
   t.last(ANA.id).hello();
   await requestOn(t.last(ANA.id));
   t.last(ANA.id).crash(1);
-  expect(await errorCode(() => first)).toBe("internal");
+  // `dropped`: the server waits for the computer and sends an agent's cut turn again, instead of failing it.
+  expect(await errorCode(() => first)).toBe("dropped");
   await waitFor(() => t.logs.some((l) => l === "[ag-a1b2c3d4] stopped (exit 1)"));
   // Nothing waits for it and it has no task to watch: it stays stopped.
   await sleep(50);
@@ -851,7 +852,7 @@ test("worker sessions follow the server's: they end when it drops and are welcom
 
   // The server's socket drops: so does the worker's session, and what it ran fails.
   t.sup.detach();
-  expect(await errorCode(() => run)).toBe("internal");
+  expect(await errorCode(() => run)).toBe("dropped");
   expect(ana.of("worker.close")).toHaveLength(1);
   // Its next session says hello: it gets its state, but no welcome while the server is away.
   const before = ana.got.length;
@@ -860,9 +861,13 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   await sleep(20);
   expect(ana.got.slice(before).map((f) => f.type)).toEqual(["worker.state"]);
 
-  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello.
+  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello. This server runs
+  // each `mcp.call` once (its welcome says so), and so the workers' welcome says too.
+  t.sup.mcp.attach(() => {}, { mcpOnce: true });
   t.sup.attach();
   await waitFor(() => ana.of("welcome").length === 2);
+  expect(ana.of("welcome")[0]).not.toHaveProperty("mcpOnce");
+  expect(ana.of("welcome")[1]).toMatchObject({ mcpOnce: true });
   t.sup.handoff({ ...handoff, agentId: BIA.id });
   const bread = handleRequest(t.ctx, { op: "read", path: "x", maxBytes: 1, agent: BIA }, scope().scope);
   await waitFor(() => t.of(BIA.id).length === 1);
@@ -1120,7 +1125,7 @@ test("a worker's word that its Chrome is in use on the desktop holds a while; it
   ana.send({ type: "browser.desktop" });
   await waitFor(() => t.sup.onDesktopInUse(ANA.id));
   ana.crash();
-  expect(await errorCode(() => run)).toBe("internal");
+  expect(await errorCode(() => run)).toBe("dropped");
   expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
 });
 

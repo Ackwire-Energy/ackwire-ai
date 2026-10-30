@@ -9,7 +9,7 @@ import {
   STEER_PROTOCOL,
 } from "@agenteschat/adapters";
 import type { MachineCaller } from "../machine-hub";
-import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
+import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
 import { accountFields, accountUnavailable, busyRefusal, steerOnMachine } from "./claude-code";
 import { computerPrompt } from "./prompt";
@@ -272,7 +272,13 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: "canceled", message: "The turn was canceled." };
     } else if (state.failure instanceof MachineOfflineError) {
       // The computer dropped mid-turn: the engine waits for it and resumes the turn there.
-      yield { type: "error", code: "machine_offline", message: state.failure.message, retryable: true };
+      yield {
+        type: "error",
+        code: "machine_offline",
+        message: state.failure.message,
+        retryable: true,
+        ...(state.failure instanceof MachineDroppedError && state.failure.serverStop ? { serverStop: true } : {}),
+      };
     } else if (state.failure instanceof MachinePausedError) {
       yield { type: "error", code: "machine_paused", message: state.failure.message, retryable: true };
     } else if (state.failure !== undefined) {

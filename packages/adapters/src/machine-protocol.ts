@@ -1535,12 +1535,27 @@ export type MachineErrorCode =
   | "terminal_unavailable"
   /** Protocol 18: the agent's (or the computer's) streams of that kind are at their cap. */
   | "too_many_streams"
+  /**
+   * The agent's process on the computer went away while the request ran (its worker stopped, the runner is
+   * stopping): it may have stopped partway. Older servers read it like `internal`.
+   */
+  | "dropped"
   | "bad_request"
   | "internal";
 
 /** Server → runner. */
 export type ServerFrame =
-  | { type: "welcome"; machineId: string; name: string; heartbeatMs: number }
+  | {
+      type: "welcome";
+      machineId: string;
+      name: string;
+      heartbeatMs: number;
+      /**
+       * The server runs each `mcp.call` once per `callId` and answers a copy with the first answer: a call cut by
+       * a reconnect may be sent again. Absent (older servers): sent again it would run twice.
+       */
+      mcpOnce?: boolean;
+    }
   | ({ type: "request"; id: string } & MachineRequest)
   | { type: "cancel"; id: string }
   | { type: "ping"; at: number }

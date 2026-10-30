@@ -69,7 +69,9 @@ import {
   touchRun,
   typingThrottle,
   unmarkStopping,
+  useSendWaiting,
 } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
@@ -544,6 +546,12 @@ export function RealtimeProvider({
     }, 5000);
     return () => clearInterval(timer);
   }, [streams, qc, orgId]);
+
+  // What I sent while the connection was down (or the server restarting) goes out once it's back, whatever page
+  // is open. One the server then refuses is said here, since its conversation may not be on screen.
+  useSendWaiting(orgId, connection, (error) =>
+    toast.show(knownErrorText(tRef.current, error) ?? tRef.current("channel.sendFailed"), "error"),
+  );
 
   // Stable across the layout's re-renders (every navigation): only a new socket changes it.
   const value = useMemo(() => ({ connection, streams }), [connection, streams]);

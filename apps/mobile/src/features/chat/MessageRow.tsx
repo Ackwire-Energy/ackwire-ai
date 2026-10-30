@@ -11,6 +11,7 @@ import {
   useReactions,
   useSteerState,
   useToggleReaction,
+  useWaiting,
 } from "@agenteschat/client";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -90,7 +91,6 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
-  offline = false,
 }: {
   message: Message;
   grouped: boolean;
@@ -99,10 +99,10 @@ export const MessageRow = memo(function MessageRow({
   thread?: ThreadInfo;
   onLongPress: (m: Message) => void;
   onRetry?: (m: Message) => void;
-  /** Mine and not sent for lack of internet: it waits and goes by itself when the connection is back. */
-  offline?: boolean;
 }) {
   const { t } = useTranslation();
+  // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
+  const offline = useWaiting(m.local === "failed" ? m.clientId : null);
   const dir = useDirectory();
   const c = useColors();
   const when = useWhen();

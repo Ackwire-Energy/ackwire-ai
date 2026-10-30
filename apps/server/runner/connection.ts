@@ -291,8 +291,9 @@ export class RunnerConnection {
             this.live = send;
             opts.onState?.("online");
             opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs });
+            // First: a supervisor passes what this server does with a repeated call on to its workers' welcome.
+            opts.mcp?.attach(send, { mcpOnce: frame.mcpOnce === true });
             tasks?.attach(send);
-            opts.mcp?.attach(send);
             return;
           }
           case "agents":

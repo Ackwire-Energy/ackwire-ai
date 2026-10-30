@@ -27,11 +27,17 @@ import { mentionHandoffs } from "./judge";
 import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
 import type { MachineCaller } from "./machine-hub";
-import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
+import {
+  checkCutTaskStart,
+  interruptOfflineMachineTasks,
+  startMachineTask,
+  type TaskCall,
+  wakeConversationForTask,
+} from "./machine-tasks";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
-import { afterMachineTaskEnded, afterMissionRunEnded } from "./mission-worktree";
+import { afterMachineTaskEnded, afterMissionRunEnded, startQueuedMissionTasks } from "./mission-worktree";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
@@ -403,7 +409,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait } : ctx),
+        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait, jobId: job.id } : ctx),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
@@ -521,7 +527,24 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {
-      await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
+      await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId), {
+        statusOnly: job.payload.statusOnly === true,
+      });
+    },
+    // A task start cut by a drop, once it can't still be underway: the agent's journal on its computer settles it.
+    "machine.task_start_check": async (job) => {
+      const hub = missions.hub;
+      if (!hub) return;
+      const call: TaskCall = (machineId, request) => hub.call(machineId, request);
+      const tasks = { db: deps.db, pubsub: deps.pubsub, call };
+      await checkCutTaskStart(
+        {
+          ...tasks,
+          start: (input) => startMachineTask(tasks, input),
+          startQueued: (machineId) => startQueuedMissionTasks(missions, machineId),
+        },
+        String(job.payload.taskId),
+      );
     },
     // A request to join through an invitation link, filed apart from the ask's reply (ADR 0068).
     [FILE_JOIN_REQUEST_JOB]: async (job) => {
