@@ -13,6 +13,7 @@ import type {
   AuthConfig,
   BrainMachine,
   Channel,
+  ChannelCategory,
   ChannelMember,
   Connection,
   ConnectorCatalog,
@@ -143,6 +144,8 @@ export interface FakeState {
   members: Member[];
   agents: Agent[];
   channels: Channel[];
+  /** Sidebar categories (ADR 0080); absent: none. */
+  channelCategories?: ChannelCategory[];
   channelMembers: Record<string, ChannelMember[]>;
   messages: Message[];
   invitations: InvitationWithStatus[];
@@ -1476,10 +1479,46 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           visibility: input.visibility ?? "public",
           isMember: true,
           createdAt: new Date().toISOString(),
+          categoryId: input.categoryId ?? null,
         };
         state.channels.push(channel);
         state.channelMembers[channel.id] = [{ type: "person", id: state.me?.user.id ?? "" }];
         return channel;
+      },
+      categories: async () => structuredClone(state.channelCategories ?? []),
+      createCategory: async (orgId, input) => {
+        log("chat.createCategory", orgId, input);
+        const list = (state.channelCategories ??= []);
+        if (list.some((c) => c.name.toLowerCase() === input.name.trim().toLowerCase()))
+          throw new ApiError(409, "conflict", `The category ${input.name} already exists`);
+        const category: ChannelCategory = { id: id("cat"), name: input.name.trim(), position: list.length };
+        list.push(category);
+        for (const channelId of input.channelIds ?? []) {
+          const c = state.channels.find((x) => x.id === channelId);
+          if (c) c.categoryId = category.id;
+        }
+        return { ...category };
+      },
+      renameCategory: async (orgId, categoryId, name) => {
+        log("chat.renameCategory", orgId, categoryId, name);
+        const c = state.channelCategories?.find((x) => x.id === categoryId);
+        if (!c) throw new ApiError(404, "not_found", "Category not found");
+        c.name = name.trim();
+        return { ...c };
+      },
+      deleteCategory: async (orgId, categoryId) => {
+        log("chat.deleteCategory", orgId, categoryId);
+        state.channelCategories = (state.channelCategories ?? []).filter((c) => c.id !== categoryId);
+        for (const c of state.channels) if (c.categoryId === categoryId) c.categoryId = null;
+      },
+      placeCategory: async (orgId, categoryId, beforeCategoryId) => {
+        log("chat.placeCategory", orgId, categoryId, beforeCategoryId);
+      },
+      place: async (orgId, channelId, input) => {
+        log("chat.place", orgId, channelId, input);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (!c) throw new ApiError(404, "not_found", "Channel not found");
+        c.categoryId = input.categoryId;
       },
       join: async (orgId, channelId) => {
         log("chat.join", orgId, channelId);
@@ -1487,6 +1526,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (c) c.isMember = true;
       },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
+      archive: async (orgId, channelId) => {
+        log("chat.archive", orgId, channelId);
+        state.channels = state.channels.filter((c) => c.id !== channelId);
+      },
+      unarchive: async (orgId, channelId) => {
+        log("chat.unarchive", orgId, channelId);
+      },
       update: async (orgId, channelId, input) => {
         log("chat.update", orgId, channelId, input);
         const c = state.channels.find((x) => x.id === channelId);
