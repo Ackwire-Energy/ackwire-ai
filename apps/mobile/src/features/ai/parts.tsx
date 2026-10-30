@@ -14,6 +14,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  ProviderLogo,
   Text,
   useTheme,
 } from "@/ui";
@@ -22,6 +23,34 @@ import { useColors } from "../shared/hooks";
 /**
  * The pieces the web's AI panels are made of (`SettingNote`, the numbered `Step`, `OpenPage`), on the phone.
  */
+
+/**
+ * A row of an agent's AI (its page, Connect an AI's first group): its maker's mark, its name, the lines under it
+ * (`accountRow`, `existingRows`).
+ */
+export function AiRow({
+  row,
+  checked,
+  disabled,
+  onPress,
+}: {
+  row: { label: string; sub?: string; below?: string; mark: string; off: boolean };
+  checked?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <GroupedRow
+      leading={<ProviderLogo id={row.mark} size="sm" off={row.off} />}
+      label={row.label}
+      {...(row.sub ? { sub: row.sub } : {})}
+      {...(row.below ? { belowText: row.below } : {})}
+      {...(checked !== undefined ? { checked } : {})}
+      disabled={disabled}
+      onPress={onPress}
+    />
+  );
+}
 
 /**
  * A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. `icon` may be

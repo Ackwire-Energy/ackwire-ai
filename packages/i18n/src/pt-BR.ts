@@ -1138,6 +1138,12 @@ export const ptBR = {
       api_key: "Adicionar uma chave de API",
     },
     titleFor: "Conectar uma IA {{for}} {{name}}",
+    /** What the person already has, before the new sign-ins: accounts on the agent's computer, the workspace's keys. */
+    have: {
+      title: "Já conectadas",
+      titleFor: "Já conectadas, {{for}} {{name}}",
+      other: "Ou conecte outra",
+    },
     orPayGo: "Ou pague pelo uso",
     plan: {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Team ou Enterprise" },

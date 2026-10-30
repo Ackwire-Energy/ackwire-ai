@@ -153,6 +153,10 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* What the person already has leads the picker: its line starts it, with no room over it. */
+.ai-picker__or:first-child {
+  margin-top: 0;
+}
 /* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
 .grid-options--plans > .ai-picker__key {
   grid-column: 1 / -1;

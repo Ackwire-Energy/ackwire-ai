@@ -1121,6 +1121,12 @@ export const en: Translations = {
       api_key: "Add an API key",
     },
     titleFor: "Connect an AI for {{name}}",
+    /** What the person already has, before the new sign-ins: accounts on the agent's computer, the workspace's keys. */
+    have: {
+      title: "Already connected",
+      titleFor: "Already connected, for {{name}}",
+      other: "Or connect another",
+    },
     orPayGo: "Or pay as you go",
     plan: {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Team or Enterprise" },
