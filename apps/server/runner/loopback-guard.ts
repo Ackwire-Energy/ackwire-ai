@@ -89,7 +89,9 @@ const elementList = (items: string[]) => (items.length ? `\n\t\telements = { ${i
  * state it was in, without touching any other table (never `flush ruleset`).
  */
 export function renderRuleset(
-  listeners: readonly GuardedListener[], reject: RejectVerb, uidRange: [number, number],
+  listeners: readonly GuardedListener[],
+  reject: RejectVerb,
+  uidRange: [number, number],
   conflictingPorts: ReadonlySet<number> = new Set(),
 ): string {
   validateBrowserUidRange(uidRange);
@@ -185,7 +187,8 @@ export class LoopbackGuard {
     // Best effort: reject needs nft_reject_inet; without it the ruleset falls back to drop.
     this.run("modprobe", ["nft_reject_inet"]);
     if (!this.reconcile()) throw new Error("System mode requires ss and an applied nft loopback guard");
-    if (this.conflicts.length) throw new Error(`Reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
+    if (this.conflicts.length)
+      throw new Error(`Reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
     this.timer = setInterval(() => this.reconcile(), GUARD_RESCAN_MS);
     this.timer.unref?.();
   }
@@ -212,7 +215,8 @@ export class LoopbackGuard {
     const listeners = parseListeners(ss.output, uids);
     this.conflicts = conflictingBrowserPorts(ss.output, this.opts.uidRange);
     const blocked = new Set(this.conflicts);
-    if (this.conflicts.length) this.warnOnce(`reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
+    if (this.conflicts.length)
+      this.warnOnce(`reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
     const text = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked);
     if (text === this.applied) return true;
     if (this.apply(text)) {
@@ -242,7 +246,9 @@ export class LoopbackGuard {
 
   private validExistingUids(uids: number[]): boolean {
     const [first, last] = this.opts.uidRange;
-    return new Set(uids).size === uids.length && uids.every((uid) => Number.isInteger(uid) && uid >= first && uid <= last);
+    return (
+      new Set(uids).size === uids.length && uids.every((uid) => Number.isInteger(uid) && uid >= first && uid <= last)
+    );
   }
 
   private validateExistingUids() {

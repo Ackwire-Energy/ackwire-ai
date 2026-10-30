@@ -156,7 +156,7 @@ function fakeHub(
     }),
     call: async (_id: string, req: MachineRequest) => {
       if (req.op !== "account") throw new Error(`unexpected ${req.op}`);
-      if (over.online === false) throw new MachineOfflineError("mac");
+      if (over.online === false) throw new MachineOfflineError("mac", null);
       calls.push(req);
       return (await answer(req)) as never;
     },

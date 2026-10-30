@@ -109,7 +109,14 @@ export type BrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean }
+  | {
+      type: "error";
+      code: string;
+      message: string;
+      retryable?: boolean;
+      /** The computer dropped because our own server stopped (a restart): never from the runner's wire. */
+      serverStop?: boolean;
+    }
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
   | { type: "steer_read"; uuids: string[] };
 

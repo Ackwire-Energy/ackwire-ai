@@ -26,7 +26,10 @@ test("suspension closes actor-only issue, artifact, wiki, calendar, channel, and
   expect(event.status).toBe(201);
   const { id: eventId } = (await event.json()) as { id: string };
 
-  await t.db.update(schema.organizations).set({ standing: "suspended", standingNotice: "silent" }).where(eq(schema.organizations.id, orgId));
+  await t.db
+    .update(schema.organizations)
+    .set({ standing: "suspended", standingNotice: "silent" })
+    .where(eq(schema.organizations.id, orgId));
 
   const attempts: Array<[string, Parameters<typeof owner>[1]?]> = [
     ["/issues"],
@@ -80,7 +83,9 @@ test("a standing change closes an existing realtime socket", async () => {
       });
       socket.addEventListener("error", () => reject(new Error("socket did not open")), { once: true });
     });
-    const closed = new Promise<number>((resolve) => socket.addEventListener("close", (event) => resolve(event.code), { once: true }));
+    const closed = new Promise<number>((resolve) =>
+      socket.addEventListener("close", (event) => resolve(event.code), { once: true }),
+    );
     await t.db.update(schema.organizations).set({ standing: "suspended" }).where(eq(schema.organizations.id, orgId));
     await publishOrgEvent(t.adapters.pubsub, {
       type: "org.broadcast",

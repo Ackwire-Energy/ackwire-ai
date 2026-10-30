@@ -3,7 +3,7 @@ import type { EventEmitter } from "node:events";
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readAgentUsers, type AgentUser } from "./agent-users";
+import { type AgentUser, readAgentUsers } from "./agent-users";
 import {
   DEFAULT_AGENT_UID_RANGE,
   expandHome,

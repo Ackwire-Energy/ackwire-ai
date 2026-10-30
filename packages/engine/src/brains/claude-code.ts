@@ -15,7 +15,7 @@ import { type Database, type Executor, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
-import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
+import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
@@ -263,6 +263,9 @@ export function toolOff(
 
 /** A failed `brain.turn` request as the turn's error. */
 export function claudeCodeCallError(error: unknown): BrainEvent {
+  if (error instanceof MachineDroppedError && error.serverStop) {
+    return { type: "error", code: "machine_offline", message: error.message, retryable: true, serverStop: true };
+  }
   if (error instanceof MachineOfflineError) return err("machine_offline", error.message, true);
   if (error instanceof MachinePausedError) return err("machine_paused", error.message, true);
   if (error instanceof MachineRequestError) {

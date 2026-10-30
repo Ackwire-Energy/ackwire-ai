@@ -98,10 +98,13 @@ export function readPack(
       size += (c & 0x7f) * 2 ** shift;
       shift += 7;
     }
-    if (!Number.isSafeInteger(size) || size < 0 || size > (options.maxInflatedBytes ?? 128 * 1024 * 1024) - inflatedTotal)
+    if (
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      size > (options.maxInflatedBytes ?? 128 * 1024 * 1024) - inflatedTotal
+    )
       throw new Error("pack exceeds uncompressed size limit");
-    if (type === 1 && size > (options.maxCommitBytes ?? 2 * 1024 * 1024))
-      throw new Error("commit exceeds size limit");
+    if (type === 1 && size > (options.maxCommitBytes ?? 2 * 1024 * 1024)) throw new Error("commit exceeds size limit");
     if (type === 6) {
       // OFS_DELTA: a variable-length offset to the base.
       do c = data[pos++] as number;

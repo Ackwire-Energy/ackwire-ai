@@ -24,6 +24,7 @@ import type {
   HttpApi,
   ImportItemKind,
   ImportItemResult,
+  Instance,
   InvitationPreview,
   InvitationWithStatus,
   InviteLink,
@@ -182,8 +183,8 @@ export interface FakeState {
   actionErrors?: Record<string, ApiError>;
   /** Set by `createFakeApi`: `chat.post` with `openThread` marks the thread (the threads fake). */
   openThread?: (orgId: string, threadId: string, at: string) => Promise<void>;
-  /** Make `chat.post` fail (optimistic send tests). */
-  failPosts?: boolean;
+  /** Make `chat.post` fail (optimistic send tests): `true` is the server refusing it, or this error. */
+  failPosts?: boolean | ApiError;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -192,6 +193,8 @@ export interface FakeState {
   answerNowError?: ApiError;
   /** `system.health`'s edition; unset = the Cloud. */
   edition?: Edition;
+  /** Overrides `system.instance` (default: agentes.chat Cloud). */
+  instance?: Partial<Instance>;
   /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
   brainMachines?: BrainMachine[];
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
@@ -772,6 +775,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   return {
     system: {
       health: async () => ({ status: "ok", version: "test", edition: state.edition ?? "cloud" }),
+      instance: async () => ({
+        name: "agentes.chat",
+        version: "test",
+        api: 1,
+        minApi: 1,
+        url: "https://app.agentes.chat",
+        signIn: { email: true, google: false, github: true, apple: false },
+        signup: "open",
+        cloud: true,
+        ...state.instance,
+      }),
       telemetry: async () => state.telemetry ?? null,
       setTelemetry: async (enabled) => {
         log("system.setTelemetry", enabled);
@@ -1518,7 +1532,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);
         if (state.holdPosts) await state.holdPosts;
-        if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
+        if (state.failPosts === true) throw new ApiError(503, "unavailable", "Try again");
+        if (state.failPosts) throw state.failPosts;
         // Like the server: a resend (the same person's `clientId`) gets the message already written.
         const resent = input.clientId
           ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))

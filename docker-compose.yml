@@ -31,8 +31,9 @@ services:
       retries: 10
 
   backup:
-    # A pg_dump a day to an S3-compatible bucket, and the restore: SELF_HOSTING.md, Backups. On with
-    # backup in COMPOSE_PROFILES and S3_BACKUP_BUCKET with the S3_* credentials in .env.
+    # A pg_dump a day (or every BACKUP_INTERVAL_HOURS) to an S3-compatible bucket, and the restore:
+    # SELF_HOSTING.md, Backups. On with backup in COMPOSE_PROFILES and S3_BACKUP_BUCKET with the S3_*
+    # credentials in .env.
     image: "${AGENTES_BACKUP_IMAGE:-ghcr.io/agentes-chat/backup:latest}"
     profiles: ["backup"]
     # Its own variables only, not the whole .env: it has no use for the app's secrets.
@@ -45,6 +46,7 @@ services:
       S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-}"
       S3_BACKUP_BUCKET: "${S3_BACKUP_BUCKET:-}"
       BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:-}"
+      BACKUP_INTERVAL_HOURS: "${BACKUP_INTERVAL_HOURS:-}"
     depends_on:
       postgres:
         condition: service_healthy

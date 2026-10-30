@@ -2,14 +2,16 @@ import { type LegalBlock, type LegalKind, legalDocument, legalInline } from "@ag
 import { Logo, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { SupportLine } from "@/components/Standing";
 import { type LocaleCode, locales, usePageT } from "@/i18n";
 import { useDocumentTitle } from "@/lib/desktop";
 import "./legal.css";
 
 /**
- * Terms of Use and Privacy Policy (`/terms`, `/privacy`): public pages, the
- * same text as the landing page's (`@agenteschat/i18n/legal`). They open in
- * English wherever the reader is; the switch shows Portuguese here only.
+ * agentes.chat Cloud's Terms of Use and Privacy Policy (`/terms`, `/privacy` on the Cloud): public pages, the same
+ * text as the landing page's (`@agenteschat/i18n/legal`). They open in English wherever the reader is, and the
+ * switch shows Portuguese here only.
  */
 export function LegalPage({ kind }: { kind: LegalKind }) {
   const [lang, setLang] = useState<LocaleCode>("en");
@@ -64,6 +66,28 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
         <footer className="legal__foot">
           <Link to={kind === "terms" ? "/privacy" : "/terms"}>{other.title}</Link>
         </footer>
+      </main>
+    </div>
+  );
+}
+
+/** `/terms` or `/privacy` on a server with no page of its own for it, and where to ask. */
+export function NoLegalPage({ kind }: { kind: LegalKind }) {
+  const { t } = useTranslation();
+  return (
+    <div className="legal">
+      <header className="legal__bar">
+        <Link to="/" aria-label={t("legal.home")}>
+          <Logo size={24} />
+        </Link>
+      </header>
+      <main className="page page--narrow">
+        <header className="legal__head">
+          <h1 className="page-title">{t(`legal.none.${kind}`)}</h1>
+          <p className="page-sub">
+            <SupportLine />
+          </p>
+        </header>
       </main>
     </div>
   );

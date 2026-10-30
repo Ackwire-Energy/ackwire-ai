@@ -15,7 +15,15 @@ import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, s
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
-import { getMachineById, MachineOfflineError, MachinePausedError, machineOnline } from "./machines";
+import {
+  getMachineById,
+  MachineDroppedError,
+  MachineOfflineError,
+  MachinePausedError,
+  type MachineRow,
+  machineOnline,
+  publishMachineStatus,
+} from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
@@ -41,8 +49,16 @@ const { machineTasks, agentRuns } = schema;
 export type MachineTaskRow = typeof machineTasks.$inferSelect;
 export type MachineTaskStatus = MachineTaskRow["status"];
 
-/** Running tasks of a machine that went offline become `interrupted` after this (it may just be a network blip). */
-export const TASK_OFFLINE_GRACE_MS = 60_000;
+/**
+ * Running tasks of a machine that went offline become `interrupted` after this (it may just be a network blip
+ * or a runner dialing again); it is also when an offline computer becomes an outage people see.
+ */
+export const TASK_OFFLINE_GRACE_MS = 2 * 60_000;
+/**
+ * A start may still be underway on the computer this long after it began (its journal doesn't list the task
+ * yet): a hello in that time says nothing about it.
+ */
+export const TASK_START_GRACE_MS = 2 * 60_000;
 /** An interrupted task resumes at most this many times in a row. */
 export const MAX_TASK_RESUMES = 3;
 /** What a resumed Claude Code session is told. */
@@ -64,6 +80,20 @@ export const isLiveTaskRow = (t: Pick<MachineTaskRow, "status" | "endedAt"> | nu
 export const liveTaskWhere = () => and(isNull(machineTasks.endedAt), inArray(machineTasks.status, ACTIVE));
 export const liveTaskSqlAs = (alias: string) =>
   sql.raw(`${alias}.ended_at is null and ${alias}.status in (${ACTIVE.map((s) => `'${s}'`).join(", ")})`);
+/** Its start was cut by a drop (`launchTask`): never seen running, it may run there or may never have started. */
+export const isCutStart = (t: Pick<MachineTaskRow, "status" | "startedAt" | "endedAt">) =>
+  t.status === "interrupted" && !t.startedAt && !t.endedAt;
+
+/** `checkCutTaskStart` for this task in `inMs`. */
+const enqueueStartCheck = (db: Executor, row: Pick<MachineTaskRow, "id" | "orgId">, inMs: number) =>
+  enqueue(db, {
+    orgId: row.orgId,
+    kind: "machine.task_start_check",
+    payload: { taskId: row.id },
+    dedupeKey: `machine.task_start_check:${row.id}:${Date.now()}`,
+    runAt: new Date(Date.now() + inMs),
+  });
+
 /** `machine_tasks.recent_lines` keeps this many human lines ("Ver saída" while the computer is offline). */
 export const RECENT_LINES = 50;
 
@@ -308,7 +338,8 @@ export const isWaitError = (error: unknown) =>
 /**
  * Asks the machine to start a recorded task (status `queued`). `requeue`: a
  * full or absent computer puts it back in our queue (`start_request`) instead
- * of failing it; any other refusal fails the row and goes up.
+ * of failing it; any other refusal fails the row and goes up. A start cut by
+ * the link dropping comes back `interrupted` (it may run there).
  */
 export async function launchTask(
   deps: TaskDeps & { call: TaskCall },
@@ -364,6 +395,20 @@ export async function launchTask(
     const behind = parseBaseBehind(started);
     return { row: fresh, queued: false, ...(behind !== undefined ? { baseBehind: behind } : {}) };
   } catch (error) {
+    // Cut while starting: it may be running there. It stays live as `interrupted` (never queued again, which
+    // would start a second copy) until its first frame, or until its computer's journal says, once its start
+    // can't still be underway (`checkCutTaskStart`).
+    if (error instanceof MachineDroppedError) {
+      const [cut] = await deps.db
+        .update(machineTasks)
+        .set({ status: "interrupted", updatedAt: new Date() })
+        .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued"), isNull(machineTasks.endedAt)))
+        .returning();
+      if (cut) await enqueueStartCheck(deps.db, cut, TASK_START_GRACE_MS);
+      const now = cut ?? (await getTask(deps.db, row.id)) ?? row;
+      await publishTaskEvent(deps.pubsub, now);
+      return { row: now, queued: false };
+    }
     if (options.requeue && isWaitError(error)) {
       const [back] = await deps.db
         .update(machineTasks)
@@ -582,10 +627,13 @@ export async function applyTaskEvent(
 ) {
   const now = new Date();
   const pr = frame.prUrl ?? findPullRequestUrl(frame.line);
+  // A start whose answer was lost has no start time: its seconds so far say when.
+  const began = new Date(now.getTime() - Math.max(0, Math.round(frame.seconds ?? 0)) * 1000);
   const [row] = await deps.db
     .update(machineTasks)
     .set({
       status: "running",
+      startedAt: sql`coalesce(${machineTasks.startedAt}, ${began.toISOString()}::timestamptz)`,
       ...(frame.line !== undefined ? { lastLine: frame.line } : {}),
       ...(frame.line ? { recentLines: pushRecentLine(frame.line) } : {}),
       ...(pr ? { prUrl: keepPrUrl(pr) } : {}),
@@ -731,23 +779,15 @@ export async function settleInterruptedTask(
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
     : [];
-  const missionAllows =
-    !claimed.missionId ||
-    (mission?.resumeTasks === true && (mission.status === "active" || mission.status === "proposed"));
-  const resumable =
-    missionAllows &&
-    claimed.executor === "claude" &&
-    Boolean(claimed.sessionId) &&
-    machine?.resumeTasks !== false &&
-    claimed.resumeCount < MAX_TASK_RESUMES &&
-    Boolean(deps.start) &&
-    !claimed.canceledBy;
+  const resumable = resumesByItself(claimed, machine, mission) && Boolean(deps.start);
   if (resumable && deps.start && machine) {
     const handle = (await deps.db
       .select({ handle: schema.agents.handle })
       .from(schema.agents)
       .where(eq(schema.agents.id, claimed.agentId))
       .then((r) => r[0]?.handle)) as string | undefined;
+    // Never seen running (its start was cut by a drop): the session may not have its task, so it comes along.
+    const asked = claimed.startedAt ? null : claimed.prompt;
     try {
       const input: StartTaskInput = {
         orgId: claimed.orgId,
@@ -761,7 +801,11 @@ export async function settleInterruptedTask(
         requestedByUserId: claimed.requestedByUserId,
         title: claimed.title,
         executor: "claude",
-        prompt: RESUME_PROMPT,
+        prompt: asked?.startsWith(RESUME_PROMPT)
+          ? asked
+          : asked
+            ? `${RESUME_PROMPT}\n\nWhat you were asked:\n${asked}`.slice(0, TASK_TEXT_LIMITS.prompt)
+            : RESUME_PROMPT,
         sessionId: claimed.sessionId,
         resume: true,
         resumedFromId: claimed.id,
@@ -830,6 +874,40 @@ export async function settleInterruptedTask(
 }
 
 /**
+ * Whether an interrupted task resumes by itself once its computer is back: Claude Code with a session, at
+ * most `MAX_TASK_RESUMES` in a row, not canceled, when its computer and its mission (still open) allow it.
+ */
+function resumesByItself(
+  row: MachineTaskRow,
+  machine: Pick<MachineRow, "resumeTasks"> | null,
+  mission: { status: string; resumeTasks: boolean } | undefined,
+) {
+  const missionAllows =
+    !row.missionId || (mission?.resumeTasks === true && (mission.status === "active" || mission.status === "proposed"));
+  return (
+    missionAllows &&
+    row.executor === "claude" &&
+    Boolean(row.sessionId) &&
+    machine?.resumeTasks !== false &&
+    row.resumeCount < MAX_TASK_RESUMES &&
+    !row.canceledBy
+  );
+}
+
+/** Whether this task resumes by itself if its computer restarts (`resumesByItself`), for what the agent is told. */
+export async function taskResumesByItself(db: Database, row: MachineTaskRow) {
+  if (row.executor !== "claude") return false;
+  const machine = await getMachineById(db, row.machineId);
+  const [mission] = row.missionId
+    ? await db
+        .select({ status: schema.missions.status, resumeTasks: schema.missions.resumeTasks })
+        .from(schema.missions)
+        .where(eq(schema.missions.id, row.missionId))
+    : [];
+  return resumesByItself(row, machine, mission);
+}
+
+/**
  * A mission task's resume in our queue (ADR 0044): `queued` with what to send
  * when it may start, at the interrupted task's place in the queue (its
  * `created_at`), so it goes before items queued after it.
@@ -866,31 +944,69 @@ export async function postTaskNotice(
 /**
  * `machine.tasks_offline` (enqueued when a machine's socket closes, due after
  * the grace): still offline, its running tasks become `interrupted` (not
- * final: the machine may come back) and each affected thread gets ONE notice.
+ * final: the machine may come back) and each affected thread gets ONE notice
+ * per outcome: tasks keep running if only the connection dropped, and if the
+ * computer restarted, Claude Code tasks resume by themselves and others don't.
+ * `statusOnly`: after our own stop, only the apps hear (its tasks wait longer).
  */
-export async function interruptOfflineMachineTasks(deps: TaskDeps, machineId: string) {
+export async function interruptOfflineMachineTasks(
+  deps: TaskDeps,
+  machineId: string,
+  options: { statusOnly?: boolean } = {},
+) {
   const machine = await getMachineById(deps.db, machineId);
   if (!machine || machineOnline(machine)) return [];
+  // Away past the grace: open apps look again, and it is an outage now (`listMachineOutages`).
+  await publishMachineStatus(deps.pubsub, machine.orgId, machineId, false).catch(() => undefined);
+  if (options.statusOnly) return [];
   const rows = await deps.db
     .update(machineTasks)
     .set({ status: "interrupted", updatedAt: new Date() })
     .where(and(eq(machineTasks.machineId, machineId), eq(machineTasks.status, "running"), isNull(machineTasks.endedAt)))
     .returning();
-  const threads = new Map<string, MachineTaskRow[]>();
+  const missionIds = [...new Set(rows.flatMap((r) => (r.missionId ? [r.missionId] : [])))];
+  const missions = new Map(
+    missionIds.length
+      ? (
+          await deps.db
+            .select({
+              id: schema.missions.id,
+              status: schema.missions.status,
+              resumeTasks: schema.missions.resumeTasks,
+            })
+            .from(schema.missions)
+            .where(inArray(schema.missions.id, missionIds))
+        ).map((m) => [m.id, m])
+      : [],
+  );
+  const threads = new Map<string, { resumes: boolean; list: MachineTaskRow[] }>();
   for (const row of rows) {
-    const key = `${row.channelId}:${row.threadRootId ?? ""}`;
-    threads.set(key, [...(threads.get(key) ?? []), row]);
+    const resumes = resumesByItself(row, machine, row.missionId ? missions.get(row.missionId) : undefined);
+    const key = `${row.channelId}:${row.threadRootId ?? ""}:${resumes}`;
+    const group = threads.get(key) ?? { resumes, list: [] };
+    group.list.push(row);
+    threads.set(key, group);
   }
   const since = (machine.lastSeenAt ?? new Date()).toISOString();
-  for (const list of threads.values()) {
+  for (const { resumes, list } of threads.values()) {
     const first = list[0] as MachineTaskRow;
-    const n = list.length;
+    const one = list.length === 1;
+    const then = resumes
+      ? `, and ${one ? "resumes where it" : "resume where they"} stopped if the computer restarted.`
+      : `. If the computer restarted, ${one ? "it stopped and won't resume by itself" : "they stopped and won't resume by themselves"}.`;
     await postTaskNotice(deps, first, {
       body: `The computer ${machine.name} went offline (since ${since.slice(11, 16)} UTC): ${
-        n === 1 ? `"${first.title}" is paused` : `${n} tasks here are paused`
-      } until it's back.`,
+        one ? `"${first.title}" keeps` : `${list.length} tasks here keep`
+      } running there if only the connection dropped${then}`,
       code: "machine_offline",
-      params: { computer: machine.name, since, count: String(n), title: first.title },
+      // `context`: the apps' wording for tasks that resume by themselves (`machine_offline_resumes`).
+      params: {
+        computer: machine.name,
+        since,
+        count: String(list.length),
+        title: first.title,
+        ...(resumes ? { context: "resumes" } : {}),
+      },
       meta: { machineOffline: { machineId, taskIds: list.map((r) => r.id) } },
     }).catch(() => undefined);
     for (const row of list) await publishTaskEvent(deps.pubsub, row);
@@ -959,24 +1075,80 @@ export async function reconcileMachineTasks(
   const byId = new Map(reported.map((t) => [t.taskId, t]));
   for (const row of rows) {
     const there = byId.get(row.id);
+    // A start cut by a drop: this list may come before the runner has written it down, and a supervisor lists
+    // every task it handed a worker, started or not. Only the agent's own journal settles it, once its start
+    // can't still be underway (`checkCutTaskStart`).
+    if (isCutStart(row)) {
+      if (Date.now() - row.updatedAt.getTime() >= TASK_START_GRACE_MS) await enqueueStartCheck(deps.db, row, 0);
+      continue;
+    }
     if (there?.status === "running") {
-      if (row.status !== "running") {
-        const [back] = await deps.db
-          .update(machineTasks)
-          .set({ status: "running", lastEventAt: new Date(), updatedAt: new Date() })
-          .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
-          .returning();
-        if (back) await publishTaskEvent(deps.pubsub, back);
-      }
+      if (row.status !== "running") await markRunning(deps, row, there);
       continue;
     }
     if (there) continue;
     // Waiting in our queue (ADR 0044): the runner never had it.
     if (row.status === "queued" && row.startRequest) continue;
-    // Being started right now (its `task.start` may still be on the way).
-    if (row.status === "queued" && Date.now() - row.createdAt.getTime() < 2 * 60_000) continue;
+    // Being started right now (its `task.start` may still be on the way). One from our queue began when it was
+    // taken from there, not when it was queued.
+    if (row.status === "queued" && Date.now() - row.updatedAt.getTime() < TASK_START_GRACE_MS) continue;
     await settleInterruptedTask(deps, row);
   }
+}
+
+/** Running there: running here, since when its journal says (a start whose answer was lost has no time). */
+async function markRunning(deps: TaskDeps, row: MachineTaskRow, there: RunnerTask) {
+  const at = new Date(there.startedAt);
+  const [back] = await deps.db
+    .update(machineTasks)
+    .set({
+      status: "running",
+      ...(row.startedAt || Number.isNaN(at.getTime()) ? {} : { startedAt: at }),
+      lastEventAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
+    .returning();
+  if (back) await publishTaskEvent(deps.pubsub, back);
+}
+
+/**
+ * `machine.task_start_check`: a start cut by a drop, once it can't still be underway. The agent's own journal
+ * on the computer says (`task.status`, answered by the process that runs the agent's tasks there): running
+ * there is running here; ended there, its `task.done` is on its way; not there, it never started, and it is
+ * settled like a task that went away (Claude Code starts with what it was asked, others wake the agent). Its
+ * computer away: its next hello asks for this check again.
+ */
+export async function checkCutTaskStart(
+  deps: TaskDeps & {
+    call: TaskCall;
+    start?: LocalTaskStarter;
+    startQueued?: (machineId: string) => Promise<unknown>;
+  },
+  taskId: string,
+) {
+  const row = await getTask(deps.db, taskId);
+  if (!row || !isCutStart(row)) return;
+  const [agent] = await deps.db
+    .select({ handle: schema.agents.handle })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, row.agentId));
+  const reply = await deps
+    .call<"task.status">(row.machineId, {
+      agent: { id: row.agentId, handle: agent?.handle ?? "agent" },
+      op: "task.status",
+      taskId: row.id,
+    })
+    .catch((error: unknown) => {
+      // Away, or gone again: its next hello asks again. Anything else: the job is tried again later.
+      if (error instanceof MachineOfflineError) return null;
+      throw error;
+    });
+  if (!reply) return;
+  const there = reply.tasks.find((t) => t.taskId === row.id);
+  if (there?.status === "running") return markRunning(deps, row, there);
+  if (there) return;
+  await settleInterruptedTask(deps, row);
 }
 
 /** The text of a task's end, for the thread (English; the app uses the code). */

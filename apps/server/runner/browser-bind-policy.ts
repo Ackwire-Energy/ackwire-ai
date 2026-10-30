@@ -36,7 +36,9 @@ export function ensureBrowserBindPolicy(
   // allowances on worker restarts. systemd commits the cgroup change after all
   // properties in the call have been processed.
   const configured = run("systemctl", [
-    "set-property", "--runtime", slice,
+    "set-property",
+    "--runtime",
+    slice,
     "SocketBindAllow=",
     `SocketBindAllow=tcp:1-${BROWSER_PORT_FIRST - 1}`,
     `SocketBindAllow=tcp:${BROWSER_PORT_LAST + 1}-65535`,
@@ -52,7 +54,8 @@ export function ensureBrowserBindPolicy(
   const sockets = run("ss", ["-Htln", "-e"]);
   if (sockets.code !== 0) throw new Error(`Cannot inspect browser bind test ports: ${sockets.output.slice(0, 200)}`);
   const wrongOwner = conflictingBrowserPorts(sockets.output, [user.uid, user.uid]);
-  if (wrongOwner.length) throw new Error(`Agent ${user.uid}'s browser ports have the wrong listener owner: ${wrongOwner.join(", ")}`);
+  if (wrongOwner.length)
+    throw new Error(`Agent ${user.uid}'s browser ports have the wrong listener owner: ${wrongOwner.join(", ")}`);
   const occupied = new Set<number>();
   for (const line of sockets.output.split("\n")) {
     const local = line.trim().split(/\s+/)[3];
@@ -62,21 +65,35 @@ export function ensureBrowserBindPolicy(
     }
   }
   let forbidden = BROWSER_PORT_FIRST;
-  while (forbidden <= BROWSER_PORT_LAST && (forbidden === cdp || forbidden === stream || occupied.has(forbidden))) forbidden++;
+  while (forbidden <= BROWSER_PORT_LAST && (forbidden === cdp || forbidden === stream || occupied.has(forbidden)))
+    forbidden++;
   if (forbidden > BROWSER_PORT_LAST) throw new Error("No free reserved port for browser bind policy self-check");
   let dev = 3000;
   while (dev < BROWSER_PORT_FIRST && occupied.has(dev)) dev++;
   if (dev >= BROWSER_PORT_FIRST) throw new Error("No free development port for browser bind policy self-check");
   const verified = run("/usr/bin/systemd-run", [
-    "--quiet", "--scope", "--collect", `--slice=${slice}`, "--",
-    "/usr/sbin/runuser", "-u", user.user, "--", ...runner, "bind-check", String(forbidden),
-    String(occupied.has(cdp) ? 0 : cdp), String(occupied.has(stream) ? 0 : stream), String(dev),
+    "--quiet",
+    "--scope",
+    "--collect",
+    `--slice=${slice}`,
+    "--",
+    "/usr/sbin/runuser",
+    "-u",
+    user.user,
+    "--",
+    ...runner,
+    "bind-check",
+    String(forbidden),
+    String(occupied.has(cdp) ? 0 : cdp),
+    String(occupied.has(stream) ? 0 : stream),
+    String(dev),
   ]);
   if (verified.code !== 0) {
     throw new Error(`Browser bind policy is not enforced in ${slice}: ${verified.output.slice(0, 200)}`);
   }
   const finalSockets = run("ss", ["-Htln", "-e"]);
-  if (finalSockets.code !== 0) throw new Error(`Cannot recheck browser listener owners: ${finalSockets.output.slice(0, 200)}`);
+  if (finalSockets.code !== 0)
+    throw new Error(`Cannot recheck browser listener owners: ${finalSockets.output.slice(0, 200)}`);
   const finalWrongOwner = conflictingBrowserPorts(finalSockets.output, [user.uid, user.uid]);
   if (finalWrongOwner.length) {
     throw new Error(`Agent ${user.uid}'s browser ports have the wrong listener owner: ${finalWrongOwner.join(", ")}`);

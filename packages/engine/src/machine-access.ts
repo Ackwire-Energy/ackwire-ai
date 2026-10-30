@@ -101,7 +101,7 @@ export async function reduceMachineAccess(
     );
   }
   const status = await deps.hub.status(machine.id);
-  if (!status?.online) throw new MachineOfflineError(machine.name);
+  if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
   const removeFolder = input.removeFolder
     ? {
         path: input.removeFolder.path.slice(0, ACCESS_LIMITS.path),
@@ -160,7 +160,7 @@ export async function requestFolderAccess(
     );
   }
   const status = await deps.hub.status(machine.id);
-  if (!status?.online) throw new MachineOfflineError(machine.name);
+  if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
   await assertNotPaused(deps.db, machine);
   const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
   const now = new Date();

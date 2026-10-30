@@ -44,9 +44,12 @@ describe("what the agent did on its desktop, on its message", () => {
     await settle(8);
 
     const desk = screen().getByRole("group", { name: "Tela da Ada" });
-    expect(desk.querySelector(".brw-ac__tx b")?.textContent).toBe("Arquivos");
-    expect(desk.textContent).toContain("5 passos");
-    await act(async () => fireEvent.click(within(desk).getByRole("button", { name: "Ver os passos" })));
+    // Closed into one band that opens to the steps: the app, its steps, how long.
+    const band = within(desk).getByRole("button", { expanded: false });
+    expect(band.querySelector("b")?.textContent).toBe("Arquivos");
+    expect(band.title).toBe("Ver os passos");
+    expect(band.textContent).toContain("5 passos");
+    await act(async () => fireEvent.click(band));
     const pages = [...desk.querySelectorAll(".brw-trail__page")].map((p) => p.textContent ?? "");
     expect(pages).toHaveLength(2);
     expect(pages[0]).toContain("Antes de abrir um app");
@@ -60,7 +63,9 @@ describe("what the agent did on its desktop, on its message", () => {
     expect(desk.querySelector(".brw-trail__ext")).toBeNull();
 
     const browser = screen().getByRole("group", { name: "Navegador da Ada" });
-    expect(browser.querySelector(".brw-ac__tx b")?.textContent).toBe("shop.example");
+    expect(within(browser).getByRole("button", { expanded: false }).querySelector("b")?.textContent).toBe(
+      "shop.example",
+    );
   });
 });
 
