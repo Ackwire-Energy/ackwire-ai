@@ -16,6 +16,7 @@ import { deliverNoticeToRun } from "./run-resume";
 const {
   agentRuns,
   agents,
+  channelMembers,
   channels,
   connectorConnections,
   machineAccounts,
@@ -269,6 +270,31 @@ export async function mayCreateAgents(db: Database, orgId: string, userId: strin
   return membership !== null && can(membership.role, "manage_agents");
 }
 
+/**
+ * Whether someone who may create agents can open this conversation, and so decide a card in it (the decision
+ * routes read it as `requireChannelAccess` does): any of them in a public channel, which they may join, or a
+ * forum; in a DM or a private channel, only one of its members.
+ */
+export async function deciderCanOpen(db: Database, orgId: string, channelId: string) {
+  const [channel] = await db
+    .select({ kind: channels.kind, visibility: channels.visibility, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.id, channelId)));
+  if (!channel) return false;
+  if (channel.kind === "forum" || (channel.kind === "channel" && channel.visibility === "public" && !channel.dmKey)) {
+    return true;
+  }
+  const members = await db
+    .select({ role: organizationMembers.role })
+    .from(channelMembers)
+    .innerJoin(
+      organizationMembers,
+      and(eq(organizationMembers.orgId, channelMembers.orgId), eq(organizationMembers.userId, channelMembers.userId)),
+    )
+    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId)));
+  return members.some((m) => can(m.role, "manage_agents"));
+}
+
 /** The proposal behind a card message the viewer can read, or 404. */
 async function proposalMessage(db: Database, userId: string, orgId: string, messageId: string) {
   const message = await getMessage(db, orgId, messageId);
@@ -368,7 +394,10 @@ async function settle(
     channelId: message.channelId,
     threadId: message.threadId,
     messageId: message.id,
-    card: card as unknown as Record<string, unknown>,
+    state: card.state,
+    agentId: card.agentId,
+    decidedByUserId: card.decidedByUserId,
+    decidedAt: card.decidedAt,
   });
   const [run] = message.agentRunId
     ? await deps.db

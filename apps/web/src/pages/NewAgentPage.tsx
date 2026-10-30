@@ -1,11 +1,13 @@
 import type { Agent, AgentAudience, AgentProposal } from "@agenteschat/client";
 import {
+  ApiError,
   useAgentProposal,
   useAgents,
   useBrainMachines,
   useChannels,
   useCreateAgent,
   useCredentials,
+  useDenyAgentProposal,
   useDms,
   useMailAccounts,
   useMembers,
@@ -181,7 +183,9 @@ export function NewAgentPage({ proposalId = null }: { proposalId?: string | null
                 </Button>
               }
             >
-              {t("newAgent.proposalClosed")}
+              {proposal.error instanceof ApiError && proposal.error.status === 403
+                ? t("newAgent.proposalNoAccess")
+                : t("newAgent.proposalClosed")}
             </EmptyState>
           )}
         </div>
@@ -208,6 +212,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
+  const deny = useDenyAgentProposal(org.id);
   const connected = useConnectedById();
   const connectedList = useMemo(() => [...connected.values()], [connected]);
   const mail = useMailAccounts(org.id);
@@ -262,9 +267,11 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
+  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
   const myChannels = useMemo(
-    () => (channels.data ?? []).filter((c) => c.isMember && !dmChannels.has(c.id)),
-    [channels.data, dmChannels],
+    () =>
+      (channels.data ?? []).filter((c) => (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id)),
+    [channels.data, dmChannels, draft],
   );
   const choices = useMemo(
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
@@ -528,9 +535,19 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   /* ---------- Changes that also move the preview ---------- */
 
   const pickRole = (id: RoleId) => {
+    // The role it already has: filling it in again would drop what was typed.
+    if (id === role) return;
+    setRole(id);
+    setTried((prev) => {
+      const nextTried = new Set(prev);
+      nextTried.delete("role");
+      return nextTried;
+    });
+    mood.react(id === "custom" ? "wink" : "happy", 1400);
+    // A proposal keeps its draft: only the role changes.
+    if (from) return;
     const preset = ROLE_PRESETS[id];
     const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
-    setRole(id);
     setRoleText("");
     setName(agentName);
     setHandle(handleForName(agentName));
@@ -540,12 +557,6 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
     setModel(AUTO);
-    setTried((prev) => {
-      const nextTried = new Set(prev);
-      nextTried.delete("role");
-      return nextTried;
-    });
-    if (id !== role) mood.react(id === "custom" ? "wink" : "happy", 1400);
   };
   const changeName = (value: string) => {
     const had = Boolean(name.trim());
@@ -708,6 +719,21 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
             </span>
           </button>
         </div>
+        {role === "custom" && (
+          <Card as="div" className="newag__card">
+            <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
+              <Input
+                value={roleText}
+                maxLength={200}
+                autoComplete="off"
+                onChange={(e) => {
+                  setRoleText(e.target.value);
+                  mood.onTyping();
+                }}
+              />
+            </Field>
+          </Card>
+        )}
         {errorLine(errorOf("role"))}
       </>
     ),
@@ -1289,6 +1315,24 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 <Link to="/org/$orgId" params={{ orgId: org.id }}>
                   {t("common.cancel")}
                 </Link>
+              </Button>
+            )}
+            {from && last && (
+              <Button
+                variant="ghost"
+                size="lg"
+                loading={deny.isPending}
+                onClick={() =>
+                  deny.mutate(from.messageId, {
+                    onSuccess: () =>
+                      void navigate({
+                        to: "/org/$orgId/c/$channelId",
+                        params: { orgId: org.id, channelId: from.channelId },
+                      }),
+                  })
+                }
+              >
+                {t("approval.refuse")}
               </Button>
             )}
             <Button

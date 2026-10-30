@@ -2677,6 +2677,7 @@ export const en: Translations = {
     createAnother: "Create another agent",
     adminsOnly: "Only admins and owners create agents. Ask a {{org}} admin.",
     proposalClosed: "This proposal was already decided or expired.",
+    proposalNoAccess: "Only people in its conversation can see this proposal.",
     backToChat: "Back to the conversation",
     and: " and ",
   },

@@ -2706,6 +2706,7 @@ export const ptBR = {
     createAnother: "Criar outro agente",
     adminsOnly: "Só admins e donos criam agentes. Peça a um admin da {{org}}.",
     proposalClosed: "Esta proposta já foi decidida ou expirou.",
+    proposalNoAccess: "Só quem está na conversa vê esta proposta.",
     backToChat: "Voltar para a conversa",
     and: " e ",
   },

@@ -7,7 +7,7 @@
 
 ## Context
 
-People ask an agent for another one ("make me a bot that answers the support inbox", "like a manager I can tell to create other bots"). Agents could connect an AI, create channels and invite people through cards (ADR 0061), but not this: the agent said it couldn't.
+Agents could connect an AI, create channels and invite people through cards (ADR 0061), but had no way to create an agent or propose one.
 
 Creating an agent is a person's permission (`manage_agents`): an agent gets scopes, a budget, a computer and its owner's plan. So there is no "manager" agent that creates agents. Any agent may propose one, and a person decides.
 
@@ -19,6 +19,7 @@ Creating an agent is a person's permission (`manage_agents`): an agent gets scop
 - It takes the draft: a name, an @handle, a role, what it does (the instructions), a look (the app's allow-list), the public channels it joins by name, its level (read or write) on the workspace's connected apps by catalog id or name, and one line for the person (`why`).
 - The draft is checked as the create-agent API checks an agent: a name of up to 80 characters, a handle of the right shape that no agent (archived ones too) or person has, a role of up to 200 characters, instructions of 1 to 50,000, a look from the allow-list. Channels are public ones only, because the card shows their names to everyone in the conversation; the person adds private ones while reviewing. Unknown channels and apps are refused with the ones that exist, so the agent can correct itself.
 - The card is `meta.actionCard` with `kind: "agent_proposal"` (`bodyCode: "agent_proposal"`), so it starts no run and counts toward the run's 3 cards.
+- It is posted only where someone who may create agents can open the conversation (`deciderCanOpen`): a public channel, which they may join, or a forum; a DM or a private channel only with one of them in it. Elsewhere (a member's DM with an agent, say) a card could never be decided, so nothing is posted and the tool tells the agent to send the person to an admin or owner.
 
 ### 2. The AI it suggests
 
@@ -34,11 +35,11 @@ The card shows the suggestion made for the asker. The review screens read the pr
 
 - Unlike a Connect card, what a person decided can't come from live data, so the card holds it: `state` (`pending`, `creating`, `created`, `denied`), the agent made from it, who decided and when, and `expiresAt`, a day after it was posted, like an approval. "Expired" isn't stored: a pending card past it.
 - Only the decision routes write it, each with a conditional update on the state it expects, so two people deciding at once get one decision. `creating` holds the card while the agent is made and goes back to `pending` if that fails. A crash in between leaves it decided for good, as the forum's suggestions.
-- `agent.proposal.updated` on the channel carries the card, and every app replaces it in place.
+- `agent.proposal.updated` on the channel carries the decision (the state, the agent made, who decided and when), never the draft: its instructions alone can be past a Postgres NOTIFY payload's limit (ADR 0010). Every app puts it on the card it already has.
 
 ### 4. Deciding
 
-- `GET /api/app/organizations/{orgId}/agent-proposals/{messageId}`: whoever reads the conversation, with `canDecide` for who may create agents while it is open.
+- `GET /api/app/organizations/{orgId}/agent-proposals/{messageId}`: whoever reads the conversation, with `canDecide` for who may create agents while it is open. Anyone else gets 403, and the review screens say that only people in its conversation see it.
 - Creating it is the create-agent route itself, `POST …/agents` with `proposal`: the person's own fields, edited or not, and their own permission. The card then says created and links to the agent.
 - `POST …/agent-proposals/{messageId}/deny`: the card stays, marked denied.
 - Both need `manage_agents` and a person's session; no tool decides a proposal, so no agent approves its own or another's. Decided or expired: 409 `agent_proposal.decided` or `agent_proposal.expired`.
@@ -49,14 +50,14 @@ The decision reaches the agent that proposed it as a `proposal_result` notice in
 
 ### 6. The apps
 
-- Web and the desktop app (its window loads the site, ADR 0036): the card shows the draft's face, name, @handle and role, the AI it would think with and the agent's line, with Revisar and Recusar for who may create agents while it is open; anyone else sees it waiting for an admin. Revisar opens Criar agente (`?proposal=`) on its last step, filled in with the draft, where every step can be edited. Created, the card links to the agent's page.
-- Phone: the same card in the chat. Revisar opens the phone's own Criar agente (Papel, Quem é, O que faz, Revisar) filled in; the suggested account is given to the new agent when it is the reviewer's, and with no AI the Connect sheet opens over the new agent's conversation.
+- Web and the desktop app (its window loads the site, ADR 0036): the card shows the draft's face, name, @handle and role, the AI it would think with and the agent's line, with Revisar and Recusar for who may create agents while it is open; anyone else sees it waiting for an admin. Revisar opens Criar agente (`?proposal=`) on its last step, filled in with the draft, where every step can be edited and Recusar says no too (then back to the conversation). Picking a role there changes the role alone, and a role's words are a field of their own under Do zero (in any new agent). The channels it proposes are listed even when the reviewer isn't in them, and the agent joins them. Created, the card links to the agent's page.
+- Phone: the same card in the chat. Revisar opens the phone's own Criar agente (Papel, Quem é, O que faz, Revisar) filled in, with the same rules for the role and the channels; a tap on an app in Revisar moves its level on (Sem acesso, Ler, Ler e escrever), and Recusar is there too. The suggested account is given to the new agent when it is the reviewer's, and with no AI the Connect sheet opens over the new agent's conversation.
 
 ## Consequences
 
 - An agent can answer "create a bot that…" with a ready draft one review away, and nothing exists until a person creates it.
 - A prompt injection can at most post a card that a person has to review and create.
-- Nobody is told outside the conversation: a member's request waits on the card for an admin who reads it there.
+- Nobody is told outside the conversation: a member's request waits on the card for an admin who reads it there. Where no admin or owner can read it, there is no card, and the person is sent to one.
 
 ## Alternatives considered
 

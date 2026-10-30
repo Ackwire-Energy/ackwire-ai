@@ -427,6 +427,9 @@ export interface AgentProposalCard {
   expiresAt: string;
 }
 
+/** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
+export type AgentProposalDecision = Pick<AgentProposalCard, "state" | "agentId" | "decidedByUserId" | "decidedAt">;
+
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
 export interface AgentProposal extends AgentProposalCard {
   messageId: string;
@@ -712,14 +715,13 @@ export type ChannelEvent =
       messageId: string;
       suggestion: ForumSuggestion;
     }
-  /** An agent's proposal of a new agent was decided (ADR 0080): its card (`meta.actionCard`) now. */
-  | {
+  /** An agent's proposal of a new agent was decided (ADR 0080): the decision on its card (`meta.actionCard`). */
+  | ({
       type: "agent.proposal.updated";
       channelId: string;
       threadId: string | null;
       messageId: string;
-      card: AgentProposalCard;
-    }
+    } & AgentProposalDecision)
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | {

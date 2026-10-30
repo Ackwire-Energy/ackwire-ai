@@ -16,6 +16,7 @@ afterEach(() => {
 
 type State = ReturnType<typeof seedState>;
 const HOUR = 3_600_000;
+const DESIGN_ID = "00000000-0000-4000-8000-0000000000c9";
 
 /** Atlas's proposal of Nina in #eng (`meta.actionCard`), as `propose_agent` posts it. */
 const proposal = (
@@ -137,6 +138,41 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     const [old] = cardOf("@vera");
     expect(old?.textContent).toContain("Expirou");
   });
+
+  test("live: decided by someone else, the card changes in place (only the decision comes)", async () => {
+    const state = seedState();
+    state.messages.push(proposal("p-1"));
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          type: "agent.proposal.updated",
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "p-1",
+          state: "created",
+          agentId: ATLAS_ID,
+          decidedByUserId: "u-joao",
+          decidedAt: new Date().toISOString(),
+        },
+      }),
+    );
+    await settle(3);
+    const [card] = cardOf("@nina");
+    expect(card?.textContent).toContain("Criado");
+    expect(within(card as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
+    expect(
+      within(card as HTMLElement)
+        .getByRole("link", { name: "Abrir perfil" })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/agents/${ATLAS_ID}`);
+  });
 });
 
 describe("Revisar: Criar agente filled in with the draft", () => {
@@ -181,5 +217,83 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     expect(screen().getByRole("link", { name: "Voltar para a conversa" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/c/${ENG_ID}`,
     );
+  });
+
+  test("a proposal in a conversation I'm not in says so, not that it was decided", async () => {
+    const state = seedState();
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.messages.push({ ...proposal("p-1"), channelId: DESIGN_ID });
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(screen().getByText("Só quem está na conversa vê esta proposta.")).toBeTruthy();
+    expect(screen().queryByText("Esta proposta já foi decidida ou expirou.")).toBeNull();
+  });
+
+  test("the channels it proposes, also public ones I'm not in: shown, and the agent joins them", async () => {
+    const state = seedState();
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.messages.push(proposal("p-1", {}, { channelIds: [ENG_ID, DESIGN_ID] }));
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    const review = document.querySelector(".newag__review")?.textContent ?? "";
+    expect(review).toContain("eng");
+    expect(review).toContain("design");
+    await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
+    const joined = state.calls.find((c) => c.method === "agents.setChannels")?.args[2];
+    expect(joined).toEqual([{ channelId: ENG_ID }, { channelId: DESIGN_ID }]);
+  });
+
+  test("changing the role keeps the rest of the draft; its words are a field of their own", async () => {
+    const state = seedState();
+    state.messages.push(proposal("p-1"));
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Editar Papel" }));
+    const custom = screen().getByRole("button", { name: /^Do zero/ });
+    expect(custom.getAttribute("aria-pressed")).toBe("true");
+    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Designer");
+    // Again on the role it has: nothing changes.
+    await click(custom);
+    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Designer");
+    await typeIn(screen().getByLabelText("Cargo"), "Design de produto");
+    // Another role and back: the name, the instructions and the words stay.
+    await click(screen().getByRole("button", { name: /^QA/ }));
+    await click(screen().getByRole("button", { name: /^Do zero/ }));
+    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Design de produto");
+    await click(railStep("Revisar e criar"));
+    await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
+    expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({
+      name: "Nina",
+      handle: "nina",
+      role: "Design de produto",
+      instructions: "Desenha as telas.",
+      appearance: { color: "rose", eyes: "happy", accessory: "bow" },
+      proposal: "p-1",
+    });
+  });
+
+  test("Recusar on the review says no and goes back to the conversation", async () => {
+    const state = seedState();
+    state.messages.push(proposal("p-1"));
+    const { router } = await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Recusar" }), 8);
+    expect(state.calls.some((c) => c.method === "agents.denyProposal" && c.args[1] === "p-1")).toBe(true);
+    expect(state.calls.some((c) => c.method === "agents.create")).toBe(false);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 });

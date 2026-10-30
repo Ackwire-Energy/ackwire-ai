@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { channelTopic, createPostgresPubSub, type RealtimeEvent } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   type AgentProposalCard,
+  addChannelMember,
   agentProposalOf,
   ConflictError,
   createAgent,
   createAgentFromProposal,
+  createChannel,
   createSetupToolSource,
   createToolGateway,
   denyAgentProposal,
@@ -13,6 +16,7 @@ import {
   getAgentProposal,
   insertMessage,
   NEW_AGENT_DEFAULTS,
+  openPersonAgentDm,
   suggestAgentAi,
   type ToolContext,
 } from "../src";
@@ -24,11 +28,11 @@ afterEach(async () => {
   await f?.close();
 });
 
-/** A run of @dev on a message `userId` wrote in #general. */
-async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolContext> {
+/** A run of @dev on a message `userId` wrote in #general (or in `channelId`). */
+async function runFor(fx: Fixture, userId: string, body: string, channelId = fx.general.id): Promise<ToolContext> {
   const trigger = await insertMessage(fx.db, {
     orgId: fx.org.id,
-    channelId: fx.general.id,
+    channelId,
     author: { type: "person", userId },
     body,
   });
@@ -37,7 +41,7 @@ async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolCo
     .values({
       orgId: fx.org.id,
       agentId: fx.agent.id,
-      channelId: fx.general.id,
+      channelId,
       threadRootId: trigger.id,
       triggerMessageId: trigger.id,
       trigger: "mention",
@@ -51,7 +55,7 @@ async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolCo
     orgId: fx.org.id,
     agentId: fx.agent.id,
     runId: run.id,
-    channelId: fx.general.id,
+    channelId,
     threadRootId: trigger.id,
     triggerMessageId: trigger.id,
   };
@@ -171,6 +175,25 @@ describe("propose_agent", () => {
     await refused({ why: "  " }, "why");
     expect(await proposals(f)).toHaveLength(0);
   });
+
+  test("only where someone who may create agents can open the conversation and decide it", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    // Bia's DM with @dev, and a private channel of hers: no admin or owner can read either.
+    const dm = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
+    const hers = await createChannel(f.db, bia.id, f.org.id, { name: "bia-notes", visibility: "private" });
+    for (const where of [dm.id, hers.id]) {
+      const out = await propose(f, await runFor(f, bia.id, "cria um agente", where), ADA);
+      expect(out.isError).toBe(true);
+      expect(out.content).toContain("Nothing was posted: nobody who may create agents can open this conversation");
+    }
+    expect(await proposals(f)).toHaveLength(0);
+    // With the owner in it, a private channel takes the card (as does a public one).
+    await addChannelMember(f.db, bia.id, f.org.id, hers.id, { userId: f.owner.id });
+    const out = await propose(f, await runFor(f, bia.id, "cria um agente", hers.id), ADA);
+    expect(out.isError).toBeUndefined();
+    expect(await proposals(f)).toHaveLength(1);
+  });
 });
 
 describe("the AI it suggests", () => {
@@ -278,7 +301,9 @@ describe("deciding", () => {
     expect(await cardOf(f, id)).toMatchObject({ state: "created", agentId: agent.id, decidedByUserId: caio.id });
     expect(events.find((e) => e.type === "agent.proposal.updated")).toMatchObject({
       messageId: id,
-      card: { state: "created", agentId: agent.id },
+      state: "created",
+      agentId: agent.id,
+      decidedByUserId: caio.id,
     });
     // The agent that proposed it is told, in its conversation, and answers it.
     const [notice] = (
@@ -328,6 +353,39 @@ describe("deciding", () => {
     expect((notices[0]?.meta.notice as { text: string } | undefined)?.text).toBe(
       "ana said no. Don't propose it again unless someone asks.",
     );
+  });
+
+  test("the decision reaches the conversation through Postgres NOTIFY, however long the instructions", async () => {
+    f = await setup();
+    // The server's pub/sub across replicas, looped back: it refuses a payload over the NOTIFY limit.
+    let deliver: ((payload: string) => void) | null = null;
+    const pg = await createPostgresPubSub({
+      listen: async (_channel, on) => {
+        deliver = on;
+        return async () => {};
+      },
+      notify: async (_channel, payload) => deliver?.(payload),
+    });
+    const seen: RealtimeEvent[] = [];
+    pg.subscribe(channelTopic(f.general.id), (e) => seen.push(e));
+    const ctx = await runFor(f, f.owner.id, "cria um agente de acessibilidade");
+    const out = await propose(f, ctx, { ...ADA, instructions: "Revisão de acessibilidade. ".repeat(1_850) });
+    expect(out.isError).toBeUndefined();
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    await denyAgentProposal({ db: f.db, pubsub: pg }, f.owner.id, f.org.id, id);
+    await pg.close?.();
+    expect(seen.filter((e) => e.type === "agent.proposal.updated")).toEqual([
+      {
+        type: "agent.proposal.updated",
+        channelId: f.general.id,
+        threadId: null,
+        messageId: id,
+        state: "denied",
+        agentId: null,
+        decidedByUserId: f.owner.id,
+        decidedAt: expect.any(String),
+      },
+    ]);
   });
 
   test("expired after a day: nobody decides it any more", async () => {

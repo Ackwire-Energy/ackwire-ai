@@ -6,6 +6,7 @@ import {
   AGENT_PROPOSAL_CARD,
   type AgentProposalCard,
   checkAgentDraft,
+  deciderCanOpen,
   mayCreateAgents,
   type SuggestedAi,
   suggestAgentAi,
@@ -359,6 +360,13 @@ export function createSetupToolSource(deps: {
           if (!why) return { content: "Say in `why` why this agent: one short line.", isError: true };
           const full = await cardsLeft(ctx);
           if (full) return full;
+          if (!(await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId))) {
+            return {
+              content:
+                "Nothing was posted: nobody who may create agents can open this conversation, so nobody could decide the card. Tell the person that an admin or owner creates agents: they can ask one, or ask you again in a public channel.",
+              isError: true,
+            };
+          }
           const forUserId = await personBehindCall(ctx);
           const draft = {
             ...(await checkAgentDraft(ctx.db, ctx.orgId, input)),

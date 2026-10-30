@@ -245,7 +245,7 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "agent.proposal.updated":
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
-      cacheAgentProposal(qc, orgId, { channelId, messageId: event.messageId }, event.card);
+      cacheAgentProposal(qc, orgId, event, event);
       break;
     case "browser.handoff.updated":
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.

@@ -39,7 +39,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
-  AgentProposalCard,
+  AgentProposalDecision,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -325,8 +325,7 @@ export function useDenyAgentProposal(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (messageId: string) => api.agents.denyProposal(orgId, messageId),
-    onSuccess: ({ messageId, channelId, threadId: _t, proposedByAgentId: _a, expired: _e, canDecide: _c, ...card }) =>
-      cacheAgentProposal(qc, orgId, { channelId, messageId }, card),
+    onSuccess: (proposal) => cacheAgentProposal(qc, orgId, proposal, proposal),
   });
 }
 
@@ -538,19 +537,22 @@ export function cacheReceipts(
   );
 }
 
-/** A card's meta changed (`patch`, by key): that message in every loaded list of its channel. */
+/**
+ * A card's meta changed (`patch` gives the keys that change, from the meta it has): that message in every loaded
+ * list of its channel.
+ */
 export function cacheMessageMeta(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   channelId: string,
   messageId: string,
-  patch: Record<string, unknown>,
+  patch: (meta: Record<string, unknown>) => Record<string, unknown>,
 ) {
   qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
     if (!Array.isArray(data)) return data;
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch } } : m));
+    return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch(m.meta ?? {}) } } : m));
   });
 }
 
@@ -565,17 +567,28 @@ export function cacheForumSuggestion(
   messageId: string,
   suggestion: ForumSuggestion,
 ) {
-  cacheMessageMeta(qc, orgId, channelId, messageId, { forumSuggestion: suggestion });
+  cacheMessageMeta(qc, orgId, channelId, messageId, () => ({ forumSuggestion: suggestion }));
 }
 
-/** An agent's proposal of a new agent changed (ADR 0080): its card in the chat and its own query. */
+/**
+ * An agent's proposal of a new agent was decided (ADR 0080): the decision on its card in the chat, which already
+ * holds the draft, and its own query again.
+ */
 export function cacheAgentProposal(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   where: { channelId: string; messageId: string },
-  card: AgentProposalCard,
+  { state, agentId, decidedByUserId, decidedAt }: AgentProposalDecision,
 ) {
-  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, { actionCard: card });
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: {
+      ...(meta.actionCard as Record<string, unknown> | undefined),
+      state,
+      agentId,
+      decidedByUserId,
+      decidedAt,
+    },
+  }));
   void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
 }
 

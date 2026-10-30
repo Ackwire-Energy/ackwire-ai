@@ -1939,11 +1939,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     return p;
   }
 
-  /** An agent's proposal of a new agent: its card message (`meta.actionCard`), changed in place like the server's. */
+  /**
+   * An agent's proposal of a new agent: its card message (`meta.actionCard`), changed in place like the server's,
+   * for whoever is in its conversation.
+   */
   function proposalCard(messageId: string) {
     const message = state.messages.find((m) => m.id === messageId);
     const card = message?.meta?.actionCard as AgentProposalCard | undefined;
     if (!message || card?.kind !== "agent_proposal") throw new ApiError(404, "not_found", "Proposal not found");
+    if (!state.channels.find((c) => c.id === message.channelId)?.isMember) {
+      throw new ApiError(403, "forbidden", "Join this channel first");
+    }
     return { message, card };
   }
 
