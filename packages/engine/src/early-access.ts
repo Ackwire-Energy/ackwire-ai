@@ -22,8 +22,9 @@ import { WAITLIST_IMPORT_SOURCE } from "./waitlist";
 
 /**
  * Early access (ADR 0078): the installation's sign-up mode, changed live, and invitations from the people who run
- * it, one per address, each letting that address create an account and then one workspace of its own. The
- * operator API drives all of it; the waiting list is where most addresses come from.
+ * it, one per address, each letting that address create an account, or allowing the account it already has, and
+ * then make workspaces of its own. The operator API drives all of it; the waiting list is where most addresses
+ * come from.
  */
 
 const { signupSettings, earlyAccessInvitations: invitations, waitlistEntries, users } = schema;
@@ -52,7 +53,7 @@ export const EARLY_ACCESS_OUTCOMES = [
   "recent",
   "already_invited",
   "signed_up",
-  "has_account",
+  "allowed",
   "invalid_email",
 ] as const;
 export type EarlyAccessOutcome = (typeof EARLY_ACCESS_OUTCOMES)[number];
@@ -128,34 +129,25 @@ export async function useEarlyAccess(
   return used.length > 0;
 }
 
-// ── One workspace per invitation ─────────────────────────────────────────────
+// ── Workspaces while sign-up is by invitation ────────────────────────────────
 
 /**
- * Records a new workspace on its creator's invitation, in the workspace's own transaction. The row lock makes two
- * creations at once take it once: the second finds the row taken once the first commits. Returns whether there was
- * one to take.
+ * Records an allowed account's first workspace on its invitation, in the workspace's own transaction. Set only while
+ * still empty: of two creations at once both go ahead, and the one whose update runs first is recorded.
  */
-export async function claimWorkspaceAllowance(tx: Executor, userId: string, orgId: string, now = new Date()) {
-  const claimed = await tx
+export async function recordFirstWorkspace(tx: Executor, userId: string, orgId: string, now = new Date()) {
+  await tx
     .update(invitations)
     .set({ workspaceCreatedAt: now, workspaceId: orgId })
-    .where(
-      eq(
-        invitations.id,
-        sql`(select id from ${invitations} where user_id = ${userId}
-          and workspace_created_at is null and revoked_at is null limit 1 for update)`,
-      ),
-    )
-    .returning({ id: invitations.id });
-  return claimed.length > 0;
+    .where(and(eq(invitations.userId, userId), isNull(invitations.workspaceCreatedAt), isNull(invitations.revokedAt)));
 }
 
-/** The account has an invitation that can still make its workspace. */
+/** Early access allowed the account to make workspaces: an invitation is bound to it (used) and not revoked. */
 export async function hasWorkspaceAllowance(db: Executor, userId: string) {
   const [row] = await db
     .select({ id: invitations.id })
     .from(invitations)
-    .where(and(eq(invitations.userId, userId), isNull(invitations.workspaceCreatedAt), isNull(invitations.revokedAt)))
+    .where(and(eq(invitations.userId, userId), isNull(invitations.revokedAt)))
     .limit(1);
   return row !== undefined;
 }
@@ -199,10 +191,19 @@ async function invitationById(db: Executor, id: string, now: Date) {
   return { ...row, locale: emailLocale(row.locale) };
 }
 
-const hasAccount = async (db: Executor, email: string) =>
-  (await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)).length > 0;
+const accountOf = async (db: Executor, email: string) =>
+  (await db.select({ id: users.id, locale: users.locale }).from(users).where(eq(users.email, email)).limit(1))[0];
 
 const sentLately = (sentAt: Date, now: Date) => now.getTime() - sentAt.getTime() < EARLY_ACCESS_RESEND_AFTER_MS;
+
+const expiresAfter = (now: Date) => new Date(now.getTime() + EARLY_ACCESS_TTL_DAYS * 86_400_000);
+
+/** The waiting list notes the address's first invitation. */
+const noteInvited = (tx: Executor, email: string, now: Date) =>
+  tx
+    .update(waitlistEntries)
+    .set({ invitedAt: sql`coalesce(${waitlistEntries.invitedAt}, ${now.toISOString()}::timestamptz)` })
+    .where(eq(waitlistEntries.email, email));
 
 /**
  * Sends the address its link: a new invitation, or the same one again with a new token (the old link stops working
@@ -211,11 +212,7 @@ const sentLately = (sentAt: Date, now: Date) => now.getTime() - sentAt.getTime()
  */
 async function claimSend(tx: Executor, email: string, locale: EmailLocale, publicUrl: string, now: Date) {
   const token = randomToken(32);
-  const fresh = {
-    tokenHash: sha256(token),
-    sentAt: now,
-    expiresAt: new Date(now.getTime() + EARLY_ACCESS_TTL_DAYS * 86_400_000),
-  };
+  const fresh = { tokenHash: sha256(token), sentAt: now, expiresAt: expiresAfter(now) };
   const [claimed] = await tx
     .insert(invitations)
     .values({ email, locale, createdAt: now, ...fresh })
@@ -229,10 +226,7 @@ async function claimSend(tx: Executor, email: string, locale: EmailLocale, publi
     })
     .returning({ id: invitations.id, sends: invitations.sends, locale: invitations.locale });
   if (!claimed) return null;
-  await tx
-    .update(waitlistEntries)
-    .set({ invitedAt: sql`coalesce(${waitlistEntries.invitedAt}, ${now.toISOString()}::timestamptz)` })
-    .where(eq(waitlistEntries.email, email));
+  await noteInvited(tx, email, now);
   await queueEmail(tx, {
     orgId: null,
     key: `early-access:${claimed.id}:${claimed.sends}`,
@@ -248,13 +242,57 @@ async function claimSend(tx: Executor, email: string, locale: EmailLocale, publi
   return claimed;
 }
 
+/**
+ * Allows the account an address already has to make workspaces, instead of sending it a sign-up link: the address's
+ * invitation (a new one if it has none) is bound to the account and used at once, with no link, and the person is
+ * told by email in `locale`, with a link to make a workspace. Claimed by one conditional upsert, so two calls at once
+ * allow and mail once; null when the invitation was used already. The waiting list notes it as an invitation.
+ */
+async function allowAccount(
+  tx: Executor,
+  email: string,
+  userId: string,
+  locale: EmailLocale,
+  publicUrl: string,
+  now: Date,
+) {
+  const used = {
+    locale,
+    tokenHash: null,
+    usedAt: now,
+    userId,
+    revokedAt: null,
+    sentAt: now,
+    expiresAt: expiresAfter(now),
+  };
+  const [allowed] = await tx
+    .insert(invitations)
+    .values({ email, createdAt: now, ...used })
+    .onConflictDoUpdate({
+      target: invitations.email,
+      set: { ...used, sends: sql`${invitations.sends} + 1` },
+      setWhere: isNull(invitations.usedAt),
+    })
+    .returning({ id: invitations.id, sends: invitations.sends });
+  if (!allowed) return null;
+  await noteInvited(tx, email, now);
+  await queueEmail(tx, {
+    orgId: null,
+    key: `early-access:${allowed.id}:${allowed.sends}`,
+    to: [email],
+    template: { kind: "early_access_allowed", locale, email, url: `${publicUrl.replace(/\/$/, "")}/onboarding` },
+  });
+  return allowed;
+}
+
 export type EarlyAccessResult = { email: string; outcome: EarlyAccessOutcome; invitationId?: string };
 
 /**
  * Invites each address, each in its own transaction, answering in the request's order (an address repeated in
- * another form answers once, where it first came). An address whose invitation was used, or that has an account,
- * gets nothing; one invited already gets its link again unless `resend` is false. The email is in the language of
- * the invitation, else of the waiting list's entry, else `locale`, else pt-BR.
+ * another form answers once, where it first came). An address whose invitation was used gets nothing. One that has
+ * an account gets no link: the account is allowed at once (`allowed`). One invited already gets its link again
+ * unless `resend` is false. The email is in the language of the account, else of the invitation, else of the
+ * waiting list's entry, else `locale`, else pt-BR.
  */
 export async function inviteEarlyAccess(
   db: Database,
@@ -275,21 +313,33 @@ export async function inviteEarlyAccess(
     seen.add(email);
     const answer = await db.transaction(async (tx): Promise<Omit<EarlyAccessResult, "email">> => {
       const [row] = await tx
-        .select({ id: invitations.id, usedAt: invitations.usedAt, sentAt: invitations.sentAt })
+        .select({
+          id: invitations.id,
+          usedAt: invitations.usedAt,
+          sentAt: invitations.sentAt,
+          locale: invitations.locale,
+        })
         .from(invitations)
         .where(eq(invitations.email, email));
       const id = row ? { invitationId: row.id } : {};
       if (row?.usedAt) return { outcome: "signed_up", ...id };
-      if (await hasAccount(tx, email)) return { outcome: "has_account", ...id };
-      if (row && !input.resend) return { outcome: "already_invited", ...id };
-      if (row && sentLately(row.sentAt, now)) return { outcome: "recent", ...id };
+      const account = await accountOf(tx, email);
+      if (row && !account) {
+        if (!input.resend) return { outcome: "already_invited", ...id };
+        if (sentLately(row.sentAt, now)) return { outcome: "recent", ...id };
+      }
       const [entry] = row
         ? []
         : await tx
             .select({ locale: waitlistEntries.locale })
             .from(waitlistEntries)
             .where(eq(waitlistEntries.email, email));
-      const claimed = await claimSend(tx, email, emailLocale(entry?.locale ?? input.locale), input.publicUrl, now);
+      const locale = emailLocale(account?.locale ?? row?.locale ?? entry?.locale ?? input.locale);
+      if (account) {
+        const allowed = await allowAccount(tx, email, account.id, locale, input.publicUrl, now);
+        return allowed ? { outcome: "allowed", invitationId: allowed.id } : { outcome: "signed_up", ...id };
+      }
+      const claimed = await claimSend(tx, email, locale, input.publicUrl, now);
       if (!claimed) return { outcome: "recent", ...id };
       return { outcome: row ? "resent" : "invited", invitationId: claimed.id };
     });
@@ -298,32 +348,33 @@ export async function inviteEarlyAccess(
   return results;
 }
 
-/** Sends one invitation again, unless it went out in the last 2 minutes (`sent: false`). */
+/**
+ * Sends one invitation again, unless it went out in the last 2 minutes (`sent: false`). When its address has an
+ * account by now, no link goes: the account is allowed instead (`allowed`), also with `sent: false`.
+ */
 export async function resendEarlyAccess(db: Database, id: string, publicUrl: string, now = new Date()) {
   return db.transaction(async (tx) => {
     const row = await invitationById(tx, id, now);
     if (row.usedAt) throw new ConflictError("This invitation was used: its account exists", "early_access.used");
-    if (await hasAccount(tx, row.email))
-      throw new ConflictError("This address already has an account", "early_access.has_account");
+    const account = await accountOf(tx, row.email);
+    if (account) {
+      await allowAccount(tx, row.email, account.id, emailLocale(account.locale ?? row.locale), publicUrl, now);
+      return { invitation: await invitationById(tx, id, now), sent: false };
+    }
     const sent = !sentLately(row.sentAt, now) && (await claimSend(tx, row.email, row.locale, publicUrl, now)) !== null;
     return { invitation: sent ? await invitationById(tx, id, now) : row, sent };
   });
 }
 
 /**
- * Revokes an invitation: its link stops working, and an account made with it loses its workspace allowance.
- * Revoking again answers the same. Refused once its workspace exists.
+ * Revokes an invitation: its link stops working, and its account can make no more workspaces while sign-up is by
+ * invitation (the ones it made stay). Revoking again answers the same.
  */
 export async function revokeEarlyAccess(db: Database, id: string, now = new Date()) {
-  const [revoked] = await db
+  await db
     .update(invitations)
     .set({ revokedAt: sql`coalesce(${invitations.revokedAt}, ${now.toISOString()}::timestamptz)`, tokenHash: null })
-    .where(and(eq(invitations.id, id), isNull(invitations.workspaceCreatedAt)))
-    .returning({ id: invitations.id });
-  if (!revoked) {
-    await invitationById(db, id, now);
-    throw new ConflictError("Its workspace exists: it can't be revoked", "early_access.workspace_created");
-  }
+    .where(eq(invitations.id, id));
   return invitationById(db, id, now);
 }
 
@@ -376,9 +427,9 @@ export async function listEarlyAccess(db: Database, query: EarlyAccessQuery, now
 // ── The waiting list ─────────────────────────────────────────────────────────
 
 /**
- * The waiting list against invitations: `waiting` are confirmed entries with no invitation (in any state) and no
- * account; `invited`, `signedUp` and `workspaceCreated` count confirmed entries whose invitation exists, was used,
- * or made its workspace.
+ * The waiting list against invitations: `waiting` are confirmed entries with no invitation (in any state), an address
+ * with an account among them; `invited`, `signedUp` and `workspaceCreated` count confirmed entries whose invitation
+ * exists, was used (made or allowed an account), or whose account made a workspace.
  */
 export async function waitlistCounts(db: Database) {
   const n = (filter: SQL) => sql<number>`count(*) filter (where ${filter})`.mapWith(Number);
@@ -387,14 +438,13 @@ export async function waitlistCounts(db: Database) {
     .select({
       unconfirmed: n(sql`${waitlistEntries.confirmedAt} is null`),
       confirmed: n(confirmed),
-      waiting: n(sql`${confirmed} and ${invitations.id} is null and ${users.id} is null`),
+      waiting: n(sql`${confirmed} and ${invitations.id} is null`),
       invited: n(sql`${confirmed} and ${invitations.id} is not null`),
       signedUp: n(sql`${confirmed} and ${invitations.usedAt} is not null`),
       workspaceCreated: n(sql`${confirmed} and ${invitations.workspaceCreatedAt} is not null`),
     })
     .from(waitlistEntries)
-    .leftJoin(invitations, eq(invitations.email, waitlistEntries.email))
-    .leftJoin(users, eq(users.email, waitlistEntries.email));
+    .leftJoin(invitations, eq(invitations.email, waitlistEntries.email));
   return row ?? { unconfirmed: 0, confirmed: 0, waiting: 0, invited: 0, signedUp: 0, workspaceCreated: 0 };
 }
 
@@ -403,9 +453,9 @@ const joinedAtMs = sql<Date>`date_trunc('milliseconds', ${waitlistEntries.create
 );
 
 /**
- * The next confirmed entries still waiting (no invitation, no account), oldest first, skipping addresses sign-up
- * wouldn't take (they still count as waiting). A read: the caller invites exactly these, so a retry never invites
- * more than it showed.
+ * The next confirmed entries still waiting (no invitation; inviting one with an account allows it), oldest first,
+ * skipping addresses sign-up wouldn't take (they still count as waiting). A read: the caller invites exactly these,
+ * so a retry never invites more than it showed.
  */
 export async function waitlistNext(db: Database, limit: number) {
   const out: { email: string; locale: EmailLocale; joinedAt: Date }[] = [];
@@ -420,10 +470,9 @@ export async function waitlistNext(db: Database, limit: number) {
       })
       .from(waitlistEntries)
       .leftJoin(invitations, eq(invitations.email, waitlistEntries.email))
-      .leftJoin(users, eq(users.email, waitlistEntries.email))
       .where(
         and(
-          sql`${waitlistEntries.confirmedAt} is not null and ${invitations.id} is null and ${users.id} is null`,
+          sql`${waitlistEntries.confirmedAt} is not null and ${invitations.id} is null`,
           after
             ? sql`(${joinedAtMs}, ${waitlistEntries.id}) > (${after.joinedAt.toISOString()}::timestamptz, ${after.id}::uuid)`
             : undefined,

@@ -3,7 +3,7 @@
 - Status: Accepted (built: the server, the operator API, the email, the web's sign-up page and the shared client; the Cloud's console calls it)
 - Date: 2026-10-29
 - Amends: ADR 0006 (the sign-up policy), ADR 0056 (the operator API gains sign-up, the waiting list and invitations), ADR 0068 (only an email invitation opens sign-up: an early-access link does too, for the address it was sent to)
-- Code: `packages/engine/src/early-access.ts`, `packages/engine/src/organizations.ts` (`signupAdmission`, `needsWorkspaceAllowance`, `createOrganization`), `packages/db/src/schema/early-access.ts`, `apps/server/src/auth.ts` (the hooks), `apps/server/src/operator/access.ts`, `apps/server/src/routes/app/account.ts`, `apps/web/src/pages/AuthPage.tsx`, `apps/web/src/routes/signup.tsx`
+- Code: `packages/engine/src/early-access.ts`, `packages/engine/src/organizations.ts` (`signupAdmission`, `needsWorkspaceAllowance`, `canCreateWorkspace`, `createOrganization`), `packages/db/src/schema/early-access.ts`, `apps/server/src/auth.ts` (the hooks), `apps/server/src/operator/access.ts`, `apps/server/src/routes/app/account.ts`, `apps/web/src/pages/AuthPage.tsx`, `apps/web/src/routes/signup.tsx`
 
 ## Context
 
@@ -25,10 +25,11 @@ On agentes.chat Cloud every workspace gets a computer someone pays for (ADR 0056
 
 - **The link** is `/signup?email=<address>&access=<token>`: 32 random bytes (43 base64url characters). Only its SHA-256 is stored, behind a unique index. The token is only in the email and its outbox row, whose payload goes after 30 days like every job's. No API returns it and nothing logs it.
 - **The email** (`early_access`, ADR 0069's layout, pt-BR or English) is queued in the same transaction as the invitation, keyed `early-access:<id>:<sends>`. Its language is the invitation's, else the waiting list entry's, else the request's, else pt-BR.
-- **Expiry** is 14 days after the latest send, and limits sign-up only: an account made in time keeps its workspace allowance.
-- **Inviting an address again** sends the same invitation a new token (the old link stops at once), one more send, 14 days from now, and clears a revocation. There is never a second row. Within 2 minutes of the previous send nothing goes out (`recent`), so a retry or a double submit mails once; one conditional upsert claims the send, so two calls at once send one email. A used invitation is never sent again, and an address with an account is never invited.
-- **Revoking** clears the token and takes the allowance of an account made with it; it is refused once its workspace exists.
-- **State**, the first that holds: `revoked`, `workspace_created`, `signed_up`, `expired`, else `sent`.
+- **Expiry** is 14 days after the latest send, and limits sign-up only: an account made in time stays allowed (§4).
+- **Inviting an address again** sends the same invitation a new token (the old link stops at once), one more send, 14 days from now, and clears a revocation. There is never a second row. Within 2 minutes of the previous send nothing goes out (`recent`), so a retry or a double submit mails once; one conditional upsert claims the send, so two calls at once send one email. A used invitation is never sent again (`signed_up`).
+- **An address that already has an account** gets no link. Inviting it, inviting it as one of the waiting list's next, or resending its invitation allows that account instead (`allowed`): the invitation, made then if there was none, is bound to the account and used at once, and a short email (`early_access_allowed`, in the account's language, else the order above) says it can now make its own workspace, with a link to the app. One conditional upsert claims it, so two calls at once allow and mail once. The resend answers the invitation, now `signed_up`, with `sent: false`.
+- **Revoking** clears the token, so an unused link stops working, and stops its account from making more workspaces (§4); the ones it made stay. It always works.
+- **State**, the first that holds: `revoked`, `workspace_created` (its account made at least one), `signed_up` (its account exists: made with the link, or allowed), `expired`, else `sent`.
 
 ### 3. Who the link lets in
 
@@ -38,15 +39,17 @@ An invitation is looked up only by its token's hash, never by address. Without a
 
 The refusals: a link for another address is 403 `EARLY_ACCESS_OTHER_EMAIL` (naming no address); a provider that hasn't verified the address is 403 `EARLY_ACCESS_EMAIL_UNVERIFIED` (Google's and Apple's `email_verified`, GitHub's verified primary address); anything else is 403 `SIGNUP_CLOSED`, the same answer for an invited address without its link as for any other. A provider's refusal comes back to `/login?error=<code>`, which it does only for a refusal with a code.
 
-After the account is committed, a sign-up that carried the token uses the invitation while its link hasn't expired: `used_at`, `user_id`, and the token is cleared, for the invited address only, and never for a provider's unverified address. An account let in another way (open mode, a workspace invitation) with an expired link takes nothing from it. A failure is logged and never fails the sign-up. An account made without the token (open mode, a workspace invitation) never uses one. Deleting the account keeps `used_at` and nulls `user_id`, so neither the link nor the allowance comes back.
+After the account is committed, a sign-up that carried the token uses the invitation while its link hasn't expired: `used_at`, `user_id`, and the token is cleared, for the invited address only, and never for a provider's unverified address. An account let in another way (open mode, a workspace invitation) with an expired link takes nothing from it. A failure is logged and never fails the sign-up. An account made without the token (open mode, a workspace invitation) never uses one, until its address is allowed (§2). Deleting the account keeps `used_at` and nulls `user_id`, so neither the link nor the allowance comes back.
 
-### 4. One workspace per invitation on agentes.chat Cloud
+### 4. Who makes workspaces on agentes.chat Cloud
 
-On agentes.chat Cloud, where every workspace gets a paid computer (`MACHINE_PROVISIONING=external` at an agentes.chat `PUBLIC_URL`), while sign-up is by invitation (no `ALLOW_SIGNUP`, the mode `invite`), a new workspace takes the creator's invitation that hasn't made one, except for the installation's pinned owner (ADR 0073). `createOrganization` claims it in the workspace's own transaction with a row lock, so two creations at once make one; with none to take it refuses with 403 `org.create_invite_only` and nothing is left behind. Everywhere else the claim still runs, so the console sees which workspace an invitation made. `/api/app/me` says `user.canCreateWorkspace`; the web hides New workspace and the onboarding says why when it is false. Someone who joined another person's workspace keeps it, and makes their own once sign-up opens. A self-hosted server with a provisioner of its own isn't held to it.
+On agentes.chat Cloud, where every workspace gets a paid computer (`MACHINE_PROVISIONING=external` at an agentes.chat `PUBLIC_URL`), while sign-up is by invitation (no `ALLOW_SIGNUP`, the mode `invite`), only an allowed account makes workspaces: one an early-access invitation is bound to (used, not revoked), or the installation's pinned owner (ADR 0073). There is no count: an allowed account makes as many as it likes. An account that isn't allowed, such as someone who joined a teammate's workspace through a workspace invitation, makes none until its address is allowed (§2) or sign-up opens; `createOrganization` refuses it with 403 `org.create_invite_only` before anything is made. `/api/app/me` says `user.canCreateWorkspace` by the same rule; the web hides New workspace and the onboarding says why when it is false. Revoking the invitation stops further workspaces and leaves the ones made.
+
+An allowed account's first workspace is recorded on its invitation (`workspace_created_at`, `workspace_id`) in the workspace's own transaction, set only while still empty, so two creations at once both go ahead and the first recorded stays. Everywhere else the record still runs, so the console sees which workspace an invitation led to. Open mode, `ALLOW_SIGNUP` and a self-hosted server, with a provisioner of its own or none, aren't held to the rule.
 
 ### 5. The waiting list
 
-The operator API imports addresses as confirmed entries (`source = 'import'`, deduplicated, up to 5,000 a call, `joinedAt` kept or else the list's own order), counts the list against invitations and accounts, and reads the next confirmed entries still waiting, oldest first. "Invite the next N" is that read followed by inviting exactly those addresses, so a retry of either never invites more than was shown. The first invitation sets `waitlist_entries.invited_at`. Imported entries never go to the email provider's contacts (at import, at boot or in `waitlist.contact`): they came from there, and a sync would overwrite their properties.
+The operator API imports addresses as confirmed entries (`source = 'import'`, deduplicated, up to 5,000 a call, `joinedAt` kept or else the list's own order), counts the list against invitations, and reads the next confirmed entries still waiting (no invitation in any state), oldest first. An address that has an account waits like any other: inviting it allows the account (§2). "Invite the next N" is that read followed by inviting exactly those addresses, so a retry of either never invites more than was shown, and it answers the same outcomes as any invitation. The first invitation sets `waitlist_entries.invited_at`. Imported entries never go to the email provider's contacts (at import, at boot or in `waitlist.contact`): they came from there, and a sync would overwrite their properties.
 
 ### 6. The operator API
 
@@ -54,7 +57,7 @@ Under `/api/operator/v1`, behind `OPERATOR_API_TOKEN` like the rest (ADR 0056): 
 
 ## Consequences
 
-- Opening sign-up on agentes.chat Cloud is a switch in the console, and invitation-only bounds new computers: each invitation makes at most one workspace.
+- Opening sign-up on agentes.chat Cloud is a switch in the console. Invitation-only bounds who makes workspaces, not how many: the provisioner's pool, not the invitation, bounds new computers, and a workspace waits (`capacity`) once the pool is full (ADR 0056 §10).
 - The waiting list moves to production as a CSV, without touching its contacts.
 - On a new database whoever signs up first is the installation's owner, exempt from §4: set `OWNER_CLAIM_SHA256`, or sign up before the address is public.
-- A member who needs their own workspace before sign-up opens has no path yet (their address `has_account`). Early-access sign-up in the phone and Mac apps, and treating plus or dot variants as one person, are left out until they are needed.
+- A member who needs their own workspace before sign-up opens gets it by allowing their address from the console (`allowed`). Early-access sign-up in the phone and Mac apps, and treating plus or dot variants as one person, are left out until they are needed.

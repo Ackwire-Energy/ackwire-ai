@@ -634,7 +634,7 @@
           "waiting": {
             "type": "integer",
             "minimum": 0,
-            "description": "Confirmed, with no invitation (in any state) and no account."
+            "description": "Confirmed, with no invitation (in any state). Some may have an account: inviting one allows it."
           },
           "invited": {
             "type": "integer",
@@ -644,12 +644,12 @@
           "signedUp": {
             "type": "integer",
             "minimum": 0,
-            "description": "Confirmed, whose invitation made an account."
+            "description": "Confirmed, whose invitation made an account or allowed the one it had."
           },
           "workspaceCreated": {
             "type": "integer",
             "minimum": 0,
-            "description": "Confirmed, whose invitation made its workspace."
+            "description": "Confirmed, whose account made a workspace."
           }
         },
         "required": ["unconfirmed", "confirmed", "waiting", "invited", "signedUp", "workspaceCreated"]
@@ -724,15 +724,7 @@
                 },
                 "outcome": {
                   "type": "string",
-                  "enum": [
-                    "invited",
-                    "resent",
-                    "recent",
-                    "already_invited",
-                    "signed_up",
-                    "has_account",
-                    "invalid_email"
-                  ]
+                  "enum": ["invited", "resent", "recent", "already_invited", "signed_up", "allowed", "invalid_email"]
                 },
                 "invitationId": {
                   "type": "string",
@@ -823,7 +815,7 @@
           },
           "usedAt": {
             "type": ["string", "null"],
-            "description": "When an account was made with it."
+            "description": "When an account was made with it, or the address's account was allowed."
           },
           "userId": {
             "type": ["string", "null"],
@@ -831,7 +823,7 @@
           },
           "workspaceCreatedAt": {
             "type": ["string", "null"],
-            "description": "When its one workspace was made."
+            "description": "When its account made its first workspace."
           },
           "workspaceId": {
             "type": ["string", "null"],
@@ -858,7 +850,7 @@
       "OperatorInvitationState": {
         "type": "string",
         "enum": ["sent", "expired", "signed_up", "workspace_created", "revoked"],
-        "description": "The first that holds: `revoked`, `workspace_created`, `signed_up`, `expired` (the link no longer signs anyone up), else `sent`."
+        "description": "The first that holds: `revoked`, `workspace_created` (its account made a workspace), `signed_up` (its account exists: made with the link, or allowed), `expired` (the link no longer signs anyone up), else `sent`."
       },
       "OperatorInvitationResend": {
         "type": "object",
@@ -1977,7 +1969,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Open sign-up to everyone, or back to invitation only",
-        "description": "Takes effect at once, with no restart. Setting the current mode changes nothing. On agentes.chat Cloud, while it is `invite`, an account makes a workspace only with an early-access invitation that hasn't made one yet; `open` lets every account make workspaces, each with its own computer. Refused (409 `signup.host_computer`) to open while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
+        "description": "Takes effect at once, with no restart. Setting the current mode changes nothing. On agentes.chat Cloud, while it is `invite`, only the accounts early access allowed make workspaces, as many as they like; `open` lets every account make workspaces, each with its own computer. Refused (409 `signup.host_computer`) to open while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2071,7 +2063,7 @@
       "get": {
         "tags": ["Operator"],
         "summary": "The next confirmed entries still waiting, oldest first",
-        "description": "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. Skips addresses sign-up wouldn't take; they still count as waiting.",
+        "description": "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. An address with an account is among them: inviting it allows the account. Skips addresses sign-up wouldn't take; they still count as waiting.",
         "parameters": [
           {
             "schema": {
@@ -2203,8 +2195,8 @@
     "/early-access/invitations": {
       "post": {
         "tags": ["Operator"],
-        "summary": "Invite addresses to create an account and a workspace",
-        "description": "Each address, up to 200, gets an email with a link to sign up with that address only, valid 14 days, in the language of its invitation, else of its waiting-list entry, else `locale`, else pt-BR. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless `resend` is false. Answers come in the request's order, once per address. Outcomes: `invalid_email`, `signed_up` (its invitation made an account), `has_account`, `already_invited` (with `resend: false`), `recent` (sent in the last 2 minutes, so nothing went out), `resent`, `invited`. Refused (409 `early_access.no_email`) on a server that sends no email.",
+        "summary": "Invite addresses to create an account and make workspaces",
+        "description": "Each address, up to 200, gets an email with a link to sign up with that address only, valid 14 days, in the language of its invitation, else of its waiting-list entry, else `locale`, else pt-BR. An address that has an account gets no link: the account is allowed to make workspaces at once, and an email in its language says so. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless `resend` is false. Answers come in the request's order, once per address. Outcomes: `invalid_email`, `signed_up` (its invitation made an account or allowed one already, so nothing went out), `allowed`, `already_invited` (with `resend: false`), `recent` (sent in the last 2 minutes, so nothing went out), `resent`, `invited`. Refused (409 `early_access.no_email`) on a server that sends no email.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2287,7 +2279,7 @@
               "$ref": "#/components/schemas/OperatorInvitationState"
             },
             "required": false,
-            "description": "The first that holds: `revoked`, `workspace_created`, `signed_up`, `expired` (the link no longer signs anyone up), else `sent`.",
+            "description": "The first that holds: `revoked`, `workspace_created` (its account made a workspace), `signed_up` (its account exists: made with the link, or allowed), `expired` (the link no longer signs anyone up), else `sent`.",
             "name": "state",
             "in": "query"
           },
@@ -2361,7 +2353,7 @@
       "post": {
         "tags": ["Operator"],
         "summary": "Send an invitation again, with a new link",
-        "description": "The old link stops working, the invitation is no longer revoked and runs 14 days from now. Within 2 minutes of the previous send nothing goes out (`sent: false`). Refused (409) once it made an account (`early_access.used`), when the address has an account (`early_access.has_account`), and on a server that sends no email (`early_access.no_email`).",
+        "description": "The old link stops working, the invitation is no longer revoked and runs 14 days from now. Within 2 minutes of the previous send nothing goes out (`sent: false`). When the address has an account by now, no link goes: the account is allowed to make workspaces at once and an email says so, and the answer is the invitation, now `signed_up`, with `sent: false`. Refused (409) once it was used (`early_access.used`), and on a server that sends no email (`early_access.no_email`).",
         "parameters": [
           {
             "schema": {
@@ -2415,7 +2407,7 @@
             }
           },
           "409": {
-            "description": "Used, the address has an account, or no email (`early_access.*`)",
+            "description": "Used, or no email (`early_access.*`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2431,7 +2423,7 @@
       "post": {
         "tags": ["Operator"],
         "summary": "Revoke an invitation",
-        "description": "Its link stops working, and an account it made can no longer make its workspace with it. Revoking again answers the same. Refused (409 `early_access.workspace_created`) once its workspace exists.",
+        "description": "Its link stops working, and its account can make no more workspaces while sign-up is by invitation. The workspaces it made stay. Revoking again answers the same.",
         "parameters": [
           {
             "schema": {
@@ -2476,16 +2468,6 @@
           },
           "404": {
             "description": "No invitation with this id",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Its workspace exists (`early_access.workspace_created`)",
             "content": {
               "application/json": {
                 "schema": {

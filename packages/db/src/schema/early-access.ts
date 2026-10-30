@@ -26,8 +26,9 @@ export const signupSettings = pgTable(
 
 /**
  * Early access (ADR 0078): one invitation per address, sent by the people who run the installation, lets that
- * address create an account and then one workspace of its own. Installation-level, so no `org_id`. Only the
- * SHA-256 of the link's token is kept; the token itself is only in the email.
+ * address create an account, or allows the account it already has, and then make workspaces of its own.
+ * Installation-level, so no `org_id`. Only the SHA-256 of the link's token is kept; the token itself is only in
+ * the email.
  */
 export const earlyAccessInvitations = pgTable(
   "early_access_invitations",
@@ -46,10 +47,10 @@ export const earlyAccessInvitations = pgTable(
     /** `sentAt` + 14 days: the link signs nobody up after it. */
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     revokedAt: timestamp({ withTimezone: true }),
-    /** When an account was created with it. */
+    /** When an account was created with it, or the address's account was allowed (no link then). */
     usedAt: timestamp({ withTimezone: true }),
     userId: text().references(() => users.id, { onDelete: "set null" }),
-    /** When its one workspace was created. */
+    /** When its account created its first workspace. */
     workspaceCreatedAt: timestamp({ withTimezone: true }),
     workspaceId: uuid().references(() => organizations.id, { onDelete: "set null" }),
   },

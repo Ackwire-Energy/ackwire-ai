@@ -112,6 +112,7 @@ describe("every email, in both languages", () => {
       calendar_invite: true,
       waitlist_confirm: true,
       early_access: true,
+      early_access_allowed: true,
       budget: true,
       approval_digest: true,
       computer_ready: true,

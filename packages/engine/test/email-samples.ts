@@ -87,6 +87,18 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     url: `${APP}/signup?email=rafa%40estudio.design&access=Hk3vQ9xLm2Tz8Rb5Wc1Yd7Fg4Jn6Ps0Ua2Ve9Xi3Ko`,
     days: 14,
   },
+  "early_access_allowed.en": {
+    kind: "early_access_allowed",
+    locale: "en",
+    email: "rafa@studio.design",
+    url: `${APP}/onboarding`,
+  },
+  "early_access_allowed.pt-BR": {
+    kind: "early_access_allowed",
+    locale: "pt-BR",
+    email: "rafa@estudio.design",
+    url: `${APP}/onboarding`,
+  },
   "budget-warning.en": {
     kind: "budget",
     locale: "en",

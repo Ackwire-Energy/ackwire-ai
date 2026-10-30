@@ -50,6 +50,18 @@ async function accessFor(t: TestServer, email: string) {
   return url.searchParams.get("access") ?? "";
 }
 
+/** The early-access emails queued for `email`, oldest first: their kind and link. */
+async function mailed(t: TestServer, email: string) {
+  const rows = await t.db
+    .select({ payload: schema.outbox.payload })
+    .from(schema.outbox)
+    .where(eq(schema.outbox.kind, "email.send"));
+  return rows
+    .map((r) => r.payload as { to: string[]; template: { kind: string; url: string } })
+    .filter((p) => p.to[0] === email && p.template.kind.startsWith("early_access"))
+    .map((p) => ({ kind: p.template.kind, url: p.template.url }));
+}
+
 async function invite(t: TestServer, email: string) {
   const res = await operator(t)("POST", "/early-access/invitations", { emails: [email] });
   expect(res.status).toBe(200);
@@ -101,7 +113,7 @@ function cloudBrowser(t: TestServer): Browser {
   });
 }
 
-test("an invitation's link: sign-up for its address, then one workspace (agentes.chat Cloud)", async () => {
+test("an invitation's link: sign-up for its address, then workspaces (agentes.chat Cloud)", async () => {
   const t = await server({ MACHINE_PROVISIONING: "external", PUBLIC_URL: CLOUD });
   const owner = cloudBrowser(t);
   await signUp(owner, "owner@acme.test");
@@ -140,11 +152,57 @@ test("an invitation's link: sign-up for its address, then one workspace (agentes
   const first = await ana("/api/app/organizations", { json: { name: "Ana's" } });
   expect(first.status).toBe(201);
   const { organization } = (await first.json()) as { organization: { id: string } };
+  // As many as she likes: the first is the one recorded.
+  expect((await ana("/api/app/organizations", { json: { name: "Another" } })).status).toBe(201);
   expect((await invitation(t, "ana@acme.test"))?.workspaceId).toBe(organization.id);
-  expect((await me(ana)).canCreateWorkspace).toBe(false);
-  const second = await ana("/api/app/organizations", { json: { name: "Another" } });
-  expect(second.status).toBe(403);
-  expect(((await second.json()) as { error: { code: string } }).error.code).toBe("org.create_invite_only");
+  expect((await me(ana)).canCreateWorkspace).toBe(true);
+});
+
+test("agentes.chat Cloud: a member makes no workspace until the address is allowed, then as many as it likes, until revoked", async () => {
+  const t = await server({ MACHINE_PROVISIONING: "external", PUBLIC_URL: CLOUD });
+  const owner = cloudBrowser(t);
+  await signUp(owner, "owner@acme.test");
+  const created = await owner("/api/app/organizations", { json: { name: "Acme" } });
+  const { organization } = (await created.json()) as { organization: { id: string } };
+  const asked = await owner(`/api/app/organizations/${organization.id}/invitations`, {
+    json: { email: "bia@acme.test", role: "member" },
+  });
+  expect(asked.status).toBe(201);
+  const token = ((await asked.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  const bia = cloudBrowser(t);
+  expect((await signUpWith(bia, "bia@acme.test")).status).toBe(200);
+  expect((await bia(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
+  expect((await me(bia)).canCreateWorkspace).toBe(false);
+  const refused = await bia("/api/app/organizations", { json: { name: "Bia's" } });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("org.create_invite_only");
+
+  const op = operator(t);
+  const outcome = async (email: string) => {
+    const res = await op("POST", "/early-access/invitations", { emails: [email] });
+    return ((await res.json()) as { results: { email: string; outcome: string; invitationId: string }[] }).results[0];
+  };
+  const allowed = await outcome("bia@acme.test");
+  expect(allowed?.outcome).toBe("allowed");
+  expect(await mailed(t, "bia@acme.test")).toEqual([{ kind: "early_access_allowed", url: `${CLOUD}/onboarding` }]);
+  expect((await me(bia)).canCreateWorkspace).toBe(true);
+  for (const name of ["Bia's", "Bia Labs"]) {
+    expect((await bia("/api/app/organizations", { json: { name } })).status).toBe(201);
+  }
+  // Allowing again sends nothing.
+  expect(await outcome("bia@acme.test")).toEqual({
+    email: "bia@acme.test",
+    outcome: "signed_up",
+    invitationId: allowed?.invitationId ?? "",
+  });
+  expect(await mailed(t, "bia@acme.test")).toHaveLength(1);
+
+  // Revoked: no more workspaces, and the ones made stay.
+  expect((await op("POST", `/early-access/invitations/${allowed?.invitationId}/revoke`)).status).toBe(200);
+  expect((await me(bia)).canCreateWorkspace).toBe(false);
+  expect((await bia("/api/app/organizations", { json: { name: "More" } })).status).toBe(403);
+  const mine = (await (await bia("/api/app/me")).json()) as { organizations: { name: string }[] };
+  expect(mine.organizations.map((o) => o.name).sort()).toEqual(["Acme", "Bia Labs", "Bia's"]);
 });
 
 test("a link used for another address is refused with its own code, naming no address", async () => {

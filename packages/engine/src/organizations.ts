@@ -18,7 +18,7 @@ import { appLocale } from "@agenteschat/i18n/locale";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
-import { claimWorkspaceAllowance, earlyAccessLink, hasWorkspaceAllowance, signupMode } from "./early-access";
+import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
@@ -175,8 +175,8 @@ export function assertInviting(membership: Membership) {
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
  * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
  * (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
- * The first workspace of an account made with early access is recorded on its invitation; with `needsAllowance`
- * (`needsWorkspaceAllowance`) there must be one to take, else `org.create_invite_only` and nothing is made.
+ * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
+ * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
  */
 export async function createOrganization(
   db: Database,
@@ -192,14 +192,15 @@ export async function createOrganization(
     .limit(1);
   if (paused || (await isUserBlocked(db, userId)))
     throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
+  if (options.needsAllowance && !(await hasWorkspaceAllowance(db, userId)))
+    throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
       .values({ name: input.name, context: input.context ?? "" })
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
-    if (!(await claimWorkspaceAllowance(tx, userId, organization.id)) && options.needsAllowance)
-      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
+    await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
     await assignHandle(tx, organization.id, userId);
     const [general] = await tx
@@ -345,7 +346,7 @@ export async function isSignupAllowed(db: Database, email: string, policy: Signu
   return (await signupAdmission(db, email, policy, { now })) !== null;
 }
 
-/** What decides whether a new workspace takes an early-access invitation (`needsWorkspaceAllowance`). */
+/** What decides whether making a workspace needs early access (`needsWorkspaceAllowance`). */
 export interface WorkspacePolicy {
   /** agentes.chat Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
   paidMachines: boolean;
@@ -354,8 +355,8 @@ export interface WorkspacePolicy {
 }
 
 /**
- * Whether making a workspace takes an early-access invitation (ADR 0078 §4): on agentes.chat Cloud, where every
- * workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
+ * Whether making a workspace needs the account allowed by early access (ADR 0078 §4): on agentes.chat Cloud, where
+ * every workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
  */
 export async function needsWorkspaceAllowance(db: Database, userId: string, policy: WorkspacePolicy) {
   if (!policy.paidMachines || policy.allowSignup) return false;

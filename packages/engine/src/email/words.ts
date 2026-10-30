@@ -106,6 +106,18 @@ const en = {
       `The link works for ${days} days, for this address only. Sign up with a password, or with Google, GitHub or Apple on this same address.`,
     why: "You got this email because this address is on the agentes.chat waiting list, or was invited to agentes.chat. Nothing happens until you sign up.",
   },
+  earlyAccessAllowed: {
+    subject: "You can now create your own workspace",
+    preheader: "Sign in with the account you already have and set it up.",
+    headline: "Create your own workspace",
+    body: (email: string): Text => [
+      "You can now create your own workspace on agentes.chat with ",
+      { b: email },
+      ", the account you already have.",
+    ],
+    button: "Create my workspace",
+    why: "You got this email because this account was given early access to agentes.chat.",
+  },
   budget: {
     subject: {
       warning: "An agent passed 80% of its monthly budget",
@@ -307,6 +319,18 @@ const ptBR: Words = {
     small: (days) =>
       `O link vale por ${days} dias, só para este endereço. Cadastre-se com uma senha, ou com Google, GitHub ou Apple neste mesmo endereço.`,
     why: "Você recebeu este e-mail porque este endereço está na lista de espera do agentes.chat, ou foi convidado para o agentes.chat. Nada acontece até você se cadastrar.",
+  },
+  earlyAccessAllowed: {
+    subject: "Agora você pode criar o seu workspace",
+    preheader: "Entre com a conta que você já tem e monte o seu.",
+    headline: "Crie o seu workspace",
+    body: (email) => [
+      "Agora você pode criar o seu workspace no agentes.chat com ",
+      { b: email },
+      ", a conta que você já tem.",
+    ],
+    button: "Criar meu workspace",
+    why: "Você recebeu este e-mail porque esta conta ganhou acesso antecipado ao agentes.chat.",
   },
   budget: {
     subject: {

@@ -666,11 +666,10 @@ test("early access: every route needs the token, answers in its shape, and refus
   }
 
   const invited = await body<{ results: { email: string; outcome: string; invitationId?: string }[] }>(
-    await call("POST", "/early-access/invitations", { emails: ["wl-one@acme.test", "owner@acme.test", "x"] }),
+    await call("POST", "/early-access/invitations", { emails: ["wl-one@acme.test", "x"] }),
   );
   expect(invited.results).toEqual([
     { email: "wl-one@acme.test", outcome: "invited", invitationId: expect.any(String) },
-    { email: "owner@acme.test", outcome: "has_account" },
     { email: "x", outcome: "invalid_email" },
   ]);
   const id = invited.results[0]?.invitationId ?? "";
@@ -734,19 +733,30 @@ test("early access: every route needs the token, answers in its shape, and refus
   expect(signedUp.status).toBe(200);
   expect(await code(await call("POST", `/early-access/invitations/${id}/resend`))).toBe("early_access.used");
   expect((await ana("/api/app/organizations", { json: { name: "Ana" } })).status).toBe(201);
-  expect(await code(await call("POST", `/early-access/invitations/${id}/revoke`))).toBe(
-    "early_access.workspace_created",
-  );
   expect(await body(await call("GET", "/waitlist"))).toMatchObject({ invited: 1, signedUp: 1, workspaceCreated: 1 });
+  // Revoking works once its account made a workspace too.
+  expect(await body(await call("POST", `/early-access/invitations/${id}/revoke`))).toMatchObject({
+    invitation: { id, state: "revoked" },
+  });
 
   const other = await body<{ results: { invitationId?: string }[] }>(
     await call("POST", "/early-access/invitations", { emails: ["wl-two@acme.test"], resend: false }),
   );
   const otherId = other.results[0]?.invitationId ?? "";
   await signUp(browser(t), "wl-two@acme.test");
-  expect(await code(await call("POST", `/early-access/invitations/${otherId}/resend`))).toBe(
-    "early_access.has_account",
+  // The address has an account now: resending allows that account instead of sending a link.
+  expect(await body(await call("POST", `/early-access/invitations/${otherId}/resend`))).toMatchObject({
+    sent: false,
+    invitation: { id: otherId, state: "signed_up", userId: expect.any(String) },
+  });
+  // So does inviting an address with an account; allowing it again answers signed_up.
+  const allowed = await body<{ results: unknown[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["owner@acme.test", "wl-two@acme.test"] }),
   );
+  expect(allowed.results).toEqual([
+    { email: "owner@acme.test", outcome: "allowed", invitationId: expect.any(String) },
+    { email: "wl-two@acme.test", outcome: "signed_up", invitationId: otherId },
+  ]);
   const revoked = await body<{ invitation: { state: string; revokedAt: string } }>(
     await call("POST", `/early-access/invitations/${otherId}/revoke`),
   );

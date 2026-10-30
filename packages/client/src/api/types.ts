@@ -109,7 +109,7 @@ export interface User {
   hasPassword?: boolean;
   /** Opened the link that confirms the email address. */
   emailVerified?: boolean;
-  /** A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, once theirs exists). */
+  /** A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, unless early access allowed them). */
   canCreateWorkspace?: boolean;
 }
 

@@ -50,16 +50,18 @@ const Waitlist = z
   .object({
     unconfirmed: Count.openapi({ description: "Entries that never confirmed their address." }),
     confirmed: Count,
-    waiting: Count.openapi({ description: "Confirmed, with no invitation (in any state) and no account." }),
+    waiting: Count.openapi({
+      description: "Confirmed, with no invitation (in any state). Some may have an account: inviting one allows it.",
+    }),
     invited: Count.openapi({ description: "Confirmed, with an invitation." }),
-    signedUp: Count.openapi({ description: "Confirmed, whose invitation made an account." }),
-    workspaceCreated: Count.openapi({ description: "Confirmed, whose invitation made its workspace." }),
+    signedUp: Count.openapi({ description: "Confirmed, whose invitation made an account or allowed the one it had." }),
+    workspaceCreated: Count.openapi({ description: "Confirmed, whose account made a workspace." }),
   })
   .openapi("OperatorWaitlist");
 
 const State = z.enum(EARLY_ACCESS_STATES).openapi("OperatorInvitationState", {
   description:
-    "The first that holds: `revoked`, `workspace_created`, `signed_up`, `expired` (the link no longer signs anyone up), else `sent`.",
+    "The first that holds: `revoked`, `workspace_created` (its account made a workspace), `signed_up` (its account exists: made with the link, or allowed), `expired` (the link no longer signs anyone up), else `sent`.",
 });
 
 const Invitation = z
@@ -73,9 +75,12 @@ const Invitation = z
     sends: z.number().int().min(1),
     expiresAt: z.string().openapi({ description: `${EARLY_ACCESS_TTL_DAYS} days after the latest send.` }),
     revokedAt: z.string().nullable(),
-    usedAt: z.string().nullable().openapi({ description: "When an account was made with it." }),
+    usedAt: z
+      .string()
+      .nullable()
+      .openapi({ description: "When an account was made with it, or the address's account was allowed." }),
     userId: z.string().nullable().openapi({ description: "That account; null once it is deleted." }),
-    workspaceCreatedAt: z.string().nullable().openapi({ description: "When its one workspace was made." }),
+    workspaceCreatedAt: z.string().nullable().openapi({ description: "When its account made its first workspace." }),
     workspaceId: z.uuid().nullable().openapi({ description: "That workspace; null once it is deleted." }),
   })
   .openapi("OperatorInvitation");
@@ -129,7 +134,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       tags,
       summary: "Open sign-up to everyone, or back to invitation only",
       description:
-        "Takes effect at once, with no restart. Setting the current mode changes nothing. On agentes.chat Cloud, while it is `invite`, an account makes a workspace only with an early-access invitation that hasn't made one yet; `open` lets every account make workspaces, each with its own computer. Refused (409 `signup.host_computer`) to open while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
+        "Takes effect at once, with no restart. Setting the current mode changes nothing. On agentes.chat Cloud, while it is `invite`, only the accounts early access allowed make workspaces, as many as they like; `open` lets every account make workspaces, each with its own computer. Refused (409 `signup.host_computer`) to open while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
       request: { body: body(z.object({ mode: z.enum(SIGNUP_MODES) })) },
       responses: {
         200: json(Signup),
@@ -170,7 +175,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       tags,
       summary: "The next confirmed entries still waiting, oldest first",
       description:
-        "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. Skips addresses sign-up wouldn't take; they still count as waiting.",
+        "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. An address with an account is among them: inviting it allows the account. Skips addresses sign-up wouldn't take; they still count as waiting.",
       request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }) },
       responses: {
         200: json(
@@ -247,8 +252,8 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       method: "post",
       path: "/early-access/invitations",
       tags,
-      summary: "Invite addresses to create an account and a workspace",
-      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else pt-BR. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account), \`has_account\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
+      summary: "Invite addresses to create an account and make workspaces",
+      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else pt-BR. An address that has an account gets no link: the account is allowed to make workspaces at once, and an email in its language says so. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account or allowed one already, so nothing went out), \`allowed\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
       request: {
         body: body(
           z.object({
@@ -329,13 +334,13 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       path: "/early-access/invitations/{invitationId}/resend",
       tags,
       summary: "Send an invitation again, with a new link",
-      description: `The old link stops working, the invitation is no longer revoked and runs ${EARLY_ACCESS_TTL_DAYS} days from now. Within 2 minutes of the previous send nothing goes out (\`sent: false\`). Refused (409) once it made an account (\`early_access.used\`), when the address has an account (\`early_access.has_account\`), and on a server that sends no email (\`early_access.no_email\`).`,
+      description: `The old link stops working, the invitation is no longer revoked and runs ${EARLY_ACCESS_TTL_DAYS} days from now. Within 2 minutes of the previous send nothing goes out (\`sent: false\`). When the address has an account by now, no link goes: the account is allowed to make workspaces at once and an email says so, and the answer is the invitation, now \`signed_up\`, with \`sent: false\`. Refused (409) once it was used (\`early_access.used\`), and on a server that sends no email (\`early_access.no_email\`).`,
       request: { params: InvitationParams },
       responses: {
         200: json(z.object({ invitation: Invitation, sent: z.boolean() }).openapi("OperatorInvitationResend")),
         ...errors,
         ...notFound,
-        409: errorResponse("Used, the address has an account, or no email (`early_access.*`)"),
+        409: errorResponse("Used, or no email (`early_access.*`)"),
       },
     }),
     async (c) => {
@@ -352,13 +357,12 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       tags,
       summary: "Revoke an invitation",
       description:
-        "Its link stops working, and an account it made can no longer make its workspace with it. Revoking again answers the same. Refused (409 `early_access.workspace_created`) once its workspace exists.",
+        "Its link stops working, and its account can make no more workspaces while sign-up is by invitation. The workspaces it made stay. Revoking again answers the same.",
       request: { params: InvitationParams },
       responses: {
         200: json(z.object({ invitation: Invitation }).openapi("OperatorInvitationRevoke")),
         ...errors,
         ...notFound,
-        409: errorResponse("Its workspace exists (`early_access.workspace_created`)"),
       },
     }),
     async (c) => {
