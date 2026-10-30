@@ -146,7 +146,9 @@ describe("the agent's AI", () => {
     // One switch, its line under it saying what its state does, with the ⓘ, the plan's words behind it.
     expect(parts).toContain('label={t("aiAccounts.share.switch")}');
     expect(parts).toContain("planReplies(t, { on, agent, brain, plan, coding })");
-    expect(parts).toMatch(/<InfoHint name=\{says\.about\} text=\{says\.text\}[^>]*>\s*<Text[^>]*>\s*\{says\.line\}/);
+    expect(parts).toMatch(
+      /<InfoHint\s+name=\{t\("common\.about", \{ label: t\("aiAccounts\.share\.terms\.about"\) \}\)\}\s+text=\{says\.text\}[^>]*>\s*<Text[^>]*>\s*\{says\.line\}/,
+    );
     // The line names the agent.
     expect(screen).toMatch(/<PlanReplies\s+agent=\{name\}/);
     expect(connect).toMatch(/<PlanReplies\s+agent=\{done\?\.agent \?\? agent\?\.name \?\? ""\}/);
