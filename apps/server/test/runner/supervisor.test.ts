@@ -822,9 +822,13 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   await sleep(20);
   expect(ana.got.slice(before).map((f) => f.type)).toEqual(["worker.state"]);
 
-  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello.
+  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello. This server runs
+  // each `mcp.call` once (its welcome says so), and so the workers' welcome says too.
+  t.sup.mcp.attach(() => {}, { mcpOnce: true });
   t.sup.attach();
   await waitFor(() => ana.of("welcome").length === 2);
+  expect(ana.of("welcome")[0]).not.toHaveProperty("mcpOnce");
+  expect(ana.of("welcome")[1]).toMatchObject({ mcpOnce: true });
   t.sup.handoff({ ...handoff, agentId: BIA.id });
   const bread = handleRequest(t.ctx, { op: "read", path: "x", maxBytes: 1, agent: BIA }, scope().scope);
   await waitFor(() => t.of(BIA.id).length === 1);

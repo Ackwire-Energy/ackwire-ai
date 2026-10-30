@@ -249,6 +249,8 @@ export class Supervisor {
   /** Open `browser.handoff`s, for a worker that says hello later. */
   private readonly handoffs = new Map<string, Handoff>();
   private online = false;
+  /** The server runs each `mcp.call` once per `callId` (its `welcome`): the workers' welcome says so too. */
+  private mcpOnce = false;
   private closed = false;
   private seq = 0;
   private pinger: ReturnType<typeof setInterval> | null = null;
@@ -257,7 +259,9 @@ export class Supervisor {
 
   /** The connection's MCP side: answers go back to the worker that asked. */
   readonly mcp = {
-    attach: () => {},
+    attach: (_send: unknown, server: { mcpOnce?: boolean } = {}) => {
+      this.mcpOnce = server.mcpOnce === true;
+    },
     detach: () => {},
     result: (frame: Extract<ServerFrame, { type: "mcp.result" }>) => this.toCaller(frame),
     tools: (frame: Extract<ServerFrame, { type: "mcp.tools" }>) => this.toCaller(frame),
@@ -620,7 +624,13 @@ export class Supervisor {
   }
 
   private welcome(w: Worker) {
-    this.send(w, { type: "welcome", machineId: w.user.id, name: w.user.user, heartbeatMs: HEARTBEAT_MS });
+    this.send(w, {
+      type: "welcome",
+      machineId: w.user.id,
+      name: w.user.user,
+      heartbeatMs: HEARTBEAT_MS,
+      ...(this.mcpOnce ? { mcpOnce: true } : {}),
+    });
     const handoff = this.handoffs.get(w.user.id);
     if (handoff) this.send(w, handoff);
   }

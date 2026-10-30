@@ -54,6 +54,11 @@ export type MachineTaskStatus = MachineTaskRow["status"];
  * or a runner dialing again); it is also when an offline computer becomes an outage people see.
  */
 export const TASK_OFFLINE_GRACE_MS = 2 * 60_000;
+/**
+ * A start may still be underway on the computer this long after it began (its journal doesn't list the task
+ * yet): a hello in that time says nothing about it.
+ */
+export const TASK_START_GRACE_MS = 2 * 60_000;
 /** An interrupted task resumes at most this many times in a row. */
 export const MAX_TASK_RESUMES = 3;
 /** What a resumed Claude Code session is told. */
@@ -75,6 +80,20 @@ export const isLiveTaskRow = (t: Pick<MachineTaskRow, "status" | "endedAt"> | nu
 export const liveTaskWhere = () => and(isNull(machineTasks.endedAt), inArray(machineTasks.status, ACTIVE));
 export const liveTaskSqlAs = (alias: string) =>
   sql.raw(`${alias}.ended_at is null and ${alias}.status in (${ACTIVE.map((s) => `'${s}'`).join(", ")})`);
+/** Its start was cut by a drop (`launchTask`): never seen running, it may run there or may never have started. */
+export const isCutStart = (t: Pick<MachineTaskRow, "status" | "startedAt" | "endedAt">) =>
+  t.status === "interrupted" && !t.startedAt && !t.endedAt;
+
+/** `checkCutTaskStart` for this task in `inMs`. */
+const enqueueStartCheck = (db: Executor, row: Pick<MachineTaskRow, "id" | "orgId">, inMs: number) =>
+  enqueue(db, {
+    orgId: row.orgId,
+    kind: "machine.task_start_check",
+    payload: { taskId: row.id },
+    dedupeKey: `machine.task_start_check:${row.id}:${Date.now()}`,
+    runAt: new Date(Date.now() + inMs),
+  });
+
 /** `machine_tasks.recent_lines` keeps this many human lines ("Ver saída" while the computer is offline). */
 export const RECENT_LINES = 50;
 
@@ -377,13 +396,15 @@ export async function launchTask(
     return { row: fresh, queued: false, ...(behind !== undefined ? { baseBehind: behind } : {}) };
   } catch (error) {
     // Cut while starting: it may be running there. It stays live as `interrupted` (never queued again, which
-    // would start a second copy); the computer's next hello says which (`reconcileMachineTasks`).
+    // would start a second copy) until its first frame, or until its computer's journal says, once its start
+    // can't still be underway (`checkCutTaskStart`).
     if (error instanceof MachineDroppedError) {
       const [cut] = await deps.db
         .update(machineTasks)
         .set({ status: "interrupted", updatedAt: new Date() })
         .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued"), isNull(machineTasks.endedAt)))
         .returning();
+      if (cut) await enqueueStartCheck(deps.db, cut, TASK_START_GRACE_MS);
       const now = cut ?? (await getTask(deps.db, row.id)) ?? row;
       await publishTaskEvent(deps.pubsub, now);
       return { row: now, queued: false };
@@ -606,10 +627,13 @@ export async function applyTaskEvent(
 ) {
   const now = new Date();
   const pr = frame.prUrl ?? findPullRequestUrl(frame.line);
+  // A start whose answer was lost has no start time: its seconds so far say when.
+  const began = new Date(now.getTime() - Math.max(0, Math.round(frame.seconds ?? 0)) * 1000);
   const [row] = await deps.db
     .update(machineTasks)
     .set({
       status: "running",
+      startedAt: sql`coalesce(${machineTasks.startedAt}, ${began.toISOString()}::timestamptz)`,
       ...(frame.line !== undefined ? { lastLine: frame.line } : {}),
       ...(frame.line ? { recentLines: pushRecentLine(frame.line) } : {}),
       ...(pr ? { prUrl: keepPrUrl(pr) } : {}),
@@ -870,6 +894,19 @@ function resumesByItself(
   );
 }
 
+/** Whether this task resumes by itself if its computer restarts (`resumesByItself`), for what the agent is told. */
+export async function taskResumesByItself(db: Database, row: MachineTaskRow) {
+  if (row.executor !== "claude") return false;
+  const machine = await getMachineById(db, row.machineId);
+  const [mission] = row.missionId
+    ? await db
+        .select({ status: schema.missions.status, resumeTasks: schema.missions.resumeTasks })
+        .from(schema.missions)
+        .where(eq(schema.missions.id, row.missionId))
+    : [];
+  return resumesByItself(row, machine, mission);
+}
+
 /**
  * A mission task's resume in our queue (ADR 0044): `queued` with what to send
  * when it may start, at the interrupted task's place in the queue (its
@@ -910,12 +947,18 @@ export async function postTaskNotice(
  * final: the machine may come back) and each affected thread gets ONE notice
  * per outcome: tasks keep running if only the connection dropped, and if the
  * computer restarted, Claude Code tasks resume by themselves and others don't.
+ * `statusOnly`: after our own stop, only the apps hear (its tasks wait longer).
  */
-export async function interruptOfflineMachineTasks(deps: TaskDeps, machineId: string) {
+export async function interruptOfflineMachineTasks(
+  deps: TaskDeps,
+  machineId: string,
+  options: { statusOnly?: boolean } = {},
+) {
   const machine = await getMachineById(deps.db, machineId);
   if (!machine || machineOnline(machine)) return [];
   // Away past the grace: open apps look again, and it is an outage now (`listMachineOutages`).
   await publishMachineStatus(deps.pubsub, machine.orgId, machineId, false).catch(() => undefined);
+  if (options.statusOnly) return [];
   const rows = await deps.db
     .update(machineTasks)
     .set({ status: "interrupted", updatedAt: new Date() })
@@ -1032,31 +1075,80 @@ export async function reconcileMachineTasks(
   const byId = new Map(reported.map((t) => [t.taskId, t]));
   for (const row of rows) {
     const there = byId.get(row.id);
+    // A start cut by a drop: this list may come before the runner has written it down, and a supervisor lists
+    // every task it handed a worker, started or not. Only the agent's own journal settles it, once its start
+    // can't still be underway (`checkCutTaskStart`).
+    if (isCutStart(row)) {
+      if (Date.now() - row.updatedAt.getTime() >= TASK_START_GRACE_MS) await enqueueStartCheck(deps.db, row, 0);
+      continue;
+    }
     if (there?.status === "running") {
-      if (row.status !== "running") {
-        // A start whose answer was lost: when it started is the journal's word.
-        const at = new Date(there.startedAt);
-        const [back] = await deps.db
-          .update(machineTasks)
-          .set({
-            status: "running",
-            ...(row.startedAt || Number.isNaN(at.getTime()) ? {} : { startedAt: at }),
-            lastEventAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
-          .returning();
-        if (back) await publishTaskEvent(deps.pubsub, back);
-      }
+      if (row.status !== "running") await markRunning(deps, row, there);
       continue;
     }
     if (there) continue;
     // Waiting in our queue (ADR 0044): the runner never had it.
     if (row.status === "queued" && row.startRequest) continue;
-    // Being started right now (its `task.start` may still be on the way).
-    if (row.status === "queued" && Date.now() - row.createdAt.getTime() < 2 * 60_000) continue;
+    // Being started right now (its `task.start` may still be on the way). One from our queue began when it was
+    // taken from there, not when it was queued.
+    if (row.status === "queued" && Date.now() - row.updatedAt.getTime() < TASK_START_GRACE_MS) continue;
     await settleInterruptedTask(deps, row);
   }
+}
+
+/** Running there: running here, since when its journal says (a start whose answer was lost has no time). */
+async function markRunning(deps: TaskDeps, row: MachineTaskRow, there: RunnerTask) {
+  const at = new Date(there.startedAt);
+  const [back] = await deps.db
+    .update(machineTasks)
+    .set({
+      status: "running",
+      ...(row.startedAt || Number.isNaN(at.getTime()) ? {} : { startedAt: at }),
+      lastEventAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
+    .returning();
+  if (back) await publishTaskEvent(deps.pubsub, back);
+}
+
+/**
+ * `machine.task_start_check`: a start cut by a drop, once it can't still be underway. The agent's own journal
+ * on the computer says (`task.status`, answered by the process that runs the agent's tasks there): running
+ * there is running here; ended there, its `task.done` is on its way; not there, it never started, and it is
+ * settled like a task that went away (Claude Code starts with what it was asked, others wake the agent). Its
+ * computer away: its next hello asks for this check again.
+ */
+export async function checkCutTaskStart(
+  deps: TaskDeps & {
+    call: TaskCall;
+    start?: LocalTaskStarter;
+    startQueued?: (machineId: string) => Promise<unknown>;
+  },
+  taskId: string,
+) {
+  const row = await getTask(deps.db, taskId);
+  if (!row || !isCutStart(row)) return;
+  const [agent] = await deps.db
+    .select({ handle: schema.agents.handle })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, row.agentId));
+  const reply = await deps
+    .call<"task.status">(row.machineId, {
+      agent: { id: row.agentId, handle: agent?.handle ?? "agent" },
+      op: "task.status",
+      taskId: row.id,
+    })
+    .catch((error: unknown) => {
+      // Away, or gone again: its next hello asks again. Anything else: the job is tried again later.
+      if (error instanceof MachineOfflineError) return null;
+      throw error;
+    });
+  if (!reply) return;
+  const there = reply.tasks.find((t) => t.taskId === row.id);
+  if (there?.status === "running") return markRunning(deps, row, there);
+  if (there) return;
+  await settleInterruptedTask(deps, row);
 }
 
 /** The text of a task's end, for the thread (English; the app uses the code). */

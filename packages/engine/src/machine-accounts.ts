@@ -735,7 +735,7 @@ const runnerOld = (machine: Pick<MachineRow, "name">) =>
 async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow, protocol = ACCOUNTS_PROTOCOL) {
   if (machine.protocol < protocol) throw runnerOld(machine);
   const status = await deps.hub.status(machine.id);
-  if (!status?.online) throw new MachineOfflineError(machine.name);
+  if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
   if (status.protocol < protocol) throw runnerOld(machine);
 }
 

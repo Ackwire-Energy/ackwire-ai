@@ -50,16 +50,17 @@ export const REMOVED_COMPUTER_MESSAGE =
 
 /**
  * The machine can't be reached now (runner not connected): nothing was sent. The workspace's own computer
- * (`managed`) has no runner for anyone to start: it comes back by itself.
+ * (`managed`) has no runner for anyone to start: it comes back by itself. `kind` has no default, so no
+ * caller tells a workspace to start a runner it doesn't have.
  */
 export class MachineOfflineError extends Error {
   constructor(
     readonly machineName: string,
-    kind?: string | null,
+    kind: string | null | undefined,
   ) {
     super(
       kind === "managed"
-        ? `The computer ${machineName} isn't answering right now; it usually comes back within minutes.`
+        ? `The computer ${machineName} isn't answering right now. It usually comes back within minutes.`
         : `The computer ${machineName} is offline. Ask its owner to start the runner.`,
     );
     this.name = "MachineOfflineError";
@@ -74,7 +75,7 @@ export class MachineOfflineError extends Error {
 export class MachineDroppedError extends MachineOfflineError {
   readonly serverStop: boolean;
   constructor(machineName: string, options: { serverStop?: boolean; message?: string } = {}) {
-    super(machineName);
+    super(machineName, null);
     this.name = "MachineDroppedError";
     this.serverStop = options.serverStop === true;
     this.message =

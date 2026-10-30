@@ -335,7 +335,7 @@ test("accounts (ADR 0041): the account and effort go to a runner that knows them
 
 test("a failed request becomes the turn's error (offline and old runners may fall back; a timeout doesn't)", async () => {
   const cases: [Error, string, boolean][] = [
-    [new MachineOfflineError("mac"), "machine_offline", true],
+    [new MachineOfflineError("mac", null), "machine_offline", true],
     [new MachineRequestError("bad_request", "Unknown op brain.turn"), "runner_outdated", true],
     [new MachineRequestError("timeout", "too slow"), "timeout", false],
     [new MachineRequestError("internal", "busy"), "busy", true],

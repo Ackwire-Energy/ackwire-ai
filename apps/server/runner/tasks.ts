@@ -90,6 +90,12 @@ export const TASK_MAX_SECONDS_CAP = 24 * 3600;
 /** `alive` is touched this often by the wrapper; older than `ALIVE_STALE_MS` means the wrapper is gone. */
 export const ALIVE_EVERY_MS = 15_000;
 export const ALIVE_STALE_MS = 60_000;
+/**
+ * A command killed by a SIGTERM the wrapper didn't send: the wrapper waits this long for one of its own. A
+ * shutdown stopping the agent's scope signals every process in it at once; a kill aimed at the command alone
+ * (a person, the agent's own `pkill`) never reaches the wrapper.
+ */
+const OUTSIDE_SIGTERM_WAIT_MS = 2000;
 /** Finished, acknowledged tasks (and their logs) are kept this long. */
 export const TASK_KEEP_MS = 7 * 24 * 3600_000;
 /** The watcher reads the logs this often. */
@@ -297,17 +303,19 @@ const stop = (why) => {
   kill("SIGTERM");
   setTimeout(() => kill("SIGKILL"), 5000).unref();
 };
+let exited = null;
+// A command stopped by us ends by our signal even when its shell reports none (or exits with 143).
+const settle = () => finish(reason && (exited.signal || exited.code === null || exited.code === 143) ? { exitCode: null, signal: exited.signal ?? "SIGTERM" } : { exitCode: exited.code, signal: exited.signal ?? null });
 // The runner cancels through the "cancel" file, never a signal: a SIGTERM comes from outside (the system
 // shutting down stops the agent's scope), and the task resumes or is reported like after a crash.
-process.on("SIGTERM", () => stop("interrupted"));
+process.on("SIGTERM", () => { stop("interrupted"); if (exited) settle(); });
 process.on("SIGINT", () => stop("canceled"));
 process.on("SIGHUP", () => {});
 if (spec.maxSeconds > 0) setTimeout(() => stop("timeout"), spec.maxSeconds * 1000).unref();
 const poll = setInterval(() => { if (existsSync(file("cancel"))) stop("canceled"); }, 1000);
 child.on("error", (e) => { clearInterval(beat); clearInterval(poll); finish({ exitCode: 127, signal: null, error: String(e && e.message || e) }); });
-// A command stopped by us ends by our signal even when its shell reports none (or exits with 143). One
-// killed by a SIGTERM we didn't send (its scope stopped first at a shutdown) was interrupted too.
-child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); if (!reason && signal === "SIGTERM") reason = "interrupted"; finish(reason && (signal || code === null || code === 143) ? { exitCode: null, signal: signal ?? "SIGTERM" } : { exitCode: code, signal: signal ?? null }); });
+// Killed by a SIGTERM we didn't send: interrupted only if one reaches this wrapper too (its whole scope stopped).
+child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); exited = { code, signal }; if (!reason && signal === "SIGTERM") setTimeout(settle, ${OUTSIDE_SIGTERM_WAIT_MS}); else settle(); });
 `;
 
 /** The wrapper every task runs under (written next to the journal; plain JS for Node and Bun). */

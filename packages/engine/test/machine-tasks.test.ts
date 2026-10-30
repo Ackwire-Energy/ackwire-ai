@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic, type RunnerTask, type ServerFrame } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   createMachineHub,
@@ -9,9 +9,11 @@ import {
   listMessages,
   type MachineHub,
   postPersonMessage,
+  queueMachineTask,
   RESUME_PROMPT,
   setAgentComputerTarget,
   startMachineTask,
+  TASK_START_GRACE_MS,
   taskNotice,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -43,9 +45,12 @@ type TaskStartRequest = Extract<Request, { op: "task.start" }>;
 
 /**
  * A runner over an in-memory socket that answers task ops (and nothing else) on a later tick. `dropOnStart`:
- * it takes a `task.start` and its socket drops before the answer.
+ * it takes a `task.start` and its socket drops before the answer. `journal`: its answer to `task.status`.
  */
-function taskRunner(hub: MachineHub, options: { noSlot?: boolean; dropOnStart?: boolean } = {}) {
+function taskRunner(
+  hub: MachineHub,
+  options: { noSlot?: boolean; dropOnStart?: boolean; journal?: () => RunnerTask[] } = {},
+) {
   const sent: ServerFrame[] = [];
   const started: TaskStartRequest[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -77,6 +82,7 @@ function taskRunner(hub: MachineHub, options: { noSlot?: boolean; dropOnStart?: 
           });
         }
         if (frame.op === "task.cancel") return ok({ canceled: true });
+        if (frame.op === "task.status") return ok({ tasks: options.journal?.() ?? [] });
         return ok({});
       }, 1);
     },
@@ -276,6 +282,68 @@ describe("background tasks (ADR 0029)", () => {
     expect(await taskRow((await tasks()).find((t) => t.title === "More")?.id ?? "")).toMatchObject({
       status: "failed",
     });
+  });
+
+  test("task_status says what becomes of an interrupted task: it resumes only when its computer resumes tasks", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = f.machineHub as MachineHub;
+    const runner = taskRunner(hub);
+    await runner.hello(paired.token);
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: run.threadRootId,
+      triggerMessageId: msg.id,
+    };
+    const status = async (taskId: string) => {
+      const outcome = await f.tools?.invoke(ctx, {
+        toolUseId: crypto.randomUUID(),
+        name: "task_status",
+        input: { task_id: taskId },
+      });
+      if (outcome?.type !== "result") throw new Error(`expected a result, got ${outcome?.type}`);
+      return outcome.output.content;
+    };
+    const row = await startMachineTask(
+      { db: f.db, pubsub: f.pubsub, call: hub.call },
+      {
+        orgId: f.org.id,
+        agent: { id: f.agent.id, handle: "dev" },
+        machineId: paired.machineId,
+        protocol: 4,
+        machineName: "MacBook",
+        channelId: f.general.id,
+        threadRootId: run.threadRootId,
+        runId: run.id,
+        requestedByUserId: f.owner.id,
+        title: "API",
+        executor: "claude",
+        prompt: "do API",
+        sessionId: run.threadRootId,
+      },
+    );
+    const set = (values: Partial<typeof schema.machineTasks.$inferInsert>) =>
+      f.db.update(schema.machineTasks).set(values).where(eq(schema.machineTasks.id, row.id));
+    await set({ status: "interrupted" });
+    expect(await status(row.id)).toContain("Claude Code resumes it where it stopped once the computer is back.");
+    // Resuming turned off on that computer: nothing resumes it.
+    await f.db.update(schema.machines).set({ resumeTasks: false }).where(eq(schema.machines.id, paired.machineId));
+    const off = await status(row.id);
+    expect(off).toContain("it stopped and won't resume by itself; you are woken then.");
+    expect(off).not.toContain("Claude Code resumes it");
+    // Its start cut by a drop: it may have started, and its computer tells.
+    await set({ startedAt: null });
+    expect(await status(row.id)).toContain("The connection dropped while it was starting: it may have started there.");
   });
 
   test("a runner older than protocol 4 gets no task tools and is refused with the update command", async () => {
@@ -489,12 +557,44 @@ describe("background tasks (ADR 0029)", () => {
     expect(statuses).toContainEqual({ type: "machine.status", machineId: paired.machineId, online: false });
   });
 
-  test("a start cut by a drop stays live: the next hello's journal says it runs, or it starts with its task", async () => {
+  test("after our own stop, open apps hear at the usual grace that the computer is still away; its tasks run on", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-s", taskOfflineGraceMs: 0 });
+    hubs.push(hub);
+    const runner = taskRunner(hub);
+    await runner.hello(paired.token);
+    const row = await startMachineTask(
+      { db: f.db, pubsub: f.pubsub, call: hub.call },
+      {
+        orgId: f.org.id,
+        agent: { id: f.agent.id, handle: "dev" },
+        machineId: paired.machineId,
+        protocol: 4,
+        machineName: "MacBook",
+        channelId: f.general.id,
+        threadRootId: null,
+        runId: null,
+        requestedByUserId: f.owner.id,
+        title: "Build",
+        executor: "shell",
+        command: "make",
+      },
+    );
+    await hub.stop();
+    const statuses: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => statuses.push((e as { event?: unknown }).event));
+    await drainOutbox(f.db, f.handlers);
+    expect(statuses).toContainEqual({ type: "machine.status", machineId: paired.machineId, online: false });
+    expect(await taskRow(row.id)).toMatchObject({ status: "running", endedAt: null });
+  });
+
+  test("a start cut by a drop stays live: a hello decides nothing, its frames or its journal do", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const paired = await pairedMachine();
     const hub = f.machineHub as MachineHub;
     const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-      body: "two parts",
+      body: "three parts",
     });
     const start = (title: string) =>
       startMachineTask(
@@ -515,38 +615,115 @@ describe("background tasks (ADR 0029)", () => {
           sessionId: root.id,
         },
       );
-    const running = (taskId: string) => ({
+    const running = (taskId: string, startedAt = new Date().toISOString()): RunnerTask => ({
       taskId,
       agentId: f.agent.id,
       status: "running",
-      startedAt: new Date().toISOString(),
+      startedAt,
     });
+    const checks = () =>
+      f.db
+        .select()
+        .from(schema.outbox)
+        .where(and(eq(schema.outbox.kind, "machine.task_start_check"), eq(schema.outbox.status, "pending")));
+    /** The grace is over: the pending checks run now. */
+    const checkNow = async () => {
+      await f.db
+        .update(schema.outbox)
+        .set({ nextAttemptAt: new Date() })
+        .where(and(eq(schema.outbox.kind, "machine.task_start_check"), eq(schema.outbox.status, "pending")));
+      await drainOutbox(f.db, f.handlers);
+    };
+
     const cut = taskRunner(hub, { dropOnStart: true });
     await cut.hello(paired.token);
     const api = await start("API");
     expect(cut.started).toHaveLength(1);
-    // Not failed (it may run there), and never back in our queue (that would start a second copy).
+    // Not failed (it may run there), and never back in our queue (that would start a second copy). Its
+    // computer's journal is asked once its start can't still be underway.
     expect(api).toMatchObject({ status: "interrupted", endedAt: null, startRequest: null });
+    const [check] = await checks();
+    expect((check?.nextAttemptAt.getTime() ?? 0) - Date.now()).toBeGreaterThan(TASK_START_GRACE_MS - 5000);
 
-    // Back, and its journal has it: it runs (since when the journal says), nothing started twice.
+    // Back a moment later, while the runner still starts it (its journal doesn't list it yet): nothing is
+    // decided, nothing starts twice. Then it runs there: its frames make it run, and its end is kept.
     const back = taskRunner(hub);
-    await back.hello(paired.token, { tasks: [running(api.id)] });
+    await back.hello(paired.token, { tasks: [] });
+    expect(back.started).toEqual([]);
+    expect(await taskRow(api.id)).toMatchObject({ status: "interrupted", endedAt: null });
+    await back.frame({ type: "task.event", taskId: api.id, kind: "line", line: "deploying", seconds: 3 });
     const runs = await taskRow(api.id);
     expect(runs).toMatchObject({ status: "running", endedAt: null });
-    expect(runs?.startedAt).toBeInstanceOf(Date);
+    expect(Date.now() - (runs?.startedAt?.getTime() ?? Date.now())).toBeGreaterThanOrEqual(3000);
+    await back.frame({ type: "task.done", taskId: api.id, exitCode: 0, seconds: 30, result: "deployed v2" });
+    expect(await taskRow(api.id)).toMatchObject({ status: "done", result: "deployed v2" });
+    await checkNow();
     expect(back.started).toEqual([]);
 
-    // A start the computer never got: back without it, it starts with what it was asked.
+    // A start that never arrived. A hello listing it (a supervisor lists each task it handed a worker, started
+    // or not) isn't believed; past the grace, the agent's journal doesn't have it: it starts with its task.
     const cut2 = taskRunner(hub, { dropOnStart: true });
-    await cut2.hello(paired.token, { tasks: [running(api.id)] });
+    await cut2.hello(paired.token);
     const screens = await start("Screens");
     expect(screens.status).toBe("interrupted");
-    const again = taskRunner(hub);
-    await again.hello(paired.token, { tasks: [running(api.id)] });
+    const again = taskRunner(hub, { journal: () => [] });
+    await again.hello(paired.token, { tasks: [running(screens.id)] });
+    expect(await taskRow(screens.id)).toMatchObject({ status: "interrupted", endedAt: null });
+    expect(again.started).toEqual([]);
+    await checkNow();
     expect(again.started).toHaveLength(1);
     expect(again.started[0]?.prompt).toContain(RESUME_PROMPT);
     expect(again.started[0]?.prompt).toContain("What you were asked:\ndo Screens");
-    expect(await taskRow(api.id)).toMatchObject({ status: "running" });
+    expect((await taskRow(screens.id))?.endedAt).toBeInstanceOf(Date);
+    const resumed = (await tasks()).find((t) => t.resumedFromId === screens.id);
+    expect(resumed).toMatchObject({ status: "running" });
+
+    // Cut, and its computer away when the grace ends: its next hello asks again, and its journal has it.
+    const cut3 = taskRunner(hub, { dropOnStart: true });
+    await cut3.hello(paired.token, { tasks: [running(resumed?.id ?? "")] });
+    const docs = await start("Docs");
+    await checkNow();
+    expect(await taskRow(docs.id)).toMatchObject({ status: "interrupted", endedAt: null });
+    const old = new Date(Date.now() - TASK_START_GRACE_MS - 60_000);
+    await f.db.update(schema.machineTasks).set({ updatedAt: old }).where(eq(schema.machineTasks.id, docs.id));
+    const since = new Date(Date.now() - 90_000).toISOString();
+    const later = taskRunner(hub, { journal: () => [running(docs.id, since)] });
+    await later.hello(paired.token, { tasks: [running(resumed?.id ?? "")] });
+    await drainOutbox(f.db, f.handlers);
+    const docsRow = await taskRow(docs.id);
+    expect(docsRow).toMatchObject({ status: "running", endedAt: null });
+    expect(docsRow?.startedAt?.toISOString()).toBe(since);
+    expect(later.started).toEqual([]);
+  });
+
+  test("a task taken from our queue long after it was queued is being started: a hello then leaves it alone", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const queued = await queueMachineTask(
+      { db: f.db, pubsub: f.pubsub },
+      {
+        orgId: f.org.id,
+        agent: { id: f.agent.id, handle: "dev" },
+        machineId: paired.machineId,
+        protocol: 4,
+        machineName: "MacBook",
+        channelId: f.general.id,
+        threadRootId: null,
+        runId: null,
+        requestedByUserId: f.owner.id,
+        title: "Build",
+        executor: "shell",
+        command: "make",
+      },
+    );
+    // Queued an hour ago, taken from the queue now: its start is on the way.
+    await f.db
+      .update(schema.machineTasks)
+      .set({ startRequest: null, createdAt: new Date(Date.now() - 3600_000), updatedAt: new Date() })
+      .where(eq(schema.machineTasks.id, queued.id));
+    const runner = taskRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token, { tasks: [] });
+    expect(await taskRow(queued.id)).toMatchObject({ status: "queued", endedAt: null });
   });
 
   test("start_task cut by a drop tells the agent it may have started and not to start it again", async () => {

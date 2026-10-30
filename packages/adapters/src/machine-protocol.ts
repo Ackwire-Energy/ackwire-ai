@@ -1542,7 +1542,17 @@ export type MachineErrorCode =
 
 /** Server → runner. */
 export type ServerFrame =
-  | { type: "welcome"; machineId: string; name: string; heartbeatMs: number }
+  | {
+      type: "welcome";
+      machineId: string;
+      name: string;
+      heartbeatMs: number;
+      /**
+       * The server runs each `mcp.call` once per `callId` and answers a copy with the first answer: a call cut by
+       * a reconnect may be sent again. Absent (older servers): sent again it would run twice.
+       */
+      mcpOnce?: boolean;
+    }
   | ({ type: "request"; id: string } & MachineRequest)
   | { type: "cancel"; id: string }
   | { type: "ping"; at: number }

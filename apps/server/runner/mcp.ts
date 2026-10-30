@@ -196,6 +196,10 @@ const RESEND_SAFE = new Set<string>([PERMISSION_TOOL, "get_context", LIST]);
 /** How long a relayed call may take (an upload of a large file takes minutes). */
 export const MCP_CALL_TIMEOUT_MS = 6 * 60_000;
 
+/** A call sent before the connection dropped whose answer never came: the server may have run it, in part. */
+export const MCP_CUT_OFF =
+  "The connection to agentes.chat dropped while this ran and no answer came: it may have run in part. Check before doing it again.";
+
 /**
  * The daemon's half: a local endpoint for the MCP processes of this
  * machine's mission tasks, relaying their calls to the server.
@@ -212,6 +216,10 @@ export class McpBridge {
       tool: string;
       /** Sent again under the same `callId` after a reconnect (`detach`). */
       resend: boolean;
+      /** It reached a connection once. */
+      sent?: boolean;
+      /** A connection dropped after it was sent: the server may have run it. */
+      cut?: boolean;
     }
   >();
   /** Calls made while the connection is down (a restart, a reconnect): relayed once it is back. */
@@ -248,19 +256,29 @@ export class McpBridge {
     this.server = server;
   }
 
-  /** A connection to the server is up: calls go there, the ones that waited first. */
-  attach(send: (frame: RunnerFrame) => void) {
+  /**
+   * A connection to the server is up: calls go there, the ones that waited first. One sent before a drop goes
+   * again only to a server that runs a call once per `callId` (its `welcome`): an older one would run it twice.
+   */
+  attach(send: (frame: RunnerFrame) => void, server: { mcpOnce?: boolean } = {}) {
     this.send = send;
     for (const [callId, w] of this.waiting) {
       this.waiting.delete(callId);
+      const p = this.pending.get(callId);
+      if (p?.cut && !RESEND_SAFE.has(p.tool) && !server.mcpOnce) {
+        clearTimeout(p.timer);
+        this.pending.delete(callId);
+        p.resolve({ ok: false, error: MCP_CUT_OFF });
+        continue;
+      }
       this.relay(callId, w.frame);
     }
   }
 
   /**
    * The connection went away. Calls not answered yet wait for the connection
-   * and go again under the same `callId` (the server runs a call once per id
-   * and answers a repeat with the first answer), when that is safe: a mission
+   * and go again under the same `callId` (a server that runs a call once per
+   * id answers a repeat with the first answer), when that is safe: a mission
    * task's calls (its executor runs on through a drop), the permission prompt
    * (keyed by its request) and reads. A brain turn's other calls fail as
    * transient: the turn itself was cut, and it is sent again whole.
@@ -269,6 +287,7 @@ export class McpBridge {
     this.send = null;
     for (const [callId, p] of this.pending) {
       if (p.resend) {
+        if (p.sent) p.cut = true;
         this.waiting.set(callId, { frame: p.frame, tool: p.tool });
         continue;
       }
@@ -292,6 +311,7 @@ export class McpBridge {
     }
     try {
       send(frame);
+      p.sent = true;
     } catch {
       // The socket broke while sending: wait for the next connection.
       this.waiting.set(callId, { frame, tool: p.tool });
@@ -385,17 +405,20 @@ export class McpBridge {
   private relayAndWait(callId: string, tool: string, frame: RunnerFrame, resend: boolean) {
     return new Promise<IpcReply>((resolve) => {
       const timer = setTimeout(() => {
+        const cut = this.pending.get(callId)?.cut === true && !RESEND_SAFE.has(tool);
         const waited = this.waiting.has(callId);
         this.pending.delete(callId);
         this.waiting.delete(callId);
         resolve(
-          waited
-            ? {
-                ok: false,
-                error: "The computer is not connected to agentes.chat right now. Try again in a minute.",
-                transient: true,
-              }
-            : { ok: false, error: "agentes.chat did not answer in time." },
+          cut
+            ? { ok: false, error: MCP_CUT_OFF }
+            : waited
+              ? {
+                  ok: false,
+                  error: "The computer is not connected to agentes.chat right now. Try again in a minute.",
+                  transient: true,
+                }
+              : { ok: false, error: "agentes.chat did not answer in time." },
         );
       }, this.opts.callTimeoutMs ?? MCP_CALL_TIMEOUT_MS);
       timer.unref?.();
@@ -436,7 +459,11 @@ export class McpBridge {
     this.detach();
     for (const [callId, p] of this.pending) {
       clearTimeout(p.timer);
-      p.resolve({ ok: false, error: "The runner is stopping. Try again in a minute.", transient: true });
+      p.resolve(
+        p.cut && !RESEND_SAFE.has(p.tool)
+          ? { ok: false, error: MCP_CUT_OFF }
+          : { ok: false, error: "The runner is stopping. Try again in a minute.", transient: true },
+      );
       this.pending.delete(callId);
     }
     this.waiting.clear();

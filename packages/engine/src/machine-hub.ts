@@ -192,8 +192,10 @@ export interface MachineHubDeps {
   helloTimeoutMs?: number;
   /** Cross-replica callers read the `machine_rpc` row this often (the signal usually comes first). */
   rpcPollMs?: number;
-  /** A machine offline this long has its running tasks interrupted (default 60 s). */
+  /** A machine offline this long has its running tasks interrupted (default `TASK_OFFLINE_GRACE_MS`). */
   taskOfflineGraceMs?: number;
+  /** A repeated `mcp.call` whose first run is in another process waits this long for its answer (default 30 s). */
+  mcpRepeatWaitMs?: number;
   /** A brain turn with no frame of its own (event, tool call) for this long fails (default `BRAIN_IDLE_TIMEOUT_MS`). */
   brainIdleMs?: number;
   /** A cross-replica caller checks this often that the replica it asked still holds the socket (default 5 s). */
@@ -277,8 +279,11 @@ export const MACHINE_RPC_KEEP_MS = 60 * 60_000;
  */
 export const MCP_CALL_KEEP_MS = 10 * 60_000;
 
-/** A repeated call waits this long for the first run's answer: as long as the runner's bridge waits for a call. */
-const MCP_REPEAT_WAIT_MS = 6 * 60_000;
+/**
+ * A repeated call whose first run is in another process waits this long for its answer: a replica that stops
+ * writes it before it closes (`drain`), one that crashed never does. Well inside the bridge's own 6 minutes.
+ */
+const MCP_REPEAT_WAIT_MS = 30_000;
 
 const MCP_CUT_OFF =
   "This call was cut off before it finished (the server restarted or lost the connection): it may have run in part. Check before doing it again.";
@@ -321,12 +326,15 @@ export function createMachineHub(deps: MachineHubDeps) {
   const helloTimeoutMs = deps.helloTimeoutMs ?? HELLO_TIMEOUT_MS;
   const rpcPollMs = deps.rpcPollMs ?? 500;
   const taskOfflineGraceMs = deps.taskOfflineGraceMs ?? TASK_OFFLINE_GRACE_MS;
+  const mcpRepeatWaitMs = deps.mcpRepeatWaitMs ?? MCP_REPEAT_WAIT_MS;
   const brainIdleMs = deps.brainIdleMs ?? BRAIN_IDLE_TIMEOUT_MS;
   const rpcLivenessMs = deps.rpcLivenessMs ?? 5000;
   /** Sockets on this replica, by machine id. */
   const local = new Map<string, MachineConnection>();
   /** Cross-replica requests this replica is running, to cancel them. */
   const running = new Map<string, AbortController>();
+  /** `mcp.call`s this process answers, by machine and `callId`: a copy sent here waits on the same answer. */
+  const mcpCalls = new Map<string, Promise<McpOutcome>>();
   let lastCleanup = 0;
   /** `stop()` ran: every socket closing from now on is our own stop, not the computer's drop. */
   let stopping = false;
@@ -367,14 +375,17 @@ export function createMachineHub(deps: MachineHubDeps) {
     await publishMachineStatus(pubsub, row.orgId ?? conn.orgId, machineId, false);
     // Its running tasks become interrupted if it isn't back after the grace (any replica's worker runs it).
     // Our own stop: the runner dials the next server by itself and its tasks run on meanwhile, so only one
-    // still away after a long backstop has them interrupted.
-    await enqueue(db, {
-      orgId: row.orgId,
-      kind: "machine.tasks_offline",
-      payload: { machineId },
-      dedupeKey: `machine.tasks_offline:${machineId}:${Date.now()}`,
-      runAt: new Date(Date.now() + (serverStop ? SERVER_STOP_TASK_GRACE_MS : taskOfflineGraceMs)),
-    }).catch(() => undefined);
+    // still away after a long backstop has them interrupted; it shows as an outage after the usual grace.
+    const later = (ms: number, statusOnly: boolean) =>
+      enqueue(db, {
+        orgId: row.orgId,
+        kind: "machine.tasks_offline",
+        payload: statusOnly ? { machineId, statusOnly } : { machineId },
+        dedupeKey: `machine.tasks_offline:${machineId}:${statusOnly ? "status:" : ""}${Date.now()}`,
+        runAt: new Date(Date.now() + ms),
+      }).catch(() => undefined);
+    if (serverStop) await later(taskOfflineGraceMs, true);
+    await later(serverStop ? SERVER_STOP_TASK_GRACE_MS : taskOfflineGraceMs, false);
     return true;
   };
 
@@ -526,7 +537,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
-    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
+    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs, mcpOnce: true });
     // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
     const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
     await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
@@ -663,10 +674,23 @@ export function createMachineHub(deps: MachineHubDeps) {
 
   /**
    * One run per `callId` (`machine_mcp_calls`): the runner sends a call cut by a reconnect again under the
-   * same id, and that copy gets the first run's answer, waiting for it while it runs (here or on a replica
-   * that is stopping).
+   * same id, and that copy gets the first run's answer. Run here: the copy waits on it. Run by another
+   * process: the copy waits a short while for its answer to land, then hears it was cut off.
    */
-  async function mcpOnce(conn: MachineConnection, callId: string, run: () => Promise<McpOutcome>): Promise<McpOutcome> {
+  function mcpOnce(conn: MachineConnection, callId: string, run: () => Promise<McpOutcome>): Promise<McpOutcome> {
+    const id = `${conn.machineId}:${callId}`;
+    const here = mcpCalls.get(id);
+    if (here) return here;
+    const out = answerOnce(conn, callId, run).finally(() => mcpCalls.delete(id));
+    mcpCalls.set(id, out);
+    return out;
+  }
+
+  async function answerOnce(
+    conn: MachineConnection,
+    callId: string,
+    run: () => Promise<McpOutcome>,
+  ): Promise<McpOutcome> {
     void pruneRows();
     const machineId = conn.machineId as string;
     const key = and(eq(machineMcpCalls.machineId, machineId), eq(machineMcpCalls.callId, callId));
@@ -688,7 +712,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         .catch(() => undefined);
       return kept;
     }
-    for (const until = Date.now() + MCP_REPEAT_WAIT_MS; ; ) {
+    for (const until = Date.now() + mcpRepeatWaitMs; ; ) {
       const [row] = await db.select({ result: machineMcpCalls.result }).from(machineMcpCalls).where(key);
       if (row?.result) return row.result as McpOutcome;
       if (!row || Date.now() >= until) return { ok: false, error: { code: "bridge.cut_off", message: MCP_CUT_OFF } };
@@ -1239,11 +1263,30 @@ export function createMachineHub(deps: MachineHubDeps) {
       for (const off of subscriptions) off();
       subscriptions.length = 0;
       for (const conn of [...local.values()]) {
+        // Started before the socket's own close can run it: awaited here, its offline row and jobs are written
+        // before the database closes.
+        const closed = closeConn(conn);
         try {
           conn.socket.close(1001, "server stopping");
         } catch {}
-        await closeConn(conn);
+        await closed;
       }
+    },
+
+    /**
+     * After `stop()`: waits (at most `ms`) for the `mcp.call`s still running here, so their answers are stored
+     * before the database closes and the runner's copy on the next server gets them instead of a cut-off.
+     */
+    async drain(ms: number) {
+      if (mcpCalls.size === 0) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        Promise.allSettled([...mcpCalls.values()]),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ms);
+        }),
+      ]);
+      clearTimeout(timer);
     },
   };
   return hub;

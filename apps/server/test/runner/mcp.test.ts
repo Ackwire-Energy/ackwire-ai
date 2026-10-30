@@ -18,6 +18,7 @@ import {
   cleanRules,
   handleMcpMessage,
   ipcCall,
+  MCP_CUT_OFF,
   McpBridge,
   type McpTaskInfo,
   McpToolCache,
@@ -135,11 +136,45 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   await waitFor(() => frames.length === 2);
   b.detach();
   const resent: RunnerFrame[] = [];
-  b.attach((f) => resent.push(f));
+  b.attach((f) => resent.push(f), { mcpOnce: true });
   await waitFor(() => resent.length === 1);
   expect(resent[0]).toEqual(frames[1]);
   b.result({ type: "mcp.result", callId: (frames[1] as { callId: string }).callId, ok: true, text: "Reported." });
   expect(await second).toEqual({ ok: true, text: "Reported." });
+});
+
+test("a task's call cut by a drop goes again only to a server that runs it once, and says when it may have run", async () => {
+  const task: McpTaskInfo = { token: "secret-token-1", missionId: "m1", running: true };
+  const req = { taskId: TASK, token: "secret-token-1", tool: "report", args: { summary: "hi" } };
+  const { b, frames } = bridge(task);
+  b.attach((f) => frames.push(f), { mcpOnce: true });
+  // Back on a server that would run it twice (an older one): never sent again.
+  const older = b.handle(req);
+  await waitFor(() => frames.length === 1);
+  b.detach();
+  const resent: RunnerFrame[] = [];
+  b.attach((f) => resent.push(f));
+  expect(await older).toEqual({ ok: false, error: MCP_CUT_OFF });
+  // A call made while the link was down was never sent: it goes out as usual.
+  b.detach();
+  const fresh = b.handle(req);
+  await new Promise((r) => setTimeout(r, 20));
+  b.attach((f) => resent.push(f));
+  await waitFor(() => resent.length === 1);
+  b.result({ type: "mcp.result", callId: (resent[0] as { callId: string }).callId, ok: true, text: "posted" });
+  expect(await fresh).toEqual({ ok: true, text: "posted" });
+
+  // Sent again, and no answer before its time is up: it may have run, never "try again".
+  const quick = new McpBridge({ socketPath: "unused", task: (id) => (id === TASK ? task : null), callTimeoutMs: 80 });
+  closers.push(() => quick.close());
+  const out: RunnerFrame[] = [];
+  quick.attach((f) => out.push(f), { mcpOnce: true });
+  const late = quick.handle(req);
+  await waitFor(() => out.length === 1);
+  quick.detach();
+  quick.attach((f) => out.push(f), { mcpOnce: true });
+  await waitFor(() => out.length === 2);
+  expect(await late).toEqual({ ok: false, error: MCP_CUT_OFF });
 });
 
 test("at a drop, a brain turn's calls fail as transient (the turn itself is sent again); its prompt goes again", async () => {

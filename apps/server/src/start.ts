@@ -72,6 +72,9 @@ import { startWorkers } from "./workers";
 /** On SIGTERM, how long runs in progress get to finish before they are handed to the next instance. */
 const RUN_DRAIN_MS = 20_000;
 
+/** Then, how long the `agentes` tool calls of computers' tasks still running here get to store their answers. */
+const MCP_DRAIN_MS = 5_000;
+
 export interface StartOptions {
   edition: Edition;
   modules?: AgentesModule[];
@@ -355,6 +358,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
+    // A task's call cut by the stop is sent again to the next instance, which answers it from what is stored.
+    await engine.machineHub.drain(MCP_DRAIN_MS);
     // Browser tabs, left open so they saw those runs finish, reconnect to the next instance.
     await server.stop(true);
     for (const module of modules) await module.onStop?.();
