@@ -479,6 +479,9 @@ export async function getMigration(db: Database, actorId: string, orgId: string)
 const notAt = (orgId: string, target: string | null) =>
   and(
     eq(artifactVersions.orgId, orgId),
+    // Only a live artifact's versions: a trashed one's copies aren't counted or moved (matching storedBytes),
+    // so cycling storages doesn't drag dead files along.
+    sql`exists (select 1 from ${artifacts} where ${artifacts.id} = ${artifactVersions.artifactId} and ${artifacts.deletedAt} is null)`,
     target ? or(isNull(artifactVersions.storageConfigId), ne(artifactVersions.storageConfigId, target)) : undefined,
     target ? undefined : sql`${artifactVersions.storageConfigId} is not null`,
   );
@@ -596,6 +599,9 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
           .update(artifactVersions)
           .set({ storageConfigId: target.storageConfigId, blobKey: key })
           .where(eq(artifactVersions.id, v.id));
+        // The row now points at the target copy; drop the old object so cycling storages doesn't pile up copies.
+        // Never delete the key the row now holds (a store that overwrote in place): orphan beats data loss.
+        if (v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
       } catch (error) {
         await db
           .update(storageMigrations)

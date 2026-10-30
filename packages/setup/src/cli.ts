@@ -968,7 +968,7 @@ async function emailEntries(
       (ui.canAsk ? await ui.ask("API address", { initial: DEFAULT_EMAIL_API_URL, validate: httpUrlProblem }) : null);
     if (url && url !== DEFAULT_EMAIL_API_URL) entries.MILLIONSEND_API_URL = url;
   }
-  // A sender .env already has stays as written. Without one, mail goes out as ola@ the server's own host, which no
+  // A sender .env already has stays as written. Without one, mail goes out as ping@ the server's own host, which no
   // provider verifies for a ts.net name or localhost.
   if (!envValue(content, "EMAIL_FROM")) {
     const fallback = senderFor(network, domain);
