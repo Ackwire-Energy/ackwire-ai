@@ -211,6 +211,8 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
+  /** The workspace's logo, served for this invitation or link only (absent without one, or while it is paused). */
+  logo?: string;
   /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
   /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
