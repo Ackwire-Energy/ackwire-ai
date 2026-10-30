@@ -316,7 +316,8 @@ test("Jev's request of its own: the line, its worth and the weight; level probab
   expect(pick?.heavy).toBeCloseTo(0.8);
   expect(pick?.worth).toBeCloseTo(0.7);
   // No distribution: the expected level decides.
-  expect((await ask(createFakeJudge((_k, id) => (id === "status_weight" ? { score: 2.2 } : undefined))))?.heavy).toBe(1);
+  const levelOnly = createFakeJudge((_k, id) => (id === "status_weight" ? { score: 2.2 } : undefined));
+  expect((await ask(levelOnly))?.heavy).toBe(1);
 });
 
 test("a task or mission title shows only where everyone may see it", async () => {
