@@ -15,6 +15,7 @@ import {
   saveCustomTools,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { imageFile } from "../../http/image-file";
 import {
   type AppDeps,
   body,
@@ -100,25 +101,18 @@ export function customConnectorRoutes(deps: AppDeps) {
     blobs: adapters.platformBlobs,
   };
 
-  // A server's icon, for the org's members (content-hash names: cached for good).
-  app.get("/connector-icons/:orgId/:connectionId/:file", async (c) => {
-    const file = await connectorIconFile(
-      { db, blobs: adapters.platformBlobs },
-      c.get("user").id,
-      c.req.param("orgId"),
-      c.req.param("connectionId"),
-      c.req.param("file"),
-    );
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
-  });
+  // A server's icon, for the org's members.
+  app.get("/connector-icons/:orgId/:connectionId/:file", async (c) =>
+    imageFile(
+      await connectorIconFile(
+        { db, blobs: adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("orgId"),
+        c.req.param("connectionId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
 
   app.openapi(
     createRoute({

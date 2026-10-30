@@ -1,6 +1,6 @@
 import { type Message, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -14,10 +14,12 @@ type Answer = "pending" | "answering" | "still_missing";
 
 /**
  * Opens "Conectar uma IA" (the web's `connect.open`): `from`, the message answered once the agent has an AI;
- * `intent`, the step it asked for; `provider`, the key's maker it named; `agentId`, the agent to connect.
+ * `intent`, the step it asked for; `provider`, the key's maker it named; `agentId`, the agent to connect; `plan`, the
+ * plan's page it opens on (Sign in again: the agent's own); `email`, one more login of the account with this email
+ * (one other agents use), Claude's hint.
  */
 export const openConnectAi = (
-  request: { from?: string; intent?: string; provider?: string; agentId?: string } = {},
+  request: { from?: string; intent?: string; provider?: string; agentId?: string; plan?: string; email?: string } = {},
 ) => {
   const query = Object.entries(request)
     .filter(([, v]) => Boolean(v))
@@ -43,6 +45,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   if (!card || m.author.type !== "agent") return null;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
+  const again = signInAgainPlan(card, agent);
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   const mayAnswer =
@@ -54,7 +57,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", agentGrammar(t, name));
+        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -87,9 +90,15 @@ export function NoAiCard({ message: m }: { message: Message }) {
         <Button
           variant="secondary"
           size="sm"
-          label={t("noAi.action")}
+          label={t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
           onPress={() =>
-            openConnectAi({ from: m.id, intent: card.intent, provider: card.provider, agentId: card.agentId })
+            openConnectAi({
+              from: m.id,
+              intent: card.intent,
+              provider: card.provider,
+              agentId: card.agentId,
+              ...(again ? { plan: again } : {}),
+            })
           }
         />
       )}

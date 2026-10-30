@@ -139,6 +139,7 @@ export * from "./missions";
 export * from "./missions-engine";
 export * from "./net-guard";
 export * from "./no-ai";
+export * from "./notice-prefs";
 export * from "./notification-producers";
 export * from "./notifications";
 export * from "./operator";

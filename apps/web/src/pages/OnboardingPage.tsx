@@ -1,4 +1,4 @@
-import type { AiStatus, ApiClient, Machine, Role } from "@agenteschat/client";
+import type { AiStatus, ApiClient, Machine, MachineAccount, Role } from "@agenteschat/client";
 import {
   ApiError,
   keys,
@@ -373,6 +373,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
   const [aiTarget, setAiTarget] = useState<string | undefined>(undefined);
   const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
+  // Agents a plan's panel moved onto it one at a time ("All agents"), until it says done: shown again (another tile and
+  // back, another step and back), it goes on from the next one.
+  const [signedIn, setSignedIn] = useState<typeof planned>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
   // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
@@ -761,7 +764,12 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       mayAddKey: true,
       claudeGate: noComputer ? { state: "missing" } : gates.gateOf("claude"),
     });
-  const aiAll = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
+  const aiAll = setOf(choice).map((a) => ({ ...a, done: (signedIn[a.id] ?? planned[a.id])?.choice === choice }));
+  const thinksOf = (account: MachineAccount, plan: PlanChoice) => ({
+    label: account.label,
+    mark: account.provider ?? account.kind,
+    choice: plan,
+  });
   const target = defaultTarget({ ...aimed, set: aiAll });
   const pickAi = (next: AiChoice) => {
     setAiPicked(next);
@@ -1623,12 +1631,18 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                           said={railSaysComputer}
                           onKey={() => pickAi("key")}
                           onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                          onAssigned={(id, account) => setSignedIn((s) => ({ ...s, [id]: thinksOf(account, choice) }))}
                           onDone={(ids, account) => {
                             // The panel stays on whom it was for, saying it's done; another tile moves on.
                             setAiTarget(target);
                             if (!account) return;
-                            const thinks = { label: account.label, mark: account.provider ?? account.kind, choice };
-                            setPlanned((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, thinks])) }));
+                            const thinks = thinksOf(account, choice);
+                            // With the agents it signed in before it showed again.
+                            setPlanned((p) => ({
+                              ...p,
+                              ...signedIn,
+                              ...Object.fromEntries(ids.map((id) => [id, thinks])),
+                            }));
                           }}
                         />
                       )

@@ -1,10 +1,15 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
+import { agentBrowserStatus } from "./browser/status";
+import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
+import { agentDesktopUseStatus } from "./desktop/status";
+import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
+import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
@@ -24,6 +29,61 @@ export async function agentScopeNames(db: Database, orgId: string, agentIds: str
     agentId: r.agentId,
     scope: r.scope.startsWith("connector:") && r.connector ? `${r.connector}:${r.scope.slice(10)}` : r.scope,
   }));
+}
+
+/** Granted to every new agent, but each works only where the agent's computer serves it. */
+const COMPUTER_SCOPES: ReadonlySet<string> = new Set([SANDBOX_SCOPE, BROWSER_SCOPE, DESKTOP_SCOPE]);
+
+/**
+ * Each agent's scopes as the other agents read them (the roster in a run's
+ * context, `find_agent`): a computer's (Code, Browser, Desktop) only while the
+ * agent's computer serves it, by the checks its own tools pass.
+ */
+export async function rosterScopeNames(
+  db: Database,
+  machines: Pick<MachineCaller, "status"> | null | undefined,
+  orgId: string,
+  agentIds: string[],
+) {
+  if (agentIds.length === 0) return [];
+  // Every run's context reads this: one round trip, and one read per computer however many agents share it.
+  const reads = new Map<string, Promise<MachineStatus | null>>();
+  const hub = machines
+    ? {
+        status: (id: string) => {
+          const read = reads.get(id) ?? machines.status(id);
+          reads.set(id, read);
+          return read;
+        },
+      }
+    : undefined;
+  const [rows, sandbox, statuses] = await Promise.all([
+    agentScopeNames(db, orgId, agentIds),
+    getSandboxSettings(db, orgId),
+    Promise.all(
+      agentIds.map(async (agentId) => {
+        const [browser, desktop] = await Promise.all([
+          agentBrowserStatus(db, hub, orgId, agentId),
+          agentDesktopUseStatus(db, hub, orgId, agentId),
+        ]);
+        return { agentId, browser, desktop };
+      }),
+    ),
+  ]);
+  const served = new Map(
+    statuses.map(({ agentId, browser, desktop }) => {
+      // No computer, or a removed one, is what the browser's status checks first.
+      const computer = browser.available || !["no_machine", "machine_removed"].includes(browser.code);
+      const code = sandbox.enabled && computer && rows.some((r) => r.agentId === agentId && r.scope === SANDBOX_SCOPE);
+      const scopes = [
+        ...(code ? [SANDBOX_SCOPE] : []),
+        ...(browser.available ? [BROWSER_SCOPE] : []),
+        ...(code && desktop.available ? [DESKTOP_SCOPE] : []),
+      ];
+      return [agentId, new Set(scopes)] as const;
+    }),
+  );
+  return rows.filter((r) => !COMPUTER_SCOPES.has(r.scope) || served.get(r.agentId)?.has(r.scope));
 }
 
 export const FIND_AGENT_TOOL = "find_agent";
@@ -84,10 +144,10 @@ const words = (s: string) =>
 /**
  * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
- * talk to, with what they can do, who is responsible and whether they are
- * busy. Read-only; asking one is `ask_agent`.
+ * talk to, with what they can do (`rosterScopeNames`), who is responsible and
+ * whether they are busy. Read-only; asking one is `ask_agent`.
  */
-export function createFindAgentToolSource(): ToolSource {
+export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller, "status"> | null } = {}): ToolSource {
   const tool: ToolDefinition = {
     name: FIND_AGENT_TOOL,
     description:
@@ -127,7 +187,7 @@ export function createFindAgentToolSource(): ToolSource {
       const ids = scored.map((x) => x.a.id);
       const ownerIds = [...new Set(scored.map((x) => x.a.ownerUserId).filter((id): id is string => !!id))];
       const [scopes, owners, busy] = await Promise.all([
-        agentScopeNames(db, ctx.orgId, ids),
+        rosterScopeNames(db, deps.machines, ctx.orgId, ids),
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),

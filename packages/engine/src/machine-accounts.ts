@@ -416,15 +416,17 @@ async function settleAccount(
   const keyHint = info.keyHint ?? row.keyHint;
   const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
   const signingIn = row.status === "signing_in";
-  // Signed in again as another account (an email other than its own, or one its owner already has here): it stays
-  // signed out with what it was, so its agents never think with an account nobody chose for them, and Try again signs
-  // in to it once more. Checked on every report, not only when its owner asks: the runner reports a new login at once.
+  // Signed in again as another account (an email other than its own, or one its owner already has here where an
+  // account has one login): it stays signed out with what it was, so its agents never think with an account nobody
+  // chose for them, and Try again signs in to it once more. The account that came back, where its owner has it here,
+  // goes with the answer (theirs to think with instead). Checked on every report, not only when its owner asks: the
+  // runner reports a new login at once.
   // ponytail: that login stays in the account's folder on the computer until it signs in again or is removed (nothing
   // thinks with a signed-out account); a runner sign-out that keeps the folder, if a stray login there ever matters.
   if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
     const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
-    const duplicate = await duplicateOf(db, row, { email, keyHint });
-    if (otherEmail || duplicate) {
+    const duplicate = await sameAccount(db, row, { email, keyHint });
+    if (otherEmail || (duplicate && !loginPerAgent(row.kind, row.provider))) {
       const [kept] =
         row.status === "signed_out"
           ? [row]

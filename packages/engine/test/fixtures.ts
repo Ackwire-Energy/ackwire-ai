@@ -250,7 +250,12 @@ export async function setup(
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
-    ...(options.askAgent ? [createAskAgentToolSource({ pubsub }), createFindAgentToolSource()] : []),
+    ...(options.askAgent
+      ? [
+          createAskAgentToolSource({ pubsub, ai: { gateway, machines: machineHub } }),
+          createFindAgentToolSource({ machines: machineHub }),
+        ]
+      : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),

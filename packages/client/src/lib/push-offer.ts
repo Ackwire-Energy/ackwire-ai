@@ -1,8 +1,9 @@
 /**
- * When our notifications sheet opens by itself (pure: no React Native import, so it is unit-tested). It
- * comes before the system's prompt, on Conversas only (never inside a conversation): once when the home has
- * loaded with something on it, and once more at the first request to approve, while the phone hasn't been
- * asked yet. "Agora não" doesn't spend the system's prompt: Você › Avisos turns them on any time.
+ * When our notifications ask opens by itself, before the system's or the browser's prompt (pure, so it is
+ * unit-tested): the phone's sheet on Conversas (`PushAskSheet`) and the web's dialog (`WebPushAsk`, ADR 0071),
+ * never inside a conversation. Once when the home has loaded with something on it, and once more at the first
+ * request to approve, while the device hasn't been asked yet. "Agora não" doesn't spend the prompt: the
+ * switch (Você › Avisos on the phone, the account menu on the web) turns them on any time.
  */
 
 export type PushPermissionLike = "granted" | "denied" | "undetermined";

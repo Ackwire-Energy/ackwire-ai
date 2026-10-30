@@ -11,6 +11,7 @@ import {
   type ImportInput,
   type InvitationPreview,
   keys,
+  type MachineAccount,
   type SignInOptions,
 } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -1433,9 +1434,11 @@ describe("Onboarding", () => {
       "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
     );
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    // For Ada, whose face asks the step's question, before Theo (made first, the team's first with no AI).
-    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
+    // For both, as Claude signs each agent in with the same account: one sign-in at a time, in the team's order.
+    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
+      "Todos os agentes",
+    );
+    expect(within(panel).getByRole("button", { name: "Fazer login para o Theo" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
     // Ada picked: another plan's tile keeps her while she has none.
     const agent = () => screen().getByRole("combobox", { name: "Agentes que usam este plano" });
@@ -1446,6 +1449,52 @@ describe("Onboarding", () => {
     expect(agent().textContent).toContain("Ada");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
+  });
+
+  test("Claude for both, one sign-in each: another tile and back goes on from Ada, never signing Theo in twice", async () => {
+    const { state, api } = await start();
+    fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    const max = (id: string): MachineAccount => ({
+      id,
+      kind: "claude_code",
+      label: "Claude Max",
+      email: "walter@acme.com.br",
+      plan: "max",
+      status: "active",
+      ownerId: "u-walter",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    });
+    // The computer finishes each sign-in as soon as the page asks.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: max("acct_theo") });
+    fakeMachinesOf.get(api)?.endLogin("login_2", { state: "done", account: max("acct_ada") });
+    await toComputer(state);
+    await next();
+    const idOf = (name: string) => state.agents.find((a) => a.name === name)?.id;
+    const panel = () => screen().getByRole("region", { name: "Seu plano do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(panel()).getByRole("button", { name: "Fazer login para o Theo" }), 8);
+      expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([idOf("Theo")]);
+      expect(within(panel()).getByRole("button", { name: "Fazer login para a Ada" })).toBeTruthy();
+      // Another plan's tile and back: Theo thinks with his login already, so Ada's sign-in is the one left.
+      await click(option(/^ChatGPT$/), 6);
+      await click(option(/^Claude$/), 6);
+      expect(within(panel()).queryByRole("button", { name: "Fazer login para o Theo" })).toBeNull();
+      await click(within(panel()).getByRole("button", { name: "Fazer login para a Ada" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(2);
+    expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([idOf("Theo"), idOf("Ada")]);
+    // Both think with it: nobody left without an AI, and the step can be done.
+    expect(screen().queryByRole("region", { name: "Quem pensa" })).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
   test("a plan for Ada, who asks: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
@@ -1473,6 +1522,11 @@ describe("Onboarding", () => {
     await toComputer(state);
     await next();
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    // Ada alone, picked out of All agents.
+    const agent = screen().getByRole("combobox", { name: "Agentes que usam este plano" });
+    agent.focus();
+    await act(async () => fireEvent.keyDown(agent, { key: "Enter" }));
+    await click(screen().getByRole("option", { name: "Ada" }));
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
     try {
@@ -1530,7 +1584,7 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.create")).toHaveLength(2);
     expect(option(/^Claude$/).querySelector(".ac-brand--off")).toBeNull();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "Fazer login para o Theo" })).toBeTruthy();
   });
 
   test("the team made on a computer, then the Computer step skipped: the agents leave it, as the AI step says", async () => {
@@ -1762,7 +1816,7 @@ describe("Onboarding", () => {
     await next();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
-    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "Fazer login para o Theo" })).toBeTruthy();
     // Continue would point every agent at a sign-in that isn't there: it waits for one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);

@@ -7,6 +7,7 @@ import {
   addReaction,
   drainOutbox,
   ForbiddenError,
+  grantScopes,
   listMessageReactions,
   listMessages,
   listReactions,
@@ -15,6 +16,7 @@ import {
   removeReaction,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -99,6 +101,27 @@ describe("react (reaction instead of reply)", () => {
     expect(normalizeReaction("👍")).toBe("+1");
     expect(normalizeReaction("👎")).toBe("-1");
     expect(normalizeReaction(" 🎉 ")).toBe("🎉");
+  });
+
+  test("a reply that also reacted counts only its other tools: alone, the apps show no tools under it", async () => {
+    const gh = fakeGithub();
+    // Reacts, and on "PR" also reads it; then answers anyway.
+    const both = (req: ModelRequest) => {
+      const last = lastText(req);
+      if (last.includes("tool_result")) return { chunks: ["Os builds rodam no GitHub Actions."] };
+      const pr = last.includes("PR") ? [{ name: "github_get_pr", input: { repo: "acme/app", pr: 42 } }] : [];
+      return { chunks: [], toolUses: [{ name: "react", input: { emoji: "🙌" } }, ...pr] };
+    };
+    f = await setup({ react: true, reply: both, toolSources: [gh.source] });
+    await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+    await post("@dev valeu, e onde rodam os builds?");
+    await drainOutbox(f.db, f.handlers);
+    await post("@dev valeu, e o PR 42?");
+    await drainOutbox(f.db, f.handlers);
+
+    const replies = (await agentMessages()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    expect(replies.map((m) => (m.meta as { work?: { steps: number } } | null)?.work?.steps)).toEqual([0, 1]);
+    expect(gh.executed.map((e) => e.tool)).toEqual(["github_get_pr"]);
   });
 
   test("the react tool turns 👎 into -1 without a feedback job", async () => {

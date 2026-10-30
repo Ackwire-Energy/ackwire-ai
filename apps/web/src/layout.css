@@ -10584,3 +10584,88 @@ html[data-menu-overlay] .shell {
   line-height: 16px;
   color: var(--ink-muted);
 }
+
+/* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
+   stacked like the phone's sheet, then "Ativar avisos" and "Agora não" full width. */
+.web-push-ask {
+  gap: 16px;
+}
+.web-push-ask__examples {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.web-push-ask__example {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--e2);
+}
+.web-push-ask__example img {
+  flex: none;
+  border-radius: 8px;
+}
+.web-push-ask__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.web-push-ask__top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.web-push-ask__top strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__top span {
+  font-size: 12px;
+  color: var(--faint);
+}
+.web-push-ask__body {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__acts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Configurações › Notificações (NoticePrefs.tsx, ADR 0071 §8): settings rows with the kind's icon before its name
+   and a switch or a chip at the end. The icon sits in the agent page cells' tile (`.agp-cell__key`). */
+.notice-prefs__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  color: var(--muted);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
+}
+.notice-prefs__control {
+  flex: none;
+  display: flex;
+  align-items: center;
+}

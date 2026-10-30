@@ -184,7 +184,7 @@ const SELFHOST_EXTRA = [
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
-  ...["shared", "one"].map((k) => `connectAi.own.${k}`),
+  ...["shared", "one", "each"].map((k) => `connectAi.own.${k}`),
   "usageViews.agent.sharedPart",
   "agentPage.work.brain.add.duplicate.claude_code",
   "agentPage.work.brain.add.duplicate.codex",
@@ -275,7 +275,7 @@ describe("computer copy", () => {
     // sees one shared account on each, so it never claims to be every agent's.
     for (const strings of [ptBR, en]) {
       const values = valuesOf(strings);
-      const choice = ["own.shared", "own.one"].map((k) => values.get(`connectAi.${k}`) ?? "");
+      const choice = ["own.shared", "own.one", "own.each"].map((k) => values.get(`connectAi.${k}`) ?? "");
       const shared = [values.get("connectAi.own.shared") ?? "", values.get("usageViews.agent.sharedPart") ?? ""];
       expect([...choice, ...shared].every(Boolean)).toBe(true);
       const placed = /\{\{(computer|brand)\}\}|comput|login|signed in|outra|another/i;

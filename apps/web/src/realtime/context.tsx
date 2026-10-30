@@ -457,8 +457,14 @@ export function RealtimeProvider({
       // Notifications in this browser (ADR 0071): what was read, done or snoozed closes there too; a drop in
       // the badge ("Marcar tudo como lido") has one tab ask the server which shown ones went stale.
       if (isNotificationEvent(event)) settleShownPushes(orgId, event, notificationAudience().mine);
-      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
-      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background,
+      // unless the person turned that kind off (`alert`, ADR 0071 §8).
+      if (
+        isNotificationEvent(event) &&
+        event.type === "notification.upserted" &&
+        event.alert !== false &&
+        inDesktopApp()
+      ) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);
         if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
       }

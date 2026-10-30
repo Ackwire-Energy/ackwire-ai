@@ -87,7 +87,7 @@ Named `browser_*` (the `computer_*` names are the Daytona lifecycle):
 - `browser_click(ref)`, `browser_fill(ref, text)`, `browser_select(ref, value)`, `browser_check(ref)`, `browser_press(key)`, `browser_scroll`, `browser_upload(ref, file)` (a file from the agent's folder)
 - `browser_type_secret(ref, secret)`: types a secret already delivered with `request_secret`; the runner reads it locally; refused when the target isn't a password or one-time-code field
 - `browser_wait(text | url | selector | load, timeout)`
-- `browser_screenshot`: saved in the agent's folder (Claude Code and Codex read it there); image results for gateway brains come with ADR 0031 step 2
+- `browser_screenshot`: saved in the agent's folder (Claude Code and Codex read it there), always as a `.png`, since agent-browser's `screenshot [selector] [path]` reads a lone name without a slash or an image extension as a selector; image results for gateway brains come with ADR 0031 step 2. With `share`, the same call also sends it to the Drive the way `upload_file` sends a file (ADR 0025 §4) and its card goes with the reply; that takes Write files (`drive:write`), never Run code, and without it the image stays saved and the answer says to ask with `request_permission`
 - `browser_ask_person(instructions, timeout)`: the handoff (§6)
 - `browser_close`
 

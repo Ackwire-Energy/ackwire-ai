@@ -24,6 +24,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { CenteredLayout } from "@/components/AuthLayout";
+import { OrgMark } from "@/components/ProfilePhoto";
 import { useNow } from "@/hooks/useNow";
 import { TYPED_VALUES } from "@/i18n";
 import { useHumanCheck } from "@/lib/human-check";
@@ -101,7 +102,7 @@ export function InvitePage({ token }: { token: string }) {
   return (
     <CenteredLayout narrow>
       <Card padded as="div" className="invite-card">
-        {invitation && <OrgHead orgName={orgName} />}
+        {invitation && <OrgHead orgName={orgName} logo={invitation.logo} />}
 
         {invitation ? (
           <>
@@ -222,13 +223,17 @@ export function InvitePage({ token }: { token: string }) {
   );
 }
 
-/** The workspace an invitation is for: its initial, this server's address and its name. */
-function OrgHead({ orgName }: { orgName: string }) {
+/** The workspace an invitation is for: its logo (else its initial), this server's address and its name. */
+function OrgHead({ orgName, logo }: { orgName: string; logo?: string }) {
   return (
     <div className="row" style={{ gap: 12 }}>
-      <span className="org-badge" aria-hidden="true">
-        {orgName.trim()[0]?.toUpperCase()}
-      </span>
+      {logo ? (
+        <OrgMark logo={logo} size={48} />
+      ) : (
+        <span className="org-badge" aria-hidden="true">
+          {orgName.trim()[0]?.toUpperCase()}
+        </span>
+      )}
       <div className="stack-4" style={{ gap: 0 }}>
         <span className="small muted">{window.location.host}</span>
         <span style={{ fontWeight: 700, fontSize: 18, lineHeight: "24px" }}>{orgName}</span>
@@ -680,7 +685,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   return (
     <CenteredLayout narrow>
       <Card padded as="div" className="invite-card">
-        <OrgHead orgName={org} />
+        <OrgHead orgName={org} logo={preview.logo} />
         {body}
       </Card>
     </CenteredLayout>

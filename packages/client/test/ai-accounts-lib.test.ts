@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
+import { accountChoices, groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
@@ -83,6 +83,33 @@ describe("groupPlans: one row per account, its logins together", () => {
       ["a", ["a"]],
       ["b", ["b"]],
     ]);
+  });
+});
+
+describe("accountChoices: an agent's account choice, one entry per account", () => {
+  const claude = (id: string, over: Partial<MachineAccount & { machineId: string }> = {}) =>
+    login(id, { provider: null, keyHint: null, label: "Claude Max", email: "ana@example.com", ...over });
+  const choice = (accounts: (MachineAccount & { machineId: string })[], ids: (string | null)[]) =>
+    accountChoices(accounts, ids).map((c) => [c.login.id, c.usedBy, c.also]);
+
+  test("its own login, else a free one, else one more for it where the account may have a login per agent", () => {
+    const theo = claude("t", { usedBy: ["Theo"] });
+    // Every login another agent's: Claude signs in once more for this one, its agents named.
+    expect(choice([theo, claude("l", { usedBy: ["Lia"] })], [null])).toEqual([["t", ["Theo", "Lia"], true]]);
+    expect(choice([theo, claude("a", { usedBy: ["Ada"] })], ["a"])).toEqual([["a", ["Theo", "Ada"], false]]);
+    // A login that thinks for nobody comes before a new one.
+    expect(choice([theo, claude("f")], [null])).toEqual([["f", ["Theo"], false]]);
+    // ChatGPT stays one agent per account, and someone else's is never one to sign in to.
+    expect(choice([claude("c", { kind: "codex", usedBy: ["Theo"] })], [null])).toEqual([["c", ["Theo"], false]]);
+    expect(choice([claude("x", { mine: false, ownerId: "u_bia", email: null, usedBy: ["Theo"] })], [null])).toEqual([
+      ["x", ["Theo"], false],
+    ]);
+  });
+
+  test("the login chosen comes before the one the agent thinks with", () => {
+    const logins = [claude("a", { usedBy: ["Ada"] }), claude("b")];
+    expect(choice(logins, ["b", "a"])).toEqual([["b", ["Ada"], false]]);
+    expect(choice(logins, [null, "a"])).toEqual([["a", ["Ada"], false]]);
   });
 });
 

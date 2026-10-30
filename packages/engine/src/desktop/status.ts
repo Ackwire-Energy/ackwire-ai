@@ -35,7 +35,7 @@ export type AgentDesktopUseStatus =
  */
 export async function agentDesktopUseStatus(
   db: Database,
-  hub: MachineCaller | undefined,
+  hub: Pick<MachineCaller, "status"> | undefined,
   orgId: string,
   agentId: string,
 ): Promise<AgentDesktopUseStatus> {

@@ -140,11 +140,14 @@ export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.ke
 /**
  * The accounts that may have one login per agent, the same account signed in again for each (on a computer where
  * every agent is its own OS user, a sign-in folder belongs to one agent at a time). A coding plan's key has no
- * refresh token, so its copies never sign each other out. Claude's and ChatGPT's sign-ins stay one agent per
- * account until several sign-ins of one account are seen to hold.
+ * refresh token, so its copies never sign each other out. Claude's sign-ins may too (ADR 0059 §2, amended
+ * 2026-10-30), though a new sign-in or a token refresh can sign the account's other logins out: such a login reads
+ * as signed out from its next turn on, for its owner to sign in again. ChatGPT's stay one agent per account (OpenAI
+ * documents one `auth.json` per runner). Set back to false, a kind refuses a new login of an account already there
+ * again; logins made meanwhile keep thinking, each for its agent.
  */
 export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
-  claude_code: false,
+  claude_code: true,
   codex: false,
   key: true,
 };

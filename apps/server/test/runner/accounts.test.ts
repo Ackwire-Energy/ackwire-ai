@@ -186,6 +186,32 @@ test.if(posix)(
 );
 
 test.if(posix)(
+  "a sign-in its endpoint refused in a turn reads as signed out, though its CLI still says signed in, until it signs in again",
+  async () => {
+    const { m } = setup();
+    const id = LOGIN(13);
+    const signIn = async (again: boolean) => {
+      const begun = await m.begin("claude_code", id, again);
+      const { aad, box } = await sealed(begun.publicKey as string, id, "good-code");
+      await m.code(id, aad, box);
+      await waitFor(() => m.status(id).state !== "waiting", 5000);
+    };
+    await signIn(false);
+    const account = { id, kind: "claude_code" as const, loggedIn: true, email: "dev@acme.test", plan: "max" };
+    expect(await m.list()).toEqual([account]);
+    // Another login of the same account ended this one: its credentials stay, the turn's refusal decides.
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+    await signIn(true);
+    expect(m.status(id)).toEqual({ state: "done", account });
+    m.invalidate();
+    expect(await m.list()).toEqual([account]);
+  },
+  15_000,
+);
+
+test.if(posix)(
   "a key, token or other endpoint in the runner's env never reaches an account: its CLI sees only the folder's sign-in",
   async () => {
     const stray = {

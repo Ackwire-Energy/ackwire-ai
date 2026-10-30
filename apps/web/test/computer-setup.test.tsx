@@ -888,12 +888,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
 
-    // The team was made before it: the AI step opens on Claude's sign-in, on the workspace's computer.
+    // The team was made before it: the AI step opens on Claude's sign-in for each of them, on the workspace's
+    // computer.
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(within(rail).getByRole("button", { name: /^IA/ }).getAttribute("aria-current")).toBe("step");
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
+    expect((within(panel).getByRole("button", { name: "Fazer login para o Theo" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
     await click(screen().getByRole("button", { name: "Conectar depois" }));
@@ -1197,11 +1198,14 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel().textContent?.split("pronto")).toHaveLength(2);
     expect(well.querySelector(".ac-iconline")).toBeNull();
     expect([...panel().querySelectorAll(".ac-iconline")].filter(leadsWithClock)).toEqual([]);
-    const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
+    const signIn = () => within(panel()).getByRole("button", { name: "Fazer login para o Theo" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
-    // Ada asks which AI they use, so the plan is for her; Theo is the other choice. The foot is whom she replies to.
-    expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe("Ada");
-    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Responde a todos");
+    // Claude signs each agent in with the same account: the plan is for both, in the team's order. The foot is whom
+    // they reply to.
+    expect(within(panel()).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
+      "Todos os agentes",
+    );
+    expect(panel().querySelector(".ac-card__foot")?.textContent).toContain("Respondem a todos");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -1266,13 +1270,16 @@ describe("the onboarding where the workspace gets its own computer", () => {
       "Esperando um computador disponívelAvisamos você por e-mail quando o computador ficar pronto. Pode fechar esta página.",
     );
     await r.reported({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
-    // Without the computer's name, in a group of its own: the account's words start after its hairline.
+    // Without the computer's name, in a group of its own: whom it signs in, then the account's words, start after
+    // its hairline.
     const ready = panel().querySelector(".ai-panel__ready") as HTMLElement;
     expect(ready.textContent).toBe("O computador está pronto.");
     expect(ready.getAttribute("aria-live")).toBe("polite");
-    expect(ready.nextElementSibling?.matches(".agp-addacct")).toBe(true);
+    expect(ready.nextElementSibling?.matches(".ai-panel__who")).toBe(true);
     expect(
-      within(ready.nextElementSibling as HTMLElement).getByRole("button", { name: "Entrar com Claude" }),
+      within(panel().querySelector(".agp-addacct") as HTMLElement).getByRole("button", {
+        name: "Fazer login para o Theo",
+      }),
     ).toBeTruthy();
     expect(heardOnly(panel())).toBeNull();
     expect(panel().textContent?.split("pronto")).toHaveLength(2);
@@ -1285,17 +1292,18 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
     try {
-      await click(within(panel).getByRole("button", { name: "Entrar com Claude" }));
+      await click(within(panel).getByRole("button", { name: "Fazer login para o Theo" }));
       await settle(6);
     } finally {
       window.open = realOpen;
     }
+    expect(within(panel).getByRole("button", { name: "Enviar ao computador" })).toBeTruthy();
+    // The sign-in's own code goes by itself as it lands in the field.
     await act(async () =>
       fireEvent.change(within(panel).getByRole("textbox", { name: "Código do Claude" }), {
         target: { value: "c0de#st4te" },
       }),
     );
-    await click(within(panel).getByRole("button", { name: "Enviar ao computador" }));
     await settle(4);
     expect(r.state.calls.filter((c) => c.method === "machines.sendAccountCode")).toHaveLength(1);
     expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");
@@ -1316,7 +1324,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       const panel = () =>
         screen().getByRole("region", { name: plan === "Claude" ? "Seu plano do Claude" : "GLM Coding Plan" });
       const action = () =>
-        within(panel()).getByRole("button", { name: plan === "Claude" ? "Entrar com Claude" : /^Enviar ao/ });
+        within(panel()).getByRole("button", { name: plan === "Claude" ? "Fazer login para o Theo" : /^Enviar ao/ });
       // Asked again at ready, the agent's view and the accounts answer late, the view first: each says what was
       // true when it was asked.
       let viewIn = () => {};
@@ -1398,15 +1406,15 @@ describe("the onboarding where the workspace gets its own computer", () => {
     }
   });
 
-  test("a coding plan thinks for all of them at once by default; then the Team step says nobody else gets an answer", async () => {
+  test("a plan thinks for all of them at once by default; then the Team step says nobody else gets an answer", async () => {
     const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS });
     // Whoever creates an agent owns it, as the server makes them.
     for (const a of r.state.agents) a.ownerUserId = "u-walter";
     await click(screen().getByRole("button", { name: "Continuar" }));
     const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
-    // Claude signs in once per account: one agent, the first in the team's order.
+    // Claude signs each agent in, one at a time; a coding plan's key goes to all of them at once.
     const claude = screen().getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(claude).getByRole("combobox").textContent).not.toBe("Todos os agentes");
+    expect(within(claude).getByRole("combobox").textContent).toBe("Todos os agentes");
     await click(within(picker).getByRole("button", { name: /^GLM Coding/ }));
     const panel = screen().getByRole("region", { name: "GLM Coding Plan" });
     expect(within(panel).getByRole("combobox").textContent).toBe("Todos os agentes");

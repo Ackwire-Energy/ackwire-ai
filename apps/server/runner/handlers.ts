@@ -799,10 +799,10 @@ function doBrainSteer(
 
 /**
  * A turn in an account that was refused (`not_logged_in`) or is gone
- * (`account_missing`): its CLI is asked again (a key, or a folder root can't
- * run, is marked refused) and the server hears the answer either way
- * (`accounts.changed`). The machine is the only one that says an account is
- * signed out or gone; a passing failure leaves it as it was.
+ * (`account_missing`): a refused one is marked so, and reads as signed out
+ * until it signs in again (`AccountManager.refused`), and the server hears the
+ * answer either way (`accounts.changed`). The machine is the only one that
+ * says an account is signed out or gone; a passing failure leaves it as it was.
  */
 function signedOut(
   ctx: HandlerContext,
