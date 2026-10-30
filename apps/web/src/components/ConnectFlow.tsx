@@ -3,8 +3,10 @@ import {
   keys,
   useAgents,
   useCatalog,
+  useConnections,
   useConnectWithKey,
   useCustomServerAction,
+  useCustomServers,
   useStartOAuth,
 } from "@agenteschat/client";
 import {
@@ -17,7 +19,7 @@ import {
   sharedLevel,
 } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, fromConnection, fromServer, itemName } from "@agenteschat/client/lib/connected";
-import { humanize, isHttpsUrl } from "@agenteschat/client/lib/custom-tools";
+import { humanize, isHttpsUrl, sameServer } from "@agenteschat/client/lib/custom-tools";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import {
   partsOf,
@@ -146,6 +148,8 @@ function ConnectStep({
   const { org } = useOrg();
   const toast = useToast();
   const catalog = useCatalog();
+  const connections = useConnections(org.id);
+  const servers = useCustomServers(org.id);
   const { connect } = useCustomServerAction(org.id);
   const withKey = useConnectWithKey(org.id);
   const oauth = useStartOAuth(org.id);
@@ -163,6 +167,10 @@ function ConnectStep({
   const canKey = byAddress || Boolean(def?.auth.includes("api_key"));
   const serverUrl = def?.kind === "remote_mcp" ? (def.serverUrl ?? "") : url.trim();
   const busy = connect.isPending || withKey.isPending || oauth.isPending;
+  // As the server does: one connection per catalog connector, one per address; connecting again keeps the grants.
+  const again = byAddress
+    ? (servers.data ?? []).some((s) => sameServer(s.serverUrl, serverUrl))
+    : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt);
   const steps = useStepText(connect.isPending, [
     t("connectFlow.reaching"),
     t("connectFlow.listing"),
@@ -303,7 +311,10 @@ function ConnectStep({
         )}
         {!canOAuth && canKey && keyForm}
       </DialogBody>
-      <DialogFooter bar note={connect.isPending ? steps : t("connectFlow.allCanUse")}>
+      <DialogFooter
+        bar
+        note={connect.isPending ? steps : t(again ? "connectFlow.keepAccess" : "connectFlow.allCanUse")}
+      >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>
     </>

@@ -111,7 +111,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
     // What connecting changes, as one line under what it can do (no heading of its own).
-    expect(notion.textContent).toContain("Nenhum agente usa até você escolher.");
+    expect(notion.textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso depois.");
     expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
     // × goes back to the catalog; another tile opens its own.
     await click(within(notion).getByRole("button", { name: "Fechar detalhe" }));
@@ -189,6 +189,53 @@ describe("Adicionar conector: one catalog", () => {
       within(dialog).getByRole("radiogroup", { name: "Categorias" }).querySelectorAll("[role=radio]")[1] as Element,
     );
     expect(names(dialog)).toEqual(["GitHub", "Zapier", "Não achou?"]);
+  });
+
+  test("what connecting does to who uses it: a new service is everyone's, again keeps it, a database starts with none", async () => {
+    const api = createFakeApi(seedState());
+    await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.zapier.example/mcp/",
+      label: "Zapier",
+      returnTo: "/",
+    });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const catalog = async () => {
+      await click(screen().getByRole("button", { name: "Adicionar conector" }));
+      return screen().getByRole("dialog", { name: "Adicionar conector" });
+    };
+    let dialog = await catalog();
+    const detail = async (tile: string, name: string) => {
+      await click(within(dialog).getByRole("button", { name: tile }));
+      const text = service(name).textContent;
+      await pressEsc(service(name));
+      return text;
+    };
+    const everyone = "Ao conectar, todos os agentes podem usar. Você muda isso depois.";
+    const keeps = "Os agentes mantêm o acesso que já têm. Você muda isso depois.";
+    expect(await detail("Notion", "Notion")).toContain(everyone);
+    expect(await detail("GitHub, conectado", "GitHub")).toContain(keeps);
+    expect(await detail("Zapier, conectado", "Zapier")).toContain(keeps);
+    const database = await detail("Banco de dados", "Banco de dados");
+    expect(database).toContain("Nenhum agente usa até você escolher.");
+    expect(database).not.toContain(everyone);
+
+    // Connecting another account: step 1 says the agents keep what they have.
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    await click(within(dialog).getByRole("button", { name: "GitHub, conectado" }));
+    await click(within(service("GitHub")).getByRole("button", { name: "Conectar GitHub de novo" }));
+    expect(screen().getByRole("dialog", { name: "Conectar GitHub" })).toBe(flow());
+    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
+    expect(flow().textContent).not.toContain("todos os agentes podem usar");
+    await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+
+    // By address: the note follows the address typed (a server already connected is connected again).
+    dialog = await catalog();
+    await click(within(dialog).getByRole("button", { name: /Não achou/ }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
+    await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.zapier.example/mcp");
+    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
   });
 
   test("rules: how it connects, search", () => {

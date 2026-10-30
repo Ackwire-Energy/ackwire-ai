@@ -2444,6 +2444,10 @@ p {
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
 }
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+.ac-dialog__body > .people-picker:last-child .people-picker__results {
+  border-bottom: 0;
+}
 
 /*
  * Markdown inside chat messages, styled for reading: line breaks

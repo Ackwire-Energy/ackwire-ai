@@ -111,12 +111,19 @@ describe("Criar canal", () => {
       // The column scrolls when the screen is short (a phone's sheet too); the list scrolls in its box; the footer
       // never shrinks.
       const ui = await sheet("../../../packages/ui/src/styles/components.css");
+      const app = await sheet("../src/layout.css");
       expect(rule(ui, ".ac-dialog__body")).toContain("overflow-y: auto;");
       expect(rule(ui, ".ac-dialog__body")).toContain("flex-direction: column;");
-      expect(rule(await sheet("../src/layout.css"), ".people-picker__results")).toMatch(
-        /max-height: \d+px;[\s\S]*overflow-y: auto;/,
-      );
+      expect(rule(app, ".people-picker__results")).toMatch(/max-height: \d+px;[\s\S]*overflow-y: auto;/);
       expect(ui).toMatch(/\.ac-dialog__foot \{\n {2}flex: none;/);
+      // The list ends the body, right over the footer's line: it drops its own, so one line shows there, not two.
+      expect(body?.lastElementChild?.classList.contains("people-picker")).toBe(true);
+      expect(foot.classList.contains("ac-dialog__foot--bar")).toBe(true);
+      expect(rule(ui, ".ac-dialog__foot--bar")).toContain("border-top: 1px solid");
+      expect(rule(app, ".people-picker__results")).toContain("border-bottom: 1px solid");
+      expect(rule(app, ".ac-dialog__body > .people-picker:last-child .people-picker__results")).toContain(
+        "border-bottom: 0;",
+      );
     });
   }
 
