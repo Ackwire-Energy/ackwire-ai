@@ -1367,6 +1367,7 @@ export const featureKeysPtBR = {
     connectedSub: "Agora confira o que os agentes podem fazer sozinhos.",
     connectedDone: "Serviço conectado.",
     levelFailed: "Não deu para mudar o acesso de {{name}}. Tente de novo.",
+    everyoneFailed: "Não deu para mudar o acesso de todos. Tente de novo.",
     disconnectFailed: "Não deu para desconectar o {{name}}. Tente de novo.",
     whoTitle: "Quem usa e até onde",
     level: {

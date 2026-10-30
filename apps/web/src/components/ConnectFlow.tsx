@@ -14,6 +14,7 @@ import {
   type LevelState,
   levelIn,
   saveLevels,
+  sharedLevel,
 } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, fromConnection, fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { humanize, isHttpsUrl } from "@agenteschat/client/lib/custom-tools";
@@ -302,7 +303,7 @@ function ConnectStep({
         )}
         {!canOAuth && canKey && keyForm}
       </DialogBody>
-      <DialogFooter bar note={connect.isPending ? steps : t("connectFlow.nothingYet")}>
+      <DialogFooter bar note={connect.isPending ? steps : t("connectFlow.allCanUse")}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>
     </>
@@ -415,7 +416,10 @@ function ToolsStep({
   );
 }
 
-/** Step 3: one level per agent; "Liberar" merges it into each agent's grants. */
+/**
+ * Step 3: "Todos os agentes" on top (the main choice: it sets every agent), then one level per agent; "Liberar"
+ * merges them into each agent's grants.
+ */
 function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -427,13 +431,15 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
   const access = useAgentsAccess(list);
   const resourceId = `connector:${item.id}`;
   const current = (agentId: string) => levelIn(access.byAgent.get(agentId), resourceId);
-  const [who, setWho] = useState<Record<string, LevelState>>({});
-  const ready = agents.isSuccess && !access.loading;
-  // Starts from each agent's current level, once loaded.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when loading ends
+  const [who, setWho] = useState<Record<string, LevelState> | null>(null);
+  const loaded = agents.isSuccess && !access.loading && !access.fetching;
+  // Starts once from each agent's level, read fresh: a connection made a moment ago is already every agent's.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the fresh trees arrive
   useEffect(() => {
-    if (ready) setWho(Object.fromEntries(list.map((a) => [a.id, current(a.id)])));
-  }, [ready]);
+    if (loaded && who === null) setWho(Object.fromEntries(list.map((a) => [a.id, current(a.id)])));
+  }, [loaded]);
+  const ready = who !== null;
+  const picked = (agentId: string) => who?.[agentId] ?? "none";
   const levelLabel = (l: LevelState) => t(`access.level.${l}`);
   const options = (agentId: string) => [
     ...LEVELS.map((l) => ({ value: l as LevelState, label: levelLabel(l) })),
@@ -447,11 +453,11 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
   const grant = useMutation({
     mutationFn: async () => {
       const changed = list.filter((a) => {
-        const level = who[a.id] ?? "none";
+        const level = picked(a.id);
         return level !== "custom" && level !== current(a.id);
       });
       for (const a of changed) {
-        const saved = await saveLevels(api, org.id, a.id, { [resourceId]: who[a.id] as Level });
+        const saved = await saveLevels(api, org.id, a.id, { [resourceId]: picked(a.id) as Level });
         qc.setQueryData(keys.agentAccess(org.id, a.id), saved);
       }
       return changed.length;
@@ -459,7 +465,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.access(org.id) });
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[4] === "scopes" });
-      const count = list.filter((a) => (who[a.id] ?? "none") !== "none").length;
+      const count = list.filter((a) => picked(a.id) !== "none").length;
       toast.show(t("connectFlow.saved", { count, name: itemName(t, item) }));
       onClose();
     },
@@ -474,20 +480,26 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
           <p className="muted">{t("connectFlow.noAgents")}</p>
         ) : (
           <>
-            <div className="cflow__all">
-              <span className="small muted">{t("connectFlow.all")}</span>
-              {LEVELS.map((l) => (
-                <Button
-                  key={l}
+            {list.length > 1 && (
+              <div className="cflow-agent cflow-agent--all">
+                <span className="cflow-agent__all-icon" aria-hidden="true">
+                  <Icon name="members" size={16} />
+                </span>
+                <span className="cflow-agent__name">
+                  <span>{t("connectFlow.everyone")}</span>
+                  <span className="small muted">{t("connectFlow.everyoneCount", { count: list.length })}</span>
+                </span>
+                <Segmented<LevelState | "">
                   size="sm"
-                  variant="ghost"
-                  aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
-                  onClick={() => setWho(Object.fromEntries(list.map((a) => [a.id, l])))}
-                >
-                  {levelLabel(l)}
-                </Button>
-              ))}
-            </div>
+                  label={t("connectFlow.everyoneLevel")}
+                  value={sharedLevel(list.map((a) => picked(a.id))) ?? ""}
+                  onValueChange={(l) => {
+                    if (l) setWho(Object.fromEntries(list.map((a) => [a.id, l])));
+                  }}
+                  options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
+                />
+              </div>
+            )}
             <ul className="cflow-agents">
               {list.map((a) => (
                 <li key={a.id} className="cflow-agent">
@@ -499,7 +511,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
                   <Segmented
                     size="sm"
                     label={t("connectFlow.levelOf", { name: a.name })}
-                    value={who[a.id] ?? "none"}
+                    value={picked(a.id)}
                     onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
                     options={options(a.id)}
                   />
