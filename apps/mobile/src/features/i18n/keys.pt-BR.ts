@@ -838,7 +838,7 @@ export const featureKeysPtBR = {
     on: "Ligadas",
     off: "Desligadas",
     notificationsPhone: "Notificações no celular",
-    notificationsOnHint: "Também chegam no navegador e no app do Mac, se estiverem ligadas lá.",
+    notificationsOnHint: "Também chegam no navegador e no app do computador, se estiverem ligadas lá.",
     notificationsOffHint: "Ligue para receber avisos aqui. Os tipos abaixo valem para todos os seus aparelhos.",
     notificationsKindsHint: "A Atividade guarda tudo. Vale para este workspace, em todos os seus aparelhos.",
     version: "agentes.chat · versão {{version}}",
