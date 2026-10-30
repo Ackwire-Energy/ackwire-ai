@@ -28,9 +28,9 @@ import {
   verifyGitToken,
   ZERO_OID,
 } from "../src";
+import { readBody } from "../src/git/proxy";
 import { type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { readBody } from "../src/git/proxy";
 
 let f: Fixture;
 afterEach(async () => {

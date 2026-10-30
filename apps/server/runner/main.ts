@@ -25,6 +25,7 @@ import {
 import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
 import { verifyBrowserBindPolicy } from "./browser-bind-check";
 import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { browserPortsForUid } from "./browser-ports";
 import {
   configPath,
   DEFAULT_AGENT_UID_RANGE,
@@ -53,7 +54,6 @@ import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { LoopbackGuard } from "./loopback-guard";
-import { browserPortsForUid } from "./browser-ports";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import {
   type DeviceGrant,
@@ -531,9 +531,14 @@ async function host(p: Parsed): Promise<number> {
     log,
     start: runnerChild(thisRunner(), (line) => console.log(line)),
   });
-  const guard = system ? new LoopbackGuard({
-    home: flags.state, agentUids: () => computer.agentUids(), uidRange: DEFAULT_AGENT_UID_RANGE, log,
-  }) : null;
+  const guard = system
+    ? new LoopbackGuard({
+        home: flags.state,
+        agentUids: () => computer.agentUids(),
+        uidRange: DEFAULT_AGENT_UID_RANGE,
+        log,
+      })
+    : null;
   const stop = () => void computer.stop();
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);

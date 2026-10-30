@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import type { BrowserPorts } from "./browser-ports";
 import { countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
@@ -30,7 +31,6 @@ import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside } from "./paths";
 import type { Spawn } from "./scope-gate";
-import type { BrowserPorts } from "./browser-ports";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -571,9 +571,11 @@ export async function launchChrome(
     const rows = (result.stdout ?? "").split("\n").filter((line) => {
       const cols = line.trim().split(/\s+/);
       const local = cols[3] ?? "";
-      return cols[0] === "LISTEN" &&
+      return (
+        cols[0] === "LISTEN" &&
         (local.startsWith("127.0.0.1:") || local.startsWith("0.0.0.0:")) &&
-        Number(local.slice(local.lastIndexOf(":") + 1)) === port;
+        Number(local.slice(local.lastIndexOf(":") + 1)) === port
+      );
     });
     return rows.length > 0 && rows.every((line) => Number(/\buid:(\d+)\b/.exec(line)?.[1]) === uid);
   },
@@ -651,7 +653,7 @@ export async function launchChrome(
           signal: AbortSignal.timeout(300),
         });
         if (reply.ok) {
-          const version = await reply.json() as { webSocketDebuggerUrl?: unknown };
+          const version = (await reply.json()) as { webSocketDebuggerUrl?: unknown };
           if (typeof version.webSocketDebuggerUrl === "string") {
             const url = new URL(version.webSocketDebuggerUrl);
             if (url.hostname === "127.0.0.1" && Number(url.port) === fixedPort) wsPath = url.pathname;
@@ -667,7 +669,12 @@ export async function launchChrome(
       wsPath = second.trim();
     }
     const validPath = /^\/devtools\/browser\/[\w-]+$/.test(wsPath);
-    if (Number.isInteger(port) && port > 0 && port < 65536 && (!fixedPort || (port === fixedPort && validPath && ownsPort(fixedPort)))) {
+    if (
+      Number.isInteger(port) &&
+      port > 0 &&
+      port < 65536 &&
+      (!fixedPort || (port === fixedPort && validPath && ownsPort(fixedPort)))
+    ) {
       if (!child.pid) break;
       started = true;
       return {
@@ -1557,8 +1564,15 @@ export class BrowserManager {
       const start = this.opts.startChrome ?? launchChrome;
       const launch = async (on: ChromeDisplay | null) => {
         if (on) prepareProfile(profile);
-        const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page,
-          this.opts.fixedPorts?.cdp ?? 0);
+        const args = chromeLaunchArgs(
+          exe,
+          profile,
+          process.platform,
+          osLang(),
+          on !== null,
+          page,
+          this.opts.fixedPorts?.cdp ?? 0,
+        );
         try {
           const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
           if (on) started.display = on.display;

@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { browserPortsForUid, checkEphemeralRange, validateBrowserUidRange } from "../../runner/browser-ports";
 import {
-  type GuardedListener,
   conflictingBrowserPorts,
+  type GuardedListener,
   LoopbackGuard,
   parseListeners,
   RUNNER_NFT_TABLE,
@@ -162,10 +162,18 @@ function guard(run: RunCommand, agentUids: number[]) {
   const home = tempDir("loopback-guard-");
   dirs.push(home);
   const logs: string[] = [];
-  return { g: new LoopbackGuard({
-    home, agentUids: () => agentUids, uidRange: RANGE, run, log: (l) => logs.push(l),
-    systemd: true, ephemeralRange: "32768 60999",
-  }), logs };
+  return {
+    g: new LoopbackGuard({
+      home,
+      agentUids: () => agentUids,
+      uidRange: RANGE,
+      run,
+      log: (l) => logs.push(l),
+      systemd: true,
+      ephemeralRange: "32768 60999",
+    }),
+    logs,
+  };
 }
 
 test("reconcile guards the agent's port after reading its uid from ss, and leaves others alone", () => {
@@ -294,7 +302,10 @@ test("an overlapping ephemeral range refuses system mode because bind(0) can sel
 });
 
 test("old UIDs in another bucket or duplicate UIDs refuse startup before nft applies", () => {
-  for (const uids of [[21000, 31000], [21000, 21000]]) {
+  for (const uids of [
+    [21000, 31000],
+    [21000, 21000],
+  ]) {
     const nft = fakeNft();
     const { g } = guard(nft.run, uids);
     expect(() => g.start()).toThrow("Persisted agent UIDs overlap or fall outside");

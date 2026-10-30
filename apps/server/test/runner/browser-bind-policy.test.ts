@@ -9,11 +9,13 @@ test("loads an empty slice, replaces bind rules, and probes denied and allowed p
   const calls: { file: string; args: string[] }[] = [];
   const run: RunCommand = (file, args) => {
     calls.push({ file, args });
-    if (file === "ss") return {
-      code: 0,
-      output: "LISTEN 0 0 127.0.0.1:10000 0.0.0.0:* uid:20000 ino:1 sk:0\n" +
-        "LISTEN 0 0 127.0.0.1:3000 0.0.0.0:* uid:21001 ino:2 sk:0",
-    };
+    if (file === "ss")
+      return {
+        code: 0,
+        output:
+          "LISTEN 0 0 127.0.0.1:10000 0.0.0.0:* uid:20000 ino:1 sk:0\n" +
+          "LISTEN 0 0 127.0.0.1:3000 0.0.0.0:* uid:21001 ino:2 sk:0",
+      };
     return { code: 0, output: "" };
   };
   ensureBrowserBindPolicy(user, runner, { run, systemd: true });
@@ -21,19 +23,36 @@ test("loads an empty slice, replaces bind rules, and probes denied and allowed p
   expect(calls[1]).toEqual({
     file: "systemctl",
     args: [
-      "set-property", "--runtime", "agents-21000.slice",
-      "SocketBindAllow=", "SocketBindAllow=tcp:1-9999",
-      "SocketBindAllow=tcp:30000-65535", "SocketBindAllow=tcp:12000-12001",
-      "SocketBindDeny=", "SocketBindDeny=tcp",
+      "set-property",
+      "--runtime",
+      "agents-21000.slice",
+      "SocketBindAllow=",
+      "SocketBindAllow=tcp:1-9999",
+      "SocketBindAllow=tcp:30000-65535",
+      "SocketBindAllow=tcp:12000-12001",
+      "SocketBindDeny=",
+      "SocketBindDeny=tcp",
     ],
   });
   expect(calls[2]).toEqual({ file: "ss", args: ["-Htln", "-e"] });
   expect(calls[3]).toEqual({
     file: "/usr/bin/systemd-run",
     args: [
-      "--quiet", "--scope", "--collect", "--slice=agents-21000.slice", "--",
-      "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--", ...runner,
-      "bind-check", "10001", "12000", "12001", "3001",
+      "--quiet",
+      "--scope",
+      "--collect",
+      "--slice=agents-21000.slice",
+      "--",
+      "/usr/sbin/runuser",
+      "-u",
+      "ag-a1b2c3d4",
+      "--",
+      ...runner,
+      "bind-check",
+      "10001",
+      "12000",
+      "12001",
+      "3001",
     ],
   });
   expect(calls[4]).toEqual({ file: "ss", args: ["-Htln", "-e"] });

@@ -834,7 +834,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(within(pc).getByRole("button", { name: "Mudar onde trabalha" })).toBeTruthy();
   });
 
-  test("browser: an agent at work in its browser stays in use between its calls (ADR 0040)", async () => {
+  test("browser: an agent at work in its browser stays in use between its calls; Ver shows its card (ADR 0040)", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
@@ -874,7 +874,16 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(card.textContent).toContain("Em uso agora");
     expect(card.textContent).not.toContain("Ninguém usa o navegador agora.");
     expect(card.querySelector(".brw-use")?.textContent).toContain("No navegador");
-    expect(within(card).getByRole("button", { name: "Ver" })).toBeTruthy();
+    // Ver shows its card in the page's own layout, not the conversation's frame. Recolher puts it away.
+    const see = within(card).getByRole("button", { name: "Ver" });
+    await act(async () => fireEvent.click(see));
+    await settle(4);
+    const browser = card.querySelector(".brw-ac") as HTMLElement;
+    expect(browser.classList.contains("brw-mf")).toBe(false);
+    await act(async () => fireEvent.click(within(browser).getByRole("button", { name: "Recolher" })));
+    await settle(2);
+    expect(card.querySelector(".brw-ac")).toBeNull();
+    expect(see.getAttribute("aria-expanded")).toBe("false");
   });
 });
 
