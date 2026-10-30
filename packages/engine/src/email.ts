@@ -109,7 +109,7 @@ export type EmailTemplate =
    */
   | { kind: "waitlist_confirm"; locale: EmailLocale; url: string; email?: string }
   /**
-   * Early access (ADR 0078): `email` may now create an account and its workspace, through `url` (the sign-up page
+   * Early access (ADR 0078): `email` may now create an account and workspaces, through `url` (the sign-up page
    * with the address filled in and the link's token), for `days` days.
    */
   | { kind: "early_access"; locale: EmailLocale; email: string; url: string; days: number }

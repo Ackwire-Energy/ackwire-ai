@@ -294,7 +294,7 @@ export function accountRoutes(deps: AppDeps) {
               }),
               canCreateWorkspace: z.boolean().openapi({
                 description:
-                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account (ADR 0078).",
+                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078).",
               }),
             }),
             organizations: z.array(Organization),
@@ -603,7 +603,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Refused with 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account (ADR 0078).",
+        "Refused with 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078).",
       request: {
         body: body(
           z.object({

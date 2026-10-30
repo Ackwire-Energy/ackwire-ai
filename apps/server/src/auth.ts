@@ -451,7 +451,7 @@ export async function signupOpen(db: Database, config: Config, users: number) {
   return users === 0 ? !policy.ownerByLink : signupOpenToAll(db, policy);
 }
 
-/** Whether new workspaces take an early-access invitation here (ADR 0078 §4): only on agentes.chat Cloud. */
+/** Whether making a workspace needs an account early access allowed (ADR 0078 §4): only on agentes.chat Cloud. */
 export const workspacePolicy = (config: Config): WorkspacePolicy => ({
   paidMachines: config.MACHINE_PROVISIONING === "external" && isAgentesCloud(config.PUBLIC_URL),
   allowSignup: config.ALLOW_SIGNUP,

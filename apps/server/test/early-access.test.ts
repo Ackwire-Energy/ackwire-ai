@@ -94,7 +94,15 @@ const userId = async (t: TestServer, email: string) =>
 async function me(b: Browser) {
   const res = await b("/api/app/me");
   expect(res.status).toBe(200);
-  return ((await res.json()) as { user: { canCreateWorkspace: boolean } }).user;
+  return ((await res.json()) as { user: { canCreateWorkspace: boolean; emailVerified: boolean } }).user;
+}
+
+/** The link that confirms `email`, from the latest confirmation email sent to it. */
+async function confirmationLink(t: TestServer, email: string) {
+  await t.drain();
+  const text = t.email.sent.filter((m) => m.to[0] === email && m.text.includes("/verify-email")).at(-1)?.text;
+  const link = new URL(/https?:\/\/\S+\/api\/auth\/verify-email\S*/.exec(text ?? "")?.[0] ?? "");
+  return `${link.pathname}${link.search}`;
 }
 
 /** Whether the sign-in page and `/api/instance` say anyone may sign up. */
@@ -148,7 +156,8 @@ test("an invitation's link: sign-up for its address, then workspaces (agentes.ch
   // The link is spent: it signs nobody else up.
   expect((await signUpWith(cloudBrowser(t), "ana@acme.test", access)).status).not.toBe(200);
 
-  expect((await me(ana)).canCreateWorkspace).toBe(true);
+  // The link reached her mailbox: her address counts as confirmed.
+  expect(await me(ana)).toMatchObject({ canCreateWorkspace: true, emailVerified: true });
   const first = await ana("/api/app/organizations", { json: { name: "Ana's" } });
   expect(first.status).toBe(201);
   const { organization } = (await first.json()) as { organization: { id: string } };
@@ -158,7 +167,7 @@ test("an invitation's link: sign-up for its address, then workspaces (agentes.ch
   expect((await me(ana)).canCreateWorkspace).toBe(true);
 });
 
-test("agentes.chat Cloud: a member makes no workspace until the address is allowed, then as many as it likes, until revoked", async () => {
+test("agentes.chat Cloud: a member makes no workspace until the address is allowed and confirmed, then as many as it likes, until revoked", async () => {
   const t = await server({ MACHINE_PROVISIONING: "external", PUBLIC_URL: CLOUD });
   const owner = cloudBrowser(t);
   await signUp(owner, "owner@acme.test");
@@ -185,6 +194,10 @@ test("agentes.chat Cloud: a member makes no workspace until the address is allow
   const allowed = await outcome("bia@acme.test");
   expect(allowed?.outcome).toBe("allowed");
   expect(await mailed(t, "bia@acme.test")).toEqual([{ kind: "early_access_allowed", url: `${CLOUD}/onboarding` }]);
+  // A workspace invitation let her sign up unconfirmed, as it would anyone typing her address: confirming comes first.
+  expect(await me(bia)).toMatchObject({ canCreateWorkspace: false, emailVerified: false });
+  expect((await bia("/api/app/organizations", { json: { name: "Bia's" } })).status).toBe(403);
+  expect((await bia(await confirmationLink(t, "bia@acme.test"))).status).toBe(302);
   expect((await me(bia)).canCreateWorkspace).toBe(true);
   for (const name of ["Bia's", "Bia Labs"]) {
     expect((await bia("/api/app/organizations", { json: { name } })).status).toBe(201);

@@ -175,7 +175,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       tags,
       summary: "The next confirmed entries still waiting, oldest first",
       description:
-        "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. An address with an account is among them: inviting it allows the account. Skips addresses sign-up wouldn't take; they still count as waiting.",
+        "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. An address with an account is among them: inviting it allows the account. Skips addresses sign-up wouldn't take and those of blocked accounts; they still count as waiting.",
       request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }) },
       responses: {
         200: json(
@@ -253,7 +253,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       path: "/early-access/invitations",
       tags,
       summary: "Invite addresses to create an account and make workspaces",
-      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else pt-BR. An address that has an account gets no link: the account is allowed to make workspaces at once, and an email in its language says so. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account or allowed one already, so nothing went out), \`allowed\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
+      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else pt-BR. An address that has an account gets no link: the account is allowed at once, and an email in its language says so (none to a blocked account). An allowed account makes workspaces once its address is confirmed. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account or allowed one already, so nothing went out), \`allowed\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
       request: {
         body: body(
           z.object({
@@ -334,7 +334,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       path: "/early-access/invitations/{invitationId}/resend",
       tags,
       summary: "Send an invitation again, with a new link",
-      description: `The old link stops working, the invitation is no longer revoked and runs ${EARLY_ACCESS_TTL_DAYS} days from now. Within 2 minutes of the previous send nothing goes out (\`sent: false\`). When the address has an account by now, no link goes: the account is allowed to make workspaces at once and an email says so, and the answer is the invitation, now \`signed_up\`, with \`sent: false\`. Refused (409) once it was used (\`early_access.used\`), and on a server that sends no email (\`early_access.no_email\`).`,
+      description: `The old link stops working, the invitation is no longer revoked and runs ${EARLY_ACCESS_TTL_DAYS} days from now. Within 2 minutes of the previous send nothing goes out (\`sent: false\`). When the address has an account by now, no link goes: the account is allowed at once and an email says so (none to a blocked account), and the answer is the invitation, now \`signed_up\`, with \`sent: false\`. Refused (409) once it was used (\`early_access.used\`), and on a server that sends no email (\`early_access.no_email\`).`,
       request: { params: InvitationParams },
       responses: {
         200: json(z.object({ invitation: Invitation, sent: z.boolean() }).openapi("OperatorInvitationResend")),

@@ -66,6 +66,19 @@ async function member(email: string, orgId: string, locale?: "en" | "pt-BR") {
   return id;
 }
 
+/** The account's address confirmed, as its confirmation link does. */
+async function confirm(userId: string) {
+  await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, userId));
+}
+
+async function confirmed(userId: string) {
+  const [user] = await db
+    .select({ emailVerified: schema.users.emailVerified })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId));
+  return user?.emailVerified;
+}
+
 async function invite(email: string, now = T0, options: { resend?: boolean; locale?: "en" | "pt-BR" } = {}) {
   const [result] = await inviteEarlyAccess(
     db,
@@ -199,16 +212,19 @@ describe("who may sign up", () => {
 });
 
 describe("using an invitation", () => {
-  test("once, by its own address: the token goes; deleting the account keeps the use", async () => {
+  test("once, by its own address, which it confirms: the token goes; deleting the account keeps the use", async () => {
     await account("owner@acme.com");
     const { invitationId } = await invite("ana@acme.com");
     const access = await tokenOf("ana@acme.com");
     const bia = await account("bia@acme.com");
     expect(await useEarlyAccess(db, { access, email: "bia@acme.com", userId: bia })).toBe(false);
+    expect(await confirmed(bia)).toBe(false);
     const ana = await account("ana@acme.com");
     expect(await useEarlyAccess(db, { access, email: " Ana@Acme.com", userId: ana }, at(MIN))).toBe(true);
     expect(await useEarlyAccess(db, { access, email: "ana@acme.com", userId: ana }, at(2 * MIN))).toBe(false);
     expect(await row("ana@acme.com")).toMatchObject({ usedAt: at(MIN), userId: ana, tokenHash: null });
+    // The token reached her mailbox, as a confirmation link would.
+    expect(await confirmed(ana)).toBe(true);
 
     await deleteAccount(db, ana);
     expect(await row("ana@acme.com")).toMatchObject({ id: invitationId, usedAt: at(MIN), userId: null });
@@ -426,18 +442,26 @@ describe("revoking and expiry", () => {
 });
 
 describe("workspaces while sign-up is by invitation (every workspace with a paid computer)", () => {
-  test("a member early access didn't allow is refused, leaving nothing, until its address is invited", async () => {
+  test("a member early access didn't allow is refused, leaving nothing, until its address is invited and confirmed", async () => {
     const owner = await account("owner@acme.com");
     const acme = await createOrganization(db, owner, { name: "Acme" });
     const bia = await member("bia@acme.com", acme.organization.id);
     expect(await needsWorkspaceAllowance(db, bia, CLOUD)).toBe(true);
-    expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(false);
-    await expect(createOrganization(db, bia, { name: "Bia" }, { needsAllowance: true })).rejects.toMatchObject({
-      code: "org.create_invite_only",
-    });
-    expect(await db.select().from(schema.organizations)).toHaveLength(1);
+    const refused = async () => {
+      expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(false);
+      await expect(createOrganization(db, bia, { name: "Bia" }, { needsAllowance: true })).rejects.toMatchObject({
+        code: "org.create_invite_only",
+      });
+      expect(await db.select().from(schema.organizations)).toHaveLength(1);
+    };
+    await refused();
+    // Allowed, but anyone can sign up with an address that isn't theirs: it counts once the address is confirmed.
     expect((await invite("bia@acme.com")).outcome).toBe("allowed");
+    expect(await hasWorkspaceAllowance(db, bia)).toBe(false);
+    await refused();
+    await confirm(bia);
     expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(true);
+    await createOrganization(db, bia, { name: "Bia" }, { needsAllowance: true });
   });
 
   test("an allowed account makes as many as it likes, and its first is recorded on its invitation", async () => {
@@ -531,6 +555,7 @@ describe("allowing an account that exists", () => {
     const owner = await account("owner@acme.com");
     const acme = await createOrganization(db, owner, { name: "Acme" });
     const bia = await member("bia@acme.com", acme.organization.id, "en");
+    await confirm(bia);
     const result = await invite(" Bia@Acme.com", T0, { locale: "pt-BR" });
     expect(result).toEqual({ email: "bia@acme.com", outcome: "allowed", invitationId: expect.any(String) });
     expect(await row("bia@acme.com")).toMatchObject({
@@ -560,6 +585,7 @@ describe("allowing an account that exists", () => {
     const acme = await createOrganization(db, owner, { name: "Acme" });
     await importWaitlist(db, [{ email: "ana@acme.com" }, { email: "bia@acme.com", locale: "en" }], at(-DAY));
     const bia = await member("bia@acme.com", acme.organization.id);
+    await confirm(bia);
     expect((await waitlistCounts(db)).waiting).toBe(2);
     const next = await waitlistNext(db, 10);
     expect(next.map((e) => e.email)).toEqual(["ana@acme.com", "bia@acme.com"]);
@@ -592,7 +618,26 @@ describe("allowing an account that exists", () => {
       ["early_access_allowed", "en"],
     ]);
     expect(await signupAdmission(db, "ana@acme.com", CLOSED, { access: link, now: at(2 * MIN) })).toBeNull();
+    expect(await canCreateWorkspace(db, ana, CLOUD)).toBe(false);
+    await confirm(ana);
     expect(await canCreateWorkspace(db, ana, CLOUD)).toBe(true);
+  });
+
+  test("a blocked account's address: left out of the next N, and allowed when named, with no email", async () => {
+    const owner = await account("owner@acme.com");
+    const acme = await createOrganization(db, owner, { name: "Acme" });
+    await importWaitlist(db, [{ email: "bia@acme.com" }, { email: "ana@acme.com" }], at(-DAY));
+    const bia = await member("bia@acme.com", acme.organization.id);
+    await db
+      .update(schema.users)
+      .set({ blockedAt: at(-MIN) })
+      .where(eq(schema.users.id, bia));
+    expect((await waitlistNext(db, 10)).map((e) => e.email)).toEqual(["ana@acme.com"]);
+    expect((await waitlistCounts(db)).waiting).toBe(2);
+    // It can't sign in: nothing tells it to make a workspace.
+    expect((await invite("bia@acme.com")).outcome).toBe("allowed");
+    expect(await row("bia@acme.com")).toMatchObject({ userId: bia, usedAt: T0 });
+    expect(await sent()).toEqual([]);
   });
 
   test("allowing twice sends nothing, and two at once mail once", async () => {

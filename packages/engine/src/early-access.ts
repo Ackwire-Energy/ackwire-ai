@@ -104,8 +104,9 @@ export async function earlyAccessLink(db: Executor, access: string | null | unde
 
 /**
  * An account made with the link's token, before it expires, uses its invitation: once, and only for the address it
- * was sent to. The token goes, so the link signs nobody else up. An expired link uses nothing, even when the account
- * got in another way (open mode, a workspace's invitation). Returns whether it was used.
+ * was sent to. The token goes, so the link signs nobody else up, and the account's address counts as confirmed: the
+ * token reached that mailbox, as a confirmation link would. An expired link uses nothing, even when the account got
+ * in another way (open mode, a workspace's invitation). Returns whether it was used.
  */
 export async function useEarlyAccess(
   db: Executor,
@@ -113,20 +114,28 @@ export async function useEarlyAccess(
   now = new Date(),
 ) {
   if (!EARLY_ACCESS_TOKEN.test(input.access)) return false;
-  const used = await db
-    .update(invitations)
-    .set({ usedAt: now, userId: input.userId, tokenHash: null })
-    .where(
-      and(
-        eq(invitations.tokenHash, sha256(input.access)),
-        eq(invitations.email, input.email.trim().toLowerCase()),
-        isNull(invitations.usedAt),
-        isNull(invitations.revokedAt),
-        gt(invitations.expiresAt, now),
-      ),
-    )
-    .returning({ id: invitations.id });
-  return used.length > 0;
+  const email = input.email.trim().toLowerCase();
+  return db.transaction(async (tx) => {
+    const used = await tx
+      .update(invitations)
+      .set({ usedAt: now, userId: input.userId, tokenHash: null })
+      .where(
+        and(
+          eq(invitations.tokenHash, sha256(input.access)),
+          eq(invitations.email, email),
+          isNull(invitations.usedAt),
+          isNull(invitations.revokedAt),
+          gt(invitations.expiresAt, now),
+        ),
+      )
+      .returning({ id: invitations.id });
+    if (used.length === 0) return false;
+    await tx
+      .update(users)
+      .set({ emailVerified: true })
+      .where(and(eq(users.id, input.userId), eq(users.email, email)));
+    return true;
+  });
 }
 
 // ── Workspaces while sign-up is by invitation ────────────────────────────────
@@ -142,12 +151,17 @@ export async function recordFirstWorkspace(tx: Executor, userId: string, orgId: 
     .where(and(eq(invitations.userId, userId), isNull(invitations.workspaceCreatedAt), isNull(invitations.revokedAt)));
 }
 
-/** Early access allowed the account to make workspaces: an invitation is bound to it (used) and not revoked. */
+/**
+ * Early access allowed the account to make workspaces: an invitation is bound to it (used), not revoked, and its
+ * address is confirmed. Anyone can sign up with an address that isn't theirs (a pending workspace invitation or open
+ * mode lets it in unconfirmed), and allowing an address binds whichever account holds it.
+ */
 export async function hasWorkspaceAllowance(db: Executor, userId: string) {
   const [row] = await db
     .select({ id: invitations.id })
     .from(invitations)
-    .where(and(eq(invitations.userId, userId), isNull(invitations.revokedAt)))
+    .innerJoin(users, eq(users.id, invitations.userId))
+    .where(and(eq(invitations.userId, userId), isNull(invitations.revokedAt), eq(users.emailVerified, true)))
     .limit(1);
   return row !== undefined;
 }
@@ -192,7 +206,13 @@ async function invitationById(db: Executor, id: string, now: Date) {
 }
 
 const accountOf = async (db: Executor, email: string) =>
-  (await db.select({ id: users.id, locale: users.locale }).from(users).where(eq(users.email, email)).limit(1))[0];
+  (
+    await db
+      .select({ id: users.id, locale: users.locale, blockedAt: users.blockedAt })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+  )[0];
 
 const sentLately = (sentAt: Date, now: Date) => now.getTime() - sentAt.getTime() < EARLY_ACCESS_RESEND_AFTER_MS;
 
@@ -245,13 +265,14 @@ async function claimSend(tx: Executor, email: string, locale: EmailLocale, publi
 /**
  * Allows the account an address already has to make workspaces, instead of sending it a sign-up link: the address's
  * invitation (a new one if it has none) is bound to the account and used at once, with no link, and the person is
- * told by email in `locale`, with a link to make a workspace. Claimed by one conditional upsert, so two calls at once
- * allow and mail once; null when the invitation was used already. The waiting list notes it as an invitation.
+ * told by email in `locale`, with a link to make a workspace, unless the account is blocked: it can't sign in. Claimed
+ * by one conditional upsert, so two calls at once allow and mail once; null when the invitation was used already. The
+ * waiting list notes it as an invitation.
  */
 async function allowAccount(
   tx: Executor,
   email: string,
-  userId: string,
+  account: { id: string; blockedAt: Date | null },
   locale: EmailLocale,
   publicUrl: string,
   now: Date,
@@ -260,7 +281,7 @@ async function allowAccount(
     locale,
     tokenHash: null,
     usedAt: now,
-    userId,
+    userId: account.id,
     revokedAt: null,
     sentAt: now,
     expiresAt: expiresAfter(now),
@@ -276,12 +297,14 @@ async function allowAccount(
     .returning({ id: invitations.id, sends: invitations.sends });
   if (!allowed) return null;
   await noteInvited(tx, email, now);
-  await queueEmail(tx, {
-    orgId: null,
-    key: `early-access:${allowed.id}:${allowed.sends}`,
-    to: [email],
-    template: { kind: "early_access_allowed", locale, email, url: `${publicUrl.replace(/\/$/, "")}/onboarding` },
-  });
+  if (!account.blockedAt) {
+    await queueEmail(tx, {
+      orgId: null,
+      key: `early-access:${allowed.id}:${allowed.sends}`,
+      to: [email],
+      template: { kind: "early_access_allowed", locale, email, url: `${publicUrl.replace(/\/$/, "")}/onboarding` },
+    });
+  }
   return allowed;
 }
 
@@ -336,7 +359,7 @@ export async function inviteEarlyAccess(
             .where(eq(waitlistEntries.email, email));
       const locale = emailLocale(account?.locale ?? row?.locale ?? entry?.locale ?? input.locale);
       if (account) {
-        const allowed = await allowAccount(tx, email, account.id, locale, input.publicUrl, now);
+        const allowed = await allowAccount(tx, email, account, locale, input.publicUrl, now);
         return allowed ? { outcome: "allowed", invitationId: allowed.id } : { outcome: "signed_up", ...id };
       }
       const claimed = await claimSend(tx, email, locale, input.publicUrl, now);
@@ -358,7 +381,7 @@ export async function resendEarlyAccess(db: Database, id: string, publicUrl: str
     if (row.usedAt) throw new ConflictError("This invitation was used: its account exists", "early_access.used");
     const account = await accountOf(tx, row.email);
     if (account) {
-      await allowAccount(tx, row.email, account.id, emailLocale(account.locale ?? row.locale), publicUrl, now);
+      await allowAccount(tx, row.email, account, emailLocale(account.locale ?? row.locale), publicUrl, now);
       return { invitation: await invitationById(tx, id, now), sent: false };
     }
     const sent = !sentLately(row.sentAt, now) && (await claimSend(tx, row.email, row.locale, publicUrl, now)) !== null;
@@ -454,8 +477,8 @@ const joinedAtMs = sql<Date>`date_trunc('milliseconds', ${waitlistEntries.create
 
 /**
  * The next confirmed entries still waiting (no invitation; inviting one with an account allows it), oldest first,
- * skipping addresses sign-up wouldn't take (they still count as waiting). A read: the caller invites exactly these,
- * so a retry never invites more than it showed.
+ * skipping addresses sign-up wouldn't take and those of blocked accounts (they still count as waiting). A read: the
+ * caller invites exactly these, so a retry never invites more than it showed.
  */
 export async function waitlistNext(db: Database, limit: number) {
   const out: { email: string; locale: EmailLocale; joinedAt: Date }[] = [];
@@ -470,9 +493,10 @@ export async function waitlistNext(db: Database, limit: number) {
       })
       .from(waitlistEntries)
       .leftJoin(invitations, eq(invitations.email, waitlistEntries.email))
+      .leftJoin(users, eq(users.email, waitlistEntries.email))
       .where(
         and(
-          sql`${waitlistEntries.confirmedAt} is not null and ${invitations.id} is null`,
+          sql`${waitlistEntries.confirmedAt} is not null and ${invitations.id} is null and ${users.blockedAt} is null`,
           after
             ? sql`(${joinedAtMs}, ${waitlistEntries.id}) > (${after.joinedAt.toISOString()}::timestamptz, ${after.id}::uuid)`
             : undefined,

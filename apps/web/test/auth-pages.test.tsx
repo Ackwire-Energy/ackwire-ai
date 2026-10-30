@@ -939,17 +939,35 @@ describe("Onboarding", () => {
     const seeded = seedState();
     const user = { ...(seeded.me?.user ?? { id: "u", name: "Ana", email: "ana@acme.com", image: null }) };
     const { state } = await start({
-      me: { user: { ...user, canCreateWorkspace: false }, organizations: [] },
+      me: { user: { ...user, canCreateWorkspace: false, emailVerified: true }, organizations: [] },
       authConfig: { supportEmail: "suporte@agentes.chat" },
     });
-    expect(document.querySelector(".onb__note")?.textContent).toBe(
+    expect([...document.querySelectorAll(".onb__note")].map((n) => n.textContent)).toEqual([
       "Novos workspaces precisam de convite por enquanto. Peça um em suporte@agentes.chat.",
-    );
+    ]);
     await type("Nome", "Acme Saúde");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await act(async () => fireEvent.keyDown(screen().getByLabelText("Nome"), { key: "Enter" }));
     await settle(4);
     expect(calls(state, "orgs.create")).toEqual([]);
+  });
+
+  test("held there with the address unconfirmed: early access counts once it is, so a new link is at hand", async () => {
+    const state = seedState();
+    if (!state.me) throw new Error("no me");
+    state.me.organizations = [];
+    state.me.user = { ...state.me.user, canCreateWorkspace: false, emailVerified: false };
+    state.authConfig = { ...state.authConfig, supportEmail: "suporte@agentes.chat" };
+    const { auth, calls: authCalls } = createFakeAuth();
+    await renderApp("/onboarding", { api: createFakeApi(state), auth });
+    await settle(4);
+    expect([...document.querySelectorAll(".onb__note")].map((n) => n.textContent)).toEqual([
+      "Novos workspaces precisam de convite por enquanto. Peça um em suporte@agentes.chat.",
+      "Já tem convite? Confirme seu e-mail primeiro.Mandar outro link",
+    ]);
+    await click(button("Mandar outro link"), 4);
+    expect(authCalls).toEqual([{ method: "sendVerificationEmail", args: ["walter@acme.com.br"] }]);
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
   });
 
   test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {

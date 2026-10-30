@@ -654,6 +654,7 @@ export const en: Translations = {
     skip: "Skip this step",
     confirmation: {
       sent: "We sent a confirmation link to {{email}}.",
+      first: "Already invited? Confirm your email first.",
     },
   },
   // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).

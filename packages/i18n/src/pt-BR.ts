@@ -664,6 +664,7 @@ export const ptBR = {
     skip: "Pular esta etapa",
     confirmation: {
       sent: "Mandamos um link de confirmação para {{email}}.",
+      first: "Já tem convite? Confirme seu e-mail primeiro.",
     },
   },
   /** The desktop app's right click (lib/context-menu.ts). */
