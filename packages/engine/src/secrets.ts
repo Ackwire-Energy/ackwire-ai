@@ -85,7 +85,10 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
 export function secretResult(row: SecretRequestRow | undefined): { content: string; isError?: boolean } {
   if (!row) return { content: "The secret request is gone.", isError: true };
   if (row.status === "delivered" && row.removedAt)
-    return { content: `${row.name} was replaced or removed before this run could use it. Ask the person for it again if needed.`, isError: true };
+    return {
+      content: `${row.name} was replaced or removed before this run could use it. Ask the person for it again if needed.`,
+      isError: true,
+    };
   const where =
     row.targetKind === "file"
       ? `written to ${row.targetPath} (mode 600)`
@@ -211,12 +214,17 @@ async function onRequestComputer<T>(
       { allowPaused },
     );
   }
-  return withSandbox(deps, ctx, async (computer) => {
-    if (computer.machineId !== row.machineId) {
-      throw new ConflictError("The agent changed computers since it asked. Ask it again.", "secret.computer_changed");
-    }
-    return fn(computer);
-  }, { allowPaused });
+  return withSandbox(
+    deps,
+    ctx,
+    async (computer) => {
+      if (computer.machineId !== row.machineId) {
+        throw new ConflictError("The agent changed computers since it asked. Ask it again.", "secret.computer_changed");
+      }
+      return fn(computer);
+    },
+    { allowPaused },
+  );
 }
 
 async function loadForRequester(db: Database, actorId: string, orgId: string, requestId: string) {
@@ -233,10 +241,67 @@ export async function getSecretRequest(db: Database, actorId: string, orgId: str
   return secretRequestView(await loadForRequester(db, actorId, orgId, requestId));
 }
 
+/** Resolve an uncertain or lost delivery commit without deleting another caller's staged box. */
+async function reconcileStagedDelivery(
+  deps: SandboxDeps & { pubsub?: PubSub },
+  row: SecretRequestRow,
+): Promise<SecretRequestView | null> {
+  let current: SecretRequestRow | undefined;
+  try {
+    [current] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+  } catch {
+    // The DB may have committed before its reply was lost. Keep the staged box
+    // for the durable activation job until the outcome can be read.
+    return null;
+  }
+  if (current?.status === "delivered") {
+    await activateDeliveredSecret(deps, row.orgId, row.id);
+    const [latest] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+    return secretRequestView(latest ?? current);
+  }
+  // Pending can still be won by another in-flight caller. Only a durable
+  // declined/expired/canceled decision makes every activation impossible.
+  if (current && current.status !== "pending") {
+    await onRequestComputer(
+      deps,
+      row,
+      (computer) => secretOnComputer(computer, { action: "discard", requestId: row.id }),
+      true,
+    ).catch(() => undefined);
+  }
+  return null;
+}
+
+/** Retry deletion after a terminal DB decision, including when the computer was offline. */
+async function enqueueSecretDiscard(tx: Executor, row: SecretRequestRow) {
+  await enqueue(tx, {
+    orgId: row.orgId,
+    kind: "secret.discard",
+    payload: { requestId: row.id },
+    dedupeKey: `secret.discard:${row.id}`,
+    maxAttempts: 96,
+  });
+}
+
+export async function discardClosedSecret(deps: SandboxDeps, orgId: string, requestId: string) {
+  const [row] = await deps.db
+    .select()
+    .from(secretRequests)
+    .where(and(eq(secretRequests.id, requestId), eq(secretRequests.orgId, orgId)));
+  if (!row || !["declined", "expired", "canceled"].includes(row.status)) return;
+  await onRequestComputer(
+    deps,
+    row,
+    (computer) => secretOnComputer(computer, { action: "discard", requestId: row.id }),
+    true,
+    true,
+  );
+}
+
 /**
  * The computer stages only the sealed box while the DB request is pending.
  * Once the DB commits delivery, the computer activates the value, then the
- * run resumes. A failed transaction can leave ciphertext, never live plaintext.
+ * run resumes. A failed transaction can leave staged ciphertext and its key.
  */
 export async function deliverSecret(
   deps: SandboxDeps & { pubsub?: PubSub },
@@ -260,23 +325,36 @@ export async function deliverSecret(
       // Serialize delivery generations across server replicas. A timestamp
       // taken before this lock (or from a skewed app clock) can reverse two
       // commits and let an older activation overwrite the newer value.
-      await tx.select({ id: schema.agents.id }).from(schema.agents)
-        .where(and(eq(schema.agents.id, row.agentId), eq(schema.agents.orgId, orgId))).for("update");
-      const [previous] = await tx.select({ deliveredAt: secretRequests.deliveredAt })
+      await tx
+        .select({ id: schema.agents.id })
+        .from(schema.agents)
+        .where(and(eq(schema.agents.id, row.agentId), eq(schema.agents.orgId, orgId)))
+        .for("update");
+      const [previous] = await tx
+        .select({ deliveredAt: secretRequests.deliveredAt })
         .from(secretRequests)
-        .where(and(
-          eq(secretRequests.orgId, orgId),
-          eq(secretRequests.agentId, row.agentId),
-          eq(secretRequests.name, row.name),
-          row.machineId ? eq(secretRequests.machineId, row.machineId) : isNull(secretRequests.machineId),
-          isNotNull(secretRequests.deliveredAt),
-        ))
-        .orderBy(desc(secretRequests.deliveredAt)).limit(1);
+        .where(
+          and(
+            eq(secretRequests.orgId, orgId),
+            eq(secretRequests.agentId, row.agentId),
+            eq(secretRequests.name, row.name),
+            row.machineId ? eq(secretRequests.machineId, row.machineId) : isNull(secretRequests.machineId),
+            isNotNull(secretRequests.deliveredAt),
+          ),
+        )
+        .orderBy(desc(secretRequests.deliveredAt))
+        .limit(1);
       const now = new Date(Math.max(Date.now(), (previous?.deliveredAt?.getTime() ?? 0) + 1));
       const [updated] = await tx
         .update(secretRequests)
         .set({ status: "delivered", deliveredAt: now, deliveredSize: reply.size ?? null })
-        .where(and(eq(secretRequests.id, row.id), eq(secretRequests.status, "pending")))
+        .where(
+          and(
+            eq(secretRequests.id, row.id),
+            eq(secretRequests.status, "pending"),
+            sql`${secretRequests.expiresAt} > now()`,
+          ),
+        )
         .returning();
       if (!updated) return null;
       await syncSecretMessage(tx, updated);
@@ -291,15 +369,13 @@ export async function deliverSecret(
       return updated;
     });
   } catch (error) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw error;
   }
   if (!delivered) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw new ConflictError("This request was already answered or expired");
   }
   try {
@@ -323,17 +399,23 @@ export async function activateDeliveredSecret(
     .select()
     .from(secretRequests)
     .where(and(eq(secretRequests.id, requestId), eq(secretRequests.orgId, orgId)));
-  if (!row || row.status !== "delivered" || row.removedAt) return;
-  const reply = await onRequestComputer(deps, row, (computer) =>
-    secretOnComputer(computer, { action: "activate", requestId: row.id, order: deliveryOrder(row) }),
-  true);
+  if (row?.status !== "delivered" || row.removedAt) return;
+  const reply = await onRequestComputer(
+    deps,
+    row,
+    (computer) => secretOnComputer(computer, { action: "activate", requestId: row.id, order: deliveryOrder(row) }),
+    true,
+  );
   const finalized = await deps.db.transaction(async (tx) => {
     // Serialize the DB side of activation with owner removal and other
     // deliveries for this agent.
-    await tx.select({ id: schema.agents.id }).from(schema.agents)
-      .where(and(eq(schema.agents.id, row.agentId), eq(schema.agents.orgId, orgId))).for("update");
+    await tx
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.id, row.agentId), eq(schema.agents.orgId, orgId)))
+      .for("update");
     const [current] = await tx.select().from(secretRequests).where(eq(secretRequests.id, row.id)).for("update");
-    if (!current || current.status !== "delivered" || current.removedAt) return null;
+    if (current?.status !== "delivered" || current.removedAt) return null;
     if (!current.deliveredAt) throw new Error("A delivered secret has no delivery time");
     const job = resumeJob(current);
     const [already] = await tx
@@ -369,10 +451,7 @@ export async function activateDeliveredSecret(
             or(
               isNull(secretRequests.deliveredAt),
               lt(secretRequests.deliveredAt, current.deliveredAt),
-              and(
-                eq(secretRequests.deliveredAt, current.deliveredAt),
-                lt(secretRequests.id, current.id),
-              ),
+              and(eq(secretRequests.deliveredAt, current.deliveredAt), lt(secretRequests.id, current.id)),
             ),
           ),
         )
@@ -399,9 +478,12 @@ export async function activateDeliveredSecret(
     return { finished, old };
   });
   if (reply.superseded) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    await onRequestComputer(
+      deps,
+      row,
+      (computer) => secretOnComputer(computer, { action: "discard", requestId: row.id }),
+      true,
+    ).catch(() => undefined);
   }
   if (finalized) {
     await publishSecret(deps.pubsub, finalized.finished, "secret.updated");
@@ -409,7 +491,7 @@ export async function activateDeliveredSecret(
   }
 }
 
-/** The person says no: the run goes on without it; the computer forgets the key (best effort). */
+/** The person says no: the run goes on without it; a durable job removes the runner key. */
 export async function declineSecret(
   deps: { db: Database; pubsub?: PubSub; sandbox?: SandboxDeps | null },
   actorId: string,
@@ -432,6 +514,7 @@ export async function declineSecret(
     if (!updated) return null;
     await syncSecretMessage(tx, updated);
     await enqueue(tx, resumeJob(updated));
+    await enqueueSecretDiscard(tx, updated);
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
@@ -445,9 +528,12 @@ export async function declineSecret(
   await publishSecret(deps.pubsub, declined, "secret.updated");
   const sandbox = deps.sandbox;
   if (sandbox) {
-    await onRequestComputer(sandbox, declined, (c) =>
-      secretOnComputer(c, { action: "discard", requestId: declined.id }),
-    true).catch(() => undefined);
+    await onRequestComputer(
+      sandbox,
+      declined,
+      (c) => secretOnComputer(c, { action: "discard", requestId: declined.id }),
+      true,
+    ).catch(() => undefined);
   }
   return secretRequestView(declined);
 }
@@ -463,6 +549,7 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
     for (const row of rows) {
       await syncSecretMessage(tx, row);
       await enqueue(tx, resumeJob(row));
+      await enqueueSecretDiscard(tx, row);
       await recordAudit(tx, {
         orgId: row.orgId,
         actor: { type: "system", id: null },
@@ -479,11 +566,13 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
 
 /** A run canceled while waiting: its requests close too. */
 export async function cancelSecretRequests(tx: Executor, runId: string) {
-  return tx
+  const rows = await tx
     .update(secretRequests)
     .set({ status: "canceled" })
     .where(and(eq(secretRequests.runId, runId), eq(secretRequests.status, "pending")))
     .returning();
+  for (const row of rows) await enqueueSecretDiscard(tx, row);
+  return rows;
 }
 
 export interface AgentSecretView {
@@ -532,31 +621,49 @@ export async function removeAgentSecret(
 ) {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   if (!SECRET_NAME.test(name)) throw new ValidationError("Invalid secret name");
-  const live = await deps.db.select().from(secretRequests).where(and(
-    eq(secretRequests.orgId, orgId),
-    eq(secretRequests.agentId, agentId),
-    eq(secretRequests.name, name),
-    eq(secretRequests.status, "delivered"),
-    isNull(secretRequests.removedAt),
-    machineId ? eq(secretRequests.machineId, machineId) : isNull(secretRequests.machineId),
-  ));
+  const live = await deps.db
+    .select()
+    .from(secretRequests)
+    .where(
+      and(
+        eq(secretRequests.orgId, orgId),
+        eq(secretRequests.agentId, agentId),
+        eq(secretRequests.name, name),
+        eq(secretRequests.status, "delivered"),
+        isNull(secretRequests.removedAt),
+        machineId ? eq(secretRequests.machineId, machineId) : isNull(secretRequests.machineId),
+      ),
+    );
   const latest = live.at(-1);
   if (!latest) throw new NotFoundError("Secret not found");
   // Clear the runner before marking the rows removed. The machine RPC can
   // read the DB itself, so it must not run inside a PGlite transaction.
-  await onRequestComputer(deps, latest, (c) =>
-    secretOnComputer(c, {
-      action: "remove", name, requestIds: live.map((r) => r.id),
-      throughOrder: live.map(deliveryOrder).sort().at(-1),
-    }),
-  true, true);
+  await onRequestComputer(
+    deps,
+    latest,
+    (c) =>
+      secretOnComputer(c, {
+        action: "remove",
+        name,
+        requestIds: live.map((r) => r.id),
+        throughOrder: live.map(deliveryOrder).sort().at(-1),
+      }),
+    true,
+    true,
+  );
   await deps.db.transaction(async (tx) => {
-    await tx.select({ id: schema.agents.id }).from(schema.agents)
-      .where(and(eq(schema.agents.id, agentId), eq(schema.agents.orgId, orgId))).for("update");
+    await tx
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.id, agentId), eq(schema.agents.orgId, orgId)))
+      .for("update");
     const now = new Date();
     for (const r of live) {
-      const [removed] = await tx.update(secretRequests).set({ removedAt: now })
-        .where(and(eq(secretRequests.id, r.id), isNull(secretRequests.removedAt))).returning();
+      const [removed] = await tx
+        .update(secretRequests)
+        .set({ removedAt: now })
+        .where(and(eq(secretRequests.id, r.id), isNull(secretRequests.removedAt)))
+        .returning();
       if (removed) {
         await syncSecretMessage(tx, removed);
         // A committed delivery can still be waiting for activation. Removal

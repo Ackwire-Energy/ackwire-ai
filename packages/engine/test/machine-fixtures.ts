@@ -121,10 +121,19 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           if (!key) return fail("not_found", "This request's key is gone");
           const value = await openSecret(key, req.box, req.aad).catch(() => null);
           if (value === null) return fail("bad_request", "The secret couldn't be opened");
+          // The real runner receives MachineRequest after the wire's request id is stripped.
+          const delivery = {
+            action: req.action,
+            requestId: req.requestId,
+            name: req.name,
+            target: req.target,
+            aad: req.aad,
+            box: req.box,
+          };
           const previous = staged.get(req.requestId);
-          if (previous && JSON.stringify(previous) !== JSON.stringify(req))
+          if (previous && JSON.stringify(previous) !== JSON.stringify(delivery))
             return fail("conflict", "This request is already staged with another box");
-          if (!previous) staged.set(req.requestId, req);
+          if (!previous) staged.set(req.requestId, delivery);
           await options.onSecretStaged?.(req.requestId);
           return ok({ size: Buffer.byteLength(value) });
         }
@@ -154,12 +163,15 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           staged.delete(req.requestId);
         }
         if (req.action === "remove") {
-          const selected = (id: string, prior: { order: string }) => !req.requestIds || req.requestIds.includes(id) ||
+          const selected = (id: string, prior: { order: string }) =>
+            !req.requestIds ||
+            req.requestIds.includes(id) ||
             (req.throughOrder !== undefined && prior.order <= req.throughOrder);
-          for (const [id, prior] of activated) if (prior.name === req.name && selected(id, prior)) {
-            activated.delete(id);
-            if (orders.get(req.name) === prior.order) secrets.delete(req.name);
-          }
+          for (const [id, prior] of activated)
+            if (prior.name === req.name && selected(id, prior)) {
+              activated.delete(id);
+              if (orders.get(req.name) === prior.order) secrets.delete(req.name);
+            }
           if (!req.requestIds) secrets.delete(req.name);
           for (const id of req.requestIds ?? []) {
             canceled.add(id);

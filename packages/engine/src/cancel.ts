@@ -245,7 +245,7 @@ export async function stopRun(
         .update(agentQuestions)
         .set({ status: "canceled" })
         .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")));
-      // Its secret requests close too (the keys left on the computer are pruned there).
+      // Its secret requests close too; each terminal row queues runner key cleanup.
       closedSecrets = await cancelSecretRequests(tx, run.id);
       for (const r of closedSecrets) await syncSecretMessage(tx, r);
       // Jobs of this run that haven't started never will.

@@ -8011,21 +8011,28 @@ a.machine-row__name:hover {
   background: var(--line);
 }
 /*
- * The key on its label's 16px line, in the label's type so the capitals are the label's: an icon's middle on their
- * middle (an `.ac-iconline` lead's place), a logo tile's top at their top (an `.ac-faceline` picture's).
+ * The key is a tile, the same as an engine's logo (`.ac-brand--sm`), so every cell's icon lines up with the next:
+ * its top at the label's capitals (an `.ac-faceline` picture's place), in the label's type so they are the label's.
  */
 .agp-cell__key {
   display: grid;
   place-items: center;
+  flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 10px 10px 10px 3px;
+  border-radius: 10px 10px 10px 4px;
   color: var(--muted);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
   font-size: 12px;
-  translate: 0 calc(8px - var(--cap-mid) - 50%);
-}
-.agp-cell__key:has(> .ac-brand) {
   translate: 0 calc(8px - var(--cap-top));
+}
+/* A logo brings its own tile. */
+.agp-cell__key:has(> .ac-brand) {
+  background: none;
+  box-shadow: none;
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;

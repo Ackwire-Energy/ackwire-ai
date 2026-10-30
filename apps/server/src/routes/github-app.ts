@@ -12,7 +12,6 @@ import {
   validGitHubAppSignature,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { readWebhookText } from "./webhook-body";
 import {
   type AppDeps,
   body,
@@ -24,6 +23,7 @@ import {
   requireSession,
   security,
 } from "./app/context";
+import { readWebhookText } from "./webhook-body";
 
 const tags = ["Connectors"];
 

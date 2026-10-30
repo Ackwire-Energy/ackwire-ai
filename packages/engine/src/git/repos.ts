@@ -117,7 +117,7 @@ export async function setAgentRepositories(
   const { list, invalid } = cleanRepoList(repositories);
   if (invalid.length > 0) throw new ValidationError(`Not a repository (owner/name or owner/*): ${invalid.join(", ")}`);
   if (!admin && !withinRepos(await agentRepositoryList(db, orgId, agentId), list)) {
-    throw new ForbiddenError("Only an admin can give an agent more repositories; its owner can only take some away");
+    throw new ForbiddenError("Only an admin can give an agent more repositories. Its owner can only take some away.");
   }
   if (list.length > MAX_AGENT_REPOSITORIES) {
     throw new ValidationError(`At most ${MAX_AGENT_REPOSITORIES} repositories per agent`);
