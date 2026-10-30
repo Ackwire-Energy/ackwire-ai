@@ -59,7 +59,12 @@ export function BrowserNoticesRow() {
     // Straight from the click: the browser shows its permission prompt only during the person's gesture.
     const run = on ? enableWebPush(api, publicKey, i18n.language) : disableWebPush(api);
     run
-      .then(setState)
+      .then((next) => {
+        // Chrome's quieter prompts may keep the request as a crossed-out bell in the address bar, with no answer:
+        // without a word here the switch would just go back off.
+        if (on && next === "default") toast.show(t("shell.browserNoticesUnanswered"));
+        setState(next);
+      })
       .catch(() => {
         toast.show(t("shell.browserNoticesFailed"), "error");
         return readWebPushState(publicKey).then(setState);

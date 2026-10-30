@@ -806,6 +806,8 @@ export const en: Translations = {
     browserNoticesBlocked:
       "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
     browserNoticesFailed: "Couldn't turn notifications on right now. Try again.",
+    browserNoticesUnanswered:
+      "Your browser tucked the request away. Click the bell next to the site's address and choose Allow.",
     languageCurrent: "Language: {{name}}",
     orgSettings: "Workspace settings",
     switchOrg: "Switch workspace",

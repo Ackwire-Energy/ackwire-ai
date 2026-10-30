@@ -817,6 +817,8 @@ export const ptBR = {
     browserNoticesBlocked:
       "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
     browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
+    browserNoticesUnanswered:
+      "O navegador guardou o pedido sem mostrar. Clique no sininho ao lado do endereço do site e escolha Permitir.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações do workspace",
     switchOrg: "Trocar de workspace",
