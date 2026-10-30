@@ -645,7 +645,7 @@ ones a self-hosted instance usually touches:
 | `OWNER_CLAIM_SHA256` | | While no account exists, only the owner link made with it creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
-| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
+| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens and the help pages when both are set. `/terms` and `/privacy` on this server go to them, or say it has none. |
 | `LANDING_URL` | | The agentes.chat landing page's address, which turns on its waiting list. Leave it unset. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
@@ -1080,6 +1080,30 @@ only when a release's compose file moves that pin. The new file, `docker compose
 `docker compose up -d` then recreate the `postgres` container on the new image, keeping the `pgdata`
 volume. That covers Postgres 18 minor releases and pgvector updates; a new Postgres major version
 can't open the old data directory, so moving to one takes a dump and a restore into a new volume.
+
+</details>
+
+<details>
+<summary><b>Rebooting the server</b></summary>
+
+A reboot stops every container at once, so Postgres can go before the app saves the runs in
+progress. Stop the app first: runs get up to 20 s to finish, and the rest are saved and go on when it
+starts again.
+
+```sh
+docker compose stop agentes
+sudo reboot
+```
+
+A container stopped by hand stays stopped after the reboot. Start it again in the install directory:
+
+```sh
+docker compose up -d
+```
+
+An uptime check from outside the server on `https://<your address>/api/health` is worth having: it
+answers 200 only while the app and its database are up, so it tells you when the server doesn't come
+back. On Tailscale, run it from another device in your tailnet.
 
 </details>
 
