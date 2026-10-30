@@ -1117,6 +1117,12 @@ export const ptBR = {
     agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
     /** Its plan's sign-in ended (`reason: not_signed_in`). */
     signedOut: "{{name}} não vai responder porque a IA {{hers}} saiu da\u00a0conta.",
+    /** The computer's own sign-in of that CLI isn't there, and the agent has no account (`own` on the card). */
+    notSignedIn: {
+      claude_code:
+        "O Claude Code está sem login neste computador. Conecte uma conta do Claude na página {{of}}\u00a0{{name}}.",
+      codex: "O Codex está sem login neste computador. Conecte uma conta do ChatGPT na página {{of}}\u00a0{{name}}.",
+    },
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
@@ -4639,7 +4645,6 @@ export const ptBR = {
       letEveryone: "Liberar para todos",
       letPeople: "Liberar de novo",
       ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
-      hereNotYours: "Só para agentes de quem conectou o {{computer}}",
     },
     errors: {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",

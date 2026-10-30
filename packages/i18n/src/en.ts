@@ -1101,6 +1101,10 @@ export const en: Translations = {
     },
     agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
     signedOut: "{{name}} won't reply because {{hers}} AI is signed\u00a0out.",
+    notSignedIn: {
+      claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
+      codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
+    },
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
@@ -4602,7 +4606,6 @@ export const en: Translations = {
       letEveryone: "Let everyone talk to {{pronoun}}",
       letPeople: "Let them talk to {{pronoun}} again",
       ownerOnly: "{{name}} thinks with {{owner}}'s plan: only {{owner}} can let more people talk to {{pronoun}}.",
-      hereNotYours: "Only for agents of whoever connected {{computer}}",
     },
     errors: {
       planOwnerOnly:

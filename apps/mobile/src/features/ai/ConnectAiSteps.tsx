@@ -94,9 +94,9 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
-          // person connected whether its own sign-in is there (`ownSignInFor`).
-          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude or ChatGPT on a
+          // computer the person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.

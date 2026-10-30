@@ -1,6 +1,6 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §1 (the computer's own sign-in is offered only where it is signed in)
 - Date: 2026-10-20
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out
@@ -29,6 +29,8 @@ What the CLIs do (checked 2026-10-20, Claude Code 2.1.304, Codex 0.163.0):
 
 - Each account is `<runner home>/accounts/<kind>/<accountId>/`, used as `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex). The CLI writes and keeps its own sign-in there; the runner never reads, copies or sends it. Folder mode 700, outside every agent workspace (the runner refuses `read` and `push` inside `<runner home>`).
 - There is always **"Conta deste computador"**: no folder, the sign-in already in `~/.claude` / `~/.codex`, exactly as today. It is the default.
+
+  *Amended 2026-10-30:* it is offered only where it can think for the agent: the computer's pairer owns the agent (ADR 0059 §3) and the runner reports that CLI signed in there. For Claude Code that is `claude auth status` at `hello` (`executors.claude.loggedIn`) or a usage it read with that sign-in; for Codex, the usage it read with it (`ownUsage.codex`, protocol 19), since `hello` says nothing of Codex's sign-in. The apps list it otherwise only while the agent thinks with it, on its owner's computer or to someone who can't change the account. On a computer nobody connected (the Cloud's, a server's own) no person signs in at its terminal, so it is never offered there, and an agent that still thinks with it fails its run at once as not signed in: `not_logged_in` before any other check, no AI (ADR 0061), and its card says that the CLI isn't signed in on this computer and to connect an account of its plan on the agent's page (`meta.noAi.own`), never "I'll answer when it's back". Choosing a plan brain starts on the computer's own sign-in where it is offered, else on one of the person's accounts of that kind that thinks for nobody, else on its sign-in.
 - An account's sessions live in its folder. Changing an agent's account starts a new CLI session for its threads (the conversation itself is ours and continues). Rare, and accepted.
 - The person's personal CLAUDE.md, skills and plugins don't load in an account folder. That matches the runner's `--setting-sources project` (`apps/server/runner/brain.ts`) anyway.
 

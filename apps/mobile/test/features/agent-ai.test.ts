@@ -208,11 +208,40 @@ describe("the agent's AI", () => {
     // The plan the client tests pin (`signInAgainPlan`): ChatGPT for a Codex agent, never Claude's page.
     expect(card).toContain("const again = signInAgainPlan(card, agent);");
     expect(card).toContain('t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")');
-    expect(card).toContain("...(again ? { plan: again } : {}),");
+    expect(card).toContain("...(plan ? { plan } : {}),");
     expect(sheet).toContain("PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(");
     const t = await translator("pt-BR");
     expect(t("noAi.signedOut", { name: "Ada", hers: "dela" })).toBe(
       "Ada não vai responder porque a IA dela saiu da\u00a0conta.",
+    );
+  });
+
+  test("the computer's own sign-in: listed only where it can think for the agent, and a card that says how when it isn't", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [screen, card, connect] = await Promise.all([
+      read("AgentAiScreen.tsx"),
+      read("NoAiCard.tsx"),
+      read("ConnectAiSteps.tsx"),
+    ]);
+    // Its row only where the client tests say (`ownSignInListed`): never on the workspace's computer, nobody's.
+    expect(screen).toContain("{ownSignInListed(view, row, kind) ? (");
+    expect(screen).not.toContain("hereNotYours");
+    // A plan's page waits for the computer's row for ChatGPT too, not only Claude (`ownSignInFor`).
+    expect(connect).toContain("brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,");
+    // Its card: what isn't signed in and where to connect, and Conectar on that CLI's plan.
+    expect(card).toMatch(/t\(`noAi\.notSignedIn\.\$\{card\.own\}`, agentGrammar\(t, name\)\)/);
+    expect(card).toContain("const plan = card.own ? planOfKind(card.own) : again;");
+    const pt = await translator("pt-BR");
+    expect(pt("noAi.notSignedIn.codex", { of: "da", name: "Ada" })).toBe(
+      "O Codex está sem login neste computador. Conecte uma conta do ChatGPT na página da Ada.",
+    );
+    const en = await translator("en");
+    expect(en("noAi.notSignedIn.codex", { name: "Ada" })).toBe(
+      "Codex isn't signed in on this computer. Connect a ChatGPT account on Ada's page.",
+    );
+    expect(en("noAi.notSignedIn.claude_code", { name: "Ada" })).toBe(
+      "Claude Code isn't signed in on this computer. Connect a Claude account on Ada's page.",
     );
   });
 

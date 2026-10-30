@@ -1,9 +1,10 @@
 import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, ownSignInListed, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planName, planOf } from "@agenteschat/client/lib/plans";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
@@ -30,9 +31,6 @@ import { Note, PlanReplies, PlanRepliesOf } from "./parts";
  * one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its owner
  * picks an account or lets other people talk to it on the plan (`canUsePlans`).
  */
-
-/** The plan's page Connect an AI opens on for another account of that kind. */
-const PLAN_INTENT = { claude_code: "claude", codex: "chatgpt" } as const;
 
 /** Opens an agent's AI. */
 export const openAgentAi = (agentId: string) => router.push(`/agent-ai/${agentId}` as never);
@@ -95,7 +93,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const connect = (a: MachineAccount | undefined, also = false) =>
     openConnectAi({
       agentId,
-      ...(kind && !planOf(a?.provider) ? { intent: PLAN_INTENT[kind] } : {}),
+      ...(kind && !planOf(a?.provider) ? { intent: planOfKind(kind) } : {}),
       ...(also && a?.email ? { email: a.email } : {}),
     });
   const computer = view?.computer?.name ?? "";
@@ -154,15 +152,15 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <>
                 <GroupedHeader>{t(`agentPage.work.brain.account.${kind}`)}</GroupedHeader>
                 <GroupedList>
-                  <GroupedRow
-                    leading={<ProviderLogo id={kind} size="sm" />}
-                    label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
-                    {...(view.ownSignIn ? {} : { sub: t("aiAccounts.share.hereNotYours", { computer }), subLines: 2 })}
-                    checked={view.account === null}
-                    // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
-                    disabled={!mayPick || (!view.ownSignIn && view.account !== null)}
-                    onPress={() => choose(null)}
-                  />
+                  {ownSignInListed(view, row, kind) ? (
+                    <GroupedRow
+                      leading={<ProviderLogo id={kind} size="sm" />}
+                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
+                      checked={view.account === null}
+                      disabled={!mayPick}
+                      onPress={() => choose(null)}
+                    />
+                  ) : null}
                   {accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also }) => {
                     const others = takenFrom(a, name);
                     const about = !a.mine

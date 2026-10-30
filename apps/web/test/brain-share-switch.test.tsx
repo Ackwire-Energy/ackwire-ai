@@ -170,7 +170,7 @@ describe("Responde a todos (Quem pensa)", () => {
   });
 
   test("onto a plan it starts off, and Usar asks nothing", async () => {
-    const state = await ada({ brain: "model", effectiveModel: null, onlyOwner: false });
+    const state = await ada({ brain: "model", effectiveModel: null, onlyOwner: false }, { ownPlan: "max" });
     const d = await brainDialog();
     await click(
       within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude Code/ }),

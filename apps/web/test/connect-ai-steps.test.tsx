@@ -578,9 +578,22 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(dialog).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(panel()).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     expect(within(panel()).getAllByRole("switch", { name: "Responde a todos" })).toHaveLength(1);
-    // ChatGPT's own sign-in isn't reported: its cards stay.
+    // ChatGPT's alike: none reported for Codex, so only its sign-in.
     await click(tile("ChatGPT"));
-    expect(within(panel()).getByRole("button", { name: "A conta que os seus agentes dividem" })).toBeTruthy();
+    expect(within(panel()).queryByRole("button", { name: "A conta que os seus agentes dividem" })).toBeNull();
+    expect(within(panel()).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+  });
+
+  test("ChatGPT's own sign-in to share once the computer reports it (the usage it read with it)", async () => {
+    const usage = { windows: [], source: "probe" as const, at: "2026-10-30T12:00:00.000Z" };
+    const { dialog, tile } = await connect({
+      brain: { ownSignIn: true },
+      computers: [{ ...MAC, own: { codex: { usage } } }],
+    });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(within(panel).getByRole("button", { name: "A conta que os seus agentes dividem" })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "Uma conta só para a Ada" })).toBeTruthy();
   });
 
   test("a plan its computer can't take: its tile dims, and its panel says why, with the key one click away", async () => {

@@ -403,6 +403,34 @@ describe("the agent's no-AI card", () => {
     ]);
   });
 
+  test("Codex on its computer's own sign-in, which isn't there: she says so and how, and Conectar opens on ChatGPT", async () => {
+    const state = walters(withCard({ reason: "not_signed_in", own: "codex" }), ADA_ID);
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "codex", model: null };
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    // The workspace's computer: nobody connected it, so its own sign-in thinks for nobody.
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await brain(orgId, agentId)),
+      ownSignIn: false,
+      ...(agentId === ADA_ID ? { brain: "codex" as const } : {}),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const row = cardRow();
+    expect(row.textContent).toContain(
+      "O Codex está sem login neste computador. Conecte uma conta do ChatGPT na página da Ada.",
+    );
+    expect(row.textContent).not.toMatch(/saiu da|quando ele voltar/);
+    expect(within(row).queryByRole("button", { name: "Entrar de novo" })).toBeNull();
+    await click(within(row).getByRole("button", { name: "Conectar" }), 8);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(plan, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    // Nothing of that computer's to share: ChatGPT's own sign-in, from here.
+    expect(within(plan).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
+    expect(within(plan).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+  });
+
   test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {
     const state = walters(withCard({ intent: "claude" }), ADA_ID);
     const api = createFakeApi(state);

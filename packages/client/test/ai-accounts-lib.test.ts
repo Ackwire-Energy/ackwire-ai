@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { accountChoices, groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
+import {
+  accountChoices,
+  groupPlans,
+  ownSignInListed,
+  ownSignInName,
+  ownSignInReady,
+  ownSignIns,
+  planWordOf,
+  signInPlan,
+} from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
@@ -140,6 +149,26 @@ describe("the computers' own sign-ins", () => {
       ["mac:codex", "MacBook Air", "codex", null, u],
     ]);
     expect(ownSignIns(undefined)).toEqual([]);
+  });
+
+  test("an agent's account choice offers the computer's own sign-in only where it can think for the agent", () => {
+    type View = Parameters<typeof ownSignInListed>[0];
+    const theirs: View = { ownSignIn: true, brain: "model", account: null, canUsePlans: true };
+    const reported = computer({ own: { claude_code: { plan: "max" }, codex: { usage: usage("2026-10-30", 5) } } });
+    // On a computer the agent's owner connected, once that CLI's own sign-in is reported there.
+    expect(ownSignInReady(theirs, reported, "codex")).toBe(true);
+    expect(ownSignInReady(theirs, computer({ own: {} }), "codex")).toBe(false);
+    expect(ownSignInReady(theirs, undefined, "claude_code")).toBe(false);
+    expect(ownSignInListed(theirs, computer({ own: {} }), "codex")).toBe(false);
+    // On one nobody connected (the workspace's), never, whatever it reports.
+    const nobodys: View = { ...theirs, ownSignIn: false };
+    expect(ownSignInReady(nobodys, reported, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex" }, reported, "codex")).toBe(false);
+    // While the agent thinks with it: on its owner's computer, before the computer says; to someone who can't change
+    // the account, wherever it is (what it thinks with).
+    expect(ownSignInListed({ ...theirs, brain: "codex" }, undefined, "codex")).toBe(true);
+    expect(ownSignInListed({ ...theirs, brain: "codex", account: "acct_1" }, undefined, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex", canUsePlans: false }, undefined, "codex")).toBe(true);
   });
 
   test("the plan's word", () => {

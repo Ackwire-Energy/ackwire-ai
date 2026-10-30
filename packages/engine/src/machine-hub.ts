@@ -131,6 +131,8 @@ export interface MachineStatus {
   name: string;
   /** `managed`: the workspace's own computer (ADR 0056 §10), always on. */
   kind?: string;
+  /** Who connected it; null: nobody did (the workspace's or a server's own computer). */
+  pairedByUserId?: string | null;
   online: boolean;
   execAllowed: boolean;
   os: string;
@@ -1223,6 +1225,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         orgId: row.orgId,
         name: row.name,
         kind: row.kind,
+        pairedByUserId: row.pairedByUserId,
         online,
         execAllowed: row.execAllowed,
         os: row.os,

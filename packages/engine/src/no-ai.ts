@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
-import { type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
+import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
 import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { runRequester } from "./cancel";
@@ -31,6 +31,8 @@ export interface NoAiCard extends ConnectIntent {
   agentId: string;
   forUserId: string | null;
   reason: NoAiReason;
+  /** With `not_signed_in`: the computer's own sign-in of this CLI isn't there, not an account's (`AgentAi.own`). */
+  own?: AgentAi["own"];
   /** The run that couldn't think (deleted when "Responder agora" starts it again). */
   runId: string;
 }
@@ -68,6 +70,7 @@ export async function postNoAiCard(
   deps: AiStatusDeps & { db: Database; pubsub: PubSub; judge?: Judge | null },
   run: AgentRun,
   reason: NoAiReason,
+  own?: AgentAi["own"],
 ): Promise<Message | null> {
   const { db } = deps;
   const threadId = replyThreadOf(run);
@@ -87,7 +90,14 @@ export async function postNoAiCard(
     // The agents of one message fail together: they take turns here, so the organization gets one card.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`no-ai-card:${run.channelId}:${threadId ?? ""}`}))`);
     if (repeated(await cardsPosted(tx, run, threadId))) return null;
-    const noAi: NoAiCard = { agentId: run.agentId, forUserId, reason, ...intent, runId: run.id };
+    const noAi: NoAiCard = {
+      agentId: run.agentId,
+      forUserId,
+      reason,
+      ...(own ? { own } : {}),
+      ...intent,
+      runId: run.id,
+    };
     return insertMessage(tx, {
       orgId: run.orgId,
       channelId: run.channelId,

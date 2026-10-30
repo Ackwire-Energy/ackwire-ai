@@ -1,6 +1,6 @@
 import { type Message, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, noAiCardOf, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf, planOfKind, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -46,6 +46,8 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
+  // The computer's own sign-in isn't there: Conectar opens on an account of that CLI's plan.
+  const plan = card.own ? planOfKind(card.own) : again;
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   const mayAnswer =
@@ -57,7 +59,9 @@ export function NoAiCard({ message: m }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
+        : card.own
+          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(t, name))
+          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -97,7 +101,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
               intent: card.intent,
               provider: card.provider,
               agentId: card.agentId,
-              ...(again ? { plan: again } : {}),
+              ...(plan ? { plan } : {}),
             })
           }
         />
