@@ -21,6 +21,14 @@ const OWN = { termsUrl: "https://example.com/terms", privacyUrl: "https://exampl
 /** A server that isn't agentes.chat's, with these legal links of its own. */
 const ownServer = (authConfig: Partial<typeof OWN> = {}) =>
   createFakeApi(seedState({ me: null, instance: { cloud: false, url: "https://chat.example.com" }, authConfig }));
+/** agentes.chat Cloud, with the legal links its servers set by default: on another address than this browser's. */
+const cloud = () =>
+  createFakeApi(
+    seedState({
+      me: null,
+      authConfig: { termsUrl: "https://app.agentes.chat/terms", privacyUrl: "https://app.agentes.chat/privacy" },
+    }),
+  );
 
 /** The page's title, and each section's heading at its anchor. */
 function expectPage(doc: ReturnType<typeof helpDocument>) {
@@ -111,14 +119,20 @@ describe("help pages", () => {
 describe("the Terms and the Privacy Policy", () => {
   test("agentes.chat Cloud's, where the server says it is the Cloud, whatever the browser's address", async () => {
     expect(window.location.origin).toBe("http://localhost:3000");
-    for (const kind of ["terms", "privacy"] as const) {
-      await renderApp(`/${kind}`, { api: signedOut() });
-      expect(screen().getByRole("heading", { level: 1, name: legalDocument(kind, "en").title })).toBeTruthy();
-      cleanup();
+    const replace = spyOn(window.location, "replace").mockImplementation(() => {});
+    try {
+      for (const kind of ["terms", "privacy"] as const) {
+        await renderApp(`/${kind}`, { api: cloud() });
+        expect(screen().getByRole("heading", { level: 1, name: legalDocument(kind, "en").title })).toBeTruthy();
+        cleanup();
+      }
+      const { router } = await renderApp("/termos", { api: cloud() });
+      expect(router.state.location.pathname).toBe("/terms");
+      expect(screen().getByRole("heading", { level: 1, name: legalDocument("terms", "en").title })).toBeTruthy();
+      expect(replace).not.toHaveBeenCalled();
+    } finally {
+      replace.mockRestore();
     }
-    const { router } = await renderApp("/termos", { api: signedOut() });
-    expect(router.state.location.pathname).toBe("/terms");
-    expect(screen().getByRole("heading", { level: 1, name: legalDocument("terms", "en").title })).toBeTruthy();
   });
 
   test("any other server sends each to its own page, and shows none of the Cloud's", async () => {
