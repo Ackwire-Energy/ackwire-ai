@@ -16,6 +16,7 @@ import {
   createFakeJudge,
   decideApproval,
   decideProposal,
+  deleteContextItem,
   drainOutbox,
   editContextItem,
   ensureThreadSummary,
@@ -23,10 +24,12 @@ import {
   grantScopes,
   insertMessage,
   isVerified,
+  listAgentMemoryRows,
   listApprovals,
   listContextItems,
   listProposals,
   looksLikeSecret,
+  NotFoundError,
   normalizeSubject,
   postPersonMessage,
   recordOutcome,
@@ -541,6 +544,59 @@ describe("edit and proposals (human gate)", () => {
       pinned: true,
     });
     expect(edited).toMatchObject({ version: 2, pinned: true, content: "HQ is in Olinda", createdByKind: "person" });
+  });
+});
+
+describe("memory privacy (what a person may see and change)", () => {
+  test("an item learned in a channel a member can't read: hidden from them, not editable by the agent's non-admin owner, its proposal hidden", async () => {
+    f = await setup();
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    const keeper = await addMember(f.db, f.org.id, "member", "keeper");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: keeper.id });
+    await f.db.update(schema.agents).set({ ownerUserId: keeper.id }).where(eq(schema.agents.id, f.agent.id));
+    const item = (channelId: string, content: string) =>
+      consolidateItem(f.db, {
+        orgId: f.org.id,
+        kind: "lesson",
+        scopeType: "agent",
+        agentId: f.agent.id,
+        channelIds: [channelId],
+        content,
+      });
+    const hidden = (await item(secret.id, "The acquisition closes in March.")).item;
+    const open = (await item(f.general.id, "Deploys happen on Tuesdays.")).item;
+
+    const { items } = await listAgentMemoryRows(f.db, keeper.id, f.org.id, f.agent.id);
+    expect(items.map((i) => i.id)).toEqual([open.id]);
+    expect((await listAgentMemoryRows(f.db, f.owner.id, f.org.id, f.agent.id)).items).toHaveLength(2);
+
+    // The owner who isn't an admin can't change (or read back) an item they can't see.
+    await expect(
+      editContextItem(f.db, keeper.id, f.org.id, hidden.id, { content: "x", archived: true }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteContextItem(f.db, keeper.id, f.org.id, hidden.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect((await editContextItem(f.db, keeper.id, f.org.id, open.id, { pinned: true })).pinned).toBe(true);
+    // Admins still can.
+    expect((await editContextItem(f.db, f.owner.id, f.org.id, hidden.id, { pinned: true })).pinned).toBe(true);
+
+    const [proposal] = await f.db
+      .insert(schema.contextProposals)
+      .values({
+        orgId: f.org.id,
+        target: "agent_instructions",
+        agentId: f.agent.id,
+        baseHash: "x",
+        proposedText: "Answer briefly.\n\n## Learned\n- The acquisition closes in March.",
+        diff: "+- The acquisition closes in March.",
+        rationale: "Seen 2×.",
+        itemIds: [hidden.id],
+      })
+      .returning();
+    expect(await listProposals(f.db, keeper.id, f.org.id)).toEqual([]);
+    expect((await listProposals(f.db, f.owner.id, f.org.id)).map((p) => p.id)).toEqual([proposal?.id ?? ""]);
+    await expect(decideProposal(f.db, keeper.id, f.org.id, proposal?.id ?? "", "accept")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { consolidateItem, createIssueToolSource, insertMessage, linkRunActions } from "@agenteschat/engine";
 import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -218,4 +218,71 @@ test("memories about=me: only what came from the viewer, with the message it cam
     json: { archived: true },
   });
   expect(denied.status).toBe(403);
+});
+
+test("memories and proposals: what came from a channel the viewer can't read stays out (old versions too)", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const ownerId = await meOf(owner);
+  const ana = await member(owner, orgId, "ana@example.com");
+  // A private channel only the owner is in (as a DM with the agent would be).
+  const [secret] = await t.db
+    .insert(schema.channels)
+    .values({ orgId, name: "secreto", visibility: "private" })
+    .returning();
+  const secretId = secret?.id ?? "";
+  await t.db.insert(schema.channelMembers).values({ orgId, channelId: secretId, userId: ownerId });
+
+  const save = (content: string, where: string) =>
+    consolidateItem(t.db, { orgId, kind: "fact", scopeType: "agent", agentId, content, channelIds: [where] });
+  const hidden = (await save("A aquisição fecha em março.", secretId)).item;
+  const open = (await save("O deploy roda às terças.", channelId)).item;
+  // An older version of the open item that came from the private channel.
+  const old = (await save("O deploy roda às quintas (plano secreto).", secretId)).item;
+  await t.db
+    .update(schema.contextItems)
+    .set({ status: "archived", supersededBy: open.id })
+    .where(eq(schema.contextItems.id, old.id));
+  await t.db.insert(schema.contextProposals).values({
+    orgId,
+    target: "agent_instructions",
+    agentId,
+    baseHash: "x",
+    proposedText: "## Learned\n- A aquisição fecha em março.",
+    diff: "+- A aquisição fecha em março.",
+    rationale: "Seen 2×.",
+    itemIds: [hidden.id],
+  });
+
+  type Mem = { id: string; text: string; supersedes: string | null };
+  const list = async (b: ReturnType<typeof browser>) =>
+    ((await (await b(`/api/app/organizations/${orgId}/agents/${agentId}/memories`)).json()) as { memories: Mem[] })
+      .memories;
+  const proposals = async (b: ReturnType<typeof browser>) =>
+    ((await (await b(`/api/app/organizations/${orgId}/proposals`)).json()) as { proposals: { why: string }[] })
+      .proposals;
+
+  const hers = await list(ana.b);
+  expect(hers.map((m) => [m.text, m.supersedes])).toEqual([["O deploy roda às terças.", null]]);
+  expect(JSON.stringify(hers)).not.toContain("secreto");
+  expect((await list(owner)).map((m) => m.id).sort()).toEqual([hidden.id, open.id].sort());
+  const ownersOpen = (await list(owner)).find((m) => m.id === open.id);
+  expect(ownersOpen?.supersedes).toBe("O deploy roda às quintas (plano secreto).");
+  expect(await proposals(ana.b)).toEqual([]);
+  expect(await proposals(owner)).toHaveLength(1);
+
+  // Ana owns the agent now but isn't an admin: the hidden item can't be changed (nor read back) by her.
+  await t.db.update(schema.agents).set({ ownerUserId: ana.id }).where(eq(schema.agents.id, agentId));
+  const patch = await ana.b(`/api/app/organizations/${orgId}/memories/${hidden.id}`, {
+    method: "PATCH",
+    json: { archived: true },
+  });
+  expect(patch.status).toBe(404);
+  const mine = await ana.b(`/api/app/organizations/${orgId}/memories/${open.id}`, {
+    method: "PATCH",
+    json: { pinned: true },
+  });
+  expect(mine.status).toBe(200);
+  expect(((await mine.json()) as Mem).supersedes).toBeNull();
 });

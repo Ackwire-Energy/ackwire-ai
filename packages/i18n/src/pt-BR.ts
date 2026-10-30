@@ -137,10 +137,15 @@ export const ptBR = {
     desktop: {
       browser: "Continue no navegador",
       browserLead: "A gente volta para cá quando você entrar com {{provider}}.",
+      codeHint: "O navegador vai mostrar este código. Confira se é o mesmo antes de continuar.",
       reopen: "Abrir o navegador de novo",
       otherWay: "Usar outro jeito de entrar",
       otherServer: "Usar outro servidor",
       opening: "Abrindo {{provider}}…",
+      confirm: "É o seu app?",
+      confirmLead: "Este código tem que ser o mesmo que aparece no app agentes.chat no seu computador.",
+      confirmYes: "Sim, entrar no app",
+      confirmNo: "Não fui eu",
       done: "Tudo certo.",
       doneLead: "Você entrou no app agentes. Pode fechar esta aba.",
       expired: "Esse pedido expirou.",
@@ -2043,9 +2048,9 @@ export const ptBR = {
     readOnly: {
       member: "Você vê como {{article}} {{name}} trabalha. Só admins editam.",
       memberOwner: "Você vê como {{article}} {{name}} trabalha. Quem edita: admins e {{owner}} (responsável).",
-      owner:
-        "Você é responsável {{of}} {{name}}: muda o jeito, os acessos, quem pode falar e o computador. O resto, só admins.",
+      owner: "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar e o computador. O resto, só admins.",
       ownerInstructions: "Só admins editam as instruções. Você, como responsável, aprova as propostas de mudança.",
+      ownerAccess: "Só admins dão ou tiram acessos e repositórios.",
     },
     status: {
       idle: "Disponível",

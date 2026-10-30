@@ -6,12 +6,14 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 25;
+export const MACHINE_PROTOCOL_VERSION = 26;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
 /** From this protocol on, the runner keeps secrets for each agent (`op: "secret"`, ADR 0027). */
 export const SECRETS_PROTOCOL = 3;
+/** Staged ciphertext and a separate activation after the server commits delivery. */
+export const SECRET_ACTIVATE_PROTOCOL = 26;
 /** From this protocol on, the runner runs background tasks that outlive a request (`task.*`, ADR 0029). */
 export const TASKS_PROTOCOL = 4;
 /**
@@ -792,14 +794,16 @@ export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string };
 
 /**
  * Secrets of the request's agent (ADR 0027): `keypair` makes the key for a
- * request (the private key stays on the machine), `deliver` opens the box and
- * stores the value, `discard` drops a request's key, `remove` forgets a secret.
+ * request (the private key stays on the machine), `deliver` validates and stages
+ * only the sealed box, `activate` opens it after the server commits delivery,
+ * `discard` drops a request's key and staged box, `remove` forgets a secret.
  */
 export type SecretRequest =
   | { action: "keypair"; requestId: string }
   | { action: "deliver"; requestId: string; name: string; target: WireSecretTarget; aad: string; box: WireSecretBox }
+  | { action: "activate"; requestId: string; order: string }
   | { action: "discard"; requestId: string }
-  | { action: "remove"; name: string };
+  | { action: "remove"; name: string; requestIds?: string[]; throughOrder?: string };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -1386,8 +1390,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
-  /** `keypair`: the public key (raw P-256, base64); `deliver`: the value's size in bytes. */
-  secret: { publicKey?: string; size?: number };
+  /** `keypair`: public key; `deliver`/`activate`: size; an older activation may be superseded. */
+  secret: { publicKey?: string; size?: number; superseded?: boolean };
   /**
    * `begin`: what the person needs (`url`; Claude Code: `publicKey`; Codex: `userCode`);
    * `status`: `state` and, when done, `account`; `list`: `accounts`; `code`, `cancel`, `remove`: `{}`.

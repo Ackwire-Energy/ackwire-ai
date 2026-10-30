@@ -57,6 +57,7 @@ function brokerFor(
   options: {
     reply?: (request: MachineRequest) => Promise<unknown>;
     authorize?: StreamBrokerDeps["authorize"];
+    recheck?: StreamBrokerDeps["recheck"];
     onReady?: StreamBrokerDeps["onReady"];
     onClosed?: StreamBrokerDeps["onClosed"];
     limits?: StreamBrokerDeps["limits"];
@@ -87,6 +88,7 @@ function brokerFor(
       (async (input) => ({ machineId: machine.machineId, agent: { id: input.agentId, handle: "dev" } })),
     onReady: options.onReady,
     onClosed: options.onClosed,
+    recheck: options.recheck,
     limits: options.limits,
   });
   broker = created;
@@ -224,6 +226,28 @@ describe("the broker", () => {
     broker.close(control);
     await Bun.sleep(10);
     expect(ready).toHaveLength(2);
+  });
+
+  test("a failed or stalled access recheck closes both sides of a private stream", async () => {
+    f = await setup();
+    const machine = await paired();
+    for (const mode of ["rejected", "stalled"] as const) {
+      const { broker: current, runners } = brokerFor(machine, {
+        recheck:
+          mode === "rejected"
+            ? async () => {
+                throw new Error("access store unavailable");
+              }
+            : () => new Promise<null>(() => {}),
+        limits: { accessRecheckMs: 20 },
+      });
+      const viewer = fakeSocket();
+      current.open(viewer.socket, input(WATCH));
+      await until(() => viewer.closed !== null, `${mode} recheck`);
+      expect(viewer.closed).toEqual({ code: STREAM_CLOSE.internal, reason: "access unavailable" });
+      expect(runners[0]?.socket.closed).toEqual(viewer.closed);
+      current.stop();
+    }
   });
 
   test("the computer's answer: its refusal, offline, paused, at its cap, or a reply without a data socket", async () => {

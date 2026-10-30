@@ -50,6 +50,7 @@ import {
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -186,22 +187,28 @@ export function configFromGrant(
 
 /**
  * The machine this home was on `server`, to reconnect it instead of making a
- * new one (the id stays in the config after a refusal and after "leave").
- * Undefined for another server or a home never paired.
+ * new one (the id stays in the config after a refusal and after "leave"),
+ * with the token it had there: the server reconnects a machine only for a
+ * computer that proves it held that machine's token (ADR 0036 §5).
+ * Undefined for another server, a home never paired, or no token kept.
  */
-export function previousMachineFor(prev: StoredConfig | null, server: string): string | undefined {
-  return prev?.machineId && prev.server === server ? prev.machineId : undefined;
+export function previousMachineFor(
+  prev: StoredConfig | null,
+  server: string,
+): { machineId: string; token: string } | undefined {
+  const token = prev?.token ?? prev?.previousToken;
+  return prev?.machineId && prev.server === server && token ? { machineId: prev.machineId, token } : undefined;
 }
 
 /** What `POST /api/machines/device` is told about this computer. */
-export function deviceInfo(name?: string, previousMachineId?: string) {
+export function deviceInfo(name?: string, previous?: { machineId: string; token: string }) {
   return {
     ...(name ? { name } : {}),
     os: machineOs(),
     arch: os.arch(),
     hostname: os.hostname(),
     version: RUNNER_VERSION,
-    ...(previousMachineId ? { previousMachineId } : {}),
+    ...(previous ? { previousMachineId: previous.machineId, previousToken: previous.token } : {}),
   };
 }
 
@@ -825,18 +832,39 @@ export class RunnerDaemon implements RequestObserver {
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
-      agentUser = this.opts.workers?.user ?? ((agent) => users.ensure(agent));
+      const prepared = new Set<number>();
+      const prepare = (user: AgentUser) => {
+        if (prepared.has(user.uid)) return;
+        ensureBrowserBindPolicy(user, this.self.command);
+        prepared.add(user.uid);
+      };
+      // Desktops and terminals can start before a worker. The first use of a
+      // newly allocated UID installs its bind policy before returning it.
+      agentUser = this.opts.workers?.user ?? ((agent) => {
+        const user = users.ensure(agent);
+        prepare(user);
+        return user;
+      });
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
       // would replace the others' rules with its own.
       const guard =
         this.opts.workers || config.managedBy === "host"
           ? undefined
-          : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
+          : new LoopbackGuard({
+              home, agentUids: () => readAgentUsers(home).map((u) => u.uid),
+              uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE, log,
+            });
       supervisor = new Supervisor({
         home,
+        requireRootBroker: !this.opts.workers,
         user: agentUser,
         start: launchWorker(this.self.command),
+        ...(this.opts.workers || config.managedBy === "host" ? {} : {
+          prepareExisting: (existing: AgentUser[]) => {
+            for (const user of existing) prepare(user);
+          },
+        }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
@@ -1389,14 +1417,15 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   /**
-   * Forgets the pairing: the token goes; settings that aren't the
-   * organization's stay. `machineId` stays too, so pairing again with the
+   * Forgets the pairing: the token goes (nothing connects with it); settings
+   * that aren't the organization's stay. `machineId` stays too, with the token
+   * as `previousToken` (its only use is the proof), so pairing again with the
    * same server can bring that machine back (`previousMachineFor`).
    */
   unpair(): { unpaired: true } {
     const s = this.stored;
     if (!s?.token) return { unpaired: true };
-    const { token: _token, orgId: _orgId, orgName, name: _name, paused: _paused, access, ...rest } = s;
+    const { token, orgId: _orgId, orgName, name: _name, paused: _paused, access, ...rest } = s;
     this.agents = [];
     try {
       writeAgents(this.opts.home, []);
@@ -1406,7 +1435,11 @@ export class RunnerDaemon implements RequestObserver {
       removeCachedLogo(this.opts.home);
     } catch {}
     this.refused = null;
-    this.write({ ...rest, ...(access ? { access: { folders: [], tools: access.tools } } : {}) });
+    this.write({
+      ...rest,
+      previousToken: token,
+      ...(access ? { access: { folders: [], tools: access.tools } } : {}),
+    });
     this.record({ kind: "pair", summary: `disconnected${orgName ? ` from ${orgName}` : ""}`, result: "ok" });
     return { unpaired: true };
   }

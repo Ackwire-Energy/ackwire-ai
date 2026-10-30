@@ -162,6 +162,8 @@ export const keys = {
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
   agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
     ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
+  agentBrowserControl: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
+    ["org", orgId, "browser", "agent", agentId, "control", screen] as const,
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
   /** The agent's desktop (ADR 0058): its state as this person sees it. */
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,

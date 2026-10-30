@@ -639,7 +639,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       await requirePermission(db, c.get("user").id, orgId, "read");
-      return c.json({ channels: await listAgentChannels(db, orgId, agentId) }, 200);
+      return c.json({ channels: await listAgentChannels(db, c.get("user").id, orgId, agentId) }, 200);
     },
   );
 

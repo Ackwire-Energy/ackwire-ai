@@ -53,6 +53,8 @@ export interface DeviceInfo {
    * permissions and agents, when the person confirming may manage it.
    */
   previousMachineId?: string;
+  /** The token it had for `previousMachineId`: the proof that it is that computer (no reconnect without it). */
+  previousToken?: string;
 }
 
 /** `K7Q4ZP` → `K7Q·4ZP`. */

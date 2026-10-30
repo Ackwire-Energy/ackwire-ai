@@ -45,6 +45,10 @@ export const actionHash = (action: {
 export const APPROVAL_TTL_MS = 24 * 3600_000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
+/** Server-owned Git tools have a connection ID only to use that connection's credential. */
+const serverGitTool = (tool: ToolDefinition) =>
+  (tool.name === "git_clone" && tool.scope === "github:git.read") ||
+  (tool.name === "open_pull_request" && tool.scope === "github:pr.write");
 
 /**
  * An `external` tool's output (an MCP server's answer) reaches the model inside the one envelope for
@@ -162,8 +166,12 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     const byName = new Map<string, ToolDefinition>();
     for (const source of deps.sources) {
       for (const tool of await source.tools(ctx)) {
-        if (!TOOL_NAME.test(tool.name) || byName.has(tool.name)) continue;
-        byName.set(tool.name, tool);
+        if (!TOOL_NAME.test(tool.name)) continue;
+        const current = byName.get(tool.name);
+        // A connected MCP server must not shadow one of our own tools just
+        // because its source appears earlier in the list.
+        if (!current || (current.connectionId && (!tool.connectionId || serverGitTool(tool))))
+          byName.set(tool.name, tool);
       }
     }
     return byName;

@@ -6,6 +6,7 @@
 ## Decision
 
 - **Endpoint** `GET /api/ws?orgId=<uuid>`, served by the same `Bun.serve` as the HTTP app (`apps/server/src/realtime/ws.ts`). The upgrade requires a Better Auth session cookie, an allowed `Origin` (prevents cross-site WebSocket hijacking), and membership of `orgId`.
+- **A socket lives as long as its session.** The upgrade reads the session from the database, never Better Auth's signed cookie cache, and the socket keeps its session id. A session Better Auth deletes (sign-out, "sign out everywhere", a password reset, a deleted user) is announced on the server-side topic `session:<userId>`, and every socket opened with it closes on every replica: `/api/ws` with `{"type":"error","code":"session_ended"}` and code 4401, a desktop or terminal stream (ADR 0058) with 4403 `signed_out`. Endings nobody announces (an expired session, rows deleted outside Better Auth) are caught by a lookup of every open socket's session each 60 s (`realtime/session-watch.ts`), and by the streams' own 30 s recheck.
 - **Subscriptions:** the client sends `{"type":"subscribe","channelId":…}`. The server allows it only if `requireChannelAccess` passes for that org (same check as HTTP); otherwise it answers `{"type":"error","code":"forbidden"|"not_found"}`. At most 200 subscriptions per socket, 60 frames per 10 s, 16 KB frames.
 - **Events** (`ChannelEvent` in `@agenteschat/engine`), forwarded as `{"type":"event","channelId","event"}`:
   - `message.created` — committed message (inline when small; otherwise only `messageId`, fetch it over HTTP);

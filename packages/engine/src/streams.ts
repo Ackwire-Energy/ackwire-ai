@@ -29,6 +29,8 @@ export interface StreamInput {
   orgId: string;
   agentId: string;
   request: StreamRequest;
+  /** The person's session behind the viewer socket (its token): the recheck ends the stream once it is gone. */
+  sessionToken?: string;
 }
 
 /**
@@ -246,13 +248,26 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     const recheck = deps.recheck;
     if (recheck) {
       // Access can end while it's open (removed from the org, someone else took control…).
+      let checking = false;
       s.checker = setInterval(() => {
-        void recheck(s).then(
-          (lost) => {
-            if (lost) close(s, lost.refused, lost.reason);
-          },
-          (error) => deps.log?.warn("stream recheck failed", { agentId: s.agentId, error: String(error) }),
-        );
+        if (s.closed) return;
+        // An unresponsive store cannot leave a private stream open indefinitely.
+        if (checking) return close(s, STREAM_CLOSE.internal, "access unavailable");
+        checking = true;
+        void Promise.resolve()
+          .then(() => recheck(s))
+          .then(
+            (lost) => {
+              if (lost) close(s, lost.refused, lost.reason);
+            },
+            (error) => {
+              deps.log?.warn("stream recheck failed", { agentId: s.agentId, error: String(error) });
+              close(s, STREAM_CLOSE.internal, "access unavailable");
+            },
+          )
+          .finally(() => {
+            checking = false;
+          });
       }, limits.accessRecheckMs);
     }
     quietly(() => link.socket.send(JSON.stringify({ type: "stream.ready" })));
@@ -275,6 +290,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
         orgId: input.orgId,
         agentId: input.agentId,
         request: input.request,
+        sessionToken: input.sessionToken,
         id: randomBytes(32).toString("base64url"),
         viewer,
         machineId: null,

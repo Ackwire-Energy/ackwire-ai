@@ -6,7 +6,7 @@ import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
-import { can, getMembership } from "./organizations";
+import { can, requireActiveMembership } from "./organizations";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
@@ -180,8 +180,7 @@ export async function cancelRun(
   options: { stopMessageId?: string } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [row] = await db
     .select({
       run: agentRuns,
@@ -246,7 +245,7 @@ export async function stopRun(
         .update(agentQuestions)
         .set({ status: "canceled" })
         .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")));
-      // Its secret requests close too (the keys left on the computer are pruned there).
+      // Its secret requests close too; each terminal row queues runner key cleanup.
       closedSecrets = await cancelSecretRequests(tx, run.id);
       for (const r of closedSecrets) await syncSecretMessage(tx, r);
       // Jobs of this run that haven't started never will.

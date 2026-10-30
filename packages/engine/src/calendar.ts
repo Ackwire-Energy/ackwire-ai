@@ -7,7 +7,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
 import { routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 import { replyThreadOf } from "./runs";
@@ -508,8 +508,7 @@ export interface CalendarEventPatch {
 
 /** The event's creator or admins change or delete it. */
 async function requireEventEditor(db: Database, userId: string, orgId: string, eventId: string) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [row] = await db
     .select()
     .from(calendarEvents)
@@ -1110,8 +1109,7 @@ async function decideProposalRow(db: Database, userId: string, orgId: string, id
     .from(calendarProposals)
     .where(and(eq(calendarProposals.id, id), eq(calendarProposals.orgId, orgId)));
   if (!p) throw new NotFoundError("Proposal not found");
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   if (p.requesterUserId !== userId && !can(membership.role, "configure")) {
     throw new ForbiddenError("Only the person who asked can confirm this");
   }

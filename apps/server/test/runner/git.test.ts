@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineReplies, MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { credentialHelper } from "../../runner/git";
@@ -204,6 +204,69 @@ test("git.sync: not cloned and not asked, refused by the remote, outside the fol
   // Paused computers start nothing new, this included; the log line names the repositories.
   expect(NEW_WORK_OPS.has("git.sync")).toBe(true);
   expect(describeRequest(sync([{ repo: "acme/app", clone: true }]))).toBe("[dev] git.sync acme/app");
+});
+
+test("with commands off the runner's git runs nothing the agent chose: no .git writes, no hooks, no unsafe config", async () => {
+  const { ctx, home } = setup();
+  const first = (await handleRequest(
+    ctx,
+    sync([{ repo: "acme/app", clone: true }]),
+    scope(),
+  )) as MachineReplies["git.sync"];
+  expect(first.repos[0]?.status).toBe("cloned");
+  const folder = await agentWorkspace(ctx.workspaceReal, AGENT);
+  const checkout = path.join(folder, "repos", "acme", "app");
+  const base64 = Buffer.from("[core]\n\tfsmonitor = evil\n").toString("base64");
+  const write = (p: string) =>
+    handleRequest(ctx, { op: "write", agent: AGENT, path: p, base64 } as MachineRequest, scope());
+
+  // The `write` op (allowed with commands off) never reaches into a git dir, in any spelling.
+  for (const p of [
+    "repos/acme/app/.git/config",
+    "repos/acme/app/.git/hooks/post-merge",
+    "repos/acme/app/.GIT/config",
+    "repos/acme/app/.git./config",
+    "repos/acme/app/.git",
+    "repos/other/.git",
+  ]) {
+    expect(await errorCode(() => write(p))).toBe("bad_request");
+  }
+  expect(readFileSync(path.join(checkout, ".git", "config"), "utf8")).not.toContain("evil");
+  expect(existsSync(path.join(folder, "repos", "other"))).toBe(false);
+  // Anything else in the checkout is still the agent's to write.
+  await write("repos/acme/app/.gitignore");
+  expect(existsSync(path.join(checkout, ".gitignore"))).toBe(true);
+
+  // A hook already in the checkout (made while commands were on): the fast-forward runs none.
+  const marker = path.join(home, "ran");
+  if (process.platform !== "win32") {
+    const hook = path.join(checkout, ".git", "hooks", "post-merge");
+    writeFileSync(hook, `#!/bin/sh\ntouch '${marker}'\n`);
+    chmodSync(hook, 0o755);
+    git(checkout, "config", "core.hooksPath", ".git/hooks");
+  }
+  writeFileSync(path.join(source, "README.md"), "hooks\n");
+  git(source, "commit", "-qam", "hooks");
+  git(source, "push", "-q", "origin", "main");
+  const second = (await handleRequest(
+    ctx,
+    sync([{ repo: "acme/app", clone: false }]),
+    scope(),
+  )) as MachineReplies["git.sync"];
+  expect(second.repos[0]?.status).toBe("updated");
+  expect(readFileSync(path.join(checkout, "README.md"), "utf8")).toBe("hooks\n");
+  expect(existsSync(marker)).toBe(false);
+
+  // Config that names a program (a filter driver, an ssh command): that checkout fails, nothing runs.
+  git(checkout, "config", "core.sshCommand", `touch '${marker}'`);
+  const third = (await handleRequest(
+    ctx,
+    sync([{ repo: "acme/app", clone: false }]),
+    scope(),
+  )) as MachineReplies["git.sync"];
+  expect(third.repos[0]).toMatchObject({ status: "failed" });
+  expect(third.repos[0]?.message).toContain("core.sshcommand");
+  expect(existsSync(marker)).toBe(false);
 });
 
 test("the credential helper prints our token for `get` only", () => {

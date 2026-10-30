@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { authorizeSubscription, parseClientFrame } from "../src/realtime/ws";
-import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
+import { orgTopic } from "@agenteschat/adapters";
+import { authorizeSubscription, currentSubscriptions, parseClientFrame } from "../src/realtime/ws";
+import { browser, createTestServer, joinByInvitation, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
 
 describe("parseClientFrame", () => {
   test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
@@ -73,6 +74,35 @@ test("upgrade requires a session, our Origin and org membership", async () => {
   const stranger = browser(t);
   await signUp(stranger, "stranger@example.com");
   expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: stranger.cookie() })).toBe(403);
+});
+
+test("revoked signed cookies cannot open a new realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies })).toBe(401);
+});
+
+test("a revoked session closes its existing realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  // The ordinary client pings; a revoked socket must close instead of
+  // accepting another frame. The periodic check also bounds idle sockets.
+  await Bun.sleep(2_100);
+  c.send({ type: "ping" });
+  expect(await Promise.race([closed, Bun.sleep(5_000).then(() => -1)])).toBe(4401);
 });
 
 test("subscriptions are limited to channels the person belongs to, in the connection's org", async () => {
@@ -220,3 +250,33 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
 });
+
+test("a missed revocation event is reconciled from durable membership", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const anaId = (await meId(ana)) ?? "";
+  const publish = t.adapters.pubsub.publish.bind(t.adapters.pubsub);
+  t.adapters.pubsub.publish = (topic, event) =>
+    topic === orgTopic(orgId) && (event as { type?: string }).type === "membership.revoked"
+      ? Promise.resolve()
+      : publish(topic, event);
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  a.send({ type: "subscribe", channelId });
+  await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(true);
+
+  expect((await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
+    method: "DELETE",
+  })).status).toBe(204);
+  expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(false);
+  expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId, 20_000)).toMatchObject({
+    reason: "revoked",
+  });
+  const closed = new Promise<number>((resolve) => a.ws.addEventListener("close", (e) => resolve(e.code)));
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+  expect(await Promise.race([closed, Bun.sleep(20_000).then(() => -1)])).toBe(4403);
+}, 60_000);

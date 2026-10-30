@@ -24,7 +24,10 @@ export const GIT_LIMITS = {
   fetchBytes: 2 * 1024 * 1024 * 1024,
   /** Wants/haves of a fetch. */
   fetchRequestBytes: 10 * 1024 * 1024,
-  maxObjects: 500_000,
+  maxObjects: 50_000,
+  /** Decompressed pack content is bounded independently of the wire size. */
+  maxInflatedBytes: 128 * 1024 * 1024,
+  maxCommitBytes: 2 * 1024 * 1024,
 };
 
 export interface GitProxyDeps {
@@ -110,14 +113,40 @@ function capped(body: ReadableStream<Uint8Array>, max: number) {
   );
 }
 
-async function readBody(req: Request, max: number) {
+export async function readBody(req: Request, max: number) {
   const declared = Number(req.headers.get("content-length") ?? "0");
-  if (declared > max) return null;
-  const raw = new Uint8Array(await req.arrayBuffer());
-  if (raw.byteLength > max) return null;
+  if (!Number.isFinite(declared) || declared < 0 || declared > max) return null;
+  const reader = req.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (reader) {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > max) {
+          void reader.cancel().catch(() => undefined);
+          return null;
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  const raw = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    raw.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   if ((req.headers.get("content-encoding") ?? "").toLowerCase() === "gzip") {
-    const plain = new Uint8Array(gunzipSync(raw, { maxOutputLength: max }));
-    return plain;
+    try {
+      return new Uint8Array(gunzipSync(raw, { maxOutputLength: max }));
+    } catch {
+      return null;
+    }
   }
   return raw;
 }
@@ -290,7 +319,11 @@ export async function handleGitProxy(
   if (reasons.size === 0) {
     let pack: ReturnType<typeof readPack>;
     try {
-      pack = readPack(body, request.packStart, { maxObjects: limits.maxObjects });
+      pack = readPack(body, request.packStart, {
+        maxObjects: limits.maxObjects,
+        maxInflatedBytes: limits.maxInflatedBytes,
+        maxCommitBytes: limits.maxCommitBytes,
+      });
     } catch {
       return text(400, "agentes: unreadable pack");
     }

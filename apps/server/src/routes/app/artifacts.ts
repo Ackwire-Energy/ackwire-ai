@@ -358,7 +358,8 @@ export function artifactRoutes(deps: AppDeps) {
         "content-disposition": attachmentDisposition(file.filename),
         "x-content-type-options": "nosniff",
         "content-security-policy": "sandbox",
-        "cache-control": "private, no-store",
+        // no-transform: no proxy rewrites the bytes (Cloudflare's email obfuscation edits text/html).
+        "cache-control": "private, no-store, no-transform",
       },
     });
   });

@@ -13,7 +13,7 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
+import { landingFor, membershipIn, safeRedirect, webUrl } from "@agenteschat/client/lib/guards";
 import {
   addInvites,
   firstAskOrder,
@@ -252,6 +252,30 @@ describe("guards and permissions", () => {
     expect(safeRedirect("//evil.com")).toBeUndefined();
     expect(safeRedirect("https://evil.com")).toBeUndefined();
     expect(safeRedirect("/\\evil.com")).toBeUndefined();
+    expect(safeRedirect("/org/a/issues?view=board#top")).toBe("/org/a/issues?view=board#top");
+    // Browsers drop tabs and newlines and read a backslash as a slash: each would leave the site.
+    for (const bypass of [
+      "/\t/evil.com",
+      "/\n/evil.com",
+      "/\r/evil.com",
+      "/%09/evil.com",
+      "/%0a/evil.com",
+      "/%2F/evil.com",
+      "/%2f%2fevil.com",
+      "/%5Cevil.com",
+      "\\\\evil.com",
+      "/.//evil.com",
+      "///evil.com",
+      "javascript:alert(1)",
+    ])
+      expect(safeRedirect(bypass)).toBeUndefined();
+  });
+  test("web links: only http(s)", () => {
+    expect(webUrl("https://github.com/acme/app/pull/3")).toBe("https://github.com/acme/app/pull/3");
+    expect(webUrl("http://example.com")).toBe("http://example.com");
+    expect(webUrl("javascript:alert(1)")).toBeUndefined();
+    expect(webUrl("data:text/html,x")).toBeUndefined();
+    expect(webUrl("/relative")).toBeUndefined();
   });
   test("landing: last org, first org, onboarding", () => {
     expect(landingFor(me, "b")).toEqual({ orgId: "b" });

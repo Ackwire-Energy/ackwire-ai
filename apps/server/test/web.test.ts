@@ -53,6 +53,15 @@ describe("web app serving", () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("not_found");
   });
 
+  test("API answers are never stored, even at a path that ends like a file", async () => {
+    const health = await app.request("/api/health");
+    expect(health.status).toBe(200);
+    expect(health.headers.get("cache-control")).toBe("no-store");
+    const missing = await app.request("/api/app/x.png");
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("cache-control")).toBe("no-store");
+  });
+
   test("the runner bundle: JavaScript, revalidated, and never index.html when missing", async () => {
     const res = await app.request("/runner/agentes-runner.mjs");
     expect(res.status).toBe(200);

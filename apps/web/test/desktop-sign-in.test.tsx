@@ -53,13 +53,16 @@ describe("in the Mac app's window", () => {
       await settle(6);
       expect(calls.some((c) => c.method === "signInSocial")).toBe(false);
       expect(heading()).toBe("Continue no navegador");
-      expect(document.querySelector(".auth__lead")?.textContent).toBe(
-        "A gente volta para cá quando você entrar com GitHub.",
-      );
-      const opened = new URL(assign.urls[0] ?? "", "https://app.agentes.chat");
-      expect(opened.pathname).toBe("/desktop/sign-in");
-      expect(opened.searchParams.get("provider")).toBe("github");
-      expect(opened.searchParams.get("challenge")).toMatch(KEY);
+      // The window opens a request for the challenge and shows the code it got back.
+      const opened = calls.find((c) => c.method === "desktopOpen");
+      expect(opened?.args[0]).toMatch(KEY);
+      expect(document.querySelector(".auth__codeValue")?.textContent).toBe("KQ7M-3XPF");
+      const url = new URL(assign.urls[0] ?? "", "https://app.agentes.chat");
+      expect(url.pathname).toBe("/desktop/sign-in");
+      expect(url.searchParams.get("provider")).toBe("github");
+      // The request id travels through the browser, never the challenge or the verifier.
+      expect(url.searchParams.get("request")).toBe("r".repeat(43));
+      expect(url.searchParams.get("challenge")).toBeNull();
 
       // Not yet: stays. Back in front after the browser finished: enters.
       await act(async () => window.dispatchEvent(new Event("focus")));
@@ -71,8 +74,8 @@ describe("in the Mac app's window", () => {
       expect(assign.urls[1]).toBe("/desktop/signed-in?to=%2F");
       const verifiers = calls.filter((c) => c.method === "desktopRedeem").map((c) => c.args[0]);
       expect(verifiers[0]).toMatch(KEY);
-      // The verifier never left the window: only its hash went to the browser.
-      expect(opened.searchParams.get("challenge")).not.toBe(verifiers[0]);
+      // The verifier never left the window: only the request id went to the browser.
+      expect(url.searchParams.get("request")).not.toBe(verifiers[0]);
     } finally {
       assign.restore();
     }
@@ -89,39 +92,47 @@ describe("in the Mac app's window", () => {
 });
 
 describe("in the browser, for the app", () => {
-  const challenge = "c".repeat(43);
+  const request = "r".repeat(43);
 
-  test("goes to the provider, and back from it hands the sign-in over", async () => {
+  test("goes to the provider, and back from it asks to confirm the code before handing over", async () => {
     const first = createFakeAuth();
-    await renderApp(`/desktop/sign-in?provider=github&challenge=${challenge}`, {
+    await renderApp(`/desktop/sign-in?provider=github&request=${request}`, {
       api: createFakeApi(seedState({ me: null })),
       auth: first.auth,
     });
     await settle(3);
     expect(first.calls[0]).toEqual({
       method: "signInSocial",
-      args: ["github", `/desktop/sign-in?provider=github&challenge=${challenge}&done=1`],
+      args: ["github", `/desktop/sign-in?provider=github&request=${request}&done=1`],
     });
     cleanup();
 
     const back = createFakeAuth();
-    await renderApp(`/desktop/sign-in?provider=github&challenge=${challenge}&done=1`, {
+    await renderApp(`/desktop/sign-in?provider=github&request=${request}&done=1`, {
       api: createFakeApi(seedState()),
       auth: back.auth,
     });
     await settle(3);
-    expect(back.calls).toEqual([{ method: "desktopHandoff", args: [challenge] }]);
+    // The code is read and shown, but nothing is handed over yet.
+    expect(back.calls).toEqual([{ method: "desktopRequestCode", args: [request] }]);
+    expect(document.querySelector(".auth__codeValue")?.textContent).toBe("KQ7M-3XPF");
+    expect(back.calls.some((c) => c.method === "desktopHandoff")).toBe(false);
+    // Only the person's confirmation hands it over.
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: /Sim, entrar no app/ })));
+    await settle(3);
+    expect(back.calls.some((c) => c.method === "desktopHandoff" && c.args[0] === request)).toBe(true);
     expect(heading()).toBe("Tudo certo.");
   });
 
-  test("a link straight to the end hands nothing over", async () => {
-    const { auth, calls } = createFakeAuth();
-    await renderApp(`/desktop/sign-in?provider=google&challenge=${challenge}&done=1`, {
+  test("a link straight to the end hands nothing over without a real request", async () => {
+    const { auth, calls } = createFakeAuth({ requestCode: null });
+    await renderApp(`/desktop/sign-in?provider=google&request=${request}&done=1`, {
       api: createFakeApi(seedState()),
       auth,
     });
     await settle(3);
-    expect(calls).toEqual([]);
+    // It only looked the request up; with no pending request it expires and hands nothing over.
+    expect(calls).toEqual([{ method: "desktopRequestCode", args: [request] }]);
     expect(heading()).toBe("Esse pedido expirou.");
   });
 });

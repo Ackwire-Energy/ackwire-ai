@@ -55,6 +55,7 @@ export const TurnRow = memo(function TurnRow({
   const items = turnItems(run);
   // It opens as if it had answered: a generic phrase until the first thing it says takes its place.
   const { said, opener, lines } = turnOpener(run, items);
+  const wordsOnTop = !said && lines.length === 0;
   const now = useNow(1000);
   const since = run.startedAt ?? run.since ?? null;
   const secs = since ? Math.max(0, now - since) : 0;
@@ -104,13 +105,17 @@ export const TurnRow = memo(function TurnRow({
             )}
           </View>
         </View>
-        {said || opener !== null ? (
+        {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
+            with stays put when a tool call turns it into narration. */}
+        {wordsOnTop && run.text ? (
+          <RevealText text={run.text} live={phase === "writing"} accent={color} />
+        ) : said || opener !== null ? (
           <View style={styles.say}>
             <MessageText body={said ?? t(`mobile.chat.turn.opener${opener}`)} selectable={false} />
           </View>
         ) : null}
         <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
-        {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+        {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
       </View>
     </View>
   );
