@@ -129,7 +129,7 @@ export function ChatsScreen() {
         sections.map((s) => {
           const off = collapsed.includes(s.key);
           const row = (r: ConversationRow, i: number, shown: boolean) => {
-            const hold = r.kind === "channel" ? menus.channelMenu(r.channelId) : undefined;
+            const hold = r.kind === "channel" && menus.movable(r.channelId);
             return (
               <ConversationRowView
                 key={r.key}
@@ -137,7 +137,7 @@ export function ChatsScreen() {
                 divider={i > 0}
                 live={shown && live++ < LIVE_ROWS}
                 agent={agentStates.get(r.key)}
-                {...(hold ? { onLongPress: hold, holdLabel: t("channelCategories.move") } : {})}
+                {...(hold ? { onHold: menus.openChannelMenu, holdLabel: t("channelCategories.move") } : {})}
               />
             );
           };

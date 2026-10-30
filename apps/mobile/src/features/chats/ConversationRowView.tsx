@@ -32,7 +32,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   divider = false,
   live = false,
   agent,
-  onLongPress,
+  onHold,
   holdLabel,
 }: {
   row: ConversationRow;
@@ -41,8 +41,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   live?: boolean;
   /** An agent DM: it waits on you, or what it is doing (from `agentRowState`). */
   agent?: AgentRowState;
-  /** A channel on the home: its menu ("Mover para…"). */
-  onLongPress?: () => void;
+  /** A channel on the home: its menu ("Mover para…"), given the row's channel (stable, so the row stays memoized). */
+  onHold?: (channelId: string) => void;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
 }) {
@@ -197,13 +197,13 @@ export const ConversationRowView = memo(function ConversationRowView({
   return (
     <ListRow
       onPress={open}
-      {...(onLongPress
+      {...(onHold && r.kind === "channel"
         ? {
-            onLongPress,
+            onLongPress: () => onHold(r.channelId),
             delayLongPress: 380,
             accessibilityActions: [{ name: "menu", label: holdLabel ?? name }],
             onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
-              if (e.nativeEvent.actionName === "menu") onLongPress();
+              if (e.nativeEvent.actionName === "menu") onHold(r.channelId);
             },
           }
         : {})}
