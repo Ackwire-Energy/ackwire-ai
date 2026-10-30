@@ -725,7 +725,7 @@ describe("VAPID keys", () => {
     for (const url of ["http://localhost:3000", "https://localhost", "https://agentes.local", "https://192.168.1.10"])
       expect(subject(url)).toBe(VAPID_FALLBACK_SUBJECT);
     expect(subject("http://chat.acme.com")).toBe(VAPID_FALLBACK_SUBJECT);
-    expect(subject("http://localhost:3000", "agentes.chat <ola@localhost>")).toBe(VAPID_FALLBACK_SUBJECT);
+    expect(subject("http://localhost:3000", "agentes.chat <ping@localhost>")).toBe(VAPID_FALLBACK_SUBJECT);
     expect(subject("http://localhost:3000", "Ops <ops@acme.com>")).toBe("mailto:ops@acme.com");
     expect(subject("http://localhost:3000", "not an address")).toBe(VAPID_FALLBACK_SUBJECT);
   });
