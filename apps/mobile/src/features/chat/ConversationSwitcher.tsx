@@ -7,8 +7,8 @@ import { type ConversationRow, rowName } from "../chats/logic";
 import { matches } from "../search/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
-import { Tile } from "../shared/parts";
 import { SheetTitle } from "../shared/PromptForm";
+import { Tile } from "../shared/parts";
 import { useConversations } from "../shared/queries";
 
 type Conversation = Extract<ConversationRow, { kind: "dm" | "channel" }>;
