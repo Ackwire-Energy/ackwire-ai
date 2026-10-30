@@ -4,6 +4,7 @@ import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secre
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  cancelRun,
   createAgent,
   createMachineHub,
   declineSecret,
@@ -810,6 +811,42 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
     expect(closed?.status).toBe("declined");
   });
+
+  test("a request expiring during staging cannot commit delivery", async () => {
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretStaged: async (requestId) => {
+        await f.db.update(schema.secretRequests)
+          .set({ expiresAt: new Date(Date.now() - 1000) })
+          .where(eq(schema.secretRequests.id, requestId));
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered or expired",
+    );
+    const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    expect(closed?.status).toBe("pending");
+    expect(closed?.deliveredAt).toBeNull();
+    expect(runner.secrets.has(row.name)).toBe(false);
+    // A pending row may reflect an uncertain concurrent commit; wait for a terminal decision.
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(await expireSecretRequests({ db: f.db, pubsub: f.pubsub })).toBe(1);
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.staged.has(row.id)).toBe(false);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
+
+  test("canceling a waiting run queues removal of its unused runner key", async () => {
+    const { runner, row } = await asking();
+    expect(runner.keys.has(row.id)).toBe(true);
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, row.runId);
+    const [job] = await f.db.select().from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `secret.discard:${row.id}`));
+    expect(job?.status).toBe("pending");
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
 
   test("identical concurrent deliveries keep the winning staged box until activation", async () => {
     const gate = () => {
