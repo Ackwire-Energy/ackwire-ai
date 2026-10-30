@@ -92,7 +92,8 @@ export function PeoplePicker({
   label: string;
   searchLabel: string;
   hint?: string;
-  emptyText: string;
+  /** Under the search when nothing matches what was typed. */
+  emptyText: (query: string) => string;
   selected: Set<PickKey>;
   onChange: (next: Set<PickKey>) => void;
 }) {
@@ -148,7 +149,7 @@ export function PeoplePicker({
       {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
       <div className="people-picker__results" role="region" aria-label={searchLabel}>
         {rows.length === 0 ? (
-          <p className="small muted">{emptyText}</p>
+          <p className="small muted">{emptyText(query)}</p>
         ) : (
           <MemberPickerRows rows={rows} selected={selected} onToggle={toggle} />
         )}

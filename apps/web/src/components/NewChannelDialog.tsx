@@ -1,21 +1,11 @@
 import { keys, useChannels } from "@agenteschat/client";
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogSearchList,
-  Field,
-  Input,
-  RadioCard,
-  RadioGroup,
-} from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "./MemberPicker";
+import { memberOf, PeoplePicker, type PickKey } from "./MemberPicker";
 import { useOrg } from "./org-context";
 
 /** Same rule as the backend (CHANNEL_NAME_PATTERN): lower case, digits, - or _. */
@@ -37,7 +27,10 @@ export function channelNameError(name: string, taken: Set<string>): "invalid" | 
   return null;
 }
 
-/** "Criar canal": name, topic, public/private and initial members (people and agents). */
+/**
+ * "Criar canal", in one column: name, topic, public/private, then the initial members (people and agents: search
+ * and a list that scrolls in its own box). The footer, with the count and Criar, stays in view.
+ */
 export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -48,7 +41,6 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<PickKey>>(new Set());
   const [touched, setTouched] = useState(false);
   useEffect(() => {
@@ -56,11 +48,9 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
     setName("");
     setTopic("");
     setVisibility("public");
-    setQ("");
     setSelected(new Set());
     setTouched(false);
   }, [open]);
-  const rows = useMemberRows(q);
   const taken = new Set((channels.data ?? []).map((c) => c.name));
   const error = channelNameError(name, taken);
   const create = useMutation({
@@ -141,29 +131,14 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
               />
             </RadioGroup>
           </fieldset>
-          <span className="ac-field__label">{t("newChannel.members")}</span>
-        </DialogBody>
-        <DialogSearchList
-          query={q}
-          onQueryChange={setQ}
-          searchLabel={t("newChannel.membersSearch")}
-          searchPlaceholder={t("newChannel.membersSearch")}
-          isEmpty={rows.length === 0}
-          emptyText={t("newChannel.membersEmpty", { q })}
-        >
-          <MemberPickerRows
-            rows={rows}
+          <PeoplePicker
+            label={t("newChannel.members")}
+            searchLabel={t("newChannel.membersSearch")}
+            emptyText={(q) => t("newChannel.membersEmpty", { q })}
             selected={selected}
-            onToggle={(key, on) =>
-              setSelected((prev) => {
-                const next = new Set(prev);
-                if (on) next.add(key);
-                else next.delete(key);
-                return next;
-              })
-            }
+            onChange={setSelected}
           />
-        </DialogSearchList>
+        </DialogBody>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>
