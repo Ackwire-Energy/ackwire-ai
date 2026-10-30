@@ -727,6 +727,21 @@ export const en: Translations = {
       privacy: "This server has no privacy page",
     },
   },
+  webPushAsk: {
+    title: "Know when an agent needs you",
+    text: "Even with the tab closed, we'll tell you when they need your ok, have a question or call you.",
+    on: "Turn on notifications",
+    later: "Not now",
+    done: "Notifications on in this browser",
+    failed: "Couldn't turn on notifications. Try again from your account menu.",
+    someone: "An agent",
+    examples: "Examples of notifications",
+    now: "now",
+    minutes: "{{n}} min",
+    approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
+    question: { title: "{{name}} has a question", body: "Which spreadsheet should I use?" },
+    mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
+  },
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },

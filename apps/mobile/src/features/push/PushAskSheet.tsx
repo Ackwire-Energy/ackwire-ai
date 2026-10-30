@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { pushPermission } from "@/lib/push";
-import { exampleSenders } from "@/lib/push-offer";
+import { exampleSenders } from "@agenteschat/client/lib/push-offer";
 import { usePush } from "@/providers/push";
 import { Button, SheetScreen, Text, useToast } from "@/ui";
 import { useDirectory } from "../shared/hooks";
@@ -19,7 +19,7 @@ const EXAMPLES = [
 ] as const;
 
 /**
- * Our notifications sheet, before the system's prompt (Conversas opens it: `lib/push-offer.ts`): three
+ * Our notifications sheet, before the system's prompt (Conversas opens it: `@agenteschat/client/lib/push-offer`): three
  * notifications as they will arrive, from the workspace's own agents (a request to approve, work done, being
  * called), what they are for, "Ativar avisos" (the system's prompt) and "Agora não".
  */

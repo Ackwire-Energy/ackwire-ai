@@ -41,7 +41,7 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
  * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
- * first request to approve, while the phone wasn't asked yet (`lib/push-offer.ts`). When the server doesn't answer
+ * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 export function ChatsScreen() {

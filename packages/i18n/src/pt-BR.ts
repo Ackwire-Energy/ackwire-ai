@@ -738,6 +738,21 @@ export const ptBR = {
       privacy: "Este servidor não tem página de privacidade",
     },
   },
+  webPushAsk: {
+    title: "Saiba quando um agente precisar de você",
+    text: "Mesmo com a aba fechada, avisamos quando pedem seu ok, têm uma pergunta ou chamam você.",
+    on: "Ativar avisos",
+    later: "Agora não",
+    done: "Avisos ativados neste navegador",
+    failed: "Não deu para ativar os avisos. Tente de novo no menu da sua conta.",
+    someone: "Um agente",
+    examples: "Exemplos de avisos",
+    now: "agora",
+    minutes: "{{n}} min",
+    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
+    question: { title: "{{name}} tem uma pergunta", body: "Qual planilha devo usar?" },
+    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+  },
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
