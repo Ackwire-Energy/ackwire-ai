@@ -1,6 +1,19 @@
 import { execFile, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { chmodSync, chownSync, lstatSync, mkdirSync } from "node:fs";
+import {
+  chmodSync,
+  chownSync,
+  closeSync,
+  constants,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
@@ -21,15 +34,17 @@ import {
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
-import { RunnerError, toMachineError } from "./errors";
+import { errnoCode, RunnerError, toMachineError } from "./errors";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
+import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
 import { agentCategorySlice, agentSlice } from "./service";
 import type { RelayCount } from "./streams";
 
@@ -86,6 +101,22 @@ const SCOPE_ENTERS_PER_MINUTE = 30;
 /** A moved process shows in its new slice within this, or the worker hears it didn't. */
 const SCOPE_SHOW_MS = 2000;
 const SCOPE_POLL_MS = 20;
+const SECRET_INSTALL_MS = 20_000;
+
+/** The broker is a child of the root runner home, never of an agent-owned home. */
+function secureSecretRoot(home: string, requireRoot = false): string {
+  const owner = process.getuid?.();
+  if (requireRoot && owner !== 0) throw new RunnerError("internal", "System secret broker requires root");
+  const parent = lstatSync(home);
+  if (!parent.isDirectory() || (owner !== undefined && parent.uid !== owner) || parent.mode & 0o022)
+    throw new RunnerError("internal", "The runner home is not owned securely");
+  const root = path.join(home, "secret-broker");
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  const st = lstatSync(root);
+  if (!st.isDirectory() || (owner !== undefined && st.uid !== owner) || st.mode & 0o077)
+    throw new RunnerError("internal", "The secret broker is not owned securely");
+  return root;
+}
 
 /** `busctl` and its answer, without holding the runner while systemd answers. */
 const busctl = (args: string[]) =>
@@ -150,7 +181,15 @@ export type WorkerLinkFrame =
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
-  | { type: "scope.entered"; enterId: string; error?: string };
+  | { type: "scope.entered"; enterId: string; error?: string }
+  | { type: "secret.install"; installId: string; agent: AgentScope; secret: ActivatedSecret }
+  | {
+      type: "secret.installed";
+      installId: string;
+      size?: number;
+      superseded?: boolean;
+      error?: { code: MachineErrorCode; message: string };
+    };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -167,6 +206,8 @@ export type StartWorker = (user: AgentUser) => WorkerProcess;
 export interface SupervisorOptions {
   /** The supervisor's own home (`agents.json`, `worker-tasks.json`). */
   home: string;
+  /** Real system installation: refuse to start the broker without root. Tests use in-memory workers. */
+  requireRootBroker?: boolean;
   /** The agent's OS user, made on its first request (`AgentUsers.ensure`). */
   user: (agent: AgentScope) => AgentUser;
   /** Starts an agent's worker (`launchWorker`). */
@@ -182,6 +223,8 @@ export interface SupervisorOptions {
   fetch?: FetchLike;
   /** System mode: the loopback firewall (root), started with the supervisor. Absent in single-user and in tests. */
   guard?: { start(): void; stop(): void };
+  /** System mode: apply socket bind policy to every persisted UID before restoring or serving workers. */
+  prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
@@ -227,6 +270,7 @@ interface Worker {
   waiters: Set<{ resolve(): void; reject(err: RunnerError): void }>;
   /** Requests sent to it, by the id this side gave them. */
   inflight: Map<string, Inflight>;
+  installs: Map<string, { settle(value: MachineReplies["secret"] | RunnerError): void }>;
   /** Clicks on Browser on its agent's desktop it is answering, by the id this side gave them. */
   shows: Map<string, Show>;
   /** When it last said its agent's Chrome is in use on the agent's desktop. */
@@ -249,21 +293,27 @@ export class Supervisor {
   /** Open `browser.handoff`s, for a worker that says hello later. */
   private readonly handoffs = new Map<string, Handoff>();
   private online = false;
+  /** The server runs each `mcp.call` once per `callId` (its `welcome`): the workers' welcome says so too. */
+  private mcpOnce = false;
   private closed = false;
   private seq = 0;
+  private readonly secretRoot: string;
   private pinger: ReturnType<typeof setInterval> | null = null;
   /** What the workers said their agents' Chromes sent and received, not taken yet (protocol 23). */
   private traffic = { up: 0, down: 0 };
 
   /** The connection's MCP side: answers go back to the worker that asked. */
   readonly mcp = {
-    attach: () => {},
+    attach: (_send: unknown, server: { mcpOnce?: boolean } = {}) => {
+      this.mcpOnce = server.mcpOnce === true;
+    },
     detach: () => {},
     result: (frame: Extract<ServerFrame, { type: "mcp.result" }>) => this.toCaller(frame),
     tools: (frame: Extract<ServerFrame, { type: "mcp.tools" }>) => this.toCaller(frame),
   };
 
   constructor(private readonly opts: SupervisorOptions) {
+    this.secretRoot = secureSecretRoot(opts.home, opts.requireRootBroker);
     const saved = readJson<Record<string, { agentId?: unknown; startedAt?: unknown } | null>>(this.ownersFile);
     const cutoff = Date.now() - TASK_OWNER_KEEP_MS;
     for (const [taskId, o] of Object.entries(saved ?? {})) {
@@ -278,7 +328,10 @@ export class Supervisor {
 
   /** Starts the workers whose tasks need watching, and the pings. */
   boot() {
+    // Browser ports are guarded for the entire UID range before any worker can bind.
+    this.opts.guard?.start();
     const users = readAgentUsers(this.opts.home);
+    this.opts.prepareExisting?.(users);
     for (const agentId of new Set([...this.owners.values()].map((o) => o.agentId))) {
       const user = users.find((u) => u.id === agentId);
       if (user) this.launch(this.entry(user));
@@ -287,13 +340,12 @@ export class Supervisor {
       for (const w of this.workers.values()) this.send(w, { type: "ping", at: Date.now() });
     }, WORKER_PING_MS);
     this.pinger.unref?.();
-    this.opts.guard?.start();
   }
 
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", STOPPING);
+    if (this.closed) throw new RunnerError("dropped", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -330,6 +382,59 @@ export class Supervisor {
       w.inflight.set(id, entry);
       scope.signal.addEventListener("abort", onAbort, { once: true });
       this.send(w, { ...req, type: "request", id });
+    });
+  }
+
+  /** The root-owned pre-commit store; the worker receives a value only after activation. */
+  async secret(req: Extract<MachineRequest, { op: "secret" }>, scope: RequestScope): Promise<MachineReplies["secret"]> {
+    if (!req.agent) throw new RunnerError("bad_request", "Secrets belong to an agent");
+    if (this.closed) throw new RunnerError("internal", STOPPING);
+    const w = this.entry(this.opts.user(req.agent));
+    if (req.action === "discard" || req.action === "keypair")
+      return handleSecret(this.secretRoot, req.agent, this.opts.home, req, { storageOnly: true });
+    if (req.action === "remove") {
+      if (!req.throughOrder && !req.requestIds?.length)
+        throw new RunnerError("bad_request", "Secret removal needs a delivery generation cutoff");
+      await this.ready(w, scope.signal);
+      // The server does not mark a removal committed unless the live worker cleared it.
+      await this.run(req, scope);
+      return handleSecret(this.secretRoot, req.agent, this.opts.home, req, { storageOnly: true });
+    }
+    const result = await handleSecret(this.secretRoot, req.agent, this.opts.home, req, { storageOnly: true });
+    if (req.action !== "activate" || result.superseded) return result;
+    await this.ready(w, scope.signal);
+    const secret = await activatedSecret(this.secretRoot, req.agent, req.requestId);
+    if (!secret) throw new RunnerError("not_found", "This request has no activated secret");
+    return this.install(w, req.agent, secret, scope.signal);
+  }
+
+  private install(
+    w: Worker,
+    agent: AgentScope,
+    secret: ActivatedSecret,
+    signal: AbortSignal,
+  ): Promise<MachineReplies["secret"]> {
+    const installId = String(++this.seq);
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const finish = (value: MachineReplies["secret"] | RunnerError) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+        w.installs.delete(installId);
+        if (value instanceof RunnerError) reject(value);
+        else resolve(value);
+      };
+      const abort = () => finish(new RunnerError("internal", "Canceled"));
+      const timer = setTimeout(
+        () => finish(new RunnerError("internal", "The agent's worker did not install the secret in time")),
+        SECRET_INSTALL_MS,
+      );
+      w.installs.set(installId, { settle: finish });
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) return abort();
+      this.write(w, { type: "secret.install", installId, agent, secret });
     });
   }
 
@@ -444,7 +549,7 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", STOPPING));
+      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
       this.endSession(w, STOPPING);
       this.endShows(w, STOPPING);
@@ -474,6 +579,7 @@ export class Supervisor {
         timer: null,
         waiters: new Set(),
         inflight: new Map(),
+        installs: new Map(),
         shows: new Map(),
         browserLeaseAt: 0,
         enters: [],
@@ -574,7 +680,10 @@ export class Supervisor {
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
-    this.endSession(w, "The agent's worker stopped on this computer. Try again.");
+    this.endSession(
+      w,
+      "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
+    );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
@@ -583,9 +692,13 @@ export class Supervisor {
     if (w.waiters.size > 0 || [...this.owners.values()].some((o) => o.agentId === w.user.id)) this.launch(w);
   }
 
-  /** Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. */
+  /**
+   * Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. `dropped`: the
+   * server waits for the computer and resumes an agent's turn instead of failing it.
+   */
   private endSession(w: Worker, message: string) {
-    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("internal", message) });
+    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("dropped", message) });
+    for (const install of [...w.installs.values()]) install.settle(new RunnerError("internal", message));
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
   }
 
@@ -614,7 +727,13 @@ export class Supervisor {
   }
 
   private welcome(w: Worker) {
-    this.send(w, { type: "welcome", machineId: w.user.id, name: w.user.user, heartbeatMs: HEARTBEAT_MS });
+    this.send(w, {
+      type: "welcome",
+      machineId: w.user.id,
+      name: w.user.user,
+      heartbeatMs: HEARTBEAT_MS,
+      ...(this.mcpOnce ? { mcpOnce: true } : {}),
+    });
     const handoff = this.handoffs.get(w.user.id);
     if (handoff) this.send(w, handoff);
   }
@@ -794,6 +913,25 @@ export class Supervisor {
       }
       return;
     }
+    if (f?.type === "secret.installed") {
+      const id = typeof f.installId === "string" ? f.installId : "";
+      const install = w.installs.get(id);
+      if (!install) return;
+      const error = f.error as { code?: unknown; message?: unknown } | undefined;
+      if (error)
+        install.settle(
+          new RunnerError(
+            typeof error.code === "string" ? (error.code as MachineErrorCode) : "internal",
+            typeof error.message === "string" ? error.message.slice(0, 500) : "Secret installation failed",
+          ),
+        );
+      else
+        install.settle({
+          ...(typeof f.size === "number" ? { size: f.size } : {}),
+          ...(f.superseded === true ? { superseded: true } : {}),
+        });
+      return;
+    }
     if (!w.ready) return;
     if (f?.type === "browser.desktop") {
       w.browserLeaseAt = (this.opts.now ?? Date.now)();
@@ -962,6 +1100,93 @@ export function workerHome(base: string, user: AgentUser): string {
   return dir;
 }
 
+/**
+ * Pre-broker keys were readable by the agent UID. They cannot be trusted for
+ * a later committed delivery, even if copied into a root directory: the
+ * agent may already have copied or changed them. Retire them before the new
+ * worker starts. Active values in store.json remain available to the agent.
+ * Linux /proc/self/fd pins both agent-owned parent directories, so a symlink
+ * swap cannot redirect root's rename into another tree.
+ */
+export function retireLegacyPending(
+  base: string,
+  home: string,
+  user: AgentUser,
+  afterRetire?: (name: string, attempt: number) => void,
+): void {
+  if (process.platform !== "linux" || process.getuid?.() !== 0)
+    throw new RunnerError("internal", "Retiring legacy secrets requires root on Linux");
+  const baseStat = lstatSync(base);
+  if (!baseStat.isDirectory() || baseStat.uid !== 0 || baseStat.mode & 0o022)
+    throw new RunnerError("internal", "The worker home base is not owned securely");
+  const quarantine = path.join(base, ".legacy-secret-quarantine");
+  mkdirSync(quarantine, { mode: 0o700, recursive: true });
+  const qst = lstatSync(quarantine);
+  if (!qst.isDirectory() || qst.uid !== 0 || qst.mode & 0o077)
+    throw new RunnerError("internal", "The legacy secret quarantine is not owned securely");
+  const flags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
+  let secretsFd: number;
+  try {
+    secretsFd = openSync(path.join(home, "secrets"), flags);
+  } catch (err) {
+    if (errnoCode(err) === "ENOENT") return;
+    throw err;
+  }
+  try {
+    const id8 = user.user.slice(3);
+    if (!/^[a-z0-9]{8}$/.test(id8)) throw new RunnerError("internal", "Invalid agent user");
+    let agentFd: number;
+    try {
+      agentFd = openSync(`/proc/self/fd/${secretsFd}/${id8}`, flags);
+    } catch (err) {
+      if (errnoCode(err) === "ENOENT") return;
+      throw err;
+    }
+    try {
+      for (const name of ["keys", "staged"]) {
+        // An agent that continually recreates this directory makes startup
+        // fail closed. No new broker key is ever written under this home.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const source = `/proc/self/fd/${agentFd}/${name}`;
+          const retired = path.join(quarantine, randomUUID());
+          try {
+            renameSync(source, retired);
+          } catch (err) {
+            if (errnoCode(err) === "ENOENT") break;
+            throw err;
+          }
+          afterRetire?.(name, attempt);
+          const retiredFd = openSync(retired, flags);
+          try {
+            for (const entry of readdirSync(retired)) {
+              if (entry === "." || entry === "..") continue;
+              const file = `/proc/self/fd/${retiredFd}/${entry}`;
+              const item = lstatSync(file);
+              if (item.isDirectory()) throw new RunnerError("internal", "Legacy pending secrets contain a directory");
+              unlinkSync(file);
+            }
+          } finally {
+            closeSync(retiredFd);
+          }
+          rmdirSync(retired);
+          if (attempt === 2) {
+            try {
+              lstatSync(source);
+              throw new RunnerError("internal", "Legacy pending secrets were recreated during startup");
+            } catch (err) {
+              if (errnoCode(err) !== "ENOENT") throw err;
+            }
+          }
+        }
+      }
+    } finally {
+      closeSync(agentFd);
+    }
+  } finally {
+    closeSync(secretsFd);
+  }
+}
+
 /** `agentes-runner worker` for one agent through its launcher (its user, its slice, only its environment). */
 export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean) {
   const l = systemLauncher(user, systemd);
@@ -975,7 +1200,10 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
 /** Starts each agent's worker as a process (`runner`: how this runner starts itself). */
 export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): StartWorker {
   return (user) => {
-    const { argv, cwd, env } = workerCommand(user, runner, workerHome(base, user));
+    ensureBrowserBindPolicy(user, runner);
+    const home = workerHome(base, user);
+    retireLegacyPending(base, home, user);
+    const { argv, cwd, env } = workerCommand(user, runner, home);
     const [file = "", ...args] = argv;
     const child = spawn(file, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     const events = child as unknown as EventEmitter;

@@ -18,6 +18,7 @@ import {
   grantScopes,
   listAgentSecrets,
   listMachines,
+  MachineDroppedError,
   type MachineHub,
   MachineOfflineError,
   MachineRequestError,
@@ -26,13 +27,16 @@ import {
   receiveMachineUpload,
   removeAgentSecret,
   renameMachine,
+  SERVER_STOP_TASK_GRACE_MS,
   type SecretRequestView,
   secretSite,
   setAgentComputerTarget,
+  TASK_OFFLINE_GRACE_MS,
   type ToolContext,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { fakeRunner, type FakeRunnerOptions, pairMachine, RUNNER } from "./machine-fixtures";
+import { type FakeRunnerOptions, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { until } from "./stream-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -163,6 +167,221 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(runner.closed()).toMatchObject({ code: 4408 });
     const [row] = await f.db.select().from(schema.machines);
     expect(row).toMatchObject({ online: false, connectedReplica: null });
+  });
+
+  test("a silent runner is dropped two heartbeats after its last pong, as the runner drops a silent server", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-s", heartbeatMs: 100 });
+    hubs.push(hub);
+    const paired = await pair();
+    const runner = fakeRunner(hub, { dead: true });
+    await runner.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    // Gone at the second heartbeat (200 ms), not the fourth.
+    expect(await within(turn, 300)).toBeInstanceOf(MachineDroppedError);
+    expect(runner.closed()).toMatchObject({ code: 4408 });
+  });
+
+  test("a request cut by its socket closing fails as dropped (it may have run); our own stop says it is ours", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-d" });
+    hubs.push(hub);
+    const paired = await pair();
+    const exec = { op: "exec" as const, command: "make deploy", timeoutSeconds: 60, stream: false };
+    const runner = fakeRunner(hub, { exec: () => "hang" });
+    await runner.hello(paired.token);
+    const cut = hub.call(paired.machineId, exec);
+    await Bun.sleep(5);
+    await runner.disconnect();
+    const error = await within(cut);
+    expect(error).toBeInstanceOf(MachineDroppedError);
+    expect(error).toMatchObject({ serverStop: false });
+    expect((error as Error).message).toContain("may have had effects");
+    // Nothing is sent to a computer that is away: offline, in the plain words.
+    const away = await hub.call(paired.machineId, exec).catch((e: unknown) => e);
+    expect(away).toBeInstanceOf(MachineOfflineError);
+    expect(away).not.toBeInstanceOf(MachineDroppedError);
+
+    // Our own stop: the same, marked as ours; its tasks get a long backstop instead of the usual grace, and
+    // the apps hear after the usual grace that it is still away (an outage then).
+    const again = fakeRunner(hub, { exec: () => "hang" });
+    await again.hello(paired.token);
+    const stopped = hub.call(paired.machineId, exec);
+    await Bun.sleep(5);
+    await hub.stop();
+    expect(await within(stopped)).toMatchObject({ serverStop: true });
+    const jobs = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "machine.tasks_offline"));
+    await until(async () => (await jobs()).length === 3, "the stop's offline jobs");
+    const graces = (await jobs())
+      .map((j) => ({ ms: j.nextAttemptAt.getTime() - j.createdAt.getTime(), payload: j.payload }))
+      .sort((a, b) => a.ms - b.ms);
+    expect(graces[0]?.ms).toBeLessThan(TASK_OFFLINE_GRACE_MS + 5000);
+    expect(graces[1]?.ms).toBeLessThan(TASK_OFFLINE_GRACE_MS + 5000);
+    expect(graces.slice(0, 2).map((g) => g.payload)).toContainEqual({
+      machineId: paired.machineId,
+      statusOnly: true,
+    });
+    expect(graces[2]?.payload).toEqual({ machineId: paired.machineId });
+    expect(graces[2]?.ms).toBeGreaterThan(SERVER_STOP_TASK_GRACE_MS - 5000);
+  });
+
+  test("the agent's process gone mid-request (`dropped` from the runner) is a drop, in the runner's words", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    await Bun.sleep(5);
+    const req = runner.sent.find((s) => s.type === "request" && s.op === "brain.turn") as Request;
+    const message = "The agent's worker on this computer stopped while this ran.";
+    await runner.frame({ type: "result", id: req.id, ok: false, error: { code: "dropped", message } });
+    const error = await within(turn);
+    expect(error).toBeInstanceOf(MachineDroppedError);
+    expect((error as Error).message).toBe(message);
+  });
+
+  test("a hello that fails on our side closes the socket without a refusal, so the runner dials again", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    // The database is away for a moment while the runner says hello.
+    const db = f.db as unknown as Record<string, unknown>;
+    db.select = () => {
+      throw new Error("database away");
+    };
+    try {
+      await runner.hello(paired.token);
+    } finally {
+      delete db.select;
+    }
+    expect(runner.sent).toEqual([]);
+    expect(runner.closed()).toMatchObject({ code: 1011 });
+    const back = fakeRunner(hub);
+    await back.hello(paired.token);
+    expect(back.sent[0]).toMatchObject({ type: "welcome", machineId: paired.machineId });
+  });
+
+  test("an mcp.call sent again under its callId runs once: the copy waits for the first answer", async () => {
+    f = await setup({ machines: true });
+    // The first run is in this process: the copy waits on it, however long it takes.
+    const hub = createMachineHub({
+      db: f.db,
+      pubsub: f.pubsub,
+      replicaId: "replica-m",
+      rpcPollMs: 10,
+      mcpRepeatWaitMs: 5,
+    });
+    hubs.push(hub);
+    let runs = 0;
+    let finish = () => {};
+    hub.setMissionHooks({
+      mcp: async (_machineId, frame) => {
+        runs++;
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        return { ok: true, text: `posted: ${String(frame.args.text)}` };
+      },
+    });
+    const paired = await pair();
+    const call = { type: "mcp.call", callId: "call-1", taskId: "t", tool: "post_message", args: { text: "oi" } };
+    const first = fakeRunner(hub);
+    await first.hello(paired.token);
+    await first.frame(call);
+    await until(() => runs === 1, "the first run");
+    // The link drops while it runs; the runner sends the call again on its new socket.
+    const second = fakeRunner(hub);
+    await second.hello(paired.token);
+    await second.frame(call);
+    await Bun.sleep(30);
+    finish();
+    await until(() => second.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(runs).toBe(1);
+    expect(second.sent.find((s) => s.type === "mcp.result")).toEqual({
+      type: "mcp.result",
+      callId: "call-1",
+      ok: true,
+      text: "posted: oi",
+    });
+    // Later copies get the same answer at once.
+    await second.frame(call);
+    await until(() => second.sent.filter((s) => s.type === "mcp.result").length === 2, "a later copy's answer");
+    expect(runs).toBe(1);
+  });
+
+  test("a copy whose first run died with its server hears soon that it was cut off, and nothing runs again", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({
+      db: f.db,
+      pubsub: f.pubsub,
+      replicaId: "replica-c",
+      rpcPollMs: 5,
+      mcpRepeatWaitMs: 50,
+    });
+    hubs.push(hub);
+    let runs = 0;
+    hub.setMissionHooks({
+      mcp: async () => {
+        runs++;
+        return { ok: true, text: "posted" };
+      },
+    });
+    const paired = await pair();
+    // What a server that crashed mid-call leaves: the call taken, no answer.
+    await f.db
+      .insert(schema.machineMcpCalls)
+      .values({ orgId: f.org.id, machineId: paired.machineId, callId: "call-9" });
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const at = Date.now();
+    await runner.frame({ type: "mcp.call", callId: "call-9", taskId: "t", tool: "post_message", args: { text: "oi" } });
+    await until(() => runner.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(Date.now() - at).toBeLessThan(2000);
+    expect(runner.sent.find((s) => s.type === "mcp.result")).toMatchObject({
+      callId: "call-9",
+      ok: false,
+      error: { code: "bridge.cut_off", message: expect.stringContaining("it may have run in part") },
+    });
+    expect(runs).toBe(0);
+  });
+
+  test("our own stop lets a task's call in flight store its answer: the copy on the next server gets it", async () => {
+    f = await setup({ machines: true });
+    let runs = 0;
+    const mcp = async () => {
+      runs++;
+      await Bun.sleep(50);
+      return { ok: true as const, text: "posted" };
+    };
+    const old = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-old" });
+    old.setMissionHooks({ mcp });
+    const paired = await pair();
+    const call = { type: "mcp.call", callId: "call-5", taskId: "t", tool: "post_message", args: { text: "oi" } };
+    const runner = fakeRunner(old);
+    await runner.hello(paired.token);
+    await runner.frame(call);
+    await until(() => runs === 1, "the first run");
+    await old.stop();
+    await old.drain(2000);
+    const [row] = await f.db.select().from(schema.machineMcpCalls).where(eq(schema.machineMcpCalls.callId, "call-5"));
+    expect(row?.result).toEqual({ ok: true, text: "posted" });
+
+    const next = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-new", mcpRepeatWaitMs: 5 });
+    hubs.push(next);
+    next.setMissionHooks({ mcp });
+    const back = fakeRunner(next);
+    await back.hello(paired.token);
+    await back.frame(call);
+    await until(() => back.sent.some((s) => s.type === "mcp.result"), "the copy's answer");
+    expect(back.sent.find((s) => s.type === "mcp.result")).toEqual({
+      type: "mcp.result",
+      callId: "call-5",
+      ok: true,
+      text: "posted",
+    });
+    expect(runs).toBe(1);
   });
 
   test("a pong's browser traffic is stored with when it came, with or without a load (protocol 23)", async () => {
@@ -403,6 +622,7 @@ describe("hub", () => {
       machineId: paired.machineId,
       name: "Build box",
       heartbeatMs: 25_000,
+      mcpOnce: true,
     });
     const [row] = await f.db.select().from(schema.machines);
     expect(row).toMatchObject({
@@ -625,6 +845,17 @@ describe("tools on a connected machine", () => {
     const offline = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(offline).toMatchObject({ isError: true });
     expect(offline.content).toContain("The computer Build box is offline. Ask its owner to start the runner.");
+    // The workspace's own computer has no runner for anyone to start: it comes back by itself.
+    await kind("managed");
+    const away = await call(ctx, "run_code", { language: "bash", code: "ls" });
+    expect(away.content).toContain(
+      "The computer Build box isn't answering right now. It usually comes back within minutes.",
+    );
+    expect(away.content).not.toContain("runner");
+    const folder = await call(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
+    expect(folder).toMatchObject({ isError: true });
+    expect(folder.content).toContain("isn't answering right now. It usually comes back within minutes.");
+    expect(folder.content).not.toContain("runner");
   });
 
   test("commands turned off on the machine are explained", async () => {
@@ -793,13 +1024,19 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   test("a decline during staging prevents activation and leaves no live secret", async () => {
     let stagedWhilePending = false;
-    const { runner, row } = await asking({ target: "env" }, {
-      onSecretStaged: async (requestId) => {
-        const [current] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, requestId));
-        stagedWhilePending = current?.status === "pending";
-        await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, requestId);
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async (requestId) => {
+          const [current] = await f.db
+            .select()
+            .from(schema.secretRequests)
+            .where(eq(schema.secretRequests.id, requestId));
+          stagedWhilePending = current?.status === "pending";
+          await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, requestId);
+        },
       },
-    });
+    );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
     await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
@@ -813,13 +1050,17 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   });
 
   test("a request expiring during staging cannot commit delivery", async () => {
-    const { runner, row } = await asking({ target: "env" }, {
-      onSecretStaged: async (requestId) => {
-        await f.db.update(schema.secretRequests)
-          .set({ expiresAt: new Date(Date.now() - 1000) })
-          .where(eq(schema.secretRequests.id, requestId));
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async (requestId) => {
+          await f.db
+            .update(schema.secretRequests)
+            .set({ expiresAt: new Date(Date.now() - 1000) })
+            .where(eq(schema.secretRequests.id, requestId));
+        },
       },
-    });
+    );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
     await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
@@ -841,7 +1082,9 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const { runner, row } = await asking();
     expect(runner.keys.has(row.id)).toBe(true);
     await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, row.runId);
-    const [job] = await f.db.select().from(schema.outbox)
+    const [job] = await f.db
+      .select()
+      .from(schema.outbox)
       .where(eq(schema.outbox.dedupeKey, `secret.discard:${row.id}`));
     expect(job?.status).toBe("pending");
     await drainOutbox(f.db, f.handlers);
@@ -851,7 +1094,9 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   test("identical concurrent deliveries keep the winning staged box until activation", async () => {
     const gate = () => {
       let release!: () => void;
-      const promise = new Promise<void>((resolve) => { release = resolve; });
+      const promise = new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return { promise, release };
     };
     const firstStaged = gate();
@@ -862,34 +1107,50 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const firstActivationReply = gate();
     let stages = 0;
     let activations = 0;
-    const { runner, row } = await asking({ target: "env" }, {
-      onSecretStaged: async () => {
-        (stages++ === 0 ? firstStaged : secondStaged).release();
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async () => {
+          (stages++ === 0 ? firstStaged : secondStaged).release();
+        },
+        onSecretActivate: async () => {
+          if (activations++ === 0) {
+            firstActivation.release();
+            await firstActivationReply.promise;
+          }
+        },
       },
-      onSecretActivate: async () => {
-        if (activations++ === 0) {
-          firstActivation.release();
-          await firstActivationReply.promise;
-        }
-      },
-    });
+    );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
-    const waitBeforeCommit = (until: Promise<void>) => new Proxy(f.db, {
-      get(target, property, receiver) {
-        if (property === "transaction") {
-          return async (callback: Parameters<typeof f.db.transaction>[0]) => {
-            await until;
-            return target.transaction(callback);
-          };
-        }
-        return Reflect.get(target, property, receiver);
-      },
-    });
+    const waitBeforeCommit = (until: Promise<void>) =>
+      new Proxy(f.db, {
+        get(target, property, receiver) {
+          if (property === "transaction") {
+            return async (callback: Parameters<typeof f.db.transaction>[0]) => {
+              await until;
+              return target.transaction(callback);
+            };
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
     const box = await seal(view);
-    const first = deliverSecret({ ...sandbox, db: waitBeforeCommit(firstCommit.promise) }, f.owner.id, f.org.id, row.id, box);
+    const first = deliverSecret(
+      { ...sandbox, db: waitBeforeCommit(firstCommit.promise) },
+      f.owner.id,
+      f.org.id,
+      row.id,
+      box,
+    );
     await firstStaged.promise;
-    const second = deliverSecret({ ...sandbox, db: waitBeforeCommit(secondCommit.promise) }, f.owner.id, f.org.id, row.id, box);
+    const second = deliverSecret(
+      { ...sandbox, db: waitBeforeCommit(secondCommit.promise) },
+      f.owner.id,
+      f.org.id,
+      row.id,
+      box,
+    );
     try {
       await secondStaged.promise;
       firstCommit.release();
@@ -945,24 +1206,36 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     let failed = false;
     const unreadableDb = new Proxy(f.db, {
       get(target, property, receiver) {
-        if (property === "transaction") return async () => { failed = true; throw new Error("commit outcome unknown"); };
-        if (property === "select" && failed) return () => { throw new Error("database read unavailable"); };
+        if (property === "transaction")
+          return async () => {
+            failed = true;
+            throw new Error("commit outcome unknown");
+          };
+        if (property === "select" && failed)
+          return () => {
+            throw new Error("database read unavailable");
+          };
         return Reflect.get(target, property, receiver);
       },
     });
-    await expect(deliverSecret({ ...sandbox, db: unreadableDb }, f.owner.id, f.org.id, row.id, box))
-      .rejects.toThrow("commit outcome unknown");
+    await expect(deliverSecret({ ...sandbox, db: unreadableDb }, f.owner.id, f.org.id, row.id, box)).rejects.toThrow(
+      "commit outcome unknown",
+    );
     expect(runner.staged.has(row.id)).toBe(true);
     expect(runner.keys.has(row.id)).toBe(true);
 
     const pendingDb = new Proxy(f.db, {
       get(target, property, receiver) {
-        if (property === "transaction") return async () => { throw new Error("commit did not start"); };
+        if (property === "transaction")
+          return async () => {
+            throw new Error("commit did not start");
+          };
         return Reflect.get(target, property, receiver);
       },
     });
-    await expect(deliverSecret({ ...sandbox, db: pendingDb }, f.owner.id, f.org.id, row.id, box))
-      .rejects.toThrow("commit did not start");
+    await expect(deliverSecret({ ...sandbox, db: pendingDb }, f.owner.id, f.org.id, row.id, box)).rejects.toThrow(
+      "commit did not start",
+    );
     expect(runner.staged.has(row.id)).toBe(true);
     expect(runner.keys.has(row.id)).toBe(true);
 
@@ -983,11 +1256,14 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   test("a pause after staging still allows committed activation but blocks new keys", async () => {
     let pauseRunner!: ReturnType<typeof fakeRunner>;
-    const { runner, row, paired } = await asking({ target: "env" }, {
-      onSecretStaged: async () => {
-        await pauseRunner.frame({ type: "runner.state", paused: { paused: true, until: null } });
+    const { runner, row, paired } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async () => {
+          await pauseRunner.frame({ type: "runner.state", paused: { paused: true, until: null } });
+        },
       },
-    });
+    );
     pauseRunner = runner;
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -995,10 +1271,14 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(delivered.status).toBe("delivered");
     expect(runner.secrets.has(row.name)).toBe(true);
     const hub = f.machineHub as MachineHub;
-    await expect(hub.call(paired.machineId, {
-      agent: { id: f.agent.id, handle: "dev" }, op: "secret", action: "keypair",
-      requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    })).rejects.toThrow(/paused/i);
+    await expect(
+      hub.call(paired.machineId, {
+        agent: { id: f.agent.id, handle: "dev" },
+        op: "secret",
+        action: "keypair",
+        requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }),
+    ).rejects.toThrow(/paused/i);
     await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
     expect(runner.secrets.has(row.name)).toBe(false);
   });
@@ -1007,8 +1287,13 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const { row } = await asking();
     const ahead = new Date(Date.now() + 60_000);
     await f.db.insert(schema.secretRequests).values({
-      ...row, id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", toolUseId: "prior-clock-delivery", messageId: null,
-      status: "delivered", deliveredAt: ahead, removedAt: new Date(),
+      ...row,
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      toolUseId: "prior-clock-delivery",
+      messageId: null,
+      status: "delivered",
+      deliveredAt: ahead,
+      removedAt: new Date(),
     });
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -1019,37 +1304,67 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   test("a delayed older activation cannot overwrite a newer secret of the same name", async () => {
     let releaseOlder!: () => void;
     let reachedOlder!: () => void;
-    const holdOlder = new Promise<void>((resolve) => { releaseOlder = resolve; });
-    const olderReached = new Promise<void>((resolve) => { reachedOlder = resolve; });
-    let olderId = "";
-    const { runner, row: older, paired } = await asking({ target: "env" }, {
-      onSecretActivate: async (id) => {
-        if (id === olderId) {
-          reachedOlder();
-          await holdOlder;
-        }
-      },
+    const holdOlder = new Promise<void>((resolve) => {
+      releaseOlder = resolve;
     });
+    const olderReached = new Promise<void>((resolve) => {
+      reachedOlder = resolve;
+    });
+    let olderId = "";
+    const {
+      runner,
+      row: older,
+      paired,
+    } = await asking(
+      { target: "env" },
+      {
+        onSecretActivate: async (id) => {
+          if (id === olderId) {
+            reachedOlder();
+            await holdOlder;
+          }
+        },
+      },
+    );
     olderId = older.id;
     const newerId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
     const hub = f.machineHub as MachineHub;
-    const key = await hub.call(paired.machineId, {
-      agent: { id: f.agent.id, handle: "dev" }, op: "secret", action: "keypair", requestId: newerId,
-    }) as { publicKey: string };
+    const key = (await hub.call(paired.machineId, {
+      agent: { id: f.agent.id, handle: "dev" },
+      op: "secret",
+      action: "keypair",
+      requestId: newerId,
+    })) as { publicKey: string };
     await f.db.insert(schema.secretRequests).values({
-      ...older, id: newerId, toolUseId: "second-secret", messageId: null,
-      publicKey: key.publicKey, status: "pending", deliveredAt: null, deliveredSize: null, removedAt: null,
+      ...older,
+      id: newerId,
+      toolUseId: "second-secret",
+      messageId: null,
+      publicKey: key.publicKey,
+      status: "pending",
+      deliveredAt: null,
+      deliveredSize: null,
+      removedAt: null,
     });
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
-    const aad = (id: string) => secretAad({ requestId: id, orgId: f.org.id, name: "NPM_TOKEN", target: { kind: "env" } });
+    const aad = (id: string) =>
+      secretAad({ requestId: id, orgId: f.org.id, name: "NPM_TOKEN", target: { kind: "env" } });
     const olderValue = "older-secret-value";
     const newerValue = "newer-secret-value";
     const olderDelivery = deliverSecret(
-      sandbox, f.owner.id, f.org.id, older.id, await sealSecret(older.publicKey, olderValue, aad(older.id)),
+      sandbox,
+      f.owner.id,
+      f.org.id,
+      older.id,
+      await sealSecret(older.publicKey, olderValue, aad(older.id)),
     );
     await olderReached;
     const newerView = await deliverSecret(
-      sandbox, f.owner.id, f.org.id, newerId, await sealSecret(key.publicKey, newerValue, aad(newerId)),
+      sandbox,
+      f.owner.id,
+      f.org.id,
+      newerId,
+      await sealSecret(key.publicKey, newerValue, aad(newerId)),
     );
     expect(newerView.removed).toBe(false);
     expect(runner.secrets.get("NPM_TOKEN")).toBe(newerValue);
@@ -1064,14 +1379,24 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   test("removing a delivered request before activation cancels its runner value and resumes absent", async () => {
     let release!: () => void;
     let reached!: () => void;
-    const hold = new Promise<void>((resolve) => { release = resolve; });
-    const atActivation = new Promise<void>((resolve) => { reached = resolve; });
-    let targetId = "";
-    const { runner, row } = await asking({ target: "env" }, {
-      onSecretActivate: async (id) => {
-        if (id === targetId) { reached(); await hold; }
-      },
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    const atActivation = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let targetId = "";
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretActivate: async (id) => {
+          if (id === targetId) {
+            reached();
+            await hold;
+          }
+        },
+      },
+    );
     targetId = row.id;
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -1082,22 +1407,34 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const result = await delivery;
     expect(result.removed).toBe(true);
     expect(runner.secrets.has(row.name)).toBe(false);
-    const [resume] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey,
-      `agent_run.execute:${row.runId}:secret:${row.id}`));
+    const [resume] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `agent_run.execute:${row.runId}:secret:${row.id}`));
     expect(resume).toBeDefined();
   });
 
   test("removal after runner activation wins before a delayed DB finalization", async () => {
     let release!: () => void;
     let reached!: () => void;
-    const hold = new Promise<void>((resolve) => { release = resolve; });
-    const activated = new Promise<void>((resolve) => { reached = resolve; });
-    let targetId = "";
-    const { runner, row } = await asking({ target: "env" }, {
-      onSecretActivated: async (id) => {
-        if (id === targetId) { reached(); await hold; }
-      },
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    const activated = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let targetId = "";
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretActivated: async (id) => {
+          if (id === targetId) {
+            reached();
+            await hold;
+          }
+        },
+      },
+    );
     targetId = row.id;
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -1108,8 +1445,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     release();
     expect((await delivery).removed).toBe(true);
     expect(runner.secrets.has(row.name)).toBe(false);
-    const [resume] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey,
-      `agent_run.execute:${row.runId}:secret:${row.id}`));
+    const [resume] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `agent_run.execute:${row.runId}:secret:${row.id}`));
     expect(resume).toBeDefined();
   });
 
@@ -1151,10 +1490,16 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const [delivered] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
     if (!delivered) throw new Error("missing delivered request");
     await f.db.insert(schema.secretRequests).values({
-      ...delivered, id: "dddddddd-dddd-dddd-dddd-dddddddddddd", toolUseId: "mixed-command-secret",
-      messageId: null, site: null, deliveredAt: new Date((delivered.deliveredAt?.getTime() ?? 0) + 1),
+      ...delivered,
+      id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      toolUseId: "mixed-command-secret",
+      messageId: null,
+      site: null,
+      deliveredAt: new Date((delivered.deliveredAt?.getTime() ?? 0) + 1),
     });
-    await f.db.insert(schema.orgSandboxSettings).values({ orgId: f.org.id, enabled: false })
+    await f.db
+      .insert(schema.orgSandboxSettings)
+      .values({ orgId: f.org.id, enabled: false })
       .onConflictDoUpdate({ target: schema.orgSandboxSettings.orgId, set: { enabled: false } });
     await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
     expect(runner.secrets.has(row.name)).toBe(false);

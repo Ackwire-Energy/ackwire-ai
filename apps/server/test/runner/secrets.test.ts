@@ -4,6 +4,7 @@ import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { type SecretTarget, sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { describeRequest, handleRequest, type RequestScope } from "../../runner/handlers";
+import { handleSecret } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -118,7 +119,13 @@ test("replacing a file secret removes its old path before it becomes untracked",
   const oldFile = path.join(ws, "dev-01a142cb", ".npmrc");
   expect(existsSync(oldFile)).toBe(true);
 
-  const second = await give(dev, "req-0021-bbbb", "NPM_TOKEN", { kind: "file", path: "config/token" }, "new-secret-value");
+  const second = await give(
+    dev,
+    "req-0021-bbbb",
+    "NPM_TOKEN",
+    { kind: "file", path: "config/token" },
+    "new-secret-value",
+  );
   await second.commit();
   const newFile = path.join(ws, "dev-01a142cb", "config/token");
   const staleRead = (await call({ agent: dev, op: "read", path: ".npmrc", maxBytes: 1000 })) as {
@@ -127,7 +134,9 @@ test("replacing a file secret removes its old path before it becomes untracked",
   expect(staleRead.base64 === null).toBe(true);
   expect(existsSync(oldFile)).toBe(false);
   expect(readFileSync(newFile, "utf8")).toBe("new-secret-value");
-  expect(await errorCode(() => call({ agent: dev, op: "read", path: "config/token", maxBytes: 1000 }))).toBe("bad_request");
+  expect(await errorCode(() => call({ agent: dev, op: "read", path: "config/token", maxBytes: 1000 }))).toBe(
+    "bad_request",
+  );
 
   await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN" });
   expect(existsSync(newFile)).toBe(false);
@@ -135,7 +144,9 @@ test("replacing a file secret removes its old path before it becomes untracked",
 
 test("moving a file secret to the environment removes its old plaintext file", async () => {
   const { ws, call, give } = setup();
-  await (await give(dev, "req-0022-cccc", "API_KEY", { kind: "file", path: "private/key" }, "old-secret-value")).commit();
+  await (
+    await give(dev, "req-0022-cccc", "API_KEY", { kind: "file", path: "private/key" }, "old-secret-value")
+  ).commit();
   const oldFile = path.join(ws, "dev-01a142cb", "private/key");
   expect(existsSync(oldFile)).toBe(true);
 
@@ -199,13 +210,39 @@ test("a removed newer secret keeps an older delayed activation superseded", asyn
   expect(env.stdout.trim()).toBe("[]");
 });
 
+test("a delayed broker install cannot restore a secret after its request was removed", async () => {
+  const { ws, home, call, give } = setup();
+  const requestId = "req-0041-aaaa";
+  const name = "API_KEY";
+  const sent = await give(dev, requestId, name, { kind: "env" }, "removed-value");
+  await sent.commit();
+  await call({ agent: dev, op: "secret", action: "remove", name, throughOrder: sent.order });
+  const result = await handleSecret(path.join(home, "secrets"), dev, ws, {
+    action: "install",
+    requestId,
+    name,
+    target: { kind: "env" },
+    value: "removed-value",
+    order: sent.order,
+  });
+  expect(result).toEqual({ superseded: true });
+  expect(((await call({ agent: dev, ...exec('echo "[$API_KEY]"') })) as { stdout: string }).stdout.trim()).toBe("[]");
+});
+
 test("removal of an old request leaves a newer value in place", async () => {
   const { call, give } = setup();
   const older = await give(dev, "req-0028-aaaa", "NPM_TOKEN", { kind: "env" }, "old-value");
   await older.commit();
   const newer = await give(dev, "req-0029-bbbb", "NPM_TOKEN", { kind: "env" }, "new-value");
   await newer.commit();
-  await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN", requestIds: ["req-0028-aaaa"], throughOrder: older.order });
+  await call({
+    agent: dev,
+    op: "secret",
+    action: "remove",
+    name: "NPM_TOKEN",
+    requestIds: ["req-0028-aaaa"],
+    throughOrder: older.order,
+  });
   const env = (await call({ agent: dev, ...exec('echo "$NPM_TOKEN"') })) as { stdout: string };
   expect(env.stdout.trim()).toBe("[secret:NPM_TOKEN]");
   expect(await newer.activate()).toEqual({ size: "new-value".length });
@@ -223,8 +260,14 @@ test("removing a newer delivery clears retained older file guards through its ge
   writeFileSync(storePath, JSON.stringify({ secrets: [oldEntry, ...current.secrets] }));
   const oldPath = path.join(ws, "dev-01a142cb", ".npmrc");
   writeFileSync(oldPath, "old-value");
-  await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN",
-    requestIds: ["req-0031-bbbb"], throughOrder: newer.order });
+  await call({
+    agent: dev,
+    op: "secret",
+    action: "remove",
+    name: "NPM_TOKEN",
+    requestIds: ["req-0031-bbbb"],
+    throughOrder: newer.order,
+  });
   const store = JSON.parse(readFileSync(storePath, "utf8")) as { secrets: unknown[] };
   expect(store.secrets).toEqual([]);
   expect(existsSync(oldPath)).toBe(false);

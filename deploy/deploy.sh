@@ -7,12 +7,16 @@
 #
 # The app restarts in place: requests fail for a few seconds while the new container boots, and up to
 # about 25 s more while agent runs finish (they get 20 s, then resume in the new container). A version
-# that never gets healthy keeps the app down for about a minute more, until the rollback.
+# that never gets healthy keeps the app down for up to 150 s more, until the rollback.
 #
 # Setup: .env sets AGENTES_IMAGE=agentes:current, the tag this script moves (with the backup profile,
 # AGENTES_BACKUP_IMAGE=agentes-backup:current too), and RUN_MIGRATIONS_ON_BOOT=false: this script
 # migrates on every deploy, a restored dump included, and after a rollback the previous version runs
-# on a database the newer one may have migrated, which a boot that migrates refuses. For the workflow,
+# on a database the newer one may have migrated, which a boot that migrates refuses. With
+# MACHINE_PROVISIONING=external (agentes.chat Cloud), uploaded files must not live on this server's
+# disk alone, so the script refuses to deploy without S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and
+# S3_SECRET_ACCESS_KEY. Set them before the first upload: files already on the disk are not moved to
+# the bucket, and the app stops finding them once it is set. For the workflow,
 # the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
@@ -56,6 +60,16 @@ main() {
     echo "deploy: .env needs AGENTES_IMAGE=agentes:current and RUN_MIGRATIONS_ON_BOOT=false (top of deploy/deploy.sh)" >&2
     false
   fi
+  if grep -Eq "^MACHINE_PROVISIONING=[\"']?external([\"'[:space:]#]|$)" .env; then
+    local key missing=""
+    for key in S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
+      grep -Eq "^${key}=[\"']?[^\"'[:space:]#]" .env || missing+=" $key"
+    done
+    if [[ -n $missing ]]; then
+      echo "deploy: .env sets MACHINE_PROVISIONING=external, so files go to the S3_* bucket, and it lacks${missing} (top of deploy/deploy.sh). Files already on this server's disk are not moved: once the bucket is set, the app stops finding them." >&2
+      false
+    fi
+  fi
   echo "deploy: ${target:0:7}"
   if [[ -n ${DEPLOY_IMAGE:-} ]]; then
     docker pull --quiet "$DEPLOY_IMAGE"
@@ -67,20 +81,34 @@ main() {
     docker build --quiet --tag agentes-backup:current deploy/backup
   fi
 
+  # A dump in progress (the backup service's pg_dump) holds every table until it ends: a migration that
+  # changes one would wait for it, and the running app's requests to that table would wait behind it.
+  local waited=0
+  while [[ $(docker compose exec -T postgres psql -U agentes -d agentes -tAc \
+    "select 1 from pg_stat_activity where application_name = 'pg_dump' and datname = current_database() limit 1" \
+    2>/dev/null) == 1 ]]; do
+    if ((waited >= 300)); then
+      echo "deploy: a dump of the database is still running after 5 minutes, deploy again once it ends" >&2
+      false
+    fi
+    sleep 10
+    waited=$((waited + 10))
+  done
   # Before the swap, so a migration that fails leaves the running app serving.
   AGENTES_IMAGE=agentes:next docker compose run --rm agentes migrate
   local current next
   current=$(docker image inspect --format '{{.Id}}' agentes:current 2>/dev/null || true)
   next=$(docker image inspect --format '{{.Id}}' agentes:next)
   docker tag agentes:next agentes:current
-  if ! docker compose up --detach --wait --wait-timeout 60; then
+  # Past the image's health check start period (120 s, Dockerfile): a slow boot isn't a broken version.
+  if ! docker compose up --detach --wait --wait-timeout 150; then
     docker compose logs --no-color --tail 50 agentes >&2 || true
     echo "deploy: ${target:0:7} is not healthy, going back to ${previous:0:7}" >&2
     git checkout --quiet --detach "$previous"
     if [[ -n $current ]]; then
       docker tag "$current" agentes:current
     fi
-    docker compose up --detach --wait --wait-timeout 60 || echo "deploy: the rollback is not healthy either" >&2
+    docker compose up --detach --wait --wait-timeout 150 || echo "deploy: the rollback is not healthy either" >&2
     return 1
   fi
   trap - ERR

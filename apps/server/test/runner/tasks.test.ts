@@ -285,6 +285,50 @@ test.skipIf(!posix)(
 );
 
 test.skipIf(!posix)(
+  "a SIGTERM from outside (the system shutting down) ends a task interrupted, not canceled; one aimed at the command alone, failed",
+  async () => {
+    const { tasks, send, done, home } = setup();
+    await tasks.init();
+    tasks.attach(send);
+    const childPid = async (taskId: string) => {
+      const file = path.join(home, "tasks", taskId, "child.pid");
+      await waitFor(() => existsSync(file) && readFileSync(file, "utf8").trim() !== "");
+      return Number(readFileSync(file, "utf8"));
+    };
+    // The wrapper gets it (systemd stops the agent's scope).
+    const { pid } = await tasks.start(AGENT, { taskId: id(11), executor: "shell", command: "sleep 30" });
+    groups.push(await childPid(id(11)));
+    process.kill(pid, "SIGTERM");
+    await waitFor(() => Boolean(done(id(11))), 8000);
+    expect(done(id(11))).toMatchObject({ interrupted: true, exitCode: null });
+    expect(done(id(11))?.canceled).toBeUndefined();
+
+    // The command gets it first, the wrapper a moment later: the scope signals each of its processes.
+    const second = await tasks.start(AGENT, { taskId: id(12), executor: "shell", command: "sleep 30" });
+    process.kill(-(await childPid(id(12))), "SIGTERM");
+    await Bun.sleep(200);
+    process.kill(second.pid, "SIGTERM");
+    await waitFor(() => Boolean(done(id(12))), 8000);
+    expect(done(id(12))).toMatchObject({ interrupted: true, exitCode: null, signal: "SIGTERM" });
+
+    // Only the command gets it (a person's `kill`, the agent's own `pkill`): it failed by that signal, it was
+    // never interrupted, and nothing resumes it.
+    await tasks.start(AGENT, { taskId: id(13), executor: "shell", command: "sleep 30" });
+    process.kill(await childPid(id(13)), "SIGTERM");
+    await waitFor(() => Boolean(done(id(13))), 8000);
+    expect(done(id(13))).toMatchObject({ exitCode: null, signal: "SIGTERM" });
+    expect(done(id(13))?.interrupted).toBeUndefined();
+    expect(done(id(13))?.canceled).toBeUndefined();
+    expect(tasks.list()).toMatchObject([
+      { taskId: id(11), status: "interrupted" },
+      { taskId: id(12), status: "interrupted" },
+      { taskId: id(13), status: "done" },
+    ]);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
   "Claude Code: the prompt goes through stdin, its session is resumed when it exists, secrets are redacted",
   async () => {
     const bin = tempDir("bin-");

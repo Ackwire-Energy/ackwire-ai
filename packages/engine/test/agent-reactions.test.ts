@@ -142,10 +142,12 @@ test("reaction reads and deletes require access to the message's channel", async
     .values({ orgId: f.org.id, name: "reaction-private", visibility: "private", createdByUserId: f.owner.id })
     .returning();
   if (!privateChannel) throw new Error("no private channel");
-  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: privateChannel.id, userId: f.owner.id });
-  const message = await postPersonMessage(
-    { db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, privateChannel.id, { body: "private note" },
-  );
+  await f.db
+    .insert(schema.channelMembers)
+    .values({ orgId: f.org.id, channelId: privateChannel.id, userId: f.owner.id });
+  const message = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, privateChannel.id, {
+    body: "private note",
+  });
   await addReaction(f.db, f.owner.id, f.org.id, message.id, "🎉");
   expect(await listMessageReactions(f.db, f.owner.id, f.org.id, message.id)).toHaveLength(1);
   await expect(listMessageReactions(f.db, outsider.id, f.org.id, message.id)).rejects.toBeInstanceOf(ForbiddenError);

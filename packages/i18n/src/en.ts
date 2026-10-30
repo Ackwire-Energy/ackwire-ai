@@ -948,9 +948,9 @@ export const en: Translations = {
     unreadDivider: "New",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Seen",
-    offline: "No internet. Whatever you send goes out on its own when it's back.",
+    offline: "No connection. Whatever you send goes out on its own when it's back.",
     backOnline: "Connected again",
-    sendingOffline: "goes out when the internet is back",
+    sendingOffline: "goes out when the connection is back",
     endOfReply: "End of reply",
     mentionSuggestions: "Mention suggestions",
   },
@@ -2149,7 +2149,7 @@ export const en: Translations = {
         provider_error: "The model provider returned an error: {{detail}}",
         provider_unavailable: "The model provider didn't answer: {{detail}}",
         canceled: "Someone stopped the task.",
-        interrupted: "Interrupted by a server update.",
+        interrupted: "Interrupted by a server restart.",
         missing_credential: "The workspace has no {{provider}} key.",
         credential_revoked: "This agent's key was revoked.",
         credential_wrong_provider: "The model is from {{modelProvider}}, but the key is from {{keyProvider}}.",
@@ -3295,7 +3295,7 @@ export const en: Translations = {
       credential_revoked: "The API key was revoked",
       credential_wrong_provider: "The API key is from another provider",
       agent_archived: "The agent was archived",
-      interrupted: "Interrupted by an update",
+      interrupted: "Interrupted by a server restart",
       no_ai: "The agent has no AI connected",
       org_paused: "Didn't run: the workspace's agents were paused",
       org_suspended: "Didn't run: the workspace was unavailable",
@@ -3653,8 +3653,14 @@ export const en: Translations = {
       more_other: "+{{count}} edited items",
     },
     notice: {
-      machine_offline_one: "{{computer}} went offline: “{{title}}” stopped until it's back. Nothing is lost.",
-      machine_offline_other: "{{computer}} went offline: {{count}} tasks stopped until it's back. Nothing is lost.",
+      machine_offline_one:
+        "{{computer}} went offline: “{{title}}” keeps running there if only the connection dropped. If the computer restarted, it stopped and won't resume by itself.",
+      machine_offline_other:
+        "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped. If the computer restarted, they stopped and won't resume by themselves.",
+      machine_offline_resumes_one:
+        "{{computer}} went offline: “{{title}}” keeps running there if only the connection dropped, and resumes where it stopped if the computer restarted.",
+      machine_offline_resumes_other:
+        "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped",
       machine_task_resume_waits: "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready",
       machine_task_done: "“{{title}}” finished in {{span}} on {{computer}}",
@@ -7960,7 +7966,7 @@ export const en: Translations = {
         updated: "Memory updated: {{text}}",
         remembered: "Memory updated: {{text}}",
       },
-      interrupted: "Interrupted by a server update. Ask again to continue.",
+      interrupted: "Interrupted by a server restart. Ask again to continue.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
@@ -8392,7 +8398,6 @@ export const en: Translations = {
       noSite: "Before opening a page",
     },
     inCard: {
-      expandHint: "Click to expand",
       scrollHint: "Scrolling the page · Esc to leave",
       targetMarked: "Marked field",
       targetNone: "Click a field",
@@ -8413,7 +8418,6 @@ export const en: Translations = {
       subOther: "{{person}} is in control · you're watching",
       subReconnect: "Reconnecting… {{name}} waits 2 min",
       reconnectHelp: "If you leave, {{name}} waits 2 min.",
-      expand: "Watch live",
       collapse: "Collapse",
       takeover: "Take over",
       stop: "Stop",

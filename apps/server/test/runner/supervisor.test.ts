@@ -1,9 +1,19 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
@@ -14,9 +24,11 @@ import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
 import type { FetchLike } from "../../runner/push";
+import { agentSecrets } from "../../runner/secrets";
 import { RelayCount } from "../../runner/streams";
 import {
   BROWSER_LEASE_MS,
+  retireLegacyPending,
   Supervisor,
   type SupervisorOptions,
   WORKER_TASKS_FILE,
@@ -235,6 +247,33 @@ const browserOpen = (
   ...(desktop ? { desktop } : {}),
 });
 const BROWSER_REFUSED = "No browser command of this agent on its desktop is running";
+
+test("system boot guards ports and prepares every persisted UID before restoring a worker", () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({
+      "task-ana-0001": { agentId: ANA.id, startedAt: new Date().toISOString() },
+    }),
+  );
+  const order: string[] = [];
+  const t = setup(
+    {
+      guard: { start: () => order.push("guard"), stop: () => {} },
+      prepareExisting: (users) => {
+        expect(users.map((u) => u.uid)).toEqual([21000, 21001]);
+        order.push("policy");
+      },
+      start: (user) => {
+        order.push("worker");
+        return new FakeWorker(user);
+      },
+    },
+    home,
+  );
+  t.sup.boot();
+  expect(order).toEqual(["guard", "policy", "worker"]);
+});
 
 test("the computer's own ops stay in the supervisor; an agent's go to its worker, started on its first request", async () => {
   const t = setup();
@@ -758,7 +797,8 @@ test("a worker that stops fails what it ran and starts again with a backoff", as
   t.last(ANA.id).hello();
   await requestOn(t.last(ANA.id));
   t.last(ANA.id).crash(1);
-  expect(await errorCode(() => first)).toBe("internal");
+  // `dropped`: the server waits for the computer and sends an agent's cut turn again, instead of failing it.
+  expect(await errorCode(() => first)).toBe("dropped");
   await waitFor(() => t.logs.some((l) => l === "[ag-a1b2c3d4] stopped (exit 1)"));
   // Nothing waits for it and it has no task to watch: it stays stopped.
   await sleep(50);
@@ -812,7 +852,7 @@ test("worker sessions follow the server's: they end when it drops and are welcom
 
   // The server's socket drops: so does the worker's session, and what it ran fails.
   t.sup.detach();
-  expect(await errorCode(() => run)).toBe("internal");
+  expect(await errorCode(() => run)).toBe("dropped");
   expect(ana.of("worker.close")).toHaveLength(1);
   // Its next session says hello: it gets its state, but no welcome while the server is away.
   const before = ana.got.length;
@@ -821,9 +861,13 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   await sleep(20);
   expect(ana.got.slice(before).map((f) => f.type)).toEqual(["worker.state"]);
 
-  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello.
+  // Bia's turn opens while her worker isn't running: her worker gets it when it says hello. This server runs
+  // each `mcp.call` once (its welcome says so), and so the workers' welcome says too.
+  t.sup.mcp.attach(() => {}, { mcpOnce: true });
   t.sup.attach();
   await waitFor(() => ana.of("welcome").length === 2);
+  expect(ana.of("welcome")[0]).not.toHaveProperty("mcpOnce");
+  expect(ana.of("welcome")[1]).toMatchObject({ mcpOnce: true });
   t.sup.handoff({ ...handoff, agentId: BIA.id });
   const bread = handleRequest(t.ctx, { op: "read", path: "x", maxBytes: 1, agent: BIA }, scope().scope);
   await waitFor(() => t.of(BIA.id).length === 1);
@@ -1081,7 +1125,7 @@ test("a worker's word that its Chrome is in use on the desktop holds a while; it
   ana.send({ type: "browser.desktop" });
   await waitFor(() => t.sup.onDesktopInUse(ANA.id));
   ana.crash();
-  expect(await errorCode(() => run)).toBe("internal");
+  expect(await errorCode(() => run)).toBe("dropped");
   expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
 });
 
@@ -1913,6 +1957,120 @@ test.if(posix)("a worker's home: its agent's own, in a folder nobody else can li
   expect(statSync(dir).uid).toBe(me.uid);
   expect(workerHome(base, me)).toBe(dir);
 });
+
+test.if(posix)(
+  "system broker keeps pending material out of the worker and installs only after activation",
+  async () => {
+    const t = realWorkers();
+    t.sup.boot();
+    t.sup.attach();
+    const requestId = "broker-0001-aaaa";
+    const name = "BROKER_TEST_KEY";
+    const target = { kind: "env" as const };
+    const value = "broker-secret-value";
+    const key = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId }, scope().scope);
+    const aad = secretAad({ requestId, orgId: "org-1", name, target });
+    const box = await sealSecret(key.publicKey as string, value, aad);
+    expect(
+      await t.sup.secret(
+        { op: "secret", agent: ANA, action: "deliver", requestId, name, target, aad, box },
+        scope().scope,
+      ),
+    ).toEqual({ size: value.length });
+    expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(true);
+    expect(existsSync(path.join(t.ownHome, "secrets", "a1b2c3d4", "keys", requestId))).toBe(false);
+    expect(await agentSecrets(path.join(t.ownHome, "secrets"), ANA)).toBeNull();
+    const order = `2026-10-29T00:00:00.000Z|${requestId}`;
+    expect(
+      await t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope),
+    ).toEqual({ size: value.length });
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBe(value);
+    expect(await agentSecrets(path.join(t.ownHome, "secrets"), BIA)).toBeNull();
+    expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(false);
+
+    const declined = "broker-0002-bbbb";
+    const declinedKey = await t.sup.secret(
+      { op: "secret", agent: ANA, action: "keypair", requestId: declined },
+      scope().scope,
+    );
+    const declinedAad = secretAad({ requestId: declined, orgId: "org-1", name: "OTHER_KEY", target });
+    const declinedBox = await sealSecret(declinedKey.publicKey as string, "never-installed", declinedAad);
+    await t.sup.secret(
+      {
+        op: "secret",
+        agent: ANA,
+        action: "deliver",
+        requestId: declined,
+        name: "OTHER_KEY",
+        target,
+        aad: declinedAad,
+        box: declinedBox,
+      },
+      scope().scope,
+    );
+    // A failed DB transaction or a decline sends discard rather than activate.
+    await t.sup.secret({ op: "secret", agent: ANA, action: "discard", requestId: declined }, scope().scope);
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env.OTHER_KEY).toBeUndefined();
+    await t.sup.secret({ op: "secret", agent: ANA, action: "remove", name, throughOrder: order }, scope().scope);
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBeUndefined();
+    expect((await agentSecrets(path.join(t.home, "secret-broker"), ANA))?.env[name]).toBeUndefined();
+    expect(
+      await errorCode(() => t.sup.secret({ op: "secret", agent: ANA, action: "remove", name }, scope().scope)),
+    ).toBe("bad_request");
+  },
+);
+
+test.if(posix && process.platform === "linux" && process.getuid?.() === 0)(
+  "upgrade retires old pending keys and boxes without following agent symlinks or losing active values",
+  async () => {
+    const base = path.join(tempDir("legacy-worker-homes-"), "agents");
+    dirs.push(path.dirname(base));
+    const me: AgentUser = { id: ANA.id, user: "ag-a1b2c3d4", uid: 0 };
+    const home = workerHome(base, me);
+    const own = path.join(home, "secrets", "a1b2c3d4");
+    mkdirSync(path.join(own, "keys"), { recursive: true });
+    mkdirSync(path.join(own, "staged"), { recursive: true });
+    writeFileSync(path.join(own, "keys", "legacy-0001"), "old-private-key");
+    writeFileSync(path.join(own, "staged", "legacy-0001"), "old-sealed-box");
+    writeFileSync(path.join(own, "store.json"), '{"secrets":[]}');
+    const outside = path.join(base, "sentinel");
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, "keep"), "untouched");
+    linkSync(path.join(outside, "keep"), path.join(own, "keys", "linked"));
+    retireLegacyPending(base, home, me);
+    expect(existsSync(path.join(own, "keys"))).toBe(false);
+    expect(existsSync(path.join(own, "staged"))).toBe(false);
+    expect(readFileSync(path.join(own, "store.json"), "utf8")).toBe('{"secrets":[]}');
+    expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
+    const broker = setup();
+    expect(
+      await errorCode(() =>
+        broker.sup.secret(
+          {
+            op: "secret",
+            agent: ANA,
+            action: "activate",
+            requestId: "legacy-0001",
+            order: "2026-10-29T00:00:00.000Z|legacy-0001",
+          },
+          scope().scope,
+        ),
+      ),
+    ).toBe("not_found");
+    symlinkSync(outside, path.join(own, "keys"));
+    expect(() => retireLegacyPending(base, home, me)).toThrow();
+    expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
+    mkdirSync(path.join(own, "keys"));
+    writeFileSync(path.join(own, "keys", "replanted"), "old-key");
+    expect(() =>
+      retireLegacyPending(base, home, me, (name) => {
+        if (name !== "keys") return;
+        mkdirSync(path.join(own, "keys"));
+        writeFileSync(path.join(own, "keys", "replanted"), "old-key");
+      }),
+    ).toThrow("recreated");
+  },
+);
 
 test("lines: split across chunks, UTF-8 kept whole, and a line too long is skipped without being held", async () => {
   const stream = new PassThrough();

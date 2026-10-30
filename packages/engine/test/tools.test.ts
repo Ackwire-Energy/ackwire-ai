@@ -168,11 +168,41 @@ describe("Tool Gateway", () => {
       isError: true,
       content: "Approval does not match the action",
     });
-    // Approved as is: runs once, never twice.
+    // Approved as is: runs once, never twice; asked again, it answers what that one run returned.
     const approved = { ...approval, status: "approved" as const };
     expect((await tools.executeApproved(ctx, approved)).content).toBe("github_merge_pr ok: acme/app#42");
-    expect((await tools.executeApproved(ctx, approved)).content).toBe("Already executed");
+    expect(await tools.executeApproved(ctx, approved)).toEqual({
+      content: "github_merge_pr ok: acme/app#42",
+      isError: false,
+    });
     expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
+  });
+
+  test("an approved action claimed before a cut, with no result recorded, may not have finished (and never runs again)", async () => {
+    f = await setup();
+    const gh = fakeGithub();
+    const tools = createToolGateway({ sources: [gh.source] });
+    const ctx = await ctxOf(f);
+    await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+    const result = await tools.invoke(ctx, {
+      toolUseId: "tu_9",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 7, why: WHY },
+    });
+    if (result.type !== "approval") throw new Error("expected an approval");
+    // A restart cut the run after it claimed the action and before its result was written.
+    const executedAt = new Date();
+    await f.db
+      .update(schema.approvals)
+      .set({ status: "approved", executedAt })
+      .where(eq(schema.approvals.id, result.approval.id));
+    const out = await tools.executeApproved(ctx, { ...result.approval, status: "approved", executedAt });
+    expect(out.isError).toBe(true);
+    expect(out.content).toContain("may still be running, or it was cut off before finishing");
+    // The copy the run held still had no claim: the claim on the row stops it the same way.
+    const stale = await tools.executeApproved(ctx, { ...result.approval, status: "approved" });
+    expect(stale).toEqual(out);
+    expect(gh.executed).toEqual([]);
   });
 
   test("scope revoked while waiting: the approved action does not run", async () => {
@@ -290,6 +320,15 @@ describe("approval flow (end to end)", () => {
     };
   };
 
+  test("a reply with no tool calls says so (meta.work.steps 0), so the apps leave out its work", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Hi, how can I help?"] }) });
+    await post(f, "@dev hi");
+    await drainOutbox(f.db, f.handlers);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["@dev hi", "Hi, how can I help?"]);
+    expect(main[1]?.meta?.work).toMatchObject({ steps: 0 });
+  });
+
   test("mention → tool call → approval → approve → resumed run → merged", async () => {
     const gh = fakeGithub();
     f = await setup({ toolSources: [gh.source], reply: script });
@@ -313,6 +352,8 @@ describe("approval flow (end to end)", () => {
       "Tests pass, merging.",
       "Approval request: Merge PR #42 in acme/app",
     ]);
+    // Its reply came after a tool call: "Ver o que ele fez" has something to show.
+    expect((main[1]?.meta?.work as { steps: number } | undefined)?.steps).toBeGreaterThan(0);
     // The card carries the agent's reason (ADR 0053 §8).
     expect(main[2]?.meta).toEqual({
       approvalId: approval?.id,

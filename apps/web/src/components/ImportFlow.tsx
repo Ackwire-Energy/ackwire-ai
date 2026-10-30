@@ -34,7 +34,7 @@ import type { TFunction } from "i18next";
 import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { failedOffline } from "@/chat/outbox";
+import { failedOffline } from "@/chat/offline";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { HelpLink } from "@/components/HelpLink";
