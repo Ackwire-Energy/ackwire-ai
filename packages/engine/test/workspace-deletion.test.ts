@@ -40,12 +40,13 @@ import {
   signupAdmission,
   standingRefusal,
   startDeviceCode,
+  stopOrgWork,
   type ToolContext,
   unfinishedWorkspaces,
 } from "../src";
 import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { channelRoutine, fire } from "./routine-fixtures";
+import { agentRunRow, channelRoutine, fire, routineRunRow } from "./routine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -280,6 +281,17 @@ describe("a workspace being deleted is closed", () => {
     await drainOutbox(f.db, { "test.work": () => assertCanWork(f.db, f.org.id) });
     const [job] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "test.work"));
     expect(job).toMatchObject({ status: "failed", lastError: "This workspace is being deleted." });
+  });
+
+  test("what its agents had going stops, its routines' runs as being deleted", async () => {
+    f = await setup();
+    const fired = await fire(f, (await channelRoutine(f)).id, new Date());
+    const text = new OrgDeletingError(null).message;
+    await stopOrgWork({ db: f.db, pubsub: f.pubsub }, f.org.id, text, "org_deleting");
+    expect(await routineRunRow(f, fired.id)).toMatchObject({ status: "canceled", code: "org_deleting" });
+    const run = await agentRunRow(f, fired.agentRunId);
+    expect(run).toMatchObject({ status: "canceled", error: text });
+    expect(runErrorDetail(run.error)).toEqual({ errorCode: "run.org_deleting" });
   });
 
   test("its computer: no request, no report, no code, no ready email, and taken away it waits for none", async () => {

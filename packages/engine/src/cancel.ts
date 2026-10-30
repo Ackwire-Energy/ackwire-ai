@@ -337,14 +337,15 @@ export async function stopRun(
 }
 
 /**
- * Ends what a suspended workspace's agents still have going: every run not finished stops with `reason`
- * (its `standingText`) and hands nothing on, its computers stop its tasks, and its agents' desktops end with
- * whatever runs on them (nothing else stops a desktop: they stay on).
+ * Ends what a closed workspace's agents still have going: every run not finished stops with `reason` (the
+ * refusal's text) and hands nothing on, a routine's run closes under `code`, its computers stop its tasks, and its
+ * agents' desktops end with whatever runs on them (nothing else stops a desktop: they stay on).
  */
 export async function stopOrgWork(
   deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
   orgId: string,
   reason: string,
+  code: "org_suspended" | "org_deleting" = "org_suspended",
 ) {
   const live = await deps.db
     .select({ run: agentRuns, channelKind: channels.kind })
@@ -355,7 +356,7 @@ export async function stopOrgWork(
     await stopRun(deps, orgId, run, channelKind, { type: "system", reason }).catch(() => null);
     // A routine's run: its ledger says why (`stopRun` closes it only for a person).
     if (run.background) {
-      await closeRoutineRun(deps, run, { status: "canceled", code: "org_suspended" }).catch(() => null);
+      await closeRoutineRun(deps, run, { status: "canceled", code }).catch(() => null);
     }
   }
   const { hub } = deps;
