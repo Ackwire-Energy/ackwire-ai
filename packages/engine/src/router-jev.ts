@@ -1,5 +1,12 @@
 import { callJev, type JevKeySource, JevOffError } from "./jev-key";
-import { RouterChainEnd, RouterSkip, type RouterStrategy, type RoutingInput, type RoutingResult } from "./router";
+import {
+  ROUTER_MESSAGE_CHARS,
+  RouterChainEnd,
+  RouterSkip,
+  type RouterStrategy,
+  type RoutingInput,
+  type RoutingResult,
+} from "./router";
 
 /**
  * TypeSafe Jev (System One) as a router strategy (docs/adr/0013-router.md):
@@ -64,7 +71,7 @@ export function createJevRouterStrategy(options: {
         latest_message: {
           from: input.message.author,
           names: input.message.names ?? [],
-          text: input.message.body.slice(0, 4000),
+          text: input.message.body.slice(0, ROUTER_MESSAGE_CHARS),
         },
         agent_just_talking: input.continuityHandle ? `@${input.continuityHandle}` : null,
         alone_with: input.aloneWith ? `@${input.aloneWith}` : null,

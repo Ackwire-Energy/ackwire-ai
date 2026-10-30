@@ -66,7 +66,8 @@ export interface RoutingInput {
   channel: { id: string; name: string; topic: string };
   /**
    * What it decides on: the message, after the same person's messages right before it that it decides on
-   * together (`RouterDeps.quietMs`), one per line, with everyone they name.
+   * together (`RouterDeps.quietMs`, cut to fit `ROUTER_MESSAGE_CHARS` with it), one per line, with everyone
+   * they name.
    */
   message: RoutingLine & { id: string };
   /** The conversation before it (`ROUTER_SLICE`), oldest first. */
@@ -294,7 +295,7 @@ export function routerPrompt(input: RoutingInput) {
     history ? `<history>\n${history}\n</history>` : "",
     continuity,
     alone,
-    `<message>\n${line({ ...input.message, body: input.message.body.slice(0, 4000) })}\n</message>`,
+    `<message>\n${line({ ...input.message, body: input.message.body.slice(0, ROUTER_MESSAGE_CHARS) })}\n</message>`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -523,6 +524,9 @@ export interface RouterDeps {
  */
 export const ROUTER_SLICE = { messages: 12, maxAgeMs: 30 * 60_000, charsPerMessage: 500, chars: 4000 };
 
+/** How much of what it decides on (`RoutingInput.message.body`) a step reads, from its start. */
+export const ROUTER_MESSAGE_CHARS = 4000;
+
 /**
  * How long the router waits for a person's next message (`RouterDeps.quietMs`): one thing said in a few
  * messages ("boa tarde walter", "como esta hoje") gets one decision, on the last of them.
@@ -539,7 +543,7 @@ export interface RouteResult {
     | "no_candidates"
     | "already_routed"
     | "org_paused"
-    /** The same person wrote again right after it: their next message decides for both. */
+    /** The same person's next message right after it is one the router decides on too: that one decides for both. */
     | "continued";
   selected?: string[];
   /** Candidates the strategy evaluated (receipts: "seen by"). */
@@ -569,7 +573,8 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * only a clear pick (`AGENT_CHIME_IN_SCORE`), and never from an answer to an
  * answer (`AGENT_CHIME_IN_MAX_HOP`). One decision per message (unique),
  * stored with every score. A person's message first waits `quietMs` for
- * their next one; when it comes, that one decides for both (`continued`).
+ * their next one; when it comes and the router decides on it too
+ * (`routable`), that one decides for both (`continued`).
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -717,6 +722,7 @@ export async function routeMessage(
         authorAgentId: messages.authorAgentId,
         authorUserId: messages.authorUserId,
         mentionedAgentIds: messages.mentionedAgentIds,
+        routable,
         threadId: messages.threadId,
         // As text, which every driver reads the same way.
         replyTo: sql<string | null>`(${messages.meta}->'replyTo')::text`,
@@ -764,12 +770,12 @@ export async function routeMessage(
           .where(eq(agents.id, message.authorAgentId))
       : [];
 
-  // The person's messages right before this one, here, each within the quiet period of the next: decided
-  // with it, as one message (their own jobs stopped as `continued`). One that mentions an agent was its own.
+  // The person's messages right before this one, here, each within the quiet period of the next and one the
+  // router decides on itself (`routable`): decided with it, as one message (their own jobs stopped as `continued`).
   const run: typeof history = [];
   for (const m of history) {
     if (m.threadId !== message.threadId) continue;
-    if (!m.authorUserId || m.authorUserId !== message.authorUserId || m.mentionedAgentIds.length > 0) break;
+    if (!m.authorUserId || m.authorUserId !== message.authorUserId || !m.routable) break;
     if ((run[0] ?? message).createdAt.getTime() - m.createdAt.getTime() > quietMs) break;
     run.unshift(m);
   }
@@ -871,12 +877,13 @@ export async function routeMessage(
       ...(names.length > 0 ? { names } : {}),
     };
   };
-  // What it decides on, one line per message, and everyone those name.
-  const said = [
-    ...run.map(lineOf),
-    { body: `${quotedLine(message.meta)}${message.body}`, names: namesOf(message).map((n) => n.label) },
-  ];
-  const saidNames = [...new Set(said.flatMap((l) => l.names ?? []))];
+  // What it decides on, one line per message, and everyone those name. Of the `ROUTER_MESSAGE_CHARS` a step
+  // reads, the message takes what it needs; the lines before it, cut like the slice's, fill the rest, newest
+  // first, a line break each.
+  const ownLine = { body: `${quotedLine(message.meta)}${message.body}`, names: namesOf(message).map((n) => n.label) };
+  const runLines = run.map(lineOf);
+  const saidNames = [...new Set([...runLines, ownLine].flatMap((l) => l.names ?? []))];
+  const said = [...sliced(null, runLines, ROUTER_MESSAGE_CHARS - ownLine.body.length - runLines.length), ownLine];
 
   let result: RoutingResult | null = null;
   let failures: string[] = [];
@@ -1047,14 +1054,24 @@ async function aloneInChannel(
   return !other;
 }
 
-/** The same person wrote again here within `quietMs` after it, before anyone else did. */
+/**
+ * A message the router decides on itself (`message.posted` in jobs.ts): no @agent, whose runs start at once, no
+ * answer to an agent's question, nothing delivered to a run in progress. Only these make a person's run of
+ * messages: one of the others ends it on both sides.
+ */
+const routable = sql<boolean>`(cardinality(${messages.mentionedAgentIds}) = 0 and not (${messages.meta} ? 'answersQuestionId' or ${messages.meta} ? 'steeredRunIds'))`;
+
+/**
+ * The same person's next message here, within `quietMs` and before anyone else's, is one the router decides on
+ * itself (`routable`): that one decides for this one too.
+ */
 async function continuedSoon(
   db: Executor,
   message: Pick<Message, "orgId" | "channelId" | "threadId" | "createdAt" | "authorUserId">,
   quietMs: number,
 ) {
   const [next] = await db
-    .select({ authorUserId: messages.authorUserId })
+    .select({ authorUserId: messages.authorUserId, routable })
     .from(messages)
     .where(
       and(
@@ -1068,18 +1085,18 @@ async function continuedSoon(
     )
     .orderBy(asc(messages.createdAt))
     .limit(1);
-  return next !== undefined && next.authorUserId === message.authorUserId;
+  return next !== undefined && next.authorUserId === message.authorUserId && next.routable;
 }
 
-/** `lines` (oldest first) cut to `ROUTER_SLICE`: each to its share, the oldest dropped past the total. */
-function sliced(first: RoutingLine | null, lines: RoutingLine[]): RoutingLine[] {
+/** `lines` (oldest first) cut to `ROUTER_SLICE`: each to its share, the oldest dropped past `chars` in all. */
+function sliced(first: RoutingLine | null, lines: RoutingLine[], chars = ROUTER_SLICE.chars): RoutingLine[] {
   const max = ROUTER_SLICE.charsPerMessage;
   const cut = (l: RoutingLine) => (l.body.length > max ? { ...l, body: `${l.body.slice(0, max - 1)}…` } : l);
   const kept: RoutingLine[] = [];
-  let chars = 0;
+  let total = 0;
   for (const l of lines.map(cut).reverse()) {
-    chars += l.body.length;
-    if (chars > ROUTER_SLICE.chars) break;
+    total += l.body.length;
+    if (total > chars) break;
     kept.unshift(l);
   }
   return first ? [cut(first), ...kept] : kept;

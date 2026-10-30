@@ -530,12 +530,13 @@ describe("what the router reads, and a person's messages in a row", () => {
     return { ada };
   }
   const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
-  const say = (body: string, secondsAgo: number) =>
+  const say = (body: string, secondsAgo: number, meta?: Record<string, unknown>) =>
     insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
       author: { type: "person", userId: f.owner.id },
       body,
+      meta,
       createdAt: ago(secondsAgo),
     });
   const byAda = (adaId: string, body: string, secondsAgo: number) =>
@@ -597,7 +598,7 @@ describe("what the router reads, and a person's messages in a row", () => {
     expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
   });
 
-  test("'boa tarde walter' then '@ada como está hoje': Ada answers, once, and no judge is asked", async () => {
+  test("'boa tarde walter' then '@ada como está hoje': the greeting is decided alone, for nobody, and Ada answers once", async () => {
     const { ada } = await team();
     await byAda(ada.id, "Campanha publicada.", 240);
     const greeting = await say("boa tarde walter", 11);
@@ -613,12 +614,40 @@ describe("what the router reads, and a person's messages in a row", () => {
       { startRuns: true },
     );
     const { strategy, inputs } = judge();
-    expect((await route(strategy, greeting.id)).skipped).toBe("continued");
+    // The mention started its run at once and is never routed: the greeting can't wait on it.
+    expect((await route(strategy, greeting.id)).selected).toEqual([]);
     expect((await route(strategy, asked.id)).skipped).toBe("has_mentions");
-    expect(inputs).toEqual([]);
-    expect(await f.db.select().from(schema.routingDecisions)).toEqual([]);
+    expect(inputs.map((i) => i.message.body)).toEqual(["boa tarde walter"]);
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    expect(decisions.map((d) => [d.messageId, d.selectedAgentIds])).toEqual([[greeting.id, []]]);
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs.map((r) => [r.agentId, r.trigger, r.triggerMessageId])).toEqual([[ada.id, "mention", asked.id]]);
+  });
+
+  test("an answer to an agent's question and a message to a run in progress are no part of a run", async () => {
+    await team();
+    const question = await say("alguém sabe como configurar o deploy?", 13);
+    await say("pode publicar", 12, { answersQuestionId: crypto.randomUUID() });
+    const then = await say("e o servidor?", 11);
+    await say("manda o link também", 10, { steeredRunIds: [crypto.randomUUID()] });
+    const { strategy, inputs } = judge();
+    await route(strategy, question.id);
+    await route(strategy, then.id);
+    // Neither waits on a message the router never decides on, nor reads one as its own.
+    expect(inputs.map((i) => i.message.body)).toEqual(["alguém sabe como configurar o deploy?", "e o servidor?"]);
+  });
+
+  test("when no step can read it: an earlier talk with Ada, then 'boa tarde walter' and 'como esta hoje', is for nobody", async () => {
+    const { ada } = await team();
+    await say("@ada faz o relatório", 300);
+    await byAda(ada.id, "Feito.", 240);
+    const greeting = await say("boa tarde walter", 11);
+    const then = await say("como esta hoje", 10);
+    const failing: RouterStrategy = { name: "boom", decide: async () => Promise.reject(new Error("down")) };
+    expect((await route(failing, greeting.id)).skipped).toBe("continued");
+    // R3 would follow Ana's own talk with Ada, but her messages right before this one speak to Walter.
+    expect(await route(failing, then.id)).toMatchObject({ selected: [], reason: "mention_needed" });
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
   });
 
   test("'alguém sabe como configurar o deploy?' goes, after the quiet moment, to the agent it is for", async () => {
@@ -671,15 +700,23 @@ describe("what the router reads, and a person's messages in a row", () => {
     expect(inputs[0]?.message).toEqual({ id: asked.id, author: "ana", body: "e o deploy?" });
   });
 
-  test("the slice's size: nothing older than 30 minutes, each message cut, about 4,000 characters in all", async () => {
+  test("the slice: nothing older than 30 minutes", async () => {
     await team();
     await say("antiga", 31 * 60);
+    await say("recente", 60);
+    const asked = await say("e agora?", 3);
+    const { strategy, inputs } = judge();
+    await route(strategy, asked.id);
+    expect(inputs[0]?.thread).toEqual([{ author: "ana", body: "recente" }]);
+  });
+
+  test("the slice's size: each message cut, about 4,000 characters in all", async () => {
+    await team();
     for (let i = 10; i >= 1; i--) await say(`${i} ${"x".repeat(1000)}`, i * 60);
     const asked = await say("e agora?", 0);
     const { strategy, inputs } = judge();
     await route(strategy, asked.id);
     const thread = inputs[0]?.thread ?? [];
-    expect(thread.some((l) => l.body === "antiga")).toBe(false);
     for (const l of thread) expect(l.body).toHaveLength(ROUTER_SLICE.charsPerMessage);
     expect(thread.every((l) => l.body.endsWith("…"))).toBe(true);
     // The newest that fit: 8 messages of 500 characters.
@@ -709,6 +746,23 @@ describe("what the router reads, and a person's messages in a row", () => {
     // The receipt is under the last message only.
     const routed = events.filter((e) => e.type === "message.routed") as unknown as { messageId: string }[];
     expect(routed.map((e) => e.messageId)).toEqual([second.id]);
+  });
+
+  test("long messages, then a question right after them: every step reads the question", async () => {
+    await team();
+    for (let i = 9; i >= 1; i--) await say(`erro ${i}: ${"x".repeat(1000)}`, 10 + i);
+    const asked = await say("alguém sabe o que é isso?", 10);
+    const { strategy, inputs } = judge();
+    await route(strategy, asked.id);
+    const input = inputs[0];
+    if (!input) throw new Error("not decided");
+    // The lines before it are cut like the slice's, and the oldest left out, so the question fits what a step reads.
+    const lines = input.message.body.split("\n");
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toStartWith("erro 7:");
+    for (const l of lines.slice(0, -1)) expect(l).toHaveLength(ROUTER_SLICE.charsPerMessage);
+    expect(lines.at(-1)).toBe("alguém sabe o que é isso?");
+    expect(routerPrompt(input).prompt).toContain("\nalguém sabe o que é isso?\n</message>");
   });
 
   test("a quote reply to an agent, then one more line: still a reply to that agent when the rules decide", async () => {
