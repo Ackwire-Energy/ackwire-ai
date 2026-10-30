@@ -948,9 +948,9 @@ export const en: Translations = {
     unreadDivider: "New",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Seen",
-    offline: "No internet. Whatever you send goes out on its own when it's back.",
+    offline: "No connection. Whatever you send goes out on its own when it's back.",
     backOnline: "Connected again",
-    sendingOffline: "goes out when the internet is back",
+    sendingOffline: "goes out when the connection is back",
     endOfReply: "End of reply",
     mentionSuggestions: "Mention suggestions",
   },

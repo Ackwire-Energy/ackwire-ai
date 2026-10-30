@@ -265,7 +265,7 @@ export const featureKeysPtBR = {
     seen: "Visto",
     toLatest: "Ir para as mensagens mais recentes",
     stopAgent: "Parar {{name}}",
-    offlineWait: "Sai quando a internet voltar",
+    offlineWait: "Sai quando a conexão voltar",
     turn: {
       thinking: "pensando",
       working: "trabalhando",
@@ -299,7 +299,7 @@ export const featureKeysPtBR = {
       divider: "Novas",
     },
     connection: {
-      down: "Sem internet. O que você mandar sai sozinho quando voltar.",
+      down: "Sem conexão. O que você mandar sai sozinho quando voltar.",
       back: "Conectado de novo",
     },
     longPressHint: "Segure para reagir e ver mais ações",

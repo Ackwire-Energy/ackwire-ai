@@ -4,7 +4,7 @@ import { ApiError } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
-import { failedOffline, outbox } from "@/chat/outbox";
+import { failedOffline } from "@/chat/offline";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { createI18n } from "@/i18n";
 import { createStreamsStore } from "@/realtime/context";
@@ -65,18 +65,6 @@ describe("sent while offline", () => {
     // Any other error (a bug, a parse failure) is not the network: it fails, it does not wait.
     expect(failedOffline(new Error("boom"))).toBe(false);
     expect(failedOffline(new SyntaxError("Unexpected token"))).toBe(false);
-  });
-
-  test("the outbox keeps what waits, by client id", () => {
-    const seen: number[] = [];
-    const off = outbox.subscribe(() => seen.push(outbox.list().length));
-    outbox.add("c1");
-    outbox.add("c1");
-    expect(outbox.has("c1")).toBe(true);
-    outbox.remove("c1");
-    expect(outbox.has("c1")).toBe(false);
-    expect(seen).toEqual([1, 0]);
-    off();
   });
 });
 
