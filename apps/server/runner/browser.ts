@@ -31,6 +31,7 @@ import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { SYSTEM_BROWSER_DIR } from "./install-script";
 import { readJson, writeJson } from "./json-file";
+import { acquireLock } from "./lock";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
 import type { Spawn } from "./scope-gate";
 
@@ -119,6 +120,8 @@ const MAX_OUTPUT_CHARS = 50_000;
 /** Bytes of stdout read from one command (a full-page screenshot as JSON stays well under). */
 const MAX_STDOUT = 8 * 1024 * 1024;
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
+/** How often a runner waiting on another one's Chrome install looks again. */
+const INSTALL_TURN_POLL_MS = 1000;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const QUICK_TIMEOUT_MS = 15_000;
 /** One input command on the relay: a click or a key answers in milliseconds. */
@@ -1240,8 +1243,9 @@ export class BrowserManager {
 
   /**
    * Chrome for Testing to drive: found, or installed once (`agent-browser install`). Commands that find none at
-   * the same time share one install: two would write the same folder, and one would start `chrome` while the
-   * other still writes it (ETXTBSY).
+   * the same time share one install, and the user's other runners (one per organization) take turns with this
+   * one (`installTurn`): two would write the same folder, and one would start `chrome` while the other still
+   * writes it (ETXTBSY).
    */
   private ensureChrome(command: string[]): Promise<void> {
     this.chromeInstall ??= this.findOrInstallChrome(command).finally(() => {
@@ -1253,16 +1257,42 @@ export class BrowserManager {
   private async findOrInstallChrome(command: string[]) {
     this.chromePath = this.chrome();
     if (this.chromePath) return;
-    this.opts.log("installing Chrome for Testing for the agent browser");
-    const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
-    this.chromePath = this.chrome();
-    if (this.chromePath) return;
-    const why = firstLine(out.stderr || out.stdout);
-    const hint =
-      process.platform === "linux"
-        ? ` Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps.`
-        : "";
-    throw this.fail(`Couldn't install a browser for the agent${why ? ` (${why})` : ""}.${hint}`);
+    const release = await this.installTurn();
+    try {
+      this.chromePath = this.chrome();
+      if (this.chromePath) return;
+      this.opts.log("installing Chrome for Testing for the agent browser");
+      const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
+      this.chromePath = this.chrome();
+      if (this.chromePath) return;
+      const why = firstLine(out.stderr || out.stdout);
+      const hint =
+        process.platform === "linux"
+          ? ` Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps.`
+          : "";
+      throw this.fail(`Couldn't install a browser for the agent${why ? ` (${why})` : ""}.${hint}`);
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * `install.lock` next to the user's Chrome for Testing, held across processes (`acquireLock`): while another live
+   * runner holds it, this one waits, at most an install's time; one whose runner is gone is taken over.
+   */
+  private async installTurn(): Promise<() => void> {
+    const dir = path.dirname(testingChromeDir(this.userHome));
+    for (let waited = 0; waited < INSTALL_TIMEOUT_MS; waited += INSTALL_TURN_POLL_MS) {
+      try {
+        const lock = acquireLock(dir, "install", { file: "install.lock" });
+        if (lock.ok) return lock.release;
+      } catch {
+        // A home it can't write to: `agent-browser install` fails there too, and says why.
+        break;
+      }
+      await new Promise((r) => setTimeout(r, INSTALL_TURN_POLL_MS));
+    }
+    return () => {};
   }
 
   /**

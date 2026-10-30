@@ -874,7 +874,7 @@ Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the 
 which opens the apps menu, then Browser, Files and Terminal), one workspace and no desktop icons; its
 terminal's prompt shows the agent's name. Browser opens the agent's own browser on its desktop, the one
 it browses with, so a person who signs in to a site there signs the agent in (the first time, unless
-the installer put the browser there, it is installed first, which takes about a minute). The runner
+the runner installed it as it started, it is installed first, which takes about a minute). The runner
 writes the look into that desktop's own settings (`<agent folder>/.agentes/home`, or the agent's own
 home with `--system`), never your user's or the computer's, so your own desktop stays as it is. For
 its rounded windows, also install Orchis and the SVG loader it draws its buttons with (Debian 12 and
@@ -909,10 +909,11 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead. On x64 it also installs the agents' browser once for
-all of them, `agent-browser` and Chrome for Testing in `/opt/agentes-runner/browser` (root's, each
-checked against the SHA-256 in the installer), so no agent's first page waits for a download; running
-the installer again updates them when agentes.chat pins newer ones.
+(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` once for all
+of them, in `/opt/agentes-runner/browser` (root's, checked against the SHA-256 in the installer;
+running the installer again updates it), while each agent still installs Chrome for Testing in its own
+home at its browser's first use, which takes about a minute. If the installer can't download
+`agent-browser`, it goes on, and each agent downloads that at its browser's first use too.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals

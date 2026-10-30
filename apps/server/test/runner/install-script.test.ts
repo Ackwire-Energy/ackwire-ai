@@ -602,6 +602,31 @@ test.skipIf(process.platform === "win32")(
 );
 
 test.skipIf(process.platform === "win32")(
+  "install.sh --system: a browser download that fails leaves it to each agent's first use, and the install goes on",
+  () => {
+    for (const [failing, kept] of [
+      ["agent-browser-linux-x64", []],
+      ["chrome-linux64.zip", [`agent-browser-${AGENT_BROWSER_VERSION}`]],
+    ] as const) {
+      const pc = rootX64();
+      const curl = path.join(pc.fake, "curl");
+      const logged = 'echo "curl $url" >> "$LOG"\n';
+      writeFileSync(
+        curl,
+        readFileSync(curl, "utf8").replace(logged, () => `${logged}case "$url" in *${failing}) exit 22 ;; esac\n`),
+      );
+      const r = pc.run();
+      expect(r.status).toBe(0);
+      expect(r.out).toContain("failed: each agent installs what's missing at its browser's first use");
+      expect(readdirSync(pc.browser())).toEqual([...kept]);
+      expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
+      expect(r.log).toContain("service install --system --no-start");
+    }
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
   "install.sh --system: a new pin keeps the build installed last before it, for a runner not restarted yet; older ones go",
   () => {
     const pc = rootX64();

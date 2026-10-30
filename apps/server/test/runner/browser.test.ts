@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -107,6 +107,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
     secret: async (_agent, name) => secrets[name] ?? null,
     command: [process.execPath, FAKE],
     chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
+    userHome: home,
     startChrome: chromes.start,
     isOurChrome: async () => false,
     connectStream: (url) => {
@@ -1159,9 +1160,44 @@ test.if(posix)(
       secret: async () => null,
       command: ["/bin/sh", "-c", ":"],
       chrome: () => null,
+      userHome: home,
     });
     await failing.prepareInBackground();
     expect(failing.info()).toMatchObject({ available: true });
+  },
+);
+
+test.if(posix)(
+  "the person's other runner installing Chrome (another organization's, as it starts): this one waits and installs none",
+  async () => {
+    const user = tempDir("user-home-");
+    dirs.push(user);
+    const lock = path.join(user, ".agent-browser", "install.lock");
+    mkdirSync(path.dirname(lock));
+    const other = Bun.spawn(["sleep", "60"]);
+    try {
+      writeFileSync(lock, JSON.stringify({ pid: other.pid, mode: "install", startedAt: new Date().toISOString() }));
+      let othersDone = false;
+      const { t, installs } = setupWithoutChrome({
+        userHome: user,
+        chrome: () => (othersDone ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
+      });
+      const ready = t.manager.prepareInBackground();
+      await sleep(300);
+      expect(installs()).toBe(0);
+      othersDone = true;
+      rmSync(lock);
+      await ready;
+      expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
+      expect(installs()).toBe(0);
+      // With nobody else installing, it installs at once, and leaves no lock behind.
+      const alone = setupWithoutChrome({ userHome: user });
+      await alone.t.manager.prepareInBackground();
+      expect(alone.installs()).toBe(1);
+      expect(existsSync(lock)).toBe(false);
+    } finally {
+      other.kill();
+    }
   },
 );
 
@@ -1570,6 +1606,7 @@ test.if(posix)(
       secret: async () => null,
       command: ["/bin/sh", "-c", ":"],
       chrome: () => null,
+      userHome: home,
     });
     const act = () =>
       manager.act(dev, ws, { op: "browser.act", command: "open", args: ["https://a.example"], timeoutSeconds: 5 });

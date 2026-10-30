@@ -139,7 +139,8 @@ export const TESTING_CHROME: { version: string; sha256: string } | null = null;
  * them), the pinned Bun and the bundle in
  * `SYSTEM_RUNNER_DIR`, on x86_64 the pinned `agent-browser` and
  * `TESTING_CHROME` in `SYSTEM_BROWSER_DIR` (each checked against its SHA-256,
- * so no agent downloads them at its browser's first use), the launcher at
+ * so no agent downloads them at its browser's first use; one that can't be
+ * fetched is left to that first use, warned about), the launcher at
  * `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
@@ -419,6 +420,13 @@ prune() {
   done
 }
 
+# What of the agents' browser couldn't be installed here, each agent's runner installs at its browser's first use,
+# so the install goes on; only a download that isn't the pinned one stops it.
+browser_later() {
+  t_tail "$T_LOG"
+  t_warn "$1: each agent installs what's missing at its browser's first use"
+}
+
 # The agents' browser in $BROWSER_DIR, for every agent's user to run and root alone to write: the pinned
 # agent-browser and Chrome for Testing build, each checked against its SHA-256 before it is installed, so no agent
 # downloads them at its browser's first use. What is already there at those checksums is kept. Only on x86_64:
@@ -432,9 +440,9 @@ get_browser() {
   if [ ! -f "$AB" ] || [ "$(sha256 "$AB")" != "$AB_SHA256" ]; then
     TMP="$BROWSER_DIR/.agent-browser-$AB_VERSION.download"
     t_run "Downloading agent-browser $AB_VERSION" download "$AB_URL" "$TMP" || {
-      t_tail "$T_LOG"
       rm -f "$TMP"
-      die "downloading agent-browser failed"
+      browser_later "Downloading agent-browser $AB_VERSION failed"
+      return 0
     }
     if [ "$(sha256 "$TMP")" != "$AB_SHA256" ]; then
       rm -f "$TMP"
@@ -452,15 +460,17 @@ get_browser() {
   # Written last, before the folder takes its name: a folder that has it is whole.
   if [ "$(cat "$CHROME/.sha256" 2>/dev/null || true)" != "$CHROME_SHA256" ]; then
     # Unzipped by unzip, which keeps the executables' modes (Python's zipfile doesn't).
-    command -v unzip >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && t_run "Installing unzip" apt_install unzip; } ||
-      die "installing Chrome for Testing needs unzip"
+    command -v unzip >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && t_run "Installing unzip" apt_install unzip; } || {
+      browser_later "Chrome for Testing needs unzip"
+      return 0
+    }
     ZIP="$BROWSER_DIR/.chrome-$CHROME_VERSION.zip"
     STAGE="$BROWSER_DIR/.chrome-$CHROME_VERSION.new"
     rm -rf "$STAGE"
     t_run "Downloading Chrome for Testing $CHROME_VERSION" download "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION/linux64/chrome-linux64.zip" "$ZIP" || {
-      t_tail "$T_LOG"
       rm -f "$ZIP"
-      die "downloading Chrome for Testing failed"
+      browser_later "Downloading Chrome for Testing $CHROME_VERSION failed"
+      return 0
     }
     if [ "$(sha256 "$ZIP")" != "$CHROME_SHA256" ]; then
       rm -f "$ZIP"
@@ -468,7 +478,8 @@ get_browser() {
     fi
     if ! unzip -q "$ZIP" -d "$STAGE" || [ ! -f "$STAGE/chrome-linux64/chrome" ]; then
       rm -rf "$ZIP" "$STAGE"
-      die "unpacking Chrome for Testing failed"
+      browser_later "Unpacking Chrome for Testing failed"
+      return 0
     fi
     rm -f "$ZIP"
     # The same modes under any umask: readable by everyone, written by root alone, nothing set-user or set-group.
