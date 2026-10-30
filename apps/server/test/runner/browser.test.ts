@@ -131,11 +131,13 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
       timeoutSeconds: 30,
       ...(extra.allowedDomains ? { allowedDomains: extra.allowedDomains } : {}),
     });
+  // The fake appends one line per call: a line still being written (no newline yet) is left for the next read.
   const logged = (): Logged[] =>
     existsSync(log)
       ? readFileSync(log, "utf8")
-          .trim()
           .split("\n")
+          .slice(0, -1)
+          .filter(Boolean)
           .map((l) => JSON.parse(l) as Logged)
       : [];
   const page = (patch: Record<string, unknown>) => {
