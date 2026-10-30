@@ -599,9 +599,10 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
           .update(artifactVersions)
           .set({ storageConfigId: target.storageConfigId, blobKey: key })
           .where(eq(artifactVersions.id, v.id));
-        // The row now points at the target copy; drop the old object so cycling storages doesn't pile up copies.
-        // Never delete the key the row now holds (a store that overwrote in place): orphan beats data loss.
-        if (v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
+        // The row now points at the target copy. Drop the old object only when it was on our platform store,
+        // so cycling off the platform frees our disk; a workspace's own bucket is theirs (and may be a backup),
+        // so its copies stay. Never delete the key the row now holds (a store that overwrote in place).
+        if (v.storageConfigId === null && v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
       } catch (error) {
         await db
           .update(storageMigrations)
