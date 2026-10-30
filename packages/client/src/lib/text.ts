@@ -129,3 +129,9 @@ export function excerpt(text: string, max: number, lines = 3) {
   const space = cut.lastIndexOf(" ");
   return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, "")}…`;
 }
+
+const typedForm = (value: string) => value.normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+
+/** Whether what someone typed to confirm is `name` (case and extra spaces aside): a permanent step's last check. */
+export const matchesName = (typed: string, name: string) =>
+  typedForm(name) !== "" && typedForm(typed) === typedForm(name);

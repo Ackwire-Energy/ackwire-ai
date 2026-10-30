@@ -1,11 +1,14 @@
-import type { Agent, AgentAudience } from "@agenteschat/client";
+import type { Agent, AgentAudience, AgentProposal } from "@agenteschat/client";
 import {
+  ApiError,
+  useAgentProposal,
   useAgents,
   useAiAccounts,
   useBrainMachines,
   useChannels,
   useCreateAgent,
   useCredentials,
+  useDenyAgentProposal,
   useDms,
   useMailAccounts,
   useMembers,
@@ -15,6 +18,7 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { draftLevels } from "@agenteschat/client/lib/action-cards";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -43,9 +47,10 @@ import {
   modKey,
   prefersReducedMotion,
   randomAppearance,
+  Spinner,
   Textarea,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -71,6 +76,7 @@ import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import {
@@ -139,27 +145,61 @@ interface Created {
   channels: { id: string; name: string }[];
 }
 
-/** "Criar agente": the steps on a rail, a live preview of the agent on the right. */
-export function NewAgentPage() {
+/**
+ * "Criar agente": the steps on a rail, a live preview of the agent on the right. With `proposalId` (an agent's
+ * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open.
+ */
+export function NewAgentPage({ proposalId = null }: { proposalId?: string | null }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const proposal = useAgentProposal(org.id, proposalId);
+  // The draft as it was when it opened: once created here the proposal is closed, and the flow stays on.
+  const opened = useRef<AgentProposal | null>(null);
+  if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
+  const from = opened.current?.messageId === proposalId ? opened.current : null;
   const allowed = can(org.role, "manage_agents");
-  if (!allowed) {
+  const closed = proposalId !== null && !from;
+  if (!allowed || closed) {
     return (
       <main className="shell__main">
         <div className="page page--narrow">
           <header className="page__header">
             <h1 className="page-title">{t("newAgent.title")}</h1>
           </header>
-          <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+          {!allowed ? (
+            <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+          ) : proposal.isPending ? (
+            <Spinner />
+          ) : (
+            <EmptyState
+              icon="agent"
+              actions={
+                <Button asChild>
+                  {proposal.data ? (
+                    <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: proposal.data.channelId }}>
+                      {t("newAgent.backToChat")}
+                    </Link>
+                  ) : (
+                    <Link to="/org/$orgId" params={{ orgId: org.id }}>
+                      {t("newAgent.backToChat")}
+                    </Link>
+                  )}
+                </Button>
+              }
+            >
+              {proposal.error instanceof ApiError && proposal.error.status === 403
+                ? t("newAgent.proposalNoAccess")
+                : t("newAgent.proposalClosed")}
+            </EmptyState>
+          )}
         </div>
       </main>
     );
   }
-  return <NewAgentFlow />;
+  return from ? <NewAgentFlow key={from.messageId} from={from} /> : <NewAgentFlow />;
 }
 
-function NewAgentFlow() {
+function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
@@ -178,40 +218,53 @@ function NewAgentFlow() {
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
+  const deny = useDenyAgentProposal(org.id);
   const connected = useConnectedById();
   const connectedList = useMemo(() => [...connected.values()], [connected]);
   const mail = useMailAccounts(org.id);
   // Mailboxes (ADR 0038) start without access: email is always granted on purpose.
   const mailboxes = useMemo(() => (mail.data ?? []).filter((a) => a.status === "active"), [mail.data]);
+  const navigate = useNavigate();
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
 
+  // An agent's proposal starts on the last step, filled in: its role as written, its look, levels and channels.
+  const draft = from?.params.draft;
+  const review = NEW_AGENT_STEPS.length - 1;
   // Navigation
-  const [index, setIndex] = useState(0);
-  const [reached, setReached] = useState(0);
+  const [index, setIndex] = useState(draft ? review : 0);
+  const [reached, setReached] = useState(draft ? review : 0);
   const [tried, setTried] = useState<Set<NewAgentStep>>(new Set());
   const [created, setCreated] = useState<Created | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   // The draft
-  const [role, setRole] = useState<RoleId | null>(null);
-  const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [handleTouched, setHandleTouched] = useState(false);
-  const [look, setLook] = useState<Required<AgentAppearance>>(BLANK_LOOK);
-  const [instructions, setInstructions] = useState("");
-  const [levels, setLevels] = useState<Record<string, Level>>({});
+  const [role, setRole] = useState<RoleId | null>(draft ? "custom" : null);
+  const [roleText, setRoleText] = useState(draft?.role ?? "");
+  const [name, setName] = useState(draft?.name ?? "");
+  const [handle, setHandle] = useState(draft?.handle ?? "");
+  const [handleTouched, setHandleTouched] = useState(Boolean(draft));
+  const [look, setLook] = useState<Required<AgentAppearance>>(
+    (draft?.appearance as Required<AgentAppearance> | null) ?? BLANK_LOOK,
+  );
+  const [instructions, setInstructions] = useState(draft?.instructions ?? "");
+  const [levels, setLevels] = useState<Record<string, Level>>(draft ? draftLevels(draft) : {});
   const [mailLevels, setMailLevels] = useState<Record<string, Level>>({});
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds));
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
   const [model, setModel] = useState<string>(AUTO);
-  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists.
-  const [plan, setPlan] = useState<PlanChoice | null>(null);
+  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists. A proposal
+  // starts on the account the server suggests for this person, if any.
+  const [plan, setPlan] = useState<PlanChoice | null>(
+    draft?.ai.kind === "account"
+      ? { kind: draft.ai.brain, machineId: draft.ai.machineId, accountId: draft.ai.accountId, label: draft.ai.label }
+      : null,
+  );
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
@@ -219,9 +272,11 @@ function NewAgentFlow() {
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
+  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
   const myChannels = useMemo(
-    () => (channels.data ?? []).filter((c) => c.isMember && !dmChannels.has(c.id)),
-    [channels.data, dmChannels],
+    () =>
+      (channels.data ?? []).filter((c) => (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id)),
+    [channels.data, dmChannels, draft],
   );
   const choices = useMemo(
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
@@ -260,7 +315,9 @@ function NewAgentFlow() {
   const previewName = name.trim() || t("newAgent.previewName");
   const g = agentGrammar(t, displayName);
   const rolePreset = role ? ROLE_PRESETS[role] : null;
-  const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : null;
+  const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
+  // A proposed agent with nothing to think with yet is created all the same, and Connect opens for it after.
+  const connectAfter = Boolean(from) && plan === null && usable.size === 0;
   const check: DraftCheck = {
     role,
     name,
@@ -269,7 +326,7 @@ function NewAgentFlow() {
     ownerUserId: ownerId,
     audience,
     budget,
-    modelOk: plan !== null || (isAuto(model) ? usable.size > 0 : usable.has(model)),
+    modelOk: plan !== null || connectAfter || (isAuto(model) ? usable.size > 0 : usable.has(model)),
   };
   const errors = tried.has(step) ? stepErrors(step, check) : [];
   const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
@@ -294,10 +351,12 @@ function NewAgentFlow() {
   const budgetShown = amount ?? defaultBudget;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
   const modelLabel = plan
-    ? t(`brain.card.${plan.kind}`)
-    : isAuto(model)
-      ? t("brain.auto.label")
-      : (modelInfo?.label ?? model);
+    ? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · ")
+    : connectAfter
+      ? t("actionCard.agentProposal.aiNone")
+      : isAuto(model)
+        ? t("brain.auto.label")
+        : (modelInfo?.label ?? model);
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
@@ -345,7 +404,7 @@ function NewAgentFlow() {
     const agent = await create.mutateAsync({
       name: name.trim(),
       handle,
-      role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : "",
+      role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
       instructions,
       model,
       ownerUserId: ownerId,
@@ -353,6 +412,7 @@ function NewAgentFlow() {
       credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
       appearance: look,
+      ...(from ? { proposal: from.messageId } : {}),
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
@@ -360,12 +420,18 @@ function NewAgentFlow() {
     if (plan) {
       try {
         await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
-        await api.agents.setBrain(org.id, agent.id, { brain: plan.kind });
+        await api.agents.setBrain(org.id, agent.id, {
+          brain: plan.kind,
+          ...(plan.accountId ? { account: plan.accountId } : {}),
+        });
         // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
         // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
         // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
         const row = aiAccounts.data?.computers.find((c) => c.machineId === plan.machineId);
-        signIn = ownerId === me.user.id && !ownSignInReady({ ownSignIn: row?.mine === true }, row, plan.kind);
+        signIn =
+          !plan.accountId &&
+          ownerId === me.user.id &&
+          !ownSignInReady({ ownSignIn: row?.mine === true }, row, plan.kind);
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
@@ -409,6 +475,7 @@ function NewAgentFlow() {
     mood.react("happy", 2200);
     scrollTop();
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
+    if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
   };
   const next = () => {
     if (created || create.isPending) return;
@@ -483,9 +550,20 @@ function NewAgentFlow() {
   /* ---------- Changes that also move the preview ---------- */
 
   const pickRole = (id: RoleId) => {
+    // The role it already has: filling it in again would drop what was typed.
+    if (id === role) return;
+    setRole(id);
+    setTried((prev) => {
+      const nextTried = new Set(prev);
+      nextTried.delete("role");
+      return nextTried;
+    });
+    mood.react(id === "custom" ? "wink" : "happy", 1400);
+    // A proposal keeps its draft: only the role changes.
+    if (from) return;
     const preset = ROLE_PRESETS[id];
     const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
-    setRole(id);
+    setRoleText("");
     setName(agentName);
     setHandle(handleForName(agentName));
     setHandleTouched(false);
@@ -494,12 +572,6 @@ function NewAgentFlow() {
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
     setModel(AUTO);
-    setTried((prev) => {
-      const nextTried = new Set(prev);
-      nextTried.delete("role");
-      return nextTried;
-    });
-    if (id !== role) mood.react(id === "custom" ? "wink" : "happy", 1400);
   };
   const changeName = (value: string) => {
     const had = Boolean(name.trim());
@@ -662,6 +734,21 @@ function NewAgentFlow() {
             </span>
           </button>
         </div>
+        {role === "custom" && (
+          <Card as="div" className="newag__card">
+            <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
+              <Input
+                value={roleText}
+                maxLength={200}
+                autoComplete="off"
+                onChange={(e) => {
+                  setRoleText(e.target.value);
+                  mood.onTyping();
+                }}
+              />
+            </Field>
+          </Card>
+        )}
         {errorLine(errorOf("role"))}
       </>
     ),
@@ -894,18 +981,12 @@ function NewAgentFlow() {
               </h2>
               <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
             </div>
-            <div className="newag__pills">
-              {(library.data ?? []).map((s) => (
-                <CheckboxPill
-                  key={s.id}
-                  id={`ag-skill-${s.id}`}
-                  checked={skillIds?.has(s.id) ?? false}
-                  onCheckedChange={(on) => setSkillIds((prev) => toggle(prev ?? new Set(), s.id, on))}
-                >
-                  {s.name}
-                </CheckboxPill>
-              ))}
-            </div>
+            <SkillPicker
+              skills={library.data ?? []}
+              selected={skillIds ?? new Set()}
+              onChange={setSkillIds}
+              idPrefix="ag-skill"
+            />
           </section>
         )}
       </>
@@ -1085,7 +1166,7 @@ function NewAgentFlow() {
               <span>
                 {role && role !== "custom"
                   ? `${roleName} · ${t(`newAgent.roles.${role}.desc`)}`
-                  : t("newAgent.roles.custom.name")}
+                  : roleText || t("newAgent.roles.custom.name")}
               </span>,
             )}
             {row(
@@ -1170,7 +1251,18 @@ function NewAgentFlow() {
         <NewAgentRail index={total} reached={total} total={total} onGo={() => {}} done />
         <main className="newag__main">
           <div className="newag__content newag__content--done">
-            <CreatedMoment created={created} phone={phone} face={mood.face} onAgain={reset} heading={heading} />
+            <CreatedMoment
+              created={created}
+              phone={phone}
+              face={mood.face}
+              // Another one starts empty, without the proposal (it is decided).
+              onAgain={
+                from
+                  ? () => void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id }, search: {} })
+                  : reset
+              }
+              heading={heading}
+            />
           </div>
         </main>
       </div>
@@ -1232,6 +1324,24 @@ function NewAgentFlow() {
                 <Link to="/org/$orgId" params={{ orgId: org.id }}>
                   {t("common.cancel")}
                 </Link>
+              </Button>
+            )}
+            {from && last && (
+              <Button
+                variant="ghost"
+                size="lg"
+                loading={deny.isPending}
+                onClick={() =>
+                  deny.mutate(from.messageId, {
+                    onSuccess: () =>
+                      void navigate({
+                        to: "/org/$orgId/c/$channelId",
+                        params: { orgId: org.id, channelId: from.channelId },
+                      }),
+                  })
+                }
+              >
+                {t("approval.refuse")}
               </Button>
             )}
             <Button

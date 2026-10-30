@@ -464,6 +464,9 @@ export function ModelCards({
 export interface PlanChoice {
   kind: "claude_code" | "codex";
   machineId: string;
+  /** One account there (an agent's proposal suggests a free one, ADR 0081); none: the computer's own sign-in. */
+  accountId?: string;
+  label?: string;
 }
 
 const PLAN_KINDS = ["claude_code", "codex"] as const;

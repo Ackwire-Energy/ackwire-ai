@@ -2026,10 +2026,19 @@ textarea.ac-input {
   font-size: 12px;
   color: var(--ink-muted);
 }
+/* Compact: the tightest windows in one line, one bar for the fullest, the state under it only near the limit. */
 .ac-planmeter--compact {
   gap: 4px;
+  font-size: 12px;
 }
-.ac-planmeter--compact .ac-planmeter__window {
+.ac-planmeter__line {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-planmeter--compact .ac-meter {
+  height: 4px;
+}
+.ac-planmeter--compact .ac-planmeter__state {
   font-size: 12px;
 }
 

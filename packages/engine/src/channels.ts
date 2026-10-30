@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
+import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
@@ -19,9 +20,12 @@ export async function createChannel(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { name: string; topic?: string; visibility?: "public" | "private" },
+  input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
 ): Promise<Channel> {
   await requirePermission(db, actorId, orgId, "create_channels");
+  // Whoever may create a channel may put it in an existing category (arranging categories is for admins).
+  const categoryId = input.categoryId ?? null;
+  if (categoryId) await requireCategoryInOrg(db, orgId, categoryId);
   const name = input.name.trim().toLowerCase();
   if (name.startsWith("dm-")) throw new ValidationError("Channel names can't start with dm-");
   if (!CHANNEL_NAME_PATTERN.test(name)) {
@@ -37,6 +41,8 @@ export async function createChannel(
           topic: input.topic ?? "",
           visibility: input.visibility ?? "public",
           createdByUserId: actorId,
+          categoryId,
+          position: await endOfCategory(tx, orgId, categoryId),
         })
         .returning();
       if (!channel) throw new Error("channel insert returned nothing");
@@ -75,6 +81,10 @@ export interface ChannelListItem {
   visibility: "public" | "private";
   createdByUserId: string | null;
   createdAt: Date;
+  /** Its sidebar category; null: on top, with none. */
+  categoryId: string | null;
+  /** Order inside its category. */
+  position: number;
   isMember: boolean;
   /**
    * Messages since I last read it (from when I joined, if never), not mine;
@@ -97,6 +107,8 @@ interface ChannelListRow {
   visibility: "public" | "private";
   created_by_user_id: string | null;
   created_at: Date | string;
+  category_id: string | null;
+  position: number | string;
   is_member: boolean;
   unread_count: number | string | null;
   last_id: string | null;
@@ -113,13 +125,14 @@ const asDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
 
 /**
  * Channels the user can see: every public channel plus private ones they
- * belong to, by name, with their unread count and last message, in one
+ * belong to, in sidebar order (then by name), with their unread count and last message, in one
  * query (a lateral read per channel on `(channel_id, created_at)`).
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
   const rows = rowsOf<ChannelListRow>(
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.created_by_user_id, c.created_at,
+        c.category_id, c.position,
         (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
@@ -150,7 +163,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       ) un on true
       where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
         and (c.visibility = 'public' or cm.id is not null)
-      order by c.name asc`),
+      order by c.position asc, c.name asc`),
   );
   return rows.map((r) => ({
     id: r.id,
@@ -160,6 +173,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
     visibility: r.visibility,
     createdByUserId: r.created_by_user_id,
     createdAt: asDate(r.created_at),
+    categoryId: r.category_id,
+    position: Number(r.position),
     isMember: r.is_member === true,
     unreadCount: Number(r.unread_count ?? 0),
     lastMessage:

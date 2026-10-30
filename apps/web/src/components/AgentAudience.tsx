@@ -33,7 +33,7 @@ const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /**
- * "Seus agentes só respondem a você.", before inviting anyone (setup's Team step, Members' invite card): every agent
+ * "Seus agentes só atendem você.", before inviting anyone (setup's Team step, Members' invite card): every agent
  * with an AI is the viewer's and answers only them, so whoever joins now gets no answer. Nothing otherwise.
  */
 export function OnlyYouNote({ orgId, viewerId }: { orgId: string; viewerId: string }) {

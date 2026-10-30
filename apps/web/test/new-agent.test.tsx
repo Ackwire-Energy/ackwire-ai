@@ -414,6 +414,12 @@ describe("Criar agente: what gets created", () => {
     const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
     await click(claude);
     expect(claude.getAttribute("aria-pressed")).toBe("true");
+    // In the words of the switch it points to, "Atende outras pessoas".
+    expect(
+      screen().getByText(
+        "No plano, a Eva começa atendendo só você. Na página da Eva, você pode escolher se ela atende outras pessoas.",
+      ),
+    ).toBeTruthy();
     expect(
       screen()
         .getByRole("button", { name: /^Automático/ })

@@ -62,6 +62,8 @@ const tool = ([name, description, readOnly]: [string, string, boolean | null], n
 export function createMockCustomConnectors(
   ctx: MockContext,
   log: (method: string, ...args: unknown[]) => void = () => {},
+  /** A new server connected (the backend gives it to every agent). */
+  onConnected: (orgId: string, serverId: string) => Promise<void> = async () => {},
 ): ApiClient["customConnectors"] {
   const byOrg = new Map<string, CustomServer[]>();
   const refreshed = new Set<string>();
@@ -95,6 +97,7 @@ export function createMockCustomConnectors(
         createdAt: now.toISOString(),
       };
       list(orgId).push(server);
+      await onConnected(orgId, server.id);
       // A real OAuth flow leaves for the provider; the mock connects at once.
       return { status: "connected", server: clone(server) };
     },

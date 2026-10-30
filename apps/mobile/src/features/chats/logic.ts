@@ -32,6 +32,8 @@ export type ConversationRow =
       channelId: string;
       name: string;
       topic: string;
+      /** Its sidebar category (ADR 0080); null: none. */
+      categoryId: string | null;
       last: LastLine | null;
       at: string | null;
       unread: number;
@@ -165,6 +167,7 @@ export function buildConversations(input: {
       channelId: c.id,
       name: c.name,
       topic: c.topic,
+      categoryId: c.categoryId ?? null,
       last: last
         ? {
             author: { type: last.authorType, id: last.authorId },
@@ -266,6 +269,81 @@ export function homeSections(
   }).filter((s) => s.total > 0);
 }
 
+/** A section of the home with the channel categories (ADR 0080): the fixed ones, or one per category. */
+export type HomeKey = HomeSection | `category:${string}`;
+export interface HomeBlock {
+  key: HomeKey;
+  /** A category's name (the fixed sections are translated by key). */
+  name?: string;
+  /** The category's id, for its "Ver todos" and its menu. */
+  categoryId?: string;
+  rows: ConversationRow[];
+  total: number;
+  more: boolean;
+  /** A category's unread rows: they stay in sight while it is closed, as on the web. */
+  unread: ConversationRow[];
+}
+
+/** A category's "Ver todos" route segment (`conversations/category-<id>`). */
+const CATEGORY_LIST_PREFIX = "category-";
+export const categoryListKind = (categoryId: string) => `category-${categoryId}` as const;
+export const categoryOfListKind = (kind: string) =>
+  kind.startsWith(CATEGORY_LIST_PREFIX) ? kind.slice(CATEGORY_LIST_PREFIX.length) || null : null;
+
+/**
+ * The home with channel categories: Agentes, Canais (the channels with no category), one section per category
+ * in the sidebar's order, then Pessoas; each the first `max` by latest activity. A channel whose category is
+ * unknown counts as having none. Sections with no rows are left out.
+ */
+export function homeLayout(
+  rows: ConversationRow[],
+  categories: readonly { id: string; name: string }[],
+  max = SECTION_MAX,
+): HomeBlock[] {
+  const known = new Set(categories.map((c) => c.id));
+  const categoryOf = (r: ConversationRow) =>
+    r.kind === "channel" && r.categoryId && known.has(r.categoryId) ? r.categoryId : null;
+  const block = (key: HomeKey, all: ConversationRow[], extra: Partial<HomeBlock> = {}): HomeBlock => ({
+    key,
+    rows: all.slice(0, max),
+    total: all.length,
+    more: all.length > max,
+    unread: all.filter((r) => r.unread > 0),
+    ...extra,
+  });
+  const channels = rowsOfKind(rows, "channels");
+  return [
+    block("agents", rowsOfKind(rows, "agents")),
+    block(
+      "channels",
+      channels.filter((r) => categoryOf(r) === null),
+    ),
+    ...categories.map((c) =>
+      block(
+        `category:${c.id}`,
+        channels.filter((r) => categoryOf(r) === c.id),
+        { name: c.name, categoryId: c.id },
+      ),
+    ),
+    block("people", rowsOfKind(rows, "people")),
+  ].filter((b) => b.total > 0);
+}
+
+/** The home's closed sections as remembered: any keys (categories come and go), anything unreadable: none. */
+export function parseHomeCollapsed(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const v: unknown = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Closes or opens one of the home's sections. */
+export const toggleHomeCollapsed = (list: readonly string[], key: string) =>
+  list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+
 /** The Threads tab: threads and missions, by latest activity. */
 export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads");
 
@@ -276,27 +354,32 @@ export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads
  */
 export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
-/** The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. */
+/**
+ * The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. Null `keys` takes any
+ * ids: the groups of agents of every workspace share one list, so one workspace's toggles keep the others'.
+ */
 export function parseCollapsed<K extends string>(
   raw: string | null,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   if (!raw) return [];
   try {
     const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? keys.filter((k) => v.includes(k)) : [];
+    if (!Array.isArray(v)) return [];
+    return keys ? keys.filter((k) => v.includes(k)) : v.filter((k): k is K => typeof k === "string");
   } catch {
     return [];
   }
 }
 
-/** Collapses or opens a section (in the sections' order). */
+/** Collapses or opens a section (in the sections' order; with null `keys`, the others stay as they were). */
 export function toggleCollapsed<K extends string>(
   list: readonly K[],
   key: K,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   const on = list.includes(key);
+  if (!keys) return on ? list.filter((k) => k !== key) : [...list, key];
   return keys.filter((k) => (k === key ? !on : list.includes(k)));
 }
 

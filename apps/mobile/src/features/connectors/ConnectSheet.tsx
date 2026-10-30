@@ -13,7 +13,15 @@ import {
   useDisconnect,
   useStartOAuth,
 } from "@agenteschat/client";
-import { type Level, levelOf, resourcesOf, saveLevels } from "@agenteschat/client/lib/access-levels";
+import {
+  LEVELS,
+  type Level,
+  levelIn,
+  levelOf,
+  resourcesOf,
+  saveLevels,
+  sharedLevel,
+} from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
@@ -26,9 +34,10 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, InfoHint, LineIcon, Segmented, Text, useTheme, useToast } from "@/ui";
+import { useAgentsAccess, useSetLevels } from "../settings/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { errorHaptic, successHaptic } from "../shared/parts";
+import { errorHaptic, successHaptic, Tile } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
 import {
@@ -578,20 +587,75 @@ function ConnectStep({
   );
 }
 
-/** Who uses this connection and how far: one choice per agent (admins and each agent's owner change it). */
+/**
+ * Who uses this connection and how far: "Todos os agentes" first (admins: it sets every agent), then one choice per
+ * agent (admins and each agent's owner change it).
+ */
 export function AgentLevels({ connectionId }: { connectionId: string }) {
   const dir = useDirectory();
   const qc = useQueryClient();
   const orgId = useOrgId();
+  const { org } = useOrg();
   // A new connection: every agent's tree must be read again to show it.
   useEffect(() => {
     void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[2] === "access" });
   }, [qc]);
   return (
     <View style={styles.agents}>
+      {dir.agents.length > 1 && can(org?.role, "manage_agents") ? <EveryoneLevel connectionId={connectionId} /> : null}
       {dir.agents.map((a) => (
         <AgentLevel key={a.id} orgId={orgId} agentId={a.id} connectionId={connectionId} />
       ))}
+    </View>
+  );
+}
+
+/** "Todos os agentes": the main choice, as an agent's row; picking a level saves it for every agent, one by one. */
+function EveryoneLevel({ connectionId }: { connectionId: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const access = useAgentsAccess(dir.agents);
+  const set = useSetLevels();
+  const [saving, setSaving] = useState<Level | null>(null);
+  const [failed, setFailed] = useState(false);
+  const resourceId = `connector:${connectionId}`;
+  const levels = dir.agents.map((a) => levelIn(access.byAgent.get(a.id), resourceId));
+  const current = saving ?? (access.loading ? null : sharedLevel(levels));
+  const choose = async (level: Level) => {
+    if (saving || access.loading || level === current) return;
+    setSaving(level);
+    setFailed(false);
+    try {
+      for (const [i, a] of dir.agents.entries()) {
+        if (levels[i] !== level) await set.mutateAsync({ agentId: a.id, changes: { [resourceId]: level } });
+      }
+    } catch {
+      errorHaptic();
+      setFailed(true);
+    } finally {
+      setSaving(null);
+    }
+  };
+  return (
+    <View style={[styles.agent, styles.everyone, { borderColor: c.line2, backgroundColor: c.raised }]}>
+      <View style={styles.agentHead}>
+        <Tile icon="members" size={30} />
+        <View style={styles.grow}>
+          <Text variant="body" numberOfLines={1} style={styles.bold}>
+            {t("connectFlow.everyone")}
+          </Text>
+          <Text variant="small" tone="muted" numberOfLines={1}>
+            {t("connectFlow.everyoneCount", { count: dir.agents.length })}
+          </Text>
+        </View>
+      </View>
+      <Segmented
+        items={LEVELS.map((l) => ({ key: l, label: t(`mobile.connectors.level.${l}`) }))}
+        value={current === "custom" || current === null ? "" : current}
+        onChange={(k) => void choose(k as Level)}
+      />
+      {failed ? <Problem text={t("mobile.connectors.everyoneFailed")} /> : null}
     </View>
   );
 }
@@ -728,5 +792,6 @@ const styles = StyleSheet.create({
   badge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   agents: { gap: 10 },
   agent: { gap: 10, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  everyone: { borderWidth: 1 },
   agentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
 });
