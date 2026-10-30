@@ -369,6 +369,9 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const { phrase, timezone } = c.req.valid("json");
+      // Membership is the gate for this org's schedule reader (a model call): a
+      // supplied timezone otherwise skips the only path that checked it.
+      await requirePermission(db, c.get("user").id, orgId, "read");
       return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone), 200);
     },
   );
@@ -425,6 +428,9 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const { phrase, timezone } = c.req.valid("json");
+      // Membership is the gate for this org's schedule reader (a model call): a
+      // supplied timezone otherwise skips the only path that checked it.
+      await requirePermission(db, c.get("user").id, orgId, "read");
       const zone = await routineTimezone(db, c.get("user").id, orgId, timezone);
       const reader = routines.context ? schedulesOf(routines.context) : null;
       const reading = await readSchedule(reader, { orgId, phrase, timezone: zone });
