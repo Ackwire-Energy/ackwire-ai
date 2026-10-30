@@ -23,6 +23,9 @@ import {
   TOOL_NAMES,
 } from "./access";
 import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
+import { verifyBrowserBindPolicy } from "./browser-bind-check";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { browserPortsForUid } from "./browser-ports";
 import {
   configPath,
   DEFAULT_AGENT_UID_RANGE,
@@ -442,6 +445,7 @@ async function worker(p: Parsed): Promise<number> {
   process.stdout.on("error", () => {});
   return runWorker({
     agentId,
+    browserPorts: browserPortsForUid(process.getuid?.() ?? 0),
     home: runnerHome(),
     dir: expandHome(dir),
     input: process.stdin,
@@ -449,6 +453,20 @@ async function worker(p: Parsed): Promise<number> {
     // The root runner's log stamps it.
     log: (line) => toStderr(line),
   });
+}
+
+/** Internal kernel self-check run by root in the candidate agent slice. */
+async function bindCheck(portText: string | undefined, allowedText: string[]): Promise<number> {
+  const port = Number(portText);
+  const allowed = allowedText.map(Number);
+  if (process.getuid?.() === 0) return 1;
+  try {
+    await verifyBrowserBindPolicy(port, allowed);
+    return 0;
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 1;
+  }
 }
 
 const HOST_USAGE =
@@ -513,13 +531,21 @@ async function host(p: Parsed): Promise<number> {
     log,
     start: runnerChild(thisRunner(), (line) => console.log(line)),
   });
-  const guard = system ? new LoopbackGuard({ home: flags.state, agentUids: () => computer.agentUids(), log }) : null;
+  const guard = system
+    ? new LoopbackGuard({
+        home: flags.state,
+        agentUids: () => computer.agentUids(),
+        uidRange: DEFAULT_AGENT_UID_RANGE,
+        log,
+      })
+    : null;
   const stop = () => void computer.stop();
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   log(`agentes-runner ${RUNNER_VERSION}: this server's computer for ${flags.server} (${flags.state})`);
-  guard?.start();
   try {
+    guard?.start();
+    if (system) for (const user of computer.agentUsers()) ensureBrowserBindPolicy(user, thisRunner());
     await computer.run();
     log("stopped");
     return 0;
@@ -1169,6 +1195,8 @@ async function main(argv: string[]): Promise<number> {
     }
     case "worker":
       return worker(p);
+    case "bind-check":
+      return bindCheck(sub, p.positional.slice(2));
     case "desktop-browser":
       if (!sub) {
         console.error("Usage: agentes-runner desktop-browser <socket>");

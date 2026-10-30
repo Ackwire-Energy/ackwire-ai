@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { authorizeSubscription, currentSubscriptions, parseClientFrame } from "../src/realtime/ws";
-import { browser, createTestServer, joinByInvitation, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
+import {
+  browser,
+  createTestServer,
+  joinByInvitation,
+  listen,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+  upgradeStatus,
+} from "./harness";
 
 describe("parseClientFrame", () => {
   test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
@@ -153,6 +163,34 @@ async function meId(b: ReturnType<typeof browser>) {
   return ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
 }
 
+test("a subscribe whose check can't run (the database is away) answers an error and closes, so the tab reconnects", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  await c.next((f) => f.type === "ready");
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+  const select = t.db.select;
+  t.db.select = (() => {
+    throw new Error("connection refused");
+  }) as unknown as typeof t.db.select;
+  try {
+    c.send({ type: "subscribe", channelId });
+    expect(await c.next((f) => f.channelId === channelId)).toEqual({ type: "error", code: "unavailable", channelId });
+    expect(await closed).toBe(1011);
+  } finally {
+    t.db.select = select;
+  }
+
+  // The server lives on: the tab's next connection subscribes.
+  const again = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await again.opened;
+  again.send({ type: "subscribe", channelId });
+  expect(await again.next((f) => f.channelId === channelId)).toEqual({ type: "subscribed", channelId });
+  again.ws.close();
+});
+
 test("end to end: a subscriber sees the message, the streamed deltas and the agent's reply", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
@@ -269,9 +307,13 @@ test("a missed revocation event is reconciled from durable membership", async ()
   await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
   expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(true);
 
-  expect((await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
-    method: "DELETE",
-  })).status).toBe(204);
+  expect(
+    (
+      await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
+        method: "DELETE",
+      })
+    ).status,
+  ).toBe(204);
   expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(false);
   expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId, 20_000)).toMatchObject({
     reason: "revoked",

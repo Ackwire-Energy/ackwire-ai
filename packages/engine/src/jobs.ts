@@ -56,8 +56,8 @@ import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
-import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
 import { indexSource, reindexOrg } from "./search";
+import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
 import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
@@ -406,14 +406,18 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait } : ctx),
+        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait, jobId: job.id } : ctx),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
     },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");
-      await activateDeliveredSecret({ ...deps.sandbox, pubsub: deps.pubsub }, orgOf(job), String(job.payload.requestId));
+      await activateDeliveredSecret(
+        { ...deps.sandbox, pubsub: deps.pubsub },
+        orgOf(job),
+        String(job.payload.requestId),
+      );
     },
     "secret.discard": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret cleanup is unavailable");

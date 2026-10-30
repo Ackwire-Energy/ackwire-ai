@@ -4,13 +4,14 @@ import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
-import { Glass, PressScale, Text, useTheme } from "@/ui";
+import { Glass, haptics, PressScale, Text, useTheme } from "@/ui";
 
 /**
  * The conversation's title as a glass pill in the header: who
  * or where on the left, the name and a quiet line under it. An agent's pill carries a little of its sky at
  * the right end; while it works, a pixel sweep in its color crosses the pill (the sidebar's trail) and the
- * quiet line says what it is doing. A channel shows who is in on the right.
+ * quiet line says what it is doing. A channel shows who is in on the right. Held (`onHold`), it opens the
+ * conversation switcher.
  */
 export function HeaderPill({
   lead,
@@ -22,6 +23,8 @@ export function HeaderPill({
   onPress,
   label,
   extraActions = 0,
+  onHold,
+  holdHint,
 }: {
   lead?: ReactNode;
   title: string;
@@ -36,6 +39,9 @@ export function HeaderPill({
   label: string;
   /** Bar buttons beside "…" (an agent's computer): the centered pill gives up twice their 40 points each. */
   extraActions?: number;
+  onHold?: () => void;
+  /** What a screen reader says the hold does. */
+  holdHint?: string;
 }) {
   const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
@@ -43,9 +49,19 @@ export function HeaderPill({
     <PressScale
       to={0.97}
       onPress={onPress}
-      disabled={!onPress}
+      disabled={!onPress && !onHold}
+      {...(onHold
+        ? {
+            delayLongPress: 300,
+            onLongPress: () => {
+              haptics.medium();
+              onHold();
+            },
+          }
+        : {})}
       accessibilityRole={onPress ? "button" : "header"}
       accessibilityLabel={label}
+      accessibilityHint={holdHint}
       style={[
         styles.press,
         { maxWidth: Math.max(160, width - 136 - extraActions * 80) },

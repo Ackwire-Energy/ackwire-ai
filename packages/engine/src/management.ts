@@ -285,9 +285,7 @@ export async function listAgentChannels(db: Database, actorId: string, orgId: st
   const visible = new Set(ownChannels.map((row) => row.channelId));
   const admin = can(membership.role, "manage_agents");
   return rows
-    .filter((row) =>
-      visible.has(row.id) || (row.kind === "channel" && (row.visibility === "public" || admin)),
-    )
+    .filter((row) => visible.has(row.id) || (row.kind === "channel" && (row.visibility === "public" || admin)))
     .map(({ id, name, autoReply }) => ({ id, name, autoReply }));
 }
 
@@ -324,7 +322,13 @@ export async function setAgentChannels(
       .where(and(eq(channels.orgId, orgId), eq(channels.kind, "channel")));
     await tx
       .delete(channelMembers)
-      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), inArray(channelMembers.channelId, ordinaryChannels)));
+      .where(
+        and(
+          eq(channelMembers.orgId, orgId),
+          eq(channelMembers.agentId, agentId),
+          inArray(channelMembers.channelId, ordinaryChannels),
+        ),
+      );
     for (const c of input) {
       await tx
         .insert(channelMembers)

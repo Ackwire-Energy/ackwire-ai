@@ -81,12 +81,18 @@
   /*
    * What looks the same in both themes: a site is a light page, behind its frame and before it loads; our drawings
    * of the Mac's own menus and switches keep its blue and white; an agent's screen keeps its dark ground.
+   * A site's letter, when it has no icon, is dark on its paper. An agent's frame in the conversation has white words
+   * on the agent's color and turns graphite while a person is in control.
    */
   --site-paper: #fff;
   --site-blank: #fbfbfc;
+  --site-ink: #111;
   --mac-accent: #2f7cf6;
   --mac-accent-ink: #fff;
   --screen-bg: #1f2128;
+  --frame-ink: #fff;
+  --frame-control-a: #3a3a3c;
+  --frame-control-b: #1c1c1e;
   --text-xs: 12px; --text-sm: 13px; --text-md: 14.5px; --text-base: 15px; --text-lg: 16px;
   --text-h3: 17px; --text-h2: 20px; --text-h1: 28px; --text-display: 32px;
   --track-tight: -0.025em; --track-tighter: -0.035em;

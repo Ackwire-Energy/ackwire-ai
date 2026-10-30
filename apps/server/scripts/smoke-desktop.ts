@@ -58,16 +58,24 @@ export async function signInForDesktop(
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const verifier = randomBytes(32).toString("base64url");
   const { internalAdapter } = await auth.$context;
-  await internalAdapter.createVerificationValue({
-    identifier: HANDOFF_PREFIX + desktopChallenge(verifier),
-    value: userId,
-    expiresAt: new Date(Date.now() + 60_000),
-  });
-  const res = await fetch(`${base}/api/auth/desktop/redeem`, {
-    method: "POST",
-    headers: { origin, "content-type": "application/json" },
-    body: JSON.stringify({ verifier }),
-  });
+  // The browser's half of the hand-over (`/desktop/handoff`): redeem requires that person's live session. Only the
+  // window's session that redeem makes stays.
+  const source = await internalAdapter.createSession(userId, true);
+  let res: Response;
+  try {
+    await internalAdapter.createVerificationValue({
+      identifier: HANDOFF_PREFIX + desktopChallenge(verifier),
+      value: source.token,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    res = await fetch(`${base}/api/auth/desktop/redeem`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: JSON.stringify({ verifier }),
+    });
+  } finally {
+    await internalAdapter.deleteSession(source.token);
+  }
   const cookie = res.headers
     .getSetCookie()
     .map((c) => c.split(";")[0])

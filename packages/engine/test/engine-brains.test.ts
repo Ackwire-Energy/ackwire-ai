@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  addRunStep,
   type Brain,
   type BrainEvent,
   type BrainTurn,
@@ -19,6 +20,7 @@ import {
   createJobHandlers,
   createMissionEngine,
   decideApproval,
+  drainLocalRuns,
   drainOutbox,
   executeToolForRun,
   grantScopes,
@@ -32,6 +34,7 @@ import {
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
+  recoverStaleRuns,
   resolveBrain,
   resumeRunsWaitingForMachine,
   runWhere,
@@ -752,6 +755,142 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
   expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
   main = await timeline(f);
   expect(main.at(-1)?.body).toBe("Voltei.");
+});
+
+test("a computer turn whose server died mid-turn is sent again as cut off, with what ran, never as the request again", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Tem Go 1.23." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev tem Go aí?");
+  // Its server died in the middle of the turn, after `check_env` ran through the bridge; the dead worker still
+  // holds the job.
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const long = new Date(Date.now() - 10 * 60_000);
+  await f.db
+    .update(schema.agentRuns)
+    .set({
+      status: "running",
+      brain: "claude_code",
+      startedAt: long,
+      heartbeatAt: long,
+      transcript: { system: [], messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0 },
+    })
+    .where(eq(schema.agentRuns.id, run.id));
+  await addRunStep(f.db, run, "tool_call", { toolUseId: "c-1", name: "check_env", input: {} });
+  await addRunStep(f.db, run, "tool_result", { toolUseId: "c-1", name: "check_env", isError: false, content: "go" });
+  await f.db
+    .update(schema.outbox)
+    .set({ status: "processing", lockedUntil: new Date(Date.now() + 600_000), lockedBy: "dead" })
+    .where(eq(schema.outbox.kind, "agent_run.execute"));
+
+  expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([run.id]);
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(1);
+  expect(seen[0]?.trigger).toContain("cut off because the server restarted");
+  expect(seen[0]?.trigger).toContain("do not repeat: check_env");
+  expect(seen[0]?.trigger).toContain("tem Go aí?");
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  expect((await timeline(f)).at(-1)?.body).toBe("Tem Go 1.23.");
+});
+
+test("a computer turn cut by a crash while it answered a decision is sent again with that decision, not the request", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  let midTurn: typeof schema.agentRuns.$inferSelect | undefined;
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        {
+          id: "call-1",
+          name: "github_merge_pr",
+          input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+        },
+      );
+      yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
+      yield { type: "done", text: "Pedi aprovação para o merge." };
+      return;
+    }
+    // What a crash in the middle of this turn would leave behind: the run's row as it is now.
+    if (n === 1) [midTurn] = await f.db.select().from(schema.agentRuns);
+    yield { type: "done", text: "Merge feito." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+  if (!midTurn) throw new Error("the second turn never ran");
+
+  // The server died in that turn instead: the row as it was then, its beat minutes old.
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "running", transcript: midTurn.transcript, heartbeatAt: new Date(Date.now() - 10 * 60_000) })
+    .where(eq(schema.agentRuns.id, midTurn.id));
+  expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([midTurn.id]);
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(3);
+  expect(seen[2]?.trigger).toContain("cut off because the server restarted");
+  expect(seen[2]?.trigger).toContain("github_merge_pr ok: acme/app#42");
+  expect(seen[2]?.trigger).not.toContain("faz o merge do PR 42");
+  expect(gh.executed).toHaveLength(1);
+});
+
+test("a turn its computer's return resumed, cut by a server shutdown, goes on at once on the next instance", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  let online = true;
+  const { brain, seen } = scriptedComputerBrain((n) => {
+    if (n === 0) {
+      online = false;
+      return [{ type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true }];
+    }
+    if (n === 1) {
+      // The server begins shutting down in the middle of the turn sent again: it is cut.
+      void drainLocalRuns(0, { graceMs: 0 });
+      return [{ type: "error", code: "brain_failed", message: "The turn was stopped.", retryable: true }];
+    }
+    return [{ type: "done", text: "Voltei." }];
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+
+  // Back: its "back" job resumes the wait, and the shutdown hands that job back.
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers, { maxBatches: 1 });
+  expect(seen.length).toBe(2);
+  const back = (await f.db.select().from(schema.outbox)).find((j) => j.dedupeKey?.includes(":brain_back:"));
+  // Its wait is over: handed back, it goes on with the run instead of finding it no longer waiting.
+  expect(back).toMatchObject({ status: "pending", attempts: 0, payload: { runId: run?.id } });
+  expect(back?.payload).not.toHaveProperty("wait");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  expect(seen.length).toBe(3);
+  expect((await timeline(f)).at(-1)?.body).toBe("Voltei.");
 });
 
 test("a resumed computer turn is told what each cut-off call ran on: a command's first line, a file's path", async () => {

@@ -1115,8 +1115,13 @@ anyone who holds both can read those keys.
 
 **Every day, to a bucket.** The `backup` service dumps the database at 03:00 UTC to a bucket on
 Cloudflare R2 or another S3-compatible store, and deletes dumps older than `BACKUP_RETENTION_DAYS`
-(14 by default). Create a private bucket for the dumps alone, since they hold every message, and a
-key that can read, write and delete in it. Then add to `.env`:
+(14 by default). To lose less than a day if the server is lost, dump more often:
+`BACKUP_INTERVAL_HOURS=6` dumps at 03:00, 09:00, 15:00 and 21:00 UTC, and `1` every hour. Each dump is
+the whole database, so with hourly dumps a shorter `BACKUP_RETENTION_DAYS` keeps the bucket small. While
+a dump runs, an upgrade's migration that changes a table waits for it to end, and the app's requests to
+that table wait behind the migration: once a dump takes minutes, upgrade between dumps.
+Create a private bucket for the dumps alone, since they hold every message, and a key that can read,
+write and delete in it. Then add to `.env`:
 
 ```sh
 S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
@@ -1128,11 +1133,11 @@ S3_BACKUP_BUCKET=agentes-backups
 Add `backup` to `COMPOSE_PROFILES` too, comma-separated: `COMPOSE_PROFILES=tailscale,backup` on
 Tailscale (the setup's default), `https,backup` with Caddy, or `backup` alone. Running the setup
 again keeps it. Run `docker compose up -d`: the first dump runs right away, unless the bucket has one
-from the last 26 hours, and `docker compose logs backup` shows each one. These `S3_*` values also
-serve file storage when `S3_BUCKET` is set, so the key then needs both buckets. Outside R2, set
-`S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and `S3_REGION` if it
-needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each release under the
-app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
+from the last 26 hours (the interval plus 2), and `docker compose logs backup` shows each one. These
+`S3_*` values also serve file storage when `S3_BUCKET` is set, so the key then needs both buckets.
+Outside R2, set `S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and
+`S3_REGION` if it needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each
+release under the app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
 
 ```sh
 docker compose run --rm backup now     # a dump right away, before a big upgrade for example
