@@ -61,6 +61,7 @@ function poisoned(t: EmailTemplate, value = SENTINEL): EmailTemplate {
   const o = structuredClone(t) as Record<string, unknown>;
   for (const k of TYPED) if (typeof o[k] === "string") o[k] = value;
   if (Array.isArray(o.items)) o.items = o.items.map((i) => ({ ...i, agentName: value, title: value }));
+  if (Array.isArray(o.orgNames)) o.orgNames = o.orgNames.map(() => value);
   return o as EmailTemplate;
 }
 
@@ -122,6 +123,7 @@ describe("every email, in both languages", () => {
       join_code: true,
       workspace_deleting: true,
       workspace_restored: true,
+      account_deleted: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
   });

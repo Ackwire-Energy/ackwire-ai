@@ -6,7 +6,15 @@ import { appLocale } from "@agenteschat/i18n/locale";
 import { z } from "zod";
 import { approverIds } from "./approvals";
 import { inertText } from "./email/inert";
-import { type Block, EMAIL_PICTURES, type EmailArt, type EmailDoc, type EmailLocale, renderDoc } from "./email/layout";
+import {
+  type Block,
+  EMAIL_PICTURES,
+  type EmailArt,
+  type EmailDoc,
+  type EmailLocale,
+  type Inline,
+  renderDoc,
+} from "./email/layout";
 import { WORDS } from "./email/words";
 import { dayAndTime } from "./format";
 import { adminIds } from "./gateway";
@@ -155,6 +163,21 @@ export type EmailTemplate =
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
   | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  /**
+   * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for
+   * good at `dueAt` (ISO, shown in `timeZone`). `support`: whom to write to if it wasn't them (`SUPPORT_EMAIL`), else
+   * the people who run the server. `url`: the server's own address, for the pictures.
+   */
+  | {
+      kind: "account_deleted";
+      locale: EmailLocale;
+      email: string;
+      orgNames: string[];
+      dueAt: string | null;
+      timeZone: string;
+      support: string | null;
+      url: string;
+    }
   /** The workspace's own computer is ready after a long wait (ADR 0056 §10): what it is, and what to do next. */
   | {
       kind: "computer_ready";
@@ -519,6 +542,25 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [{ p: c.body(inertText(t.byName) || w.someone, org) }, { button: c.button, url: t.url }],
         c.why(org),
+      );
+    }
+    case "account_deleted": {
+      const c = w.accountDeleted;
+      const names = new Intl.ListFormat(lang, { type: "conjunction" })
+        .formatToParts(t.orgNames.map((name) => inertText(name)))
+        .map((part): Inline => (part.type === "element" ? { b: part.value } : part.value));
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(inertText(t.email)) },
+          ...(t.dueAt && t.orgNames.length > 0
+            ? [{ p: c.closes(t.orgNames.length, dayAndTime(new Date(t.dueAt), t.timeZone, lang).day, names) }]
+            : []),
+          { small: t.support ? c.support(t.support) : c.noSupport },
+        ],
+        c.why,
       );
     }
   }

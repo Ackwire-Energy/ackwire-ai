@@ -264,4 +264,37 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     byName: "Ana Souza",
     url: `${APP}/org/${ORG}`,
   },
+  /** Two workspaces closed with it, on a server with a support address. */
+  "account_deleted.en": {
+    kind: "account_deleted",
+    locale: "en",
+    email: "ana@souzabakery.com",
+    orgNames: ["Souza Bakery", "Ana's drafts"],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/New_York",
+    support: "help@agentes.chat",
+    url: APP,
+  },
+  /** One workspace closed with it; the server has no support address. */
+  "account_deleted-one.pt-BR": {
+    kind: "account_deleted",
+    locale: "pt-BR",
+    email: "ana@padariasouza.com.br",
+    orgNames: ["Padaria Souza"],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    support: null,
+    url: APP,
+  },
+  /** Nothing closed with it: they were only in workspaces with others. */
+  "account_deleted-none.en": {
+    kind: "account_deleted",
+    locale: "en",
+    email: "ana@souzabakery.com",
+    orgNames: [],
+    dueAt: null,
+    timeZone: "UTC",
+    support: "help@agentes.chat",
+    url: APP,
+  },
 };

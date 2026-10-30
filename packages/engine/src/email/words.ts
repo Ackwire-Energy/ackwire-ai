@@ -1,4 +1,4 @@
-import type { EmailLocale, Text } from "./layout";
+import type { EmailLocale, Inline, Text } from "./layout";
 
 /**
  * Every email's words, in English and pt-BR. Plain text only (bold is `{ b }`): the layout escapes it.
@@ -257,6 +257,22 @@ const en = {
     button: "Open the workspace",
     why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
   },
+  accountDeleted: {
+    subject: "Your agentes.chat account was deleted",
+    preheader: "It's signed out everywhere and can't sign in again.",
+    headline: "Your account was deleted",
+    body: (email: string): Text => ["We deleted the account ", { b: email }, "."],
+    closes: (count: number, day: string, names: Inline[]): Text => [
+      count === 1
+        ? `The workspace only you were in is closed and will be deleted for good on ${day}: `
+        : `The workspaces only you were in are closed and will be deleted for good on ${day}: `,
+      ...names,
+      ".",
+    ],
+    support: (address: string): Text => ["If it wasn't you, write to ", { mail: address }, "."],
+    noSupport: "If it wasn't you, tell the people who run this server." as Text,
+    why: "You got this email because this address had an account on agentes.chat.",
+  },
 };
 
 type Words = typeof en;
@@ -488,6 +504,22 @@ const ptBR: Words = {
     body: (by, org) => [{ b: by }, " restaurou ", { b: org }, ". Ele voltou a funcionar."],
     button: "Abrir o workspace",
     why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+  },
+  accountDeleted: {
+    subject: "Sua conta do agentes.chat foi apagada",
+    preheader: "Ela saiu de todos os aparelhos e não entra mais.",
+    headline: "Sua conta foi apagada",
+    body: (email) => ["Apagamos a conta ", { b: email }, "."],
+    closes: (count, day, names) => [
+      count === 1
+        ? `O workspace em que só você estava está fechado e vai ser apagado de vez em ${day}: `
+        : `Os workspaces em que só você estava estão fechados e vão ser apagados de vez em ${day}: `,
+      ...names,
+      ".",
+    ],
+    support: (address) => ["Se não foi você, escreva para ", { mail: address }, "."],
+    noSupport: "Se não foi você, avise quem cuida deste servidor.",
+    why: "Você recebeu este e-mail porque este endereço tinha uma conta no agentes.chat.",
   },
 };
 
