@@ -543,7 +543,9 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
     expect(box.textContent).toContain("Ada agora pensa com Claude Team.");
     // On his plan she answers only him until he lets everyone in (ADR 0059 §5).
-    expect(within(box).getByRole("switch", { name: "Responde a todos" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(box).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     await click(within(box).getByRole("button", { name: "Pronto" }));
     expect(dialog("Conectar uma IA para a Ada")).toBeNull();
@@ -622,7 +624,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     // Her model runs on that key: it stays.
     expect(calls(state, "agents.update").map((c) => c.args)).toEqual([[ORG_ID, ADA_ID, { credentialId: "cred-1" }]]);
     expect(box.textContent).toContain("Ada agora pensa com Claude da Acme.");
-    expect(within(box).queryByRole("switch", { name: "Responde a todos" })).toBeNull();
+    expect(within(box).queryByRole("switch", { name: "Atende outras pessoas" })).toBeNull();
   });
 
   test("someone else's agent: its owner's account shows, locked, his alone to pick; an admin may still give her a key", async () => {

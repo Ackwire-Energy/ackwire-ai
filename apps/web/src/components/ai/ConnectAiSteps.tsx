@@ -353,7 +353,7 @@ export function ExistingRows({
   );
 }
 
-/** After a row of what the person already had: what the agent thinks with now, and on a plan whom it replies to. */
+/** After a row of what the person already had: what the agent thinks with now, and on a plan whom it answers. */
 export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: ExistingUsed }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -386,11 +386,12 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
           <PlanReplies
+            agent={agent.name}
             on={on}
             onChange={(v) => void reply(v)}
             brain={a.kind}
             plan={a.plan}
-            maker={planOf(a.provider)?.maker}
+            coding={planOf(a.provider)}
             disabled={busy}
           />
         </div>
