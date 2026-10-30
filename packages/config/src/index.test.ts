@@ -30,7 +30,7 @@ describe("loadConfig", () => {
     expect(config.AGENT_MAX_HOPS).toBe(3);
     expect(config.S3_PATH_STYLE).toBe(false);
     expect(config.MILLIONSEND_API_URL).toBe("https://api.millionsend.com");
-    // Unset: the email senders use ola@ on the host of PUBLIC_URL.
+    // Unset: the email senders use ping@ on the host of PUBLIC_URL.
     expect(config.EMAIL_FROM).toBeUndefined();
   });
 
@@ -58,13 +58,13 @@ describe("loadConfig", () => {
     expect([selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([undefined, undefined]);
   });
 
-  test("agentes.chat's own servers send from ola@agentes.chat, whichever of its addresses they are at", () => {
+  test("agentes.chat's own servers send from ping@agentes.chat, whichever of its addresses they are at", () => {
     for (const site of ["https://app.agentes.chat", "https://agentes.chat"]) {
-      expect(loadConfig({ ...valid, PUBLIC_URL: site }).EMAIL_FROM).toBe("agentes.chat <ola@agentes.chat>");
+      expect(loadConfig({ ...valid, PUBLIC_URL: site }).EMAIL_FROM).toBe("agentes.chat <ping@agentes.chat>");
     }
     const set = loadConfig({ ...valid, PUBLIC_URL: "https://app.agentes.chat", EMAIL_FROM: "ops@agentes.chat" });
     expect(set.EMAIL_FROM).toBe("ops@agentes.chat");
-    // Elsewhere it stays unset: the sender is ola@ on the host of PUBLIC_URL.
+    // Elsewhere it stays unset: the sender is ping@ on the host of PUBLIC_URL.
     expect(loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" }).EMAIL_FROM).toBeUndefined();
   });
 

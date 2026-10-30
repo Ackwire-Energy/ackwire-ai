@@ -23,7 +23,7 @@ describe("MillionSend sender", () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const sender = createMillionSendSender({
       apiKey: "ms_test",
-      from: "agentes <ola@agentes.chat>",
+      from: "agentes <ping@agentes.chat>",
       replyTo: "suporte@agentes.chat",
       fetch: (async (url: string, init: RequestInit) => {
         calls.push({ url, init });
@@ -36,7 +36,7 @@ describe("MillionSend sender", () => {
     expect(headers.get("authorization")).toBe("Bearer ms_test");
     expect(headers.get("idempotency-key")).toBe("invite:1");
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
-      from: "agentes <ola@agentes.chat>",
+      from: "agentes <ping@agentes.chat>",
       to: ["ana@example.com"],
       subject: "Oi",
       html: "<p>Oi</p>",
@@ -161,12 +161,12 @@ describe("SMTP sender", () => {
     const mails: Mail.Options[] = [];
     const sender = createSmtpEmailSender({
       url: "smtps://u:p@smtp.example.com",
-      from: "agentes <ola@example.com>",
+      from: "agentes <ping@example.com>",
       replyTo: "suporte@example.com",
       transport: {
         sendMail: async (mail: Mail.Options) => {
           mails.push(mail);
-          return { messageId: "<m1@example.com>", envelope: { from: "ola@example.com", to: ["ana@example.com"] } };
+          return { messageId: "<m1@example.com>", envelope: { from: "ping@example.com", to: ["ana@example.com"] } };
         },
       },
     });
@@ -174,7 +174,7 @@ describe("SMTP sender", () => {
     expect(await sender.send(msg)).toEqual({ id: "<m1@example.com>" });
     expect(mails).toEqual([
       {
-        from: "agentes <ola@example.com>",
+        from: "agentes <ping@example.com>",
         to: ["ana@example.com"],
         subject: "Oi",
         html: "<p>Oi</p>",
@@ -185,7 +185,7 @@ describe("SMTP sender", () => {
     // nodemailer builds a valid message from it.
     const json = createSmtpEmailSender({
       url: "smtp://unused",
-      from: "agentes <ola@example.com>",
+      from: "agentes <ping@example.com>",
       transport: nodemailer.createTransport({ jsonTransport: true }),
     });
     expect((await json.send(msg)).id).toMatch(/^<.+>$/);
