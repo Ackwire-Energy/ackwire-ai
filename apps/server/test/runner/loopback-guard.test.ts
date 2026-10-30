@@ -1,7 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { browserPortsForUid, checkEphemeralRange, validateBrowserUidRange } from "../../runner/browser-ports";
 import {
   type GuardedListener,
+  conflictingBrowserPorts,
   LoopbackGuard,
   parseListeners,
   RUNNER_NFT_TABLE,
@@ -16,6 +18,7 @@ afterEach(() => removeDirs(dirs));
 const A: GuardedListener = { port: 45891, uid: 21000 };
 const A2: GuardedListener = { port: 45777, uid: 21000 };
 const B: GuardedListener = { port: 50001, uid: 21001 };
+const RANGE: [number, number] = [21000, 21001];
 
 /** `ss -Htln -e` lines as the kernel prints them: no `uid:` for root, `uid:<n>` otherwise. */
 function ssOutput(rows: { port: number; uid?: number; state?: string; address?: string }[]): string {
@@ -30,7 +33,7 @@ function ssOutput(rows: { port: number; uid?: number; state?: string; address?: 
 // ── render ───────────────────────────────────────────────────────────────
 
 test("renders the table, both sets and the owner/root/reject chain for two agents", () => {
-  const text = renderRuleset([A, A2, B], "reject with tcp reset");
+  const text = renderRuleset([A, A2, B], "reject with tcp reset", RANGE);
   // Atomic single-table replace, never `flush ruleset` (the Cloud guard has its own table).
   expect(text).toContain(`table inet ${RUNNER_NFT_TABLE} {}`);
   expect(text).toContain(`delete table inet ${RUNNER_NFT_TABLE}`);
@@ -43,26 +46,34 @@ test("renders the table, both sets and the owner/root/reject chain for two agent
   // Guarded set: the ports, each once.
   expect(text).toContain("type inet_service\n");
   expect(text).toMatch(/guarded \{[^}]*elements = \{ 45891, 45777, 50001 \}/s);
-  // The three rules, in order: owner pair, then root, then reject.
+  // Permanent browser pairs are checked before the polled listener exceptions.
+  expect(text).toContain("12000 . 21000");
+  expect(text).toContain("12002 . 21001");
+  const reply = text.indexOf('oif "lo" ct direction reply accept');
+  const browser = text.indexOf('oif "lo" tcp dport @browser_ports reject with tcp reset');
   const owner = text.indexOf('oif "lo" tcp dport . meta skuid @owner accept');
   const root = text.indexOf('oif "lo" meta skuid 0 accept');
   const reject = text.indexOf('oif "lo" tcp dport @guarded reject with tcp reset');
+  expect(reply).toBeGreaterThan(root);
+  expect(browser).toBeGreaterThan(reply);
+  expect(owner).toBeGreaterThan(browser);
   expect(owner).toBeGreaterThan(0);
-  expect(root).toBeGreaterThan(owner);
-  expect(reject).toBeGreaterThan(root);
+  expect(reject).toBeGreaterThan(owner);
 });
 
-test("with no agent listeners the sets are empty and nothing is rejected but the table still loads", () => {
-  const text = renderRuleset([], "reject with tcp reset");
+test("browser ports are guarded before any agent listener or UID exists", () => {
+  const text = renderRuleset([], "reject with tcp reset", RANGE);
   expect(text).toContain("set owner");
   expect(text).toContain("set guarded");
-  expect(text).not.toContain("elements =");
+  expect(text).toContain("12000 . 21000");
+  expect(text).toContain("12003 . 21001");
+  expect(text).toContain("@browser_ports reject with tcp reset");
   expect(text).toContain("@guarded reject with tcp reset");
 });
 
 test("the drop fallback renders drop instead of reject", () => {
-  expect(renderRuleset([A], "drop")).toContain('oif "lo" tcp dport @guarded drop');
-  expect(renderRuleset([A], "drop")).not.toContain("reject");
+  expect(renderRuleset([A], "drop", RANGE)).toContain('oif "lo" tcp dport @guarded drop');
+  expect(renderRuleset([A], "drop", RANGE)).not.toContain("reject");
 });
 
 // ── parse ss ───────────────────────────────────────────────────────────────
@@ -100,7 +111,7 @@ test("a port shared by different agent uids never grants either uid access to th
   );
   expect(listeners).toContainEqual({ port: 45891, uid: 21000 });
   expect(listeners).toContainEqual({ port: 45891, uid: 21001 });
-  const text = renderRuleset(listeners, "reject with tcp reset");
+  const text = renderRuleset(listeners, "reject with tcp reset", RANGE);
   expect(text).not.toContain("45891 . 21000");
   expect(text).not.toContain("45891 . 21001");
   expect(text).toContain("50001 . 21001");
@@ -115,7 +126,7 @@ test("a port shared by different agent uids never grants either uid access to th
       ]),
       new Set([21000, 21001]),
     );
-    const rules = renderRuleset(mixed, "reject with tcp reset");
+    const rules = renderRuleset(mixed, "reject with tcp reset", RANGE);
     expect(rules).not.toContain("45891 . 21000");
     expect(rules).not.toContain("45891 . 21001");
     expect(rules).toMatch(/guarded \{[^}]*elements = \{ 45891 \}/s);
@@ -151,7 +162,10 @@ function guard(run: RunCommand, agentUids: number[]) {
   const home = tempDir("loopback-guard-");
   dirs.push(home);
   const logs: string[] = [];
-  return { g: new LoopbackGuard({ home, agentUids: () => agentUids, run, log: (l) => logs.push(l) }), logs };
+  return { g: new LoopbackGuard({
+    home, agentUids: () => agentUids, uidRange: RANGE, run, log: (l) => logs.push(l),
+    systemd: true, ephemeralRange: "32768 60999",
+  }), logs };
 }
 
 test("reconcile guards the agent's port after reading its uid from ss, and leaves others alone", () => {
@@ -234,13 +248,56 @@ test("falls back to drop when the kernel refuses the reject rule", () => {
   g.stop();
 });
 
-test("without nft it warns once and does not crash or apply", () => {
+test("without nft system mode refuses before a worker starts", () => {
   const nft = fakeNft({ hasNft: false });
   const { g, logs } = guard(nft.run, [21000]);
-  g.start();
-  g.reconcile();
-  expect(logs.length).toBe(1);
-  expect(logs[0]).toContain("not isolated");
+  expect(() => g.start()).toThrow("requires nft");
+  expect(logs).toHaveLength(0);
   expect(nft.calls.some((c) => c.startsWith("nft -f"))).toBe(false);
   g.stop();
+});
+
+test("two host organization blocks get distinct permanent browser pairs", () => {
+  expect(browserPortsForUid(20000)).toEqual({ cdp: 10000, stream: 10001 });
+  expect(browserPortsForUid(20100)).toEqual({ cdp: 10200, stream: 10201 });
+  const text = renderRuleset([], "drop", [20000, 20100]);
+  expect(text).toContain("10000 . 20000");
+  expect(text).toContain("10200 . 20100");
+  expect(() => validateBrowserUidRange([20000, 30000])).toThrow("one 10,000-uid block");
+});
+
+test("a pre-existing wrong-owner browser listener blocks startup with its owner exception removed", () => {
+  const nft = fakeNft({ listeners: ssOutput([{ port: 12000, uid: 21001 }]) });
+  const { g } = guard(nft.run, [21000, 21001]);
+  expect(conflictingBrowserPorts(ssOutput([{ port: 12000, uid: 21001 }]), RANGE)).toEqual([12000]);
+  expect(() => g.start()).toThrow("Reserved browser ports have the wrong owner: 12000");
+  expect(nft.applied()).not.toContain("12000 . 21000");
+  expect(nft.applied()).toContain("12001 . 21000");
+  g.stop();
+});
+
+test("correct browser owner is accepted and a later collision removes its exception", () => {
+  const opts = { listeners: ssOutput([{ port: 12000, uid: 21000 }]) };
+  const nft = fakeNft(opts);
+  const { g } = guard(nft.run, [21000, 21001]);
+  g.start();
+  expect(nft.applied()).toContain("12000 . 21000");
+  opts.listeners = ssOutput([{ port: 12000, uid: 21001 }]);
+  g.reconcile();
+  expect(nft.applied()).not.toContain("12000 . 21000");
+  g.stop();
+});
+
+test("an overlapping ephemeral range refuses system mode because bind(0) can select a browser port", () => {
+  expect(() => checkEphemeralRange("10000 60999")).toThrow("overlaps reserved browser ports");
+  expect(() => checkEphemeralRange("32768 60999")).not.toThrow();
+});
+
+test("old UIDs in another bucket or duplicate UIDs refuse startup before nft applies", () => {
+  for (const uids of [[21000, 31000], [21000, 21000]]) {
+    const nft = fakeNft();
+    const { g } = guard(nft.run, uids);
+    expect(() => g.start()).toThrow("Persisted agent UIDs overlap or fall outside");
+    expect(nft.calls.some((call) => call.startsWith("nft -f"))).toBe(false);
+  }
 });

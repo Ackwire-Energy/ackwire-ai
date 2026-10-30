@@ -4,6 +4,7 @@ import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { type SecretTarget, sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { describeRequest, handleRequest, type RequestScope } from "../../runner/handlers";
+import { handleSecret } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -207,6 +208,20 @@ test("a removed newer secret keeps an older delayed activation superseded", asyn
   expect(await older.activate()).toEqual({ superseded: true });
   const env = (await call({ agent: dev, ...exec('echo "[$NPM_TOKEN]"') })) as { stdout: string };
   expect(env.stdout.trim()).toBe("[]");
+});
+
+test("a delayed broker install cannot restore a secret after its request was removed", async () => {
+  const { ws, home, call, give } = setup();
+  const requestId = "req-0041-aaaa";
+  const name = "API_KEY";
+  const sent = await give(dev, requestId, name, { kind: "env" }, "removed-value");
+  await sent.commit();
+  await call({ agent: dev, op: "secret", action: "remove", name, throughOrder: sent.order });
+  const result = await handleSecret(path.join(home, "secrets"), dev, ws, {
+    action: "install", requestId, name, target: { kind: "env" }, value: "removed-value", order: sent.order,
+  });
+  expect(result).toEqual({ superseded: true });
+  expect((await call({ agent: dev, ...exec('echo "[$API_KEY]"') }) as { stdout: string }).stdout.trim()).toBe("[]");
 });
 
 test("removal of an old request leaves a newer value in place", async () => {
