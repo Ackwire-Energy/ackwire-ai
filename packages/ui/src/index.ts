@@ -201,6 +201,7 @@ export {
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planLine,
   planState,
   planWindows,
 } from "./components/PlanMeter";
