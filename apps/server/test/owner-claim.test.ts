@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { schema } from "@agenteschat/db";
+import { deleteAccount } from "@agenteschat/engine";
 import { browser, createTestServer, signUp, type TestServer } from "./harness";
 
 /**
@@ -168,5 +169,27 @@ describe("the desktop app's owner key (OWNER_KEY_SHA256)", () => {
     const twice = await window("/api/app/me/password", { json: { password: "another one entirely" } });
     expect(twice.status).toBe(409);
     expect(await twice.json()).toMatchObject({ error: { code: "password_set" } });
+  });
+
+  test("the key follows the pinned owner, not whoever is oldest after a deletion", async () => {
+    t = await createTestServer({ env: { OWNER_KEY_SHA256: sha256(KEY), ALLOW_SIGNUP: "true" } });
+    expect((await ownerKey({ key: KEY, name: "Ana", email: "ana@example.com" })).status).toBe(200);
+    const [ana] = await t.db.select().from(schema.users);
+    if (!ana) throw new Error("no owner account");
+    // A newer account, then the owner deletes hers (deleteAccount pins the owner first, so it stays Ana once gone).
+    await signUp(browser(t), "bia@example.com");
+    await deleteAccount(t.db, ana.id);
+    // The owner key must never sign in as Bia, the now-oldest account.
+    const later = await ownerKey({ key: KEY });
+    const token = ((await later.json()) as { token?: string }).token;
+    let email: string | null = null;
+    if (token) {
+      const { res, window } = await trade(token);
+      if (res.status === 200) {
+        const me = await window("/api/app/me");
+        if (me.status === 200) email = ((await me.json()) as { user: { email: string } }).user.email;
+      }
+    }
+    expect(email).not.toBe("bia@example.com");
   });
 });
