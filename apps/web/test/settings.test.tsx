@@ -459,7 +459,15 @@ describe("Configurações do workspace", () => {
       within(nav)
         .getAllByRole("link")
         .map((l) => l.textContent),
-    ).toEqual(["Notificações", "Geral", "Membros e convites", "Conectores", "Computadores", "Orçamento e uso", "Contas de IA"]);
+    ).toEqual([
+      "Notificações",
+      "Geral",
+      "Membros e convites",
+      "Conectores",
+      "Computadores",
+      "Orçamento e uso",
+      "Contas de IA",
+    ]);
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
