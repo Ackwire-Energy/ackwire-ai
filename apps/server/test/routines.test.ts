@@ -92,3 +92,31 @@ test("webhooks: signature checked; a GitHub PR opened fires the routine listenin
   expect(run?.event).toMatchObject({ summary: "PR #7 opened in acme/app: Fix login" });
   expect((await t.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(true);
 });
+
+test("the schedule parsers need org membership even when a timezone is given", async () => {
+  // A second account needs sign-up open (the first account closes it otherwise).
+  await t.close();
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["Feito."] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+
+  // An authenticated user who is not a member of this org.
+  const outsider = browser(t);
+  await signUp(outsider, "outsider@example.com");
+
+  // A supplied timezone used to skip the only path that checked membership.
+  for (const path of ["parse-schedule", "parse-rule"]) {
+    const res = await outsider(`/api/app/organizations/${orgId}/routines/${path}`, {
+      json: { phrase: "weekdays at 9", timezone: "America/Sao_Paulo" },
+    });
+    expect(res.status).toBe(403);
+  }
+
+  // Not signed in at all.
+  const anon = browser(t);
+  const r = await anon(`/api/app/organizations/${orgId}/routines/parse-schedule`, {
+    json: { phrase: "weekdays at 9", timezone: "America/Sao_Paulo" },
+  });
+  expect(r.status).toBe(401);
+});
