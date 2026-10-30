@@ -925,6 +925,32 @@ describe("agentes.chat bundle", () => {
     expect(fenced.source.files).toEqual(["pasted"]);
   });
 
+  test("labels another app's agent writes as paragraphs are shortened to what the server takes, never refused", () => {
+    // Grok Bot wrote left-out labels of 503 to 1,768 characters, and the server takes 500: the whole import failed.
+    const paragraph =
+      "A daily routine that reads the inbox, sums up the threads and tells the team in the channel. ".repeat(20);
+    const b = parseImport([
+      {
+        name: "agentes-chat-export.json",
+        text: JSON.stringify({
+          ...ourBundle,
+          todo: [{ kind: "app", label: paragraph, agents: ["writer"] }],
+          leftOut: [
+            { kind: "routine", label: paragraph },
+            { kind: "other", label: "Q4 planning" },
+          ],
+        }),
+      },
+    ]);
+    const labels = [...b.todo.map((t) => t.label), ...b.leftOut.map((l) => l.label)];
+    expect(labels.every((label) => label.length <= 500)).toBe(true);
+    const long = b.leftOut.find((l) => l.label.startsWith("A daily routine that reads the inbox"))?.label ?? "";
+    expect(long.length).toBeGreaterThan(400);
+    expect(long.endsWith("channel.")).toBe(true);
+    // A label that fits stays as written.
+    expect(b.leftOut.find((l) => l.kind === "other")?.label).toBe("Q4 planning");
+  });
+
   test("the export prompt asks for exactly our shape, and never for a secret", () => {
     expect(EXPORT_PROMPT).toContain('"format": "agenteschat.bundle"');
     expect(EXPORT_PROMPT).toContain('"version": 1');

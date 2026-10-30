@@ -8,11 +8,13 @@ import { useTheme } from "./theme";
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
- * the text, an uppercase faint header above and a faint footer below.
+ * the text, an uppercase faint header above and a faint footer below. With no
+ * rows it draws nothing, never an empty card.
  */
 export function GroupedList({ children }: { children?: ReactNode }) {
   const { colors: c, shadows } = useTheme();
   const items = Children.toArray(children).filter(isValidElement);
+  if (items.length === 0) return null;
   return (
     <View style={[styles.list, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
       {items.map((child, i) => (

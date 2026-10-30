@@ -114,6 +114,8 @@ test("a tool of a connection the agent lacks names that connection's permission;
     connector: "github",
     apiKey: "ghp_secret_123456",
   });
+  // A new connection is every agent's: take it away from this one, as an admin can.
+  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, github.id));
   const bia = await addUser(f.db, "bia");
   const { organization: other } = await createOrganization(f.db, bia.id, { name: "Other" });
   const theirs = await createApiKeyConnection(deps(), bia.id, other.id, {

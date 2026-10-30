@@ -126,7 +126,7 @@ export function MessageReactions({
   if (shown.length === 0 && !extra) return null;
   const nameOf = (id: string) =>
     id === userId ? t("reactions.you") : (dir.memberById.get(id)?.name ?? t("reactions.someone"));
-  const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("reactions.someone");
+  const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("reactions.someone");
   return (
     <Reactions label={t("channel.reactions")}>
       {/* No pills: the memory mark starts the row (no divider before it), "+" after it. */}

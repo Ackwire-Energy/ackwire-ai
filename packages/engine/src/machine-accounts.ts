@@ -1190,7 +1190,40 @@ export async function releaseMemberAccounts(
   return out;
 }
 
-/** After `releaseMemberAccounts`: pages refetch, and the replica holding each machine's runner removes them. */
+/**
+ * An agent is being deleted (ADR 0082): its login (the account it thinks with, which serves only it) becomes a
+ * tombstone like one a person removes; the account's other logins stay with their agents. Runs in the caller's
+ * transaction; `announceReleasedAccounts` afterwards.
+ */
+export async function releaseAgentLogin(db: Executor, orgId: string, agentId: string): Promise<ReleasedAccounts> {
+  const [login] = await db
+    .select({ id: machineAccounts.id, machineId: machineAccounts.machineId })
+    .from(agents)
+    .innerJoin(
+      machineAccounts,
+      and(eq(machineAccounts.orgId, agents.orgId), eq(machineAccounts.id, agents.brainAccountId)),
+    )
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId), ne(machineAccounts.status, "removing")));
+  if (!login) return { machines: [], agents: [] };
+  // An archived agent's login may have been given to a live agent since (one agent per login counts only those
+  // not archived): it stays that agent's.
+  const [live] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        eq(agents.brainAccountId, login.id),
+        ne(agents.id, agentId),
+        isNull(agents.archivedAt),
+      ),
+    );
+  if (live) return { machines: [], agents: [] };
+  const agentIds = await tombstone(db, orgId, [login.id]);
+  return { machines: [{ orgId, machineId: login.machineId }], agents: [{ orgId, agentIds }] };
+}
+
+/** After `releaseMemberAccounts` or `releaseAgentLogin`: pages refetch, and the replica holding each machine's runner removes them. */
 export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
   for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);
   for (const m of released.machines) {

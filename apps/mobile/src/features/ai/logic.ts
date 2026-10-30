@@ -2,13 +2,22 @@ import type {
   AgentBrain,
   AgentBrainInput,
   BrainKind,
+  Credential,
   MachineAccount,
   MachineAccountKind,
   PlanUsage,
 } from "@agenteschat/client";
+import {
+  type AccountChoice,
+  accountAbout,
+  accountTitle,
+  type ExistingAi,
+  existingAi,
+} from "@agenteschat/client/lib/ai-accounts";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { PlanGate } from "@agenteschat/client/lib/no-ai";
 import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
 /*
@@ -118,4 +127,37 @@ export function modelInput(
   if (isAuto(value)) return { model: AUTO, effort: AUTO };
   const defaultModel = view.options.find((o) => o.kind === view.brain)?.defaultModel;
   return { model: value === defaultModel ? null : value, ...(isAuto(view.effort) ? { effort: "medium" } : {}) };
+}
+
+/** An account as the agent's AI lists it (its page and Connect an AI): its name and plan, the line under it, its mark. */
+export const accountRow = (t: TFunction, choice: AccountChoice<MachineAccount>, agentName: string) => ({
+  label: accountTitle(choice.login),
+  sub: accountAbout(t, choice, agentName),
+  mark: choice.login.provider ?? choice.login.kind,
+  off: choice.login.status === "signed_out",
+});
+
+/**
+ * Connect an AI's first group: what the person already has for the agent (`existingAi`), each row as it reads, the
+ * accounts as the agent's page lists them and a workspace key with the budget line under it.
+ */
+export function existingRows(
+  t: TFunction,
+  view: Pick<AgentBrain, "accounts" | "account">,
+  keys: readonly Credential[],
+  agentName: string,
+) {
+  return existingAi(view, keys).map((row: ExistingAi) =>
+    row.kind === "key"
+      ? {
+          key: row.key.id,
+          row,
+          label: row.key.label,
+          sub: t("newAgent.otherKeyDesc", { provider: providerLabel(row.key.provider), hint: row.key.keyHint }),
+          below: t("agentPage.work.brain.modelText", agentGrammar(t, agentName)),
+          mark: row.key.provider,
+          off: false,
+        }
+      : { key: row.choice.login.id, row, ...accountRow(t, row.choice, agentName) },
+  );
 }

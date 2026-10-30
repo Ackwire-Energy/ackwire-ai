@@ -519,6 +519,13 @@ html:has(.onb) {
   gap: 4px;
   height: 18.9px;
 }
+/* After the few faces a row shows: how many more. */
+.onb__faces-more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
 @supports (top: 1lh) {
   .onb__done-row > .ac-icon {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
@@ -713,7 +720,7 @@ html:has(.onb) {
   .onb__crew {
     gap: 8px;
   }
-  /* Two agents a side around the computer from 360 px wide; the checklist names everyone. */
+  /* Two agents a side around the computer from 360 px wide; the checklist counts the rest. */
   .onb__scene {
     gap: 8px;
     height: 184px;

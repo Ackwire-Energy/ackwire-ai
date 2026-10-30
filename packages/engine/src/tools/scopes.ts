@@ -264,7 +264,7 @@ export async function setAgentScopes(
   const [agent] = await db
     .select({ id: agents.id })
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
   if (!agent) throw new NotFoundError("Agent not found");
   // Mail grants stay as they are (the mail API manages them); any sent back here are ignored.
   const mail = await mailConnectionIds(
