@@ -1484,7 +1484,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem {{she}} responde",
+    audience: "Quem {{she}} atende",
     another: "Outra IA",
   },
   crash: {

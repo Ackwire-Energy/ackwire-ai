@@ -1,5 +1,5 @@
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { planTerms } from "@agenteschat/client/lib/plans";
+import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactElement, ReactNode } from "react";
@@ -48,29 +48,32 @@ export function Note({
 }
 
 /**
- * "Responde a todos" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan replies only to them;
- * on, to everyone who may talk to it. Under it, a line saying the plan's terms are a gray area there, what they say
- * behind its ⓘ. A plan's page and the agent's AI draw the same.
+ * "Atende outras pessoas" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan answers only them;
+ * on, everyone who may talk to it. Under it, a line saying which, on which plan, and the plan's terms behind its ⓘ.
+ * A plan's page and the agent's AI draw the same.
  */
 export function PlanReplies({
   on,
   onChange,
+  agent,
   brain,
   plan,
-  maker,
+  coding,
   disabled,
 }: {
   on: boolean;
   onChange: (on: boolean) => void;
+  /** The agent's name, for the line under the switch. */
+  agent: string;
   brain: "claude_code" | "codex";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
-  /** A coding plan's maker, whose own words they are. */
-  maker?: string;
+  /** A coding plan, named by the line, its maker's words behind the ⓘ. */
+  coding?: CodingPlan;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const terms = planTerms(t, brain, plan, maker);
+  const says = planReplies(t, { on, agent, brain, plan, coding });
   return (
     <View>
       <GroupedList>
@@ -83,9 +86,9 @@ export function PlanReplies({
         />
       </GroupedList>
       <View style={styles.foot}>
-        <InfoHint name={t("common.about", { label: terms.line })} text={terms.text} variant="footnote">
+        <InfoHint name={says.about} text={says.text} variant="footnote">
           <Text variant="footnote" tone="faint">
-            {terms.line}
+            {says.line}
           </Text>
         </InfoHint>
       </View>
@@ -93,14 +96,14 @@ export function PlanReplies({
   );
 }
 
-/** The same place for someone who isn't the plan's owner: whom the agent replies to, and who decides. */
+/** The same place for someone who isn't the plan's owner: whom the agent answers, and who decides. */
 export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: string; agentName: string }) {
   const { t } = useTranslation();
   return (
     <View>
       <GroupedList>
         <GroupedRow
-          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { name: owner })}
+          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { owner })}
           labelLines={2}
         />
       </GroupedList>

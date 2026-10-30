@@ -2671,8 +2671,8 @@ export const en: Translations = {
     and: " and ",
   },
   members: {
-    agentsOnlyYou: "Your agents only reply to you.",
-    agentsOnlyYouHint: "On a plan, you can let each one reply to everyone on its page.",
+    agentsOnlyYou: "Your agents answer only you.",
+    agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",
     roleFilter: "Role",
     rolesCount_one: "{{count}} role",
@@ -4584,29 +4584,38 @@ export const en: Translations = {
   },
   aiAccounts: {
     share: {
-      switch: "Replies to everyone",
-      switchAll: "Reply to everyone",
-      switchOther: "Only replies to {{name}}",
-      onOther: "{{She}} uses {{owner}}'s plan: only {{owner}} can let other people talk to {{pronoun}}.",
-      terms: {
-        line: "A gray area in {{provider}}'s terms",
-        linePlan: "A gray area in the plan's terms",
-        own: "{{provider}}'s terms say your plan is for your own use. Using it to reply to other people might go against them.",
-        seat: "{{provider}}'s terms say each seat is for one person. Using yours to reply to other people might go against them.",
-        other:
-          "{{maker}} says the plan is for its subscriber only. Using yours to reply to other people might go against its terms.",
+      switch: "Answers other people",
+      switchAll: "Answer other people",
+      switchOther: "Answers only {{owner}}",
+      onOther: "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to {{pronoun}}.",
+      line: {
+        off: "{{name}} answers only you, on your {{plan}}.",
+        on: "{{name}} answers anyone who can talk to {{pronoun}}, on your {{plan}}.",
+        offAll: "They answer only you, on your {{plan}}.",
+        onAll: "They answer anyone who can talk to them, on your {{plan}}.",
       },
-      savedEveryone: "Now {{name}} replies to everyone.",
-      savedOwner: "{{name}} now only replies to you.",
-      backOnApi: "{{name}} is back on the API and still only replies to you.",
-      letEveryone: "Let everyone talk to {{pronoun}}",
-      letPeople: "Let them talk to {{pronoun}} again",
-      ownerOnly: "{{name}} thinks with {{owner}}'s plan: only {{owner}} can let more people talk to {{pronoun}}.",
+      plan: {
+        own: "{{provider}} plan",
+        seat: "{{provider}} seat",
+        coding: "{{label}} plan",
+      },
+      terms: {
+        about: "the plan's terms",
+        own: "{{provider}} plans are for personal use. Letting other people use yours is a gray area in {{provider}}'s terms.",
+        seat: "Each {{provider}} seat is for one person. Letting other people use yours is a gray area in {{provider}}'s terms.",
+        other:
+          "{{maker}} says the plan is for its subscriber only. Letting other people use yours is a gray area in {{maker}}'s terms.",
+      },
+      savedEveryone: "Now {{name}} answers other people.",
+      savedOwner: "{{name}} now answers only you.",
+      backOnApi: "{{name}} is back on the API and still answers only you.",
+      letEveryone: "Let {{pronoun}} answer everyone",
+      letPeople: "Let {{pronoun}} answer other people",
       hereNotYours: "Only for agents of whoever connected {{computer}}",
     },
     errors: {
       planOwnerOnly:
-        "Only the person responsible for {{agentName}} can let more people in: their plan is the one that answers.",
+        "Only the person responsible for {{agentName}} can let more people in: {{agentName}} answers on their plan.",
     },
     add: {
       paste: "Paste",

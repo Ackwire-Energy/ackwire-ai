@@ -512,7 +512,7 @@ export const AgentBrain = z
         "The caller may add an account there for this agent: its owner, on a computer where they add accounts.",
     }),
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
-    onlyOwner: z.boolean().openapi({ description: '"Responde a todos" off: nobody but its owner talks to it.' }),
+    onlyOwner: z.boolean().openapi({ description: '"Atende outras pessoas" off: nobody but its owner talks to it.' }),
     canUsePlans: z.boolean().openapi({
       description: "The caller owns the agent: only they choose its plan and let other people talk to it on a plan.",
     }),
