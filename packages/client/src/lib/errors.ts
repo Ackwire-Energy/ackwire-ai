@@ -11,6 +11,8 @@ import { endSentence } from "./text";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "agent_proposal.decided": "errors.agentProposal.decided",
+  "agent_proposal.expired": "errors.agentProposal.expired",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
@@ -24,6 +26,8 @@ const KNOWN = {
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
   "machine.target_paused": "errors.machine.targetPaused",
+  "agent_group.not_found": "errors.agentGroup.notFound",
+  "agent_group.too_many": "errors.agentGroup.tooMany",
   "thread.context_not_visible": "errors.thread.contextNotVisible",
   "thread.archived": "errors.thread.archived",
   "thread.has_replies": "errors.thread.hasReplies",

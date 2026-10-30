@@ -1,20 +1,58 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import type { ResolveHost } from "../net-guard";
 import { requirePermission } from "../organizations";
+import { CONNECTOR_ALL } from "../tools/scopes";
 import { CONNECTOR_CATALOG, type ConnectorDefinition } from "./catalog";
 import { beginMcpOAuth, storeCustomConnection } from "./custom";
 import { clientCredentials, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
 
-const { connectorConnections, oauthStates, agentScopes } = schema;
+const { connectorConnections, oauthStates, agentScopes, agents } = schema;
 
 export type ConnectorConnection = typeof connectorConnections.$inferSelect;
+
+/**
+ * A new connection starts at "Ler e escrever" (`connector:*`) for every agent: agents get the basics and people take
+ * access away where they want. Sensitive tools still ask a person on every call, whatever the grant. Connecting is an
+ * admin's call, as giving grants is; each agent's grant is an `agent.access_changed` audit row. Runs in the caller's
+ * transaction, which clears the org's scope cache once it commits.
+ */
+export async function grantToEveryAgent(
+  tx: Executor,
+  orgId: string,
+  actorId: string,
+  connection: Pick<ConnectorConnection, "id" | "label">,
+) {
+  const everyone = await tx
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+  if (everyone.length === 0) return;
+  await tx.insert(agentScopes).values(
+    everyone.map((a) => ({
+      orgId,
+      agentId: a.id,
+      connectionId: connection.id,
+      scope: CONNECTOR_ALL,
+      grantedByUserId: actorId,
+    })),
+  );
+  for (const a of everyone) {
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.access_changed",
+      target: { type: "agent", id: a.id },
+      details: { connectionId: connection.id, label: connection.label, level: "write" },
+    });
+  }
+}
 
 /** OAuth app credentials per connector (from env; real apps are configured per deployment). */
 export type OAuthApps = Record<string, { clientId: string; clientSecret: string } | undefined>;
@@ -99,7 +137,7 @@ async function storeConnection(
   const id = crypto.randomUUID();
   const sealed = input.secret ? await sealSecret(wrapper, JSON.stringify(input.secret), aadFor(input.orgId, id)) : null;
   return deps.db.transaction(async (tx) => {
-    // One active connection per connector: a new one replaces the old (grants move over).
+    // One active connection per connector: a new one replaces the old (grants move over); a first one is every agent's.
     const [previous] = await tx
       .update(connectorConnections)
       .set({ revokedAt: deps.now?.() ?? new Date() })
@@ -143,6 +181,7 @@ async function storeConnection(
         details: { connector: input.connector, label: row.label, auth: input.authType },
       });
     }
+    if (!previous) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
     caches.connections.delete(`${input.orgId}:active`);
     caches.scopes.deletePrefix(`${input.orgId}:`);
     return row;

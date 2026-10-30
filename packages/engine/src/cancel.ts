@@ -337,25 +337,34 @@ export async function stopRun(
 }
 
 /**
- * Ends what a suspended workspace's agents still have going: every run not finished stops with `reason`
- * (its `standingText`) and hands nothing on, its computers stop its tasks, and its agents' desktops end with
- * whatever runs on them (nothing else stops a desktop: they stay on).
+ * Ends what a suspended workspace's agents (or, with `agentId`, an agent being deleted) still have going: every
+ * run not finished stops with `reason` (the standing's text, or `agent_archived`) and hands nothing on, its
+ * computers stop its tasks, and its agents' desktops end with whatever runs on them (nothing else stops a
+ * desktop: they stay on).
  */
 export async function stopOrgWork(
   deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
   orgId: string,
   reason: string,
+  agentId?: string,
 ) {
   const live = await deps.db
     .select({ run: agentRuns, channelKind: channels.kind })
     .from(agentRuns)
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
-    .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES])));
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+        agentId ? eq(agentRuns.agentId, agentId) : undefined,
+      ),
+    );
   for (const { run, channelKind } of live) {
     await stopRun(deps, orgId, run, channelKind, { type: "system", reason }).catch(() => null);
     // A routine's run: its ledger says why (`stopRun` closes it only for a person).
     if (run.background) {
-      await closeRoutineRun(deps, run, { status: "canceled", code: "org_suspended" }).catch(() => null);
+      const code = agentId ? "deleted" : "org_suspended";
+      await closeRoutineRun(deps, run, { status: "canceled", code }).catch(() => null);
     }
   }
   const { hub } = deps;
@@ -363,13 +372,19 @@ export async function stopOrgWork(
   const call: TaskCall | undefined = hub
     ? (machineId, request) => hub.call(machineId, request, { timeoutMs: 15_000 })
     : undefined;
-  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system");
+  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system", agentId);
   if (!hub) return;
   const desktops = await deps.db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, machineId: machines.id })
     .from(agents)
     .innerJoin(machines, eq(machines.id, agents.machineId))
-    .where(and(eq(agents.orgId, orgId), gte(machines.protocol, DESKTOP_PROTOCOL)));
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        gte(machines.protocol, DESKTOP_PROTOCOL),
+        agentId ? eq(agents.id, agentId) : undefined,
+      ),
+    );
   await Promise.all(
     desktops.map(({ machineId, ...agent }) =>
       hub.call(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 15_000 }).catch(() => null),

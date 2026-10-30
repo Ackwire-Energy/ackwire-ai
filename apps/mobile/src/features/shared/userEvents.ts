@@ -57,7 +57,8 @@ export function useUserEvents() {
       // it, "Computador desconectado"), paused, renamed, removed, its agents moved; an agent switched computers.
       applyMachineEvent(qc, orgId, event);
       applyComputerEvent(qc, orgId, event);
-      // The workspace's standing (the suspended screen comes and goes) and its own computer on its way.
+      // The workspace's standing (the suspended screen comes and goes), its own computer on its way, and the groups
+      // of agents (Agentes' sections).
       applyWorkspaceEvent(qc, orgId, event);
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
@@ -82,6 +83,8 @@ export function useUserEvents() {
       void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
+      // The groups of agents someone changed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
     });
     return () => {
       offUser();

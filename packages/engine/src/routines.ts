@@ -1216,6 +1216,20 @@ export async function updateRoutine(
 export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const current = await loadRoutine(deps.db, orgId, id);
   await requireRoutineEditor(deps.db, actorId, orgId, current);
+  await dropRoutine(deps, actorId, current);
+}
+
+/** A deleted agent's routines are deleted with it (ADR 0082), each as `deleteRoutine` does. */
+export async function deleteAgentRoutines(deps: RoutineDeps, actorId: string, orgId: string, agentId: string) {
+  const rows = await deps.db
+    .select()
+    .from(routines)
+    .where(and(eq(routines.orgId, orgId), eq(routines.agentId, agentId), isNull(routines.deletedAt)));
+  for (const row of rows) await dropRoutine(deps, actorId, row);
+}
+
+async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineRow) {
+  const orgId = current.orgId;
   await deps.db
     .update(routines)
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })

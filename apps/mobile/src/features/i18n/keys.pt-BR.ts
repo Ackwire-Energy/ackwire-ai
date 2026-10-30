@@ -657,6 +657,7 @@ export const featureKeysPtBR = {
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
+    noGroupSection: "Sem grupo",
   },
   agentEdit: {
     missing: "Este agente não existe mais.",
@@ -685,10 +686,9 @@ export const featureKeysPtBR = {
     canUse: "Pode usar",
     month: "Este mês",
     ofBudget: "de {{budget}} por mês",
-    percent: "{{percent}}% do limite",
-    ofLimit: "do limite do mês",
-    exhaustedF: "A {{name}} chegou ao limite do mês.",
-    exhaustedM: "O {{name}} chegou ao limite do mês.",
+    ofMonthBudget: "do orçamento do mês",
+    exhaustedF: "A {{name}} usou todo o orçamento do mês.",
+    exhaustedM: "O {{name}} usou todo o orçamento do mês.",
     taskForF: "Tarefa para a {{name}}",
     taskForM: "Tarefa para o {{name}}",
     taskPlaceholder: "O que precisa ficar pronto?",
@@ -1385,6 +1385,7 @@ export const featureKeysPtBR = {
     connectedSub: "Agora confira o que os agentes podem fazer sozinhos.",
     connectedDone: "Serviço conectado.",
     levelFailed: "Não deu para mudar o acesso de {{name}}. Tente de novo.",
+    everyoneFailed: "Não deu para mudar o acesso de todos. Tente de novo.",
     disconnectFailed: "Não deu para desconectar o {{name}}. Tente de novo.",
     whoTitle: "Quem usa e até onde",
     level: {
@@ -1502,7 +1503,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem {{she}} responde",
+    audience: "Quem {{she}} atende",
     another: "Outra IA",
   },
   crash: {

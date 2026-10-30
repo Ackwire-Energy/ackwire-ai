@@ -25,7 +25,7 @@ export function Face({
   const member = who?.type !== "agent" && who?.id ? dir.memberById.get(who.id) : undefined;
   const photo = usePersonPhoto(member ? (member.avatarUrl ?? member.image) : null);
   if (who?.type === "agent") {
-    const agent = who.id ? dir.agentById.get(who.id) : undefined;
+    const agent = who.id ? dir.anyAgent(who.id) : undefined;
     return <AgentAvatar agent={agentLook(agent)} size={size} mode={mode} live={live} framed={framed} />;
   }
   return <PersonAvatar name={dir.nameOf(who) || "?"} size={size} photo={photo} />;
@@ -47,6 +47,6 @@ export function AgentFace({
   framed?: boolean;
 }) {
   const dir = useDirectory();
-  const agent = agentId ? dir.agentById.get(agentId) : undefined;
+  const agent = agentId ? dir.anyAgent(agentId) : undefined;
   return <AgentAvatar agent={agentLook(agent)} size={size} mode={mode} live={live} framed={framed} />;
 }

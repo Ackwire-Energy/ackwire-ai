@@ -9,6 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
+import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { sendWaits } from "../lib/errors";
@@ -36,9 +37,11 @@ import type {
   AgentComputer,
   AgentDatabase,
   AgentDatabaseInput,
+  AgentGroup,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AgentProposalDecision,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -371,6 +374,12 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
+/** Agents no longer in the team: the directories name their old messages with these (fresh with `useAgents`). */
+export const useFormerAgents = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
+};
+
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();
@@ -410,7 +419,31 @@ export function useCreateAgent(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AgentInput) => api.agents.create(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
+    onSuccess: (_agent, input) => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // Made from a card: the card says so (its conversation gets the change live too).
+      if (input.proposal) void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, input.proposal) });
+    },
+  });
+}
+
+/** An agent's proposal of a new agent (ADR 0081), by its card's message; `null` id: none. */
+export function useAgentProposal(orgId: string, messageId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentProposal(orgId, messageId ?? ""),
+    queryFn: () => api.agents.proposal(orgId, messageId ?? ""),
+    enabled: Boolean(messageId),
+  });
+}
+
+/** "Recusar" on an agent's proposal: the card shows it at once. */
+export function useDenyAgentProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.denyProposal(orgId, messageId),
+    onSuccess: (proposal) => cacheAgentProposal(qc, orgId, proposal, proposal),
   });
 }
 
@@ -434,6 +467,51 @@ export function useAddCredential(orgId: string) {
   return useMutation({
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+  });
+}
+
+// ── Agent groups (ADR 0083) ─────────────────────────────────────────────────
+
+export const useAgentGroups = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.agentGroups(orgId), queryFn: () => api.agentGroups.list(orgId), staleTime: 30_000 });
+};
+
+export type AgentGroupAction =
+  | { type: "create"; name: string; agentIds?: string[] }
+  | { type: "update"; groupId: string; name?: string; index?: number }
+  | { type: "remove"; groupId: string }
+  | { type: "move"; agentId: string; groupId: string | null; index?: number };
+
+/** Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. */
+export function useAgentGroupAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.agentGroups(orgId);
+  return useMutation({
+    mutationFn: (action: AgentGroupAction): Promise<AgentGroup[]> => {
+      switch (action.type) {
+        case "create":
+          return api.agentGroups.create(orgId, { name: action.name, agentIds: action.agentIds });
+        case "update":
+          return api.agentGroups.update(orgId, action.groupId, { name: action.name, index: action.index });
+        case "remove":
+          return api.agentGroups.remove(orgId, action.groupId);
+        case "move":
+          return api.agentGroups.move(orgId, action.agentId, { groupId: action.groupId, index: action.index });
+      }
+    },
+    onMutate: async (action) => {
+      if (action.type !== "move") return undefined;
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<AgentGroup[]>(key);
+      if (before) qc.setQueryData(key, moveInGroups(before, action.agentId, action.groupId, action.index));
+      return { before };
+    },
+    onError: (_error, _action, context) => {
+      if (context?.before) qc.setQueryData(key, context.before);
+    },
+    onSuccess: (groups) => qc.setQueryData(key, groups),
   });
 }
 
@@ -698,6 +776,25 @@ export function cacheReceipts(
 }
 
 /**
+ * A card's meta changed (`patch` gives the keys that change, from the meta it has): that message in every loaded
+ * list of its channel.
+ */
+export function cacheMessageMeta(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  patch: (meta: Record<string, unknown>) => Record<string, unknown>,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch(m.meta ?? {}) } } : m));
+  });
+}
+
+/**
  * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
  * the message's `meta.forumSuggestion` in every loaded list of that channel.
  */
@@ -708,14 +805,29 @@ export function cacheForumSuggestion(
   messageId: string,
   suggestion: ForumSuggestion,
 ) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) =>
-      m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), forumSuggestion: suggestion } } : m,
-    );
-  });
+  cacheMessageMeta(qc, orgId, channelId, messageId, () => ({ forumSuggestion: suggestion }));
+}
+
+/**
+ * An agent's proposal of a new agent was decided (ADR 0081): the decision on its card in the chat, which already
+ * holds the draft, and its own query again.
+ */
+export function cacheAgentProposal(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  { state, agentId, decidedByUserId, decidedAt }: AgentProposalDecision,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: {
+      ...(meta.actionCard as Record<string, unknown> | undefined),
+      state,
+      agentId,
+      decidedByUserId,
+      decidedAt,
+    },
+  }));
+  void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
 }
 
 /** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */
@@ -1010,7 +1122,12 @@ export function useConnectWithKey(orgId: string) {
   return useMutation({
     mutationFn: (input: { connector: string; apiKey: string; serverUrl?: string; label?: string }) =>
       api.connectors.connectWithKey(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+    // A new connection is every agent's: their access trees change too.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+      ]),
   });
 }
 
@@ -1031,11 +1148,12 @@ export function useCompleteOAuth(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
-    // It may finish a catalog connection or a server connected by address (their own list).
+    // It may finish a catalog connection or a server connected by address (their own list), every agent's.
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
         qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
       ]),
   });
 }
@@ -1695,7 +1813,8 @@ export function useCustomServerAction(orgId: string) {
     connect: useMutation({
       mutationFn: (input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string }) =>
         api.customConnectors.connect(orgId, input),
-      onSuccess: done,
+      // A new server is every agent's: their access trees change too.
+      onSuccess: () => Promise.all([done(), qc.invalidateQueries({ queryKey: keys.access(orgId) })]),
     }),
     refresh: useMutation({ mutationFn: (id: string) => api.customConnectors.refresh(orgId, id), onSuccess: done }),
     save: useMutation({

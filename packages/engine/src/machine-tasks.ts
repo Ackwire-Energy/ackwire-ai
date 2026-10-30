@@ -1015,16 +1015,23 @@ export async function interruptOfflineMachineTasks(
 }
 
 /**
- * Stops every live task of a workspace (it was suspended), all at once: its computer stops each one it
- * runs, and that task's `task.done` ends the row; one it doesn't run (queued here, its computer offline or
- * not answering) ends `canceled` now, and an interrupted one never resumes. Returns how many.
+ * Stops every live task of a workspace (it was suspended) or of one agent (being deleted), all at once: its
+ * computer stops each one it runs, and that task's `task.done` ends the row; one it doesn't run (queued here,
+ * its computer offline or not answering) ends `canceled` now, and an interrupted one never resumes. Returns how many.
  */
-export async function cancelOrgTasks(deps: TaskDeps & { call?: TaskCall }, orgId: string, canceledBy: string) {
+export async function cancelOrgTasks(
+  deps: TaskDeps & { call?: TaskCall },
+  orgId: string,
+  canceledBy: string,
+  agentId?: string,
+) {
   const rows = await deps.db
     .select({ task: machineTasks, handle: schema.agents.handle })
     .from(machineTasks)
     .innerJoin(schema.agents, eq(schema.agents.id, machineTasks.agentId))
-    .where(and(eq(machineTasks.orgId, orgId), liveTaskWhere()));
+    .where(
+      and(eq(machineTasks.orgId, orgId), liveTaskWhere(), agentId ? eq(machineTasks.agentId, agentId) : undefined),
+    );
   await Promise.all(
     rows.map(async ({ task, handle }) => {
       await deps.db.update(machineTasks).set({ canceledBy, updatedAt: new Date() }).where(eq(machineTasks.id, task.id));

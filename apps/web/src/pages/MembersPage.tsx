@@ -43,6 +43,7 @@ import {
   FilterChip,
   Input,
   List,
+  PlanMeter,
   Textarea,
 } from "@agenteschat/ui";
 import { Link, useSearch } from "@tanstack/react-router";
@@ -59,6 +60,7 @@ import { RoleChip } from "@/components/roles/RolesSection";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 import { copyText } from "@/lib/context-menu";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import "./members.css";
 
@@ -371,6 +373,9 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}
           {dir.agents.map((a) => {
             const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId) : undefined;
+            // Its plan's limits, the budget under them only once it spent through the API (ADR 0063 §5).
+            const shown = usageShown(a.brain, a.budgetUsedPercent ?? 0);
+            const budget = shown.budget && a.budgetUsedPercent !== undefined;
             return (
               <Link
                 key={a.id}
@@ -388,10 +393,25 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     {owner ? t("members.ownerLine", { name: owner.name }) : t("members.noOwner")}
                   </span>
                 </span>
-                {a.budgetUsedPercent !== undefined && (
-                  <span className="small muted tabular" style={{ flex: "0 1 220px" }}>
-                    {t("members.budgetLine", { percent: formatPercent(i18n.language, a.budgetUsedPercent), month })}
-                  </span>
+                {(shown.plan || budget) && (
+                  <div className="list-col" style={{ flex: "0 1 220px", gap: 4 }}>
+                    {shown.plan && (
+                      <PlanMeter
+                        compact
+                        usage={shown.plan.usage}
+                        text={planMeterText(t, i18n.language)}
+                        label={shown.plan.account}
+                      />
+                    )}
+                    {budget && (
+                      <span className="small muted tabular">
+                        {t("members.budgetLine", {
+                          percent: formatPercent(i18n.language, a.budgetUsedPercent ?? 0),
+                          month,
+                        })}
+                      </span>
+                    )}
+                  </div>
                 )}
               </Link>
             );

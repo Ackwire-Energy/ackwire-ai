@@ -1,5 +1,5 @@
-import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
-import { useAiStatus, useCatalog, useTeam } from "@agenteschat/client";
+import type { FormerAgent, Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
+import { useAiStatus, useCatalog, useFormerAgents, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -26,6 +26,7 @@ import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
@@ -177,6 +178,11 @@ export function TeamPage() {
   useCatalog();
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
+  // Archived agents have no page: admins delete them for good here (ADR 0082).
+  const admin = can(org, "manage_agents");
+  const former = useFormerAgents(org.id);
+  const archived = (former.data ?? []).filter((a) => !a.deleted);
+  const [deleting, setDeleting] = useState<FormerAgent | null>(null);
   return (
     <div className="page team">
       <header className="team-head">
@@ -224,6 +230,33 @@ export function TeamPage() {
           </Card>
         </>
       )}
+      {admin && archived.length > 0 && (
+        <Card className="team-archived">
+          <div className="team-feed__head">
+            <Icon name="archive" size={16} />
+            <h2>{t("team.archived")}</h2>
+          </div>
+          {archived.map((a) => (
+            <div key={a.id} className="member-row">
+              <AgentAvatar agentId={a.id} size="sm" name={a.name} />
+              <span className="list-col">
+                <b>{a.name}</b>
+                {a.role && <span className="small muted">{a.role}</span>}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="trash"
+                aria-label={t("agentPage.delete.action", agentGrammar(t, a.name))}
+                onClick={() => setDeleting(a)}
+              >
+                {t("agentPage.delete.button")}
+              </Button>
+            </div>
+          ))}
+        </Card>
+      )}
+      <DeleteAgentDialog agent={deleting} onClose={() => setDeleting(null)} />
     </div>
   );
 }

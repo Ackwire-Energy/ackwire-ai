@@ -883,6 +883,27 @@
       "when": 1793390843712,
       "tag": "0125_channel_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1793393736459,
+      "tag": "0126_agent_deleted",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1793393974159,
+      "tag": "0127_agent_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1793403974159,
+      "tag": "0128_roles",
+      "breakpoints": true
     }
   ]
 }

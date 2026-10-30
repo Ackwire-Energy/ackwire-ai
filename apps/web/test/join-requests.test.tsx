@@ -599,12 +599,12 @@ describe("Members › Invite people", () => {
       await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
       await settle(6);
       const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-      return { invite, line: within(invite).queryByText("Seus agentes só respondem a você.")?.closest(".setup-line") };
+      return { invite, line: within(invite).queryByText("Seus agentes só atendem você.")?.closest(".setup-line") };
     };
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
-    expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Num plano, você pode deixar cada um responder a todos na página dele.",
+    expect(hintOf("Seus agentes só atendem você.", invite).text).toBe(
+      "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");

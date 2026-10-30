@@ -652,6 +652,7 @@ export const featureKeysEn: FeatureTranslations = {
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
     freeSection: "Free",
+    noGroupSection: "No group",
   },
   agentEdit: {
     missing: "This agent no longer exists.",
@@ -680,10 +681,9 @@ export const featureKeysEn: FeatureTranslations = {
     canUse: "Can use",
     month: "This month",
     ofBudget: "of {{budget}} a month",
-    percent: "{{percent}}% of the limit",
-    ofLimit: "of the monthly limit",
-    exhaustedF: "{{name}} reached the monthly limit.",
-    exhaustedM: "{{name}} reached the monthly limit.",
+    ofMonthBudget: "of this month's budget",
+    exhaustedF: "{{name}} used all of this month's budget.",
+    exhaustedM: "{{name}} used all of this month's budget.",
     taskForF: "Task for {{name}}",
     taskForM: "Task for {{name}}",
     taskPlaceholder: "What needs to get done?",
@@ -1380,6 +1380,7 @@ export const featureKeysEn: FeatureTranslations = {
     connectedSub: "Now check what agents can do on their own.",
     connectedDone: "Service connected.",
     levelFailed: "Couldn't change {{name}}'s access. Try again.",
+    everyoneFailed: "Couldn't change everyone's access. Try again.",
     disconnectFailed: "Couldn't disconnect {{name}}. Try again.",
     whoTitle: "Who uses it and how far",
     level: {
@@ -1497,7 +1498,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who {{she}} replies to",
+    audience: "Who {{she}} answers",
     another: "Another AI",
   },
   crash: {

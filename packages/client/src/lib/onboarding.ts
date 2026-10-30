@@ -24,6 +24,21 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
 
 /**
+ * Where a resumed onboarding opens: the furthest step the server keeps, or further where the workspace shows the
+ * person got there (an older app could have saved a step behind them). The team is kept once its guide is made
+ * (`guide`) and, saved at the import, once that import came in (`imported`): a creation cut short opens where it was,
+ * where keeping the team again makes it whole. Past the team, a computer step with nothing to ask (`computerDone`: the
+ * workspace's own computer, nothing held over it) is behind them too.
+ */
+export function resumeAt(
+  saved: OnboardingStepId,
+  shows: { guide: boolean; imported: boolean; computerDone?: boolean },
+) {
+  if (!shows.guide || (saved === "import" && !shows.imported)) return stepIndex(saved);
+  return Math.max(stepIndex(saved), stepIndex(shows.computerDone ? "ai" : "computer"));
+}
+
+/**
  * Whether the server's answer to a step just saved (`saveOnboarding`) says the onboarding went further in another
  * window or on another device, or was finished there: the app asks for `me` again and follows it.
  */

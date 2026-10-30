@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, type RunnerAccess, type RunnerInfo, STREAM_CLOSE } from "@agenteschat/adapters";
+import {
+  BROWSER_WARM_PROTOCOL,
+  DESKTOP_PROTOCOL,
+  type RunnerAccess,
+  type RunnerInfo,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { DESKTOP_SCOPE, grantScopes } from "@agenteschat/engine";
+import { BROWSER_SCOPE, DESKTOP_SCOPE, grantScopes } from "@agenteschat/engine";
 import { connectUrl } from "../runner/config";
 import { RunnerConnection } from "../runner/connection";
 import type { DesktopSessions } from "../runner/desktop-session";
@@ -97,18 +103,21 @@ const SESSION: Record<string, unknown> = {
     started: false,
   },
   "desktop.session.stop": { stopped: true },
+  "browser.warm": { started: true },
 };
 
 /**
  * A runner on real sockets: its machine socket says hello; each `stream.open`
  * dials a data socket, says hello and answers once it got `stream.ready`; a
  * desktop's own requests get the answers of one that runs. `refuseOpens`: the
- * first opens get `desktop_off`, as a runner from before desktops stayed on.
+ * first opens get `desktop_off`, as a runner from before desktops stayed on;
+ * `hello`: what its hello says besides `RUNNER`.
  */
-async function connectRunner(token: string, options: { refuseOpens?: number } = {}) {
+async function connectRunner(token: string, options: { refuseOpens?: number; hello?: Partial<RunnerInfo> } = {}) {
   let refuse = options.refuseOpens ?? 0;
   const ws = new WebSocket(`${base()}/api/machines/connect`);
   const requests: string[] = [];
+  const asked: Record<string, unknown>[] = [];
   const opened: Record<string, unknown>[] = [];
   const data: { socket: WebSocket; ready: boolean; got: (string | ArrayBuffer)[]; closed: number | null }[] = [];
   const welcome = new Promise<void>((resolve, reject) => {
@@ -117,6 +126,7 @@ async function connectRunner(token: string, options: { refuseOpens?: number } = 
       if (frame.type === "welcome") resolve();
       if (frame.type === "ping") ws.send(JSON.stringify({ type: "pong", at: frame.at }));
       if (frame.type === "request") requests.push(String(frame.op));
+      if (frame.type === "request") asked.push(frame);
       if (frame.type === "request" && String(frame.op) in SESSION) {
         ws.send(JSON.stringify({ type: "result", id: frame.id, ok: true, data: SESSION[String(frame.op)] }));
       }
@@ -145,9 +155,9 @@ async function connectRunner(token: string, options: { refuseOpens?: number } = 
   await new Promise<void>((resolve) => {
     ws.onopen = () => resolve();
   });
-  ws.send(JSON.stringify({ type: "hello", token, ...RUNNER }));
+  ws.send(JSON.stringify({ type: "hello", token, ...RUNNER, ...options.hello }));
   await welcome;
-  return { ws, requests, opened, data };
+  return { ws, requests, asked, opened, data };
 }
 
 /** A person's stream socket in the web app: what it got and how it closed. */
@@ -177,6 +187,37 @@ test("before the upgrade: a session, our Origin, membership and sane parameters;
   expect(await upgradeStatus(desktop.replace("mode=watch", "mode=drive"), { origin: ORIGIN, cookie })).toBe(400);
   expect(await upgradeStatus(terminal.replace("cols=80", "cols=10"), { origin: ORIGIN, cookie })).toBe(400);
   expect(await upgradeStatus(`${base()}/api/machines/stream`, { origin: ORIGIN })).toBe(403);
+});
+
+test("someone opening the agent's desktop gets its browser ready for the agent's next command, on that desktop", async () => {
+  const { owner, org, machine, desktop } = await seeded();
+  await grantScopes(t.db, org.orgId, org.agentId, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  // A runner from before it: nothing asked.
+  const old = await connectRunner(machine.token, {
+    hello: { browser: { available: true }, access: { ...ACCESS, tools: { ...ACCESS.tools, browser: true } } },
+  });
+  let viewer = openViewer(desktop, owner);
+  await until(() => old.data[0]?.ready === true, "the data socket");
+  viewer.socket.close();
+  await until(() => viewer.closed !== null, "the viewer to close");
+  old.ws.close();
+  await Bun.sleep(50);
+  expect(old.requests).not.toContain("browser.warm");
+  const runner = await connectRunner(machine.token, {
+    hello: {
+      protocol: BROWSER_WARM_PROTOCOL,
+      browser: { available: true },
+      access: { ...ACCESS, tools: { ...ACCESS.tools, browser: true } },
+    },
+  });
+  viewer = openViewer(desktop, owner);
+  await until(() => runner.data[0]?.ready === true, "the data socket");
+  await until(() => runner.requests.includes("browser.warm"), "the browser started ahead");
+  expect(runner.asked.find((r) => r.op === "browser.warm")).toMatchObject({
+    agent: { id: org.agentId, handle: "dev" },
+    desktop: true,
+  });
+  viewer.socket.close();
 });
 
 test("bytes go both ways through the computer's data socket; the audit keeps who, how long and how many bytes", async () => {
