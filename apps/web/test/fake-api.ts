@@ -173,6 +173,8 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** What an agent spent through the API this month (US$), over the fake's own (Ada 12.30, Atlas 3.10). */
+  spentUsd?: Record<string, number>;
   /** Configurações › Auditoria: newest first. */
   audit?: AuditRow[];
   /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
@@ -770,7 +772,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) return;
     state.me = { ...state.me, organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, logo } : o)) };
   };
-  const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
+  const spentOf = (agentId: string) =>
+    state.spentUsd?.[agentId] ?? (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
   const budgetOf = (a: Agent) => a.monthlyBudgetUsd ?? state.defaultAgentBudgetUsd ?? 50;
   const percentOf = (a: Agent) => Math.round((spentOf(a.id) / budgetOf(a)) * 1000) / 10;
   const workspacePercent = () => {

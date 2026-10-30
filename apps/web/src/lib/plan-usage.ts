@@ -10,6 +10,7 @@ export {
   noWindowsText,
   partedUsage,
   planMeterText,
+  usageShown,
   usageSourceName,
   usageSourcePart,
 } from "@agenteschat/client/lib/plan-usage";

@@ -8150,6 +8150,17 @@ a.machine-row__name:hover {
   width: 40px;
   height: 4px;
 }
+/* A plan's limits read like the facts beside them: the line, its small bar, then the state near the limit. */
+.agp-number .ac-planmeter--compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: inherit;
+}
+.agp-number .ac-planmeter__line {
+  color: inherit;
+}
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
   color: var(--muted);

@@ -10,13 +10,14 @@ import {
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
 import { excerpt } from "@agenteschat/client/lib/text";
-import { Avatar, Button, Card, Chip, Icon, Meter } from "@agenteschat/ui";
+import { Avatar, Button, Card, Chip, Icon, Meter, PlanMeter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { ComputerNow } from "./ComputerNow";
@@ -59,8 +60,19 @@ export function OverviewTab() {
   const mine = (routines.data ?? []).filter((r) => r.agentId === agent.id);
   const recent = (runs.data ?? []).slice(0, 4);
   const used = detail.data?.budgetUsedPercent ?? 0;
+  const shown = usageShown(agent.brain, used);
   const spent = usage.data?.find((u) => u.agentId === agent.id)?.costUsd;
   const limit = detail.data?.monthlyBudgetUsd ?? detail.data?.defaultBudgetUsd;
+  const budgetText =
+    viewer === "admin" && spent !== undefined && limit !== undefined
+      ? t("agentPage.overview.spentOf", {
+          spent: formatUsd(t, locale, spent),
+          limit: usd(t, locale, limit),
+          month: formatMonth(locale, new Date()),
+        })
+      : t(detail.data?.monthlyBudgetUsd === null ? "agentPage.overview.percentDefault" : "agentPage.overview.percent", {
+          percent: formatPercent(locale, used),
+        });
   const decides = viewer !== "member";
   return (
     <>
@@ -367,47 +379,58 @@ export function OverviewTab() {
             )}
           </Card>
 
-          {/* Who thinks is the sentence under the name; here, the money. */}
-          <Card as="section" className="agp-card" aria-labelledby="ov-budget">
-            <CardHead
-              id="ov-budget"
-              icon="wallet"
-              title={t("agentPage.settings.budget")}
-              action={
-                can("budget") ? (
-                  <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "budget")}>
-                    {t("agentPage.change")}
+          {/* Who thinks is the sentence under the name; here, its plan's limits or the money (ADR 0063 §5). */}
+          {shown.plan ? (
+            <Card as="section" className="agp-card" aria-labelledby="ov-usage">
+              <CardHead
+                id="ov-usage"
+                icon="clock"
+                title={t("agentPage.tabs.usage")}
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => goTo("usage")}>
+                    {t("agentPage.overview.seeAll")}
                   </Button>
-                ) : null
-              }
-            />
-            <div className="agp-budget">
-              <span className="small muted">
-                {viewer === "admin" && spent !== undefined && limit !== undefined
-                  ? t("agentPage.overview.spentOf", {
-                      spent: formatUsd(t, locale, spent),
-                      limit: usd(t, locale, limit),
-                      month: formatMonth(locale, new Date()),
-                    })
-                  : t(
-                      detail.data?.monthlyBudgetUsd === null
-                        ? "agentPage.overview.percentDefault"
-                        : "agentPage.overview.percent",
-                      {
-                        percent: formatPercent(locale, used),
-                      },
-                    )}
-              </span>
-              <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
-              <span className="small muted">
-                {viewer === "admin"
-                  ? ownerFirst
-                    ? t("agentPage.overview.warnsOwner", { name: ownerFirst })
-                    : t("agentPage.overview.warnsAdmins")
-                  : t("agent.usageHidden")}
-              </span>
-            </div>
-          </Card>
+                }
+              />
+              <div className="agp-budget">
+                <PlanMeter
+                  compact
+                  usage={shown.plan.usage}
+                  text={planMeterText(t, locale)}
+                  label={shown.plan.account}
+                />
+                {shown.budget && <span className="small muted">{budgetText}</span>}
+              </div>
+            </Card>
+          ) : (
+            shown.budget && (
+              <Card as="section" className="agp-card" aria-labelledby="ov-budget">
+                <CardHead
+                  id="ov-budget"
+                  icon="wallet"
+                  title={t("agentPage.settings.budget")}
+                  action={
+                    can("budget") ? (
+                      <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "budget")}>
+                        {t("agentPage.change")}
+                      </Button>
+                    ) : null
+                  }
+                />
+                <div className="agp-budget">
+                  <span className="small muted">{budgetText}</span>
+                  <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
+                  <span className="small muted">
+                    {viewer === "admin"
+                      ? ownerFirst
+                        ? t("agentPage.overview.warnsOwner", { name: ownerFirst })
+                        : t("agentPage.overview.warnsAdmins")
+                      : t("agent.usageHidden")}
+                  </span>
+                </div>
+              </Card>
+            )
+          )}
         </div>
       </div>
     </>

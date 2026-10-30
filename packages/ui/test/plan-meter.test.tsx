@@ -10,6 +10,7 @@ import {
   PlanMeter,
   type PlanMeterText,
   type PlanMeterUsage,
+  planLine,
   planState,
   planWindows,
 } from "../src";
@@ -22,7 +23,8 @@ const at = (ms: number) => new Date(NOW + ms).toISOString();
 
 const text: PlanMeterText = {
   window: (w) => (w.kind === "five_hour" ? "5 horas" : w.kind === "seven_day" ? "Semana" : (w.label ?? "Outro")),
-  resets: (iso) => `volta ${iso.slice(11, 16)}`,
+  short: (w) => (w.kind === "five_hour" ? "5h" : w.kind === "seven_day" ? "semana" : (w.label ?? "outro")),
+  resets: (iso) => `renova ${iso.slice(11, 16)}`,
   almost: "Quase no limite",
   limited: (until) => (until ? `No limite até ${until.slice(11, 16)}` : "No limite"),
   updated: (iso) => `Atualizado ${iso.slice(11, 16)}`,
@@ -50,8 +52,8 @@ test("a bar per window, tightest first, each with its percentage and reset; how 
   expect(el.querySelector(".ac-planmeter__state")).toBeNull();
   // The same share: the shorter window first.
   expect(rows(el)).toEqual([
-    ["5 horas", "62%", "volta 14:00"],
-    ["Semana", "35%", "volta 12:00"],
+    ["5 horas", "62%", "renova 14:00"],
+    ["Semana", "35%", "renova 12:00"],
     ["Fable", "35%", null],
   ]);
   const meters = [...el.querySelectorAll("[role=meter]")];
@@ -107,18 +109,69 @@ test("a window whose reset already passed is empty again, and the limit with it"
   expect(rows(container)[1]).toEqual(["5 horas", "0%", null]);
 });
 
-test("compact: the tightest window only, no resets, no age", () => {
+test("compact: the two tightest windows in one line after the account's name, one bar for the fullest, every window on hover", () => {
   const usage: PlanMeterUsage = {
     windows: [
-      { kind: "seven_day", usedPercent: 91, resetsAt: at(HOUR) },
-      { kind: "five_hour", usedPercent: 20 },
+      { kind: "five_hour", usedPercent: 12, resetsAt: at(2 * HOUR) },
+      { kind: "seven_day", usedPercent: 40, resetsAt: at(48 * HOUR) },
+      { kind: "other", label: "Fable", usedPercent: 3 },
     ],
     at: at(0),
   };
-  const { container } = render(<PlanMeter usage={usage} text={text} now={NOW} compact />);
-  expect(rows(container)).toEqual([["Semana", "91%", null]]);
-  expect(container.querySelector(".ac-planmeter__at")).toBeNull();
-  expect(container.querySelector(".ac-planmeter__state")?.textContent).toBe("Quase no limite");
+  const { container } = render(<PlanMeter usage={usage} text={text} now={NOW} compact label="Claude Team" />);
+  const el = container.querySelector(".ac-planmeter--compact") as HTMLElement;
+  expect(el.querySelector(".ac-planmeter__line")?.textContent).toBe("Claude Team · semana 40% · 5h 12%");
+  const meters = [...el.querySelectorAll("[role=meter]")];
+  expect(meters.map((m) => [m.getAttribute("aria-label"), m.getAttribute("aria-valuenow")])).toEqual([
+    ["Semana", "40"],
+  ]);
+  expect(el.title).toBe("Semana 40% · renova 12:00\n5 horas 12% · renova 14:00\nFable 3%");
+  // Far from the limit: no state line, no reset, no age.
+  expect(el.dataset.state).toBe("ok");
+  expect(el.querySelector(".ac-planmeter__state")).toBeNull();
+  expect(el.querySelector(".ac-planmeter__at")).toBeNull();
+  expect(el.querySelector(".ac-planmeter__window")).toBeNull();
+  cleanup();
+  // Where the name is the row's own title (Contas de IA): the windows alone.
+  const bare = render(<PlanMeter usage={usage} text={text} now={NOW} compact />).container;
+  expect(bare.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40% · 5h 12%");
+});
+
+test("compact near the limit says when it renews, and at the limit until when", () => {
+  const almost = render(
+    <PlanMeter
+      usage={{
+        windows: [
+          { kind: "seven_day", usedPercent: 91, resetsAt: at(HOUR) },
+          { kind: "five_hour", usedPercent: 20 },
+        ],
+        at: at(0),
+      }}
+      text={text}
+      now={NOW}
+      compact
+    />,
+  ).container;
+  expect(almost.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 91% · 5h 20%");
+  expect(almost.querySelector(".ac-planmeter__state")?.textContent).toBe("Quase no limite · renova 13:00");
+  cleanup();
+  const full = render(
+    <PlanMeter
+      usage={{ windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: at(HOUR) }], limited: true, at: at(0) }}
+      text={text}
+      now={NOW}
+      compact
+    />,
+  ).container;
+  expect(full.querySelector(".ac-planmeter")?.getAttribute("data-state")).toBe("limited");
+  expect(full.querySelector(".ac-planmeter__state")?.textContent).toBe("No limite até 13:00");
+});
+
+test("compact with no window known yet shows nothing, never 0%", () => {
+  const unknown: PlanMeterUsage = { windows: [], at: at(0) };
+  expect(planLine(unknown, text, NOW)).toBeNull();
+  const { container } = render(<PlanMeter usage={unknown} text={text} now={NOW} compact label="Claude Max" />);
+  expect(container.textContent).toBe("");
 });
 
 test("an agent's part: in full ink inside its window's bar, with its words; none once the window reset", () => {

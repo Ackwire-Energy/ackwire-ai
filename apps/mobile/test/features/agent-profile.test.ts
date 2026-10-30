@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, AgentForYouItem, Memory } from "@agenteschat/client";
+import type { AgentAccess, AgentForYouItem, Memory, PlanUsage } from "@agenteschat/client";
+import { planMeterText } from "@agenteschat/client/lib/plan-usage";
+import { planLine } from "@agenteschat/ui/plan-state";
 import {
   canEditMemories,
   dayWord,
@@ -11,7 +13,7 @@ import {
   usesOf,
   type WorkItem,
 } from "../../src/features/agents/logic";
-import { agent } from "./fixtures";
+import { agent, translator } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
 const ago = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
@@ -290,5 +292,43 @@ describe("Perfil: o que pode usar", () => {
     ]);
     expect(asks).toBe(true);
     expect(usesOf(null)).toEqual({ lines: [], asks: false });
+  });
+});
+
+describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
+  const usage = (windows: PlanUsage["windows"]): PlanUsage => ({ windows, source: "probe", at: NOW.toISOString() });
+
+  test("the compact line in the plan's words, tightest first; near the limit, when it renews; nothing unknown", async () => {
+    const pt = planMeterText(await translator("pt-BR"), "pt-BR", NOW);
+    const en = planMeterText(await translator("en"), "en", NOW);
+    const both = usage([
+      { kind: "five_hour", usedPercent: 12 },
+      { kind: "seven_day", usedPercent: 40 },
+    ]);
+    expect(planLine(both, pt, NOW.getTime())?.line).toBe("semana 40% · 5h 12%");
+    expect(planLine(both, en, NOW.getTime())?.line).toBe("week 40% · 5h 12%");
+    expect(planLine(both, pt, NOW.getTime())?.alert).toBeNull();
+    const soon = new Date(NOW.getTime() + 90 * 60_000).toISOString();
+    expect(planLine(usage([{ kind: "five_hour", usedPercent: 92, resetsAt: soon }]), pt, NOW.getTime())?.alert).toBe(
+      "Quase no limite · renova às 16:30",
+    );
+    expect(planLine(usage([]), pt, NOW.getTime())).toBeNull();
+  });
+
+  test("the screen: the plan's card with its account's name first, the budget only once it spent through the API", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+    const [screen, parts] = await Promise.all([read("agents/AgentProfileScreen.tsx"), read("usage/parts.tsx")]);
+    expect(screen).toContain("const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);");
+    const plan = screen.indexOf("<PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />");
+    const budget = screen.indexOf(") : spend && shown.budget ? (");
+    expect(plan).toBeGreaterThan(0);
+    expect(budget).toBeGreaterThan(plan);
+    // The phone's meter draws the same line as the web's (`planLine`).
+    expect(parts).toContain("const shown = planLine(usage, text, now);");
+    // The budget is never called a limit next to a plan's limits.
+    const t = await translator("pt-BR");
+    expect(t("mobile.agent.ofMonthBudget")).toBe("do orçamento do mês");
+    expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
   });
 });

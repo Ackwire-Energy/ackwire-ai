@@ -14,6 +14,7 @@ import { brainLine } from "@agenteschat/client/lib/brain";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -51,6 +52,7 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
 import {
@@ -153,6 +155,8 @@ function Profile({ id }: { id: string }) {
         usage: usage.data?.find((u) => u.agentId === id) ?? null,
       })
     : null;
+  // On a plan, its limits first and the budget only once it spent through the API (ADR 0063 §5).
+  const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
     new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
   const date = (iso: string) =>
@@ -474,7 +478,20 @@ function Profile({ id }: { id: string }) {
 
         <Section title={t("mobile.agent.month")}>
           <View style={styles.monthCards}>
-            {spend ? (
+            {shown.plan ? (
+              <Card>
+                <View style={styles.spend}>
+                  <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
+                  {spend && shown.budget ? (
+                    <Text variant="caption" tone="muted">
+                      {spend.kind === "money"
+                        ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
+                        : `${t("mobile.agent.percent", { percent: spend.percent })} ${t("mobile.agent.ofMonthBudget")}`}
+                    </Text>
+                  ) : null}
+                </View>
+              </Card>
+            ) : spend && shown.budget ? (
               <Card>
                 <View style={styles.spend}>
                   <View style={styles.spendHead}>
@@ -493,7 +510,7 @@ function Profile({ id }: { id: string }) {
                           {t("mobile.agent.percent", { percent: spend.percent })}
                         </Text>
                         <Text variant="small" tone="muted">
-                          {t("mobile.agent.ofLimit")}
+                          {t("mobile.agent.ofMonthBudget")}
                         </Text>
                       </>
                     )}

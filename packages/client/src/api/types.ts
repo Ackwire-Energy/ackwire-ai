@@ -365,6 +365,10 @@ export interface AgentBrainLine {
   computer?: string;
   /** A plan account's provider (`zai`, `kimi`…), whose mark replaces the brain's; absent for the CLI's own sign-in. */
   provider?: string | null;
+  /** On a plan: the account it thinks with ("Claude Team 2"; a computer's own sign-in by its plan, "Claude Max"). */
+  account?: string;
+  /** On a plan: that account's limits as last reported; absent: not known yet. */
+  usage?: PlanUsage;
 }
 
 /** `appearance` as stored: the UI only draws known values. */

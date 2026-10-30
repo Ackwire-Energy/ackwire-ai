@@ -2,7 +2,7 @@ import type { PlanAccountInfo } from "@agenteschat/client";
 import { accountName, brandOf, type MeterWindow, planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planName } from "@agenteschat/client/lib/plans";
 import { mixHex } from "@agenteschat/ui/agent/engine";
-import { PLAN_ALMOST, planState, planWindows } from "@agenteschat/ui/plan-state";
+import { PLAN_ALMOST, planLine, planState, planWindows } from "@agenteschat/ui/plan-state";
 import { Canvas, createPicture, Picture, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,35 +42,53 @@ export function Meter({ value, part, label, mark }: { value: number; part?: numb
 /**
  * A plan's usage like the provider shows it (the web's `PlanMeter`): a bar per window, tightest first, with its
  * percentage and when it resets; "almost" from 80%, "at the limit until…" at 100%, and how old the numbers are.
- * `compact`: the tightest window only.
+ * `compact` (an agent's month, Contas de IA, Você): one line with the tightest windows ("semana 40% · 5h 12%",
+ * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known.
  */
-export function PlanMeter({ usage, compact = false }: { usage: MeterUsage; compact?: boolean }) {
+export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage; compact?: boolean; label?: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const text = planMeterText(t, i18n.language);
   const now = Date.now();
+  if (compact) {
+    const shown = planLine(usage, text, now);
+    if (!shown) return null;
+    return (
+      <View style={styles.meterCompact}>
+        <Text variant="caption" tone="muted" style={styles.tabular}>
+          {label ? `${label} · ${shown.line}` : shown.line}
+        </Text>
+        <Meter value={shown.top.used} label={text.window(shown.top)} mark={PLAN_ALMOST} />
+        {shown.alert ? (
+          <Text variant="caption" style={[styles.bold, { color: c.attention }]}>
+            {shown.alert}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
   const rows = planWindows(usage, now);
   const { state, until } = planState(usage, now);
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   const passed = (iso: string | undefined) => iso !== undefined && Date.parse(iso) <= now;
   return (
-    <View style={compact ? styles.meterCompact : styles.meter}>
+    <View style={styles.meter}>
       {headline ? (
         <Text variant="small" style={[styles.bold, { color: c.attention }]}>
           {headline}
         </Text>
       ) : null}
-      {(compact ? rows.slice(0, 1) : rows).map((w, i) => {
+      {rows.map((w, i) => {
         const name = text.window(w);
         // A window that reset is empty again: its parts were the old window's.
         const fresh = !passed(w.resetsAt);
         return (
           <View key={`${w.kind}:${w.label ?? i}`} style={styles.window}>
             <View style={styles.windowLine}>
-              <Text variant={compact ? "caption" : "small"} tone="ink2" style={styles.grow}>
+              <Text variant="small" tone="ink2" style={styles.grow}>
                 {name}
               </Text>
-              <Text variant={compact ? "caption" : "small"} tone="muted" style={styles.tabular}>
+              <Text variant="small" tone="muted" style={styles.tabular}>
                 {w.used}%
               </Text>
             </View>
@@ -80,12 +98,12 @@ export function PlanMeter({ usage, compact = false }: { usage: MeterUsage; compa
               mark={PLAN_ALMOST}
               {...(w.part !== undefined && fresh ? { part: w.part } : {})}
             />
-            {!compact && w.note && fresh ? (
+            {w.note && fresh ? (
               <Text variant="caption" tone="muted">
                 {w.note}
               </Text>
             ) : null}
-            {!compact && w.resetsAt && fresh ? (
+            {w.resetsAt && fresh ? (
               <Text variant="caption" tone="muted">
                 {text.resets(w.resetsAt)}
               </Text>
@@ -93,11 +111,9 @@ export function PlanMeter({ usage, compact = false }: { usage: MeterUsage; compa
           </View>
         );
       })}
-      {!compact ? (
-        <Text variant="caption" tone="muted">
-          {text.updated(usage.at)}
-        </Text>
-      ) : null}
+      <Text variant="caption" tone="muted">
+        {text.updated(usage.at)}
+      </Text>
     </View>
   );
 }

@@ -26,7 +26,9 @@ export interface PlanMeterUsage {
 export interface PlanMeterText {
   /** "5 horas", "Semana", or the window's `label`. */
   window(w: PlanMeterWindow): string;
-  /** "volta às 15:40", "volta sex às 10:00". */
+  /** The compact line's name: "5h", "semana", or the window's `label`. */
+  short(w: PlanMeterWindow): string;
+  /** "renova às 15:40", "renova sex às 10:00". */
   resets(iso: string): string;
   /** "Quase no limite". */
   almost: string;
@@ -71,6 +73,33 @@ export function planState(
   const resets = full.flatMap((w) => (w.resetsAt ? [w.resetsAt] : []));
   const until = full.length > 0 && resets.length === full.length ? (resets.sort().at(-1) ?? null) : null;
   return { state: "limited", until, used };
+}
+
+/** How many windows the compact line names; every window is in its title and in the full meter. */
+const LINE_WINDOWS = 2;
+
+/**
+ * The compact meter's words: the tightest windows by their short names ("semana 40% · 5h 12%"), every window
+ * with its reset for the title, the tightest for its one bar, and only near or at the limit what matters then
+ * ("Quase no limite · renova às 14:00", "No limite até 14:00"). Null while no window is known: nothing, never 0%.
+ */
+export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.now()) {
+  const rows = planWindows(usage, now);
+  const top = rows[0];
+  if (!top) return null;
+  const { state, until } = planState(usage, now);
+  const reset = (w: PlanMeterWindow) => (w.resetsAt && !passed(w.resetsAt, now) ? text.resets(w.resetsAt) : null);
+  const join = (parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
+  return {
+    state,
+    top,
+    line: rows
+      .slice(0, LINE_WINDOWS)
+      .map((w) => `${text.short(w)} ${w.used}%`)
+      .join(" · "),
+    title: rows.map((w) => join([`${text.window(w)} ${w.used}%`, reset(w)])).join("\n"),
+    alert: state === "limited" ? text.limited(until) : state === "almost" ? join([text.almost, reset(top)]) : null,
+  };
 }
 
 /** What `limitOffers` reads of an AI account (the API's `MachineAccount`). */

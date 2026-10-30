@@ -1,5 +1,12 @@
 import type { TFunction } from "i18next";
-import type { AgentUsageSource, PlanAccountInfo, PlanAccountUsage, PlanUsage, PlanWindowParts } from "../api/types";
+import type {
+  AgentBrainLine,
+  AgentUsageSource,
+  PlanAccountInfo,
+  PlanAccountUsage,
+  PlanUsage,
+  PlanWindowParts,
+} from "../api/types";
 import { ownSignInName } from "./ai-accounts";
 import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
 import { planOf } from "./plans";
@@ -40,16 +47,19 @@ export function planMeterText(
   now = new Date(),
 ): {
   window(w: Pick<MeterWindow, "kind" | "label">): string;
+  short(w: Pick<MeterWindow, "kind" | "label">): string;
   resets(iso: string): string;
   almost: string;
   limited(until: string | null): string;
   updated(iso: string): string;
 } {
+  const named = (w: Pick<MeterWindow, "kind" | "label">, words: "window" | "short") => {
+    const kind = WINDOW_NAMES.find((k) => k === w.kind);
+    return kind ? t(`aiAccounts.usage.${words}.${kind}`) : (w.label ?? t(`aiAccounts.usage.${words}.other`));
+  };
   return {
-    window: (w) => {
-      const kind = WINDOW_NAMES.find((k) => k === w.kind);
-      return kind ? t(`aiAccounts.usage.window.${kind}`) : (w.label ?? t("aiAccounts.usage.window.other"));
-    },
+    window: (w) => named(w, "window"),
+    short: (w) => named(w, "short"),
     resets: (iso) => {
       const { day, time } = resetWhen(locale, iso, now);
       return day ? t("aiAccounts.usage.resetsOn", { day, time }) : t("aiAccounts.usage.resetsAt", { time });
@@ -61,6 +71,21 @@ export function planMeterText(
       return t("aiAccounts.usage.limitedUntil", { when: day ? `${day} ${time}` : time });
     },
     updated: (iso) => t("aiAccounts.usage.updated", { ago: relativeTime(t, locale, iso, now) }),
+  };
+}
+
+/**
+ * What shows of an agent's month where its budget used to (ADR 0063 §5): on a plan, its account's limits while a
+ * window is known, and its budget only once it spent through the API this month; on the API, its budget.
+ */
+export function usageShown(
+  brain: Pick<AgentBrainLine, "kind" | "account" | "usage"> | undefined,
+  budgetUsedPercent: number,
+): { plan: { account: string | undefined; usage: PlanUsage } | null; budget: boolean } {
+  if (!brain || brain.kind === "model") return { plan: null, budget: true };
+  return {
+    plan: brain.usage?.windows.length ? { account: brain.account, usage: brain.usage } : null,
+    budget: budgetUsedPercent > 0,
   };
 }
 

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Run } from "@agenteschat/client";
+import type { PlanUsage, Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   agentSearch,
@@ -237,6 +237,89 @@ describe("agent page: the budget on the overview", () => {
     expect(work.textContent).toContain("Pensa comClaude Code · Sonnet");
     // A member doesn't see where it works or its browser.
     expect(work.textContent).not.toContain("Trabalha");
+  });
+});
+
+describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () => {
+  const hours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+  const LIMITS: PlanUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 12, resetsAt: hours(2) },
+      { kind: "seven_day", usedPercent: 40, resetsAt: hours(72) },
+    ],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  /** Ada thinks with Claude Team; `spent`: what she spent through the API this month. */
+  const onPlan = (spent: number, usage: PlanUsage | null = LIMITS) => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.brain = {
+        kind: "claude_code",
+        model: "Sonnet",
+        account: "Claude Team",
+        ...(usage ? { usage } : {}),
+      };
+    }
+    state.spentUsd = { [ADA_ID]: spent };
+    return state;
+  };
+  const line = (el: Element) => el.querySelector(".ac-planmeter__line")?.textContent;
+
+  test("on a plan: its account's tightest windows and one bar, and no budget while it spent nothing through the API", async () => {
+    const { router } = await go("", onPlan(0));
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(line(work)).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(within(work).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("40");
+    expect(work.textContent).not.toMatch(/orçamento|US\$/);
+    // The side card: the same line, nothing called a budget, and the rest in Uso.
+    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(line(card)).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(card.textContent).not.toMatch(/orçamento|US\$/);
+    await click(within(card).getByRole("button", { name: "Ver tudo" }));
+    expect(router.state.location.search).toMatchObject({ tab: "usage" });
+  });
+
+  test("on a plan that also spent through the API: the plan's limits first, the budget after them", async () => {
+    await go("", onPlan(12.3));
+    const work = screen().getByRole("region", { name: "Como trabalha" }).textContent ?? "";
+    expect(work.indexOf("Claude Team · semana 40%")).toBeGreaterThanOrEqual(0);
+    expect(work.indexOf("Claude Team · semana 40%")).toBeLessThan(work.indexOf("US$ 12,30 de US$ 40"));
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(card.textContent).toMatch(/^Uso.*Claude Team · semana 40% · 5h 12%.*US\$ 12,30 de US\$ 40 em /);
+  });
+
+  test("on the API: the budget as before, and no plan line", async () => {
+    await go();
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.querySelector(".ac-planmeter")).toBeNull();
+    expect(work.textContent).toContain("US$ 12,30");
+    expect(screen().getByRole("region", { name: "Orçamento" })).toBeTruthy();
+    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
+  });
+
+  test("a plan whose windows aren't known yet shows nothing rather than 0%", async () => {
+    await go("", onPlan(0, null));
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.querySelector(".ac-planmeter")).toBeNull();
+    expect(work.textContent).not.toMatch(/orçamento|US\$/);
+    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
+  });
+
+  test("near the limit it says when the window renews", async () => {
+    const almost: PlanUsage = {
+      ...LIMITS,
+      windows: [{ kind: "five_hour", usedPercent: 92, resetsAt: new Date(Date.now() + 90 * 60_000).toISOString() }],
+    };
+    await go("", onPlan(0, almost));
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(line(card)).toBe("Claude Team · 5h 92%");
+    expect(card.querySelector(".ac-planmeter__state")?.textContent).toMatch(
+      /^Quase no limite · renova (\S+ )?às \d\d:\d\d$/,
+    );
   });
 });
 
