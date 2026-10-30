@@ -94,7 +94,7 @@ export const mobileEn: MobileTranslations = {
       on: "Turn on notifications",
       later: "Not now",
       done: "Notifications on",
-      failed: "Couldn't turn on notifications. Try again in You › Notifications.",
+      failed: "Couldn't turn on notifications. Try again in You\u00a0›\u00a0Notifications.",
       someone: "An agent",
       examples: "Examples of notifications",
       now: "now",
