@@ -32,6 +32,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   divider = false,
   live = false,
   agent,
+  onLongPress,
+  holdLabel,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -39,6 +41,10 @@ export const ConversationRowView = memo(function ConversationRowView({
   live?: boolean;
   /** An agent DM: it waits on you, or what it is doing (from `agentRowState`). */
   agent?: AgentRowState;
+  /** A channel on the home: its menu ("Mover para…"). */
+  onLongPress?: () => void;
+  /** What the long press does, for screen readers. */
+  holdLabel?: string;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -191,6 +197,16 @@ export const ConversationRowView = memo(function ConversationRowView({
   return (
     <ListRow
       onPress={open}
+      {...(onLongPress
+        ? {
+            onLongPress,
+            delayLongPress: 380,
+            accessibilityActions: [{ name: "menu", label: holdLabel ?? name }],
+            onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
+              if (e.nativeEvent.actionName === "menu") onLongPress();
+            },
+          }
+        : {})}
       accessibilityRole="button"
       accessibilityLabel={a11y}
       divider={divider}

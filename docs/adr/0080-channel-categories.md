@@ -1,8 +1,8 @@
 # 0080. Channel categories in the sidebar
 
-- Status: Accepted (built: the server, the shared client and the web; the phone app still lists channels without them)
+- Status: Accepted (built: the server, the shared client, the web and the phone app)
 - Date: 2026-10-30
-- Code: `packages/engine/src/channel-categories.ts`, `packages/engine/src/channels.ts` (`createChannel`, `listChannels`), `packages/db/src/schema/chat.ts` (`channel_categories`, `channels.category_id`, `channels.position`), `apps/server/src/routes/app/channels.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/ChannelCategoryDialogs.tsx`
+- Code: `packages/engine/src/channel-categories.ts`, `packages/engine/src/channels.ts` (`createChannel`, `listChannels`), `packages/db/src/schema/chat.ts` (`channel_categories`, `channels.category_id`, `channels.position`), `apps/server/src/routes/app/channels.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/ChannelCategoryDialogs.tsx`, `apps/mobile/src/features/categories/*`, `apps/mobile/src/features/chats/logic.ts` (`homeLayout`)
 
 ## Context
 
@@ -16,3 +16,4 @@ With a dozen channels, one alphabetical "Canais" list mixes every team's channel
 4. **Deleting a category** moves its channels to the end of the ones with none, in their order. Archiving a channel leaves its place as it is.
 5. **Live.** Every change sends an org broadcast `channels.layout` with no names in it (private channels stay private); clients refetch the channel list and the categories.
 6. **The sidebar.** A category is a section like Agentes: same header, chevron and a + to create a channel in it. Closed, it still shows the open channel and the unread ones. Channels move from their right-click menu ("Mover para…"), the channel details (Categoria) or by dragging.
+7. **The phone.** Conversas shows the same layout: Canais (no category), one section per category in order, each its five latest and "Ver todos", a closed category keeping its unread channels. The channel's ⋯ sheet and a long press on its row open "Categoria", a pushed screen to pick one; a long press on a category's header gives admins Rename, Categories and New category, all pushed screens. The order moves one step at a time (Move up, Move down): the app has no drag-to-reorder list.
