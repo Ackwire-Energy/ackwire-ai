@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import path from "node:path";
 import {
   AGENT_BROWSER_VERSION,
@@ -462,6 +463,31 @@ test.if(posix)("a started Chrome's browser endpoint comes from the second line o
   // A port alone, or anything else on the second line, gives no endpoint: its traffic isn't counted.
   expect(await start("45679")).not.toHaveProperty("wsPath");
   expect(await start("45680\\nws://elsewhere/devtools/browser/x")).not.toHaveProperty("wsPath");
+});
+
+test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a stale port file", async () => {
+  const dir = tempDir("chrome-fixed-");
+  dirs.push(dir);
+  const exe = path.join(dir, "chrome");
+  writeFileSync(exe, '#!/bin/sh\nprintf "45678\\n/devtools/browser/stale" > "$1/DevToolsActivePort"\nexec sleep 30\n', { mode: 0o755 });
+  const server = createServer((socket) => {
+    socket.once("data", () => {
+      const body = JSON.stringify({ webSocketDebuggerUrl: `ws://127.0.0.1:${port}/devtools/browser/owned` });
+      socket.end(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  if (!addr || typeof addr === "string") throw new Error("no listener");
+  const port = addr.port;
+  try {
+    const chrome = await launchChrome(exe, [dir, `--remote-debugging-port=${port}`], dir, undefined, undefined, () => true);
+    expect(chrome).toMatchObject({ port, wsPath: "/devtools/browser/owned" });
+    chrome.kill();
+    await chrome.exited;
+  } finally {
+    server.close();
+  }
 });
 
 /**
@@ -977,6 +1003,14 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
   expect(await t.manager.streamStop(dev)).toEqual({ stopped: false });
+});
+
+test.if(posix)("system mode refuses an agent-browser stream that fell back to an unassigned port", async () => {
+  const t = setup({ fixedPorts: { cdp: 12000, stream: 12001 } });
+  await t.act("open", ["https://shop.example.com"]);
+  expect(t.chromes[0]?.args).toContain("--remote-debugging-port=12000");
+  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_unavailable");
+  expect(t.sockets).toHaveLength(0);
 });
 
 test.if(posix)("a stream can't start on a closed browser, never opened or closed since: browser_closed", async () => {

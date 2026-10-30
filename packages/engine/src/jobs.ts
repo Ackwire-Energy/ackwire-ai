@@ -50,7 +50,7 @@ import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
-import { activateDeliveredSecret } from "./secrets";
+import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
 import { indexSource, reindexOrg } from "./search";
 import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
@@ -408,6 +408,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");
       await activateDeliveredSecret({ ...deps.sandbox, pubsub: deps.pubsub }, orgOf(job), String(job.payload.requestId));
+    },
+    "secret.discard": async (job) => {
+      if (!deps.sandbox) throw new Error("Computer secret cleanup is unavailable");
+      await discardClosedSecret(deps.sandbox, orgOf(job), String(job.payload.requestId));
     },
     "search.index": async (job) => {
       if (!deps.search) return;

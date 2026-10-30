@@ -551,7 +551,13 @@ function Tag({
   );
   if (!onPress) return chip;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityHint={hint} hitSlop={6}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityHint={hint}
+      hitSlop={6}
+      style={styles.tagPress}
+    >
       {chip}
     </Pressable>
   );
@@ -631,8 +637,9 @@ const styles = StyleSheet.create({
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  who: { flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 3 },
-  name: { fontWeight: "600", fontSize: 14, lineHeight: 19 },
+  // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
+  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
+  name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
   meCont: { paddingTop: 2, marginTop: 0 },
   mePressed: { opacity: 0.7 },
@@ -662,6 +669,8 @@ const styles = StyleSheet.create({
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
+  // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
+  tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },
   pin: { alignSelf: "center" },
   // The routine report a message answers, unfolded under its name (like the notice line's text).
   report: { marginTop: 2, marginBottom: 4, paddingLeft: 10, borderLeftWidth: 2 },

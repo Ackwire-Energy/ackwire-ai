@@ -128,7 +128,7 @@ Superseded by ADR 0065 §1: the apps have no terminal view (in control, the desk
   - Everything done for an agent runs as that user: commands, tasks, brains, files, its browser, its desktop, its terminal. The supervisor runs no agent code: until a worker serves an agent's requests, the root runner refuses them. Workers start on an agent's first request.
   - The desktop and the terminal are the supervisor's ops (`desktop.session.*`, `stream.open`), since a stream's data socket needs the machine token, which no worker holds, and the password file is root's: it starts Xtigervnc, the session and the shell through the agent's launcher.
   - The runner is updated by its installer, never by itself.
-  - Chrome's debugging port and `agent-browser`'s stream port have no authentication of their own: an nftables table, `inet agentes_runner`, lets only the owning agent's uid and root reach them, through port and uid sets the supervisor fills after checking who listens.
+  - Chrome's debugging port and `agent-browser`'s stream port have no authentication of their own. System mode assigns each agent a fixed pair, guards the full configured uid range with `inet agentes_runner` before workers start, and prevents another agent from binding that pair with a verified systemd socket-bind policy. Arbitrary local listeners still use the two-second `ss` scan and retain its race window (ADR 0057).
   - Chrome's sandbox needs unprivileged user namespaces (on by default in Debian 13): hardening must keep them.
 
 ### 11. Protocol 18

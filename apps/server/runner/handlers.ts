@@ -89,7 +89,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   write: "agent",
   list: "agent",
   push: "agent",
-  secret: "agent",
+  // Keys and staged boxes stay in the root supervisor until DB-committed activation.
+  secret: "machine",
   account: "machine",
   "task.start": "agent",
   "task.status": "agent",
@@ -173,7 +174,10 @@ export interface HandlerContext {
   /** System mode: this process is root and answers only the `machine` ops of `OP_ROUTES` itself. */
   systemMode?: () => boolean;
   /** System mode: runs an `agent` op in its agent's worker; without it those ops are refused. */
-  workers?: { run(req: MachineRequest, scope: RequestScope): Promise<unknown> };
+  workers?: {
+    run(req: MachineRequest, scope: RequestScope): Promise<unknown>;
+    secret?(req: Extract<MachineRequest, { op: "secret" }>, scope: RequestScope): Promise<unknown>;
+  };
   /**
    * Protocol 10: what the machine allows. With it, absolute paths inside the
    * agent's allowed folders are accepted and each tool needs to be on;
@@ -419,6 +423,10 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     return handleDesktop(ctx, req);
   }
   if (req.op === "stream.open") return handleStream(ctx, req, scope);
+  if (req.op === "secret" && ctx.systemMode?.()) {
+    if (!ctx.workers?.secret) throw new RunnerError("not_allowed", "The root secret broker is unavailable");
+    return ctx.workers.secret(req, scope);
+  }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {

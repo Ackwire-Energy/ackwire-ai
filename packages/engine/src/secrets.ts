@@ -233,10 +233,58 @@ export async function getSecretRequest(db: Database, actorId: string, orgId: str
   return secretRequestView(await loadForRequester(db, actorId, orgId, requestId));
 }
 
+/** Resolve an uncertain or lost delivery commit without deleting another caller's staged box. */
+async function reconcileStagedDelivery(
+  deps: SandboxDeps & { pubsub?: PubSub },
+  row: SecretRequestRow,
+): Promise<SecretRequestView | null> {
+  let current: SecretRequestRow | undefined;
+  try {
+    [current] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+  } catch {
+    // The DB may have committed before its reply was lost. Keep the staged box
+    // for the durable activation job until the outcome can be read.
+    return null;
+  }
+  if (current?.status === "delivered") {
+    await activateDeliveredSecret(deps, row.orgId, row.id);
+    const [latest] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+    return secretRequestView(latest ?? current);
+  }
+  // Pending can still be won by another in-flight caller. Only a durable
+  // declined/expired/canceled decision makes every activation impossible.
+  if (current && current.status !== "pending") {
+    await onRequestComputer(deps, row, (computer) =>
+      secretOnComputer(computer, { action: "discard", requestId: row.id }),
+    true).catch(() => undefined);
+  }
+  return null;
+}
+
+/** Retry deletion after a terminal DB decision, including when the computer was offline. */
+async function enqueueSecretDiscard(tx: Executor, row: SecretRequestRow) {
+  await enqueue(tx, {
+    orgId: row.orgId,
+    kind: "secret.discard",
+    payload: { requestId: row.id },
+    dedupeKey: `secret.discard:${row.id}`,
+    maxAttempts: 96,
+  });
+}
+
+export async function discardClosedSecret(deps: SandboxDeps, orgId: string, requestId: string) {
+  const [row] = await deps.db.select().from(secretRequests)
+    .where(and(eq(secretRequests.id, requestId), eq(secretRequests.orgId, orgId)));
+  if (!row || !["declined", "expired", "canceled"].includes(row.status)) return;
+  await onRequestComputer(deps, row, (computer) =>
+    secretOnComputer(computer, { action: "discard", requestId: row.id }),
+  true, true);
+}
+
 /**
  * The computer stages only the sealed box while the DB request is pending.
  * Once the DB commits delivery, the computer activates the value, then the
- * run resumes. A failed transaction can leave ciphertext, never live plaintext.
+ * run resumes. A failed transaction can leave staged ciphertext and its key.
  */
 export async function deliverSecret(
   deps: SandboxDeps & { pubsub?: PubSub },
@@ -276,7 +324,11 @@ export async function deliverSecret(
       const [updated] = await tx
         .update(secretRequests)
         .set({ status: "delivered", deliveredAt: now, deliveredSize: reply.size ?? null })
-        .where(and(eq(secretRequests.id, row.id), eq(secretRequests.status, "pending")))
+        .where(and(
+          eq(secretRequests.id, row.id),
+          eq(secretRequests.status, "pending"),
+          sql`${secretRequests.expiresAt} > now()`,
+        ))
         .returning();
       if (!updated) return null;
       await syncSecretMessage(tx, updated);
@@ -291,15 +343,13 @@ export async function deliverSecret(
       return updated;
     });
   } catch (error) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw error;
   }
   if (!delivered) {
-    await onRequestComputer(deps, row, (computer) =>
-      secretOnComputer(computer, { action: "discard", requestId: row.id }),
-    true).catch(() => undefined);
+    const recovered = await reconcileStagedDelivery(deps, row);
+    if (recovered) return recovered;
     throw new ConflictError("This request was already answered or expired");
   }
   try {
@@ -409,7 +459,7 @@ export async function activateDeliveredSecret(
   }
 }
 
-/** The person says no: the run goes on without it; the computer forgets the key (best effort). */
+/** The person says no: the run goes on without it; a durable job removes the runner key. */
 export async function declineSecret(
   deps: { db: Database; pubsub?: PubSub; sandbox?: SandboxDeps | null },
   actorId: string,
@@ -432,6 +482,7 @@ export async function declineSecret(
     if (!updated) return null;
     await syncSecretMessage(tx, updated);
     await enqueue(tx, resumeJob(updated));
+    await enqueueSecretDiscard(tx, updated);
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
@@ -463,6 +514,7 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
     for (const row of rows) {
       await syncSecretMessage(tx, row);
       await enqueue(tx, resumeJob(row));
+      await enqueueSecretDiscard(tx, row);
       await recordAudit(tx, {
         orgId: row.orgId,
         actor: { type: "system", id: null },
@@ -479,11 +531,13 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
 
 /** A run canceled while waiting: its requests close too. */
 export async function cancelSecretRequests(tx: Executor, runId: string) {
-  return tx
+  const rows = await tx
     .update(secretRequests)
     .set({ status: "canceled" })
     .where(and(eq(secretRequests.runId, runId), eq(secretRequests.status, "pending")))
     .returning();
+  for (const row of rows) await enqueueSecretDiscard(tx, row);
+  return rows;
 }
 
 export interface AgentSecretView {
