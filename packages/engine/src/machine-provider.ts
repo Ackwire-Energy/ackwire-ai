@@ -4,8 +4,8 @@ import {
   type ExecResult,
   MAX_INLINE_FILE_BYTES,
   type SandboxProvider,
-  SECRETS_PROTOCOL,
   SECRET_ACTIVATE_PROTOCOL,
+  SECRETS_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
@@ -133,8 +133,11 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           `The runner on the computer ${status.name} is too old to keep secrets. Tell the person: its owner should update it with \`agentes-runner update\`.`,
         );
       }
-      if (status && status.protocol < SECRET_ACTIVATE_PROTOCOL &&
-        (request.action === "keypair" || request.action === "deliver" || request.action === "activate")) {
+      if (
+        status &&
+        status.protocol < SECRET_ACTIVATE_PROTOCOL &&
+        (request.action === "keypair" || request.action === "deliver" || request.action === "activate")
+      ) {
         throw new Error(
           `The runner on the computer ${status.name} is too old for safe secret delivery. Its owner should update it with \`agentes-runner update\`.`,
         );

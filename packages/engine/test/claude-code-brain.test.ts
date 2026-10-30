@@ -22,6 +22,7 @@ import {
   drainOutbox,
   listMessages,
   type MachineCallOptions,
+  MachineDroppedError,
   MachineOfflineError,
   MachineRequestError,
   type MachineStatus,
@@ -334,7 +335,7 @@ test("accounts (ADR 0041): the account and effort go to a runner that knows them
 
 test("a failed request becomes the turn's error (offline and old runners may fall back; a timeout doesn't)", async () => {
   const cases: [Error, string, boolean][] = [
-    [new MachineOfflineError("mac"), "machine_offline", true],
+    [new MachineOfflineError("mac", null), "machine_offline", true],
     [new MachineRequestError("bad_request", "Unknown op brain.turn"), "runner_outdated", true],
     [new MachineRequestError("timeout", "too slow"), "timeout", false],
     [new MachineRequestError("internal", "busy"), "busy", true],
@@ -346,6 +347,21 @@ test("a failed request becomes the turn's error (offline and old runners may fal
     expect(await collect(brainWith(pubsub, hub).run(turn(), io()))).toEqual([
       expect.objectContaining({ type: "error", code, retryable }),
     ]);
+  }
+});
+
+test("a turn cut mid-way (the link dropped, the agent's worker stopped) waits for the computer; our own stop says so", async () => {
+  const cases: [Error, boolean][] = [
+    [new MachineDroppedError("mac"), false],
+    [new MachineDroppedError("mac", { message: "The agent's worker on this computer stopped while this ran." }), false],
+    [new MachineDroppedError("mac", { serverStop: true }), true],
+  ];
+  for (const [fail, serverStop] of cases) {
+    const pubsub = createMemoryPubSub();
+    const { hub } = fakeHub(pubsub, { fail });
+    const events = await collect(brainWith(pubsub, hub).run(turn(), io()));
+    expect(events).toEqual([expect.objectContaining({ type: "error", code: "machine_offline", retryable: true })]);
+    expect((events[0] as { serverStop?: boolean }).serverStop === true).toBe(serverStop);
   }
 });
 

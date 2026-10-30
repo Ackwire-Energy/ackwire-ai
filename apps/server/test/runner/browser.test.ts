@@ -469,11 +469,15 @@ test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a s
   const dir = tempDir("chrome-fixed-");
   dirs.push(dir);
   const exe = path.join(dir, "chrome");
-  writeFileSync(exe, '#!/bin/sh\nprintf "45678\\n/devtools/browser/stale" > "$1/DevToolsActivePort"\nexec sleep 30\n', { mode: 0o755 });
+  writeFileSync(exe, '#!/bin/sh\nprintf "45678\\n/devtools/browser/stale" > "$1/DevToolsActivePort"\nexec sleep 30\n', {
+    mode: 0o755,
+  });
   const server = createServer((socket) => {
     socket.once("data", () => {
       const body = JSON.stringify({ webSocketDebuggerUrl: `ws://127.0.0.1:${port}/devtools/browser/owned` });
-      socket.end(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+      socket.end(
+        `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,
+      );
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -481,7 +485,14 @@ test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a s
   if (!addr || typeof addr === "string") throw new Error("no listener");
   const port = addr.port;
   try {
-    const chrome = await launchChrome(exe, [dir, `--remote-debugging-port=${port}`], dir, undefined, undefined, () => true);
+    const chrome = await launchChrome(
+      exe,
+      [dir, `--remote-debugging-port=${port}`],
+      dir,
+      undefined,
+      undefined,
+      () => true,
+    );
     expect(chrome).toMatchObject({ port, wsPath: "/devtools/browser/owned" });
     chrome.kill();
     await chrome.exited;

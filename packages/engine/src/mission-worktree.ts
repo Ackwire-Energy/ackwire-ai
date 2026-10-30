@@ -764,7 +764,7 @@ export async function leaveMachineWorktree(deps: MissionDeps, mission: MissionRo
     }).catch(() => undefined);
   const hub = deps.hub;
   if (!hub || !status?.online) {
-    await leftBehind(new MachineOfflineError(computer));
+    await leftBehind(new MachineOfflineError(computer, status?.kind));
     return computer;
   }
   const remove = async () => {

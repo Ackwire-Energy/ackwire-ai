@@ -15,8 +15,12 @@ export function browserPortsForUid(uid: number): BrowserPorts {
 /** A host's configured UID range must map injectively into the reserved pair range. */
 export function validateBrowserUidRange([first, last]: [number, number]) {
   if (
-    !Number.isInteger(first) || !Number.isInteger(last) || first < 1000 || last > 59_999 ||
-    first > last || Math.floor(first / BROWSER_UID_BUCKET) !== Math.floor(last / BROWSER_UID_BUCKET)
+    !Number.isInteger(first) ||
+    !Number.isInteger(last) ||
+    first < 1000 ||
+    last > 59_999 ||
+    first > last ||
+    Math.floor(first / BROWSER_UID_BUCKET) !== Math.floor(last / BROWSER_UID_BUCKET)
   ) {
     throw new Error("System agent uid range must fit within one 10,000-uid block for browser port isolation");
   }

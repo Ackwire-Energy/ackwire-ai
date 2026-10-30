@@ -50,10 +50,10 @@ import {
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import {
   configPath,
   connectUrl,
@@ -840,11 +840,13 @@ export class RunnerDaemon implements RequestObserver {
       };
       // Desktops and terminals can start before a worker. The first use of a
       // newly allocated UID installs its bind policy before returning it.
-      agentUser = this.opts.workers?.user ?? ((agent) => {
-        const user = users.ensure(agent);
-        prepare(user);
-        return user;
-      });
+      agentUser =
+        this.opts.workers?.user ??
+        ((agent) => {
+          const user = users.ensure(agent);
+          prepare(user);
+          return user;
+        });
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
       // would replace the others' rules with its own.
@@ -852,19 +854,23 @@ export class RunnerDaemon implements RequestObserver {
         this.opts.workers || config.managedBy === "host"
           ? undefined
           : new LoopbackGuard({
-              home, agentUids: () => readAgentUsers(home).map((u) => u.uid),
-              uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE, log,
+              home,
+              agentUids: () => readAgentUsers(home).map((u) => u.uid),
+              uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
+              log,
             });
       supervisor = new Supervisor({
         home,
         requireRootBroker: !this.opts.workers,
         user: agentUser,
         start: launchWorker(this.self.command),
-        ...(this.opts.workers || config.managedBy === "host" ? {} : {
-          prepareExisting: (existing: AgentUser[]) => {
-            for (const user of existing) prepare(user);
-          },
-        }),
+        ...(this.opts.workers || config.managedBy === "host"
+          ? {}
+          : {
+              prepareExisting: (existing: AgentUser[]) => {
+                for (const user of existing) prepare(user);
+              },
+            }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,

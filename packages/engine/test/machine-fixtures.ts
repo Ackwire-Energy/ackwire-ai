@@ -163,12 +163,15 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           staged.delete(req.requestId);
         }
         if (req.action === "remove") {
-          const selected = (id: string, prior: { order: string }) => !req.requestIds || req.requestIds.includes(id) ||
+          const selected = (id: string, prior: { order: string }) =>
+            !req.requestIds ||
+            req.requestIds.includes(id) ||
             (req.throughOrder !== undefined && prior.order <= req.throughOrder);
-          for (const [id, prior] of activated) if (prior.name === req.name && selected(id, prior)) {
-            activated.delete(id);
-            if (orders.get(req.name) === prior.order) secrets.delete(req.name);
-          }
+          for (const [id, prior] of activated)
+            if (prior.name === req.name && selected(id, prior)) {
+              activated.delete(id);
+              if (orders.get(req.name) === prior.order) secrets.delete(req.name);
+            }
           if (!req.requestIds) secrets.delete(req.name);
           for (const id of req.requestIds ?? []) {
             canceled.add(id);

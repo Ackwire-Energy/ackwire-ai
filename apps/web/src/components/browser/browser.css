@@ -524,49 +524,9 @@
 .brw-ac:not(.is-open) {
   max-width: 600px;
 }
-/* Closed: the small live picture, the site, what the agent does now. */
-.brw-ac__compact {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 10px 10px 10px;
-}
-.brw-ac__thumb {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  position: relative;
-  flex: none;
-  width: 132px;
-  aspect-ratio: 16 / 10;
-  border-radius: 9px;
-  overflow: hidden;
-  background: var(--site-blank);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.brw-ac__thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top left;
-  user-select: none;
-}
-.brw-ac__thumb-blank {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(rgba(20, 22, 30, 0.05), rgba(20, 22, 30, 0.02));
-  animation: brw-pulse 1.4s ease-in-out infinite;
-}
-.brw-ac__compact .brw-ac__tx {
-  gap: 3px;
-}
 .brw-ac__hint {
   color: var(--faint);
   font-size: 12px;
-}
-.brw-ac__compact .brw-ac__acts {
-  align-self: center;
 }
 @keyframes brw-grow-in {
   from {
@@ -949,9 +909,6 @@
   .brw-ac .brw-log {
     display: none;
   }
-  .brw-ac__thumb {
-    width: 96px;
-  }
   .brw-ac__hint {
     display: none;
   }
@@ -1195,7 +1152,6 @@
   .brw-step__shot,
   .brw-mwin__row i[data-flip],
   .brw-mwin__row i[data-flip]::after,
-  .brw-ac__thumb-blank,
   .brw-skel i {
     animation: none;
   }
@@ -1372,15 +1328,6 @@
   }
 }
 
-/* Closed, or someone else in control: the small picture says so instead of pulsing. */
-.brw-ac__thumb-icon {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: var(--sunken);
-  color: var(--faint);
-}
 .brw-dim__row > .ac-icon {
   color: var(--muted);
 }
@@ -1488,7 +1435,7 @@
   }
 }
 .brw-ac.brw-mf.is-control {
-  background: linear-gradient(135deg, #3a3a3c, #1c1c1e);
+  background: linear-gradient(135deg, var(--frame-control-a), var(--frame-control-b));
 }
 .brw-mf__top {
   position: relative;
@@ -1498,7 +1445,7 @@
   gap: 8px;
   min-height: 40px;
   padding: 4px 6px 4px 8px;
-  color: #fff;
+  color: var(--frame-ink);
   font-size: 13px;
 }
 .brw-mf__site {
@@ -1526,7 +1473,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #fff;
+  background: var(--site-paper);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .brw-site-icon img {
@@ -1536,7 +1483,7 @@
   object-fit: contain;
 }
 .brw-site-icon--letter {
-  color: #111;
+  color: var(--site-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -1562,7 +1509,7 @@
   text-overflow: ellipsis;
 }
 .brw-mf__now:focus-visible {
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--frame-ink);
 }
 .brw-mf__acts {
   display: flex;
@@ -1640,7 +1587,7 @@
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   gap: 9px;
-  align-items: center;
+  align-items: start;
   padding: 6px 8px;
   border-radius: 9px;
   color: var(--muted);

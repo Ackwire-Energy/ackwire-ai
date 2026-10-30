@@ -146,6 +146,7 @@ const {
   approvals,
   agentQuestions,
   messages,
+  outbox,
   routineRuns,
   secretRequests,
   users,
@@ -273,9 +274,12 @@ export interface Transcript {
   /**
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
-   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
+   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off;
+   * `cause`: `restart` when our server stopped in the middle of the turn, not the computer.
    */
-  interruptedTurn?: { prompt: string; executed: string[]; drops: number };
+  interruptedTurn?: { prompt: string; executed: string[]; drops: number; cause?: "restart" };
+  /** What the computer brain's turn under way was asked: a turn cut by a crash is sent again with it. */
+  turnPrompt?: string;
   /**
    * This run continues one a person stopped ("Continuar"): the line a computer brain reads first
    * (the model brain reads it at the end of `messages`). Taken by the first turn.
@@ -319,6 +323,8 @@ export class BrainFailure extends Error {
     readonly retryable: boolean,
     /** A plan limit's reset time, when the brain said it. */
     readonly resetsAt?: string,
+    /** The computer dropped because our own server stopped: not one of its drops (`MAX_COMPUTER_DROPS`). */
+    readonly serverStop = false,
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -336,8 +342,9 @@ export function interruptedTurnPrompt(
   extra: string | null = null,
 ): string {
   const done = t.executed.length > 0 ? ` Already done in it, do not repeat: ${t.executed.join(", ")}.` : "";
+  const why = t.cause === "restart" ? "the server restarted" : "the computer disconnected";
   return [
-    `Your previous turn was cut off because the computer disconnected.${done} Pick up where you left off and finish it. What you were asked:`,
+    `Your previous turn was cut off because ${why}.${done} Pick up where you left off and finish it. What you were asked:`,
     t.prompt,
     extra,
   ]
@@ -363,6 +370,13 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
+/** The result of a call in a step cut by a server restart that never started. */
+const NOT_RUN_BY_RESTART =
+  "Interrupted by a server restart before it ran: nothing was done. Call it again if it's still needed.";
+/** Put before the error of a call still running when a server restart began: the restart may be what ended it. */
+const CUT_BY_RESTART =
+  "A server restart began while this call ran: it may have stopped partway, after doing part of its work. Check before running it again. What it returned:";
+
 const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
   if (approval.status === "refused") {
@@ -378,6 +392,12 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
 };
 
 /**
+ * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
+ * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`).
+ */
+type RunJobOptions = { finalAttempt: boolean; wait?: string; jobId?: string; owned?: () => Promise<boolean> };
+
+/**
  * Executes one agent run (job `agent_run.execute`), end to end
  * (docs/adr/0008, 0015): claim the run, build or load the transcript, then
  * loop: call the model through the Model Gateway (deltas go to the channel),
@@ -391,12 +411,7 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  * On the final attempt, or for permanent problems (budget, credential), the
  * run fails.
  */
-export async function executeRun(
-  deps: EngineDeps,
-  runId: string,
-  /** `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale. */
-  options: { finalAttempt: boolean; wait?: string },
-) {
+export async function executeRun(deps: EngineDeps, runId: string, options: RunJobOptions) {
   const prof = createProfiler();
   // A person can cancel it: the signal aborts the model stream, tools and running code.
   const abort = registerRunAbort(runId);
@@ -420,7 +435,7 @@ export async function executeRun(
 async function executeRunInner(
   deps: EngineDeps,
   runId: string,
-  options: { finalAttempt: boolean; wait?: string },
+  options: RunJobOptions,
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
 ) {
@@ -449,6 +464,15 @@ async function executeRunInner(
     if (!loaded) throw new PermanentJobError(`agent run ${runId} not found`);
     run = loaded;
     if (isTerminal(run.status) || run.status === "queued") return;
+    if (run.status === "running") {
+      // Picked up again (handed back at a shutdown, or recovered) with its old beat: a fresh one first, so a
+      // recovery sweep can't take it from this worker. A sweep that took it first ended this job.
+      await db
+        .update(agentRuns)
+        .set({ heartbeatAt: new Date() })
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
+      if (options.owned && !(await options.owned())) return;
+    }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const [stillPending, stillOpen, stillSecret] = await Promise.all([
         db
@@ -490,6 +514,14 @@ async function executeRunInner(
       const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
+      // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
+      // run instead of finding it no longer waiting and doing nothing.
+      if (options.wait && options.jobId) {
+        await db
+          .update(outbox)
+          .set({ payload: sql`${outbox.payload} - 'wait'` })
+          .where(eq(outbox.id, options.jobId));
+      }
     }
   }
   // status is `running` here.
@@ -987,6 +1019,8 @@ async function executeRunInner(
     if (isShutdown(signal.reason)) throw new RunInterruptedError();
     return true;
   };
+  /** The server is shutting down: the step in progress ends cleanly, then the run is handed back. */
+  const shuttingDown = () => signal.aborted && isShutdown(signal.reason);
   const isCanceled = async () => {
     if (aborted()) return true;
     const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -1530,20 +1564,34 @@ async function executeRunInner(
    * The computer dropped in the middle of the turn (its runner restarted, the network went): the run
    * waits for that computer, saying nothing for a short while, and the turn is sent again when it is
    * back (`resumeRunsWaitingForMachine`, or right away when it already is). Still away after the grace:
-   * the next attempt finds it unavailable and says so ("I'll answer when it's back").
+   * the next attempt finds it unavailable and says so ("I'll answer when it's back"). A drop caused by
+   * our own server stopping (`serverStop`) isn't one of the computer's: it never counts toward the limit,
+   * and the turn sent again reads that the server restarted.
    */
-  const waitForDroppedComputer = async (from: BrainKind, machineId: string, prompt: string, executed: string[]) => {
+  const waitForDroppedComputer = async (
+    from: BrainKind,
+    machineId: string,
+    prompt: string,
+    executed: string[],
+    serverStop: boolean,
+  ) => {
     await deferred;
     const t = transcript as Transcript;
     const prev = t.interruptedTurn;
     t.interruptedTurn = {
       prompt: prev?.prompt ?? prompt,
       executed: [...new Set([...(prev?.executed ?? []), ...executed])],
-      drops: (prev?.drops ?? 0) + 1,
+      drops: (prev?.drops ?? 0) + (serverStop ? 0 : 1),
+      ...(serverStop ? { cause: "restart" as const } : {}),
     };
     const waitId = Bun.randomUUIDv7();
     t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
-    await addRunStep(db, run, "error", { reason: "brain_dropped", code: "machine_offline", executed });
+    await addRunStep(db, run, "error", {
+      reason: "brain_dropped",
+      code: "machine_offline",
+      executed,
+      ...(serverStop ? { serverStop: true } : {}),
+    });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: machineId,
@@ -1663,6 +1711,7 @@ async function executeRunInner(
         // A computer brain's turn that can take messages mid-turn (live steering).
         steerable: (steer) => live.steerable(steer),
       };
+      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       // A computer brain's turn: the transcript is saved (the bridge's pauses join it), and the turn's
       // tool token goes in `brain.turn.mcp.token` so the runner bridge maps its calls to this run.
       if (plan.kind !== "model") {
@@ -1673,13 +1722,14 @@ async function executeRunInner(
           machineId: plan.session?.machineId ?? agent.machineId ?? "",
           runId: run.id,
         });
+        transcript.turnPrompt = prompt;
+        await saveTranscript(db, transcript);
       }
-      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       const turnPlan = plan;
       // Where this computer turn's steps start (the bridge records a step per tool it runs).
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
-      const executedNow: { id: string; name: string }[] = [];
+      const executedNow: { id: string; name: string; input: unknown }[] = [];
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -1793,16 +1843,18 @@ async function executeRunInner(
             machineId &&
             error instanceof BrainFailure &&
             error.code === "machine_offline" &&
-            (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS
+            (error.serverStop || (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS)
           ) {
-            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, executed);
+            const labels = executed.map((c) => c.label);
+            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, labels, error.serverStop);
           }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure
                 ? { code: error.code, message: error.message }
                 : { code: "brain_failed", message: error instanceof Error ? error.message : String(error) };
-            return interruptedAfterTools(turnPlan.kind, failure, executed, deltas.text());
+            const names = [...new Set(executed.map((c) => c.name))];
+            return interruptedAfterTools(turnPlan.kind, failure, names, deltas.text());
           }
         }
         // A computer brain that can't answer now (offline, not logged in, plan limit, a retryable failure):
@@ -1865,8 +1917,9 @@ async function executeRunInner(
         return suspendedByBridge(run.status, turnText, deltas.text() ? deltas.textBefore : undefined);
       }
 
-      // Canceled while the model answered: its tool calls never run.
-      if (aborted()) {
+      // Canceled while the model answered: its tool calls never run. A shutdown ends the step below instead: its
+      // calls don't start and are saved as not run, a final answer is posted.
+      if (!shuttingDown() && aborted()) {
         await saveTranscript(db, transcript);
         return stopCanceled("");
       }
@@ -1888,9 +1941,11 @@ async function executeRunInner(
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
         for (const use of toolUses) {
-          // Canceled during a tool: the rest never run.
+          // Canceled during a tool, or the server is shutting down: the rest never run.
           if (signal.aborted) break;
           const outcome = await invokeWithChip(toolScope, use);
+          // The shutdown aborted it while it ran: its error may hide work it already did.
+          const cutShort = shuttingDown();
           await absorbToolOutcome(use, outcome);
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
@@ -1913,14 +1968,25 @@ async function executeRunInner(
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });
             waits.push(wait.id);
           } else {
+            const { content, isError } = outcome.output;
             calls.push({
               toolUseId: use.id,
               name: use.name,
-              result: { content: outcome.output.content, isError: outcome.output.isError === true },
+              result: {
+                content: cutShort && isError ? `${CUT_BY_RESTART}\n${content}` : content,
+                isError: isError === true,
+              },
             });
           }
         }
-        if (aborted()) {
+        // The server is shutting down: the calls that never started say so, and the step ends as any other (its
+        // results saved, its approvals and questions asked); the next instance takes the run from there.
+        if (shuttingDown()) {
+          for (const use of toolUses) {
+            if (!calls.some((c) => c.toolUseId === use.id))
+              calls.push({ toolUseId: use.id, name: use.name, result: { content: NOT_RUN_BY_RESTART, isError: true } });
+          }
+        } else if (aborted()) {
           // The calls made are kept for the record; the run ends here.
           transcript.messages.push({
             role: "user",
@@ -2271,7 +2337,7 @@ async function thinkOnce(
     onUsage?(usage: { input: number; output: number; model?: string; cacheRead?: number; cacheWrite?: number }): void;
     onLimit?(resetsAt?: string): void;
     /** A call the brain already ran (through the bridge, or its own tools). */
-    onExecuted?(call: { id: string; name: string }): void;
+    onExecuted?(call: { id: string; name: string; input: unknown }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
   } = {},
@@ -2286,7 +2352,7 @@ async function thinkOnce(
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {
         executedCount++;
-        hooks.onExecuted?.({ id: event.id, name: event.name });
+        hooks.onExecuted?.({ id: event.id, name: event.name, input: event.input });
       } else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
     } else if (event.type === "usage") {
       usage = event;
@@ -2301,8 +2367,9 @@ async function thinkOnce(
         false,
         event.resetsAt,
       );
-    } else if (event.type === "error") throw new BrainFailure(event.code, event.message, event.retryable === true);
-    else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
+    } else if (event.type === "error") {
+      throw new BrainFailure(event.code, event.message, event.retryable === true, undefined, event.serverStop === true);
+    } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;
   }
@@ -2352,32 +2419,59 @@ async function lastStepSeq(db: Executor, runId: string): Promise<number> {
 
 /**
  * The tools a computer-brain turn already ran: the bridge's successful calls
- * after `fromSeq` (the gateway records a `tool_result` step for each) and the
- * calls the brain reported as executed. Names, once per call.
+ * after `fromSeq` (the gateway records a `tool_call` and a `tool_result` step
+ * for each) and the calls the brain reported as executed. Once per call: its
+ * name, and `label` with what it ran on (`executedLabel`).
  */
 async function executedSince(
   db: Executor,
   runId: string,
   fromSeq: number,
-  reported: { id: string; name: string }[],
-): Promise<string[]> {
+  reported: { id: string; name: string; input?: unknown }[],
+): Promise<{ name: string; label: string }[]> {
   const steps = await db
-    .select({ data: schema.agentRunSteps.data })
+    .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
     .where(
       and(
         eq(schema.agentRunSteps.runId, runId),
-        eq(schema.agentRunSteps.kind, "tool_result"),
+        inArray(schema.agentRunSteps.kind, ["tool_call", "tool_result"]),
         sql`${schema.agentRunSteps.seq} > ${fromSeq}`,
       ),
-    );
-  const calls = new Map<string, string>();
-  for (const { data } of steps) {
+    )
+    .orderBy(schema.agentRunSteps.seq);
+  const inputs = new Map<string, unknown>();
+  const calls = new Map<string, { name: string; label: string }>();
+  for (const { kind, data } of steps) {
+    const id = typeof data.toolUseId === "string" ? data.toolUseId : null;
+    if (kind === "tool_call") {
+      if (id) inputs.set(id, data.input);
+      continue;
+    }
     if (data.isError === true || typeof data.name !== "string") continue;
-    calls.set(typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`, data.name);
+    const input = id ? inputs.get(id) : undefined;
+    calls.set(id ?? `step:${calls.size}`, { name: data.name, label: executedLabel(data.name, input) });
   }
-  for (const c of reported) calls.set(c.id, c.name);
-  return [...new Set(calls.values())];
+  for (const c of reported) calls.set(c.id, { name: c.name, label: executedLabel(c.name, c.input) });
+  return [...new Map([...calls.values()].map((c) => [c.label, c])).values()];
+}
+
+/**
+ * A call a cut-off turn already ran, as its resumed turn reads it: the command's first line or the
+ * path it touched ("Bash (git push origin main)", "Edit (src/app.ts)"), so it can tell which ran.
+ */
+function executedLabel(name: string, input: unknown): string {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const changes = Array.isArray(i.changes) ? i.changes.map((c) => text((c as { path?: unknown })?.path)) : [];
+  const what =
+    (text(i.command) || text(i.code)).trim().split("\n")[0] ||
+    text(i.file_path) ||
+    text(i.notebook_path) ||
+    text(i.path) ||
+    changes.filter(Boolean).join(", ");
+  const head = maskCredentials(what.trim().replace(/\s+/g, " "));
+  return head ? `${name} (${head.length > 120 ? `${head.slice(0, 119)}…` : head})` : name;
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */

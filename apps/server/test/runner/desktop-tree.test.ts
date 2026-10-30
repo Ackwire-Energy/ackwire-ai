@@ -288,6 +288,7 @@ describe("the desktop as screen text", () => {
     const aad = secretAad({ requestId, orgId: "org-1", name, target });
     const box = await sealSecret(publicKey, "tok_SECRET_123456", aad);
     await call({ agent, op: "secret", action: "deliver", requestId, name, target, aad, box });
+    await call({ agent, op: "secret", action: "activate", requestId, order: `2026-10-29T00:00:00.000Z|${requestId}` });
     const secrets = await agentSecrets(ctx.secretsDir, agent);
     expect(secrets?.hold).toBe("tok_SECRET_123456".length - 1);
     const snap = fixture("terminal");

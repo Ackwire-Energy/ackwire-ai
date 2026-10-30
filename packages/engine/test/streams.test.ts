@@ -258,7 +258,7 @@ describe("the broker", () => {
         throw new MachineRequestError("desktop_unavailable", "Install the agents' desktops");
       },
       async () => {
-        throw new MachineOfflineError("Box");
+        throw new MachineOfflineError("Box", null);
       },
       async () => {
         throw new MachinePausedError("Box", null);

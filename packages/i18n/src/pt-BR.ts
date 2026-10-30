@@ -968,9 +968,9 @@ export const ptBR = {
     unreadDivider: "Novas",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Visto",
-    offline: "Sem internet. O que você mandar sai sozinho quando voltar.",
+    offline: "Sem conexão. O que você mandar sai sozinho quando voltar.",
     backOnline: "Conectado de novo",
-    sendingOffline: "sai quando a internet voltar",
+    sendingOffline: "sai quando a conexão voltar",
     endOfReply: "Fim da resposta",
     mentionSuggestions: "Sugestões de menção",
   },
@@ -2179,7 +2179,7 @@ export const ptBR = {
         provider_error: "O provedor do modelo deu erro: {{detail}}",
         provider_unavailable: "O provedor do modelo não respondeu: {{detail}}",
         canceled: "Alguém parou a tarefa.",
-        interrupted: "Interrompida por uma atualização do servidor.",
+        interrupted: "Interrompida porque o servidor reiniciou.",
         missing_credential: "Falta uma chave {{of}} {{provider}} no workspace.",
         credential_revoked: "A chave deste agente foi revogada.",
         credential_wrong_provider: "O modelo é {{modelOf}} {{modelProvider}}, mas a chave é {{keyOf}} {{keyProvider}}.",
@@ -3334,7 +3334,7 @@ export const ptBR = {
       credential_revoked: "A chave de API foi revogada",
       credential_wrong_provider: "A chave de API é de outro provedor",
       agent_archived: "O agente foi arquivado",
-      interrupted: "Interrompida por uma atualização",
+      interrupted: "Interrompida porque o servidor reiniciou",
       no_ai: "O agente não tem uma IA conectada",
       org_paused: "Não rodou: os agentes do workspace estavam pausados",
       org_suspended: "Não rodou: o workspace estava indisponível",
@@ -3692,8 +3692,14 @@ export const ptBR = {
       more_other: "+{{count}} itens editados",
     },
     notice: {
-      machine_offline_one: "{{computer}} ficou offline: “{{title}}” parou até ele voltar. Nada se perde.",
-      machine_offline_other: "{{computer}} ficou offline: {{count}} tarefas pararam até ele voltar. Nada se perde.",
+      machine_offline_one:
+        "{{computer}} ficou offline: “{{title}}” continua rodando lá se só a conexão caiu. Se o computador reiniciou, ela parou e não retoma sozinha.",
+      machine_offline_other:
+        "{{computer}} ficou offline: {{count}} tarefas continuam rodando lá se só a conexão caiu. Se o computador reiniciou, elas pararam e não retomam sozinhas.",
+      machine_offline_resumes_one:
+        "{{computer}} ficou offline: “{{title}}” continua rodando lá se só a conexão caiu, e retoma de onde parou se o computador reiniciou.",
+      machine_offline_resumes_other:
+        "{{computer}} ficou offline: {{count}} tarefas continuam rodando lá se só a conexão caiu, e retomam de onde pararam se o computador reiniciou.",
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto",
@@ -8021,7 +8027,7 @@ export const ptBR = {
         updated: "Memória atualizada: {{text}}",
         remembered: "Memória atualizada: {{text}}",
       },
-      interrupted: "Interrompida por uma atualização do servidor. Peça de novo para continuar.",
+      interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
@@ -8454,7 +8460,6 @@ export const ptBR = {
       noSite: "Antes de abrir uma página",
     },
     inCard: {
-      expandHint: "Clique para expandir",
       scrollHint: "Rolando a página · Esc para sair",
       targetMarked: "Campo marcado",
       targetNone: "Clique num campo",
@@ -8475,7 +8480,6 @@ export const ptBR = {
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
-      expand: "Ver ao vivo",
       collapse: "Recolher",
       takeover: "Assumir",
       stop: "Parar",

@@ -8,7 +8,7 @@ import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
-import { renderApp, settle } from "./render";
+import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -65,14 +65,13 @@ describe("a help request opens the agent's browser in its card", () => {
     const card = document.querySelector(".brw-ac") as HTMLElement;
     expect(card.classList.contains("is-open")).toBe(true);
     expect(card.classList.contains("is-control")).toBe(true);
-    // The request is the title; the line under it says who is in control.
-    expect(card.querySelector(".brw-ac__tx b")?.textContent).toBe("Entrar no painel com a conta de teste");
-    expect(card.querySelector(".brw-ac__tx small")?.textContent).toContain("Você no controle ·");
-    expect(card.querySelector(".brw-ac__tx small")?.textContent).not.toContain("Entrar no painel");
-    expect(within(card).getByRole("button", { name: "Pronto" })).toBeTruthy();
+    // The request is the frame's title, with Pronto in its top; the request above says who is helping.
+    const top = card.querySelector(".brw-mf__top") as HTMLElement;
+    expect(top.querySelector("b")?.textContent).toBe("Entrar no painel com a conta de teste");
+    expect(within(top).getByRole("button", { name: "Pronto" })).toBeTruthy();
     expect(within(card).getByRole("textbox", { name: "Texto para a página" })).toBeTruthy();
-    // Desistir next to Pronto in the header (the old "Não consegui" under the field is gone).
-    expect(within(card).getByRole("button", { name: "Desistir" })).toBeTruthy();
+    // Desistir next to Pronto (the old "Não consegui" under the field is gone).
+    expect(within(top).getByRole("button", { name: "Desistir" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
     expect(document.querySelector(".brw-rq")?.textContent).toContain("Você está ajudando · neste card");
 
@@ -127,7 +126,7 @@ describe("a help request opens the agent's browser in its card", () => {
 const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
 
 describe("the card in the message", () => {
-  test("closed it's a small live card; a click opens it in place", async () => {
+  test("always open, its page in a frame of the agent's color: full screen and back, in control too", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
@@ -135,7 +134,7 @@ describe("the card in the message", () => {
     await settle(6);
     const socket = r.sockets.last();
     await act(async () => socket.open());
-    // Taking over from the request opens the card; fold it to see the closed form.
+    // Taking over from the request: the card is the control.
     await act(async () =>
       fireEvent.click(
         within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
@@ -152,18 +151,18 @@ describe("the card in the message", () => {
         metadata: { deviceWidth: 1280, deviceHeight: 800 },
       }),
     );
-    // Folded, it keeps the last frame as its small picture (it streams only while on screen).
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Recolher" })));
-    expect(card.classList.contains("is-open")).toBe(false);
-    expect(card.querySelector(".brw-ac__thumb img")).toBeTruthy();
-    expect(card.textContent).toContain("Clique para expandir");
-    await act(async () => fireEvent.click(card.querySelector(".brw-ac__tt") as HTMLElement));
-    expect(card.classList.contains("is-open")).toBe(true);
+    // The page in its frame, with no small form to fold it into.
+    expect(card.classList.contains("brw-mf")).toBe(true);
+    expect(card.querySelector(".brw-ac__page img")).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Recolher" })).toBeNull();
     // Full screen and back, as in the computer's window: corners pulled apart, then pushed together.
     const glyph = (name: string) => within(card).getByRole("button", { name }).querySelector("path")?.getAttribute("d");
     expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
     expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Sair da tela cheia" })));
+    expect(card.classList.contains("is-full")).toBe(false);
+    expect(card.classList.contains("brw-mf")).toBe(true);
   });
 
   test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {
@@ -223,6 +222,31 @@ describe("the card in the message", () => {
     // Esc gives the wheel back to the conversation.
     await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
+  });
+
+  test("its Chrome on the agent's desktop: Ver a tela inteira over the page, and in the frame's top in control", async () => {
+    const api = createFakeApi(seedState());
+    fakeBrowserOf.get(api)?.desktops.set(ADA_ID, { available: true, running: true });
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-desktop", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    expect(within(over).getByRole("button", { name: "Ver a tela inteira" })).toBeTruthy();
+
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Assumir" })));
+    await settle(3);
+    const top = card.querySelector(".brw-mf__top") as HTMLElement;
+    await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Ver a tela inteira" })));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
   });
 });
 

@@ -49,8 +49,12 @@ export function abortLocalRun(runId: string) {
 export const SHUTDOWN_REASON = "server_shutdown";
 export const isShutdown = (reason: unknown) => reason === SHUTDOWN_REASON;
 
-/** Thrown inside a run interrupted by shutdown: the job is retried (by the next instance) from the saved transcript. */
+/**
+ * Thrown inside a run interrupted by shutdown: the outbox hands its job back (`handback`), due at once and without
+ * spending an attempt, and the next instance continues from the saved transcript.
+ */
 export class RunInterruptedError extends Error {
+  readonly handback = true;
   constructor() {
     super("run interrupted by a server shutdown; it resumes from its last checkpoint");
     this.name = "RunInterruptedError";
@@ -59,6 +63,9 @@ export class RunInterruptedError extends Error {
 
 /** How many runs this process is executing. */
 export const activeRunCount = () => active.size;
+
+/** Whether this process is executing the run. */
+export const executesHere = (runId: string) => active.has(runId);
 
 /** Graceful shutdown: waits up to `ms` for runs to finish, then interrupts the rest (they resume elsewhere). */
 export async function drainLocalRuns(ms: number, options: { graceMs?: number } = {}) {

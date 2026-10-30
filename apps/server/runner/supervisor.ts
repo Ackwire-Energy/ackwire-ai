@@ -2,10 +2,10 @@ import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import {
-  closeSync,
-  constants,
   chmodSync,
   chownSync,
+  closeSync,
+  constants,
   lstatSync,
   mkdirSync,
   openSync,
@@ -15,7 +15,6 @@ import {
   unlinkSync,
 } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
@@ -35,6 +34,7 @@ import {
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
@@ -43,8 +43,8 @@ import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
-import { activatedSecret, type ActivatedSecret, handleSecret } from "./secrets";
 import type { ScopeKind } from "./scope-gate";
+import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
 import { agentCategorySlice, agentSlice } from "./service";
 import type { RelayCount } from "./streams";
 
@@ -108,12 +108,12 @@ function secureSecretRoot(home: string, requireRoot = false): string {
   const owner = process.getuid?.();
   if (requireRoot && owner !== 0) throw new RunnerError("internal", "System secret broker requires root");
   const parent = lstatSync(home);
-  if (!parent.isDirectory() || (owner !== undefined && parent.uid !== owner) || (parent.mode & 0o022))
+  if (!parent.isDirectory() || (owner !== undefined && parent.uid !== owner) || parent.mode & 0o022)
     throw new RunnerError("internal", "The runner home is not owned securely");
   const root = path.join(home, "secret-broker");
   mkdirSync(root, { recursive: true, mode: 0o700 });
   const st = lstatSync(root);
-  if (!st.isDirectory() || (owner !== undefined && st.uid !== owner) || (st.mode & 0o077))
+  if (!st.isDirectory() || (owner !== undefined && st.uid !== owner) || st.mode & 0o077)
     throw new RunnerError("internal", "The secret broker is not owned securely");
   return root;
 }
@@ -293,6 +293,8 @@ export class Supervisor {
   /** Open `browser.handoff`s, for a worker that says hello later. */
   private readonly handoffs = new Map<string, Handoff>();
   private online = false;
+  /** The server runs each `mcp.call` once per `callId` (its `welcome`): the workers' welcome says so too. */
+  private mcpOnce = false;
   private closed = false;
   private seq = 0;
   private readonly secretRoot: string;
@@ -302,7 +304,9 @@ export class Supervisor {
 
   /** The connection's MCP side: answers go back to the worker that asked. */
   readonly mcp = {
-    attach: () => {},
+    attach: (_send: unknown, server: { mcpOnce?: boolean } = {}) => {
+      this.mcpOnce = server.mcpOnce === true;
+    },
     detach: () => {},
     result: (frame: Extract<ServerFrame, { type: "mcp.result" }>) => this.toCaller(frame),
     tools: (frame: Extract<ServerFrame, { type: "mcp.tools" }>) => this.toCaller(frame),
@@ -341,7 +345,7 @@ export class Supervisor {
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
-    if (this.closed) throw new RunnerError("internal", STOPPING);
+    if (this.closed) throw new RunnerError("dropped", STOPPING);
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -545,7 +549,7 @@ export class Supervisor {
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
       w.timer = null;
-      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", STOPPING));
+      for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
       this.endSession(w, STOPPING);
       this.endShows(w, STOPPING);
@@ -676,7 +680,10 @@ export class Supervisor {
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
-    this.endSession(w, "The agent's worker stopped on this computer. Try again.");
+    this.endSession(
+      w,
+      "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
+    );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
@@ -685,9 +692,12 @@ export class Supervisor {
     if (w.waiters.size > 0 || [...this.owners.values()].some((o) => o.agentId === w.user.id)) this.launch(w);
   }
 
-  /** Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. */
+  /**
+   * Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. `dropped`: the
+   * server waits for the computer and resumes an agent's turn instead of failing it.
+   */
   private endSession(w: Worker, message: string) {
-    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("internal", message) });
+    for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("dropped", message) });
     for (const install of [...w.installs.values()]) install.settle(new RunnerError("internal", message));
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
   }
@@ -717,7 +727,13 @@ export class Supervisor {
   }
 
   private welcome(w: Worker) {
-    this.send(w, { type: "welcome", machineId: w.user.id, name: w.user.user, heartbeatMs: HEARTBEAT_MS });
+    this.send(w, {
+      type: "welcome",
+      machineId: w.user.id,
+      name: w.user.user,
+      heartbeatMs: HEARTBEAT_MS,
+      ...(this.mcpOnce ? { mcpOnce: true } : {}),
+    });
     const handoff = this.handoffs.get(w.user.id);
     if (handoff) this.send(w, handoff);
   }
@@ -902,14 +918,18 @@ export class Supervisor {
       const install = w.installs.get(id);
       if (!install) return;
       const error = f.error as { code?: unknown; message?: unknown } | undefined;
-      if (error) install.settle(new RunnerError(
-        typeof error.code === "string" ? error.code as MachineErrorCode : "internal",
-        typeof error.message === "string" ? error.message.slice(0, 500) : "Secret installation failed",
-      ));
-      else install.settle({
-        ...(typeof f.size === "number" ? { size: f.size } : {}),
-        ...(f.superseded === true ? { superseded: true } : {}),
-      });
+      if (error)
+        install.settle(
+          new RunnerError(
+            typeof error.code === "string" ? (error.code as MachineErrorCode) : "internal",
+            typeof error.message === "string" ? error.message.slice(0, 500) : "Secret installation failed",
+          ),
+        );
+      else
+        install.settle({
+          ...(typeof f.size === "number" ? { size: f.size } : {}),
+          ...(f.superseded === true ? { superseded: true } : {}),
+        });
       return;
     }
     if (!w.ready) return;
@@ -1097,17 +1117,18 @@ export function retireLegacyPending(
   if (process.platform !== "linux" || process.getuid?.() !== 0)
     throw new RunnerError("internal", "Retiring legacy secrets requires root on Linux");
   const baseStat = lstatSync(base);
-  if (!baseStat.isDirectory() || baseStat.uid !== 0 || (baseStat.mode & 0o022))
+  if (!baseStat.isDirectory() || baseStat.uid !== 0 || baseStat.mode & 0o022)
     throw new RunnerError("internal", "The worker home base is not owned securely");
   const quarantine = path.join(base, ".legacy-secret-quarantine");
   mkdirSync(quarantine, { mode: 0o700, recursive: true });
   const qst = lstatSync(quarantine);
-  if (!qst.isDirectory() || qst.uid !== 0 || (qst.mode & 0o077))
+  if (!qst.isDirectory() || qst.uid !== 0 || qst.mode & 0o077)
     throw new RunnerError("internal", "The legacy secret quarantine is not owned securely");
   const flags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
   let secretsFd: number;
-  try { secretsFd = openSync(path.join(home, "secrets"), flags); }
-  catch (err) {
+  try {
+    secretsFd = openSync(path.join(home, "secrets"), flags);
+  } catch (err) {
     if (errnoCode(err) === "ENOENT") return;
     throw err;
   }
@@ -1115,8 +1136,9 @@ export function retireLegacyPending(
     const id8 = user.user.slice(3);
     if (!/^[a-z0-9]{8}$/.test(id8)) throw new RunnerError("internal", "Invalid agent user");
     let agentFd: number;
-    try { agentFd = openSync(`/proc/self/fd/${secretsFd}/${id8}`, flags); }
-    catch (err) {
+    try {
+      agentFd = openSync(`/proc/self/fd/${secretsFd}/${id8}`, flags);
+    } catch (err) {
       if (errnoCode(err) === "ENOENT") return;
       throw err;
     }
@@ -1127,8 +1149,9 @@ export function retireLegacyPending(
         for (let attempt = 0; attempt < 3; attempt++) {
           const source = `/proc/self/fd/${agentFd}/${name}`;
           const retired = path.join(quarantine, randomUUID());
-          try { renameSync(source, retired); }
-          catch (err) {
+          try {
+            renameSync(source, retired);
+          } catch (err) {
             if (errnoCode(err) === "ENOENT") break;
             throw err;
           }
@@ -1142,7 +1165,9 @@ export function retireLegacyPending(
               if (item.isDirectory()) throw new RunnerError("internal", "Legacy pending secrets contain a directory");
               unlinkSync(file);
             }
-          } finally { closeSync(retiredFd); }
+          } finally {
+            closeSync(retiredFd);
+          }
           rmdirSync(retired);
           if (attempt === 2) {
             try {
@@ -1154,8 +1179,12 @@ export function retireLegacyPending(
           }
         }
       }
-    } finally { closeSync(agentFd); }
-  } finally { closeSync(secretsFd); }
+    } finally {
+      closeSync(agentFd);
+    }
+  } finally {
+    closeSync(secretsFd);
+  }
 }
 
 /** `agentes-runner worker` for one agent through its launcher (its user, its slice, only its environment). */

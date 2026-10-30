@@ -57,6 +57,8 @@ test("run failures, approvals and memory updates carry codes", async () => {
     errorCode: "run.missing_credential",
     errorParams: { provider: "Claude" },
   });
+  expect(runErrorDetail("Interrupted by a server restart")).toMatchObject({ errorCode: "run.interrupted" });
+  // Rows from before it said "restart".
   expect(runErrorDetail("Interrupted by a server update")).toMatchObject({ errorCode: "run.interrupted" });
   expect(runErrorDetail("This agent's API key was revoked. Pick another one in the agent's settings.")).toEqual({
     errorCode: "run.credential_revoked",
