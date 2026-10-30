@@ -24,6 +24,7 @@ import type {
   AgentQuestion,
   AgentSecret,
   AgentSkill,
+  AgentStatus,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -372,6 +373,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from } }),
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
+      setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -433,6 +435,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
+      statuses: async (orgId) => (await request<{ agents: AgentStatus[] }>(`${org(orgId)}/agent-status`)).agents,
       importFromGithub: (orgId, url) =>
         request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
           json: { url },

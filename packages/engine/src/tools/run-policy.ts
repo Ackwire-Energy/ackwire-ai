@@ -36,6 +36,8 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
+  /** `set_status`: the agent's own line next to its name (ADR 0081), nothing else. */
+  | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
   /** Speaks elsewhere or for someone: other channels, people, agents, routines, reminders, secrets. */
@@ -160,6 +162,7 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
+  if (tool.name === "set_status") return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
@@ -212,7 +215,9 @@ const READ_ONLY_REFUSAL: Partial<Record<InternalArea, string>> = {
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
   const what = toolKind(tool);
-  if (what.kind === "directory" || what.kind === "pass" || what.kind === "computer") return ALLOW;
+  if (what.kind === "directory" || what.kind === "pass" || what.kind === "self" || what.kind === "computer") {
+    return ALLOW;
+  }
   // The mission's own work (a person's run, or the run its inbox woke: nobody but the mission behind it);
   // never a routine nor a run a report or a note woke in its thread.
   if (what.kind === "mission") {

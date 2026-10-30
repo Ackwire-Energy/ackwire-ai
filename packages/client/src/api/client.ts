@@ -23,6 +23,7 @@ import type {
   AgentQuestion,
   AgentSecret,
   AgentSkill,
+  AgentStatus,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -180,6 +181,7 @@ import type {
   SkillDetail,
   SkillInput,
   SkillPatch,
+  StatusInput,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -279,6 +281,8 @@ export interface ApiClient {
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
+    /** Your availability (auto, busy, hidden) and what you are doing (ADR 0081). */
+    setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -354,6 +358,8 @@ export interface ApiClient {
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
     aiStatus(orgId: string): Promise<AiStatus>;
+    /** Each agent's presence and what it says it is doing (ADR 0081). */
+    statuses(orgId: string): Promise<AgentStatus[]>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,

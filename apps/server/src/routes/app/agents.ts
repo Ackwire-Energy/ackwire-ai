@@ -3,6 +3,7 @@ import {
   type Agent as AgentRow,
   agentBrainSummaries,
   agentBudgetsThisMonth,
+  agentStatuses,
   agentView,
   archiveAgent,
   audienceOf,
@@ -309,6 +310,40 @@ export function agentRoutes(deps: AppDeps) {
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
       ]);
       return c.json({ ...ai, ...routing }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-status",
+      tags,
+      security,
+      summary: "Each agent's presence (online, busy, away, offline) and what it says it is doing",
+      description:
+        "From its work (ADR 0081): `busy` on a routine, a task or a run going for over 2 minutes, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status` is the agent's own line (`set_status`), gone when the run that wrote it ends unless it set `until`. Refreshed on `agent.status` events and every few seconds while open.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            agents: z.array(
+              z.object({
+                agentId: z.uuid(),
+                presence: z.enum(["online", "busy", "away", "offline"]),
+                status: z
+                  .object({ text: z.string(), emoji: z.string().nullable(), until: z.string().nullable() })
+                  .nullable(),
+                activeAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await agentStatuses(db, c.get("user").id, orgId) }, 200);
     },
   );
 

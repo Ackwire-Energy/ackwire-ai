@@ -96,6 +96,16 @@ export const organizationMembers = pgTable(
     /** The person's IANA time zone ("hora local"); null = the organization's. */
     timezone: text(),
     /**
+     * What the person chose to show: `auto` (online while connected), `busy` (online but not to be
+     * interrupted) or `hidden` (seen as offline by everyone else). Checked in `memberPresence`.
+     */
+    availability: text().$type<"auto" | "busy" | "hidden">().notNull().default("auto"),
+    /** A line the person wrote about what they are doing ("Em reunião até 15h"), with an optional emoji. */
+    statusText: text(),
+    statusEmoji: text(),
+    /** When the written status clears itself; null = it stays until changed. */
+    statusUntil: timestamp({ withTimezone: true }),
+    /**
      * What reaches this person's devices as a notification, by category (ADR 0071 §8): `{ "threads": true }`;
      * a category not here keeps its default (`NOTICE_DEFAULTS` in packages/engine/src/notice-prefs.ts).
      */

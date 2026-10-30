@@ -1132,9 +1132,44 @@ export interface Person {
   role: Role;
   joinedAt: string;
   lastSeenAt: string | null;
+  /** Seen as connected: `presence` is online or busy. */
   online: boolean;
+  /** `hidden` only for yourself; everyone else sees a hidden person as `offline` (ADR 0081). */
+  presence: MemberPresence;
+  /** What the person wrote they are doing; null = nothing (or its time is up). */
+  status: MemberStatus | null;
   handle: string;
   timezone: string;
+}
+
+/** A person as others see them (ADR 0081). */
+export type MemberPresence = "online" | "busy" | "hidden" | "offline";
+/** What a person picks: `auto` = online while connected, `busy`, or `hidden` (offline to everyone else). */
+export type Availability = "auto" | "busy" | "hidden";
+
+export interface MemberStatus {
+  text: string;
+  emoji: string | null;
+  /** ISO; null = until changed. */
+  until: string | null;
+}
+
+/** `PUT …/me/status`: either part may be left out; `status: null` clears the line. */
+export interface StatusInput {
+  availability?: Availability;
+  status?: { text: string; emoji?: string | null; until?: string | null } | null;
+}
+
+/** An agent's presence, from its work (ADR 0081); an agent with no AI is drawn `offline` by the apps. */
+export type AgentPresence = "online" | "busy" | "away" | "offline";
+
+/** `GET …/agent-status`: one agent's presence and its own line (`set_status`). */
+export interface AgentStatus {
+  agentId: string;
+  presence: AgentPresence;
+  status: MemberStatus | null;
+  /** Its last run's end (now while one is going); null = it never worked. */
+  activeAt: string | null;
 }
 
 export interface InvitationWithStatus {

@@ -135,6 +135,15 @@ export const agents = pgTable(
      */
     operatorHoldAt: timestamp({ withTimezone: true }),
     operatorHoldReason: text(),
+    /**
+     * What it says it is doing (`set_status`, ADR 0081): a line, an optional emoji, and whether it asks not
+     * to be interrupted. Tied to the run that wrote it (gone once that run ends) unless it set an end time.
+     */
+    statusText: text(),
+    statusEmoji: text(),
+    statusBusy: boolean().notNull().default(false),
+    statusRunId: uuid(),
+    statusUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

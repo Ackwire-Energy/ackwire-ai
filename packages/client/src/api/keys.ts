@@ -54,6 +54,7 @@ export const keys = {
   settings: (orgId: string) => ["org", orgId, "settings"] as const,
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
+  agentStatus: (orgId: string) => ["org", orgId, "agent-status"] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,

@@ -45,6 +45,7 @@ import {
   createSandboxToolSource,
   createScheduleToolSource,
   createSessionScreening,
+  createSetStatusToolSource,
   createSetupToolSource,
   createSkillToolSource,
   createStreamBroker,
@@ -259,6 +260,8 @@ export function buildEngine(o: EngineOptions) {
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
+      // What the agent says it is doing, next to its name (ADR 0081).
+      createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
