@@ -112,7 +112,10 @@ export const SYSTEM_BROWSER_DIR = `${SYSTEM_RUNNER_DIR}/browser`;
  * `openssl md5 -binary | base64` compared with the bucket's `md5Hash`. Null: `--system` installs `agent-browser`
  * alone, and each agent installs Chrome at its browser's first use.
  */
-export const TESTING_CHROME: { version: string; sha256: string } | null = null;
+export const TESTING_CHROME: { version: string; sha256: string } | null = {
+  version: "156.0.8078.80",
+  sha256: "b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7",
+};
 
 /**
  * The installer served at `GET /api/machines/install.sh`:

@@ -909,11 +909,11 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` once for all
-of them, in `/opt/agentes-runner/browser` (root's, checked against the SHA-256 in the installer;
-running the installer again updates it), while each agent still installs Chrome for Testing in its own
-home at its browser's first use, which takes about a minute. If the installer can't download
-`agent-browser`, it goes on, and each agent downloads that at its browser's first use too.
+(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` and Chrome for
+Testing once for all of them, in `/opt/agentes-runner/browser` (root's, each checked against the
+SHA-256 in the installer; running the installer again updates them), so an agent's first use of its
+browser downloads nothing. If the installer can't download them, it goes on, and each agent downloads
+what's missing at its browser's first use, which takes about a minute.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
