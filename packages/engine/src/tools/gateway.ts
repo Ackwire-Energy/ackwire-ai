@@ -19,10 +19,18 @@ import {
 import { carriesCredential, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
-import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
+import {
+  type BlockedTool,
+  compactSchema,
+  directoryRole,
+  ON_DEMAND_FIND,
+  presentTools,
+  resolveDirectoryTool,
+} from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
+import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
 import { approvalOrigin, type PolicyDecision, takeWhy, toolKind, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
-import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
+import { BUILTIN_SCOPES, freshGrantedKeys, grantedScopeKeys, isAllowed, NOT_IN_ALL, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
 const { approvals, agents } = schema;
@@ -208,6 +216,35 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   }
 
   /**
+   * What `find_tools` names as not allowed yet: every tool of this server's sources the agent may not use
+   * (and the run could, once allowed), with the permission `request_permission` offers for it, so the card
+   * can grant what the agent asks for; or none when an admin turned that tool off by name. A tool whose
+   * permission `request_permission` doesn't offer (a mailbox's or a database's, one more scope of a connector
+   * the agent already has some of) isn't named.
+   */
+  async function notAllowed(
+    ctx: ToolContext,
+    authority: RunAuthority | null,
+    all: Map<string, ToolDefinition>,
+  ): Promise<BlockedTool[]> {
+    const [keys, missing] = await Promise.all([
+      grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId),
+      missingPermissions(ctx),
+    ]);
+    const offered = new Map(missing.map((m) => [m.id, m]));
+    return [...all.values()].flatMap((tool): BlockedTool[] => {
+      const access = toolAccess(keys, tool);
+      if (isAllowed(access) || policyFor(authority, tool).action === "refuse") return [];
+      if (access === "denied") return [{ tool, permission: null }];
+      const m = offered.get(tool.connectionId ? `connector:${tool.connectionId}` : tool.scope);
+      if (!m) return [];
+      // The computer's scopes ("all tools" never covers them) say what they give, for the person approving.
+      const plain = NOT_IN_ALL.has(m.scope) ? BUILTIN_SCOPES[m.scope]?.description : undefined;
+      return [{ tool, permission: { id: m.id, label: plain ? `${m.label}: ${plain}` : m.label } }];
+    });
+  }
+
+  /**
    * Tools this agent may call now, as the model sees them: each big
    * connector listed as its directory, and with tools on demand
    * (`ctx.loadedGroups`, ADR 0043) the groups not loaded behind `find_tools` /
@@ -256,9 +293,12 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
-        const listed = presentTools(await grantedFor(ctx, authority), isSensitive, ctx.loadedGroups).find(
-          (t) => t.name === call.name,
-        );
+        const usable = await grantedFor(ctx, authority);
+        const blocked = async () => ({
+          tools: await notAllowed(ctx, authority, all).catch(() => []),
+          ask: usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null,
+        });
+        const listed = presentTools(usable, isSensitive, ctx.loadedGroups, blocked).find((t) => t.name === call.name);
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;
         else if (role?.kind === "use") {

@@ -1,3 +1,4 @@
+import { oneLine } from "../mail/text";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
 
@@ -37,6 +38,16 @@ const roles = new WeakMap<ToolDefinition, DirectoryRole>();
 
 /** The directory behind a listed tool, if it is `find_tools` or `use_tool`. */
 export const directoryRole = (tool: ToolDefinition | undefined) => (tool ? roles.get(tool) : undefined);
+
+/** A tool the agent may not use, as `find_tools` names it: its name and what it does, never its input. */
+export interface BlockedTool {
+  tool: ToolDefinition;
+  /** What a person turns on for it, as `request_permission` takes it; null: an admin turned this tool off by name. */
+  permission: { id: string; label: string } | null;
+}
+
+/** Read when `find_tools` runs. `ask`: the tool that asks a person for a permission, when this run may call it. */
+export type BlockedTools = () => Promise<{ tools: BlockedTool[]; ask: string | null }>;
 
 const sizeOf = (t: ToolDefinition) => t.name.length + t.description.length + JSON.stringify(t.inputSchema).length;
 
@@ -141,12 +152,14 @@ function directoryTools(
  * Tools on demand (`loaded`, a run's tool groups, ADR 0043): only the core groups
  * and the loaded ones go as they are; the rest sit behind one directory of
  * their own, `find_tools` / `use_tool`, at the end of the list. Without
- * `loaded` every tool goes.
+ * `loaded` every tool goes. `blocked`: what that `find_tools` also names as
+ * not allowed yet (the gateway's, when it runs a call).
  */
 export function presentTools(
   tools: ToolDefinition[],
   sensitive: IsSensitive = (t) => t.sensitive === true,
   loaded?: readonly string[] | null,
+  blocked?: BlockedTools,
 ): ToolDefinition[] {
   if (loaded) {
     const keep = new Set(loaded);
@@ -156,7 +169,7 @@ export function presentTools(
     if (later.length === 0) return shown;
     const taken = new Set(shown.map((t) => t.name));
     if (taken.has(ON_DEMAND_FIND) || taken.has(ON_DEMAND_USE)) return [...shown, ...later];
-    return [...shown, ...onDemandTools(later, sensitive, shown)];
+    return [...shown, ...onDemandTools(later, sensitive, shown, blocked)];
   }
   const byConnection = new Map<string, ToolDefinition[]>();
   for (const t of tools) {
@@ -258,15 +271,21 @@ export const ON_DEMAND_USE = "use_tool";
  * gateway like any direct call. Its description names every group, so the
  * model knows what it can reach. The search ranks the run's `loaded` tools
  * too: a model that searches for a tool it already has is told to call it,
- * never ahead of a better match.
+ * never ahead of a better match. And the `blocked` ones: a missing permission
+ * then reads as one, not as a missing capability.
  */
-function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive, loaded: ToolDefinition[]): ToolDefinition[] {
+function onDemandTools(
+  tools: ToolDefinition[],
+  sensitive: IsSensitive,
+  loaded: ToolDefinition[],
+  blocked?: BlockedTools,
+): ToolDefinition[] {
   const groups = deferrableGroups(tools);
   const areas = groups.map((g) => `${g.label} (${g.tools.length})`);
   const label = "other";
   const find: ToolDefinition = {
     name: ON_DEMAND_FIND,
-    description: `More tools you have, loaded when you need them: ${areas.join(", ")}. Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`${ON_DEMAND_USE}\`. Search before saying you can't do something.`,
+    description: `More tools you have, loaded when you need them: ${areas.join(", ")}. Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`${ON_DEMAND_USE}\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -295,6 +314,7 @@ function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive, loaded: 
         groups.map((g) => g.label),
         ON_DEMAND_USE,
         loaded,
+        await blocked?.(),
       ),
     }),
   };
@@ -376,6 +396,8 @@ export function compactSchema(schema: JsonSchema) {
 /**
  * A search's answer. `loaded`: tools already in the model's list, ranked with the directory's in one pass.
  * Those that outrank every other match open the answer, to call directly; any other keeps its rank, marked.
+ * `blocked`: tools the agent may not use, in the same pass; those among the best `limit` close the answer in
+ * sections of their own, never in a usable match's place.
  */
 function findTools(
   tools: ToolDefinition[],
@@ -386,11 +408,15 @@ function findTools(
   areas: string[] = areasOf(tools, prefix),
   useName = `${prefix}_use_tool`,
   loaded: ToolDefinition[] = [],
+  blocked: Awaited<ReturnType<BlockedTools>> = { tools: [], ask: null },
 ) {
   const query = typeof input.query === "string" ? input.query : "";
   const limit = Math.min(Math.max(Number(input.limit) || FIND_DEFAULT, 1), FIND_MAX);
-  const matches = rankTools([...loaded, ...tools], prefix, query).slice(0, limit);
-  if (matches.length === 0) {
+  const blockedOf = new Map(blocked.tools.map((b) => [b.tool, b]));
+  const ranked = rankTools([...loaded, ...tools, ...blockedOf.keys()], prefix, query);
+  const matches = ranked.filter((t) => !blockedOf.has(t)).slice(0, limit);
+  const notAllowed = ranked.slice(0, limit).flatMap((t) => blockedOf.get(t) ?? []);
+  if (matches.length === 0 && notAllowed.length === 0) {
     return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).`;
   }
   const listed = new Set(loaded);
@@ -411,6 +437,25 @@ function findTools(
         : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
     );
     parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);
+  }
+  // What it does in one sentence, never its input: nothing here is a way to call it.
+  const named = (t: ToolDefinition) => `- ${t.name}: ${oneLine(t.description.split(/(?<=[.!?])\s/)[0] ?? "", 200)}`;
+  const byPermission = new Map<string, string[]>();
+  for (const { tool, permission } of notAllowed) {
+    if (!permission) continue;
+    const head = `- permission "${permission.id}" (${permission.label}), for:`;
+    byPermission.set(head, [...(byPermission.get(head) ?? []), `  ${named(tool)}`]);
+  }
+  if (byPermission.size > 0) {
+    const how = blocked.ask
+      ? `ask a person with ${blocked.ask} (the permission as written here, and why), if the request needs it.`
+      : "a person can turn these on for you; you can't ask for them from here.";
+    const lines = [...byPermission].flatMap(([head, entries]) => [head, ...entries]);
+    parts.push(`Not allowed for you yet: ${how}\n${lines.join("\n")}`);
+  }
+  const turnedOff = notAllowed.flatMap(({ tool, permission }) => (permission ? [] : [named(tool)]));
+  if (turnedOff.length > 0) {
+    parts.push(`Turned off for you by an admin; only an admin can turn them back on:\n${turnedOff.join("\n")}`);
   }
   return parts.join("\n\n");
 }

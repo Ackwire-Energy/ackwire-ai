@@ -546,9 +546,10 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     name: "desktop",
     async tools(ctx) {
       if (!hub) return [];
-      // Most agents have no desktop: the cached grants decide before any lookup.
+      // Most agents have no desktop: the cached grants decide before any lookup. Without them the gateway
+      // keeps these from the agent, and `find_tools` names them as not allowed yet.
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
+      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return definitions;
       const gate = await gateOf(ctx, granted);
       if ("refused" in gate) return [];
       if (!(await agentDesktopUseStatus(ctx.db, hub, ctx.orgId, ctx.agentId)).available) return [];
