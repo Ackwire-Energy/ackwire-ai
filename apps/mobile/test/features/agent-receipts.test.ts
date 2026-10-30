@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   type AiStatus,
   applyReceiptEvent,
@@ -9,11 +11,15 @@ import {
 } from "@agenteschat/client";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import {
+  markLabel,
+  markOf,
   phaseKey,
+  type ReceiptMarkView,
   receiptLine,
   receiptMessageId,
   receiptRows,
   receiptShows,
+  turnHeadId,
 } from "../../src/features/chat/agent-receipts";
 import { endsOnNoAiCard, noAiBanner } from "../../src/features/chat/no-ai-banner";
 import { message, translator } from "./fixtures";
@@ -183,12 +189,85 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line?.more).toBe(2);
   });
 
-  test("a message that went into a task gives way to the steer line, unless there is something to tap", () => {
-    const answering = receiptLine(routed({}).m1);
-    expect(receiptShows(answering, false)).toBe(true);
-    expect(receiptShows(answering, true)).toBe(false);
+  test("a message that went into a task gives way to the steer mark, unless there is something to tap", () => {
+    const nobody = receiptLine(routed({}, { pickedBy: [] }).m1);
+    expect(receiptShows(nobody, false)).toBe(true);
+    expect(receiptShows(nobody, true)).toBe(false);
     expect(receiptShows(receiptLine(handled(routed({}), "ada", "failed").m1), true)).toBe(true);
     expect(receiptShows(null, false)).toBe(false);
+  });
+
+  test("a receipt is a mark beside the message, never a line, unless it asks something of you", () => {
+    const answered = handled(routed({}), "ada", "done").m1;
+    const marks = {
+      seen: { routed: false, agents: [["ada", "seen"]] as [string, "seen"][] },
+      answering: routed({}).m1,
+      answered,
+      approval: handled(routed({}), "ada", "waiting_approval").m1,
+    };
+    for (const receipt of Object.values(marks)) {
+      expect(receiptShows(receiptLine(receipt), false)).toBe(false);
+      expect(markOf(null, null, receipt)?.kind).toBe("agents");
+    }
+    expect(markOf(null, null, answered)).toEqual({
+      kind: "agents",
+      agentId: "ada",
+      mark: "done",
+      label: { key: "receipts.handled", agents: ["ada"] },
+    });
+    const lines = {
+      failed: handled(routed({}), "ada", "failed").m1,
+      nobody: routed({}, { pickedBy: [] }).m1,
+      mentionNeeded: routed({}, { pickedBy: [], reason: "mention_needed" }).m1,
+      noAi: routed({}, { seenBy: [], pickedBy: [], reason: "no_ai" }).m1,
+      platformCap: routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1,
+      picking: picking(seedReceipt({}, message({ id: "m1" }))).m1,
+    };
+    for (const receipt of Object.values(lines)) {
+      expect(receiptShows(receiptLine(receipt), false)).toBe(true);
+      expect(markOf(null, null, receipt)).toBeNull();
+    }
+  });
+
+  test("my message sent into a task at work wears that first; in a DM between people, who read it", () => {
+    const read = { runId: "r1", agentId: "ada", state: "read" as const };
+    expect(markOf(read, null, routed({}).m1)).toEqual({ kind: "steer", agentId: "ada", state: "read" });
+    expect(markOf(null, "u2", undefined)).toEqual({ kind: "seen", personId: "u2" });
+    expect(markOf(null, null, undefined)).toBeNull();
+  });
+
+  test("the mark's words, its label and what a tap says, in both languages", async () => {
+    const [en, pt] = await Promise.all([translator("en"), translator("pt-BR")]);
+    const names = { agent: (id: string) => (id === "ada" ? "Ada" : "Theo"), person: () => "João" };
+    const steer = (state: "waiting" | "now" | "held" | "read"): ReceiptMarkView => ({
+      kind: "steer",
+      agentId: "ada",
+      state,
+    });
+    expect(markLabel(en, steer("waiting"), names)).toBe("Ada reads it at the next pause");
+    expect(markLabel(en, steer("held"), names)).toBe("Ada reads it after your decision");
+    expect(markLabel(pt, steer("now"), names)).toBe("Ada parou para ler");
+    expect(markLabel(pt, steer("read"), names)).toBe("Ada leu");
+    expect(markLabel(en, { kind: "seen", personId: "u2" }, names)).toBe("Seen by João");
+    expect(markLabel(pt, { kind: "seen", personId: "u2" }, names)).toBe("Vista por João");
+    const two = handled(handled(routed({}, { pickedBy: ["ada", "theo"] }), "ada", "done"), "theo", "done").m1;
+    expect(markLabel(en, markOf(null, null, two) as ReceiptMarkView, names)).toBe("Ada and Theo answered");
+    const approval = markOf(null, null, handled(routed({}), "ada", "waiting_approval").m1) as ReceiptMarkView;
+    expect(markLabel(pt, approval, names)).toBe("Ada está esperando aprovação");
+  });
+
+  test("someone else's mark goes at the end of their turn's name line: a grouped row has none", () => {
+    const rows = [
+      { kind: "day" },
+      { kind: "message", message: message({ id: "a" }), grouped: false },
+      { kind: "message", message: message({ id: "b" }), grouped: true },
+      { kind: "message", message: message({ id: "c" }), grouped: true },
+      { kind: "message", message: message({ id: "d", author: { type: "person", id: "u2" } }), grouped: false },
+    ];
+    expect(turnHeadId(rows, "c")).toBe("a");
+    expect(turnHeadId(rows, "a")).toBe("a");
+    expect(turnHeadId(rows, "d")).toBe("d");
+    expect(turnHeadId(rows, "x")).toBeNull();
   });
 
   test("the sheet: each agent with its phase; one the message only names says so", () => {
@@ -279,5 +358,35 @@ describe("the no-AI banner above the box", () => {
     expect(endsOnNoAiCard([message({ id: "m" }), card])).toBe(true);
     expect(endsOnNoAiCard([card, message({ id: "m" })])).toBe(false);
     expect(endsOnNoAiCard([])).toBe(false);
+  });
+});
+
+describe("a receipt never adds a line to its row", () => {
+  const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
+  const num = (text: string, pattern: RegExp) => Number(pattern.exec(text)?.[1]);
+
+  test("the mark stands in room the row already keeps: beside my bubble's last line, at the end of a name line", () => {
+    const row = src("features/chat/MessageRow.tsx");
+    const marks = src("features/chat/AgentReceipts.tsx");
+    // My row's left padding is the mark's room plus the screen's edge, the same as its right padding.
+    const left = num(row, /me: \{ paddingLeft: (\d+)/);
+    const right = num(row, /me: \{ paddingLeft: \d+, paddingRight: (\d+)/);
+    const room = num(row, /const MARK_ROOM = (\d+);/);
+    expect(left - room).toBe(right);
+    expect(row).toContain("marginLeft: -MARK_ROOM");
+    // Centered on the bubble's last line (24px lines, 10px under them), the mark stays inside a one-line bubble.
+    const mark = num(marks, /mark: \{[^}]*height: (\d+)/);
+    const below = num(row, /meMark: \{[^}]*paddingBottom: (\d+)/);
+    const pad = num(row, /bubble: \{[^}]*paddingVertical: (\d+)/);
+    expect(below + mark / 2).toBe(pad + 24 / 2);
+    expect(below + mark).toBeLessThanOrEqual(pad + 24 + pad);
+    expect(row).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
+    // Someone else's: absolutely placed in room their name line always keeps, so a mark that comes wraps nothing.
+    expect(row).toContain('<View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>');
+    expect(row).toMatch(/whoMark: \{ position: "absolute"/);
+    expect(num(row, /whoRoom: \{ paddingRight: (\d+) \}/)).toBeGreaterThanOrEqual(16 + 4 + 12);
+    // No line of its own: neither the steer line under my bubble nor "Visto" under the list's row.
+    expect(row).not.toContain("SteerLine");
+    expect(src("features/chat/ChatScreen.tsx")).not.toContain('t("mobile.chat.seen")');
   });
 });

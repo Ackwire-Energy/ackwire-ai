@@ -9862,44 +9862,7 @@ html[data-menu-overlay] .shell {
 
 /* ── Messages fluidity ── */
 
-/*
- * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
- * At the right edge like "Visto": on the left, the agent's face read as the author of my next message.
- */
-.msg-steer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 20px;
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.msg-steer__swap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .msg-steer__swap {
-    animation: ac-msg-enter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-}
-
 /* "Novas": where the unseen messages start; it fades a few seconds after the person got there. */
-/* "Visto" under my latest message in a DM with a person, at the right edge like the receipts. */
-.channel__seen {
-  margin: -2px 24px 4px;
-  text-align: right;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-muted);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .channel__seen {
-    animation: ac-fade-in 200ms ease-out both;
-  }
-}
 .channel__unread {
   display: flex;
   align-items: center;
@@ -10507,6 +10470,22 @@ html[data-menu-overlay] .shell {
    edge, as the words do. */
 .ac-msg__foot .ac-receipt > :is(.ac-receipt__check, .ac-receipt__clock):first-child {
   margin-inline-start: -2px;
+}
+/* A face in the receipt's place (the agent that read a message sent while it worked, the person who read it in a
+   DM): 18px with 1px each side, the check's 20px, so the action bar keeps its place left of it. */
+.ac-receipt__check:has(> .ac-avatar),
+.ac-receipt__seen {
+  padding: 0 1px;
+}
+.ac-receipt__seen {
+  display: inline-flex;
+}
+/* Each new mark of a message sent into a task at work, and the face of who read it, fades in where it stands. */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-receipt__check[data-steer] > :first-child,
+  .ac-receipt__seen {
+    animation: ac-fade-in 200ms ease-out both;
+  }
 }
 /* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
 .who-by {

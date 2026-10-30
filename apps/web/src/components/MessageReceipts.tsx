@@ -1,11 +1,11 @@
-import type { DecidedBy, Message } from "@agenteschat/client";
-import { type ReceiptPhase, type ReceiptView, receiptView, useModelLabel } from "@agenteschat/client";
+import type { DecidedBy, Message, SteerState } from "@agenteschat/client";
+import { type ReceiptPhase, type ReceiptView, receiptView, useModelLabel, useSteerState } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { deciderOf } from "@agenteschat/client/lib/routing";
-import { Icon, type IconName, InfoHint, Popover, ProviderLogo } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { Icon, type IconName, InfoHint, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
+import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -42,10 +42,24 @@ function ReceiptAction({ children }: { children: ReactNode }) {
 }
 
 /**
- * A person's message's receipt: a small muted check (our icons) at the end of its first line (`part="check"`).
- * Clicking or focusing it opens a popover with each agent and its status, and who picked them. Words only for what
- * you can act on ("Nenhum agente vai responder", a failure, no AI connected), and while the author's own plan picks:
- * then the whole receipt is a line under the message (`part="line"`), so the text still follows the name.
+ * What became of a message sent into a task at work: the reader's face once it read it, else the spinner while it
+ * waits for the next pause, the bolt when it stopped to read, a check once handed over, the clock while an approval
+ * holds it.
+ */
+function SteerMark({ steer, name, size }: { steer: SteerState; name: string; size: 14 | 16 }) {
+  if (steer.state === "read" || steer.state === "resolved")
+    return <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />;
+  if (steer.state === "waiting") return <PixelSpinner size={size} />;
+  return <Icon name={steer.state === "now" ? "bolt" : steer.state === "delivered" ? "check" : "waiting"} size={size} />;
+}
+
+/**
+ * A person's message's receipt: a small muted mark at the end of its first line (`part="check"`), never a line of its
+ * own, so it never changes the message's height or the room before the next one. Clicking or focusing it opens a
+ * popover with each agent and its status, and who picked them. A message sent into a task at work wears what became
+ * of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words
+ * only for what you can act on ("Nenhum agente vai responder", a failure, no AI connected), and while the author's own
+ * plan picks: then the whole receipt is a line under the message (`part="line"`), so the text still follows the name.
  */
 export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
   const { t } = useTranslation();
@@ -54,7 +68,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const actions = useChannelActions();
   const connect = useConnectAi();
   const modelLabel = useModelLabel();
+  const steerId = useId();
   const receipt = useLive((s) => s.receipts[message.id]);
+  const steer = useSteerState(org.id, message.channelId, part === "check" ? message.id : "");
+  const steerName = steer ? dir.agentById.get(steer.agentId)?.name : undefined;
+  const steered =
+    steer && steerName ? { steer, name: steerName, text: t(`run.steer.${steer.state}`, { name: steerName }) } : null;
   const view = receiptView(receipt);
   const status = view.status;
   const callAgent =
@@ -69,8 +88,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null);
-  if (worded !== (part === "line")) return null;
-  if (view.picking) {
+  // The mark stays where a line says the rest (a failure, nobody): what became of it in the task is its own news.
+  if (part === "line" ? !worded : worded && !steered) return null;
+  if (view.picking && part === "line") {
     return (
       <div className="ac-receipt">
         <span className="ac-receipt__clock">
@@ -83,7 +103,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       </div>
     );
   }
-  if (view.seen.length === 0 && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
+  if (view.seen.length === 0 && !steered && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t("newAgent.and"));
@@ -116,47 +136,74 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     model: modelLabel,
   });
 
+  const check = (view.seen.length > 0 || steered) && (
+    <Popover
+      label={t("receipts.popoverTitle")}
+      trigger={
+        <button
+          type="button"
+          className="ac-receipt__check"
+          aria-label={label || steered?.text}
+          aria-describedby={steered && label ? steerId : undefined}
+          data-state-kind={steered ? undefined : (status?.kind ?? "seen")}
+          data-steer={steered?.steer.state}
+        >
+          {steered ? (
+            // Keyed by the state: each new mark swaps in.
+            <SteerMark key={steered.steer.state} steer={steered.steer} name={steered.name} size={16} />
+          ) : (
+            <Icon name={receiptIcon(view)} />
+          )}
+        </button>
+      }
+    >
+      <div className="ac-popover__title">{t("receipts.popoverTitle")}</div>
+      {view.seen.map((id) => (
+        <div key={id} className="ac-popover__row">
+          <AgentAvatar agentId={id} size="xs" name={name(id)} />
+          <span>{name(id)}</span>
+          <span className="ac-popover__row-status">{phaseText(id)}</span>
+        </div>
+      ))}
+      {steered && (
+        <div className="who-by ac-iconline">
+          <SteerMark steer={steered.steer} name={steered.name} size={14} />
+          <span>{steered.text}</span>
+        </div>
+      )}
+      {by && (
+        <div className="who-by ac-iconline">
+          {"logo" in by.mark ? (
+            <ProviderLogo id={by.mark.logo} size="xs" />
+          ) : (
+            <Icon name={RULE_ICON[by.mark.rule]} size={14} />
+          )}
+          <span>{by.text}</span>
+        </div>
+      )}
+      {mentionNeeded && (
+        <div className="who-by">
+          <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
+        </div>
+      )}
+    </Popover>
+  );
+
+  if (part === "check") {
+    return (
+      <div className="ac-receipt">
+        {check}
+        {steered && (
+          <span id={steerId} className="ac-visually-hidden" aria-live="polite">
+            {steered.text}
+          </span>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="ac-receipt">
-      {view.seen.length > 0 && (
-        <Popover
-          label={t("receipts.popoverTitle")}
-          trigger={
-            <button
-              type="button"
-              className="ac-receipt__check"
-              aria-label={label}
-              data-state-kind={status?.kind ?? "seen"}
-            >
-              <Icon name={receiptIcon(view)} />
-            </button>
-          }
-        >
-          <div className="ac-popover__title">{t("receipts.popoverTitle")}</div>
-          {view.seen.map((id) => (
-            <div key={id} className="ac-popover__row">
-              <AgentAvatar agentId={id} size="xs" name={name(id)} />
-              <span>{name(id)}</span>
-              <span className="ac-popover__row-status">{phaseText(id)}</span>
-            </div>
-          ))}
-          {by && (
-            <div className="who-by ac-iconline">
-              {"logo" in by.mark ? (
-                <ProviderLogo id={by.mark.logo} size="xs" />
-              ) : (
-                <Icon name={RULE_ICON[by.mark.rule]} size={14} />
-              )}
-              <span>{by.text}</span>
-            </div>
-          )}
-          {mentionNeeded && (
-            <div className="who-by">
-              <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
-            </div>
-          )}
-        </Popover>
-      )}
+      {check}
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
@@ -211,5 +258,25 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * "Visto" in a DM between people, in the receipt's place at the end of my latest message's first line: the face of
+ * who read it. The words are said to screen readers as it shows, and on hover.
+ */
+export function SeenMark({ personId }: { personId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const name = dir.memberById.get(personId)?.name ?? t("channel.unknownPerson");
+  const words = t("receipts.seenBy", { names: name });
+  return (
+    <span className="ac-receipt__seen" title={words}>
+      <ActorAvatar actor={{ type: "person", id: personId }} name={name} size="xs" />
+      <span className="ac-visually-hidden" aria-live="polite">
+        {words}
+      </span>
+    </span>
   );
 }
