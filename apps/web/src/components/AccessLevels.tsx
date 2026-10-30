@@ -40,6 +40,8 @@ const AREA_ICON: Record<string, IconName> = {
   forum: "message",
   sandbox: "computer",
   browser: "globe",
+  setup: "edit",
+  desktop: "pointer",
 };
 
 /** The connected services by connection id (their names and brand icons). */
