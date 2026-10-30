@@ -57,11 +57,19 @@ export function AccountPage() {
   const mine = meId ? dir.memberById.get(meId) : undefined;
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
   // The form starts from the profile when Conta opens (Fuso, over it, changes its zone) and is dropped when it closes.
-  const [initial] = useState<AccountDraft>(() => ({
+  // Taken once both the account and this workspace's profile are in, so an @ still loading never reads as empty.
+  const loaded = Boolean(me.data && mine);
+  const [initial, setInitial] = useState<AccountDraft>(() => ({
     name: me.data?.user.name ?? "",
     handle: mine?.handle ?? "",
     zone: mine?.timezone ?? null,
   }));
+  const [seeded, setSeeded] = useState(loaded);
+  useEffect(() => {
+    if (seeded || !loaded) return;
+    setSeeded(true);
+    setInitial({ name: me.data?.user.name ?? "", handle: mine?.handle ?? "", zone: mine?.timezone ?? null });
+  }, [seeded, loaded, me.data, mine]);
   useEffect(() => {
     setAccountDraft(initial);
     return () => setAccountDraft(null);
@@ -71,6 +79,10 @@ export function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A message from the last OK goes away once the form changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cleared on every edit of the form
+  useEffect(() => setError(null), [draft]);
 
   const problem = accountProblem(draft);
   const changes = accountChanges(initial, draft);
@@ -85,7 +97,10 @@ export function AccountPage() {
   };
 
   const save = async () => {
-    if (!changed || problem || saving) return;
+    if (saving) return;
+    // Nothing to save (a new photo saves on its own): OK just closes, as it says.
+    if (!changed) return goBack();
+    if (problem) return setError(t(`mobile.me.account.${problem}`));
     setSaving(true);
     setError(null);
     try {
@@ -190,7 +205,7 @@ export function AccountPage() {
       title={t("mobile.me.account.title")}
       action={{
         label: t("mobile.me.account.save"),
-        disabled: !changed || Boolean(problem) || saving,
+        disabled: saving,
         onPress: () => void save(),
       }}
     >
