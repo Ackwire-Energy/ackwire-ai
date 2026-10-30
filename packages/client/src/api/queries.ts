@@ -262,6 +262,12 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
+/** Agents no longer in the team: the directories name their old messages with these (fresh with `useAgents`). */
+export const useFormerAgents = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
+};
+
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();

@@ -93,10 +93,12 @@ export function SettingsTab({
   section,
   onSection,
   onArchive,
+  onDelete,
 }: {
   section: AgentSection | undefined;
   onSection: (sec: AgentSection) => void;
   onArchive: () => void;
+  onDelete: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -449,6 +451,15 @@ export function SettingsTab({
                 </span>
                 <Button variant="danger" icon="archive" onClick={onArchive}>
                   {t("agentPage.archive.button")}
+                </Button>
+              </div>
+              <div className="agp-dz">
+                <span className="agp-dz__t">
+                  <b>{t("agentPage.delete.action", g)}</b>
+                  <span>{t("agentPage.delete.help")}</span>
+                </span>
+                <Button variant="danger" icon="trash" onClick={onDelete}>
+                  {t("agentPage.delete.button")}
                 </Button>
               </div>
             </Section>

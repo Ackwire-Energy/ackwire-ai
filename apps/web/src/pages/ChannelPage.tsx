@@ -3011,11 +3011,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       avatar={
         m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
-            {agent ? (
-              // At work: thinking, then writing; a saved message: the agent at rest.
+            {m.author.type === "agent" ? (
+              // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
               <AgentAvatar
-                agentId={agent.id}
+                agentId={m.author.id}
                 name={name}
                 state={live ? agentStateOfRun(live) : "idle"}
                 reactionKey={live ? undefined : m.id}

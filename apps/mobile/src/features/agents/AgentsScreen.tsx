@@ -1,11 +1,14 @@
-import { useAiStatus, useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import { useAiStatus, useApprovals, useDms, useFormerAgents, useWorkingRuns } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
@@ -14,6 +17,7 @@ import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { openAgentDelete } from "./DeleteAgentScreen";
 import { agoOf, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
 
@@ -46,6 +50,9 @@ export function AgentsScreen() {
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch()]),
   );
   const total = dir.agents.length;
+  // Archived agents have no profile: admins delete them for good from here (ADR 0082).
+  const admin = can(useOrg().org?.role, "manage_agents");
+  const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
     <LargeTitleScreen
       title={t("mobile.agents.title")}
@@ -75,6 +82,23 @@ export function AgentsScreen() {
           <SectionHeader title={t("mobile.agents.freeSection")} count={free.length} />
           {free.map((l, i) => (
             <AgentRow key={l.agent.id} line={l} divider={i > 0} live={busy + i < LIVE_ROWS} />
+          ))}
+        </>
+      ) : null}
+      {archived.length > 0 ? (
+        <>
+          <SectionHeader title={t("team.archived")} count={archived.length} />
+          {archived.map((a, i) => (
+            <ListRow
+              key={a.id}
+              onPress={() => openAgentDelete(a.id)}
+              accessibilityRole="button"
+              accessibilityLabel={t("agentPage.delete.action", agentGrammar(t, a.name))}
+              divider={i > 0}
+              leading={<AgentFace agentId={a.id} size={50} mode="rest" live={false} />}
+              title={a.name}
+              sub={a.role.trim() || null}
+            />
           ))}
         </>
       ) : null}

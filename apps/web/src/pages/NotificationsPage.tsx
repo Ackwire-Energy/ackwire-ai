@@ -116,7 +116,7 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
   !a
     ? ""
     : a.type === "agent"
-      ? (dir.agentById.get(a.id)?.name ?? t("channel.unknownAgent"))
+      ? (dir.anyAgent(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
@@ -690,7 +690,7 @@ function Row({
       ? t("notifications.stoppedAt", { step: Math.min(stopStep, steps.total), total: steps.total })
       : t("notifications.steps", { done: steps.done, total: steps.total })
     : "";
-  const agentColor = first?.type === "agent" ? colorOf(dir.agentById.get(first.id)) : undefined;
+  const agentColor = first?.type === "agent" ? colorOf(dir.anyAgent(first.id)) : undefined;
   const channel = channelOf(n);
   return (
     // biome-ignore lint/a11y/useSemanticElements: a row of the inbox, not a fieldset
@@ -1055,7 +1055,7 @@ function WaitCard({
   const unread = n.readAt === null;
   const asked = n.kind === "join_request" ? askersOf(n) : null;
   const waitedMs = Date.now() - new Date(n.createdAt).getTime();
-  const agent = first?.type === "agent" ? dir.agentById.get(first.id) : undefined;
+  const agent = first?.type === "agent" ? dir.anyAgent(first.id) : undefined;
   const tail = (
     <span className="nt-tail ac-acts">
       <SnoozeMenu
