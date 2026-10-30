@@ -21,13 +21,14 @@ import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { isAgentOnlyDm } from "./dms";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
+import type { MachineCaller } from "./machine-hub";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { noticeForOthers, noticeText } from "./notices";
 import { WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
-import { agentScopeNames, loadTeam, teamPrompt } from "./team";
+import { loadTeam, rosterScopeNames, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 import { untrustedBlock } from "./untrusted";
 
@@ -236,6 +237,8 @@ export async function buildRunContext(
     routine?: boolean;
     /** Nobody called it by name (`replyPolicyFor`): it may `pass`, and the prompt says why it is here. */
     mayPass?: boolean;
+    /** Computers' status (the machine hub): what the other agents' computers serve them (`rosterScopeNames`). */
+    machines?: Pick<MachineCaller, "status"> | null;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -467,8 +470,9 @@ export async function buildRunContext(
   );
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
-  const otherScopes = await agentScopeNames(
+  const otherScopes = await rosterScopeNames(
     db,
+    options.machines,
     run.orgId,
     others.map((m) => m.agentId as string),
   );

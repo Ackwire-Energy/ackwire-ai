@@ -66,6 +66,17 @@ describe("chooseAutoModel", () => {
     expect(call?.calibrated).toBeUndefined();
   });
 
+  test("acting for the person with tools is never the small tier: it only answers", async () => {
+    const judge = createFakeJudge(() => "medium");
+    await chooseAutoModel(judge, { ...input, message: "me manda um print do dinzo.com.br" });
+    const tier = judge.calls[0]?.questions.tier as { criteria: Record<string, string> } | undefined;
+    const acting =
+      "acting for the person with tools (opening a site, taking a screenshot, clicking or filling in a page, running a command, changing files, sending something)";
+    expect(tier?.criteria.small).toStartWith("A quick, simple turn that only answers: a greeting or thanks,");
+    expect(tier?.criteria.small).toEndWith(`Never ${acting}.`);
+    expect(tier?.criteria.medium).toContain(acting);
+  });
+
   test("never blocks the run: a timeout, a failure or an answer off the list is medium/medium, and says why", async () => {
     const slow: Judge = { name: "slow", ask: () => new Promise(() => {}) };
     expect(await chooseAutoModel(slow, { ...input, timeoutMs: 5 })).toEqual({

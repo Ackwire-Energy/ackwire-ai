@@ -2,9 +2,9 @@ import type { InvitationWithStatus, InviteLink, JoinRequest, Role } from "@agent
 import {
   useAllInvitations,
   useApproveJoinRequest,
+  useAuthConfig,
   useChangeRole,
   useDenyJoinRequest,
-  useHealth,
   useInviteLinks,
   useInviteMany,
   useJoinRequests,
@@ -22,6 +22,7 @@ import {
   approvalNews,
   askedLabel,
   JOIN_REASON_MAX,
+  sendsEmail,
 } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -81,8 +82,8 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const dir = useDirectory(org.id);
   const manage = can(org.role, "manage_members");
-  // Self-hosted servers usually send no email: people join by the link only.
-  const byLink = useHealth().data?.edition === "selfhost";
+  // A server that sends no email invites by link only.
+  const byLink = !sendsEmail(useAuthConfig().data);
   const invitations = useAllInvitations(org.id, manage);
   const inviteMany = useInviteMany(org.id);
   const resendOne = useResendInvitation(org.id);

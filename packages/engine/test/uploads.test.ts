@@ -22,9 +22,11 @@ import {
   listArtifacts,
   listDeletedArtifacts,
   postPersonMessage,
+  rankTools,
   receiveMachineUpload,
   restoreArtifact,
   type ToolContext,
+  toolGroupKey,
   UploadTimeoutError,
   updateArtifact,
   ValidationError,
@@ -461,6 +463,16 @@ describe("upload_file", () => {
     const [up] = await f.db.select().from(schema.artifactUploads);
     expect(up).toMatchObject({ status: "done" });
     expect(await f.db.select().from(schema.artifacts)).toHaveLength(1);
+  });
+
+  test("find_tools ranks it first among the computer's tools for sharing a file or a screenshot here", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await connectedComputer(f);
+    const ctx = await runCtx();
+    const computer = ((await f.tools?.list(ctx)) ?? []).filter((t) => toolGroupKey(t) === "sandbox");
+    for (const query of ["share file in channel", "send screenshot", "attach image"]) {
+      expect(rankTools(computer, "", query)[0]?.name).toBe("upload_file");
+    }
   });
 
   test("import_file copies an uploaded file's bytes under its original name", async () => {

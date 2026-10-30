@@ -64,7 +64,7 @@ import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { grantedScopeKeys, grantKey, isAllowed, toolAccess, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
-import { createUpload, failUpload, getUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
+import { uploadedFile, uploadFromComputer } from "./uploads";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -336,9 +336,6 @@ const fileOfArtifact = (a: Awaited<ReturnType<typeof getArtifact>>) => {
   }
 };
 
-/** How long `upload_file` waits for the bytes. */
-export const UPLOAD_TIMEOUT_SECONDS = 300;
-
 const slug = (s: string) =>
   s
     .normalize("NFD")
@@ -416,44 +413,6 @@ export function createSandboxToolSource(
     if (hit) throw new Error(`${path || "The workspace"} holds a secret (${hit}); it stays on the computer.`);
   };
 
-  /**
-   * `upload_file` on one computer: it sends the file itself (`pushFile`) to our upload URL, and the upload
-   * completes when the bytes arrive (`receiveMachineUpload`).
-   */
-  const uploadFrom = async (
-    ctx: ToolContext,
-    computer: ComputerHandle,
-    path: string,
-    input: { title: string | null; note: string | null; targetArtifactId: string | null },
-  ): Promise<UploadRow> => {
-    const upload = await createUpload(deps.db, {
-      orgId: ctx.orgId,
-      agentId: ctx.agentId,
-      runId: ctx.runId,
-      channelId: ctx.channelId,
-      threadId: replyThreadOf(ctx),
-      computer: computer.ref,
-      machineId: computer.machineId,
-      path,
-      ...input,
-    });
-    const base = (deps.publicUrl ?? "").replace(/\/$/, "");
-    try {
-      await computer.provider.pushFile(computer.id, path, {
-        url: `${base}/api/machines/uploads/${upload.id}`,
-        uploadId: upload.id,
-        maxBytes: upload.maxBytes,
-      });
-    } catch (error) {
-      // The answer may be what got lost (the link dropped after the bytes arrived): what landed is the file.
-      const landed = await getUpload(deps.db, upload.id);
-      if (landed?.status === "done") return landed;
-      if (landed?.status === "storing") return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
-      await failUpload(deps, upload.id, error instanceof Error ? error.message : String(error));
-      throw error;
-    }
-    return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
-  };
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
@@ -692,7 +651,7 @@ export function createSandboxToolSource(
     },
     {
       name: "upload_file",
-      description: `Send a file from your computer to the Drive as is (PDF, images, zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file. The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. \`cp ~/x/report.pdf .\`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
+      description: `Share a file from your computer in this conversation: it goes to the Drive as is and is attached to your reply, so people in the channel or chat see it. Send or attach any file this way (an image, a screenshot, a PDF, a zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file. The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. \`cp ~/x/report.pdf .\`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
@@ -722,7 +681,7 @@ export function createSandboxToolSource(
           }
           const row = await run(ctx, async (c) => {
             await refuseSecretPath(ctx, c, path);
-            return uploadFrom(ctx, c, path, {
+            return uploadFromComputer(deps, ctx, c, path, {
               title: str(input.title) || null,
               note: str(input.note) || null,
               targetArtifactId,

@@ -3,13 +3,14 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Run, RunStep } from "@agenteschat/client";
+import type { LiveWork, Run, RunStep } from "@agenteschat/client";
 import { agentStateIn, agentStateOfRun, type LiveRun } from "@agenteschat/client";
 import { workFromSteps, workHeader } from "@agenteschat/client/lib/work";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { createI18n } from "@/i18n";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -104,6 +105,53 @@ describe("work summary", () => {
     expect(within(work).getByText("Consultou o Himetrica")).toBeTruthy();
     // The one that failed says so, and doesn't read as done.
     expect(within(work).getByText("Deu erro escrevendo no Drive")).toBeTruthy();
+  });
+
+  test("a reaction already shows on the message: no block for a reply that only reacted, other tools count alone", async () => {
+    const call = (id: string, tool: string): LiveWork => ({
+      kind: "call",
+      id,
+      tool,
+      connector: null,
+      detail: null,
+      code: null,
+      output: [],
+      running: false,
+      ms: 1000,
+    });
+    const api = createFakeApi(seedState());
+    await renderPage(<LiveTools work={[call("1", "react")]} agentName="Ada" done />, { api, org: true });
+    expect(document.querySelector(".ac-tools")).toBeNull();
+    cleanup();
+
+    api.agents.run = async (_orgId, runId) => ({
+      run: { id: runId, createdAt: at(0), finishedAt: at(4) } as Run,
+      steps: [
+        {
+          seq: 1,
+          kind: "tool_call",
+          data: { toolUseId: "t1", name: "react", input: { emoji: "🙌" } },
+          createdAt: at(1),
+        },
+        { seq: 2, kind: "tool_result", data: { toolUseId: "t1", isError: false }, createdAt: at(1) },
+        { seq: 3, kind: "tool_call", data: { toolUseId: "t2", name: "create_issue" }, createdAt: at(2) },
+        { seq: 4, kind: "tool_result", data: { toolUseId: "t2", isError: false }, createdAt: at(3) },
+      ],
+    });
+    await renderPage(
+      <>
+        <LiveTools work={[call("1", "react"), call("2", "create_issue")]} agentName="Ada" done />
+        <SavedTools runId="r-9" meta={{ work: { steps: 1, connectors: [], durationMs: 4000 } }} agentName="Ada" />
+      </>,
+      { api, org: true },
+    );
+    const [live, saved] = [...document.querySelectorAll<HTMLElement>(".ac-tools")];
+    expect(live?.querySelector(".ac-tools__text")?.textContent).toBe("Usou 1 ferramenta");
+    await click(saved?.querySelector(".ac-tools__head") as HTMLElement);
+    await settle(4);
+    expect(saved?.querySelector(".ac-tools__text")?.textContent).toBe("Usou 1 ferramenta");
+    expect(within(saved as HTMLElement).getByText("Criou uma tarefa")).toBeTruthy();
+    expect(within(saved as HTMLElement).queryByText("Reagiu à mensagem")).toBeNull();
   });
 });
 

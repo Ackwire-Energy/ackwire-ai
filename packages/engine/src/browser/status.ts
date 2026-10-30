@@ -40,7 +40,7 @@ export type AgentBrowserStatus =
  */
 export async function agentBrowserStatus(
   db: Database,
-  hub: MachineCaller | undefined,
+  hub: Pick<MachineCaller, "status"> | undefined,
   orgId: string,
   agentId: string,
   /** In a mission's thread: the mission's computer (ADR 0029). */
