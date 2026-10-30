@@ -223,6 +223,35 @@ describe("org storage", () => {
     );
   });
 
+  test("the migration keeps a workspace's own bucket copy; only platform copies are freed", async () => {
+    f = await setup();
+    const art = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Minha"));
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+
+    // The version now lives in the workspace's own bucket.
+    const [onBucket] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, art.id));
+    if (!onBucket?.storageConfigId) throw new Error("expected the version on the bucket");
+    const bucketKey = onBucket.blobKey;
+    expect(f.s3.buckets.get("acme-files")?.has(bucketKey)).toBe(true);
+
+    // Switch back to the platform and migrate: the bucket copy is theirs and must be kept, not deleted.
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+    const [backOnPlatform] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, art.id));
+    expect(backOnPlatform?.storageConfigId).toBeNull();
+    expect(f.s3.buckets.get("acme-files")?.has(bucketKey)).toBe(true);
+  });
+
   test("credentials never leak: hints only, sealed at rest, not in the audit log", async () => {
     f = await setup();
     await testStorage(f.storage, f.owner.id, f.org.id, bucket());
