@@ -1336,58 +1336,66 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <View style={[styles.center, { paddingBottom: composerHeight }]}>
             <Text tone="faint">{t("mobile.common.loading")}</Text>
           </View>
-        ) : !showList ? (
-          dmAgent && !isThread ? (
-            <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
-          ) : (
-            <View style={[styles.center, { paddingBottom: composerHeight }]}>
-              <Text tone="faint" style={styles.emptyText}>
-                {t("mobile.chat.empty")}
-              </Text>
-            </View>
-          )
         ) : (
-          <Animated.View style={[styles.grow, listFade]}>
-            <KeyboardAwareLegendList
-              ref={listRef}
-              style={styles.grow}
-              data={shownRows}
-              keyExtractor={rowKey}
-              getItemType={rowType}
-              renderItem={renderItem}
-              // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-              // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-              extraData={renderItem}
-              estimatedItemSize={72}
-              // Opens at the latest message, short conversations sit at the bottom like any chat.
-              initialScrollAtEnd
-              alignItemsAtEnd
-              // New messages, a reply growing word by word and the working line keep the end in view, but
-              // only while the person is near it.
-              maintainScrollAtEnd
-              maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-              // Older pages above and rows changing size keep what is on screen still.
-              maintainVisibleContentPosition
-              // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
-              // is the content's top padding, the indicator kept below the bar.
-              contentInsetAdjustmentBehavior="never"
-              automaticallyAdjustContentInsets={false}
-              scrollIndicatorInsets={{ top: headerHeight }}
-              // Still while a sheet or the agent's computer covers the conversation.
-              freeze={freeze}
-              onReady={revealList}
-              onStartReached={loadOlder}
-              onScrollBeginDrag={() => {
-                dragging.current = true;
-              }}
-              onStartReachedThreshold={0.5}
-              keyboardDismissMode="interactive"
-              keyboardShouldPersistTaps="handled"
-              keyboardOffset={lift}
-              contentInsetEndAdjustment={contentInsetEndAdjustment}
-              contentContainerStyle={listPad}
-            />
-          </Animated.View>
+          <>
+            {/* Mounted before the first message too: a list that appears while the keyboard is already up never
+                hears it open, and its first message landed under it. */}
+            <Animated.View style={[styles.grow, listFade]}>
+              <KeyboardAwareLegendList
+                ref={listRef}
+                style={styles.grow}
+                data={shownRows}
+                keyExtractor={rowKey}
+                getItemType={rowType}
+                renderItem={renderItem}
+                // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+                // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+                extraData={renderItem}
+                estimatedItemSize={72}
+                // Opens at the latest message, short conversations sit at the bottom like any chat.
+                initialScrollAtEnd
+                alignItemsAtEnd
+                // New messages, a reply growing word by word and the working line keep the end in view, but
+                // only while the person is near it.
+                maintainScrollAtEnd
+                maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                // Older pages above and rows changing size keep what is on screen still.
+                maintainVisibleContentPosition
+                // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
+                // is the content's top padding, the indicator kept below the bar.
+                contentInsetAdjustmentBehavior="never"
+                automaticallyAdjustContentInsets={false}
+                scrollIndicatorInsets={{ top: headerHeight }}
+                // Still while a sheet or the agent's computer covers the conversation.
+                freeze={freeze}
+                onReady={revealList}
+                onStartReached={loadOlder}
+                onScrollBeginDrag={() => {
+                  dragging.current = true;
+                }}
+                onStartReachedThreshold={0.5}
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                keyboardOffset={lift}
+                contentInsetEndAdjustment={contentInsetEndAdjustment}
+                contentContainerStyle={listPad}
+              />
+            </Animated.View>
+            {showList ? null : (
+              // A conversation with nothing yet: the agent's first day or a quiet line, over the empty list.
+              <View style={StyleSheet.absoluteFill}>
+                {dmAgent && !isThread ? (
+                  <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
+                ) : (
+                  <View style={[styles.center, { paddingBottom: composerHeight }]}>
+                    <Text tone="faint" style={styles.emptyText}>
+                      {t("mobile.chat.empty")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </>
         )}
         <KeyboardStickyView
           offset={{ opened: lift }}
